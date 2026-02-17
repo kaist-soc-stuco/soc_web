@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS demo_events (
+  id SERIAL PRIMARY KEY,
+  event_name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
