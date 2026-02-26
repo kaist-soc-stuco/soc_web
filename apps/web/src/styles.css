@@ -21,6 +21,17 @@
   --border: oklch(0.86 0.02 230);
   --input: oklch(0.88 0.02 230);
   --ring: oklch(0.58 0.09 228);
+  
+  /* KAIST SoC Custom Colors */
+  --kaist-white: oklch(0.99 0.007 220);
+  --kaist-darkgreen: oklch(0.4173 0.12863 157.503);
+  --kaist-darkgreen2: oklch(0.5173 0.12863 157.503);
+  --kaist-darkgreen-main: oklch(0.6173 0.12863 157.503);
+  --kaist-lightgreen: oklch(0.7173 0.12863 157.503);
+  --kaist-lightgreen2: oklch(0.8173 0.12863 157.503);
+  --kaist-black: oklch(0.26 0.03 240);
+  --kaist-grey: oklch(0.65 0.03 240);
+  --kaist-brown: oklch(0.6173 0.12863 18.31);
 }
 
 @theme inline {
@@ -46,6 +57,17 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  
+  /* KAIST SoC Colors */
+  --color-kaist-white: var(--kaist-white);
+  --color-kaist-darkgreen: var(--kaist-darkgreen);
+  --color-kaist-darkgreen2: var(--kaist-darkgreen2);
+  --color-kaist-darkgreen-main: var(--kaist-darkgreen-main);
+  --color-kaist-lightgreen2: var(--kaist-lightgreen2);
+  --color-kaist-lightgreen: var(--kaist-lightgreen);
+  --color-kaist-black: var(--kaist-black);
+  --color-kaist-grey: var(--kaist-grey);
+  --color-kaist-brown: var(--kaist-brown);
 }
 
 @layer base {
@@ -57,6 +79,6 @@
     @apply bg-background text-foreground antialiased;
     margin: 0;
     min-height: 100vh;
-    font-family: 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    font-family: 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Roboto Slab', sans-serif;
   }
 }
