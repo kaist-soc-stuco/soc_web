@@ -10,18 +10,14 @@ interface EventCardProps {
 
 function EventCard({ image, title, date, status }: EventCardProps) {
   return (
-    <div className="w-[calc(25%-0.75rem)] flex-shrink-0">
+    <div className="w-[calc(25%-1.75rem)] flex-shrink-0">
       {/* Image */}
       <div 
-        className="aspect-[3/4] w-full rounded-sm bg-cover bg-center"
+        className="aspect-[3/4] w-full rounded-[1px] bg-cover bg-center"
         style={{ backgroundImage: `url(${image})` }}
       />
-      
-      {/* Bottom Line */}
-      <div className="mt-2 h-px w-full border-t border-kaist-darkgreen" />
-      
       {/* Status & Date */}
-      <div className="mt-1 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between">
         <div 
           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-tight text-kaist-white ${
             status === 'ongoing' 
@@ -37,7 +33,7 @@ function EventCard({ image, title, date, status }: EventCardProps) {
       </div>
       
       {/* Title */}
-      <h3 className="mt-2 text-sm font-extrabold tracking-tight text-kaist-black line-clamp-2">
+      <h3 className="mt-2 text-base font-extrabold tracking-tight text-kaist-black line-clamp-2">
         {title}
       </h3>
     </div>
@@ -76,13 +72,15 @@ export function EventCarousel() {
 
   return (
     <section className="h-full bg-kaist-white overflow-hidden">
-      <div className="h-full w-full px-4 md:px-10 pt-2 flex flex-col">        
+      <div className="h-full w-full px-4 md:px-4 pt-12 flex flex-col">        
         {/* Event Cards with Navigation Arrows */}
         <div className="flex-1 relative flex items-center justify-center overflow-hidden">
           {/* Left Arrow - positioned at image vertical center */}
           <button
             onClick={handlePrevPage}
-            className="absolute left-0 z-10 p-1 md:p-2 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors"
+            className={`absolute left-0 z-10 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
+              currentPage === 0 ? 'opacity-0 pointer-events-none' : ''
+            }`}
             style={{ top: 'calc(37.5% - 1rem)' }} // 이미지 aspect-[3/4]의 중앙 (전체 카드 높이의 약 37.5%)
             aria-label="Previous page"
           >
@@ -92,7 +90,7 @@ export function EventCarousel() {
           {/* Event Cards Container with Slide Animation */}
           <div className="w-full overflow-hidden">
             <div 
-              className="flex gap-3 transition-transform duration-500 ease-in-out"
+              className="flex transition-transform duration-500 ease-in-out"
               style={{
                 transform: `translateX(-${currentPage * 100}%)`,
               }}
@@ -110,7 +108,9 @@ export function EventCarousel() {
           {/* Right Arrow - positioned at image vertical center */}
           <button
             onClick={handleNextPage}
-            className="absolute right-0 z-10 p-1 md:p-2 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors"
+            className={`absolute right-0 z-10 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
+              currentPage === totalPages - 1 ? 'opacity-0 pointer-events-none' : ''
+            }`}
             style={{ top: 'calc(37.5% - 1rem)' }}
             aria-label="Next page"
           >
@@ -119,15 +119,15 @@ export function EventCarousel() {
         </div>
 
         {/* Carousel Dots */}
-        <div className="flex-shrink-0 mt-3 pb-2 flex items-center justify-center gap-2 md:gap-3">
+        <div className="flex-shrink-0 my-6 flex items-center justify-center gap-2 md:gap-4">
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i}
               onClick={() => setCurrentPage(i)}
               className={`rounded-full transition-all ${
                 i === currentPage 
-                  ? 'h-4 w-4 md:h-5 md:w-5 bg-kaist-darkgreen' 
-                  : 'h-3 w-3 md:h-[14px] md:w-[14px] bg-kaist-lightgreen hover:bg-kaist-lightgreen2'
+                  ? 'h-4 w-4 md:h-4 md:w-4 bg-kaist-darkgreen' 
+                  : 'h-3 w-3 md:h-3 md:w-3 bg-kaist-lightgreen hover:bg-kaist-lightgreen2'
               }`}
               aria-label={`Go to page ${i + 1}`}
             />
