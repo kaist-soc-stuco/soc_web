@@ -26,22 +26,30 @@ function NoticeItem({ category, title, date }: NoticeItemProps) {
 
 export function NoticeBoard() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
 
   const tabs = [
-    { label: '공지', active: true },
-    { label: '행사', active: false },
-    { label: 'HoC', active: false },
-    { label: '홍보글', active: false },
-    { label: '건의사항', active: false },
-    { label: '연구실', active: false },
-    { label: 'QnA', active: false },
+    { label: '공지' },
+    { label: '행사' },
+    { label: 'HoC' },
+    { label: '홍보글' },
+    { label: '건의사항' },
+    { label: '연구실' },
+    { label: 'QnA' },
   ];
 
-  const notices = Array(5).fill({
-    category: '공지',
-    title: '전산학부 홈페이지 완료 공지',
-    date: '26.02.08',
-  });
+  // TODO: MySQL에서 각 탭별 데이터 가져오기
+  const noticesByTab: Record<number, NoticeItemProps[]> = {
+    0: Array(5).fill({ category: '공지', title: '전산학부 홈페이지 완료 공지', date: '26.02.08' }),
+    1: Array(5).fill({ category: '행사', title: '전산학부 간식 이벤트', date: '26.03.01' }),
+    2: Array(5).fill({ category: 'HoC', title: 'Hall of Code 프로젝트', date: '26.02.28' }),
+    3: Array(5).fill({ category: '홍보글', title: '전산학부 홍보 내용', date: '26.02.25' }),
+    4: Array(5).fill({ category: '건의사항', title: '학생 건의사항 접수', date: '26.02.20' }),
+    5: Array(5).fill({ category: '연구실', title: '연구실 공지사항', date: '26.02.15' }),
+    6: Array(5).fill({ category: 'QnA', title: '자주 묻는 질문', date: '26.02.10' }),
+  };
+
+  const currentNotices = noticesByTab[activeTab] || [];
 
   return (
     <section className="bg-kaist-white">
@@ -57,8 +65,9 @@ export function NoticeBoard() {
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 <button
+                  onClick={() => setActiveTab(index)}
                   className={`relative flex items-center justify-center h-full text-base font-extrabold tracking-tight transition-colors ${
-                    tab.active 
+                    activeTab === index 
                       ? 'text-kaist-darkgreen' 
                       : 'text-kaist-greygreen hover:text-kaist-darkgreen'
                   }`}
@@ -66,7 +75,7 @@ export function NoticeBoard() {
                   <span className="py-2">{tab.label}</span>
                   <span 
                     className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
-                      hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
+                      activeTab === index ? 'scale-x-100' : hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
                     }`}
                   />
                 </button>
@@ -95,8 +104,8 @@ export function NoticeBoard() {
 
         {/* Notice List */}
         <div className="flex-1 divide-y divide-kaist-grey/20 border-b border-kaist-grey/20 overflow-y-auto">
-          {notices.map((notice, index) => (
-            <NoticeItem key={index} {...notice} />
+          {currentNotices.map((notice, index) => (
+            <NoticeItem key={`${activeTab}-${index}`} {...notice} />
           ))}
         </div>
       </div>
