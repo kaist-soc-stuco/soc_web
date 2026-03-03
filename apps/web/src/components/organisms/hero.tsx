@@ -26,9 +26,9 @@ export function Hero() {
   // 임시 하드코딩된 이미지 
   const originalImages = [
     '/hero_background_1.jpg',
-    '/hero_background_2.jpg',
-    '/hero_background_3.jpg',
-    '/hero_background_4.jpg',
+    '/hero_background2.jpeg',
+    '/hero_background3.jpeg',
+    '/hero_background4.jpeg',
   ];
 
   // 무한 루프를 위해 첫 번째와 마지막 이미지를 양 끝에 추가
