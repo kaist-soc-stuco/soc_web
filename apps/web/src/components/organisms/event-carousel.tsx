@@ -72,7 +72,7 @@ export function EventCarousel() {
 
   return (
     <section className="h-full bg-kaist-white overflow-hidden">
-      <div className="h-full w-full px-4 md:px-4 pt-12 flex flex-col">        
+      <div className="h-full w-full px-4 md:px-4 pt-8 flex flex-col">        
         {/* Event Cards with Navigation Arrows */}
         <div className="flex-1 relative flex items-center justify-center overflow-hidden">
           {/* Left Arrow - positioned at image vertical center */}
@@ -119,7 +119,7 @@ export function EventCarousel() {
         </div>
 
         {/* Carousel Dots */}
-        <div className="flex-shrink-0 my-6 flex items-center justify-center gap-2 md:gap-4">
+        <div className="flex-shrink-0 mt-6 mb-2 flex items-center justify-center gap-2 md:gap-4">
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i}

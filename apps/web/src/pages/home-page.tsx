@@ -26,7 +26,7 @@ export function HomePage() {
             </div>
             
             {/* Notice & Calendar Side by Side */}
-            <div className="flex flex-col lg:flex-row gap-4 px-6 lg:px-8 py-4">
+            <div className="flex flex-col lg:flex-row gap-4 px-6 lg:px-8 py-2">
               <div className="flex-[2]">
                 <NoticeBoard />
               </div>
