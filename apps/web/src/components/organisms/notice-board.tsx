@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface NoticeItemProps {
   category: string;
@@ -84,22 +85,21 @@ export function NoticeBoard() {
           </div>
           
           {/* Plus Button */}
-          <div
+          <Link
+            to={`/board/${tabs[activeTab].label}`}
             className="relative group"
             onMouseEnter={() => setHoveredIndex(tabs.length)}
             onMouseLeave={() => setHoveredIndex(null)}
           >
-            <button
-              className="relative flex items-center justify-center h-full text-base font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors"
-            >
+            <div className="relative flex items-center justify-center h-full text-base font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors">
               <span className="py-2">+</span>
               <span 
                 className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
                   hoveredIndex === tabs.length ? 'scale-x-100' : 'scale-x-0'
                 }`}
               />
-            </button>
-          </div>
+            </div>
+          </Link>
         </div>
 
         {/* Notice List */}
