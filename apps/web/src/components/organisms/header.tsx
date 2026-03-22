@@ -1,13 +1,31 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Logo } from '@/components/atoms/logo';
 
-export function Header() {
+interface HeaderProps {
+  showLogo?: boolean;
+}
+
+export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const [navLeft, setNavLeft] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      if (navRef.current) setNavLeft(navRef.current.offsetLeft);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [showLogo]);
   
   const navItems = [
     {
       label: '게시판',
-      href: '#board',
-      dropdown: ['공지 게시판', '행사 게시판', 'HoC 게시판', '홍보 게시판', '건의사항', '연구실 게시판', 'QnA'],
+      href: '/board/공지',
+      dropdown: ['공지', '행사', 'HoC', '홍보글', '건의사항', '연구실', 'QnA'],
+      isBoard: true,
     },
     {
       label: '행사 / 설문조사',
@@ -26,32 +44,42 @@ export function Header() {
       className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative"
       onMouseLeave={() => setHoveredIndex(null)}
     >
-      <div className="flex h-14 w-full items-stretch justify-between pl-12 pr-6">
-        {/* Navigation */}
-        <nav className="hidden md:flex items-stretch">
-          {navItems.map((item, index) => (
-            <div
-              key={index}
-              className="relative group"
-              onMouseEnter={() => setHoveredIndex(index)}
-            >
-              <a 
-                href={item.href} 
-                className="relative flex items-center justify-center w-48 h-full text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors"
-              >
-                <span className="py-2">{item.label}</span>
-                <span 
-                  className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${
-                    hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
-                  }`}
-                />
-              </a>
+      <div className="flex h-14 w-full items-stretch justify-between">
+        {/* Left Section: Logo + Navigation */}
+        <div className="flex items-stretch">
+          {/* Logo Section (conditional) */}
+          {showLogo && (
+            <div className="flex items-center pl-4">
+              <Logo />
             </div>
-          ))}
-        </nav>
+          )}
+          
+          {/* Navigation */}
+          <nav ref={navRef} className={`hidden md:flex items-stretch ${showLogo ? '' : 'pl-12'}`}>
+            {navItems.map((item, index) => (
+              <div
+                key={index}
+                className="relative group"
+                onMouseEnter={() => setHoveredIndex(index)}
+              >
+                <Link
+                  to={item.href} 
+                  className="relative flex items-center justify-center w-48 h-full text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors"
+                >
+                  <span className="py-2">{item.label}</span>
+                  <span 
+                    className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${
+                      hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
+                    }`}
+                  />
+                </Link>
+              </div>
+            ))}
+          </nav>
+        </div>
 
-        {/* Right Section */}
-        <div className="flex items-center gap-2 md:gap-6">
+        {/* Right Section: Search, Notification, Login */}
+        <div className="flex items-center gap-2 md:gap-6 pr-6">
           <button className="text-kaist-black hover:text-kaist-darkgreen transition-colors p-2">
             <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -81,7 +109,7 @@ export function Header() {
         }`}
         style={{ top: 'calc(100% + 1px)', zIndex: 40 }}
       >
-        <div className="flex pl-12 gap-0">
+        <div className="flex gap-0" style={{ paddingLeft: navLeft }}>
           {navItems.map((item, index) => (
             <div
               key={index}
@@ -108,8 +136,8 @@ export function Header() {
                       transitionDelay: hoveredIndex !== null ? `${(index * 80) + (subIndex * 40) + 80}ms` : '0ms',
                     }}
                   >
-                    <a
-                      href={`${item.href}/${subItem}`}
+                    <Link
+                      to={item.isBoard ? `/board/${subItem}` : `${item.href}/${subItem}`}
                       className={`block text-sm font-semibold tracking-tight text-center py-2 transition-all ${
                         hoveredIndex === index
                           ? 'text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1'
@@ -117,7 +145,7 @@ export function Header() {
                       }`}
                     >
                       {subItem}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
