@@ -8,10 +8,15 @@ export const redisProvider: Provider = {
   provide: REDIS_CLIENT,
   inject: [ConfigService],
   useFactory: (configService: ConfigService): Redis => {
-    return new Redis(configService.get<string>('REDIS_URL', 'redis://localhost:6379'), {
+    const redis = new Redis(configService.get<string>('REDIS_URL', 'redis://localhost:6379'), {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
     });
+
+    // Keep connection failures from surfacing as unhandled error events.
+    redis.on('error', () => undefined);
+
+    return redis;
   },
 };
