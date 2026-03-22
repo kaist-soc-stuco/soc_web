@@ -40,3 +40,9 @@ lerna-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Codex & OhMyCodex
+.omx
+
+# Opencode
+.opencode
