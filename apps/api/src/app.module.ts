@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -14,7 +16,12 @@ import { UsersModule } from './modules/users/users.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: [
+        path.resolve(process.cwd(), '.env.local'),
+        path.resolve(process.cwd(), '.env'),
+        path.resolve(process.cwd(), '../../.env.local'),
+        path.resolve(process.cwd(), '../../.env'),
+      ],
     }),
     PostgresModule,
     RedisModule,
