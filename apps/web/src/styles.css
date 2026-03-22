@@ -29,6 +29,7 @@
   --kaist-darkgreen-main: oklch(0.6173 0.12863 157.503);
   --kaist-lightgreen: oklch(0.7173 0.12863 157.503);
   --kaist-lightgreen2: oklch(0.8173 0.12863 157.503);
+  --kaist-greygreen: oklch(0.6435 0.0089 157.503);
   --kaist-black: oklch(0.26 0.03 240);
   --kaist-grey: oklch(0.65 0.03 240);
   --kaist-brown: oklch(0.6173 0.12863 18.31);
@@ -65,6 +66,7 @@
   --color-kaist-darkgreen-main: var(--kaist-darkgreen-main);
   --color-kaist-lightgreen2: var(--kaist-lightgreen2);
   --color-kaist-lightgreen: var(--kaist-lightgreen);
+  --color-kaist-greygreen: var(--kaist-greygreen);
   --color-kaist-black: var(--kaist-black);
   --color-kaist-grey: var(--kaist-grey);
   --color-kaist-brown: var(--kaist-brown);
