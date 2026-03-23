@@ -6,13 +6,13 @@ RUN corepack enable
 
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
-COPY packages/config/package.json packages/config/package.json
-COPY packages/config/tsconfig/base.json packages/config/tsconfig/base.json
+COPY shared/config/package.json shared/config/package.json
+COPY shared/config/tsconfig/base.json shared/config/tsconfig/base.json
 
 RUN pnpm install --filter @soc/api... --no-frozen-lockfile
 
 COPY apps/api apps/api
-COPY packages/config packages/config
+COPY shared/config shared/config
 
 WORKDIR /app/apps/api
 
