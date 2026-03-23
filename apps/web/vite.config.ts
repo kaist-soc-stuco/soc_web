@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: Number.isNaN(port) ? 5173 : port,
+      allowedHosts: ["soc-student-council.kws.inet.sparcs.net"],
     },
   };
 });
