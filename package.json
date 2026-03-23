@@ -2,7 +2,7 @@
   "name": "soc-web-monorepo",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@10.29.3",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "pnpm -r --parallel --filter @soc/api --filter @soc/web dev",
     "dev:api": "pnpm --filter @soc/api dev",
