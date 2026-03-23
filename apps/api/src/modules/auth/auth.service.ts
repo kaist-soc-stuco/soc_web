@@ -22,6 +22,11 @@ interface StoredLoginState {
   nonce: string;
 }
 
+interface LoginStartPayload extends SsoConfig {
+  nonce: string;
+  state: string;
+}
+
 interface CallbackBody {
   code?: string;
   error?: string;
@@ -41,14 +46,6 @@ interface SsoApiErrorResponse {
 
 const STATE_TTL_SECONDS = 300;
 
-const escapeHtml = (value: string): string =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-
 const isSsoApiErrorResponse = (
   value: SsoApiErrorResponse | SsoApiSuccessResponse,
 ): value is SsoApiErrorResponse => 'error' in value || 'errorCode' in value;
@@ -62,7 +59,7 @@ export class AuthService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  async createLoginStartHtml(): Promise<string> {
+  async createLoginStartPayload(): Promise<LoginStartPayload> {
     const config = this.readStartConfig();
     const state = randomUUID();
     const nonce = randomUUID();
@@ -73,26 +70,11 @@ export class AuthService {
       expiresAt: Date.now() + STATE_TTL_SECONDS * 1000,
     });
 
-    return `<!DOCTYPE html>
-<html lang="ko">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>KAIST SSO Redirect</title>
-  </head>
-  <body>
-    <form id="sso-login-form" method="post" action="${escapeHtml(config.loginUrl)}">
-      <input type="hidden" name="client_id" value="${escapeHtml(config.clientId)}" />
-      <input type="hidden" name="redirect_uri" value="${escapeHtml(config.redirectUri)}" />
-      <input type="hidden" name="state" value="${escapeHtml(state)}" />
-      <input type="hidden" name="nonce" value="${escapeHtml(nonce)}" />
-    </form>
-    <p>KAIST SSO 로그인 페이지로 이동합니다.</p>
-    <script>
-      document.getElementById('sso-login-form').submit();
-    </script>
-  </body>
-</html>`;
+    return {
+      ...config,
+      nonce,
+      state,
+    };
   }
 
   async handleLoginCallback(body: CallbackBody): Promise<string> {
