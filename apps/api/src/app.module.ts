@@ -3,13 +3,13 @@ import path from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { RedisModule } from './cache/redis/redis.module';
-import { validateEnv } from './common/config/env.validation';
-import { PostgresModule } from './database/postgres/postgres.module';
-import { HealthController } from './health/health.controller';
-import { AuthModule } from './modules/auth/auth.module';
-import { MockModule } from './modules/mock/mock.module';
-import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './features/auth/auth.module';
+import { HealthModule } from './features/health/health.module';
+import { MockModule } from './features/mock/mock.module';
+import { UsersModule } from './features/users/users.module';
+import { PostgresModule } from './infrastructure/postgres/postgres.module';
+import { RedisModule } from './infrastructure/redis/redis.module';
+import { validateEnv } from './shared/config/env.validation';
 
 @Module({
   imports: [
@@ -27,8 +27,8 @@ import { UsersModule } from './modules/users/users.module';
     RedisModule,
     AuthModule,
     UsersModule,
+    HealthModule,
     MockModule,
   ],
-  controllers: [HealthController],
 })
 export class AppModule {}
