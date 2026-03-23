@@ -45,7 +45,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     ports:
-      - '80:80'
+      - '127.0.0.1:${NGINX_PORT:-8080}:80'
     volumes:
       - ./infra/docker/nginx/api.conf:/etc/nginx/conf.d/api.conf:ro
       - ./infra/docker/nginx/web.conf:/etc/nginx/conf.d/default.conf:ro
