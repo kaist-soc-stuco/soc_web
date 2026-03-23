@@ -19,6 +19,13 @@ KAIST SoC 웹 모노레포입니다.
 ```bash
 cp .env.example .env
 pnpm install
+docker compose up -d --build
+```
+
+루트 `compose.yml`은 전체 스택(api, web, postgres, redis, nginx)을 띄웁니다.
+DB/Redis만 필요하면 아래 개발용 compose를 사용합니다.
+
+```bash
 docker compose -f infra/docker/compose.dev.yml up -d
 ```
 
