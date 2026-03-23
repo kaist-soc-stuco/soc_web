@@ -11,12 +11,13 @@
 
 ## Login Flow
 
-1. 브라우저는 `GET /api/auth/login/start`로 로그인 시작 요청을 보낸다.
-2. 서버는 `state`와 `nonce`를 생성해 Redis에 저장하고, SSO authorize URL로 `POST`를 보낸다.
-3. 요청 파라미터는 `client_id`, `redirect_uri`, `state`, `nonce` 이다.
-4. SSO 서버는 등록된 `redirect_uri`인 `POST /api/auth/login`으로 `state`와 `code`를 전달한다.
-5. 서버는 전달받은 `code`와 `client_secret`을 사용해 사용자 정보 요청 API를 호출한다.
-6. 서버는 응답의 `nonce`를 검증하고 `userInfo`를 파싱한 뒤, 로그인 결과를 `/login?status=...&reason=...`로 되돌린다.
+1. 브라우저는 `VITE_SSO_START_URL`이 있으면 그 값을, 없으면 `VITE_SSO_REDIRECT_URI`로부터 파생한 `/start` URL을 `fetch`한다.
+2. 서버는 `state`와 `nonce`를 생성해 Redis에 저장하고, authorize payload를 반환한다.
+3. 반환 payload는 JSON init payload이거나 vendor-compatible HTML form payload일 수 있다.
+4. 프런트는 반환된 `loginUrl`, `client_id`, `redirect_uri`, `state`, `nonce`를 사용해 hidden `POST` form을 직접 만들어 SSO authorize로 제출한다.
+5. SSO 서버는 등록된 `redirect_uri`인 `POST /api/auth/login`으로 `state`와 `code`를 전달한다.
+6. 서버는 전달받은 `code`와 `client_secret`을 사용해 사용자 정보 요청 API를 호출한다.
+7. 서버는 응답의 `nonce`를 검증하고 `userInfo`를 파싱한 뒤, 로그인 결과를 `/login?status=...&reason=...`로 되돌린다.
 
 ## Required Parameters
 
@@ -74,13 +75,13 @@
 현재 프로젝트에서는 `/login` 페이지가 **SSO 시작 버튼과 결과 확인 화면** 역할만 담당한다.
 
 - 브라우저에서 할 일
-  - `VITE_SSO_REDIRECT_URI`로부터 `GET /api/auth/login/start`를 계산
-  - 로그인 시작 버튼 제공
+- `VITE_SSO_START_URL` 우선 사용, 없으면 `VITE_SSO_REDIRECT_URI`로부터 `/start`를 계산
+- start/init endpoint를 `fetch`
+- 반환된 JSON 또는 HTML form payload를 정규화한 뒤 hidden `POST` form 생성 및 SSO authorize submit
   - `status`, `reason`, `errorCode` 등 결과 쿼리 표시
 - 서버에서 할 일
-  - `GET /api/auth/login/start` 수신
+  - start/init endpoint 수신
   - `state`, `nonce` 생성 및 Redis 저장
-  - SSO authorize URL로 POST form submit
   - `POST /api/auth/login` callback 수신
   - `state` 검증
   - `client_secret`을 사용한 사용자 정보 API 호출
@@ -97,6 +98,7 @@
 예:
 
 ```env
+VITE_SSO_START_URL=https://soc-student-council.kws.inet.sparcs.net/api/auth/login/start
 VITE_SSO_REDIRECT_URI=https://soc-student-council.kws.inet.sparcs.net/api/auth/login
 VITE_SSO_LOGIN_URL=https://sso.kaist.ac.kr/auth/user/single/login/authorize
 VITE_SSO_CLIENT_ID=your-client-id
@@ -108,7 +110,7 @@ SSO_AUTH_API_URL=https://sso.kaist.ac.kr/auth/api/single/auth
 
 현재 `apps/web/src/pages/login-page.tsx`는 다음만 구현한다.
 
-- `VITE_SSO_REDIRECT_URI` 표시
-- `GET /api/auth/login/start`로 이동하는 로그인 시작 버튼 제공
+- `VITE_SSO_START_URL` 또는 `VITE_SSO_REDIRECT_URI`에서 파생한 start URL 표시
+- start/init endpoint `fetch` 후 authorize form submit
 - `/login?status=...&reason=...` 결과 표시
 - 서버 콜백이 필요하다는 점을 UI로 안내
