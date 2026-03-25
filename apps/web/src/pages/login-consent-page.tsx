@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   clearStoredAuthState,
   readStoredAuthState,
-  writeStoredAuthState,
 } from '@/lib/auth-storage';
 
 const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
@@ -66,6 +65,7 @@ export function LoginConsentPage() {
 
     try {
       const response = await fetch(resolveConsentEndpoint(), {
+        credentials: 'include',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,21 +80,8 @@ export function LoginConsentPage() {
         throw new Error(`동의 처리 요청이 실패했습니다. HTTP ${response.status}`);
       }
 
-      const body = (await response.json()) as {
-        accessToken?: string;
-        refreshToken?: string;
-        sessionId?: string;
-        storageMode: 'persisted' | 'temporary';
-        userId?: string;
-      };
-
-      writeStoredAuthState({
-        accessToken: body.accessToken,
-        refreshToken: body.refreshToken,
-        sessionId: body.sessionId,
-        storageMode: body.storageMode,
-        userId: body.userId,
-      });
+      await response.json();
+      clearStoredAuthState();
 
       navigate('/login?status=success&reason=consent_processed', {
         replace: true,

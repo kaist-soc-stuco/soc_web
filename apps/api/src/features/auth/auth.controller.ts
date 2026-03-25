@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Query, Res } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Query,
+  Res,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Response } from "express";
 
 import {
@@ -9,13 +18,91 @@ import {
 } from "./auth.types";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
+import {
+  AUTH_ACCESS_COOKIE_NAME,
+  AUTH_ACCESS_TOKEN_TTL_SECONDS,
+  AUTH_REFRESH_COOKIE_NAME,
+  AUTH_REFRESH_TOKEN_TTL_SECONDS,
+  AUTH_SESSION_COOKIE_NAME,
+} from "./auth.tokens";
 
 @Controller("auth")
 export class AuthController {
   constructor(
+    private readonly configService: ConfigService,
     private readonly authService: AuthService,
     private readonly authSessionService: AuthSessionService,
   ) {}
+
+  private readCookie(cookieHeader: string | undefined, name: string): string | undefined {
+    if (!cookieHeader) {
+      return undefined;
+    }
+
+    const encodedName = `${name}=`;
+    const found = cookieHeader
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(encodedName));
+
+    if (!found) {
+      return undefined;
+    }
+
+    return decodeURIComponent(found.slice(encodedName.length));
+  }
+
+  private getCookieOptions(maxAgeMs: number) {
+    const isProd = process.env.NODE_ENV === "production";
+
+    return {
+      httpOnly: true,
+      maxAge: maxAgeMs,
+      path: "/",
+      sameSite: "lax" as const,
+      secure: isProd,
+    };
+  }
+
+  private setAuthCookies(
+    response: Response,
+    payload: {
+      accessToken?: string;
+      refreshToken?: string;
+      sessionId?: string;
+    },
+  ): void {
+    if (payload.accessToken) {
+      response.cookie(
+        AUTH_ACCESS_COOKIE_NAME,
+        payload.accessToken,
+        this.getCookieOptions(AUTH_ACCESS_TOKEN_TTL_SECONDS * 1000),
+      );
+    }
+
+    if (payload.refreshToken) {
+      response.cookie(
+        AUTH_REFRESH_COOKIE_NAME,
+        payload.refreshToken,
+        this.getCookieOptions(AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000),
+      );
+    }
+
+    if (payload.sessionId) {
+      response.cookie(
+        AUTH_SESSION_COOKIE_NAME,
+        payload.sessionId,
+        this.getCookieOptions(AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000),
+      );
+    }
+  }
+
+  private clearAuthCookies(response: Response): void {
+    const options = this.getCookieOptions(0);
+    response.clearCookie(AUTH_ACCESS_COOKIE_NAME, options);
+    response.clearCookie(AUTH_REFRESH_COOKIE_NAME, options);
+    response.clearCookie(AUTH_SESSION_COOKIE_NAME, options);
+  }
 
   /**
    * @description SSO authorize 요청에 필요한 초기 payload를 발급합니다.
@@ -40,8 +127,17 @@ export class AuthController {
   }
 
   @Get("login/result")
-  async consumeLoginResult(@Query("resultToken") resultToken?: string) {
-    return this.authService.consumeLoginResult(resultToken);
+  async consumeLoginResult(
+    @Query("resultToken") resultToken: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.consumeLoginResult(resultToken);
+    this.setAuthCookies(response, result);
+
+    return {
+      storageMode: result.storageMode,
+      userId: result.userId,
+    };
   }
 
   /**
@@ -49,31 +145,73 @@ export class AuthController {
    * @body pendingLoginToken, consent
    */
   @Post("login/consent")
-  async handleConsentDecision(@Body() body: ConsentDecisionRequestDto) {
-    return this.authSessionService.handleConsentDecision(body);
+  async handleConsentDecision(
+    @Body() body: ConsentDecisionRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authSessionService.handleConsentDecision(body);
+    this.setAuthCookies(response, result);
+
+    return {
+      storageMode: result.storageMode,
+      userId: result.userId,
+    };
   }
 
   /**
    * @description 현재 로그인 세션 상태를 조회합니다.
    */
   @Get("session")
-  async getSession(@Query("sessionId") sessionId?: string) {
-    return this.authSessionService.getSession(sessionId);
+  async getSession(
+    @Query("sessionId") sessionId: string | undefined,
+    @Headers("cookie") cookieHeader?: string,
+  ) {
+    const cookieSessionId = this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
+    return this.authSessionService.getSession(sessionId ?? cookieSessionId);
   }
 
   /**
    * @description access token 만료 시 refresh token 기반으로 세션을 갱신합니다.
    */
   @Post("refresh")
-  async refreshSession(@Body() body: RefreshSessionRequestDto) {
-    return this.authSessionService.refreshSession(body);
+  async refreshSession(
+    @Body() body: RefreshSessionRequestDto,
+    @Headers("cookie") cookieHeader: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const cookieRefreshToken = this.readCookie(cookieHeader, AUTH_REFRESH_COOKIE_NAME);
+    const result = await this.authSessionService.refreshSession({
+      ...body,
+      refreshToken: body.refreshToken ?? cookieRefreshToken,
+    });
+
+    this.setAuthCookies(response, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      sessionId: this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME),
+    });
+
+    return {
+      storageMode: result.storageMode,
+    };
   }
 
   /**
    * @description 현재 세션을 로그아웃 처리합니다.
    */
   @Post("logout")
-  async logout(@Body() body: LogoutRequestDto) {
-    return this.authSessionService.logout(body);
+  async logout(
+    @Body() body: LogoutRequestDto,
+    @Headers("cookie") cookieHeader: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const cookieSessionId = this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
+    const result = await this.authSessionService.logout({
+      ...body,
+      sessionId: body.sessionId ?? cookieSessionId,
+    });
+
+    this.clearAuthCookies(response);
+    return result;
   }
 }
