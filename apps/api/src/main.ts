@@ -12,7 +12,7 @@ async function bootstrap(): Promise<void> {
 
   app.enableCors({
     origin: true,
-    credentials: false,
+    credentials: true,
   });
 
   app.useGlobalPipes(

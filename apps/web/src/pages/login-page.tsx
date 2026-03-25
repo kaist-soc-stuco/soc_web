@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-import { readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
+import { clearStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
 
@@ -235,6 +235,7 @@ export function TreeLogin() {
       resultEndpoint.searchParams.set('resultToken', resultToken);
 
       void fetch(resultEndpoint.toString(), {
+        credentials: 'include',
         method: 'GET',
       })
         .then((response) => {
@@ -243,21 +244,12 @@ export function TreeLogin() {
           }
 
           return response.json() as Promise<{
-            accessToken: string;
-            refreshToken: string;
-            sessionId: string;
             storageMode: 'persisted' | 'temporary';
             userId?: string;
           }>;
         })
-        .then((result) => {
-          writeStoredAuthState({
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-            sessionId: result.sessionId,
-            storageMode: result.storageMode,
-            userId: result.userId,
-          });
+        .then(() => {
+          clearStoredAuthState();
 
           navigate('/login?status=success&reason=ok', {
             replace: true,
@@ -279,17 +271,10 @@ export function TreeLogin() {
   ]);
 
   useEffect(() => {
-    const stored = readStoredAuthState();
-
-    if (!stored?.sessionId) {
-      setSessionSummary(null);
-      return;
-    }
-
     const sessionEndpoint = new URL(resolveSessionEndpoint(), window.location.origin);
-    sessionEndpoint.searchParams.set('sessionId', stored.sessionId);
 
     void fetch(sessionEndpoint.toString(), {
+      credentials: 'include',
       method: 'GET',
     })
       .then((response) => {
