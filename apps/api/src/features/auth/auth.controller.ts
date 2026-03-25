@@ -150,10 +150,23 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authSessionService.handleConsentDecision(body);
-    this.setAuthCookies(response, result);
+
+    if (result.storageMode === "persisted") {
+      this.setAuthCookies(response, result);
+    } else {
+      this.clearAuthCookies(response);
+    }
 
     return {
       storageMode: result.storageMode,
+      temporarySession:
+        result.storageMode === "temporary"
+          ? {
+              accessToken: result.accessToken,
+              refreshToken: result.refreshToken,
+              sessionId: result.sessionId,
+            }
+          : undefined,
       userId: result.userId,
     };
   }
@@ -180,19 +193,33 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const cookieRefreshToken = this.readCookie(cookieHeader, AUTH_REFRESH_COOKIE_NAME);
+    const sessionId = body.sessionId ?? this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
     const result = await this.authSessionService.refreshSession({
       ...body,
       refreshToken: body.refreshToken ?? cookieRefreshToken,
     });
 
-    this.setAuthCookies(response, {
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      sessionId: this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME),
-    });
+    if (result.storageMode === "persisted") {
+      this.setAuthCookies(response, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        sessionId,
+      });
+
+      return {
+        storageMode: result.storageMode,
+      };
+    }
+
+    this.clearAuthCookies(response);
 
     return {
       storageMode: result.storageMode,
+      temporarySession: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        sessionId,
+      },
     };
   }
 

@@ -269,8 +269,6 @@ export class AuthSessionService {
         (await this.usersService.createFromSsoUser({
           consentedAt,
           ssoUserId: pendingUser.ssoUserId,
-          userEmail: pendingUser.userEmail,
-          userMobile: pendingUser.userMobile,
         }));
 
       if (!persistedUser.privacyConsentAt) {
