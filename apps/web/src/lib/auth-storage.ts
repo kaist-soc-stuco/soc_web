@@ -10,6 +10,7 @@ export interface StoredAuthState {
   accessToken?: string;
   pendingLoginToken?: string;
   refreshToken?: string;
+  sessionId?: string;
   storageMode?: "temporary" | "persisted";
   userId?: string;
 }

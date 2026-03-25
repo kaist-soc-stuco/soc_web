@@ -32,12 +32,14 @@ export interface ConsentDecisionRequest {
 export interface ConsentDecisionResponse {
   accessToken?: string;
   refreshToken?: string;
+  sessionId?: string;
   storageMode: AuthStorageMode;
   userId?: string;
 }
 
 export interface RefreshResponse {
   accessToken: string;
+  refreshToken?: string;
   storageMode: AuthStorageMode;
 }
 

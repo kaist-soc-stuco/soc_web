@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+
+import { readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
 
@@ -38,6 +40,50 @@ const resolveStartUrl = (startUrl: string, redirectUri: string): string | null =
   }
 
   return deriveStartUrl(redirectUri);
+};
+
+const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+
+const resolveSessionEndpoint = (): string => {
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+
+  if (apiBaseUrl) {
+    return `${withNoTrailingSlash(apiBaseUrl)}/auth/session`;
+  }
+
+  const startUrl = (import.meta.env.VITE_SSO_START_URL as string | undefined)?.trim();
+  if (startUrl) {
+    try {
+      const parsed = new URL(startUrl);
+      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '/auth/session');
+      return `${parsed.origin}${path}`;
+    } catch {
+      return '/api/auth/session';
+    }
+  }
+
+  return '/api/auth/session';
+};
+
+const resolveLoginResultEndpoint = (): string => {
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+
+  if (apiBaseUrl) {
+    return `${withNoTrailingSlash(apiBaseUrl)}/auth/login/result`;
+  }
+
+  const startUrl = (import.meta.env.VITE_SSO_START_URL as string | undefined)?.trim();
+  if (startUrl) {
+    try {
+      const parsed = new URL(startUrl);
+      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '/auth/login/result');
+      return `${parsed.origin}${path}`;
+    } catch {
+      return '/api/auth/login/result';
+    }
+  }
+
+  return '/api/auth/login/result';
 };
 
 const readString = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -128,6 +174,9 @@ const getResultMessage = (searchParams: URLSearchParams): string => {
   if (status === 'success') {
     return '로그인이 완료되었습니다.';
   }
+  if (status === 'consent-required') {
+    return '개인정보 저장 동의가 필요합니다.';
+  }
   if (status === 'error') {
     return '로그인 중 오류가 발생했습니다.';
   }
@@ -137,9 +186,20 @@ const getResultMessage = (searchParams: URLSearchParams): string => {
 
 export function TreeLogin() {
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sessionSummary, setSessionSummary] = useState<
+    | {
+        authenticated: boolean;
+        canUsePersistentFeatures: boolean;
+        requiresConsent: boolean;
+        storageMode: 'persisted' | 'temporary' | null;
+        userId?: string;
+      }
+    | null
+  >(null);
 
   const startUrlEnv = import.meta.env.VITE_SSO_START_URL ?? '';
   const redirectUri = import.meta.env.VITE_SSO_REDIRECT_URI ?? '';
@@ -147,9 +207,111 @@ export function TreeLogin() {
 
   const status = searchParams.get('status');
   const reason = searchParams.get('reason');
+  const resultToken = searchParams.get('resultToken');
   const errorCode = searchParams.get('errorCode');
   const userId = searchParams.get('userId');
+  const pendingLoginToken = searchParams.get('pendingLoginToken');
+  const storageMode = searchParams.get('storageMode');
   const resultMessage = getResultMessage(searchParams);
+
+  useEffect(() => {
+    if (!status) {
+      return;
+    }
+
+    if (status === 'consent-required' && pendingLoginToken) {
+      writeStoredAuthState({
+        pendingLoginToken,
+      });
+
+      navigate('/login/consent', {
+        replace: true,
+      });
+      return;
+    }
+
+    if (status === 'success' && resultToken) {
+      const resultEndpoint = new URL(resolveLoginResultEndpoint(), window.location.origin);
+      resultEndpoint.searchParams.set('resultToken', resultToken);
+
+      void fetch(resultEndpoint.toString(), {
+        method: 'GET',
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          return response.json() as Promise<{
+            accessToken: string;
+            refreshToken: string;
+            sessionId: string;
+            storageMode: 'persisted' | 'temporary';
+            userId?: string;
+          }>;
+        })
+        .then((result) => {
+          writeStoredAuthState({
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+            sessionId: result.sessionId,
+            storageMode: result.storageMode,
+            userId: result.userId,
+          });
+
+          navigate('/login?status=success&reason=ok', {
+            replace: true,
+          });
+        })
+        .catch((error) => {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : '로그인 결과 조회 중 오류가 발생했습니다.',
+          );
+        });
+    }
+  }, [
+    navigate,
+    pendingLoginToken,
+    resultToken,
+    status,
+  ]);
+
+  useEffect(() => {
+    const stored = readStoredAuthState();
+
+    if (!stored?.sessionId) {
+      setSessionSummary(null);
+      return;
+    }
+
+    const sessionEndpoint = new URL(resolveSessionEndpoint(), window.location.origin);
+    sessionEndpoint.searchParams.set('sessionId', stored.sessionId);
+
+    void fetch(sessionEndpoint.toString(), {
+      method: 'GET',
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        return response.json() as Promise<{
+          authenticated: boolean;
+          canUsePersistentFeatures: boolean;
+          requiresConsent: boolean;
+          storageMode: 'persisted' | 'temporary' | null;
+          userId?: string;
+        }>;
+      })
+      .then((summary) => {
+        setSessionSummary(summary);
+      })
+      .catch(() => {
+        setSessionSummary(null);
+      });
+  }, [status]);
 
   const handleLogin = async () => {
     if (!startUrl || typeof window === 'undefined') {
@@ -163,7 +325,6 @@ export function TreeLogin() {
     try {
       const response = await fetch(startUrl, {
         method: 'GET',
-        credentials: 'include',
         headers: {
           Accept: 'application/json, text/html',
         },
@@ -197,7 +358,10 @@ export function TreeLogin() {
       searchParams.get('message') ||
       searchParams.get('reason') ||
       searchParams.get('error') ||
-      searchParams.get('errorCode'),
+        searchParams.get('errorCode') ||
+        searchParams.get('resultToken') ||
+        searchParams.get('storageMode') ||
+        searchParams.get('pendingLoginToken'),
   );
 
   return (
@@ -283,8 +447,10 @@ export function TreeLogin() {
               <p>status: {status ?? '없음'}</p>
               <p>message: {resultMessage}</p>
               <p>reason: {reason ?? '없음'}</p>
+              <p>resultToken: {resultToken ?? '없음'}</p>
               <p>errorCode: {errorCode ?? '없음'}</p>
               <p>userId: {userId ?? '없음'}</p>
+              <p>storageMode: {storageMode ?? '없음'}</p>
             </div>
           </section>
         ) : (
@@ -295,6 +461,20 @@ export function TreeLogin() {
             </p>
           </section>
         )}
+
+        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-extrabold tracking-tight">현재 세션 조회</h2>
+          <div className="mt-4 space-y-2 text-sm font-medium text-kaist-black">
+            <p>authenticated: {String(sessionSummary?.authenticated ?? false)}</p>
+            <p>storageMode: {sessionSummary?.storageMode ?? '없음'}</p>
+            <p>
+              canUsePersistentFeatures:{' '}
+              {String(sessionSummary?.canUsePersistentFeatures ?? false)}
+            </p>
+            <p>requiresConsent: {String(sessionSummary?.requiresConsent ?? false)}</p>
+            <p>userId: {sessionSummary?.userId ?? '없음'}</p>
+          </div>
+        </section>
       </div>
     </main>
   );

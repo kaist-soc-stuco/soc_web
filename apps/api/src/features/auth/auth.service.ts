@@ -1,13 +1,18 @@
 import {
+  BadRequestException,
   Inject,
   Injectable,
   InternalServerErrorException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 import { randomUUID } from "node:crypto";
 
 import { REDIS_CLIENT } from '../../infrastructure/redis/redis.provider';
+import { UsersService } from "../users/users.service";
+import { AuthSessionService } from "./auth-session.service";
+import { PendingLoginRepository } from "./pending-login.repository";
 
 interface SsoConfig {
   clientId: string;
@@ -31,6 +36,14 @@ interface LoginStartPayload extends SsoConfig {
   state: string;
 }
 
+interface LoginResultPayload {
+  accessToken: string;
+  refreshToken: string;
+  sessionId: string;
+  storageMode: "persisted" | "temporary";
+  userId?: string;
+}
+
 interface CallbackBody {
   code?: string;
   error?: string;
@@ -49,6 +62,8 @@ interface SsoApiErrorResponse {
 }
 
 const STATE_TTL_SECONDS = 300;
+const PENDING_LOGIN_TTL_SECONDS = 10 * 60;
+const LOGIN_RESULT_TTL_SECONDS = 60;
 
 const isSsoApiErrorResponse = (
   value: SsoApiErrorResponse | SsoApiSuccessResponse,
@@ -57,19 +72,19 @@ const isSsoApiErrorResponse = (
 @Injectable()
 export class AuthService {
   private readonly memoryStateStore = new Map<string, StoredLoginState>();
+  private readonly memoryLoginResultStore = new Map<string, LoginResultPayload>();
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly usersService: UsersService,
+    private readonly authSessionService: AuthSessionService,
+    private readonly pendingLoginRepository: PendingLoginRepository,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   /**
    * @description SSO authorize 요청에 필요한 초기 payload를 생성합니다.
    * @returns clientId, loginUrl, redirectUri, state, nonce
-   *
-   * TODO:
-   * - consent flow 도입 후에는 이 payload에 추적용 `pendingLoginId`를 연결할지 검토하세요.
-   * - Redis 저장 시 temporary/persisted 후보를 식별할 수 있는 메타데이터를 함께 넣는 방향이 좋습니다.
    */
   async createLoginStartPayload(): Promise<LoginStartPayload> {
     const config = this.readStartConfig();
@@ -92,14 +107,6 @@ export class AuthService {
   /**
    * @description SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
    * @returns `/login?...` 형식의 redirect URL
-   *
-   * TODO:
-   * - 현재는 userInfo 교환 후 redirect만 합니다.
-   * - 앞으로는 여기서
-   *   1) PostgreSQL 사용자 조회
-   *   2) 기존 사용자면 access/refresh 발급
-   *   3) 신규 사용자면 pending consent 상태 저장
-   *   로 분기시키세요.
    */
   async handleLoginCallback(body: CallbackBody): Promise<string> {
     if (body.error || body.errorCode) {
@@ -170,12 +177,49 @@ export class AuthService {
       }
 
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
-      const userId =
-        typeof userInfo.user_id === "string"
-          ? userInfo.user_id
-          : "unknown-user";
+      const ssoUserId =
+        typeof userInfo.user_id === "string" ? userInfo.user_id : "";
 
-      return this.buildFrontendRedirect("success", "ok", { userId });
+      if (!ssoUserId) {
+        return this.buildFrontendRedirect("error", "missing_sso_user_id");
+      }
+
+      const existingUser = await this.usersService.findBySsoUserId(ssoUserId);
+
+      if (existingUser) {
+        const issued = await this.authSessionService.issuePersistedSession(
+          existingUser.id,
+        );
+
+        const resultToken = randomUUID();
+        await this.storeLoginResult(resultToken, {
+          accessToken: issued.accessToken,
+          refreshToken: issued.refreshToken,
+          sessionId: issued.session.sessionId,
+          storageMode: "persisted",
+          userId: existingUser.id,
+        });
+
+        return this.buildFrontendRedirect("success", "ok", {
+          resultToken,
+          storageMode: "persisted",
+          userId: existingUser.id,
+        });
+      }
+
+      const pendingLoginToken = randomUUID();
+      await this.pendingLoginRepository.save(pendingLoginToken, {
+        expiresAt: Date.now() + PENDING_LOGIN_TTL_SECONDS * 1000,
+        ssoUserId,
+        userEmail:
+          typeof userInfo.user_email === "string" ? userInfo.user_email : undefined,
+        userMobile:
+          typeof userInfo.user_mbtlnum === "string" ? userInfo.user_mbtlnum : undefined,
+      }, PENDING_LOGIN_TTL_SECONDS);
+
+      return this.buildFrontendRedirect("consent-required", "pending_consent", {
+        pendingLoginToken,
+      });
     } catch (error) {
       return this.buildFrontendRedirect(
         "error",
@@ -185,7 +229,7 @@ export class AuthService {
   }
 
   private buildFrontendRedirect(
-    status: "error" | "success",
+    status: "consent-required" | "error" | "success",
     reason: string,
     extraParams?: Record<string, string>,
   ): string {
@@ -200,6 +244,10 @@ export class AuthService {
 
   private buildRedisKey(state: string): string {
     return `auth:sso:state:${state}`;
+  }
+
+  private buildLoginResultKey(resultToken: string): string {
+    return `auth:login-result:${resultToken}`;
   }
 
   private ensureRequired(value: string | undefined, name: string): string {
@@ -233,6 +281,14 @@ export class AuthService {
   private parseStoredState(rawValue: string): StoredLoginState | null {
     try {
       return JSON.parse(rawValue) as StoredLoginState;
+    } catch {
+      return null;
+    }
+  }
+
+  private parseLoginResult(rawValue: string): LoginResultPayload | null {
+    try {
+      return JSON.parse(rawValue) as LoginResultPayload;
     } catch {
       return null;
     }
@@ -290,6 +346,61 @@ export class AuthService {
     }
 
     this.memoryStateStore.delete(stateKey);
+  }
+
+  private async storeLoginResult(
+    resultToken: string,
+    payload: LoginResultPayload,
+  ): Promise<void> {
+    const redisClient = await this.getRedisClient();
+    const resultKey = this.buildLoginResultKey(resultToken);
+
+    if (redisClient) {
+      await redisClient.set(
+        resultKey,
+        JSON.stringify(payload),
+        "EX",
+        LOGIN_RESULT_TTL_SECONDS,
+      );
+      return;
+    }
+
+    this.memoryLoginResultStore.set(resultKey, payload);
+  }
+
+  async consumeLoginResult(resultToken: string | undefined): Promise<LoginResultPayload> {
+    if (!resultToken) {
+      throw new BadRequestException("resultToken_is_required");
+    }
+
+    const redisClient = await this.getRedisClient();
+    const resultKey = this.buildLoginResultKey(resultToken);
+
+    if (redisClient) {
+      const rawValue = await redisClient.get(resultKey);
+
+      if (!rawValue) {
+        throw new UnauthorizedException("resultToken_not_found_or_expired");
+      }
+
+      await redisClient.del(resultKey);
+
+      const parsed = this.parseLoginResult(rawValue);
+      if (!parsed) {
+        throw new UnauthorizedException("resultToken_invalid_payload");
+      }
+
+      return parsed;
+    }
+
+    const stored = this.memoryLoginResultStore.get(resultKey);
+
+    if (!stored) {
+      throw new UnauthorizedException("resultToken_not_found_or_expired");
+    }
+
+    this.memoryLoginResultStore.delete(resultKey);
+    return stored;
   }
 
   private readStartConfig(): SsoConfig {

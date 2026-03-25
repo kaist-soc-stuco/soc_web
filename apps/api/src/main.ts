@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { RequestMethod } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 
@@ -14,6 +14,13 @@ async function bootstrap(): Promise<void> {
     origin: true,
     credentials: false,
   });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+    }),
+  );
 
   app.setGlobalPrefix('v1', {
     exclude: [{ path: 'health', method: RequestMethod.GET }],
