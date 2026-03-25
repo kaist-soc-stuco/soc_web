@@ -1,18 +1,17 @@
 /**
- * 프런트 토큰 저장소 스켈레톤입니다.
+ * 프런트 인증 보조 상태 저장소입니다.
  *
- * TODO:
- * - temporary 로그인은 sessionStorage만 사용하도록 유지하세요.
- * - persisted 로그인은 refresh token을 직접 저장하지 말고 access token 관리 정책만 확정하세요.
+ * 쿠키 기반 인증으로 전환되어 access/refresh/session 토큰은 브라우저 쿠키로 관리합니다.
+ * sessionStorage에는 consent 단계 연결에 필요한 pendingLoginToken만 저장합니다.
  */
 
 export interface StoredAuthState {
-  accessToken?: string;
   pendingLoginToken?: string;
-  refreshToken?: string;
-  sessionId?: string;
-  storageMode?: "temporary" | "persisted";
-  userId?: string;
+  temporarySession?: {
+    accessToken?: string;
+    refreshToken?: string;
+    sessionId?: string;
+  };
 }
 
 const STORAGE_KEY = "soc.auth.state";

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-import { clearStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
+import { clearStoredAuthState, readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
 
@@ -213,6 +213,8 @@ export function TreeLogin() {
   const pendingLoginToken = searchParams.get('pendingLoginToken');
   const storageMode = searchParams.get('storageMode');
   const resultMessage = getResultMessage(searchParams);
+  const storedAuthState = readStoredAuthState();
+  const temporarySessionId = storedAuthState?.temporarySession?.sessionId;
 
   useEffect(() => {
     if (!status) {
@@ -273,6 +275,10 @@ export function TreeLogin() {
   useEffect(() => {
     const sessionEndpoint = new URL(resolveSessionEndpoint(), window.location.origin);
 
+    if (temporarySessionId) {
+      sessionEndpoint.searchParams.set('sessionId', temporarySessionId);
+    }
+
     void fetch(sessionEndpoint.toString(), {
       credentials: 'include',
       method: 'GET',
@@ -296,7 +302,7 @@ export function TreeLogin() {
       .catch(() => {
         setSessionSummary(null);
       });
-  }, [status]);
+  }, [status, temporarySessionId]);
 
   const handleLogin = async () => {
     if (!startUrl || typeof window === 'undefined') {
@@ -436,6 +442,7 @@ export function TreeLogin() {
               <p>errorCode: {errorCode ?? '없음'}</p>
               <p>userId: {userId ?? '없음'}</p>
               <p>storageMode: {storageMode ?? '없음'}</p>
+              <p>temporarySessionId: {temporarySessionId ?? '없음'}</p>
             </div>
           </section>
         ) : (

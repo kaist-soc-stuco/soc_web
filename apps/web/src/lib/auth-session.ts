@@ -8,7 +8,6 @@
 export type AuthStorageMode = "temporary" | "persisted";
 
 export interface AuthSession {
-  accessToken?: string;
   authenticated: boolean;
   canUsePersistentFeatures: boolean;
   requiresConsent: boolean;
