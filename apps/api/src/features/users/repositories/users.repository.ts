@@ -1,4 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
+import { Pool } from "pg";
+
+import { POSTGRES_POOL } from "../../../infrastructure/postgres/postgres.provider";
 
 import type { UserRecord } from "../entities/user";
 
@@ -12,17 +15,112 @@ import type { UserRecord } from "../entities/user";
  */
 @Injectable()
 export class UsersRepository {
-  async findBySsoUserId(_ssoUserId: string): Promise<UserRecord | null> {
-    throw new Error("TODO: users 테이블에서 sso_user_id 조회 구현");
+  constructor(@Inject(POSTGRES_POOL) private readonly pool: Pool) {}
+
+  private mapRowToUserRecord(row: {
+    id: string;
+    sso_user_id: string;
+    user_email: string | null;
+    user_mobile: string | null;
+    privacy_consent_at: string | null;
+    created_at: string;
+    updated_at: string;
+  }): UserRecord {
+    return {
+      createdAt: row.created_at,
+      id: row.id,
+      privacyConsentAt: row.privacy_consent_at,
+      ssoUserId: row.sso_user_id,
+      updatedAt: row.updated_at,
+      userEmail: row.user_email,
+      userMobile: row.user_mobile,
+    };
+  }
+
+  async findBySsoUserId(ssoUserId: string): Promise<UserRecord | null> {
+    const result = await this.pool.query<{
+      id: string;
+      sso_user_id: string;
+      user_email: string | null;
+      user_mobile: string | null;
+      privacy_consent_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `
+        SELECT id, sso_user_id, user_email, user_mobile, privacy_consent_at, created_at, updated_at
+        FROM users
+        WHERE sso_user_id = $1
+        LIMIT 1
+      `,
+      [ssoUserId],
+    );
+
+    if (result.rowCount === 0) {
+      return null;
+    }
+
+    return this.mapRowToUserRecord(result.rows[0]);
+  }
+
+  async findById(userId: string): Promise<UserRecord | null> {
+    const result = await this.pool.query<{
+      id: string;
+      sso_user_id: string;
+      user_email: string | null;
+      user_mobile: string | null;
+      privacy_consent_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `
+        SELECT id, sso_user_id, user_email, user_mobile, privacy_consent_at, created_at, updated_at
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [userId],
+    );
+
+    if (result.rowCount === 0) {
+      return null;
+    }
+
+    return this.mapRowToUserRecord(result.rows[0]);
   }
 
   async insert(
-    _input: Omit<UserRecord, "id" | "createdAt" | "updatedAt">,
+    input: Omit<UserRecord, "id" | "createdAt" | "updatedAt">,
   ): Promise<UserRecord> {
-    throw new Error("TODO: users 테이블 insert 구현");
+    const result = await this.pool.query<{
+      id: string;
+      sso_user_id: string;
+      user_email: string | null;
+      user_mobile: string | null;
+      privacy_consent_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `
+        INSERT INTO users (sso_user_id, user_email, user_mobile, privacy_consent_at)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, sso_user_id, user_email, user_mobile, privacy_consent_at, created_at, updated_at
+      `,
+      [input.ssoUserId, input.userEmail, input.userMobile, input.privacyConsentAt],
+    );
+
+    return this.mapRowToUserRecord(result.rows[0]);
   }
 
-  async markConsent(_userId: string, _consentedAt: string): Promise<void> {
-    throw new Error("TODO: privacy_consent_at 업데이트 구현");
+  async markConsent(userId: string, consentedAt: string): Promise<void> {
+    await this.pool.query(
+      `
+        UPDATE users
+        SET privacy_consent_at = $2,
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [userId, consentedAt],
+    );
   }
 }

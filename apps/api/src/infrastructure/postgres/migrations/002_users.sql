@@ -1,18 +1,11 @@
--- users 테이블 스켈레톤 마이그레이션
---
--- TODO(주니어):
--- 1. 실제 컬럼 타입과 nullability를 확정하세요.
--- 2. `sso_user_id` unique 인덱스 여부를 먼저 정하세요.
--- 3. 동의 여부는 `privacy_consent_at` 하나로 표현할지, boolean 컬럼을 추가할지 팀에서 합의하세요.
--- 4. migration 적용 전에 rollback 전략도 같이 정리하세요.
---
--- 예시 뼈대:
--- CREATE TABLE IF NOT EXISTS users (
---   id UUID PRIMARY KEY,
---   sso_user_id TEXT NOT NULL UNIQUE,
---   user_email TEXT,
---   user_mobile TEXT,
---   privacy_consent_at TIMESTAMPTZ,
---   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
---   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
--- );
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS users (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	sso_user_id TEXT NOT NULL UNIQUE,
+	user_email TEXT,
+	user_mobile TEXT,
+	privacy_consent_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
