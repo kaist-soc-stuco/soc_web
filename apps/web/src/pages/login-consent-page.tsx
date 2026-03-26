@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
 
 import {
   clearStoredAuthState,
@@ -9,25 +10,25 @@ import {
 
 const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
-const resolveConsentEndpoint = (): string => {
+const resolveApiBaseUrl = (): string => {
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
   if (apiBaseUrl) {
-    return `${withNoTrailingSlash(apiBaseUrl)}/auth/login/consent`;
+    return withNoTrailingSlash(apiBaseUrl);
   }
 
   const startUrl = (import.meta.env.VITE_SSO_START_URL as string | undefined)?.trim();
   if (startUrl) {
     try {
       const parsed = new URL(startUrl);
-      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '/auth/login/consent');
+      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '');
       return `${parsed.origin}${path}`;
     } catch {
-      return '/api/auth/login/consent';
+      return '/api';
     }
   }
 
-  return '/api/auth/login/consent';
+  return '/api';
 };
 
 /**
@@ -44,6 +45,7 @@ export function LoginConsentPage() {
   const query = new URLSearchParams(location.search);
   const [submitting, setSubmitting] = useState<null | 'persisted' | 'temporary'>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
 
   const pendingLoginToken = useMemo(() => {
     const queryToken = query.get('pendingLoginToken');
@@ -65,30 +67,10 @@ export function LoginConsentPage() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch(resolveConsentEndpoint(), {
-        credentials: 'include',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          consent,
-          pendingLoginToken,
-        }),
+      const payload = await apiClient.submitConsentDecision({
+        consent,
+        pendingLoginToken,
       });
-
-      if (!response.ok) {
-        throw new Error(`동의 처리 요청이 실패했습니다. HTTP ${response.status}`);
-      }
-
-      const payload = (await response.json()) as {
-        storageMode: 'persisted' | 'temporary';
-        temporarySession?: {
-          accessToken?: string;
-          refreshToken?: string;
-          sessionId?: string;
-        };
-      };
 
       if (payload.storageMode === 'temporary') {
         writeStoredAuthState({
