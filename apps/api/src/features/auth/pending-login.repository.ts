@@ -2,11 +2,10 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import Redis from "ioredis";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import Redis from "ioredis";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 import type { PendingSsoUser } from "./auth.types";
@@ -22,16 +21,20 @@ interface StoredPendingSsoUser {
 
 @Injectable()
 export class PendingLoginRepository {
+  private readonly encryptionKey: Buffer;
+
   constructor(
     private readonly configService: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-  ) {}
+  ) {
+    this.encryptionKey = this.createEncryptionKey();
+  }
 
   private buildKey(pendingLoginToken: string): string {
     return `${PENDING_LOGIN_PREFIX}${pendingLoginToken}`;
   }
 
-  private getEncryptionKey(): Buffer {
+  private createEncryptionKey(): Buffer {
     const encryptionSeed = this.configService.get<string>(
       "AUTH_PENDING_LOGIN_ENCRYPTION_KEY",
     );
@@ -46,9 +49,8 @@ export class PendingLoginRepository {
   }
 
   private encrypt(plainText: string): string {
-    const key = this.getEncryptionKey();
     const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const cipher = createCipheriv("aes-256-gcm", this.encryptionKey, iv);
     const encrypted = Buffer.concat([
       cipher.update(plainText, "utf8"),
       cipher.final(),
@@ -65,11 +67,10 @@ export class PendingLoginRepository {
       throw new InternalServerErrorException("pending_login_payload_corrupted");
     }
 
-    const key = this.getEncryptionKey();
     const iv = Buffer.from(ivRaw, "base64url");
     const authTag = Buffer.from(authTagRaw, "base64url");
     const encrypted = Buffer.from(encryptedRaw, "base64url");
-    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    const decipher = createDecipheriv("aes-256-gcm", this.encryptionKey, iv);
 
     decipher.setAuthTag(authTag);
 
@@ -111,30 +112,10 @@ export class PendingLoginRepository {
     }
   }
 
-  private async getRedisClient(): Promise<Redis> {
-    try {
-      if (this.redis.status === "wait") {
-        await this.redis.connect();
-      }
-
-      if (this.redis.status === "ready" || this.redis.status === "connect") {
-        return this.redis;
-      }
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        `redis_unavailable:${error instanceof Error ? error.message : "connect_failed"}`,
-      );
-    }
-
-    throw new ServiceUnavailableException(
-      `redis_unavailable:status_${this.redis.status}`,
-    );
-  }
-
   async save(pendingLoginToken: string, payload: PendingSsoUser, ttlSeconds: number): Promise<void> {
-    const redisClient = await this.getRedisClient();
     const pendingKey = this.buildKey(pendingLoginToken);
-    await redisClient.set(
+
+    await this.redis.set(
       pendingKey,
       JSON.stringify(this.serialize(payload)),
       "EX",
@@ -143,15 +124,13 @@ export class PendingLoginRepository {
   }
 
   async find(pendingLoginToken: string): Promise<PendingSsoUser | null> {
-    const redisClient = await this.getRedisClient();
     const pendingKey = this.buildKey(pendingLoginToken);
-    const rawValue = await redisClient.get(pendingKey);
+    const rawValue = await this.redis.get(pendingKey);
     return rawValue ? this.parse(rawValue) : null;
   }
 
   async delete(pendingLoginToken: string): Promise<void> {
-    const redisClient = await this.getRedisClient();
     const pendingKey = this.buildKey(pendingLoginToken);
-    await redisClient.del(pendingKey);
+    await this.redis.del(pendingKey);
   }
 }

@@ -7,6 +7,7 @@ import {
   Query,
   Res,
 } from "@nestjs/common";
+import { parse as parseCookieHeader } from "cookie";
 import { Response } from "express";
 
 import {
@@ -37,17 +38,8 @@ export class AuthController {
       return undefined;
     }
 
-    const encodedName = `${name}=`;
-    const found = cookieHeader
-      .split(";")
-      .map((part) => part.trim())
-      .find((part) => part.startsWith(encodedName));
-
-    if (!found) {
-      return undefined;
-    }
-
-    return decodeURIComponent(found.slice(encodedName.length));
+    const parsed = parseCookieHeader(cookieHeader);
+    return parsed[name];
   }
 
   private getCookieOptions(maxAgeMs: number) {
@@ -178,7 +170,7 @@ export class AuthController {
     @Headers("cookie") cookieHeader?: string,
   ) {
     const cookieSessionId = this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
-    return this.authSessionService.getSession(sessionId ?? cookieSessionId);
+    return this.authSessionService.getSession(cookieSessionId ?? sessionId);
   }
 
   /**

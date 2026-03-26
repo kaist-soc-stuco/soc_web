@@ -1,5 +1,11 @@
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param, UseGuards } from "@nestjs/common";
 
+import {
+  AuthGuard,
+  PermissionFlags,
+  PermissionGuard,
+  RequirePermission,
+} from "../../shared/guards";
 import { UsersService } from "./users.service";
 
 /**
@@ -19,6 +25,8 @@ export class UsersController {
    * @param userId 내부 사용자 ID
    */
   @Get(":userId/persisted-profile")
+  @UseGuards(AuthGuard, PermissionGuard)
+  @RequirePermission(PermissionFlags.TUITION_MANAGE)
   async getPersistedProfileStatus(@Param("userId") userId: string) {
     return {
       hasPersistedProfile: await this.usersService.hasPersistedProfile(userId),

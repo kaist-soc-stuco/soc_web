@@ -1,4 +1,4 @@
-import { Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import Redis from "ioredis";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
@@ -21,26 +21,6 @@ export class AuthSessionRepository {
     return Math.max(ttlSeconds, 1);
   }
 
-  private async getRedisClient(): Promise<Redis> {
-    try {
-      if (this.redis.status === "wait") {
-        await this.redis.connect();
-      }
-
-      if (this.redis.status === "ready" || this.redis.status === "connect") {
-        return this.redis;
-      }
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        `redis_unavailable:${error instanceof Error ? error.message : "connect_failed"}`,
-      );
-    }
-
-    throw new ServiceUnavailableException(
-      `redis_unavailable:status_${this.redis.status}`,
-    );
-  }
-
   /**
    * 세션 메타데이터를 저장합니다.
    *
@@ -48,9 +28,9 @@ export class AuthSessionRepository {
    * @returns Promise<void>
    */
   async save(record: AuthSessionRecord): Promise<void> {
-    const redisClient = await this.getRedisClient();
     const sessionKey = this.buildKey(record.sessionId);
-    await redisClient.set(
+
+    await this.redis.set(
       sessionKey,
       JSON.stringify(record),
       "EX",
@@ -65,10 +45,8 @@ export class AuthSessionRepository {
    * @returns 세션 레코드 또는 null
    */
   async findBySessionId(sessionId: string): Promise<AuthSessionRecord | null> {
-    const redisClient = await this.getRedisClient();
     const sessionKey = this.buildKey(sessionId);
-
-    const rawValue = await redisClient.get(sessionKey);
+    const rawValue = await this.redis.get(sessionKey);
 
     if (!rawValue) {
       return null;

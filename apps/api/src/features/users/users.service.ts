@@ -17,6 +17,10 @@ export class UsersService {
     return this.usersRepository.findBySsoUserId(ssoUserId);
   }
 
+  async findById(userId: string): Promise<UserRecord | null> {
+    return this.usersRepository.findById(userId);
+  }
+
   /**
    * SSO userInfo를 바탕으로 새 사용자를 저장합니다.
    */
@@ -27,11 +31,21 @@ export class UsersService {
     consentedAt?: string;
   }): Promise<UserRecord> {
     return this.usersRepository.insert({
+      permission: 0,
       privacyConsentAt: input.consentedAt ?? null,
       ssoUserId: input.ssoUserId,
       userEmail: input.userEmail ?? null,
       userMobile: input.userMobile ?? null,
     });
+  }
+
+  async upsertConsentedSsoUser(input: {
+    consentedAt: string;
+    ssoUserId: string;
+    userEmail?: string;
+    userMobile?: string;
+  }): Promise<UserRecord> {
+    return this.usersRepository.upsertConsentedUserBySso(input);
   }
 
   /**
@@ -44,5 +58,15 @@ export class UsersService {
 
   async markConsent(userId: string, consentedAt: string): Promise<void> {
     await this.usersRepository.markConsent(userId, consentedAt);
+  }
+
+  async updateProfileFromSso(
+    userId: string,
+    input: {
+      userEmail?: string;
+      userMobile?: string;
+    },
+  ): Promise<void> {
+    await this.usersRepository.updateProfile(userId, input);
   }
 }
