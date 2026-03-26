@@ -22,6 +22,19 @@ interface LoginResultResponse {
 const withNoTrailingSlash = (value: string): string =>
   value.replace(/\/+$/, "");
 
+const resolveAuthBaseUrl = (normalizedBaseUrl: string): string => {
+  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/auth`;
+  }
+
+  if (/\/api$/i.test(normalizedBaseUrl)) {
+    // Reverse proxy usually maps /api/* -> backend /v1/*
+    return `${normalizedBaseUrl}/auth`;
+  }
+
+  return `${normalizedBaseUrl}/v1/auth`;
+};
+
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
@@ -35,7 +48,7 @@ export const createApiClient = ({
   fetcher = fetch,
 }: ApiClientOptions) => {
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
-  const authBaseUrl = `${normalizedBaseUrl}/v1/auth`;
+  const authBaseUrl = resolveAuthBaseUrl(normalizedBaseUrl);
 
   return {
     getLoginStartPayload: async (): Promise<LoginStartResponse> => {
@@ -48,15 +61,10 @@ export const createApiClient = ({
     },
 
     getSession: async (sessionId?: string): Promise<LoginSessionResponse> => {
-      const endpoint = new URL(`${authBaseUrl}/session`, "http://localhost");
-
-      if (sessionId) {
-        endpoint.searchParams.set("sessionId", sessionId);
-      }
-
-      const pathWithQuery = `${endpoint.pathname}${endpoint.search}`;
-
-      const response = await fetcher(`${normalizedBaseUrl}${pathWithQuery}`, {
+      const query = sessionId
+        ? `?sessionId=${encodeURIComponent(sessionId)}`
+        : "";
+      const response = await fetcher(`${authBaseUrl}/session${query}`, {
         credentials: "include",
         method: "GET",
       });
@@ -80,14 +88,13 @@ export const createApiClient = ({
     },
 
     consumeLoginResult: async (resultToken: string): Promise<LoginResultResponse> => {
-      const endpoint = new URL(`${authBaseUrl}/login/result`, "http://localhost");
-      endpoint.searchParams.set("resultToken", resultToken);
-      const pathWithQuery = `${endpoint.pathname}${endpoint.search}`;
-
-      const response = await fetcher(`${normalizedBaseUrl}${pathWithQuery}`, {
+      const response = await fetcher(
+        `${authBaseUrl}/login/result?resultToken=${encodeURIComponent(resultToken)}`,
+        {
         credentials: "include",
         method: "GET",
-      });
+        },
+      );
 
       return readJson<LoginResultResponse>(response);
     },
