@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -71,9 +72,6 @@ const isSsoApiErrorResponse = (
 
 @Injectable()
 export class AuthService {
-  private readonly memoryStateStore = new Map<string, StoredLoginState>();
-  private readonly memoryLoginResultStore = new Map<string, LoginResultPayload>();
-
   constructor(
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
@@ -295,53 +293,25 @@ export class AuthService {
     payload: StoredLoginState,
   ): Promise<void> {
     const redisClient = await this.getRedisClient();
-
-    if (redisClient) {
-      await redisClient.set(
-        this.buildRedisKey(state),
-        JSON.stringify(payload),
-        "EX",
-        STATE_TTL_SECONDS,
-      );
-      return;
-    }
-
-    this.memoryStateStore.set(this.buildRedisKey(state), payload);
+    await redisClient.set(
+      this.buildRedisKey(state),
+      JSON.stringify(payload),
+      "EX",
+      STATE_TTL_SECONDS,
+    );
   }
 
   private async readPendingState(
     stateKey: string,
   ): Promise<StoredLoginState | null> {
     const redisClient = await this.getRedisClient();
-
-    if (redisClient) {
-      const rawValue = await redisClient.get(stateKey);
-      return rawValue ? this.parseStoredState(rawValue) : null;
-    }
-
-    const payload = this.memoryStateStore.get(stateKey);
-
-    if (!payload) {
-      return null;
-    }
-
-    if (payload.expiresAt <= Date.now()) {
-      this.memoryStateStore.delete(stateKey);
-      return null;
-    }
-
-    return payload;
+    const rawValue = await redisClient.get(stateKey);
+    return rawValue ? this.parseStoredState(rawValue) : null;
   }
 
   private async deletePendingState(stateKey: string): Promise<void> {
     const redisClient = await this.getRedisClient();
-
-    if (redisClient) {
-      await redisClient.del(stateKey);
-      return;
-    }
-
-    this.memoryStateStore.delete(stateKey);
+    await redisClient.del(stateKey);
   }
 
   private async storeLoginResult(
@@ -350,18 +320,12 @@ export class AuthService {
   ): Promise<void> {
     const redisClient = await this.getRedisClient();
     const resultKey = this.buildLoginResultKey(resultToken);
-
-    if (redisClient) {
-      await redisClient.set(
-        resultKey,
-        JSON.stringify(payload),
-        "EX",
-        LOGIN_RESULT_TTL_SECONDS,
-      );
-      return;
-    }
-
-    this.memoryLoginResultStore.set(resultKey, payload);
+    await redisClient.set(
+      resultKey,
+      JSON.stringify(payload),
+      "EX",
+      LOGIN_RESULT_TTL_SECONDS,
+    );
   }
 
   async consumeLoginResult(resultToken: string | undefined): Promise<LoginResultPayload> {
@@ -372,31 +336,20 @@ export class AuthService {
     const redisClient = await this.getRedisClient();
     const resultKey = this.buildLoginResultKey(resultToken);
 
-    if (redisClient) {
-      const rawValue = await redisClient.get(resultKey);
+    const rawValue = await redisClient.get(resultKey);
 
-      if (!rawValue) {
-        throw new UnauthorizedException("resultToken_not_found_or_expired");
-      }
-
-      await redisClient.del(resultKey);
-
-      const parsed = this.parseLoginResult(rawValue);
-      if (!parsed) {
-        throw new UnauthorizedException("resultToken_invalid_payload");
-      }
-
-      return parsed;
-    }
-
-    const stored = this.memoryLoginResultStore.get(resultKey);
-
-    if (!stored) {
+    if (!rawValue) {
       throw new UnauthorizedException("resultToken_not_found_or_expired");
     }
 
-    this.memoryLoginResultStore.delete(resultKey);
-    return stored;
+    await redisClient.del(resultKey);
+
+    const parsed = this.parseLoginResult(rawValue);
+    if (!parsed) {
+      throw new UnauthorizedException("resultToken_invalid_payload");
+    }
+
+    return parsed;
   }
 
   private readStartConfig(): SsoConfig {
@@ -430,7 +383,7 @@ export class AuthService {
     };
   }
 
-  private async getRedisClient(): Promise<Redis | null> {
+  private async getRedisClient(): Promise<Redis> {
     try {
       if (this.redis.status === "wait") {
         await this.redis.connect();
@@ -439,10 +392,14 @@ export class AuthService {
       if (this.redis.status === "ready" || this.redis.status === "connect") {
         return this.redis;
       }
-    } catch {
-      return null;
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `redis_unavailable:${error instanceof Error ? error.message : "connect_failed"}`,
+      );
     }
 
-    return null;
+    throw new ServiceUnavailableException(
+      `redis_unavailable:status_${this.redis.status}`,
+    );
   }
 }

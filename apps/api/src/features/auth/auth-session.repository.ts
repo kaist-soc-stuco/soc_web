@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import Redis from "ioredis";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
@@ -10,8 +10,6 @@ import type { AuthSessionRecord } from "./auth.types";
  */
 @Injectable()
 export class AuthSessionRepository {
-  private readonly memoryStore = new Map<string, AuthSessionRecord>();
-
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
   private buildKey(sessionId: string): string {
@@ -23,7 +21,7 @@ export class AuthSessionRepository {
     return Math.max(ttlSeconds, 1);
   }
 
-  private async getRedisClient(): Promise<Redis | null> {
+  private async getRedisClient(): Promise<Redis> {
     try {
       if (this.redis.status === "wait") {
         await this.redis.connect();
@@ -32,11 +30,15 @@ export class AuthSessionRepository {
       if (this.redis.status === "ready" || this.redis.status === "connect") {
         return this.redis;
       }
-    } catch {
-      return null;
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `redis_unavailable:${error instanceof Error ? error.message : "connect_failed"}`,
+      );
     }
 
-    return null;
+    throw new ServiceUnavailableException(
+      `redis_unavailable:status_${this.redis.status}`,
+    );
   }
 
   /**
@@ -48,18 +50,12 @@ export class AuthSessionRepository {
   async save(record: AuthSessionRecord): Promise<void> {
     const redisClient = await this.getRedisClient();
     const sessionKey = this.buildKey(record.sessionId);
-
-    if (redisClient) {
-      await redisClient.set(
-        sessionKey,
-        JSON.stringify(record),
-        "EX",
-        this.resolveTtlSeconds(record.expiresAt),
-      );
-      return;
-    }
-
-    this.memoryStore.set(sessionKey, record);
+    await redisClient.set(
+      sessionKey,
+      JSON.stringify(record),
+      "EX",
+      this.resolveTtlSeconds(record.expiresAt),
+    );
   }
 
   /**
@@ -72,32 +68,17 @@ export class AuthSessionRepository {
     const redisClient = await this.getRedisClient();
     const sessionKey = this.buildKey(sessionId);
 
-    if (redisClient) {
-      const rawValue = await redisClient.get(sessionKey);
+    const rawValue = await redisClient.get(sessionKey);
 
-      if (!rawValue) {
-        return null;
-      }
-
-      try {
-        return JSON.parse(rawValue) as AuthSessionRecord;
-      } catch {
-        return null;
-      }
-    }
-
-    const record = this.memoryStore.get(sessionKey);
-
-    if (!record) {
+    if (!rawValue) {
       return null;
     }
 
-    if (record.expiresAt <= Date.now()) {
-      this.memoryStore.delete(sessionKey);
+    try {
+      return JSON.parse(rawValue) as AuthSessionRecord;
+    } catch {
       return null;
     }
-
-    return record;
   }
 
   /**
