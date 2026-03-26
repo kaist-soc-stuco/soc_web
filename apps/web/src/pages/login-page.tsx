@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 
@@ -13,6 +13,8 @@ interface SsoStartPayload {
   redirectUri: string;
   state: string;
 }
+
+const LAST_CONSUMED_RESULT_TOKEN_KEY = 'soc.auth.last-consumed-result-token';
 
 const deriveStartUrl = (redirectUri: string): string | null => {
   if (!redirectUri) {
@@ -137,6 +139,7 @@ export function TreeLogin() {
   const startUrlEnv = import.meta.env.VITE_SSO_START_URL ?? '';
   const redirectUri = import.meta.env.VITE_SSO_REDIRECT_URI ?? '';
   const startUrl = resolveStartUrl(startUrlEnv, redirectUri);
+  const consumedResultTokenRef = useRef<Set<string>>(new Set());
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
@@ -170,6 +173,21 @@ export function TreeLogin() {
     }
 
     if (status === 'success' && resultToken) {
+      const consumedByRef = consumedResultTokenRef.current.has(resultToken);
+      const consumedBySessionStorage =
+        typeof window !== 'undefined' &&
+        window.sessionStorage.getItem(LAST_CONSUMED_RESULT_TOKEN_KEY) === resultToken;
+
+      if (consumedByRef || consumedBySessionStorage) {
+        return;
+      }
+
+      consumedResultTokenRef.current.add(resultToken);
+
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(LAST_CONSUMED_RESULT_TOKEN_KEY, resultToken);
+      }
+
       void apiClient.consumeLoginResult(resultToken)
         .then(() => {
           clearStoredAuthState();
@@ -179,6 +197,15 @@ export function TreeLogin() {
           });
         })
         .catch((error) => {
+          consumedResultTokenRef.current.delete(resultToken);
+
+          if (
+            typeof window !== 'undefined' &&
+            window.sessionStorage.getItem(LAST_CONSUMED_RESULT_TOKEN_KEY) === resultToken
+          ) {
+            window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
+          }
+
           setErrorMessage(
             error instanceof Error
               ? error.message
