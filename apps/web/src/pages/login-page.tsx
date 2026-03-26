@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
 
 import { clearStoredAuthState, readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 
@@ -44,93 +45,25 @@ const resolveStartUrl = (startUrl: string, redirectUri: string): string | null =
 
 const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
-const resolveSessionEndpoint = (): string => {
+const resolveApiBaseUrl = (): string => {
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
   if (apiBaseUrl) {
-    return `${withNoTrailingSlash(apiBaseUrl)}/auth/session`;
+    return withNoTrailingSlash(apiBaseUrl);
   }
 
   const startUrl = (import.meta.env.VITE_SSO_START_URL as string | undefined)?.trim();
   if (startUrl) {
     try {
       const parsed = new URL(startUrl);
-      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '/auth/session');
+      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '');
       return `${parsed.origin}${path}`;
     } catch {
-      return '/api/auth/session';
+      return '/api';
     }
   }
 
-  return '/api/auth/session';
-};
-
-const resolveLoginResultEndpoint = (): string => {
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-
-  if (apiBaseUrl) {
-    return `${withNoTrailingSlash(apiBaseUrl)}/auth/login/result`;
-  }
-
-  const startUrl = (import.meta.env.VITE_SSO_START_URL as string | undefined)?.trim();
-  if (startUrl) {
-    try {
-      const parsed = new URL(startUrl);
-      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '/auth/login/result');
-      return `${parsed.origin}${path}`;
-    } catch {
-      return '/api/auth/login/result';
-    }
-  }
-
-  return '/api/auth/login/result';
-};
-
-const readString = (value: unknown): string => (typeof value === 'string' ? value : '');
-
-const getStartPayloadFromJson = async (response: Response): Promise<SsoStartPayload> => {
-  const body = (await response.json()) as Record<string, unknown>;
-
-  return {
-    action: readString(
-      body.action || body.loginUrl || body.login_url || body.authorizeUrl || body.serverUrl,
-    ),
-    clientId: readString(body.clientId || body.client_id || body.clientID),
-    nonce: readString(body.nonce),
-    redirectUri: readString(body.redirectUri || body.redirect_uri),
-    state: readString(body.state),
-  };
-};
-
-const getStartPayloadFromHtml = async (response: Response): Promise<SsoStartPayload> => {
-  const html = await response.text();
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  const form = document.querySelector('form');
-
-  if (!form) {
-    throw new Error('SSO start payload에 form이 없습니다.');
-  }
-
-  const readInputValue = (name: string): string =>
-    document.querySelector<HTMLInputElement>(`input[name="${name}"]`)?.value ?? '';
-
-  return {
-    action: form.getAttribute('action') ?? '',
-    clientId: readInputValue('client_id'),
-    nonce: readInputValue('nonce'),
-    redirectUri: readInputValue('redirect_uri'),
-    state: readInputValue('state'),
-  };
-};
-
-const readStartPayload = async (response: Response): Promise<SsoStartPayload> => {
-  const contentType = response.headers.get('content-type') ?? '';
-
-  if (contentType.includes('application/json')) {
-    return getStartPayloadFromJson(response);
-  }
-
-  return getStartPayloadFromHtml(response);
+  return '/api';
 };
 
 const submitAuthorizeForm = (payload: SsoStartPayload): void => {
@@ -204,6 +137,10 @@ export function TreeLogin() {
   const startUrlEnv = import.meta.env.VITE_SSO_START_URL ?? '';
   const redirectUri = import.meta.env.VITE_SSO_REDIRECT_URI ?? '';
   const startUrl = resolveStartUrl(startUrlEnv, redirectUri);
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
 
   const status = searchParams.get('status');
   const reason = searchParams.get('reason');
@@ -233,23 +170,7 @@ export function TreeLogin() {
     }
 
     if (status === 'success' && resultToken) {
-      const resultEndpoint = new URL(resolveLoginResultEndpoint(), window.location.origin);
-      resultEndpoint.searchParams.set('resultToken', resultToken);
-
-      void fetch(resultEndpoint.toString(), {
-        credentials: 'include',
-        method: 'GET',
-      })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-
-          return response.json() as Promise<{
-            storageMode: 'persisted' | 'temporary';
-            userId?: string;
-          }>;
-        })
+      void apiClient.consumeLoginResult(resultToken)
         .then(() => {
           clearStoredAuthState();
 
@@ -267,46 +188,24 @@ export function TreeLogin() {
     }
   }, [
     navigate,
+    apiClient,
     pendingLoginToken,
     resultToken,
     status,
   ]);
 
   useEffect(() => {
-    const sessionEndpoint = new URL(resolveSessionEndpoint(), window.location.origin);
-
-    if (temporarySessionId) {
-      sessionEndpoint.searchParams.set('sessionId', temporarySessionId);
-    }
-
-    void fetch(sessionEndpoint.toString(), {
-      credentials: 'include',
-      method: 'GET',
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        return response.json() as Promise<{
-          authenticated: boolean;
-          canUsePersistentFeatures: boolean;
-          requiresConsent: boolean;
-          storageMode: 'persisted' | 'temporary' | null;
-          userId?: string;
-        }>;
-      })
+    void apiClient.getSession(temporarySessionId)
       .then((summary) => {
         setSessionSummary(summary);
       })
       .catch(() => {
         setSessionSummary(null);
       });
-  }, [status, temporarySessionId]);
+  }, [status, temporarySessionId, apiClient]);
 
   const handleLogin = async () => {
-    if (!startUrl || typeof window === 'undefined') {
-      setErrorMessage('SSO 시작 URL을 만들 수 없습니다.');
+    if (typeof window === 'undefined') {
       return;
     }
 
@@ -314,21 +213,10 @@ export function TreeLogin() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch(startUrl, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json, text/html',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`로그인 시작 요청이 실패했습니다. HTTP ${response.status}`);
-      }
-
-      const payload = await readStartPayload(response);
+      const payload = await apiClient.getLoginStartPayload();
 
       if (
-        !payload.action ||
+        !payload.loginUrl ||
         !payload.clientId ||
         !payload.nonce ||
         !payload.redirectUri ||
@@ -337,7 +225,13 @@ export function TreeLogin() {
         throw new Error('SSO 시작 payload가 불완전합니다.');
       }
 
-      submitAuthorizeForm(payload);
+      submitAuthorizeForm({
+        action: payload.loginUrl,
+        clientId: payload.clientId,
+        nonce: payload.nonce,
+        redirectUri: payload.redirectUri,
+        state: payload.state,
+      });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '로그인 시작 중 오류가 발생했습니다.');
       setLoading(false);
@@ -396,17 +290,11 @@ export function TreeLogin() {
             </div>
           </div>
 
-          {!startUrl ? (
-            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-              `VITE_SSO_START_URL` 또는 `VITE_SSO_REDIRECT_URI`로부터 시작 URL을 만들 수 없습니다.
-            </div>
-          ) : null}
-
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <button
               type="button"
               onClick={handleLogin}
-              disabled={!startUrl || loading}
+              disabled={loading}
               className="rounded-full bg-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:bg-kaist-grey"
             >
               {loading ? 'SSO 로그인 진행 중' : 'SSO 로그인 시작'}

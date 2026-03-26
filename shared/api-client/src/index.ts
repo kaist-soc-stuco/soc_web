@@ -14,6 +14,11 @@ export interface ApiClientOptions {
   fetcher?: typeof fetch;
 }
 
+interface LoginResultResponse {
+  storageMode: "persisted" | "temporary";
+  userId?: string;
+}
+
 const withNoTrailingSlash = (value: string): string =>
   value.replace(/\/+$/, "");
 
@@ -30,49 +35,87 @@ export const createApiClient = ({
   fetcher = fetch,
 }: ApiClientOptions) => {
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
+  const authBaseUrl = `${normalizedBaseUrl}/v1/auth`;
 
   return {
-    /**
-     * TODO:
-     * - `/v1/auth/login/start` 실제 경로와 인증 정책을 backend 구현과 맞추세요.
-     * - `credentials: 'include'`가 필요한지 검토하세요.
-     */
     getLoginStartPayload: async (): Promise<LoginStartResponse> => {
-      throw new Error("TODO: getLoginStartPayload 구현");
+      const response = await fetcher(`${authBaseUrl}/login/start`, {
+        credentials: "include",
+        method: "GET",
+      });
+
+      return readJson<LoginStartResponse>(response);
     },
 
-    /**
-     * TODO:
-     * - 현재 로그인 세션 상태를 조회하는 메서드로 채우세요.
-     */
-    getSession: async (): Promise<LoginSessionResponse> => {
-      throw new Error("TODO: getSession 구현");
+    getSession: async (sessionId?: string): Promise<LoginSessionResponse> => {
+      const endpoint = new URL(`${authBaseUrl}/session`, "http://localhost");
+
+      if (sessionId) {
+        endpoint.searchParams.set("sessionId", sessionId);
+      }
+
+      const pathWithQuery = `${endpoint.pathname}${endpoint.search}`;
+
+      const response = await fetcher(`${normalizedBaseUrl}${pathWithQuery}`, {
+        credentials: "include",
+        method: "GET",
+      });
+
+      return readJson<LoginSessionResponse>(response);
     },
 
-    /**
-     * TODO:
-     * - 개인정보 저장 동의/비동의를 backend consent endpoint와 연결하세요.
-     */
     submitConsentDecision: async (
-      _input: ConsentDecisionRequest,
+      input: ConsentDecisionRequest,
     ): Promise<ConsentDecisionResponse> => {
-      throw new Error("TODO: submitConsentDecision 구현");
+      const response = await fetcher(`${authBaseUrl}/login/consent`, {
+        body: JSON.stringify(input),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      return readJson<ConsentDecisionResponse>(response);
     },
 
-    /**
-     * TODO:
-     * - access token 만료 시 refresh token rotation과 연결하세요.
-     */
+    consumeLoginResult: async (resultToken: string): Promise<LoginResultResponse> => {
+      const endpoint = new URL(`${authBaseUrl}/login/result`, "http://localhost");
+      endpoint.searchParams.set("resultToken", resultToken);
+      const pathWithQuery = `${endpoint.pathname}${endpoint.search}`;
+
+      const response = await fetcher(`${normalizedBaseUrl}${pathWithQuery}`, {
+        credentials: "include",
+        method: "GET",
+      });
+
+      return readJson<LoginResultResponse>(response);
+    },
+
     refreshSession: async (): Promise<RefreshResponse> => {
-      throw new Error("TODO: refreshSession 구현");
+      const response = await fetcher(`${authBaseUrl}/refresh`, {
+        body: JSON.stringify({}),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      return readJson<RefreshResponse>(response);
     },
 
-    /**
-     * TODO:
-     * - logout 시 cookie/sessionStorage/Redis revoke가 함께 되도록 연결하세요.
-     */
     logout: async (): Promise<LogoutResponse> => {
-      throw new Error("TODO: logout 구현");
+      const response = await fetcher(`${authBaseUrl}/logout`, {
+        body: JSON.stringify({}),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      return readJson<LogoutResponse>(response);
     },
 
     getHealth: async (): Promise<HealthResponse> => {
