@@ -46,8 +46,11 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     SSO_CLIENT_SECRET: asString(config.SSO_CLIENT_SECRET, 'SSO_CLIENT_SECRET'),
     AUTH_JWT_SECRET: asString(
       config.AUTH_JWT_SECRET,
-      'AUTH_JWT_SECRET',
-      'dev-auth-jwt-secret-change-me',
+      'AUTH_JWT_SECRET'
+    ),
+    AUTH_PENDING_LOGIN_ENCRYPTION_KEY: asString(
+      config.AUTH_PENDING_LOGIN_ENCRYPTION_KEY,
+      'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
     ),
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,

@@ -7,7 +7,6 @@ import {
   Query,
   Res,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { Response } from "express";
 
 import {
@@ -29,7 +28,6 @@ import {
 @Controller("auth")
 export class AuthController {
   constructor(
-    private readonly configService: ConfigService,
     private readonly authService: AuthService,
     private readonly authSessionService: AuthSessionService,
   ) {}
@@ -193,7 +191,6 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const cookieRefreshToken = this.readCookie(cookieHeader, AUTH_REFRESH_COOKIE_NAME);
-    const sessionId = body.sessionId ?? this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
     const result = await this.authSessionService.refreshSession({
       ...body,
       refreshToken: body.refreshToken ?? cookieRefreshToken,
@@ -203,7 +200,7 @@ export class AuthController {
       this.setAuthCookies(response, {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        sessionId,
+        sessionId: result.sessionId,
       });
 
       return {
@@ -218,7 +215,7 @@ export class AuthController {
       temporarySession: {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
-        sessionId,
+        sessionId: result.sessionId,
       },
     };
   }

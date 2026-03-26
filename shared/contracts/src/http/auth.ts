@@ -29,18 +29,21 @@ export interface ConsentDecisionRequest {
   pendingLoginToken: string;
 }
 
-export interface ConsentDecisionResponse {
+export interface TemporarySessionPayload {
   accessToken?: string;
   refreshToken?: string;
   sessionId?: string;
+}
+
+export interface ConsentDecisionResponse {
   storageMode: AuthStorageMode;
+  temporarySession?: TemporarySessionPayload;
   userId?: string;
 }
 
 export interface RefreshResponse {
-  accessToken: string;
-  refreshToken?: string;
   storageMode: AuthStorageMode;
+  temporarySession?: TemporarySessionPayload;
 }
 
 export interface LogoutResponse {

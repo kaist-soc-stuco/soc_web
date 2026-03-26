@@ -199,6 +199,7 @@ export class AuthSessionService {
   async rotateRefreshToken(refreshToken: string): Promise<{
     accessToken: string;
     refreshToken?: string;
+    sessionId: string;
     storageMode: "temporary" | "persisted";
   }> {
     const claims = this.verifyRefreshToken(refreshToken);
@@ -221,6 +222,7 @@ export class AuthSessionService {
     return {
       accessToken: this.issueAccessToken(rotatedSession),
       refreshToken: this.issueRefreshToken(rotatedSession, rotatedJti),
+      sessionId: rotatedSession.sessionId,
       storageMode: rotatedSession.mode,
     };
   }
@@ -269,6 +271,8 @@ export class AuthSessionService {
         (await this.usersService.createFromSsoUser({
           consentedAt,
           ssoUserId: pendingUser.ssoUserId,
+          userEmail: pendingUser.userEmail,
+          userMobile: pendingUser.userMobile,
         }));
 
       if (!persistedUser.privacyConsentAt) {
@@ -339,6 +343,7 @@ export class AuthSessionService {
   async refreshSession(input: RefreshSessionRequest): Promise<{
     accessToken?: string;
     refreshToken?: string;
+    sessionId: string;
     storageMode: "temporary" | "persisted";
   }> {
     if (!input.refreshToken) {
