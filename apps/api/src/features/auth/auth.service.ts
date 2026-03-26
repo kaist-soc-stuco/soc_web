@@ -209,6 +209,10 @@ export class AuthService {
       await this.pendingLoginRepository.save(pendingLoginToken, {
         expiresAt: Date.now() + PENDING_LOGIN_TTL_SECONDS * 1000,
         ssoUserId,
+        userEmail:
+          typeof userInfo.user_email === "string" ? userInfo.user_email : undefined,
+        userMobile:
+          typeof userInfo.user_mbtlnum === "string" ? userInfo.user_mbtlnum : undefined,
       }, PENDING_LOGIN_TTL_SECONDS);
 
       return this.buildFrontendRedirect("consent-required", "pending_consent", {
