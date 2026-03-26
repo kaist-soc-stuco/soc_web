@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  InternalServerErrorException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -40,10 +41,13 @@ export class AuthSessionService {
   ) {}
 
   private getJwtSecret(): string {
-    return this.configService.get<string>(
-      "AUTH_JWT_SECRET",
-      "dev-auth-jwt-secret-change-me",
-    );
+    const secret = this.configService.get<string>("AUTH_JWT_SECRET");
+
+    if (secret && secret.trim().length > 0) {
+      return secret;
+    }
+
+    throw new InternalServerErrorException("AUTH_JWT_SECRET_is_required");
   }
 
   private issueAccessToken(record: AuthSessionRecord): string {
@@ -248,10 +252,6 @@ export class AuthSessionService {
     storageMode: "temporary" | "persisted";
     userId?: string;
   }> {
-    if (!input.pendingLoginToken) {
-      throw new BadRequestException("pendingLoginToken_is_required");
-    }
-
     const pendingUser = await this.pendingLoginRepository.find(
       input.pendingLoginToken,
     );
@@ -261,23 +261,13 @@ export class AuthSessionService {
     }
 
     if (input.consent) {
-      const existingUser = await this.usersService.findBySsoUserId(
-        pendingUser.ssoUserId,
-      );
       const consentedAt = new Date().toISOString();
-
-      const persistedUser =
-        existingUser ??
-        (await this.usersService.createFromSsoUser({
-          consentedAt,
-          ssoUserId: pendingUser.ssoUserId,
-          userEmail: pendingUser.userEmail,
-          userMobile: pendingUser.userMobile,
-        }));
-
-      if (!persistedUser.privacyConsentAt) {
-        await this.usersService.markConsent(persistedUser.id, consentedAt);
-      }
+      const persistedUser = await this.usersService.upsertConsentedSsoUser({
+        consentedAt,
+        ssoUserId: pendingUser.ssoUserId,
+        userEmail: pendingUser.userEmail,
+        userMobile: pendingUser.userMobile,
+      });
 
       const issued = await this.issuePersistedSession(persistedUser.id);
       await this.pendingLoginRepository.delete(input.pendingLoginToken);
@@ -362,33 +352,5 @@ export class AuthSessionService {
     }
 
     return { ok: true };
-  }
-
-  /**
-   * 토큰 클레임 타입 예시입니다. 구현 시 실제 JWT payload 설계 기준으로 사용하세요.
-   */
-  createClaimExamples(): {
-    persisted: PersistedAccessTokenClaims;
-    refresh: RefreshTokenClaims;
-    temporary: TemporaryAccessTokenClaims;
-  } {
-    return {
-      persisted: {
-        mode: "persisted",
-        sub: "user-id",
-        userId: "user-id",
-      },
-      refresh: {
-        jti: "refresh-jti",
-        mode: "persisted",
-        sid: "session-id",
-        sub: "user-id",
-      },
-      temporary: {
-        mode: "temporary",
-        pendingLoginId: "pending-login-id",
-        sub: "pending-user",
-      },
-    };
   }
 }

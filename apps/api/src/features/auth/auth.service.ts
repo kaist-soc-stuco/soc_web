@@ -72,13 +72,19 @@ const isSsoApiErrorResponse = (
 
 @Injectable()
 export class AuthService {
+  private readonly startConfig: SsoConfig;
+  private readonly callbackConfig: SsoCallbackConfig;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
     private readonly authSessionService: AuthSessionService,
     private readonly pendingLoginRepository: PendingLoginRepository,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-  ) {}
+  ) {
+    this.startConfig = this.loadStartConfig();
+    this.callbackConfig = this.loadCallbackConfig(this.startConfig);
+  }
 
   /**
    * @description SSO authorize 요청에 필요한 초기 payload를 생성합니다.
@@ -127,8 +133,6 @@ export class AuthService {
       return this.buildFrontendRedirect("error", "invalid_or_expired_state");
     }
 
-    await this.deletePendingState(stateKey);
-
     try {
       const response = await fetch(config.authApiUrl, {
         method: "POST",
@@ -171,12 +175,23 @@ export class AuthService {
       }
 
       if (parsedResponse.nonce !== storedState.nonce) {
+        await this.deletePendingState(stateKey);
         return this.buildFrontendRedirect("error", "nonce_mismatch");
       }
+
+      await this.deletePendingState(stateKey);
 
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
       const ssoUserId =
         typeof userInfo.user_id === "string" ? userInfo.user_id : "";
+      const userEmail =
+        typeof userInfo.user_email === "string" && userInfo.user_email.trim().length > 0
+          ? userInfo.user_email
+          : undefined;
+      const userMobile =
+        typeof userInfo.user_mbtlnum === "string" && userInfo.user_mbtlnum.trim().length > 0
+          ? userInfo.user_mbtlnum
+          : undefined;
 
       if (!ssoUserId) {
         return this.buildFrontendRedirect("error", "missing_sso_user_id");
@@ -209,10 +224,8 @@ export class AuthService {
       await this.pendingLoginRepository.save(pendingLoginToken, {
         expiresAt: Date.now() + PENDING_LOGIN_TTL_SECONDS * 1000,
         ssoUserId,
-        userEmail:
-          typeof userInfo.user_email === "string" ? userInfo.user_email : undefined,
-        userMobile:
-          typeof userInfo.user_mbtlnum === "string" ? userInfo.user_mbtlnum : undefined,
+        userEmail,
+        userMobile,
       }, PENDING_LOGIN_TTL_SECONDS);
 
       return this.buildFrontendRedirect("consent-required", "pending_consent", {
@@ -292,44 +305,70 @@ export class AuthService {
     }
   }
 
+  private async executeWithRedis<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      await this.ensureRedisConnected();
+      return await operation();
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      throw new ServiceUnavailableException(
+        `redis_unavailable:${error instanceof Error ? error.message : "operation_failed"}`,
+      );
+    }
+  }
+
   private async storePendingState(
     state: string,
     payload: StoredLoginState,
   ): Promise<void> {
-    const redisClient = await this.getRedisClient();
-    await redisClient.set(
-      this.buildRedisKey(state),
-      JSON.stringify(payload),
-      "EX",
-      STATE_TTL_SECONDS,
-    );
+    await this.executeWithRedis(async () => {
+      await this.redis.set(
+        this.buildRedisKey(state),
+        JSON.stringify(payload),
+        "EX",
+        STATE_TTL_SECONDS,
+      );
+    });
   }
 
   private async readPendingState(
     stateKey: string,
   ): Promise<StoredLoginState | null> {
-    const redisClient = await this.getRedisClient();
-    const rawValue = await redisClient.get(stateKey);
-    return rawValue ? this.parseStoredState(rawValue) : null;
+    return this.executeWithRedis(async () => {
+      const rawValue = await this.redis.get(stateKey);
+      return rawValue ? this.parseStoredState(rawValue) : null;
+    });
   }
 
   private async deletePendingState(stateKey: string): Promise<void> {
-    const redisClient = await this.getRedisClient();
-    await redisClient.del(stateKey);
+    await this.executeWithRedis(async () => {
+      await this.redis.del(stateKey);
+    });
   }
 
   private async storeLoginResult(
     resultToken: string,
     payload: LoginResultPayload,
   ): Promise<void> {
-    const redisClient = await this.getRedisClient();
     const resultKey = this.buildLoginResultKey(resultToken);
-    await redisClient.set(
-      resultKey,
-      JSON.stringify(payload),
-      "EX",
-      LOGIN_RESULT_TTL_SECONDS,
-    );
+
+    await this.executeWithRedis(async () => {
+      await this.redis.set(
+        resultKey,
+        JSON.stringify(payload),
+        "EX",
+        LOGIN_RESULT_TTL_SECONDS,
+      );
+    });
+  }
+
+  private async consumeRedisValueOnce(key: string): Promise<string | null> {
+    return this.executeWithRedis(async () => {
+      return this.redis.getdel(key);
+    });
   }
 
   async consumeLoginResult(resultToken: string | undefined): Promise<LoginResultPayload> {
@@ -337,16 +376,13 @@ export class AuthService {
       throw new BadRequestException("resultToken_is_required");
     }
 
-    const redisClient = await this.getRedisClient();
     const resultKey = this.buildLoginResultKey(resultToken);
 
-    const rawValue = await redisClient.get(resultKey);
+    const rawValue = await this.consumeRedisValueOnce(resultKey);
 
     if (!rawValue) {
       throw new UnauthorizedException("resultToken_not_found_or_expired");
     }
-
-    await redisClient.del(resultKey);
 
     const parsed = this.parseLoginResult(rawValue);
     if (!parsed) {
@@ -356,7 +392,7 @@ export class AuthService {
     return parsed;
   }
 
-  private readStartConfig(): SsoConfig {
+  private loadStartConfig(): SsoConfig {
     return {
       clientId: this.ensureRequired(
         this.configService.get<string>("VITE_SSO_CLIENT_ID"),
@@ -373,9 +409,9 @@ export class AuthService {
     };
   }
 
-  private readCallbackConfig(): SsoCallbackConfig {
+  private loadCallbackConfig(startConfig: SsoConfig): SsoCallbackConfig {
     return {
-      ...this.readStartConfig(),
+      ...startConfig,
       authApiUrl: this.ensureRequired(
         this.configService.get<string>("SSO_AUTH_API_URL"),
         "SSO_AUTH_API_URL",
@@ -387,14 +423,22 @@ export class AuthService {
     };
   }
 
-  private async getRedisClient(): Promise<Redis> {
+  private readStartConfig(): SsoConfig {
+    return this.startConfig;
+  }
+
+  private readCallbackConfig(): SsoCallbackConfig {
+    return this.callbackConfig;
+  }
+
+  private async ensureRedisConnected(): Promise<void> {
     try {
       if (this.redis.status === "wait") {
         await this.redis.connect();
       }
 
       if (this.redis.status === "ready" || this.redis.status === "connect") {
-        return this.redis;
+        return;
       }
     } catch (error) {
       throw new ServiceUnavailableException(

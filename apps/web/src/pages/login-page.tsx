@@ -222,14 +222,24 @@ export function TreeLogin() {
   ]);
 
   useEffect(() => {
+    let cancelled = false;
+
     void apiClient.getSession(temporarySessionId)
       .then((summary) => {
-        setSessionSummary(summary);
+        if (!cancelled) {
+          setSessionSummary(summary);
+        }
       })
       .catch(() => {
-        setSessionSummary(null);
+        if (!cancelled) {
+          setSessionSummary(null);
+        }
       });
-  }, [status, temporarySessionId, apiClient]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [temporarySessionId, apiClient]);
 
   const handleLogin = async () => {
     if (typeof window === 'undefined') {
