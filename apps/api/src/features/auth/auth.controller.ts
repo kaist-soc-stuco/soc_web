@@ -2,18 +2,15 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Post,
   Query,
   Res,
 } from "@nestjs/common";
-import { parse as parseCookieHeader } from "cookie";
 import { Response } from "express";
 
+import { Cookies } from "../../shared/decorators/cookies.decorator";
 import {
   ConsentDecisionRequestDto,
-  LogoutRequestDto,
-  RefreshSessionRequestDto,
   SsoCallbackBodyDto,
 } from "./auth.types";
 import { AuthSessionService } from "./auth-session.service";
@@ -32,15 +29,6 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly authSessionService: AuthSessionService,
   ) {}
-
-  private readCookie(cookieHeader: string | undefined, name: string): string | undefined {
-    if (!cookieHeader) {
-      return undefined;
-    }
-
-    const parsed = parseCookieHeader(cookieHeader);
-    return parsed[name];
-  }
 
   private getCookieOptions(maxAgeMs: number) {
     const isProd = process.env.NODE_ENV === "production";
@@ -166,11 +154,9 @@ export class AuthController {
    */
   @Get("session")
   async getSession(
-    @Query("sessionId") sessionId: string | undefined,
-    @Headers("cookie") cookieHeader?: string,
+    @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
   ) {
-    const cookieSessionId = this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
-    return this.authSessionService.getSession(cookieSessionId ?? sessionId);
+    return this.authSessionService.getSession(cookieSessionId);
   }
 
   /**
@@ -178,14 +164,11 @@ export class AuthController {
    */
   @Post("refresh")
   async refreshSession(
-    @Body() body: RefreshSessionRequestDto,
-    @Headers("cookie") cookieHeader: string | undefined,
+    @Cookies(AUTH_REFRESH_COOKIE_NAME) cookieRefreshToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const cookieRefreshToken = this.readCookie(cookieHeader, AUTH_REFRESH_COOKIE_NAME);
     const result = await this.authSessionService.refreshSession({
-      ...body,
-      refreshToken: body.refreshToken ?? cookieRefreshToken,
+      refreshToken: cookieRefreshToken,
     });
 
     if (result.storageMode === "persisted") {
@@ -217,14 +200,11 @@ export class AuthController {
    */
   @Post("logout")
   async logout(
-    @Body() body: LogoutRequestDto,
-    @Headers("cookie") cookieHeader: string | undefined,
+    @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const cookieSessionId = this.readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
     const result = await this.authSessionService.logout({
-      ...body,
-      sessionId: body.sessionId ?? cookieSessionId,
+      sessionId: cookieSessionId,
     });
 
     this.clearAuthCookies(response);
