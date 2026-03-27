@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -305,48 +304,27 @@ export class AuthService {
     }
   }
 
-  private async executeWithRedis<T>(operation: () => Promise<T>): Promise<T> {
-    try {
-      await this.ensureRedisConnected();
-      return await operation();
-    } catch (error) {
-      if (error instanceof ServiceUnavailableException) {
-        throw error;
-      }
-
-      throw new ServiceUnavailableException(
-        `redis_unavailable:${error instanceof Error ? error.message : "operation_failed"}`,
-      );
-    }
-  }
-
   private async storePendingState(
     state: string,
     payload: StoredLoginState,
   ): Promise<void> {
-    await this.executeWithRedis(async () => {
-      await this.redis.set(
-        this.buildRedisKey(state),
-        JSON.stringify(payload),
-        "EX",
-        STATE_TTL_SECONDS,
-      );
-    });
+    await this.redis.set(
+      this.buildRedisKey(state),
+      JSON.stringify(payload),
+      "EX",
+      STATE_TTL_SECONDS,
+    );
   }
 
   private async readPendingState(
     stateKey: string,
   ): Promise<StoredLoginState | null> {
-    return this.executeWithRedis(async () => {
-      const rawValue = await this.redis.get(stateKey);
-      return rawValue ? this.parseStoredState(rawValue) : null;
-    });
+    const rawValue = await this.redis.get(stateKey);
+    return rawValue ? this.parseStoredState(rawValue) : null;
   }
 
   private async deletePendingState(stateKey: string): Promise<void> {
-    await this.executeWithRedis(async () => {
-      await this.redis.del(stateKey);
-    });
+    await this.redis.del(stateKey);
   }
 
   private async storeLoginResult(
@@ -355,20 +333,16 @@ export class AuthService {
   ): Promise<void> {
     const resultKey = this.buildLoginResultKey(resultToken);
 
-    await this.executeWithRedis(async () => {
-      await this.redis.set(
-        resultKey,
-        JSON.stringify(payload),
-        "EX",
-        LOGIN_RESULT_TTL_SECONDS,
-      );
-    });
+    await this.redis.set(
+      resultKey,
+      JSON.stringify(payload),
+      "EX",
+      LOGIN_RESULT_TTL_SECONDS,
+    );
   }
 
   private async consumeRedisValueOnce(key: string): Promise<string | null> {
-    return this.executeWithRedis(async () => {
-      return this.redis.getdel(key);
-    });
+    return this.redis.getdel(key);
   }
 
   async consumeLoginResult(resultToken: string | undefined): Promise<LoginResultPayload> {
@@ -429,25 +403,5 @@ export class AuthService {
 
   private readCallbackConfig(): SsoCallbackConfig {
     return this.callbackConfig;
-  }
-
-  private async ensureRedisConnected(): Promise<void> {
-    try {
-      if (this.redis.status === "wait") {
-        await this.redis.connect();
-      }
-
-      if (this.redis.status === "ready" || this.redis.status === "connect") {
-        return;
-      }
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        `redis_unavailable:${error instanceof Error ? error.message : "connect_failed"}`,
-      );
-    }
-
-    throw new ServiceUnavailableException(
-      `redis_unavailable:status_${this.redis.status}`,
-    );
   }
 }

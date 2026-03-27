@@ -212,6 +212,7 @@ export class AuthSessionService {
     this.assertActiveSession(session);
 
     if (!session.refreshJti || session.refreshJti !== claims.jti) {
+      await this.authSessionRepository.revoke(claims.sid);
       throw new UnauthorizedException("refresh_token_reused_or_invalid");
     }
 
