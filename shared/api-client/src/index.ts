@@ -26,6 +26,11 @@ interface LoginResultResponse {
   userId?: string;
 }
 
+interface AccessCheckResponse {
+  mode: "persisted" | "temporary";
+  ok: boolean;
+}
+
 const withNoTrailingSlash = (value: string): string =>
   value.replace(/\/+$/, "");
 
@@ -142,6 +147,14 @@ export const createApiClient = ({
         ? `?sessionId=${encodeURIComponent(sessionId)}`
         : "";
       return requestJson<LoginSessionResponse>(`${authBaseUrl}/session${query}`, {
+        method: "GET",
+      }, {
+        retryOnUnauthorized: true,
+      });
+    },
+
+    checkAccessToken: async (): Promise<AccessCheckResponse> => {
+      return requestJson<AccessCheckResponse>(`${authBaseUrl}/access-check`, {
         method: "GET",
       }, {
         retryOnUnauthorized: true,

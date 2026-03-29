@@ -160,6 +160,21 @@ export class AuthController {
   }
 
   /**
+   * @description access token 유효성을 확인하는 테스트용 endpoint입니다.
+   */
+  @Get("access-check")
+  async checkAccessToken(
+    @Cookies(AUTH_ACCESS_COOKIE_NAME) cookieAccessToken: string | undefined,
+  ) {
+    const claims = this.authSessionService.validateAccessToken(cookieAccessToken);
+
+    return {
+      mode: claims.mode,
+      ok: true,
+    };
+  }
+
+  /**
    * @description access token 만료 시 refresh token 기반으로 세션을 갱신합니다.
    */
   @Post("refresh")

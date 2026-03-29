@@ -116,6 +116,61 @@ export class AuthSessionService {
     };
   }
 
+  validateAccessToken(
+    accessToken: string | undefined,
+  ): PersistedAccessTokenClaims | TemporaryAccessTokenClaims {
+    if (!accessToken) {
+      throw new UnauthorizedException("access_token_missing");
+    }
+
+    let decoded: string | JwtPayload;
+
+    try {
+      decoded = jwt.verify(accessToken, this.getJwtSecret());
+    } catch {
+      throw new UnauthorizedException("invalid_access_token");
+    }
+
+    if (typeof decoded === "string") {
+      throw new UnauthorizedException("invalid_access_token");
+    }
+
+    const mode = decoded.mode;
+
+    if (mode === "persisted") {
+      const userId = typeof decoded.userId === "string" ? decoded.userId : undefined;
+
+      if (!userId) {
+        throw new UnauthorizedException("invalid_access_token");
+      }
+
+      return {
+        mode: "persisted",
+        sub: userId,
+        userId,
+      };
+    }
+
+    if (mode === "temporary") {
+      const pendingLoginId =
+        typeof decoded.pendingLoginId === "string"
+          ? decoded.pendingLoginId
+          : undefined;
+
+      if (!pendingLoginId) {
+        throw new UnauthorizedException("invalid_access_token");
+      }
+
+      return {
+        mode: "temporary",
+        pendingLoginId,
+        sub: pendingLoginId,
+      };
+    }
+
+    throw new UnauthorizedException("invalid_access_token");
+  }
+
   private assertActiveSession(record: AuthSessionRecord | null): asserts record is AuthSessionRecord {
     if (!record) {
       throw new UnauthorizedException("session_not_found");

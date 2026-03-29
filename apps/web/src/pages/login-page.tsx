@@ -126,6 +126,8 @@ export function TreeLogin() {
   const searchParams = new URLSearchParams(location.search);
   const [loading, setLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [refreshTestLoading, setRefreshTestLoading] = useState(false);
+  const [refreshTestMessage, setRefreshTestMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sessionSummary, setSessionSummary] = useState<
     | {
@@ -299,6 +301,25 @@ export function TreeLogin() {
     }
   };
 
+  const handleRefreshFlowTest = async () => {
+    setRefreshTestLoading(true);
+    setErrorMessage(null);
+    setRefreshTestMessage(null);
+
+    try {
+      const result = await apiClient.checkAccessToken();
+      setRefreshTestMessage(`성공: access-check ok (mode=${result.mode})`);
+    } catch (error) {
+      setRefreshTestMessage(
+        error instanceof Error
+          ? `실패: ${error.message}`
+          : '실패: refresh 테스트 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setRefreshTestLoading(false);
+    }
+  };
+
   const hasResult = Boolean(
     status ||
       searchParams.get('message') ||
@@ -368,7 +389,21 @@ export function TreeLogin() {
             >
               {logoutLoading ? '로그아웃 처리 중' : '로그아웃'}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleRefreshFlowTest()}
+              disabled={refreshTestLoading}
+              className="rounded-full border border-kaist-greygreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-greygreen transition hover:bg-kaist-greygreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+            >
+              {refreshTestLoading ? 'refresh 테스트 중' : '401/refresh 테스트'}
+            </button>
           </div>
+
+          {refreshTestMessage ? (
+            <div className="mt-4 rounded-xl border border-kaist-darkgreen/20 bg-kaist-darkgreen/5 p-4 text-sm font-medium text-kaist-black">
+              {refreshTestMessage}
+            </div>
+          ) : null}
 
           {errorMessage ? (
             <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
