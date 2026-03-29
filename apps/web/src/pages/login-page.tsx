@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 
 import { clearStoredAuthState, readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
+import { createEmptyAuthSession, getAuthSessionSummary } from '@/lib/auth-session';
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
 
@@ -124,6 +125,7 @@ export function TreeLogin() {
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const [loading, setLoading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sessionSummary, setSessionSummary] = useState<
     | {
@@ -153,8 +155,6 @@ export function TreeLogin() {
   const pendingLoginToken = searchParams.get('pendingLoginToken');
   const storageMode = searchParams.get('storageMode');
   const resultMessage = getResultMessage(searchParams);
-  const storedAuthState = readStoredAuthState();
-  const temporarySessionId = storedAuthState?.temporarySession?.sessionId;
 
   useEffect(() => {
     if (!status) {
@@ -224,7 +224,7 @@ export function TreeLogin() {
   useEffect(() => {
     let cancelled = false;
 
-    void apiClient.getSession(temporarySessionId)
+    void getAuthSessionSummary(apiClient)
       .then((summary) => {
         if (!cancelled) {
           setSessionSummary(summary);
@@ -239,7 +239,7 @@ export function TreeLogin() {
     return () => {
       cancelled = true;
     };
-  }, [temporarySessionId, apiClient]);
+  }, [apiClient]);
 
   const handleLogin = async () => {
     if (typeof window === 'undefined') {
@@ -272,6 +272,30 @@ export function TreeLogin() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '로그인 시작 중 오류가 발생했습니다.');
       setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await apiClient.logout();
+      clearStoredAuthState();
+
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
+      }
+
+      setSessionSummary({
+        ...createEmptyAuthSession(),
+      });
+
+      navigate('/login?status=success&reason=logged_out', { replace: true });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '로그아웃 중 오류가 발생했습니다.');
+    } finally {
+      setLogoutLoading(false);
     }
   };
 
@@ -336,6 +360,14 @@ export function TreeLogin() {
             >
               {loading ? 'SSO 로그인 진행 중' : 'SSO 로그인 시작'}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={logoutLoading}
+              className="rounded-full border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition hover:bg-kaist-darkgreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+            >
+              {logoutLoading ? '로그아웃 처리 중' : '로그아웃'}
+            </button>
           </div>
 
           {errorMessage ? (
@@ -367,7 +399,7 @@ export function TreeLogin() {
               <p>errorCode: {errorCode ?? '없음'}</p>
               <p>userId: {userId ?? '없음'}</p>
               <p>storageMode: {storageMode ?? '없음'}</p>
-              <p>temporarySessionId: {temporarySessionId ?? '없음'}</p>
+              <p>temporarySessionId: {readStoredAuthState()?.temporarySession?.sessionId ?? '없음'}</p>
             </div>
           </section>
         ) : (
