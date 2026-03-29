@@ -1,126 +1,65 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { Pool } from "pg";
+import { eq, sql } from "drizzle-orm";
 
-import { POSTGRES_POOL } from "../../../infrastructure/postgres/postgres.provider";
+import {
+  DRIZZLE_DB,
+  PostgresDatabase,
+} from "../../../infrastructure/postgres/postgres.provider";
+import { users } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
 
 /**
- * PostgreSQL users 테이블 접근 골격입니다.
- *
- * TODO:
- * 1. 현재 프로젝트는 ORM이 없으므로 `pg` 기반 쿼리 또는 query helper를 선택하세요.
- * 2. 조회/삽입/동의 업데이트 쿼리를 먼저 나누세요.
- * 3. unique key는 `sso_user_id` 기준을 우선 검토하세요.
+ * PostgreSQL users 테이블 접근 로직입니다.
  */
 @Injectable()
 export class UsersRepository {
-  constructor(@Inject(POSTGRES_POOL) private readonly pool: Pool) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
 
-  private mapRowToUserRecord(row: {
-    id: string;
-    permission: number;
-    sso_user_id: string;
-    user_email: string | null;
-    user_mobile: string | null;
-    privacy_consent_at: string | null;
-    created_at: string;
-    updated_at: string;
-  }): UserRecord {
+  private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
-      createdAt: row.created_at,
+      createdAt: row.createdAt.toISOString(),
       id: row.id,
       permission: row.permission,
-      privacyConsentAt: row.privacy_consent_at,
-      ssoUserId: row.sso_user_id,
-      updatedAt: row.updated_at,
-      userEmail: row.user_email,
-      userMobile: row.user_mobile,
+      privacyConsentAt: row.privacyConsentAt ? row.privacyConsentAt.toISOString() : null,
+      ssoUserId: row.ssoUserId,
+      updatedAt: row.updatedAt.toISOString(),
+      userEmail: row.userEmail,
+      userMobile: row.userMobile,
     };
   }
 
   async findBySsoUserId(ssoUserId: string): Promise<UserRecord | null> {
-    const result = await this.pool.query<{
-      id: string;
-      permission: number;
-      sso_user_id: string;
-      user_email: string | null;
-      user_mobile: string | null;
-      privacy_consent_at: string | null;
-      created_at: string;
-      updated_at: string;
-    }>(
-      `
-        SELECT id, permission, sso_user_id, user_email, user_mobile, privacy_consent_at, created_at, updated_at
-        FROM users
-        WHERE sso_user_id = $1
-        LIMIT 1
-      `,
-      [ssoUserId],
-    );
+    const found = await this.db.query.users.findFirst({
+      where: eq(users.ssoUserId, ssoUserId),
+    });
 
-    if (result.rowCount === 0) {
-      return null;
-    }
-
-    return this.mapRowToUserRecord(result.rows[0]);
+    return found ? this.mapRowToUserRecord(found) : null;
   }
 
   async findById(userId: string): Promise<UserRecord | null> {
-    const result = await this.pool.query<{
-      id: string;
-      permission: number;
-      sso_user_id: string;
-      user_email: string | null;
-      user_mobile: string | null;
-      privacy_consent_at: string | null;
-      created_at: string;
-      updated_at: string;
-    }>(
-      `
-        SELECT id, permission, sso_user_id, user_email, user_mobile, privacy_consent_at, created_at, updated_at
-        FROM users
-        WHERE id = $1
-        LIMIT 1
-      `,
-      [userId],
-    );
+    const found = await this.db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
 
-    if (result.rowCount === 0) {
-      return null;
-    }
-
-    return this.mapRowToUserRecord(result.rows[0]);
+    return found ? this.mapRowToUserRecord(found) : null;
   }
 
   async insert(
     input: Omit<UserRecord, "id" | "createdAt" | "updatedAt">,
   ): Promise<UserRecord> {
-    const result = await this.pool.query<{
-      id: string;
-      permission: number;
-      sso_user_id: string;
-      user_email: string | null;
-      user_mobile: string | null;
-      privacy_consent_at: string | null;
-      created_at: string;
-      updated_at: string;
-    }>(
-      `
-        INSERT INTO users (sso_user_id, user_email, user_mobile, privacy_consent_at, permission)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, permission, sso_user_id, user_email, user_mobile, privacy_consent_at, created_at, updated_at
-      `,
-      [
-        input.ssoUserId,
-        input.userEmail,
-        input.userMobile,
-        input.privacyConsentAt,
-        input.permission,
-      ],
-    );
+    const inserted = await this.db
+      .insert(users)
+      .values({
+        permission: input.permission,
+        privacyConsentAt: input.privacyConsentAt ? new Date(input.privacyConsentAt) : null,
+        ssoUserId: input.ssoUserId,
+        userEmail: input.userEmail,
+        userMobile: input.userMobile,
+      })
+      .returning();
 
-    return this.mapRowToUserRecord(result.rows[0]);
+    return this.mapRowToUserRecord(inserted[0]);
   }
 
   async upsertConsentedUserBySso(input: {
@@ -129,48 +68,36 @@ export class UsersRepository {
     userEmail?: string;
     userMobile?: string;
   }): Promise<UserRecord> {
-    const result = await this.pool.query<{
-      id: string;
-      permission: number;
-      sso_user_id: string;
-      user_email: string | null;
-      user_mobile: string | null;
-      privacy_consent_at: string | null;
-      created_at: string;
-      updated_at: string;
-    }>(
-      `
-        INSERT INTO users (sso_user_id, user_email, user_mobile, privacy_consent_at)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (sso_user_id)
-        DO UPDATE SET
-          user_email = COALESCE(users.user_email, EXCLUDED.user_email),
-          user_mobile = COALESCE(users.user_mobile, EXCLUDED.user_mobile),
-          privacy_consent_at = COALESCE(users.privacy_consent_at, EXCLUDED.privacy_consent_at),
-          updated_at = NOW()
-        RETURNING id, permission, sso_user_id, user_email, user_mobile, privacy_consent_at, created_at, updated_at
-      `,
-      [
-        input.ssoUserId,
-        input.userEmail ?? null,
-        input.userMobile ?? null,
-        input.consentedAt,
-      ],
-    );
+    const upserted = await this.db
+      .insert(users)
+      .values({
+        privacyConsentAt: new Date(input.consentedAt),
+        ssoUserId: input.ssoUserId,
+        userEmail: input.userEmail ?? null,
+        userMobile: input.userMobile ?? null,
+      })
+      .onConflictDoUpdate({
+        target: users.ssoUserId,
+        set: {
+          userEmail: sql`COALESCE(${users.userEmail}, excluded.user_email)`,
+          userMobile: sql`COALESCE(${users.userMobile}, excluded.user_mobile)`,
+          privacyConsentAt: sql`COALESCE(${users.privacyConsentAt}, excluded.privacy_consent_at)`,
+          updatedAt: sql`NOW()`,
+        },
+      })
+      .returning();
 
-    return this.mapRowToUserRecord(result.rows[0]);
+    return this.mapRowToUserRecord(upserted[0]);
   }
 
   async markConsent(userId: string, consentedAt: string): Promise<void> {
-    await this.pool.query(
-      `
-        UPDATE users
-        SET privacy_consent_at = $2,
-            updated_at = NOW()
-        WHERE id = $1
-      `,
-      [userId, consentedAt],
-    );
+    await this.db
+      .update(users)
+      .set({
+        privacyConsentAt: new Date(consentedAt),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 
   async updateProfile(
@@ -180,15 +107,22 @@ export class UsersRepository {
       userMobile?: string;
     },
   ): Promise<void> {
-    await this.pool.query(
-      `
-        UPDATE users
-        SET user_email = COALESCE($2, user_email),
-            user_mobile = COALESCE($3, user_mobile),
-            updated_at = NOW()
-        WHERE id = $1
-      `,
-      [userId, input.userEmail ?? null, input.userMobile ?? null],
-    );
+    const updateSet: {
+      updatedAt: Date;
+      userEmail?: string | null;
+      userMobile?: string | null;
+    } = {
+      updatedAt: new Date(),
+    };
+
+    if (input.userEmail !== undefined) {
+      updateSet.userEmail = input.userEmail;
+    }
+
+    if (input.userMobile !== undefined) {
+      updateSet.userMobile = input.userMobile;
+    }
+
+    await this.db.update(users).set(updateSet).where(eq(users.id, userId));
   }
 }

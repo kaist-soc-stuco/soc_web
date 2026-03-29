@@ -1,14 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Pool } from 'pg';
+import { sql } from 'drizzle-orm';
 import Redis from 'ioredis';
 
-import { POSTGRES_POOL } from '../../infrastructure/postgres/postgres.provider';
+import {
+  DRIZZLE_DB,
+  PostgresDatabase,
+} from '../../infrastructure/postgres/postgres.provider';
 import { REDIS_CLIENT } from '../../infrastructure/redis/redis.provider';
 
 @Injectable()
 export class MockService {
   constructor(
-    @Inject(POSTGRES_POOL) private readonly pool: Pool,
+    @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
@@ -36,7 +39,7 @@ export class MockService {
 
   private async readDbTime(): Promise<string> {
     try {
-      const result = await this.pool.query<{ now: Date }>('SELECT NOW() as now');
+      const result = await this.db.execute<{ now: Date }>(sql`SELECT NOW() as now`);
       return new Date(result.rows[0]?.now ?? Date.now()).toISOString();
     } catch {
       return new Date().toISOString();
