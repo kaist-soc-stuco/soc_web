@@ -14,6 +14,13 @@ export interface ApiClientOptions {
   fetcher?: typeof fetch;
 }
 
+export class ApiClientHttpError extends Error {
+  constructor(public readonly status: number) {
+    super(`HTTP ${status}`);
+    this.name = "ApiClientHttpError";
+  }
+}
+
 interface LoginResultResponse {
   storageMode: "persisted" | "temporary";
   userId?: string;
@@ -35,9 +42,26 @@ const resolveAuthBaseUrl = (normalizedBaseUrl: string): string => {
   return `${normalizedBaseUrl}/v1/auth`;
 };
 
+const isAuthExpiredStatus = (status: number): boolean => status === 401 || status === 403;
+
+const redirectToLogin = (): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const target = "/login?status=error&reason=session_expired";
+  const current = `${window.location.pathname}${window.location.search}`;
+
+  if (current === target) {
+    return;
+  }
+
+  window.location.assign(target);
+};
+
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    throw new ApiClientHttpError(response.status);
   }
 
   return response.json() as Promise<T>;
@@ -49,90 +73,136 @@ export const createApiClient = ({
 }: ApiClientOptions) => {
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
   const authBaseUrl = resolveAuthBaseUrl(normalizedBaseUrl);
+  let refreshInFlight: Promise<void> | null = null;
+
+  const sendRefreshRequest = async (): Promise<void> => {
+    if (!refreshInFlight) {
+      refreshInFlight = (async () => {
+        const response = await fetcher(`${authBaseUrl}/refresh`, {
+          body: JSON.stringify({}),
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        });
+
+          if (!response.ok) {
+            const error = new ApiClientHttpError(response.status);
+
+            if (isAuthExpiredStatus(response.status)) {
+              redirectToLogin();
+            }
+
+            throw error;
+        }
+      })();
+    }
+
+    try {
+      await refreshInFlight;
+    } finally {
+      refreshInFlight = null;
+    }
+  };
+
+  const requestJson = async <T>(
+    url: string,
+    init: RequestInit,
+    options?: { retryOnUnauthorized?: boolean },
+  ): Promise<T> => {
+    const response = await fetcher(url, {
+      credentials: "include",
+      ...init,
+    });
+
+    if (response.status === 401 && options?.retryOnUnauthorized) {
+      await sendRefreshRequest();
+
+      const retriedResponse = await fetcher(url, {
+        credentials: "include",
+        ...init,
+      });
+
+      return readJson<T>(retriedResponse);
+    }
+
+    return readJson<T>(response);
+  };
 
   return {
     getLoginStartPayload: async (): Promise<LoginStartResponse> => {
-      const response = await fetcher(`${authBaseUrl}/login/start`, {
-        credentials: "include",
+      return requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, {
         method: "GET",
       });
-
-      return readJson<LoginStartResponse>(response);
     },
 
     getSession: async (sessionId?: string): Promise<LoginSessionResponse> => {
       const query = sessionId
         ? `?sessionId=${encodeURIComponent(sessionId)}`
         : "";
-      const response = await fetcher(`${authBaseUrl}/session${query}`, {
-        credentials: "include",
+      return requestJson<LoginSessionResponse>(`${authBaseUrl}/session${query}`, {
         method: "GET",
+      }, {
+        retryOnUnauthorized: true,
       });
-
-      return readJson<LoginSessionResponse>(response);
     },
 
     submitConsentDecision: async (
       input: ConsentDecisionRequest,
     ): Promise<ConsentDecisionResponse> => {
-      const response = await fetcher(`${authBaseUrl}/login/consent`, {
+      return requestJson<ConsentDecisionResponse>(`${authBaseUrl}/login/consent`, {
         body: JSON.stringify(input),
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         method: "POST",
+      }, {
+        retryOnUnauthorized: true,
       });
-
-      return readJson<ConsentDecisionResponse>(response);
     },
 
     consumeLoginResult: async (resultToken: string): Promise<LoginResultResponse> => {
-      const response = await fetcher(
+      return requestJson<LoginResultResponse>(
         `${authBaseUrl}/login/result?resultToken=${encodeURIComponent(resultToken)}`,
         {
-        credentials: "include",
-        method: "GET",
+          method: "GET",
         },
       );
-
-      return readJson<LoginResultResponse>(response);
     },
 
     refreshSession: async (): Promise<RefreshResponse> => {
-      const response = await fetcher(`${authBaseUrl}/refresh`, {
+      return requestJson<RefreshResponse>(`${authBaseUrl}/refresh`, {
         body: JSON.stringify({}),
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         method: "POST",
       });
-
-      return readJson<RefreshResponse>(response);
     },
 
     logout: async (): Promise<LogoutResponse> => {
-      const response = await fetcher(`${authBaseUrl}/logout`, {
+      return requestJson<LogoutResponse>(`${authBaseUrl}/logout`, {
         body: JSON.stringify({}),
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         method: "POST",
       });
-
-      return readJson<LogoutResponse>(response);
     },
 
     getHealth: async (): Promise<HealthResponse> => {
-      const response = await fetcher(`${normalizedBaseUrl}/health`);
-      return readJson<HealthResponse>(response);
+      return requestJson<HealthResponse>(`${normalizedBaseUrl}/health`, {
+        method: "GET",
+      });
     },
 
     getGreeting: async (): Promise<GreetingResponse> => {
-      const response = await fetcher(`${normalizedBaseUrl}/v1/mock/greeting`);
-      return readJson<GreetingResponse>(response);
+      return requestJson<GreetingResponse>(`${normalizedBaseUrl}/v1/mock/greeting`, {
+        method: "GET",
+      }, {
+        retryOnUnauthorized: true,
+      });
     },
   };
 };
