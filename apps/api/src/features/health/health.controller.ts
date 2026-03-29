@@ -1,8 +1,11 @@
 import { Controller, Get, Inject } from '@nestjs/common';
-import { Pool } from 'pg';
+import { sql } from 'drizzle-orm';
 import Redis from 'ioredis';
 
-import { POSTGRES_POOL } from '../../infrastructure/postgres/postgres.provider';
+import {
+  DRIZZLE_DB,
+  PostgresDatabase,
+} from '../../infrastructure/postgres/postgres.provider';
 import { REDIS_CLIENT } from '../../infrastructure/redis/redis.provider';
 
 interface DependencyHealth {
@@ -14,7 +17,7 @@ interface DependencyHealth {
 @Controller('health')
 export class HealthController {
   constructor(
-    @Inject(POSTGRES_POOL) private readonly pool: Pool,
+    @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
@@ -34,7 +37,7 @@ export class HealthController {
     const start = Date.now();
 
     try {
-      await this.pool.query('SELECT 1');
+      await this.db.execute(sql`SELECT 1`);
 
       return {
         ok: true,
