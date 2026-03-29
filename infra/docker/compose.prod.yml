@@ -30,8 +30,8 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-soc_web}
-      POSTGRES_USER: ${POSTGRES_USER:-soc}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-soc}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

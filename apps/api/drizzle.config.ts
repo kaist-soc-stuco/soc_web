@@ -7,7 +7,7 @@ export default defineConfig({
   dbCredentials: {
     url:
       process.env.DATABASE_URL ??
-      "postgresql://soc:soc@localhost:5432/soc_web?sslmode=disable",
+      "postgresql://localhost:5432/soc_web?sslmode=disable",
   },
   verbose: true,
 });
