@@ -40,6 +40,7 @@ export class AuthSessionService {
     private readonly usersService: UsersService,
   ) {}
 
+  /** JWT 서명/검증에 사용할 필수 시크릿을 반환합니다. */
   private getJwtSecret(): string {
     const secret = this.configService.get<string>("AUTH_JWT_SECRET");
 
@@ -50,6 +51,7 @@ export class AuthSessionService {
     throw new InternalServerErrorException("AUTH_JWT_SECRET_is_required");
   }
 
+  /** 세션 모드에 맞는 access token 클레임을 구성해 서명합니다. */
   private issueAccessToken(record: AuthSessionRecord): string {
     const claims: PersistedAccessTokenClaims | TemporaryAccessTokenClaims =
       record.mode === "persisted"
@@ -69,6 +71,7 @@ export class AuthSessionService {
     });
   }
 
+  /** 세션/회전 식별자(jti)를 포함한 refresh token을 발급합니다. */
   private issueRefreshToken(record: AuthSessionRecord, refreshJti: string): string {
     const subject = record.mode === "persisted" ? record.userId : record.pendingLoginId;
     const claims: RefreshTokenClaims = {
@@ -83,6 +86,7 @@ export class AuthSessionService {
     });
   }
 
+  /** refresh token 서명/필수 클레임을 검증하고 정규화된 클레임을 반환합니다. */
   private verifyRefreshToken(refreshToken: string): RefreshTokenClaims {
     let decoded: string | JwtPayload;
 
@@ -116,6 +120,7 @@ export class AuthSessionService {
     };
   }
 
+  /** access token을 검증하고 temporary/persisted 클레임으로 분기해 반환합니다. */
   validateAccessToken(
     accessToken: string | undefined,
   ): PersistedAccessTokenClaims | TemporaryAccessTokenClaims {
@@ -171,6 +176,7 @@ export class AuthSessionService {
     throw new UnauthorizedException("invalid_access_token");
   }
 
+  /** 세션 존재 여부, 만료, revoke 상태를 공통 검증합니다. */
   private assertActiveSession(record: AuthSessionRecord | null): asserts record is AuthSessionRecord {
     if (!record) {
       throw new UnauthorizedException("session_not_found");
@@ -182,9 +188,7 @@ export class AuthSessionService {
   }
 
   /**
-   * 영구 사용자용 access/refresh token 쌍을 발급합니다.
-   *
-   * @param userId PostgreSQL에 저장된 사용자 ID
+    * 영구 사용자용 access/refresh token 쌍을 발급합니다.
    */
   async issuePersistedSession(userId: string): Promise<{
     accessToken: string;
@@ -213,10 +217,7 @@ export class AuthSessionService {
   }
 
   /**
-   * 비동의 임시 로그인용 access/refresh(또는 session key) 세트를 발급합니다.
-   *
-   * @param pendingLoginId Redis에 저장된 pending login 식별자
-   * @param pendingUser Redis에 저장된 임시 사용자 정보
+    * 비동의 임시 로그인용 access/refresh(또는 session key) 세트를 발급합니다.
    */
   async issueTemporarySession(
     pendingLoginId: string,
@@ -251,9 +252,7 @@ export class AuthSessionService {
   }
 
   /**
-   * refresh token을 검증하고 rotation을 수행합니다.
-   *
-   * @param refreshToken refresh token 원문 또는 검증 가능한 식별자
+    * refresh token을 검증하고 rotation을 수행합니다.
    */
   async rotateRefreshToken(refreshToken: string): Promise<{
     accessToken: string;
@@ -288,9 +287,7 @@ export class AuthSessionService {
   }
 
   /**
-   * 로그아웃 시 세션을 revoke합니다.
-   *
-   * @param sessionId 세션 식별자
+    * 로그아웃 시 세션을 revoke합니다.
    */
   async revokeSession(sessionId: string): Promise<void> {
     await this.authSessionRepository.revoke(sessionId);
@@ -298,8 +295,6 @@ export class AuthSessionService {
 
   /**
     * 개인정보 저장 동의/비동의 결정을 처리합니다.
-   *
-   * @param input 동의 결정 DTO
    */
   async handleConsentDecision(input: ConsentDecisionRequest): Promise<{
     accessToken?: string;
@@ -383,8 +378,6 @@ export class AuthSessionService {
 
   /**
     * refresh 요청을 처리합니다.
-   *
-   * @param input refresh 요청 DTO
    */
   async refreshSession(input: RefreshSessionRequest): Promise<{
     accessToken?: string;

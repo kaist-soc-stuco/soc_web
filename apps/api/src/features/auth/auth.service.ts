@@ -86,8 +86,7 @@ export class AuthService {
   }
 
   /**
-   * @description SSO authorize 요청에 필요한 초기 payload를 생성합니다.
-   * @returns clientId, loginUrl, redirectUri, state, nonce
+    * SSO authorize 요청에 필요한 초기 payload를 생성합니다.
    */
   async createLoginStartPayload(): Promise<LoginStartPayload> {
     const config = this.readStartConfig();
@@ -108,8 +107,7 @@ export class AuthService {
   }
 
   /**
-   * @description SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
-   * @returns `/login?...` 형식의 redirect URL
+    * SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
    */
   async handleLoginCallback(body: CallbackBody): Promise<string> {
     if (body.error || body.errorCode) {
@@ -238,6 +236,7 @@ export class AuthService {
     }
   }
 
+  /** 프런트 로그인 페이지로 상태/사유를 담아 redirect URL을 생성합니다. */
   private buildFrontendRedirect(
     status: "consent-required" | "error" | "success",
     reason: string,
@@ -252,14 +251,17 @@ export class AuthService {
     return `/login?${searchParams.toString()}`;
   }
 
+  /** SSO state 저장용 Redis 키를 생성합니다. */
   private buildRedisKey(state: string): string {
     return `auth:sso:state:${state}`;
   }
 
+  /** 로그인 결과 1회 소비 토큰용 Redis 키를 생성합니다. */
   private buildLoginResultKey(resultToken: string): string {
     return `auth:login-result:${resultToken}`;
   }
 
+  /** 필수 환경변수가 비어 있으면 예외를 발생시킵니다. */
   private ensureRequired(value: string | undefined, name: string): string {
     if (value && value.trim().length > 0) {
       return value;
@@ -270,6 +272,7 @@ export class AuthService {
     );
   }
 
+  /** SSO userInfo가 문자열(JSON)로 와도 객체 형태로 정규화합니다. */
   private normalizeUserInfo(
     userInfo: Record<string, unknown> | string | undefined,
   ): Record<string, unknown> {
@@ -288,6 +291,7 @@ export class AuthService {
     return userInfo;
   }
 
+  /** Redis에 저장된 state payload를 안전하게 파싱합니다. */
   private parseStoredState(rawValue: string): StoredLoginState | null {
     try {
       return JSON.parse(rawValue) as StoredLoginState;
@@ -296,6 +300,7 @@ export class AuthService {
     }
   }
 
+  /** Redis에 저장된 로그인 결과 payload를 안전하게 파싱합니다. */
   private parseLoginResult(rawValue: string): LoginResultPayload | null {
     try {
       return JSON.parse(rawValue) as LoginResultPayload;
@@ -304,6 +309,7 @@ export class AuthService {
     }
   }
 
+  /** state와 nonce를 TTL과 함께 Redis에 저장합니다. */
   private async storePendingState(
     state: string,
     payload: StoredLoginState,
@@ -316,6 +322,7 @@ export class AuthService {
     );
   }
 
+  /** Redis에서 state를 조회하고 저장 payload로 역직렬화합니다. */
   private async readPendingState(
     stateKey: string,
   ): Promise<StoredLoginState | null> {
@@ -323,10 +330,12 @@ export class AuthService {
     return rawValue ? this.parseStoredState(rawValue) : null;
   }
 
+  /** 사용한 state를 Redis에서 제거합니다. */
   private async deletePendingState(stateKey: string): Promise<void> {
     await this.redis.del(stateKey);
   }
 
+  /** 로그인 완료 후 쿠키 세팅 전까지의 결과를 Redis에 임시 저장합니다. */
   private async storeLoginResult(
     resultToken: string,
     payload: LoginResultPayload,
@@ -341,10 +350,12 @@ export class AuthService {
     );
   }
 
+  /** Redis GETDEL로 값을 원자적으로 1회만 소비합니다. */
   private async consumeRedisValueOnce(key: string): Promise<string | null> {
     return this.redis.getdel(key);
   }
 
+  /** resultToken으로 로그인 결과를 1회 소비하고 payload를 반환합니다. */
   async consumeLoginResult(resultToken: string | undefined): Promise<LoginResultPayload> {
     if (!resultToken) {
       throw new BadRequestException("resultToken_is_required");
@@ -366,6 +377,7 @@ export class AuthService {
     return parsed;
   }
 
+  /** 프런트가 login/start에 쓰는 SSO 기본 설정을 구성합니다. */
   private loadStartConfig(): SsoConfig {
     return {
       clientId: this.ensureRequired(
@@ -383,6 +395,7 @@ export class AuthService {
     };
   }
 
+  /** callback 처리에 필요한 서버 측 SSO 설정을 구성합니다. */
   private loadCallbackConfig(startConfig: SsoConfig): SsoCallbackConfig {
     return {
       ...startConfig,
@@ -397,10 +410,12 @@ export class AuthService {
     };
   }
 
+  /** 캐시된 login/start 설정을 읽습니다. */
   private readStartConfig(): SsoConfig {
     return this.startConfig;
   }
 
+  /** 캐시된 callback 설정을 읽습니다. */
   private readCallbackConfig(): SsoCallbackConfig {
     return this.callbackConfig;
   }

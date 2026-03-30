@@ -31,14 +31,6 @@ const resolveApiBaseUrl = (): string => {
   return '/api';
 };
 
-/**
- * 개인정보 저장 동의 화면 스켈레톤입니다.
- *
- * TODO:
- * 1. `/login` callback 결과에서 `pendingLoginToken` 또는 `status=consent-required`를 받아 이 화면으로 넘기세요.
- * 2. 동의 / 비동의 버튼을 각각 `POST /auth/login/consent`와 연결하세요.
- * 3. temporary 로그인일 때 어떤 기능이 제한되는지 문구를 명확히 넣으세요.
- */
 export function LoginConsentPage() {
   const location = useLocation();
   const navigate = useNavigate();

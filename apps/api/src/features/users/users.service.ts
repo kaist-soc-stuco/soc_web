@@ -17,6 +17,7 @@ export class UsersService {
     return this.usersRepository.findBySsoUserId(ssoUserId);
   }
 
+  /** 내부 사용자 ID로 사용자를 조회합니다. */
   async findById(userId: string): Promise<UserRecord | null> {
     return this.usersRepository.findById(userId);
   }
@@ -60,6 +61,7 @@ export class UsersService {
     await this.usersRepository.markConsent(userId, consentedAt);
   }
 
+  /** SSO 최신 정보로 이메일/휴대전화 프로필을 부분 갱신합니다. */
   async updateProfileFromSso(
     userId: string,
     input: {
