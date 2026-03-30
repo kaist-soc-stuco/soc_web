@@ -16,6 +16,7 @@ import type { UserRecord } from "../entities/user";
 export class UsersRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
 
+  /** DB row를 서비스 계층에서 사용하는 UserRecord로 변환합니다. */
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
       createdAt: row.createdAt.toISOString(),
@@ -29,6 +30,7 @@ export class UsersRepository {
     };
   }
 
+  /** SSO 식별자로 users 레코드를 조회합니다. */
   async findBySsoUserId(ssoUserId: string): Promise<UserRecord | null> {
     const found = await this.db.query.users.findFirst({
       where: eq(users.ssoUserId, ssoUserId),
@@ -37,6 +39,7 @@ export class UsersRepository {
     return found ? this.mapRowToUserRecord(found) : null;
   }
 
+  /** 내부 사용자 ID로 users 레코드를 조회합니다. */
   async findById(userId: string): Promise<UserRecord | null> {
     const found = await this.db.query.users.findFirst({
       where: eq(users.id, userId),
@@ -45,6 +48,7 @@ export class UsersRepository {
     return found ? this.mapRowToUserRecord(found) : null;
   }
 
+  /** 신규 users 레코드를 생성하고 생성 결과를 반환합니다. */
   async insert(
     input: Omit<UserRecord, "id" | "createdAt" | "updatedAt">,
   ): Promise<UserRecord> {
@@ -62,6 +66,7 @@ export class UsersRepository {
     return this.mapRowToUserRecord(inserted[0]);
   }
 
+  /** 동의 사용자 정보를 ssoUserId 기준으로 생성/갱신합니다. */
   async upsertConsentedUserBySso(input: {
     consentedAt: string;
     ssoUserId: string;
@@ -90,6 +95,7 @@ export class UsersRepository {
     return this.mapRowToUserRecord(upserted[0]);
   }
 
+  /** 개인정보 영구 저장 동의 시각을 기록합니다. */
   async markConsent(userId: string, consentedAt: string): Promise<void> {
     await this.db
       .update(users)
@@ -100,6 +106,7 @@ export class UsersRepository {
       .where(eq(users.id, userId));
   }
 
+  /** 이메일/휴대전화 필드만 선택적으로 갱신합니다. */
   async updateProfile(
     userId: string,
     input: {

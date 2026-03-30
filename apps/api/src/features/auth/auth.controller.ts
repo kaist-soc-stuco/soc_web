@@ -30,6 +30,7 @@ export class AuthController {
     private readonly authSessionService: AuthSessionService,
   ) {}
 
+  /** 환경에 맞는 인증 쿠키 공통 옵션을 생성합니다. */
   private getCookieOptions(maxAgeMs: number) {
     const isProd = process.env.NODE_ENV === "production";
 
@@ -42,6 +43,7 @@ export class AuthController {
     };
   }
 
+  /** 발급된 세션 토큰들을 HttpOnly 쿠키로 내려줍니다. */
   private setAuthCookies(
     response: Response,
     payload: {
@@ -75,6 +77,7 @@ export class AuthController {
     }
   }
 
+  /** 기존 인증 쿠키를 모두 제거합니다. */
   private clearAuthCookies(response: Response): void {
     const options = this.getCookieOptions(0);
     response.clearCookie(AUTH_ACCESS_COOKIE_NAME, options);
@@ -83,8 +86,7 @@ export class AuthController {
   }
 
   /**
-   * @description SSO authorize 요청에 필요한 초기 payload를 발급합니다.
-   * @returns SSO authorize form submit에 필요한 최소 데이터
+   * SSO authorize 요청에 필요한 초기 payload를 발급합니다.
    */
   @Get("login/start")
   async startLogin() {
@@ -92,8 +94,7 @@ export class AuthController {
   }
 
   /**
-   * @description SSO provider callback을 받아 사용자 정보를 교환합니다.
-   * @returns `/login?...` redirect
+   * SSO provider callback을 받아 사용자 정보를 교환합니다.
    */
   @Post("login")
   async handleLoginCallback(
@@ -109,6 +110,7 @@ export class AuthController {
     @Query("resultToken") resultToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
+    // Redirect 이후 1회성 resultToken을 소비해 쿠키 세팅에 필요한 값을 회수합니다.
     const result = await this.authService.consumeLoginResult(resultToken);
     this.setAuthCookies(response, result);
 
@@ -119,7 +121,7 @@ export class AuthController {
   }
 
   /**
-   * @description 개인정보 저장 동의/비동의 결정을 처리합니다.
+    * 개인정보 저장 동의/비동의 결정을 처리합니다.
    * @body pendingLoginToken, consent
    */
   @Post("login/consent")
@@ -150,7 +152,7 @@ export class AuthController {
   }
 
   /**
-   * @description 현재 로그인 세션 상태를 조회합니다.
+    * 현재 로그인 세션 상태를 조회합니다.
    */
   @Get("session")
   async getSession(
@@ -160,7 +162,7 @@ export class AuthController {
   }
 
   /**
-   * @description access token 유효성을 확인하는 테스트용 endpoint입니다.
+    * access token 유효성을 확인하는 테스트용 endpoint입니다.
    */
   @Get("access-check")
   async checkAccessToken(
@@ -175,7 +177,7 @@ export class AuthController {
   }
 
   /**
-   * @description access token 만료 시 refresh token 기반으로 세션을 갱신합니다.
+    * access token 만료 시 refresh token 기반으로 세션을 갱신합니다.
    */
   @Post("refresh")
   async refreshSession(
@@ -211,7 +213,7 @@ export class AuthController {
   }
 
   /**
-   * @description 현재 세션을 로그아웃 처리합니다.
+    * 현재 세션을 로그아웃 처리합니다.
    */
   @Post("logout")
   async logout(

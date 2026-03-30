@@ -20,9 +20,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /**
-   * 사용자 영구 저장 여부 확인용 예시 endpoint입니다.
-   *
-   * @param userId 내부 사용자 ID
+    * 사용자 영구 저장 여부 확인용 예시 endpoint입니다.
    */
   @Get(":userId/persisted-profile")
   @UseGuards(AuthGuard, PermissionGuard)
