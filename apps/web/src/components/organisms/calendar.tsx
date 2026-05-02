@@ -1,44 +1,41 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { nowMs, msToTimeObj, timeObjToMs, addMs, subtractMs } from '@soc/shared';
 
 export function Calendar() {
-  const today = new Date();
-  const [currentDate, setCurrentDate] = useState(today);
-  
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
+  const todayMs = nowMs();
+  const todayTime = msToTimeObj(todayMs);
 
-  // 1년 전/후 제한 계산
-  const minDate = new Date(today.getFullYear() - 1, today.getMonth(), 1);
-  const maxDate = new Date(today.getFullYear() + 1, today.getMonth() + 1, 0);
+  const [viewMs, setViewMs] = useState<number>(() =>
+    timeObjToMs({ ...todayTime, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 })
+  );
 
-  // 달력 날짜 생성
+  const viewTime = msToTimeObj(viewMs);
+  const { year: currentYear, month: currentMonth } = viewTime;
+
+  const minMs = timeObjToMs({ ...todayTime, year: todayTime.year - 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 });
+  const maxMs = timeObjToMs({ ...todayTime, year: todayTime.year + 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 });
+
   const generateCalendarDays = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    
-    // 해당 월의 첫날과 마지막 날
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
+    const firstDayMs = viewMs;
+    const lastDayMs = subtractMs(addMs(firstDayMs, 1, 'month'), 1, 'day');
+    const lastDayTime = msToTimeObj(lastDayMs);
+
     // 첫날의 요일 (0: 일요일)
-    const firstDayOfWeek = firstDay.getDay();
-    
-    // 날짜 배열 생성
+    const firstDayOfWeek = new Date(firstDayMs).getDay();
+
     const days = [];
-    
-    // 이전 달의 날짜로 채우기
+
     for (let i = 0; i < firstDayOfWeek; i++) {
       days.push({ day: null, event: null, isCurrentMonth: false });
     }
-    
-    // 현재 달의 날짜
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      const isToday = 
-        year === today.getFullYear() && 
-        month === today.getMonth() && 
-        day === today.getDate();
-      
+
+    for (let day = 1; day <= lastDayTime.day; day++) {
+      const isToday =
+        currentYear === todayTime.year &&
+        currentMonth === todayTime.month &&
+        day === todayTime.day;
+
       // TODO: MySQL에서 이벤트 데이터 가져오기
       let event = null;
       if (day === 2) {
@@ -46,35 +43,30 @@ export function Calendar() {
       } else if (day === 17) {
         event = { title: '설 연휴', color: 'bg-kaist-brown' };
       }
-      
+
       days.push({ day, event, isCurrentMonth: true, today: isToday });
     }
-    
-    // 남은 칸을 다음 달 날짜로 채우기 (총 35칸 = 5주)
+
     const remainingDays = 35 - days.length;
     for (let i = 1; i <= remainingDays; i++) {
       days.push({ day: null, event: null, isCurrentMonth: false });
     }
-    
+
     return days;
   };
 
+  const prevMs = subtractMs(viewMs, 1, 'month');
+  const nextMs = addMs(viewMs, 1, 'month');
+  const canGoPrev = prevMs >= minMs;
+  const canGoNext = nextMs <= maxMs;
+
   const handlePrevMonth = () => {
-    const newDate = new Date(currentYear, currentMonth - 1, 1);
-    if (newDate >= minDate) {
-      setCurrentDate(newDate);
-    }
+    if (canGoPrev) setViewMs(prevMs);
   };
 
   const handleNextMonth = () => {
-    const newDate = new Date(currentYear, currentMonth + 1, 1);
-    if (newDate <= maxDate) {
-      setCurrentDate(newDate);
-    }
+    if (canGoNext) setViewMs(nextMs);
   };
-
-  const canGoPrev = new Date(currentYear, currentMonth - 1, 1) >= minDate;
-  const canGoNext = new Date(currentYear, currentMonth + 1, 1) <= maxDate;
 
   const days = generateCalendarDays();
 
@@ -83,10 +75,8 @@ export function Calendar() {
       <div className="flex-1 flex flex-col overflow-hidden border-b border-kaist-grey/30">
         {/* Header */}
         <div className="mb-2 mt-1 flex-shrink-0 relative flex items-center justify-center">
-          {/* Arrow - Year/Month - Arrow Group (centered) */}
           <div className="flex items-center gap-4">
-            {/* Left Arrow */}
-            <button 
+            <button
               onClick={handlePrevMonth}
               disabled={!canGoPrev}
               className={`text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
@@ -96,13 +86,11 @@ export function Calendar() {
               <ChevronLeft className="h-5 w-5" />
             </button>
 
-            {/* Year and Month */}
             <h3 className="text-base md:text-lg font-extrabold tracking-tight text-kaist-darkgreen">
-              {currentYear}년 {currentMonth + 1}월
+              {currentYear}년 {currentMonth}월
             </h3>
 
-            {/* Right Arrow */}
-            <button 
+            <button
               onClick={handleNextMonth}
               disabled={!canGoNext}
               className={`text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
@@ -113,7 +101,6 @@ export function Calendar() {
             </button>
           </div>
 
-          {/* Plus Button (absolute right) */}
           <button className="absolute right-0 text-base md:text-lg font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors">
             +
           </button>
@@ -141,8 +128,8 @@ export function Calendar() {
                 <>
                   <span
                     className={`text-sm tracking-tight ${
-                      item.today 
-                        ? 'font-semibold text-kaist-darkgreen' 
+                      item.today
+                        ? 'font-semibold text-kaist-darkgreen'
                         : item.isCurrentMonth
                         ? 'font-normal text-kaist-greygreen'
                         : 'font-normal text-kaist-grey/30'
@@ -150,7 +137,6 @@ export function Calendar() {
                   >
                     {item.day}
                   </span>
-                  {/* 이벤트 영역 - 항상 공간 확보 */}
                   <div className="mt-1 h-3 w-full max-w-[28px]">
                     {item.event && (
                       <div

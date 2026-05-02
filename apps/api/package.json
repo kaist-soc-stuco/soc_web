@@ -13,6 +13,8 @@
     "test": "echo 'no tests yet'"
   },
   "dependencies": {
+    "@soc/shared": "workspace:*",
+    "dayjs": "^1.11.13",
     "@nestjs/common": "^11.1.8",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.8",

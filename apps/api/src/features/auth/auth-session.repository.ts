@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import Redis from "ioredis";
+import { secondsUntil } from "@soc/shared";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 
@@ -19,8 +20,7 @@ export class AuthSessionRepository {
 
   /** 만료 시각 기준으로 Redis TTL(초)을 계산합니다. */
   private resolveTtlSeconds(expiresAt: number): number {
-    const ttlSeconds = Math.floor((expiresAt - Date.now()) / 1000);
-    return Math.max(ttlSeconds, 1);
+    return Math.max(secondsUntil(expiresAt), 1);
   }
 
   /**
