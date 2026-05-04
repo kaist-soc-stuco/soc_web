@@ -12,6 +12,7 @@ import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import { CommentRepository } from "./repositories/comment.repository";
 import { assertBoardReadable, type CurrentUserContext } from "./board-access";
+import { COMMENT_STATUS } from "./board.constants";
 
 interface CommentQueryParams {
   page?: number;
@@ -111,7 +112,7 @@ export class CommentService {
     if (payload.parentCommentId) {
       const parent = await this.commentRepository.findById(payload.parentCommentId);
 
-      if (!parent || parent.articleId !== articleId || parent.status === "DELETED" || parent.deletedAt) {
+      if (!parent || parent.articleId !== articleId || parent.status === COMMENT_STATUS.DELETED) {
         throw new BadRequestException("parent_comment_invalid");
       }
     }
@@ -142,7 +143,7 @@ export class CommentService {
 
     const comment = await this.commentRepository.findPermissionInfo(commentId, articleId);
 
-    if (!comment || comment.status === "DELETED" || comment.deletedAt) {
+    if (!comment || comment.status === COMMENT_STATUS.DELETED) {
       throw new NotFoundException("comment_not_found");
     }
 
@@ -172,7 +173,7 @@ export class CommentService {
 
     const comment = await this.commentRepository.findPermissionInfo(commentId, articleId);
 
-    if (!comment || comment.status === "DELETED" || comment.deletedAt) {
+    if (!comment || comment.status === COMMENT_STATUS.DELETED) {
       throw new NotFoundException("comment_not_found");
     }
 

@@ -18,6 +18,7 @@ import type {
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import { assertBoardReadable, type CurrentUserContext } from "./board-access";
+import { ARTICLE_STATUS } from "./board.constants";
 
 interface ArticleQueryParams {
   page?: number;
@@ -147,7 +148,7 @@ export class ArticleService {
       articleId,
     );
 
-    if (!article || article.status === "DELETED" || article.deletedAt) {
+    if (!article || article.status === ARTICLE_STATUS.DELETED) {
       throw new NotFoundException("article_not_found");
     }
 
@@ -179,7 +180,7 @@ export class ArticleService {
       articleId,
     );
 
-    if (!article || article.status === "DELETED" || article.deletedAt) {
+    if (!article || article.status === ARTICLE_STATUS.DELETED) {
       throw new NotFoundException("article_not_found");
     }
 
