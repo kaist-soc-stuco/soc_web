@@ -63,7 +63,7 @@ export class CommentController {
   }
 
   @Post()
-  @UseGuards(AuthGuard)
+  //@UseGuards(AuthGuard)
   async createComment(
     @Param("code") code: string,
     @Param("articleId") articleId: string,
@@ -79,7 +79,7 @@ export class CommentController {
   }
 
   @Patch(":commentId")
-  @UseGuards(AuthGuard)
+  //@UseGuards(AuthGuard)
   async updateComment(
     @Param("code") code: string,
     @Param("articleId") articleId: string,
@@ -97,7 +97,7 @@ export class CommentController {
   }
 
   @Delete(":commentId")
-  @UseGuards(AuthGuard)
+  //@UseGuards(AuthGuard)
   async deleteComment(
     @Param("code") code: string,
     @Param("articleId") articleId: string,

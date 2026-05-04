@@ -24,10 +24,11 @@ export class AssetRepository {
         originalFilename: input.originalFilename,
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
-        uploadedBy: input.uploadedBy,
+        checksum: null,
+        uploadedBy: Number(input.uploadedBy),
       })
       .returning({ assetId: assets.assetId });
 
-    return { assetId: created.assetId };
+    return { assetId: String(created.assetId) };
   }
 }

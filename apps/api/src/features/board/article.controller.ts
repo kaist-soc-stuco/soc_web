@@ -73,7 +73,7 @@ export class ArticleController {
   }
 
   @Post()
-  @UseGuards(AuthGuard)
+  //@UseGuards(AuthGuard)
   async createArticle(
     @Param("code") code: string,
     @Body() body: ArticleCreateRequest,
@@ -83,7 +83,7 @@ export class ArticleController {
   }
 
   @Patch(":articleId")
-  @UseGuards(AuthGuard)
+  //@UseGuards(AuthGuard)
   async updateArticle(
     @Param("code") code: string,
     @Param("articleId") articleId: string,
@@ -99,7 +99,7 @@ export class ArticleController {
   }
 
   @Delete(":articleId")
-  @UseGuards(AuthGuard)
+  //@UseGuards(AuthGuard)
   async deleteArticle(
     @Param("code") code: string,
     @Param("articleId") articleId: string,

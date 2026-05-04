@@ -15,7 +15,7 @@ import { UsersModule } from "../users/users.module";
 
 @Module({
   imports: [PostgresModule, UsersModule, AuthModule],
-  controllers: [BoardController, ArticleController, CommentController],
+  controllers: [ArticleController, CommentController, BoardController],
   providers: [
     BoardRepository,
     ArticleRepository,

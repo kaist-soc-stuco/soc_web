@@ -1,6 +1,21 @@
 import type {
+  ArticleCreateRequest,
+  ArticleCreateResponse,
+  ArticleDeleteResponse,
+  ArticleDetailResponse,
+  ArticleListResponse,
+  ArticleUpdateRequest,
+  ArticleUpdateResponse,
+  BoardListResponse,
+  BoardSummary,
   ConsentDecisionRequest,
   ConsentDecisionResponse,
+  CommentCreateRequest,
+  CommentCreateResponse,
+  CommentDeleteResponse,
+  CommentListResponse,
+  CommentUpdateRequest,
+  CommentUpdateResponse,
   CurrentUserResponse,
   GreetingResponse,
   HealthResponse,
@@ -31,6 +46,30 @@ interface AccessCheckResponse {
   mode: "persisted" | "temporary";
   ok: boolean;
 }
+
+interface ListQueryOptions {
+  limit?: number;
+  page?: number;
+}
+
+const buildListQuery = (options?: ListQueryOptions): string => {
+  if (!options) {
+    return "";
+  }
+
+  const params = new URLSearchParams();
+
+  if (options.page !== undefined) {
+    params.set("page", String(options.page));
+  }
+
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+};
 
 const withNoTrailingSlash = (value: string): string =>
   value.replace(/\/+$/, "");
@@ -170,6 +209,160 @@ export const createApiClient = ({
         },
         {
           retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    getBoards: async (): Promise<BoardListResponse> => {
+      return requestJson<BoardListResponse>(`${normalizedBaseUrl}/boards`, {
+        method: "GET",
+      });
+    },
+
+    getBoard: async (code: string): Promise<BoardSummary> => {
+      return requestJson<BoardSummary>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}`,
+        {
+          method: "GET",
+        },
+      );
+    },
+
+    getArticles: async (
+      code: string,
+      options?: ListQueryOptions,
+    ): Promise<ArticleListResponse> => {
+      return requestJson<ArticleListResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles${buildListQuery(options)}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    getArticle: async (
+      code: string,
+      articleId: string,
+    ): Promise<ArticleDetailResponse> => {
+      return requestJson<ArticleDetailResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    createArticle: async (
+      code: string,
+      input: ArticleCreateRequest,
+    ): Promise<ArticleCreateResponse> => {
+      return requestJson<ArticleCreateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        },
+      );
+    },
+
+    updateArticle: async (
+      code: string,
+      articleId: string,
+      input: ArticleUpdateRequest,
+    ): Promise<ArticleUpdateResponse> => {
+      return requestJson<ArticleUpdateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+    },
+
+    deleteArticle: async (
+      code: string,
+      articleId: string,
+    ): Promise<ArticleDeleteResponse> => {
+      return requestJson<ArticleDeleteResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+    },
+
+    getComments: async (
+      code: string,
+      articleId: string,
+      options?: ListQueryOptions,
+    ): Promise<CommentListResponse> => {
+      return requestJson<CommentListResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments${buildListQuery(options)}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    createComment: async (
+      code: string,
+      articleId: string,
+      input: CommentCreateRequest,
+    ): Promise<CommentCreateResponse> => {
+      return requestJson<CommentCreateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        },
+      );
+    },
+
+    updateComment: async (
+      code: string,
+      articleId: string,
+      commentId: string,
+      input: CommentUpdateRequest,
+    ): Promise<CommentUpdateResponse> => {
+      return requestJson<CommentUpdateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+    },
+
+    deleteComment: async (
+      code: string,
+      articleId: string,
+      commentId: string,
+    ): Promise<CommentDeleteResponse> => {
+      return requestJson<CommentDeleteResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}`,
+        {
+          method: "DELETE",
         },
       );
     },

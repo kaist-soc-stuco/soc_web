@@ -42,7 +42,7 @@ export class AssetController {
   constructor(private readonly assetService: AssetService) {}
 
   @Post("upload")
-  @UseGuards(AuthGuard)
+  //@UseGuards(AuthGuard)
   @UseInterceptors(FileInterceptor("file"))
   async upload(
     @UploadedFile(

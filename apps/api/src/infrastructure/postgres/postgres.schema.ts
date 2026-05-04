@@ -2,14 +2,14 @@ import {
   pgTable,
   text,
   timestamp,
-  uuid,
   integer,
   boolean,
   foreignKey,
+  serial,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
+  id: serial("id").primaryKey(),
   ssoUserId: text("sso_user_id").notNull().unique(),
   name: text("name"),
   permission: integer("permission").notNull().default(0),
@@ -25,7 +25,7 @@ export const users = pgTable("users", {
 });
 
 export const boards = pgTable("board", {
-  boardId: uuid("board_id").defaultRandom().primaryKey(),
+  boardId: serial("board_id").primaryKey(),
   code: text("code").notNull().unique(),
   nameKo: text("name_ko").notNull(),
   nameEn: text("name_en"),
@@ -38,16 +38,17 @@ export const boards = pgTable("board", {
   allowSecret: boolean("allow_secret").notNull().default(false),
   allowLike: boolean("allow_like").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 export const articles = pgTable("article", {
-  articleId: uuid("article_id").defaultRandom().primaryKey(),
-  boardId: uuid("board_id")
+  articleId: serial("article_id").primaryKey(),
+  boardId: integer("board_id")
     .notNull()
     .references(() => boards.boardId, {
       onDelete: "cascade",
     }),
-  authorUserId: uuid("author_user_id")
+  authorUserId: integer("author_user_id")
     .notNull()
     .references(() => users.id),
   titleKo: text("title_ko").notNull(),
@@ -68,24 +69,28 @@ export const articles = pgTable("article", {
 });
 
 export const assets = pgTable("asset", {
-  assetId: uuid("asset_id").defaultRandom().primaryKey(),
-  storageKey: text("storage_key").notNull(),
+  assetId: serial("asset_id").primaryKey(),
+  storageKey: text("storage_key").notNull().unique(),
   originalFilename: text("original_filename").notNull(),
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
-  uploadedBy: uuid("uploaded_by")
+  checksum: text("checksum"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  uploadedBy: integer("uploaded_by")
     .notNull()
     .references(() => users.id),
 });
 
 export const articleAssets = pgTable("article_asset", {
-  articleAssetId: uuid("article_asset_id").defaultRandom().primaryKey(),
-  articleId: uuid("article_id")
+  articleAssetId: serial("article_asset_id").primaryKey(),
+  articleId: integer("article_id")
     .notNull()
     .references(() => articles.articleId, {
       onDelete: "cascade",
     }),
-  assetId: uuid("asset_id")
+  assetId: integer("asset_id")
     .notNull()
     .references(() => assets.assetId, {
       onDelete: "cascade",
@@ -97,14 +102,14 @@ export const articleAssets = pgTable("article_asset", {
 export const comments = pgTable(
   "comment",
   {
-    commentId: uuid("comment_id").defaultRandom().primaryKey(),
-    articleId: uuid("article_id")
+    commentId: serial("comment_id").primaryKey(),
+    articleId: integer("article_id")
       .notNull()
       .references(() => articles.articleId, {
         onDelete: "cascade",
       }),
-    parentCommentId: uuid("parent_comment_id"),
-    authorUserId: uuid("author_user_id")
+    parentCommentId: integer("parent_comment_id"),
+    authorUserId: integer("author_user_id")
       .notNull()
       .references(() => users.id),
     content: text("content").notNull(),

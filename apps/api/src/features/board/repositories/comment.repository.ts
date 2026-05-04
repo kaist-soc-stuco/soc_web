@@ -30,7 +30,7 @@ export class CommentRepository {
   ): Promise<{ items: CommentItem[]; total: number }> {
     const offset = (page - 1) * limit;
     const baseFilter = and(
-      eq(comments.articleId, articleId),
+      eq(comments.articleId, Number(articleId)),
       eq(comments.status, COMMENT_STATUS.PUBLISHED),
     );
 
@@ -61,15 +61,15 @@ export class CommentRepository {
     return {
       total: Number(totalResult[0]?.count ?? 0),
       items: rows.map((row) => ({
-        commentId: row.commentId,
-        articleId: row.articleId,
-        parentCommentId: row.parentCommentId ?? null,
+        commentId: String(row.commentId),
+        articleId: String(row.articleId),
+        parentCommentId: row.parentCommentId ? String(row.parentCommentId) : null,
         content: row.content,
         status: row.status as CommentItem["status"],
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
         author: {
-          userId: row.authorId ?? "",
+          userId: String(row.authorId ?? ""),
           name: row.authorName ?? "unknown",
         },
       })),
@@ -91,13 +91,18 @@ export class CommentRepository {
       .from(comments)
       .where(
         and(
-          eq(comments.commentId, commentId),
-          eq(comments.articleId, articleId),
+          eq(comments.commentId, Number(commentId)),
+          eq(comments.articleId, Number(articleId)),
         ),
       )
       .limit(1);
 
-    return row[0] ?? null;
+    if (!row[0]) return null;
+
+    return {
+      authorUserId: String(row[0].authorUserId),
+      status: row[0].status,
+    };
   }
 
   async findById(commentId: string): Promise<{
@@ -112,10 +117,16 @@ export class CommentRepository {
         status: comments.status,
       })
       .from(comments)
-      .where(eq(comments.commentId, commentId))
+      .where(eq(comments.commentId, Number(commentId)))
       .limit(1);
 
-    return row[0] ?? null;
+    if (!row[0]) return null;
+
+    return {
+      commentId: String(row[0].commentId),
+      articleId: String(row[0].articleId),
+      status: row[0].status,
+    };
   }
 
   async createComment(input: {
@@ -127,9 +138,9 @@ export class CommentRepository {
     const [created] = await this.db
       .insert(comments)
       .values({
-        articleId: input.articleId,
-        authorUserId: input.authorUserId,
-        parentCommentId: input.payload.parentCommentId ?? null,
+        articleId: Number(input.articleId),
+        authorUserId: Number(input.authorUserId),
+        parentCommentId: input.payload.parentCommentId ? Number(input.payload.parentCommentId) : null,
         content: input.payload.content,
         status: COMMENT_STATUS.PUBLISHED,
         createdAt: now,
@@ -141,7 +152,7 @@ export class CommentRepository {
       });
 
     return {
-      commentId: created.commentId,
+      commentId: String(created.commentId),
       createdAt: created.createdAt.toISOString(),
     };
   }
@@ -157,7 +168,7 @@ export class CommentRepository {
         content: payload.content,
         updatedAt: now,
       })
-      .where(eq(comments.commentId, commentId));
+      .where(eq(comments.commentId, Number(commentId)));
 
     return {
       commentId,
@@ -174,11 +185,11 @@ export class CommentRepository {
         deletedAt: now,
         updatedAt: now,
       })
-      .where(eq(comments.commentId, commentId));
+      .where(eq(comments.commentId, Number(commentId)));
 
     return {
       ok: true,
-      commentId,
+      commentId: String(commentId),
       deletedAt: now.toISOString(),
     };
   }
