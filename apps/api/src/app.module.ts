@@ -4,6 +4,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { AuthModule } from './features/auth/auth.module';
+import { BoardModule } from './features/board/board.module';
+import { AssetModule } from './features/asset/asset.module';
 import { HealthModule } from './features/health/health.module';
 import { MockModule } from './features/mock/mock.module';
 import { UsersModule } from './features/users/users.module';
@@ -26,6 +28,8 @@ import { validateEnv } from './shared/config/env.validation';
     PostgresModule,
     RedisModule,
     AuthModule,
+    AssetModule,
+    BoardModule,
     UsersModule,
     HealthModule,
     MockModule,
