@@ -46,3 +46,7 @@ lerna-debug.log*
 
 # Opencode
 .opencode
+
+# Claude
+./CLAUDE.md
+**/CLAUDE.md
