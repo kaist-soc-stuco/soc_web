@@ -1,5 +1,9 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
+
+import { clearStoredAuthState, readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
+import { createEmptyAuthSession, getAuthSessionSummary } from '@/lib/auth-session';
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
 
@@ -10,6 +14,8 @@ interface SsoStartPayload {
   redirectUri: string;
   state: string;
 }
+
+const LAST_CONSUMED_RESULT_TOKEN_KEY = 'soc.auth.last-consumed-result-token';
 
 const deriveStartUrl = (redirectUri: string): string | null => {
   if (!redirectUri) {
@@ -40,51 +46,27 @@ const resolveStartUrl = (startUrl: string, redirectUri: string): string | null =
   return deriveStartUrl(redirectUri);
 };
 
-const readString = (value: unknown): string => (typeof value === 'string' ? value : '');
+const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
-const getStartPayloadFromJson = async (response: Response): Promise<SsoStartPayload> => {
-  const body = (await response.json()) as Record<string, unknown>;
+const resolveApiBaseUrl = (): string => {
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
-  return {
-    action: readString(
-      body.action || body.loginUrl || body.login_url || body.authorizeUrl || body.serverUrl,
-    ),
-    clientId: readString(body.clientId || body.client_id || body.clientID),
-    nonce: readString(body.nonce),
-    redirectUri: readString(body.redirectUri || body.redirect_uri),
-    state: readString(body.state),
-  };
-};
-
-const getStartPayloadFromHtml = async (response: Response): Promise<SsoStartPayload> => {
-  const html = await response.text();
-  const document = new DOMParser().parseFromString(html, 'text/html');
-  const form = document.querySelector('form');
-
-  if (!form) {
-    throw new Error('SSO start payload에 form이 없습니다.');
+  if (apiBaseUrl) {
+    return withNoTrailingSlash(apiBaseUrl);
   }
 
-  const readInputValue = (name: string): string =>
-    document.querySelector<HTMLInputElement>(`input[name="${name}"]`)?.value ?? '';
-
-  return {
-    action: form.getAttribute('action') ?? '',
-    clientId: readInputValue('client_id'),
-    nonce: readInputValue('nonce'),
-    redirectUri: readInputValue('redirect_uri'),
-    state: readInputValue('state'),
-  };
-};
-
-const readStartPayload = async (response: Response): Promise<SsoStartPayload> => {
-  const contentType = response.headers.get('content-type') ?? '';
-
-  if (contentType.includes('application/json')) {
-    return getStartPayloadFromJson(response);
+  const startUrl = (import.meta.env.VITE_SSO_START_URL as string | undefined)?.trim();
+  if (startUrl) {
+    try {
+      const parsed = new URL(startUrl);
+      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '');
+      return `${parsed.origin}${path}`;
+    } catch {
+      return '/api';
+    }
   }
 
-  return getStartPayloadFromHtml(response);
+  return '/api';
 };
 
 const submitAuthorizeForm = (payload: SsoStartPayload): void => {
@@ -128,6 +110,9 @@ const getResultMessage = (searchParams: URLSearchParams): string => {
   if (status === 'success') {
     return '로그인이 완료되었습니다.';
   }
+  if (status === 'consent-required') {
+    return '개인정보 저장 동의가 필요합니다.';
+  }
   if (status === 'error') {
     return '로그인 중 오류가 발생했습니다.';
   }
@@ -137,23 +122,129 @@ const getResultMessage = (searchParams: URLSearchParams): string => {
 
 export function TreeLogin() {
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const [loading, setLoading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [refreshTestLoading, setRefreshTestLoading] = useState(false);
+  const [refreshTestMessage, setRefreshTestMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sessionSummary, setSessionSummary] = useState<
+    | {
+        authenticated: boolean;
+        canUsePersistentFeatures: boolean;
+        requiresConsent: boolean;
+        storageMode: 'persisted' | 'temporary' | null;
+        userId?: string;
+      }
+    | null
+  >(null);
 
   const startUrlEnv = import.meta.env.VITE_SSO_START_URL ?? '';
   const redirectUri = import.meta.env.VITE_SSO_REDIRECT_URI ?? '';
   const startUrl = resolveStartUrl(startUrlEnv, redirectUri);
+  const consumedResultTokenRef = useRef<Set<string>>(new Set());
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
 
   const status = searchParams.get('status');
   const reason = searchParams.get('reason');
+  const resultToken = searchParams.get('resultToken');
   const errorCode = searchParams.get('errorCode');
   const userId = searchParams.get('userId');
+  const pendingLoginToken = searchParams.get('pendingLoginToken');
+  const storageMode = searchParams.get('storageMode');
   const resultMessage = getResultMessage(searchParams);
 
+  useEffect(() => {
+    if (!status) {
+      return;
+    }
+
+    if (status === 'consent-required' && pendingLoginToken) {
+      writeStoredAuthState({
+        pendingLoginToken,
+      });
+
+      navigate('/login/consent', {
+        replace: true,
+      });
+      return;
+    }
+
+    if (status === 'success' && resultToken) {
+      const consumedByRef = consumedResultTokenRef.current.has(resultToken);
+      const consumedBySessionStorage =
+        typeof window !== 'undefined' &&
+        window.sessionStorage.getItem(LAST_CONSUMED_RESULT_TOKEN_KEY) === resultToken;
+
+      if (consumedByRef || consumedBySessionStorage) {
+        return;
+      }
+
+      consumedResultTokenRef.current.add(resultToken);
+
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(LAST_CONSUMED_RESULT_TOKEN_KEY, resultToken);
+      }
+
+      void apiClient.consumeLoginResult(resultToken)
+        .then(() => {
+          clearStoredAuthState();
+
+          navigate('/login?status=success&reason=ok', {
+            replace: true,
+          });
+        })
+        .catch((error) => {
+          consumedResultTokenRef.current.delete(resultToken);
+
+          if (
+            typeof window !== 'undefined' &&
+            window.sessionStorage.getItem(LAST_CONSUMED_RESULT_TOKEN_KEY) === resultToken
+          ) {
+            window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
+          }
+
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : '로그인 결과 조회 중 오류가 발생했습니다.',
+          );
+        });
+    }
+  }, [
+    navigate,
+    apiClient,
+    pendingLoginToken,
+    resultToken,
+    status,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getAuthSessionSummary(apiClient)
+      .then((summary) => {
+        if (!cancelled) {
+          setSessionSummary(summary);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessionSummary(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient]);
+
   const handleLogin = async () => {
-    if (!startUrl || typeof window === 'undefined') {
-      setErrorMessage('SSO 시작 URL을 만들 수 없습니다.');
+    if (typeof window === 'undefined') {
       return;
     }
 
@@ -161,22 +252,10 @@ export function TreeLogin() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch(startUrl, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          Accept: 'application/json, text/html',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`로그인 시작 요청이 실패했습니다. HTTP ${response.status}`);
-      }
-
-      const payload = await readStartPayload(response);
+      const payload = await apiClient.getLoginStartPayload();
 
       if (
-        !payload.action ||
+        !payload.loginUrl ||
         !payload.clientId ||
         !payload.nonce ||
         !payload.redirectUri ||
@@ -185,10 +264,59 @@ export function TreeLogin() {
         throw new Error('SSO 시작 payload가 불완전합니다.');
       }
 
-      submitAuthorizeForm(payload);
+      submitAuthorizeForm({
+        action: payload.loginUrl,
+        clientId: payload.clientId,
+        nonce: payload.nonce,
+        redirectUri: payload.redirectUri,
+        state: payload.state,
+      });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '로그인 시작 중 오류가 발생했습니다.');
       setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await apiClient.logout();
+      clearStoredAuthState();
+
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
+      }
+
+      setSessionSummary({
+        ...createEmptyAuthSession(),
+      });
+
+      navigate('/login?status=success&reason=logged_out', { replace: true });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '로그아웃 중 오류가 발생했습니다.');
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
+
+  const handleRefreshFlowTest = async () => {
+    setRefreshTestLoading(true);
+    setErrorMessage(null);
+    setRefreshTestMessage(null);
+
+    try {
+      const result = await apiClient.checkAccessToken();
+      setRefreshTestMessage(`성공: access-check ok (mode=${result.mode})`);
+    } catch (error) {
+      setRefreshTestMessage(
+        error instanceof Error
+          ? `실패: ${error.message}`
+          : '실패: refresh 테스트 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setRefreshTestLoading(false);
     }
   };
 
@@ -197,7 +325,10 @@ export function TreeLogin() {
       searchParams.get('message') ||
       searchParams.get('reason') ||
       searchParams.get('error') ||
-      searchParams.get('errorCode'),
+        searchParams.get('errorCode') ||
+        searchParams.get('resultToken') ||
+        searchParams.get('storageMode') ||
+        searchParams.get('pendingLoginToken'),
   );
 
   return (
@@ -241,22 +372,38 @@ export function TreeLogin() {
             </div>
           </div>
 
-          {!startUrl ? (
-            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-              `VITE_SSO_START_URL` 또는 `VITE_SSO_REDIRECT_URI`로부터 시작 URL을 만들 수 없습니다.
-            </div>
-          ) : null}
-
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <button
               type="button"
               onClick={handleLogin}
-              disabled={!startUrl || loading}
+              disabled={loading}
               className="rounded-full bg-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:bg-kaist-grey"
             >
               {loading ? 'SSO 로그인 진행 중' : 'SSO 로그인 시작'}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={logoutLoading}
+              className="rounded-full border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition hover:bg-kaist-darkgreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+            >
+              {logoutLoading ? '로그아웃 처리 중' : '로그아웃'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleRefreshFlowTest()}
+              disabled={refreshTestLoading}
+              className="rounded-full border border-kaist-greygreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-greygreen transition hover:bg-kaist-greygreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+            >
+              {refreshTestLoading ? 'refresh 테스트 중' : '401/refresh 테스트'}
+            </button>
           </div>
+
+          {refreshTestMessage ? (
+            <div className="mt-4 rounded-xl border border-kaist-darkgreen/20 bg-kaist-darkgreen/5 p-4 text-sm font-medium text-kaist-black">
+              {refreshTestMessage}
+            </div>
+          ) : null}
 
           {errorMessage ? (
             <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
@@ -283,8 +430,11 @@ export function TreeLogin() {
               <p>status: {status ?? '없음'}</p>
               <p>message: {resultMessage}</p>
               <p>reason: {reason ?? '없음'}</p>
+              <p>resultToken: {resultToken ?? '없음'}</p>
               <p>errorCode: {errorCode ?? '없음'}</p>
               <p>userId: {userId ?? '없음'}</p>
+              <p>storageMode: {storageMode ?? '없음'}</p>
+              <p>temporarySessionId: {readStoredAuthState()?.temporarySession?.sessionId ?? '없음'}</p>
             </div>
           </section>
         ) : (
@@ -295,6 +445,20 @@ export function TreeLogin() {
             </p>
           </section>
         )}
+
+        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-extrabold tracking-tight">현재 세션 조회</h2>
+          <div className="mt-4 space-y-2 text-sm font-medium text-kaist-black">
+            <p>authenticated: {String(sessionSummary?.authenticated ?? false)}</p>
+            <p>storageMode: {sessionSummary?.storageMode ?? '없음'}</p>
+            <p>
+              canUsePersistentFeatures:{' '}
+              {String(sessionSummary?.canUsePersistentFeatures ?? false)}
+            </p>
+            <p>requiresConsent: {String(sessionSummary?.requiresConsent ?? false)}</p>
+            <p>userId: {sessionSummary?.userId ?? '없음'}</p>
+          </div>
+        </section>
       </div>
     </main>
   );

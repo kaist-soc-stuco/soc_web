@@ -1,5 +1,11 @@
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param, UseGuards } from "@nestjs/common";
 
+import {
+  AuthGuard,
+  PermissionFlags,
+  PermissionGuard,
+  RequirePermission,
+} from "../../shared/guards";
 import { UsersService } from "./users.service";
 
 /**
@@ -14,11 +20,11 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /**
-   * 사용자 영구 저장 여부 확인용 예시 endpoint입니다.
-   *
-   * @param userId 내부 사용자 ID
+    * 사용자 영구 저장 여부 확인용 예시 endpoint입니다.
    */
   @Get(":userId/persisted-profile")
+  @UseGuards(AuthGuard, PermissionGuard)
+  @RequirePermission(PermissionFlags.TUITION_MANAGE)
   async getPersistedProfileStatus(@Param("userId") userId: string) {
     return {
       hasPersistedProfile: await this.usersService.hasPersistedProfile(userId),

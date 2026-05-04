@@ -1,3 +1,5 @@
+import { IsBoolean, IsOptional, IsString } from "class-validator";
+
 /**
  * SSO 로그인 이후 개인정보 동의 / 임시 로그인 / 영구 로그인 흐름에서
  * 공통으로 사용할 타입 정의 모음입니다.
@@ -19,7 +21,6 @@ export type StorageMode = "temporary" | "persisted";
  */
 export interface PendingSsoUser {
   expiresAt: number;
-  nonce: string;
   ssoUserId: string;
   userEmail?: string;
   userMobile?: string;
@@ -77,6 +78,7 @@ export interface AuthSessionRecord {
   expiresAt: number;
   mode: StorageMode;
   pendingLoginId?: string;
+  refreshJti?: string;
   revoked: boolean;
   sessionId: string;
   userId?: string;
@@ -90,6 +92,14 @@ export interface ConsentDecisionRequest {
   pendingLoginToken: string;
 }
 
+export class ConsentDecisionRequestDto implements ConsentDecisionRequest {
+  @IsBoolean()
+  consent!: boolean;
+
+  @IsString()
+  pendingLoginToken!: string;
+}
+
 /**
  * refresh 요청 DTO입니다.
  *
@@ -99,6 +109,47 @@ export interface ConsentDecisionRequest {
 export interface RefreshSessionRequest {
   refreshToken?: string;
   sessionId?: string;
+}
+
+export class RefreshSessionRequestDto implements RefreshSessionRequest {
+  @IsOptional()
+  @IsString()
+  refreshToken?: string;
+
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
+}
+
+/**
+ * 로그아웃 요청 DTO입니다.
+ */
+export interface LogoutRequest {
+  sessionId?: string;
+}
+
+export class LogoutRequestDto implements LogoutRequest {
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
+}
+
+export class SsoCallbackBodyDto {
+  @IsOptional()
+  @IsString()
+  code?: string;
+
+  @IsOptional()
+  @IsString()
+  error?: string;
+
+  @IsOptional()
+  @IsString()
+  errorCode?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
 }
 
 /**

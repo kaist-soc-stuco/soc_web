@@ -1,11 +1,11 @@
 import { Inject, Module, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 
-import { POSTGRES_POOL, postgresProvider } from './postgres.provider';
+import { POSTGRES_POOL, postgresProviders } from './postgres.provider';
 
 @Module({
-  providers: [postgresProvider],
-  exports: [postgresProvider],
+  providers: [...postgresProviders],
+  exports: [...postgresProviders],
 })
 export class PostgresModule implements OnModuleDestroy {
   constructor(@Inject(POSTGRES_POOL) private readonly pool: Pool) {}

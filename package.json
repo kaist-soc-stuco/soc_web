@@ -7,6 +7,8 @@
     "dev": "pnpm -r --parallel --filter @soc/api --filter @soc/web dev",
     "dev:api": "pnpm --filter @soc/api dev",
     "dev:web": "pnpm --filter @soc/web dev",
+    "db:migrate": "bash infra/scripts/db-migrate.sh",
+    "db:seed": "bash infra/scripts/db-seed.sh",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"
