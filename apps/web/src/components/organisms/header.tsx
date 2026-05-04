@@ -1,6 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
+import type { CurrentUserResponse } from '@soc/contracts';
 import { Logo } from '@/components/atoms/logo';
+import { resolveApiBaseUrl } from '@/lib/api-base-url';
 
 interface HeaderProps {
   showLogo?: boolean;
@@ -10,6 +13,12 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
+  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(null);
+
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
 
   useEffect(() => {
     const update = () => {
@@ -19,6 +28,26 @@ export function Header({ showLogo = false }: HeaderProps) {
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, [showLogo]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void apiClient.getCurrentUser()
+      .then((response) => {
+        if (!cancelled) {
+          setCurrentUser(response);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentUser(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient]);
   
   const navItems = [
     {
@@ -41,7 +70,7 @@ export function Header({ showLogo = false }: HeaderProps) {
 
   return (
     <header 
-      className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative"
+      className="shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative"
       onMouseLeave={() => setHoveredIndex(null)}
     >
       <div className="flex h-14 w-full items-stretch justify-between">
@@ -90,13 +119,19 @@ export function Header({ showLogo = false }: HeaderProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
           </button>
-          <Link
-            to="/login"
-            className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
-          >
-            <span className="py-2">로그인</span>
-            <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
-          </Link>
+          {currentUser?.authenticated && currentUser.user ? (
+            <span className="text-sm lg:text-base font-extrabold tracking-tight text-kaist-darkgreen-main">
+              로그인: {currentUser.user.id}
+            </span>
+          ) : (
+            <Link
+              to="/login"
+              className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
+            >
+              <span className="py-2">로그인</span>
+              <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
+            </Link>
+          )}
         </div>
       </div>
 
