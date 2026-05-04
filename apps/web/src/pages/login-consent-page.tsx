@@ -1,14 +1,89 @@
-import { Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
 
-/**
- * 개인정보 저장 동의 화면 스켈레톤입니다.
- *
- * TODO:
- * 1. `/login` callback 결과에서 `pendingLoginToken` 또는 `status=consent-required`를 받아 이 화면으로 넘기세요.
- * 2. 동의 / 비동의 버튼을 각각 `POST /auth/login/consent`와 연결하세요.
- * 3. temporary 로그인일 때 어떤 기능이 제한되는지 문구를 명확히 넣으세요.
- */
+import {
+  clearStoredAuthState,
+  readStoredAuthState,
+  writeStoredAuthState,
+} from '@/lib/auth-storage';
+
+const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+
+const resolveApiBaseUrl = (): string => {
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+
+  if (apiBaseUrl) {
+    return withNoTrailingSlash(apiBaseUrl);
+  }
+
+  const startUrl = (import.meta.env.VITE_SSO_START_URL as string | undefined)?.trim();
+  if (startUrl) {
+    try {
+      const parsed = new URL(startUrl);
+      const path = parsed.pathname.replace(/\/auth\/login\/start$/, '');
+      return `${parsed.origin}${path}`;
+    } catch {
+      return '/api';
+    }
+  }
+
+  return '/api';
+};
+
 export function LoginConsentPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const query = new URLSearchParams(location.search);
+  const [submitting, setSubmitting] = useState<null | 'persisted' | 'temporary'>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+
+  const pendingLoginToken = useMemo(() => {
+    const queryToken = query.get('pendingLoginToken');
+    if (queryToken) {
+      return queryToken;
+    }
+
+    const stored = readStoredAuthState();
+    return stored?.pendingLoginToken ?? null;
+  }, [query]);
+
+  const submitDecision = async (consent: boolean) => {
+    if (!pendingLoginToken) {
+      setErrorMessage('pendingLoginToken이 없습니다. 로그인부터 다시 진행해 주세요.');
+      return;
+    }
+
+    setSubmitting(consent ? 'persisted' : 'temporary');
+    setErrorMessage(null);
+
+    try {
+      const payload = await apiClient.submitConsentDecision({
+        consent,
+        pendingLoginToken,
+      });
+
+      if (payload.storageMode === 'temporary') {
+        writeStoredAuthState({
+          temporarySession: payload.temporarySession,
+        });
+      } else {
+        clearStoredAuthState();
+      }
+
+      navigate('/login?status=success&reason=consent_processed', {
+        replace: true,
+      });
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : '동의 처리 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-kaist-white px-6 py-12 text-kaist-black">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -29,25 +104,43 @@ export function LoginConsentPage() {
 
         <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
           <div className="space-y-4 text-sm font-medium leading-7 text-kaist-grey">
-            <p>TODO: 저장할 개인정보 항목(예: 이메일, 휴대전화, SSO 식별자)을 명확히 적으세요.</p>
-            <p>TODO: 비동의 시 어떤 기능이 제한되는지 사용자 언어로 설명하세요.</p>
-            <p>TODO: pendingLoginToken을 어디서 받아올지(query, state, session) 먼저 결정하세요.</p>
+            <p>저장 항목: SSO 식별자, 이메일, 휴대전화</p>
+            <p>비동의 시에는 temporary 모드로 로그인되며, 개인정보 영구 저장이 필요한 기능은 제한됩니다.</p>
+            <p>pendingLoginToken: {pendingLoginToken ?? '없음'}</p>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-4">
             <button
               type="button"
-              disabled
+              disabled={!pendingLoginToken || submitting !== null}
+              onClick={() => void submitDecision(true)}
               className="rounded-full bg-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-white disabled:bg-kaist-grey"
             >
-              동의하고 저장
+              {submitting === 'persisted' ? '처리 중...' : '동의하고 저장'}
             </button>
             <button
               type="button"
-              disabled
+              disabled={!pendingLoginToken || submitting !== null}
+              onClick={() => void submitDecision(false)}
               className="rounded-full border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen disabled:border-kaist-grey disabled:text-kaist-grey"
             >
-              저장하지 않고 계속
+              {submitting === 'temporary' ? '처리 중...' : '저장하지 않고 계속'}
+            </button>
+          </div>
+
+          {errorMessage ? (
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={clearStoredAuthState}
+              className="text-sm font-semibold text-kaist-greygreen underline"
+            >
+              저장된 로그인 상태 초기화
             </button>
           </div>
         </section>

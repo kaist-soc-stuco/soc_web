@@ -1,8 +1,9 @@
 import 'reflect-metadata';
 
-import { RequestMethod } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module';
 
@@ -12,8 +13,17 @@ async function bootstrap(): Promise<void> {
 
   app.enableCors({
     origin: true,
-    credentials: false,
+    credentials: true,
   });
+
+  app.use(cookieParser());
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+    }),
+  );
 
   app.setGlobalPrefix('v1', {
     exclude: [{ path: 'health', method: RequestMethod.GET }],

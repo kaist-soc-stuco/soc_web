@@ -11,7 +11,7 @@ export const redisProvider: Provider = {
     const redis = new Redis(configService.get<string>('REDIS_URL', 'redis://localhost:6379'), {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
+      enableOfflineQueue: true,
     });
 
     // Keep connection failures from surfacing as unhandled error events.

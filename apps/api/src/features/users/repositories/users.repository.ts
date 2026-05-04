@@ -1,28 +1,135 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
+import { eq, sql } from "drizzle-orm";
+
+import {
+  DRIZZLE_DB,
+  PostgresDatabase,
+} from "../../../infrastructure/postgres/postgres.provider";
+import { users } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
 
 /**
- * PostgreSQL users 테이블 접근 골격입니다.
- *
- * TODO:
- * 1. 현재 프로젝트는 ORM이 없으므로 `pg` 기반 쿼리 또는 query helper를 선택하세요.
- * 2. 조회/삽입/동의 업데이트 쿼리를 먼저 나누세요.
- * 3. unique key는 `sso_user_id` 기준을 우선 검토하세요.
+ * PostgreSQL users 테이블 접근 로직입니다.
  */
 @Injectable()
 export class UsersRepository {
-  async findBySsoUserId(_ssoUserId: string): Promise<UserRecord | null> {
-    throw new Error("TODO: users 테이블에서 sso_user_id 조회 구현");
+  constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
+
+  /** DB row를 서비스 계층에서 사용하는 UserRecord로 변환합니다. */
+  private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
+    return {
+      createdAt: row.createdAt.toISOString(),
+      id: row.id,
+      permission: row.permission,
+      privacyConsentAt: row.privacyConsentAt ? row.privacyConsentAt.toISOString() : null,
+      ssoUserId: row.ssoUserId,
+      updatedAt: row.updatedAt.toISOString(),
+      userEmail: row.userEmail,
+      userMobile: row.userMobile,
+    };
   }
 
+  /** SSO 식별자로 users 레코드를 조회합니다. */
+  async findBySsoUserId(ssoUserId: string): Promise<UserRecord | null> {
+    const found = await this.db.query.users.findFirst({
+      where: eq(users.ssoUserId, ssoUserId),
+    });
+
+    return found ? this.mapRowToUserRecord(found) : null;
+  }
+
+  /** 내부 사용자 ID로 users 레코드를 조회합니다. */
+  async findById(userId: string): Promise<UserRecord | null> {
+    const found = await this.db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    return found ? this.mapRowToUserRecord(found) : null;
+  }
+
+  /** 신규 users 레코드를 생성하고 생성 결과를 반환합니다. */
   async insert(
-    _input: Omit<UserRecord, "id" | "createdAt" | "updatedAt">,
+    input: Omit<UserRecord, "id" | "createdAt" | "updatedAt">,
   ): Promise<UserRecord> {
-    throw new Error("TODO: users 테이블 insert 구현");
+    const inserted = await this.db
+      .insert(users)
+      .values({
+        permission: input.permission,
+        privacyConsentAt: input.privacyConsentAt ? new Date(input.privacyConsentAt) : null,
+        ssoUserId: input.ssoUserId,
+        userEmail: input.userEmail,
+        userMobile: input.userMobile,
+      })
+      .returning();
+
+    return this.mapRowToUserRecord(inserted[0]);
   }
 
-  async markConsent(_userId: string, _consentedAt: string): Promise<void> {
-    throw new Error("TODO: privacy_consent_at 업데이트 구현");
+  /** 동의 사용자 정보를 ssoUserId 기준으로 생성/갱신합니다. */
+  async upsertConsentedUserBySso(input: {
+    consentedAt: string;
+    ssoUserId: string;
+    userEmail?: string;
+    userMobile?: string;
+  }): Promise<UserRecord> {
+    const upserted = await this.db
+      .insert(users)
+      .values({
+        privacyConsentAt: new Date(input.consentedAt),
+        ssoUserId: input.ssoUserId,
+        userEmail: input.userEmail ?? null,
+        userMobile: input.userMobile ?? null,
+      })
+      .onConflictDoUpdate({
+        target: users.ssoUserId,
+        set: {
+          userEmail: sql`COALESCE(${users.userEmail}, excluded.user_email)`,
+          userMobile: sql`COALESCE(${users.userMobile}, excluded.user_mobile)`,
+          privacyConsentAt: sql`COALESCE(${users.privacyConsentAt}, excluded.privacy_consent_at)`,
+          updatedAt: sql`NOW()`,
+        },
+      })
+      .returning();
+
+    return this.mapRowToUserRecord(upserted[0]);
+  }
+
+  /** 개인정보 영구 저장 동의 시각을 기록합니다. */
+  async markConsent(userId: string, consentedAt: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({
+        privacyConsentAt: new Date(consentedAt),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  /** 이메일/휴대전화 필드만 선택적으로 갱신합니다. */
+  async updateProfile(
+    userId: string,
+    input: {
+      userEmail?: string;
+      userMobile?: string;
+    },
+  ): Promise<void> {
+    const updateSet: {
+      updatedAt: Date;
+      userEmail?: string | null;
+      userMobile?: string | null;
+    } = {
+      updatedAt: new Date(),
+    };
+
+    if (input.userEmail !== undefined) {
+      updateSet.userEmail = input.userEmail;
+    }
+
+    if (input.userMobile !== undefined) {
+      updateSet.userMobile = input.userMobile;
+    }
+
+    await this.db.update(users).set(updateSet).where(eq(users.id, userId));
   }
 }

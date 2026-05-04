@@ -108,9 +108,13 @@ SSO_AUTH_API_URL=https://sso.kaist.ac.kr/auth/api/single/auth
 
 ## Current Frontend Behavior
 
-현재 `apps/web/src/pages/login-page.tsx`는 다음만 구현한다.
+현재 `apps/web/src/pages/login-page.tsx`와 `apps/web/src/pages/login-consent-page.tsx`는 다음을 구현한다.
 
 - `VITE_SSO_START_URL` 또는 `VITE_SSO_REDIRECT_URI`에서 파생한 start URL 표시
 - start/init endpoint `fetch` 후 authorize form submit
 - `/login?status=...&reason=...` 결과 표시
-- 서버 콜백이 필요하다는 점을 UI로 안내
+++
+- `status=consent-required` + `pendingLoginToken` 수신 시 동의 페이지(`/login/consent`)로 이동
+- `status=success` + `resultToken` 수신 시 `GET /auth/login/result`로 1회 교환 후 access/refresh/session 저장
+- 저장된 sessionId로 `GET /auth/session` 호출해 세션 상태 표시
+- 동의 페이지에서 `POST /auth/login/consent` 호출 후 결과 토큰/세션 저장
