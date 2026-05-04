@@ -7,6 +7,7 @@ import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { BoardDebugPanel } from '@/components/organisms/board-debug-panel';
 
 interface BoardPost {
   id: number;
@@ -319,6 +320,10 @@ export function BoardPage() {
                 )}
               </div>
             </div>
+          </div>
+        
+          <div className="max-w-7xl mx-auto px-4 pb-16">
+            <BoardDebugPanel defaultBoardCode={category} />
           </div>
         </div>
       </main>

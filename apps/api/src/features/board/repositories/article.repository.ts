@@ -28,7 +28,7 @@ export class ArticleRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
 
   async listByBoardId(
-    boardId: string,
+    boardId: number,
     page: number,
     limit: number,
   ): Promise<{ items: ArticleListItem[]; total: number }> {
@@ -78,7 +78,7 @@ export class ArticleRepository {
     return {
       total: Number(totalResult[0]?.count ?? 0),
       items: rows.map((row) => ({
-        articleId: row.articleId,
+        articleId: String(row.articleId),
         boardId: row.boardId,
         titleKo: row.titleKo,
         titleEn: row.titleEn ?? undefined,
@@ -90,7 +90,7 @@ export class ArticleRepository {
         postedAt: row.postedAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
         author: {
-          userId: row.authorId ?? "",
+          userId: String(row.authorId ?? ""),
           name: row.authorName ?? "unknown",
         },
         commentCount: Number(row.commentCount ?? 0),
@@ -99,7 +99,7 @@ export class ArticleRepository {
   }
 
   async findDetailById(
-    boardId: string,
+    boardId: number,
     articleId: string,
   ): Promise<ArticleDetailResponse | null> {
     const row = await this.db
@@ -130,7 +130,7 @@ export class ArticleRepository {
       .where(
         and(
           eq(articles.boardId, boardId),
-          eq(articles.articleId, articleId),
+          eq(articles.articleId, Number(articleId)),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
         ),
       )
@@ -152,11 +152,11 @@ export class ArticleRepository {
       })
       .from(articleAssets)
       .innerJoin(assets, eq(articleAssets.assetId, assets.assetId))
-      .where(eq(articleAssets.articleId, articleId))
+      .where(eq(articleAssets.articleId, Number(articleId)))
       .orderBy(asc(articleAssets.sortOrder));
 
     return {
-      articleId: row[0].articleId,
+      articleId: String(row[0].articleId),
       boardId: row[0].boardId,
       titleKo: row[0].titleKo,
       titleEn: row[0].titleEn ?? undefined,
@@ -170,11 +170,11 @@ export class ArticleRepository {
       postedAt: row[0].postedAt.toISOString(),
       updatedAt: row[0].updatedAt.toISOString(),
       author: {
-        userId: row[0].authorId ?? "",
+        userId: String(row[0].authorId ?? ""),
         name: row[0].authorName ?? "unknown",
       },
       assets: assetRows.map((assetRow) => ({
-        assetId: assetRow.assetId,
+        assetId: String(assetRow.assetId),
         usageType:
           assetRow.usageType as ArticleDetailResponse["assets"][number]["usageType"],
         sortOrder: assetRow.sortOrder,
@@ -188,7 +188,7 @@ export class ArticleRepository {
   }
 
   async createArticle(input: {
-    boardId: string;
+    boardId: number;
     authorUserId: string;
     payload: ArticleCreateRequest;
   }): Promise<ArticleCreateResponse> {
@@ -199,7 +199,7 @@ export class ArticleRepository {
         .insert(articles)
         .values({
           boardId: input.boardId,
-          authorUserId: input.authorUserId,
+          authorUserId: Number(input.authorUserId),
           titleKo: input.payload.titleKo,
           titleEn: input.payload.titleEn ?? null,
           contentKo: input.payload.contentKo,
@@ -221,7 +221,7 @@ export class ArticleRepository {
         await tx.insert(articleAssets).values(
           input.payload.assets.map((asset) => ({
             articleId: created.articleId,
-            assetId: asset.assetId,
+            assetId: Number(asset.assetId),
             usageType: asset.usageType,
             sortOrder: asset.sortOrder,
           })),
@@ -229,7 +229,7 @@ export class ArticleRepository {
       }
 
       return {
-        articleId: created.articleId,
+        articleId: String(created.articleId),
         boardId: created.boardId,
         postedAt: created.postedAt.toISOString(),
       };
@@ -237,7 +237,7 @@ export class ArticleRepository {
   }
 
   async findPermissionInfo(
-    boardId: string,
+    boardId: number,
     articleId: string,
   ): Promise<{
     authorUserId: string;
@@ -250,15 +250,20 @@ export class ArticleRepository {
       })
       .from(articles)
       .where(
-        and(eq(articles.boardId, boardId), eq(articles.articleId, articleId)),
+        and(eq(articles.boardId, boardId), eq(articles.articleId, Number(articleId))),
       )
       .limit(1);
 
-    return row[0] ?? null;
+    if (!row[0]) return null;
+
+    return {
+      authorUserId: String(row[0].authorUserId),
+      status: row[0].status,
+    };
   }
 
   async updateArticle(
-    boardId: string,
+    boardId: number,
     articleId: string,
     payload: ArticleUpdateRequest,
   ): Promise<ArticleUpdateResponse> {
@@ -309,19 +314,19 @@ export class ArticleRepository {
         .update(articles)
         .set(updateSet)
         .where(
-          and(eq(articles.boardId, boardId), eq(articles.articleId, articleId)),
+          and(eq(articles.boardId, boardId), eq(articles.articleId, Number(articleId))),
         );
 
       if (payload.assets) {
         await tx
           .delete(articleAssets)
-          .where(eq(articleAssets.articleId, articleId));
+          .where(eq(articleAssets.articleId, Number(articleId)));
 
         if (payload.assets.length > 0) {
           await tx.insert(articleAssets).values(
             payload.assets.map((asset) => ({
-              articleId,
-              assetId: asset.assetId,
+              articleId: Number(articleId),
+              assetId: Number(asset.assetId),
               usageType: asset.usageType,
               sortOrder: asset.sortOrder,
             })),
@@ -330,14 +335,14 @@ export class ArticleRepository {
       }
 
       return {
-        articleId,
+        articleId: String(articleId),
         updatedAt: now.toISOString(),
       };
     });
   }
 
   async softDeleteArticle(
-    boardId: string,
+    boardId: number,
     articleId: string,
   ): Promise<ArticleDeleteResponse> {
     const now = new Date();
@@ -350,18 +355,18 @@ export class ArticleRepository {
         updatedAt: now,
       })
       .where(
-        and(eq(articles.boardId, boardId), eq(articles.articleId, articleId)),
+        and(eq(articles.boardId, boardId), eq(articles.articleId, Number(articleId))),
       );
 
     return {
       ok: true,
-      articleId,
+      articleId: String(articleId),
       deletedAt: now.toISOString(),
     };
   }
 
   async isReadableArticle(
-    boardId: string,
+    boardId: number,
     articleId: string,
   ): Promise<boolean> {
     const row = await this.db
@@ -370,7 +375,7 @@ export class ArticleRepository {
       .where(
         and(
           eq(articles.boardId, boardId),
-          eq(articles.articleId, articleId),
+          eq(articles.articleId, Number(articleId)),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
         ),
       )

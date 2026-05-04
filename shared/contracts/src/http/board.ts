@@ -1,7 +1,7 @@
 export type BoardReadScope = "PUBLIC" | "LOGIN" | "STAFF_ONLY";
 
 export interface BoardSummary {
-  boardId: string;
+  boardId: number;
   code: string;
   nameKo: string;
   nameEn?: string;
@@ -30,7 +30,7 @@ export interface ArticleAuthorSummary {
 
 export interface ArticleListItem {
   articleId: string;
-  boardId: string;
+  boardId: number;
   titleKo: string;
   titleEn?: string;
   status: ArticleStatus;
@@ -62,7 +62,7 @@ export interface ArticleAssetItem {
 
 export interface ArticleDetailResponse {
   articleId: string;
-  boardId: string;
+  boardId: number;
   titleKo: string;
   titleEn?: string;
   contentKo: string;
@@ -97,7 +97,7 @@ export interface ArticleCreateRequest {
 
 export interface ArticleCreateResponse {
   articleId: string;
-  boardId: string;
+  boardId: number;
   postedAt: string;
 }
 

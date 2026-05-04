@@ -20,7 +20,7 @@ export class UsersRepository {
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
       createdAt: row.createdAt.toISOString(),
-      id: row.id,
+      id: String(row.id),
       name: row.name,
       permission: row.permission,
       privacyConsentAt: row.privacyConsentAt
@@ -45,7 +45,7 @@ export class UsersRepository {
   /** 내부 사용자 ID로 users 레코드를 조회합니다. */
   async findById(userId: string): Promise<UserRecord | null> {
     const found = await this.db.query.users.findFirst({
-      where: eq(users.id, userId),
+      where: eq(users.id, Number(userId)),
     });
 
     return found ? this.mapRowToUserRecord(found) : null;
@@ -112,7 +112,7 @@ export class UsersRepository {
         privacyConsentAt: new Date(consentedAt),
         updatedAt: new Date(),
       })
-      .where(eq(users.id, userId));
+      .where(eq(users.id, Number(userId)));
   }
 
   /** 이메일/휴대전화 필드만 선택적으로 갱신합니다. */
@@ -145,6 +145,6 @@ export class UsersRepository {
       updateSet.userMobile = input.userMobile;
     }
 
-    await this.db.update(users).set(updateSet).where(eq(users.id, userId));
+    await this.db.update(users).set(updateSet).where(eq(users.id, Number(userId)));
   }
 }
