@@ -4,8 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { articles, boards, users } from "../src/infrastructure/postgres/postgres.schema";
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  `postgresql://${process.env.POSTGRES_USER ?? "soc"}:${process.env.POSTGRES_PASSWORD ?? "soc"}@${process.env.POSTGRES_HOST ?? "localhost"}:${process.env.POSTGRES_PORT ?? "5432"}/${process.env.POSTGRES_DB ?? "soc_web"}?sslmode=disable`;
+  process.env.DATABASE_URL;
 
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
@@ -126,12 +125,16 @@ async function seedBoards() {
   const colCheck = await pool.query(
     "SELECT column_name FROM information_schema.columns WHERE table_name='board' AND column_name='sort_order'"
   );
+  if (!colCheck.rowCount) {
+    console.log("no rowcount");
+    return;
+  }
   const hasSortOrder = colCheck.rowCount > 0;
 
   if (hasSortOrder) {
-    await db.insert(boards).values(...toInsert);
-    console.log(`Inserted ${toInsert.length} board(s)`);
-    return;
+    await db.insert(boards).values(toInsert); 
+  console.log(`Inserted ${toInsert.length} board(s)`);
+  return;
   }
 
   // If sort_order (or other new columns) don't exist, build a raw INSERT
