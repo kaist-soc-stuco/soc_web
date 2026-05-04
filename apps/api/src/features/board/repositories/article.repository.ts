@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type {
   ArticleCreateRequest,
   ArticleCreateResponse,
@@ -21,6 +21,7 @@ import {
   comments,
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
+import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
 
 @Injectable()
 export class ArticleRepository {
@@ -34,8 +35,7 @@ export class ArticleRepository {
     const offset = (page - 1) * limit;
     const baseFilter = and(
       eq(articles.boardId, boardId),
-      eq(articles.status, "PUBLISHED"),
-      isNull(articles.deletedAt),
+      eq(articles.status, ARTICLE_STATUS.PUBLISHED),
     );
 
     const totalResult = await this.db
@@ -61,7 +61,7 @@ export class ArticleRepository {
           select count(*)
           from ${comments}
           where ${comments.articleId} = ${articles.articleId}
-            and ${comments.status} = 'PUBLISHED'
+            and ${comments.status} = ${COMMENT_STATUS.PUBLISHED}
         )`,
       })
       .from(articles)
@@ -121,7 +121,7 @@ export class ArticleRepository {
           select count(*)
           from ${comments}
           where ${comments.articleId} = ${articles.articleId}
-            and ${comments.status} = 'PUBLISHED'
+            and ${comments.status} = ${COMMENT_STATUS.PUBLISHED}
         )`,
       })
       .from(articles)
@@ -129,8 +129,7 @@ export class ArticleRepository {
       .where(and(
         eq(articles.boardId, boardId),
         eq(articles.articleId, articleId),
-        eq(articles.status, "PUBLISHED"),
-        isNull(articles.deletedAt),
+        eq(articles.status, ARTICLE_STATUS.PUBLISHED),
       ))
       .limit(1);
 
@@ -200,7 +199,7 @@ export class ArticleRepository {
           titleEn: input.payload.titleEn ?? null,
           contentKo: input.payload.contentKo,
           contentEn: input.payload.contentEn ?? null,
-          status: "PUBLISHED",
+          status: ARTICLE_STATUS.PUBLISHED,
           visibilityScope: input.payload.visibilityScope,
           isPinned: input.payload.isPinned ?? false,
           pinOrder: input.payload.pinOrder ?? null,
@@ -238,13 +237,11 @@ export class ArticleRepository {
   ): Promise<{
     authorUserId: string;
     status: string;
-    deletedAt: Date | null;
   } | null> {
     const row = await this.db
       .select({
         authorUserId: articles.authorUserId,
         status: articles.status,
-        deletedAt: articles.deletedAt,
       })
       .from(articles)
       .where(and(
@@ -345,7 +342,7 @@ export class ArticleRepository {
     await this.db
       .update(articles)
       .set({
-        status: "DELETED",
+        status: ARTICLE_STATUS.DELETED,
         deletedAt: now,
         updatedAt: now,
       })
@@ -368,8 +365,7 @@ export class ArticleRepository {
       .where(and(
         eq(articles.boardId, boardId),
         eq(articles.articleId, articleId),
-        eq(articles.status, "PUBLISHED"),
-        isNull(articles.deletedAt),
+        eq(articles.status, ARTICLE_STATUS.PUBLISHED),
       ))
       .limit(1);
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type {
   CommentCreateRequest,
   CommentCreateResponse,
@@ -14,6 +14,7 @@ import {
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
 import { comments, users } from "../../../infrastructure/postgres/postgres.schema";
+import { COMMENT_STATUS } from "../board.constants";
 
 @Injectable()
 export class CommentRepository {
@@ -27,8 +28,7 @@ export class CommentRepository {
     const offset = (page - 1) * limit;
     const baseFilter = and(
       eq(comments.articleId, articleId),
-      eq(comments.status, "PUBLISHED"),
-      isNull(comments.deletedAt),
+      eq(comments.status, COMMENT_STATUS.PUBLISHED),
     );
 
     const totalResult = await this.db
@@ -79,13 +79,11 @@ export class CommentRepository {
   ): Promise<{
     authorUserId: string;
     status: string;
-    deletedAt: Date | null;
   } | null> {
     const row = await this.db
       .select({
         authorUserId: comments.authorUserId,
         status: comments.status,
-        deletedAt: comments.deletedAt,
       })
       .from(comments)
       .where(and(
@@ -101,14 +99,12 @@ export class CommentRepository {
     commentId: string;
     articleId: string;
     status: string;
-    deletedAt: Date | null;
   } | null> {
     const row = await this.db
       .select({
         commentId: comments.commentId,
         articleId: comments.articleId,
         status: comments.status,
-        deletedAt: comments.deletedAt,
       })
       .from(comments)
       .where(eq(comments.commentId, commentId))
@@ -130,7 +126,7 @@ export class CommentRepository {
         authorUserId: input.authorUserId,
         parentCommentId: input.payload.parentCommentId ?? null,
         content: input.payload.content,
-        status: "PUBLISHED",
+        status: COMMENT_STATUS.PUBLISHED,
         createdAt: now,
         updatedAt: now,
       })
@@ -169,7 +165,7 @@ export class CommentRepository {
     await this.db
       .update(comments)
       .set({
-        status: "DELETED",
+        status: COMMENT_STATUS.DELETED,
         deletedAt: now,
         updatedAt: now,
       })
