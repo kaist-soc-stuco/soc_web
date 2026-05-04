@@ -1,8 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createApiClient } from '@soc/api-client';
+import type { CurrentUserResponse } from '@soc/contracts';
+import { hasPermission } from '@soc/shared';
 import { Header } from '@/components/organisms/header';
 import { Footer } from '@/components/organisms/footer';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { resolveApiBaseUrl } from '@/lib/api-base-url';
 
 interface BoardPost {
   id: number;
@@ -23,6 +27,16 @@ interface Event {
 const BOARDS = ['공지', '행사', 'HoC', '홍보글', '건의사항', '연구실', 'QnA'] as const;
 type BoardType = typeof BOARDS[number];
 
+const BOARD_WRITE_PERMISSION: Record<BoardType, number> = {
+  '공지': 1,
+  '행사': 1,
+  'HoC': 2,
+  '홍보글': 2,
+  '건의사항': 0,
+  '연구실': 4,
+  'QnA': 16,
+};
+
 const BOARD_INFO: Record<string, {description: string}> = {
   '공지': { description: '학생회 및 학교의 중요한 공지사항을 확인하세요' },
   '행사': { description: '전산학부의 다양한 행사 정보를 확인하세요' },
@@ -38,6 +52,12 @@ export function BoardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(null);
+
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
   
   const postsPerPage = 10;
   
@@ -82,13 +102,38 @@ export function BoardPage() {
     return pages;
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void apiClient.getCurrentUser()
+      .then((response) => {
+        if (!cancelled) {
+          setCurrentUser(response);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentUser(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient]);
+
+  const requiredPermission = BOARD_WRITE_PERMISSION[category as BoardType] ?? 0;
+  const userPermission = currentUser?.user?.permission ?? 0;
+  const canWrite = Boolean(currentUser?.authenticated)
+    && (requiredPermission === 0 || hasPermission(userPermission, requiredPermission));
+
   return (
     <div className="min-h-screen flex flex-col bg-kaist-white">
       <Header showLogo={true} />
       
       <main className="flex-1 w-full mx-auto">
         {/* Banner */}
-        <div className="bg-gradient-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-8">
+        <div className="bg-linear-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-8">
           <div className="max-w-7xl mx-auto">
             <h1 className="text-4xl font-extrabold tracking-tight text-kaist-white mb-2">
               {category} 게시판
@@ -149,7 +194,7 @@ export function BoardPage() {
         <div className="max-w-7xl mx-auto pb-16">
           <div className="flex gap-6">
             {/* Board List - 5/6 width */}
-            <div className="flex-[5]">
+            <div className="flex-5">
               {/* Table Header */}
               <div className="grid grid-cols-12 gap-4 py-4 bg-kaist-white border-b-2 border-kaist-darkgreen-main font-extrabold text-sm tracking-tight text-kaist-darkgreen">
                 <div className="col-span-1 text-center">번호</div>
@@ -218,7 +263,7 @@ export function BoardPage() {
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                        className={`min-w-[40px] h-10 px-3 rounded-md text-sm font-semibold tracking-tight transition-colors ${
+                        className={`min-w-10 h-10 px-3 rounded-md text-sm font-semibold tracking-tight transition-colors ${
                           currentPage === page
                             ? 'bg-kaist-darkgreen text-kaist-white'
                             : 'text-kaist-greygreen hover:bg-kaist-grey/10'
@@ -241,9 +286,11 @@ export function BoardPage() {
                     </button>
                   </div>
                 )}
-                <button className="absolute right-0 px-6 py-2 bg-kaist-white border-1 border-kaist-darkgreen text-kaist-darkgreen rounded-sm text-sm font-extrabold tracking-tight hover:bg-kaist-darkgreen hover:text-kaist-white transition-colors">
-                  글쓰기
-                </button>
+                {canWrite && (
+                  <button className="absolute right-0 px-6 py-2 bg-kaist-white border border-kaist-darkgreen text-kaist-darkgreen rounded-sm text-sm font-extrabold tracking-tight hover:bg-kaist-darkgreen hover:text-kaist-white transition-colors">
+                    글쓰기
+                  </button>
+                )}
               </div>
             </div>
           </div>
