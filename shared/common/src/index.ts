@@ -12,3 +12,11 @@ export const formatKoreanDateTime = (isoString: string): string => {
     timeStyle: 'medium',
   }).format(date);
 };
+
+export const hasPermission = (userPermission: number, requiredBit: number): boolean => {
+  if (requiredBit === 0) {
+    return true;
+  }
+
+  return (userPermission & requiredBit) === requiredBit;
+};
