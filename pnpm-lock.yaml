@@ -25,6 +25,9 @@ importers:
       '@soc/contracts':
         specifier: workspace:*
         version: link:../../shared/contracts
+      '@soc/shared':
+        specifier: workspace:*
+        version: link:../../shared/common
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -37,6 +40,9 @@ importers:
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
+      dayjs:
+        specifier: ^1.11.13
+        version: 1.11.20
       drizzle-orm:
         specifier: 0.44.7
         version: 0.44.7(@types/pg@8.16.0)(gel@2.2.0)(pg@8.18.0)
@@ -151,7 +157,11 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
-  shared/common: {}
+  shared/common:
+    dependencies:
+      dayjs:
+        specifier: ^1.11.13
+        version: 1.11.20
 
   shared/config: {}
 
@@ -1288,6 +1298,9 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  dayjs@1.11.20:
+    resolution: {integrity: sha512-YbwwqR/uYpeoP4pu043q+LTDLFBLApUP6VxRihdfNTqu4ubqMlGDLd6ErXhEgsyvY0K6nCs7nggYumAN+9uEuQ==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -3191,6 +3204,8 @@ snapshots:
   create-require@1.1.1: {}
 
   csstype@3.2.3: {}
+
+  dayjs@1.11.20: {}
 
   debug@4.4.3:
     dependencies:

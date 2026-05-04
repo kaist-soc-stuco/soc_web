@@ -1,6 +1,7 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import Redis from 'ioredis';
+import { nowIso } from '@soc/shared';
 
 import {
   DRIZZLE_DB,
@@ -29,7 +30,7 @@ export class HealthController {
       status: postgres.ok && redis.ok ? 'ok' : 'degraded',
       postgres,
       redis,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     };
   }
 
