@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@soc/shared": "workspace:*",
+    "@soc/contracts": "workspace:*",
     "dayjs": "^1.11.13",
     "@nestjs/common": "^11.1.8",
     "@nestjs/config": "^4.0.2",

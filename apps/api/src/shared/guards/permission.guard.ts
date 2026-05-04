@@ -22,6 +22,7 @@ export const PermissionFlags = {
   TUITION_MANAGE: 32,
   SURVEY_MANAGE: 64,
   POST_DELETE: 128,
+  TUITION_PAYER: 256,
 } as const;
 
 @Injectable()
