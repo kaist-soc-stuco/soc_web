@@ -9,7 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 import { randomUUID } from "node:crypto";
 
-import { REDIS_CLIENT } from '../../infrastructure/redis/redis.provider';
+import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
@@ -86,7 +86,7 @@ export class AuthService {
   }
 
   /**
-    * SSO authorize 요청에 필요한 초기 payload를 생성합니다.
+   * SSO authorize 요청에 필요한 초기 payload를 생성합니다.
    */
   async createLoginStartPayload(): Promise<LoginStartPayload> {
     const config = this.readStartConfig();
@@ -107,7 +107,7 @@ export class AuthService {
   }
 
   /**
-    * SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
+   * SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
    */
   async handleLoginCallback(body: CallbackBody): Promise<string> {
     if (body.error || body.errorCode) {
@@ -187,15 +187,18 @@ export class AuthService {
       const ssoUserId =
         typeof userInfo.user_id === "string" ? userInfo.user_id : "";
       const userName =
-        typeof userInfo.user_name === "string" && userInfo.user_name.trim().length > 0
+        typeof userInfo.user_name === "string" &&
+        userInfo.user_name.trim().length > 0
           ? userInfo.user_name.trim()
           : undefined;
       const userEmail =
-        typeof userInfo.user_email === "string" && userInfo.user_email.trim().length > 0
+        typeof userInfo.user_email === "string" &&
+        userInfo.user_email.trim().length > 0
           ? userInfo.user_email
           : undefined;
       const userMobile =
-        typeof userInfo.user_mbtlnum === "string" && userInfo.user_mbtlnum.trim().length > 0
+        typeof userInfo.user_mbtlnum === "string" &&
+        userInfo.user_mbtlnum.trim().length > 0
           ? userInfo.user_mbtlnum
           : undefined;
 
@@ -235,13 +238,17 @@ export class AuthService {
       }
 
       const pendingLoginToken = randomUUID();
-      await this.pendingLoginRepository.save(pendingLoginToken, {
-        expiresAt: Date.now() + PENDING_LOGIN_TTL_SECONDS * 1000,
-        name: userName,
-        ssoUserId,
-        userEmail,
-        userMobile,
-      }, PENDING_LOGIN_TTL_SECONDS);
+      await this.pendingLoginRepository.save(
+        pendingLoginToken,
+        {
+          expiresAt: Date.now() + PENDING_LOGIN_TTL_SECONDS * 1000,
+          name: userName,
+          ssoUserId,
+          userEmail,
+          userMobile,
+        },
+        PENDING_LOGIN_TTL_SECONDS,
+      );
 
       return this.buildFrontendRedirect("consent-required", "pending_consent", {
         pendingLoginToken,
@@ -309,7 +316,6 @@ export class AuthService {
     return userInfo;
   }
 
-
   /** Redis에 저장된 state payload를 안전하게 파싱합니다. */
   private parseStoredState(rawValue: string): StoredLoginState | null {
     try {
@@ -375,7 +381,9 @@ export class AuthService {
   }
 
   /** resultToken으로 로그인 결과를 1회 소비하고 payload를 반환합니다. */
-  async consumeLoginResult(resultToken: string | undefined): Promise<LoginResultPayload> {
+  async consumeLoginResult(
+    resultToken: string | undefined,
+  ): Promise<LoginResultPayload> {
     if (!resultToken) {
       throw new BadRequestException("resultToken_is_required");
     }

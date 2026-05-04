@@ -8,7 +8,11 @@ import {
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
-import { ParseFilePipe, MaxFileSizeValidator, FileTypeValidator } from "@nestjs/common";
+import {
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
+} from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Request } from "express";
 
@@ -30,7 +34,8 @@ type UploadedAssetFile = {
 };
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_FILE_TYPES = /^(image\/(png|jpeg|jpg|gif|webp)|application\/pdf)$/i;
+const ALLOWED_FILE_TYPES =
+  /^(image\/(png|jpeg|jpg|gif|webp)|application\/pdf)$/i;
 
 @Controller("assets")
 export class AssetController {
@@ -49,7 +54,8 @@ export class AssetController {
         ],
         exceptionFactory: (error) => new BadRequestException(error),
       }),
-    ) file: UploadedAssetFile,
+    )
+    file: UploadedAssetFile,
     @Req() request: AuthenticatedRequest,
   ) {
     if (!request.user) {

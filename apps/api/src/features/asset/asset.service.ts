@@ -14,7 +14,8 @@ type UploadedAssetFile = {
 export class AssetService {
   constructor(
     private readonly assetRepository: AssetRepository,
-    @Inject(AssetStorageProvider) private readonly storage: AssetStorageProvider,
+    @Inject(AssetStorageProvider)
+    private readonly storage: AssetStorageProvider,
   ) {}
 
   async uploadFile(input: {

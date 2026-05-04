@@ -57,7 +57,11 @@ export class ArticleService {
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
     const limit = Math.min(rawLimit, MAX_PAGE_SIZE);
 
-    const result = await this.articleRepository.listByBoardId(board.boardId, page, limit);
+    const result = await this.articleRepository.listByBoardId(
+      board.boardId,
+      page,
+      limit,
+    );
 
     return {
       page,
@@ -80,7 +84,10 @@ export class ArticleService {
 
     assertBoardReadable(board, currentUser);
 
-    const article = await this.articleRepository.findDetailById(board.boardId, articleId);
+    const article = await this.articleRepository.findDetailById(
+      board.boardId,
+      articleId,
+    );
 
     if (!article) {
       throw new NotFoundException("article_not_found");
@@ -110,8 +117,8 @@ export class ArticleService {
 
     const requiredPermission = board.writePermissionId ?? 0;
     if (
-      requiredPermission > 0
-      && (user.permission & requiredPermission) !== requiredPermission
+      requiredPermission > 0 &&
+      (user.permission & requiredPermission) !== requiredPermission
     ) {
       throw new ForbiddenException("insufficient_permission");
     }
@@ -155,13 +162,18 @@ export class ArticleService {
     const managePermission = board.managePermissionId ?? 0;
     const isOwner = article.authorUserId === user.id;
     const isManager =
-      managePermission > 0 && (user.permission & managePermission) === managePermission;
+      managePermission > 0 &&
+      (user.permission & managePermission) === managePermission;
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
     }
 
-    return this.articleRepository.updateArticle(board.boardId, articleId, payload);
+    return this.articleRepository.updateArticle(
+      board.boardId,
+      articleId,
+      payload,
+    );
   }
 
   async deleteArticle(
@@ -187,7 +199,8 @@ export class ArticleService {
     const managePermission = board.managePermissionId ?? 0;
     const isOwner = article.authorUserId === user.id;
     const isManager =
-      managePermission > 0 && (user.permission & managePermission) === managePermission;
+      managePermission > 0 &&
+      (user.permission & managePermission) === managePermission;
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");

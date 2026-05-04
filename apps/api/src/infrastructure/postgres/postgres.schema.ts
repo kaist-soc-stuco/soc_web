@@ -1,4 +1,12 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, foreignKey } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  integer,
+  boolean,
+  foreignKey,
+} from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -8,8 +16,12 @@ export const users = pgTable("users", {
   userEmail: text("user_email"),
   userMobile: text("user_mobile"),
   privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const boards = pgTable("board", {
@@ -30,10 +42,14 @@ export const boards = pgTable("board", {
 
 export const articles = pgTable("article", {
   articleId: uuid("article_id").defaultRandom().primaryKey(),
-  boardId: uuid("board_id").notNull().references(() => boards.boardId, {
-    onDelete: "cascade",
-  }),
-  authorUserId: uuid("author_user_id").notNull().references(() => users.id),
+  boardId: uuid("board_id")
+    .notNull()
+    .references(() => boards.boardId, {
+      onDelete: "cascade",
+    }),
+  authorUserId: uuid("author_user_id")
+    .notNull()
+    .references(() => users.id),
   titleKo: text("title_ko").notNull(),
   titleEn: text("title_en"),
   contentKo: text("content_ko").notNull(),
@@ -42,8 +58,12 @@ export const articles = pgTable("article", {
   visibilityScope: text("visibility_scope").notNull().default("PUBLIC"),
   isPinned: boolean("is_pinned").notNull().default(false),
   pinOrder: integer("pin_order"),
-  postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  postedAt: timestamp("posted_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
@@ -53,36 +73,54 @@ export const assets = pgTable("asset", {
   originalFilename: text("original_filename").notNull(),
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
-  uploadedBy: uuid("uploaded_by").notNull().references(() => users.id),
+  uploadedBy: uuid("uploaded_by")
+    .notNull()
+    .references(() => users.id),
 });
 
 export const articleAssets = pgTable("article_asset", {
   articleAssetId: uuid("article_asset_id").defaultRandom().primaryKey(),
-  articleId: uuid("article_id").notNull().references(() => articles.articleId, {
-    onDelete: "cascade",
-  }),
-  assetId: uuid("asset_id").notNull().references(() => assets.assetId, {
-    onDelete: "cascade",
-  }),
+  articleId: uuid("article_id")
+    .notNull()
+    .references(() => articles.articleId, {
+      onDelete: "cascade",
+    }),
+  assetId: uuid("asset_id")
+    .notNull()
+    .references(() => assets.assetId, {
+      onDelete: "cascade",
+    }),
   usageType: text("usage_type").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
-export const comments = pgTable("comment", {
-  commentId: uuid("comment_id").defaultRandom().primaryKey(),
-  articleId: uuid("article_id").notNull().references(() => articles.articleId, {
-    onDelete: "cascade",
+export const comments = pgTable(
+  "comment",
+  {
+    commentId: uuid("comment_id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => articles.articleId, {
+        onDelete: "cascade",
+      }),
+    parentCommentId: uuid("parent_comment_id"),
+    authorUserId: uuid("author_user_id")
+      .notNull()
+      .references(() => users.id),
+    content: text("content").notNull(),
+    status: text("status").notNull().default("PUBLISHED"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => ({
+    parentCommentFk: foreignKey({
+      columns: [table.parentCommentId],
+      foreignColumns: [table.commentId],
+    }).onDelete("set null"),
   }),
-  parentCommentId: uuid("parent_comment_id"),
-  authorUserId: uuid("author_user_id").notNull().references(() => users.id),
-  content: text("content").notNull(),
-  status: text("status").notNull().default("PUBLISHED"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
-}, (table) => ({
-  parentCommentFk: foreignKey({
-    columns: [table.parentCommentId],
-    foreignColumns: [table.commentId],
-  }).onDelete("set null"),
-}));
+);

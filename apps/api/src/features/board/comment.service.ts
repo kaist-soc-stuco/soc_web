@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import type {
   CommentCreateRequest,
   CommentCreateResponse,
@@ -62,7 +67,11 @@ export class CommentService {
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
     const limit = Math.min(rawLimit, MAX_PAGE_SIZE);
 
-    const result = await this.commentRepository.listByArticleId(articleId, page, limit);
+    const result = await this.commentRepository.listByArticleId(
+      articleId,
+      page,
+      limit,
+    );
 
     return {
       page,
@@ -103,16 +112,22 @@ export class CommentService {
 
     const requiredPermission = board.commentPermissionId ?? 0;
     if (
-      requiredPermission > 0
-      && (user.permission & requiredPermission) !== requiredPermission
+      requiredPermission > 0 &&
+      (user.permission & requiredPermission) !== requiredPermission
     ) {
       throw new ForbiddenException("insufficient_permission");
     }
 
     if (payload.parentCommentId) {
-      const parent = await this.commentRepository.findById(payload.parentCommentId);
+      const parent = await this.commentRepository.findById(
+        payload.parentCommentId,
+      );
 
-      if (!parent || parent.articleId !== articleId || parent.status === COMMENT_STATUS.DELETED) {
+      if (
+        !parent ||
+        parent.articleId !== articleId ||
+        parent.status === COMMENT_STATUS.DELETED
+      ) {
         throw new BadRequestException("parent_comment_invalid");
       }
     }
@@ -141,7 +156,10 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    const comment = await this.commentRepository.findPermissionInfo(commentId, articleId);
+    const comment = await this.commentRepository.findPermissionInfo(
+      commentId,
+      articleId,
+    );
 
     if (!comment || comment.status === COMMENT_STATUS.DELETED) {
       throw new NotFoundException("comment_not_found");
@@ -150,7 +168,8 @@ export class CommentService {
     const managePermission = board.managePermissionId ?? 0;
     const isOwner = comment.authorUserId === user.id;
     const isManager =
-      managePermission > 0 && (user.permission & managePermission) === managePermission;
+      managePermission > 0 &&
+      (user.permission & managePermission) === managePermission;
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
@@ -171,7 +190,10 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    const comment = await this.commentRepository.findPermissionInfo(commentId, articleId);
+    const comment = await this.commentRepository.findPermissionInfo(
+      commentId,
+      articleId,
+    );
 
     if (!comment || comment.status === COMMENT_STATUS.DELETED) {
       throw new NotFoundException("comment_not_found");
@@ -180,7 +202,8 @@ export class CommentService {
     const managePermission = board.managePermissionId ?? 0;
     const isOwner = comment.authorUserId === user.id;
     const isManager =
-      managePermission > 0 && (user.permission & managePermission) === managePermission;
+      managePermission > 0 &&
+      (user.permission & managePermission) === managePermission;
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");

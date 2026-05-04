@@ -23,7 +23,9 @@ export class UsersRepository {
       id: row.id,
       name: row.name,
       permission: row.permission,
-      privacyConsentAt: row.privacyConsentAt ? row.privacyConsentAt.toISOString() : null,
+      privacyConsentAt: row.privacyConsentAt
+        ? row.privacyConsentAt.toISOString()
+        : null,
       ssoUserId: row.ssoUserId,
       updatedAt: row.updatedAt.toISOString(),
       userEmail: row.userEmail,
@@ -58,7 +60,9 @@ export class UsersRepository {
       .values({
         name: input.name,
         permission: input.permission,
-        privacyConsentAt: input.privacyConsentAt ? new Date(input.privacyConsentAt) : null,
+        privacyConsentAt: input.privacyConsentAt
+          ? new Date(input.privacyConsentAt)
+          : null,
         ssoUserId: input.ssoUserId,
         userEmail: input.userEmail,
         userMobile: input.userMobile,

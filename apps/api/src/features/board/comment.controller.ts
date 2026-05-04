@@ -49,11 +49,17 @@ export class CommentController {
     @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<CommentListResponse> {
-    const currentUser = await this.authSessionService.getCurrentUser(accessToken);
-    return this.commentService.getComments(code, articleId, {
-      page,
-      limit,
-    }, currentUser);
+    const currentUser =
+      await this.authSessionService.getCurrentUser(accessToken);
+    return this.commentService.getComments(
+      code,
+      articleId,
+      {
+        page,
+        limit,
+      },
+      currentUser,
+    );
   }
 
   @Post()
@@ -64,7 +70,12 @@ export class CommentController {
     @Body() body: CommentCreateRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<CommentCreateResponse> {
-    return this.commentService.createComment(code, articleId, body, request.user!);
+    return this.commentService.createComment(
+      code,
+      articleId,
+      body,
+      request.user!,
+    );
   }
 
   @Patch(":commentId")
@@ -76,7 +87,13 @@ export class CommentController {
     @Body() body: CommentUpdateRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<CommentUpdateResponse> {
-    return this.commentService.updateComment(code, articleId, commentId, body, request.user!);
+    return this.commentService.updateComment(
+      code,
+      articleId,
+      commentId,
+      body,
+      request.user!,
+    );
   }
 
   @Delete(":commentId")
@@ -87,6 +104,11 @@ export class CommentController {
     @Param("commentId") commentId: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<CommentDeleteResponse> {
-    return this.commentService.deleteComment(code, articleId, commentId, request.user!);
+    return this.commentService.deleteComment(
+      code,
+      articleId,
+      commentId,
+      request.user!,
+    );
   }
 }

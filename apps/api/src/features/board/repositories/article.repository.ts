@@ -83,7 +83,8 @@ export class ArticleRepository {
         titleKo: row.titleKo,
         titleEn: row.titleEn ?? undefined,
         status: row.status as ArticleListItem["status"],
-        visibilityScope: row.visibilityScope as ArticleListItem["visibilityScope"],
+        visibilityScope:
+          row.visibilityScope as ArticleListItem["visibilityScope"],
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
         postedAt: row.postedAt.toISOString(),
@@ -126,11 +127,13 @@ export class ArticleRepository {
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.id))
-      .where(and(
-        eq(articles.boardId, boardId),
-        eq(articles.articleId, articleId),
-        eq(articles.status, ARTICLE_STATUS.PUBLISHED),
-      ))
+      .where(
+        and(
+          eq(articles.boardId, boardId),
+          eq(articles.articleId, articleId),
+          eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+        ),
+      )
       .limit(1);
 
     if (!row[0]) {
@@ -160,7 +163,8 @@ export class ArticleRepository {
       contentKo: row[0].contentKo,
       contentEn: row[0].contentEn ?? undefined,
       status: row[0].status as ArticleDetailResponse["status"],
-      visibilityScope: row[0].visibilityScope as ArticleDetailResponse["visibilityScope"],
+      visibilityScope: row[0]
+        .visibilityScope as ArticleDetailResponse["visibilityScope"],
       isPinned: row[0].isPinned,
       pinOrder: row[0].pinOrder ?? null,
       postedAt: row[0].postedAt.toISOString(),
@@ -171,7 +175,8 @@ export class ArticleRepository {
       },
       assets: assetRows.map((assetRow) => ({
         assetId: assetRow.assetId,
-        usageType: assetRow.usageType as ArticleDetailResponse["assets"][number]["usageType"],
+        usageType:
+          assetRow.usageType as ArticleDetailResponse["assets"][number]["usageType"],
         sortOrder: assetRow.sortOrder,
         originalFilename: assetRow.originalFilename,
         mimeType: assetRow.mimeType,
@@ -244,10 +249,9 @@ export class ArticleRepository {
         status: articles.status,
       })
       .from(articles)
-      .where(and(
-        eq(articles.boardId, boardId),
-        eq(articles.articleId, articleId),
-      ))
+      .where(
+        and(eq(articles.boardId, boardId), eq(articles.articleId, articleId)),
+      )
       .limit(1);
 
     return row[0] ?? null;
@@ -304,10 +308,9 @@ export class ArticleRepository {
       await tx
         .update(articles)
         .set(updateSet)
-        .where(and(
-          eq(articles.boardId, boardId),
-          eq(articles.articleId, articleId),
-        ));
+        .where(
+          and(eq(articles.boardId, boardId), eq(articles.articleId, articleId)),
+        );
 
       if (payload.assets) {
         await tx
@@ -346,10 +349,9 @@ export class ArticleRepository {
         deletedAt: now,
         updatedAt: now,
       })
-      .where(and(
-        eq(articles.boardId, boardId),
-        eq(articles.articleId, articleId),
-      ));
+      .where(
+        and(eq(articles.boardId, boardId), eq(articles.articleId, articleId)),
+      );
 
     return {
       ok: true,
@@ -358,15 +360,20 @@ export class ArticleRepository {
     };
   }
 
-  async isReadableArticle(boardId: string, articleId: string): Promise<boolean> {
+  async isReadableArticle(
+    boardId: string,
+    articleId: string,
+  ): Promise<boolean> {
     const row = await this.db
       .select({ articleId: articles.articleId })
       .from(articles)
-      .where(and(
-        eq(articles.boardId, boardId),
-        eq(articles.articleId, articleId),
-        eq(articles.status, ARTICLE_STATUS.PUBLISHED),
-      ))
+      .where(
+        and(
+          eq(articles.boardId, boardId),
+          eq(articles.articleId, articleId),
+          eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+        ),
+      )
       .limit(1);
 
     return Boolean(row[0]);

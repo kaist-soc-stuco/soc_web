@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
-import type { UserRecord } from './entities/user';
-import { UsersRepository } from './repositories/users.repository';
+import type { UserRecord } from "./entities/user";
+import { UsersRepository } from "./repositories/users.repository";
 
 /**
  * PostgreSQL user 저장/조회 로직을 담당합니다.

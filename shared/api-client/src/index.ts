@@ -36,7 +36,10 @@ const withNoTrailingSlash = (value: string): string =>
   value.replace(/\/+$/, "");
 
 const resolveAuthBaseUrl = (normalizedBaseUrl: string): string => {
-  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+  if (
+    /\/api\/v1$/i.test(normalizedBaseUrl) ||
+    /\/v1$/i.test(normalizedBaseUrl)
+  ) {
     return `${normalizedBaseUrl}/auth`;
   }
 
@@ -48,7 +51,8 @@ const resolveAuthBaseUrl = (normalizedBaseUrl: string): string => {
   return `${normalizedBaseUrl}/v1/auth`;
 };
 
-const isAuthExpiredStatus = (status: number): boolean => status === 401 || status === 403;
+const isAuthExpiredStatus = (status: number): boolean =>
+  status === 401 || status === 403;
 
 const redirectToLogin = (): void => {
   if (typeof window === "undefined") {
@@ -93,14 +97,14 @@ export const createApiClient = ({
           method: "POST",
         });
 
-          if (!response.ok) {
-            const error = new ApiClientHttpError(response.status);
+        if (!response.ok) {
+          const error = new ApiClientHttpError(response.status);
 
-            if (isAuthExpiredStatus(response.status)) {
-              redirectToLogin();
-            }
+          if (isAuthExpiredStatus(response.status)) {
+            redirectToLogin();
+          }
 
-            throw error;
+          throw error;
         }
       })();
     }
@@ -147,19 +151,27 @@ export const createApiClient = ({
       const query = sessionId
         ? `?sessionId=${encodeURIComponent(sessionId)}`
         : "";
-      return requestJson<LoginSessionResponse>(`${authBaseUrl}/session${query}`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
+      return requestJson<LoginSessionResponse>(
+        `${authBaseUrl}/session${query}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
     },
 
     checkAccessToken: async (): Promise<AccessCheckResponse> => {
-      return requestJson<AccessCheckResponse>(`${authBaseUrl}/access-check`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
+      return requestJson<AccessCheckResponse>(
+        `${authBaseUrl}/access-check`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
     },
 
     getCurrentUser: async (): Promise<CurrentUserResponse> => {
@@ -171,18 +183,24 @@ export const createApiClient = ({
     submitConsentDecision: async (
       input: ConsentDecisionRequest,
     ): Promise<ConsentDecisionResponse> => {
-      return requestJson<ConsentDecisionResponse>(`${authBaseUrl}/login/consent`, {
-        body: JSON.stringify(input),
-        headers: {
-          "Content-Type": "application/json",
+      return requestJson<ConsentDecisionResponse>(
+        `${authBaseUrl}/login/consent`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
         },
-        method: "POST",
-      }, {
-        retryOnUnauthorized: true,
-      });
+        {
+          retryOnUnauthorized: true,
+        },
+      );
     },
 
-    consumeLoginResult: async (resultToken: string): Promise<LoginResultResponse> => {
+    consumeLoginResult: async (
+      resultToken: string,
+    ): Promise<LoginResultResponse> => {
       return requestJson<LoginResultResponse>(
         `${authBaseUrl}/login/result?resultToken=${encodeURIComponent(resultToken)}`,
         {
@@ -218,11 +236,15 @@ export const createApiClient = ({
     },
 
     getGreeting: async (): Promise<GreetingResponse> => {
-      return requestJson<GreetingResponse>(`${normalizedBaseUrl}/v1/mock/greeting`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
+      return requestJson<GreetingResponse>(
+        `${normalizedBaseUrl}/v1/mock/greeting`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
     },
   };
 };
