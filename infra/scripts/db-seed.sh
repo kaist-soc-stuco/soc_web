@@ -3,7 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-COMPOSE_FILE="$ROOT_DIR/infra/docker/compose.dev.yml"
+# COMPOSE_FILE="$ROOT_DIR/infra/docker/compose.prod.yml"
+COMPOSE_FILE="$ROOT_DIR/compose.yml"
 
 if [ -f "$ROOT_DIR/.env" ]; then
   # .env 파일에서 변수들을 읽어와 현재 쉘의 환경 변수로 등록합니다.
