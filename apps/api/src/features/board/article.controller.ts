@@ -49,11 +49,16 @@ export class ArticleController {
     @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListResponse> {
-    const currentUser = await this.authSessionService.getCurrentUser(accessToken);
-    return this.articleService.getArticles(code, {
-      page,
-      limit,
-    }, currentUser);
+    const currentUser =
+      await this.authSessionService.getCurrentUser(accessToken);
+    return this.articleService.getArticles(
+      code,
+      {
+        page,
+        limit,
+      },
+      currentUser,
+    );
   }
 
   @Get(":articleId")
@@ -62,7 +67,8 @@ export class ArticleController {
     @Param("articleId") articleId: string,
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleDetailResponse> {
-    const currentUser = await this.authSessionService.getCurrentUser(accessToken);
+    const currentUser =
+      await this.authSessionService.getCurrentUser(accessToken);
     return this.articleService.getArticle(code, articleId, currentUser);
   }
 
@@ -84,7 +90,12 @@ export class ArticleController {
     @Body() body: ArticleUpdateRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<ArticleUpdateResponse> {
-    return this.articleService.updateArticle(code, articleId, body, request.user!);
+    return this.articleService.updateArticle(
+      code,
+      articleId,
+      body,
+      request.user!,
+    );
   }
 
   @Delete(":articleId")

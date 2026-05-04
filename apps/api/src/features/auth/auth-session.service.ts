@@ -73,8 +73,12 @@ export class AuthSessionService {
   }
 
   /** 세션/회전 식별자(jti)를 포함한 refresh token을 발급합니다. */
-  private issueRefreshToken(record: AuthSessionRecord, refreshJti: string): string {
-    const subject = record.mode === "persisted" ? record.userId : record.pendingLoginId;
+  private issueRefreshToken(
+    record: AuthSessionRecord,
+    refreshJti: string,
+  ): string {
+    const subject =
+      record.mode === "persisted" ? record.userId : record.pendingLoginId;
     const claims: RefreshTokenClaims = {
       jti: refreshJti,
       mode: record.mode,
@@ -83,7 +87,10 @@ export class AuthSessionService {
     };
 
     return jwt.sign(claims, this.getJwtSecret(), {
-      expiresIn: Math.max(Math.floor((record.expiresAt - Date.now()) / 1000), 1),
+      expiresIn: Math.max(
+        Math.floor((record.expiresAt - Date.now()) / 1000),
+        1,
+      ),
     });
   }
 
@@ -144,7 +151,8 @@ export class AuthSessionService {
     const mode = decoded.mode;
 
     if (mode === "persisted") {
-      const userId = typeof decoded.userId === "string" ? decoded.userId : undefined;
+      const userId =
+        typeof decoded.userId === "string" ? decoded.userId : undefined;
 
       if (!userId) {
         throw new UnauthorizedException("invalid_access_token");
@@ -178,7 +186,9 @@ export class AuthSessionService {
   }
 
   /** 세션 존재 여부, 만료, revoke 상태를 공통 검증합니다. */
-  private assertActiveSession(record: AuthSessionRecord | null): asserts record is AuthSessionRecord {
+  private assertActiveSession(
+    record: AuthSessionRecord | null,
+  ): asserts record is AuthSessionRecord {
     if (!record) {
       throw new UnauthorizedException("session_not_found");
     }
@@ -189,7 +199,7 @@ export class AuthSessionService {
   }
 
   /**
-    * 영구 사용자용 access/refresh token 쌍을 발급합니다.
+   * 영구 사용자용 access/refresh token 쌍을 발급합니다.
    */
   async issuePersistedSession(userId: string): Promise<{
     accessToken: string;
@@ -218,7 +228,7 @@ export class AuthSessionService {
   }
 
   /**
-    * 비동의 임시 로그인용 access/refresh(또는 session key) 세트를 발급합니다.
+   * 비동의 임시 로그인용 access/refresh(또는 session key) 세트를 발급합니다.
    */
   async issueTemporarySession(
     pendingLoginId: string,
@@ -253,7 +263,7 @@ export class AuthSessionService {
   }
 
   /**
-    * refresh token을 검증하고 rotation을 수행합니다.
+   * refresh token을 검증하고 rotation을 수행합니다.
    */
   async rotateRefreshToken(refreshToken: string): Promise<{
     accessToken: string;
@@ -262,7 +272,9 @@ export class AuthSessionService {
     storageMode: "temporary" | "persisted";
   }> {
     const claims = this.verifyRefreshToken(refreshToken);
-    const session = await this.authSessionRepository.findBySessionId(claims.sid);
+    const session = await this.authSessionRepository.findBySessionId(
+      claims.sid,
+    );
 
     this.assertActiveSession(session);
 
@@ -288,14 +300,14 @@ export class AuthSessionService {
   }
 
   /**
-    * 로그아웃 시 세션을 revoke합니다.
+   * 로그아웃 시 세션을 revoke합니다.
    */
   async revokeSession(sessionId: string): Promise<void> {
     await this.authSessionRepository.revoke(sessionId);
   }
 
   /**
-    * 개인정보 저장 동의/비동의 결정을 처리합니다.
+   * 개인정보 저장 동의/비동의 결정을 처리합니다.
    */
   async handleConsentDecision(input: ConsentDecisionRequest): Promise<{
     accessToken?: string;
@@ -334,7 +346,10 @@ export class AuthSessionService {
       };
     }
 
-    const issued = await this.issueTemporarySession(input.pendingLoginToken, pendingUser);
+    const issued = await this.issueTemporarySession(
+      input.pendingLoginToken,
+      pendingUser,
+    );
     await this.pendingLoginRepository.delete(input.pendingLoginToken);
 
     return {
@@ -346,7 +361,7 @@ export class AuthSessionService {
   }
 
   /**
-    * 현재 로그인 세션 상태를 조회합니다.
+   * 현재 로그인 세션 상태를 조회합니다.
    */
   async getSession(sessionId?: string): Promise<AuthSessionSummary> {
     if (!sessionId) {
@@ -379,7 +394,7 @@ export class AuthSessionService {
   }
 
   /**
-    * access token 기반으로 현재 사용자를 조회합니다.
+   * access token 기반으로 현재 사용자를 조회합니다.
    */
   async getCurrentUser(accessToken?: string): Promise<CurrentUserSummary> {
     try {
@@ -418,7 +433,7 @@ export class AuthSessionService {
   }
 
   /**
-    * refresh 요청을 처리합니다.
+   * refresh 요청을 처리합니다.
    */
   async refreshSession(input: RefreshSessionRequest): Promise<{
     accessToken?: string;
@@ -434,7 +449,7 @@ export class AuthSessionService {
   }
 
   /**
-    * 로그아웃을 처리합니다.
+   * 로그아웃을 처리합니다.
    */
   async logout(input?: LogoutRequest): Promise<{ ok: boolean }> {
     if (input?.sessionId) {

@@ -4,7 +4,12 @@ import {
   InternalServerErrorException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 import Redis from "ioredis";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
@@ -115,7 +120,11 @@ export class PendingLoginRepository {
     }
   }
 
-  async save(pendingLoginToken: string, payload: PendingSsoUser, ttlSeconds: number): Promise<void> {
+  async save(
+    pendingLoginToken: string,
+    payload: PendingSsoUser,
+    ttlSeconds: number,
+  ): Promise<void> {
     const pendingKey = this.buildKey(pendingLoginToken);
 
     await this.redis.set(

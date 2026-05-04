@@ -13,7 +13,10 @@ import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
-import { comments, users } from "../../../infrastructure/postgres/postgres.schema";
+import {
+  comments,
+  users,
+} from "../../../infrastructure/postgres/postgres.schema";
 import { COMMENT_STATUS } from "../board.constants";
 
 @Injectable()
@@ -86,10 +89,12 @@ export class CommentRepository {
         status: comments.status,
       })
       .from(comments)
-      .where(and(
-        eq(comments.commentId, commentId),
-        eq(comments.articleId, articleId),
-      ))
+      .where(
+        and(
+          eq(comments.commentId, commentId),
+          eq(comments.articleId, articleId),
+        ),
+      )
       .limit(1);
 
     return row[0] ?? null;

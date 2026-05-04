@@ -1,12 +1,12 @@
-import { useParams, Link } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
-import { createApiClient } from '@soc/api-client';
-import type { CurrentUserResponse } from '@soc/contracts';
-import { hasPermission } from '@soc/shared';
-import { Header } from '@/components/organisms/header';
-import { Footer } from '@/components/organisms/footer';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { resolveApiBaseUrl } from '@/lib/api-base-url';
+import { useParams, Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { createApiClient } from "@soc/api-client";
+import type { CurrentUserResponse } from "@soc/contracts";
+import { hasPermission } from "@soc/shared";
+import { Header } from "@/components/organisms/header";
+import { Footer } from "@/components/organisms/footer";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
 interface BoardPost {
   id: number;
@@ -24,78 +24,91 @@ interface Event {
   image: string;
 }
 
-const BOARDS = ['공지', '행사', 'HoC', '홍보글', '건의사항', '연구실', 'QnA'] as const;
-type BoardType = typeof BOARDS[number];
+const BOARDS = [
+  "공지",
+  "행사",
+  "HoC",
+  "홍보글",
+  "건의사항",
+  "연구실",
+  "QnA",
+] as const;
+type BoardType = (typeof BOARDS)[number];
 
 const BOARD_WRITE_PERMISSION: Record<BoardType, number> = {
-  '공지': 1,
-  '행사': 1,
-  'HoC': 2,
-  '홍보글': 2,
-  '건의사항': 0,
-  '연구실': 4,
-  'QnA': 16,
+  공지: 1,
+  행사: 1,
+  HoC: 2,
+  홍보글: 2,
+  건의사항: 0,
+  연구실: 4,
+  QnA: 16,
 };
 
-const BOARD_INFO: Record<string, {description: string}> = {
-  '공지': { description: '학생회 및 학교의 중요한 공지사항을 확인하세요' },
-  '행사': { description: '전산학부의 다양한 행사 정보를 확인하세요' },
-  'HoC': { description: 'Hall of Code 프로젝트 및 활동 내역' },
-  '홍보글': { description: '학생회 및 학회의 홍보 게시물' },
-  '건의사항': { description: '학생들의 의견과 건의사항을 나눠주세요' },
-  '연구실': { description: '각 연구실의 소식과 공지사항' },
-  'QnA': { description: '궁금한 점을 자유롭게 질문하세요' },
+const BOARD_INFO: Record<string, { description: string }> = {
+  공지: { description: "학생회 및 학교의 중요한 공지사항을 확인하세요" },
+  행사: { description: "전산학부의 다양한 행사 정보를 확인하세요" },
+  HoC: { description: "Hall of Code 프로젝트 및 활동 내역" },
+  홍보글: { description: "학생회 및 학회의 홍보 게시물" },
+  건의사항: { description: "학생들의 의견과 건의사항을 나눠주세요" },
+  연구실: { description: "각 연구실의 소식과 공지사항" },
+  QnA: { description: "궁금한 점을 자유롭게 질문하세요" },
 };
 
 export function BoardPage() {
-  const { category = '공지' } = useParams<{ category: string }>();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { category = "공지" } = useParams<{ category: string }>();
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
+    null,
+  );
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  
+
   const postsPerPage = 10;
-  
+
   // TODO: MySQL에서 게시글 데이터 가져오기
   const mockPosts: BoardPost[] = Array.from({ length: 50 }, (_, i) => ({
     id: i + 1,
     category: category,
     title: `${category} 게시글 제목 ${i + 1}`,
-    author: '조성원',
-    date: '26.03.04',
+    author: "조성원",
+    date: "26.03.04",
     views: Math.floor(Math.random() * 1000),
   }));
 
   // TODO: MySQL에서 진행중인 행사 가져오기
   const ongoingEvents: Event[] = [
-    { id: 1, title: '전산학부 간식 이벤트', date: '03.10', image: '/temp.png' },
-    { id: 2, title: 'HoC 프로젝트 발표', date: '03.15', image: '/temp.png' },
-    { id: 3, title: '학생회 총회', date: '03.20', image: '/temp.png' },
+    { id: 1, title: "전산학부 간식 이벤트", date: "03.10", image: "/temp.png" },
+    { id: 2, title: "HoC 프로젝트 발표", date: "03.15", image: "/temp.png" },
+    { id: 3, title: "학생회 총회", date: "03.20", image: "/temp.png" },
   ];
 
-  const filteredPosts = mockPosts.filter(post =>
-    post.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPosts = mockPosts.filter((post) =>
+    post.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
   const startIndex = (currentPage - 1) * postsPerPage;
-  const currentPosts = filteredPosts.slice(startIndex, startIndex + postsPerPage);
+  const currentPosts = filteredPosts.slice(
+    startIndex,
+    startIndex + postsPerPage,
+  );
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const getPageNumbers = () => {
     const pages = [];
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(totalPages, startPage + 4);
-    
+
     for (let i = startPage; i <= endPage; i++) {
       pages.push(i);
     }
@@ -105,7 +118,8 @@ export function BoardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void apiClient.getCurrentUser()
+    void apiClient
+      .getCurrentUser()
       .then((response) => {
         if (!cancelled) {
           setCurrentUser(response);
@@ -124,13 +138,15 @@ export function BoardPage() {
 
   const requiredPermission = BOARD_WRITE_PERMISSION[category as BoardType] ?? 0;
   const userPermission = currentUser?.user?.permission ?? 0;
-  const canWrite = Boolean(currentUser?.authenticated)
-    && (requiredPermission === 0 || hasPermission(userPermission, requiredPermission));
+  const canWrite =
+    Boolean(currentUser?.authenticated) &&
+    (requiredPermission === 0 ||
+      hasPermission(userPermission, requiredPermission));
 
   return (
     <div className="min-h-screen flex flex-col bg-kaist-white">
       <Header showLogo={true} />
-      
+
       <main className="flex-1 w-full mx-auto">
         {/* Banner */}
         <div className="bg-linear-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-8">
@@ -139,7 +155,7 @@ export function BoardPage() {
               {category} 게시판
             </h1>
             <p className="text-base font-medium tracking-tight text-kaist-white/90">
-              {BOARD_INFO[category]?.description || ''}
+              {BOARD_INFO[category]?.description || ""}
             </p>
           </div>
         </div>
@@ -157,22 +173,28 @@ export function BoardPage() {
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}
                   >
-                    <div className={`relative flex items-center justify-center h-full text-lg font-extrabold tracking-tight transition-colors ${
-                      category === board
-                        ? 'text-kaist-darkgreen'
-                        : 'text-kaist-greygreen hover:text-kaist-darkgreen'
-                    }`}>
+                    <div
+                      className={`relative flex items-center justify-center h-full text-lg font-extrabold tracking-tight transition-colors ${
+                        category === board
+                          ? "text-kaist-darkgreen"
+                          : "text-kaist-greygreen hover:text-kaist-darkgreen"
+                      }`}
+                    >
                       <span className="py-4">{board}</span>
-                      <span 
+                      <span
                         className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
-                          category === board ? 'scale-x-100' : hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
+                          category === board
+                            ? "scale-x-100"
+                            : hoveredIndex === index
+                              ? "scale-x-100"
+                              : "scale-x-0"
                         }`}
                       />
                     </div>
                   </Link>
                 ))}
               </div>
-              
+
               {/* Search */}
               <div className="flex items-center">
                 <div className="relative">
@@ -248,12 +270,14 @@ export function BoardPage() {
                 {totalPages > 1 && (
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                      onClick={() =>
+                        handlePageChange(Math.max(1, currentPage - 1))
+                      }
                       disabled={currentPage === 1}
                       className={`p-1 rounded-md transition-colors ${
                         currentPage === 1
-                          ? 'text-kaist-grey/30 cursor-not-allowed'
-                          : 'text-kaist-darkgreen hover:bg-kaist-grey/10'
+                          ? "text-kaist-grey/30 cursor-not-allowed"
+                          : "text-kaist-darkgreen hover:bg-kaist-grey/10"
                       }`}
                     >
                       <ChevronLeft className="h-5 w-5" />
@@ -265,8 +289,8 @@ export function BoardPage() {
                         onClick={() => handlePageChange(page)}
                         className={`min-w-10 h-10 px-3 rounded-md text-sm font-semibold tracking-tight transition-colors ${
                           currentPage === page
-                            ? 'bg-kaist-darkgreen text-kaist-white'
-                            : 'text-kaist-greygreen hover:bg-kaist-grey/10'
+                            ? "bg-kaist-darkgreen text-kaist-white"
+                            : "text-kaist-greygreen hover:bg-kaist-grey/10"
                         }`}
                       >
                         {page}
@@ -274,12 +298,14 @@ export function BoardPage() {
                     ))}
 
                     <button
-                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                      onClick={() =>
+                        handlePageChange(Math.min(totalPages, currentPage + 1))
+                      }
                       disabled={currentPage === totalPages}
                       className={`p-2 rounded-md transition-colors ${
                         currentPage === totalPages
-                          ? 'text-kaist-grey/30 cursor-not-allowed'
-                          : 'text-kaist-darkgreen hover:bg-kaist-grey/10'
+                          ? "text-kaist-grey/30 cursor-not-allowed"
+                          : "text-kaist-darkgreen hover:bg-kaist-grey/10"
                       }`}
                     >
                       <ChevronRight className="h-5 w-5" />

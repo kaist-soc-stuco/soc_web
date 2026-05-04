@@ -1,18 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  Res,
-} from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, Res } from "@nestjs/common";
 import { Response } from "express";
 
 import { Cookies } from "../../shared/decorators/cookies.decorator";
-import {
-  ConsentDecisionRequestDto,
-  SsoCallbackBodyDto,
-} from "./auth.types";
+import { ConsentDecisionRequestDto, SsoCallbackBodyDto } from "./auth.types";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
 import {
@@ -121,7 +111,7 @@ export class AuthController {
   }
 
   /**
-    * 개인정보 저장 동의/비동의 결정을 처리합니다.
+   * 개인정보 저장 동의/비동의 결정을 처리합니다.
    * @body pendingLoginToken, consent
    */
   @Post("login/consent")
@@ -152,7 +142,7 @@ export class AuthController {
   }
 
   /**
-    * 현재 로그인 세션 상태를 조회합니다.
+   * 현재 로그인 세션 상태를 조회합니다.
    */
   @Get("session")
   async getSession(
@@ -162,13 +152,14 @@ export class AuthController {
   }
 
   /**
-    * access token 유효성을 확인하는 테스트용 endpoint입니다.
+   * access token 유효성을 확인하는 테스트용 endpoint입니다.
    */
   @Get("access-check")
   async checkAccessToken(
     @Cookies(AUTH_ACCESS_COOKIE_NAME) cookieAccessToken: string | undefined,
   ) {
-    const claims = this.authSessionService.validateAccessToken(cookieAccessToken);
+    const claims =
+      this.authSessionService.validateAccessToken(cookieAccessToken);
 
     return {
       mode: claims.mode,
@@ -177,7 +168,7 @@ export class AuthController {
   }
 
   /**
-    * access token 기준 현재 사용자 정보를 조회합니다.
+   * access token 기준 현재 사용자 정보를 조회합니다.
    */
   @Get("me")
   async getCurrentUser(
@@ -187,7 +178,7 @@ export class AuthController {
   }
 
   /**
-    * access token 만료 시 refresh token 기반으로 세션을 갱신합니다.
+   * access token 만료 시 refresh token 기반으로 세션을 갱신합니다.
    */
   @Post("refresh")
   async refreshSession(
@@ -223,7 +214,7 @@ export class AuthController {
   }
 
   /**
-    * 현재 세션을 로그아웃 처리합니다.
+   * 현재 세션을 로그아웃 처리합니다.
    */
   @Post("logout")
   async logout(
