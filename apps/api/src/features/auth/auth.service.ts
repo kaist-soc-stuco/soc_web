@@ -8,6 +8,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 import { randomUUID } from "node:crypto";
+import { nowIso, expiresAtMs } from "@soc/shared";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 import { UsersService } from "../users/users.service";
@@ -95,8 +96,8 @@ export class AuthService {
 
     await this.storePendingState(state, {
       nonce,
-      createdAt: new Date().toISOString(),
-      expiresAt: Date.now() + STATE_TTL_SECONDS * 1000,
+      createdAt: nowIso(),
+      expiresAt: expiresAtMs(STATE_TTL_SECONDS),
     });
 
     return {
@@ -238,17 +239,12 @@ export class AuthService {
       }
 
       const pendingLoginToken = randomUUID();
-      await this.pendingLoginRepository.save(
-        pendingLoginToken,
-        {
-          expiresAt: Date.now() + PENDING_LOGIN_TTL_SECONDS * 1000,
-          name: userName,
-          ssoUserId,
-          userEmail,
-          userMobile,
-        },
-        PENDING_LOGIN_TTL_SECONDS,
-      );
+      await this.pendingLoginRepository.save(pendingLoginToken, {
+        expiresAt: expiresAtMs(PENDING_LOGIN_TTL_SECONDS),
+        ssoUserId,
+        userEmail,
+        userMobile,
+      }, PENDING_LOGIN_TTL_SECONDS);
 
       return this.buildFrontendRedirect("consent-required", "pending_consent", {
         pendingLoginToken,

@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { Request } from "express";
+import { isExpired } from "@soc/shared";
 
 import { AuthSessionRepository } from "../../features/auth/auth-session.repository";
 import { AUTH_SESSION_COOKIE_NAME } from "../../features/auth/auth.tokens";
@@ -45,7 +46,7 @@ export class AuthGuard implements CanActivate {
       session.mode !== "persisted" ||
       !session.userId ||
       session.revoked ||
-      session.expiresAt <= Date.now()
+      isExpired(session.expiresAt)
     ) {
       throw new UnauthorizedException("session_invalid");
     }

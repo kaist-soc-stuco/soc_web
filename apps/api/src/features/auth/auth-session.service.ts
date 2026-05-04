@@ -7,6 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 import jwt, { type JwtPayload } from "jsonwebtoken";
+import { nowIso, isExpired, secondsUntil, expiresAtMs } from "@soc/shared";
 
 import type {
   AuthSessionRecord,
@@ -87,10 +88,7 @@ export class AuthSessionService {
     };
 
     return jwt.sign(claims, this.getJwtSecret(), {
-      expiresIn: Math.max(
-        Math.floor((record.expiresAt - Date.now()) / 1000),
-        1,
-      ),
+      expiresIn: Math.max(secondsUntil(record.expiresAt), 1),
     });
   }
 
@@ -193,7 +191,7 @@ export class AuthSessionService {
       throw new UnauthorizedException("session_not_found");
     }
 
-    if (record.revoked || record.expiresAt <= Date.now()) {
+    if (record.revoked || isExpired(record.expiresAt)) {
       throw new UnauthorizedException("session_expired_or_revoked");
     }
   }
@@ -210,7 +208,7 @@ export class AuthSessionService {
     const refreshJti = randomUUID();
 
     const session: AuthSessionRecord = {
-      expiresAt: Date.now() + AUTH_REFRESH_TOKEN_TTL_SECONDS * 1000,
+      expiresAt: expiresAtMs(AUTH_REFRESH_TOKEN_TTL_SECONDS),
       mode: "persisted",
       refreshJti,
       revoked: false,
@@ -244,7 +242,7 @@ export class AuthSessionService {
     const session: AuthSessionRecord = {
       expiresAt: Math.min(
         pendingUser.expiresAt,
-        Date.now() + AUTH_TEMPORARY_REFRESH_TTL_SECONDS * 1000,
+        expiresAtMs(AUTH_TEMPORARY_REFRESH_TTL_SECONDS),
       ),
       mode: "temporary",
       pendingLoginId,
@@ -325,7 +323,7 @@ export class AuthSessionService {
     }
 
     if (input.consent) {
-      const consentedAt = new Date().toISOString();
+      const consentedAt = nowIso();
       const persistedUser = await this.usersService.upsertConsentedSsoUser({
         consentedAt,
         name: pendingUser.name,
@@ -375,7 +373,7 @@ export class AuthSessionService {
 
     const session = await this.authSessionRepository.findBySessionId(sessionId);
 
-    if (!session || session.revoked || session.expiresAt <= Date.now()) {
+    if (!session || session.revoked || isExpired(session.expiresAt)) {
       return {
         authenticated: false,
         canUsePersistentFeatures: false,
