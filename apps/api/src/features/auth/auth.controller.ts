@@ -177,6 +177,16 @@ export class AuthController {
   }
 
   /**
+    * access token 기준 현재 사용자 정보를 조회합니다.
+   */
+  @Get("me")
+  async getCurrentUser(
+    @Cookies(AUTH_ACCESS_COOKIE_NAME) cookieAccessToken: string | undefined,
+  ) {
+    return this.authSessionService.getCurrentUser(cookieAccessToken);
+  }
+
+  /**
     * access token 만료 시 refresh token 기반으로 세션을 갱신합니다.
    */
   @Post("refresh")

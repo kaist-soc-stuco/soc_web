@@ -179,8 +179,17 @@ export class AuthService {
       await this.deletePendingState(stateKey);
 
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
+      if (process.env.NODE_ENV !== "production") {
+        // Test-only: log full SSO userInfo payload for debugging.
+        // eslint-disable-next-line no-console
+        console.log("SSO userInfo", userInfo);
+      }
       const ssoUserId =
         typeof userInfo.user_id === "string" ? userInfo.user_id : "";
+      const userName =
+        typeof userInfo.user_name === "string" && userInfo.user_name.trim().length > 0
+          ? userInfo.user_name.trim()
+          : undefined;
       const userEmail =
         typeof userInfo.user_email === "string" && userInfo.user_email.trim().length > 0
           ? userInfo.user_email
@@ -197,6 +206,14 @@ export class AuthService {
       const existingUser = await this.usersService.findBySsoUserId(ssoUserId);
 
       if (existingUser) {
+        if (userName || userEmail || userMobile) {
+          await this.usersService.updateProfileFromSso(existingUser.id, {
+            name: userName,
+            userEmail,
+            userMobile,
+          });
+        }
+
         const issued = await this.authSessionService.issuePersistedSession(
           existingUser.id,
         );
@@ -220,6 +237,7 @@ export class AuthService {
       const pendingLoginToken = randomUUID();
       await this.pendingLoginRepository.save(pendingLoginToken, {
         expiresAt: Date.now() + PENDING_LOGIN_TTL_SECONDS * 1000,
+        name: userName,
         ssoUserId,
         userEmail,
         userMobile,
@@ -290,6 +308,7 @@ export class AuthService {
 
     return userInfo;
   }
+
 
   /** Redis에 저장된 state payload를 안전하게 파싱합니다. */
   private parseStoredState(rawValue: string): StoredLoginState | null {

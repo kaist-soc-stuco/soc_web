@@ -3,6 +3,8 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { Request } from "express";
 
@@ -22,6 +24,7 @@ interface AuthenticatedRequest {
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly authSessionRepository: AuthSessionRepository,
+    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
   ) {}
 

@@ -8,6 +8,7 @@
 export interface UserRecord {
   createdAt: string;
   id: string;
+  name: string | null;
   permission: number;
   privacyConsentAt: string | null;
   ssoUserId: string;

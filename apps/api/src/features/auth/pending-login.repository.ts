@@ -16,6 +16,7 @@ interface StoredPendingSsoUser {
   encryptedUserEmail?: string;
   encryptedUserMobile?: string;
   expiresAt: number;
+  name?: string;
   ssoUserId: string;
 }
 
@@ -89,6 +90,7 @@ export class PendingLoginRepository {
         ? this.encrypt(payload.userMobile)
         : undefined,
       expiresAt: payload.expiresAt,
+      name: payload.name,
       ssoUserId: payload.ssoUserId,
     };
   }
@@ -99,6 +101,7 @@ export class PendingLoginRepository {
 
       return {
         expiresAt: parsed.expiresAt,
+        name: parsed.name,
         ssoUserId: parsed.ssoUserId,
         userEmail: parsed.encryptedUserEmail
           ? this.decrypt(parsed.encryptedUserEmail)
