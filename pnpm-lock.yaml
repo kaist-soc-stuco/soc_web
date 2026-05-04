@@ -22,6 +22,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^11.1.8
         version: 11.1.13(@nestjs/common@11.1.13(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.13)
+      '@soc/contracts':
+        specifier: workspace:*
+        version: link:../../shared/contracts
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -62,6 +65,9 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.10
         version: 9.0.10
+      '@types/multer':
+        specifier: ^1.4.12
+        version: 1.4.13
       '@types/node':
         specifier: ^24.5.2
         version: 24.10.13
@@ -149,7 +155,11 @@ importers:
 
   shared/config: {}
 
-  shared/contracts: {}
+  shared/contracts:
+    devDependencies:
+      typescript:
+        specifier: ^5.2.2
+        version: 5.9.3
 
 packages:
 
@@ -1087,6 +1097,9 @@ packages:
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
+
+  '@types/multer@1.4.13':
+    resolution: {integrity: sha512-bhhdtPw7JqCiEfC9Jimx5LqX9BDIPJEh2q/fQ4bqbBPtyEZYr3cvF22NwG0DmPZNYA0CAf2CnqDB4KIGGpJcaw==}
 
   '@types/node@24.10.13':
     resolution: {integrity: sha512-oH72nZRfDv9lADUBSo104Aq7gPHpQZc4BTx38r9xf9pg5LfP6EzSyH2n7qFmmxRQXh7YlUXODcYsg6PuTDSxGg==}
@@ -2979,6 +2992,10 @@ snapshots:
       '@types/node': 24.10.13
 
   '@types/ms@2.1.0': {}
+
+  '@types/multer@1.4.13':
+    dependencies:
+      '@types/express': 5.0.6
 
   '@types/node@24.10.13':
     dependencies:
