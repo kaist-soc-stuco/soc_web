@@ -1,6 +1,7 @@
 import type {
   ConsentDecisionRequest,
   ConsentDecisionResponse,
+  CurrentUserResponse,
   GreetingResponse,
   HealthResponse,
   LoginSessionResponse,
@@ -158,6 +159,12 @@ export const createApiClient = ({
         method: "GET",
       }, {
         retryOnUnauthorized: true,
+      });
+    },
+
+    getCurrentUser: async (): Promise<CurrentUserResponse> => {
+      return requestJson<CurrentUserResponse>(`${authBaseUrl}/me`, {
+        method: "GET",
       });
     },
 
