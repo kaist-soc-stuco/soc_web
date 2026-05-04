@@ -12,6 +12,7 @@ import type {
   AuthSessionRecord,
   AuthSessionSummary,
   ConsentDecisionRequest,
+  CurrentUserSummary,
   LogoutRequest,
   PendingSsoUser,
   PersistedAccessTokenClaims,
@@ -315,6 +316,7 @@ export class AuthSessionService {
       const consentedAt = new Date().toISOString();
       const persistedUser = await this.usersService.upsertConsentedSsoUser({
         consentedAt,
+        name: pendingUser.name,
         ssoUserId: pendingUser.ssoUserId,
         userEmail: pendingUser.userEmail,
         userMobile: pendingUser.userMobile,
@@ -374,6 +376,45 @@ export class AuthSessionService {
       storageMode: session.mode,
       userId: session.userId,
     };
+  }
+
+  /**
+    * access token 기반으로 현재 사용자를 조회합니다.
+   */
+  async getCurrentUser(accessToken?: string): Promise<CurrentUserSummary> {
+    try {
+      const claims = this.validateAccessToken(accessToken);
+
+      if (claims.mode === "temporary") {
+        return {
+          authenticated: true,
+          storageMode: "temporary",
+        };
+      }
+
+      const user = await this.usersService.findById(claims.userId);
+
+      if (!user) {
+        return {
+          authenticated: false,
+          storageMode: null,
+        };
+      }
+
+      return {
+        authenticated: true,
+        storageMode: "persisted",
+        user: {
+          id: user.id,
+          permission: user.permission,
+        },
+      };
+    } catch {
+      return {
+        authenticated: false,
+        storageMode: null,
+      };
+    }
   }
 
   /**

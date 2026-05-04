@@ -27,11 +27,13 @@ export class UsersService {
    */
   async createFromSsoUser(input: {
     ssoUserId: string;
+    name?: string;
     userEmail?: string;
     userMobile?: string;
     consentedAt?: string;
   }): Promise<UserRecord> {
     return this.usersRepository.insert({
+      name: input.name ?? null,
       permission: 0,
       privacyConsentAt: input.consentedAt ?? null,
       ssoUserId: input.ssoUserId,
@@ -43,6 +45,7 @@ export class UsersService {
   async upsertConsentedSsoUser(input: {
     consentedAt: string;
     ssoUserId: string;
+    name?: string;
     userEmail?: string;
     userMobile?: string;
   }): Promise<UserRecord> {
@@ -65,6 +68,7 @@ export class UsersService {
   async updateProfileFromSso(
     userId: string,
     input: {
+      name?: string;
       userEmail?: string;
       userMobile?: string;
     },

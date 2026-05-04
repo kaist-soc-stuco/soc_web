@@ -21,6 +21,7 @@ export class UsersRepository {
     return {
       createdAt: row.createdAt.toISOString(),
       id: row.id,
+      name: row.name,
       permission: row.permission,
       privacyConsentAt: row.privacyConsentAt ? row.privacyConsentAt.toISOString() : null,
       ssoUserId: row.ssoUserId,
@@ -55,6 +56,7 @@ export class UsersRepository {
     const inserted = await this.db
       .insert(users)
       .values({
+        name: input.name,
         permission: input.permission,
         privacyConsentAt: input.privacyConsentAt ? new Date(input.privacyConsentAt) : null,
         ssoUserId: input.ssoUserId,
@@ -70,12 +72,14 @@ export class UsersRepository {
   async upsertConsentedUserBySso(input: {
     consentedAt: string;
     ssoUserId: string;
+    name?: string;
     userEmail?: string;
     userMobile?: string;
   }): Promise<UserRecord> {
     const upserted = await this.db
       .insert(users)
       .values({
+        name: input.name ?? null,
         privacyConsentAt: new Date(input.consentedAt),
         ssoUserId: input.ssoUserId,
         userEmail: input.userEmail ?? null,
@@ -84,6 +88,7 @@ export class UsersRepository {
       .onConflictDoUpdate({
         target: users.ssoUserId,
         set: {
+          name: sql`COALESCE(${users.name}, excluded.name)`,
           userEmail: sql`COALESCE(${users.userEmail}, excluded.user_email)`,
           userMobile: sql`COALESCE(${users.userMobile}, excluded.user_mobile)`,
           privacyConsentAt: sql`COALESCE(${users.privacyConsentAt}, excluded.privacy_consent_at)`,
@@ -110,17 +115,23 @@ export class UsersRepository {
   async updateProfile(
     userId: string,
     input: {
+      name?: string;
       userEmail?: string;
       userMobile?: string;
     },
   ): Promise<void> {
     const updateSet: {
       updatedAt: Date;
+      name?: string | null;
       userEmail?: string | null;
       userMobile?: string | null;
     } = {
       updatedAt: new Date(),
     };
+
+    if (input.name !== undefined) {
+      updateSet.name = input.name;
+    }
 
     if (input.userEmail !== undefined) {
       updateSet.userEmail = input.userEmail;
