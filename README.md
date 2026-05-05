@@ -2,7 +2,23 @@
 
 KAIST SoC 웹 모노레포입니다.
 
-- Web: React + Vite
+```
+apps/
+  api/   — NestJS backend (port 3000)
+  web/   — React + Vite frontend (port 5173)
+shared/
+  common/     — @soc/shared: 시간 유틸리티, 상수
+  contracts/  — @soc/contracts: HTTP 요청/응답 타입
+  api-client/ — @soc/api-client: 타입 안전 fetch 래퍼
+  config/     — 공유 TypeScript/ESLint 설정
+infra/
+  docker/  — PostgreSQL 16, Redis 7, Nginx 설정
+  scripts/ — DB 마이그레이션/시드 스크립트
+```
+
+## Tech Stack
+
+- Web: React 19 + Vite
 - API: NestJS
 - Infra: Postgres, Redis, Docker Compose
 
@@ -19,41 +35,34 @@ KAIST SoC 웹 모노레포입니다.
 ```bash
 cp .env.example .env
 pnpm install
+```
+
+## Run
+
+### 전체 스택 (api, web, postgres, redis, nginx)
+
+```bash
 docker compose up -d --build
 ```
 
-루트 `compose.yml`은 전체 스택(api, web, postgres, redis, nginx)을 띄웁니다.
-nginx는 기본적으로 `127.0.0.1:8080`에만 바인딩되므로, Caddy가 80/443을 사용해도 충돌하지 않습니다.
-필요하면 `NGINX_PORT`로 바꿀 수 있습니다.
+nginx는 기본적으로 `127.0.0.1:8080`에만 바인딩됩니다. 포트를 바꾸려면:
 
 ```bash
 NGINX_PORT=18080 docker compose up -d --build
 ```
 
-DB/Redis만 필요하면 아래 개발용 compose를 사용합니다.
+### 로컬 개발 (DB + Redis만 Docker로 띄우고, api/web은 직접 실행)
 
 ```bash
 docker compose -f infra/docker/compose.dev.yml up -d
-```
-
-## Run
-
-API:
-
-```bash
-pnpm dev:api
-```
-
-Web:
-
-```bash
-pnpm dev:web
-```
-
-둘 다 같이 실행:
-
-```bash
 pnpm dev
+```
+
+개별 실행:
+
+```bash
+pnpm dev:api   # NestJS :3000
+pnpm dev:web   # Vite :5173
 ```
 
 ## Check
@@ -68,4 +77,5 @@ pnpm dev
 pnpm typecheck
 pnpm build
 pnpm test
+pnpm db:migrate
 ```
