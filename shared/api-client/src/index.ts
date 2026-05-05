@@ -7,6 +7,9 @@ import type {
   LoginStartResponse,
   LogoutResponse,
   RefreshResponse,
+  ResponseDetailResponse,
+  SubmitResponseRequest,
+  SurveyDetailResponse,
 } from "@soc/contracts";
 
 export interface ApiClientOptions {
@@ -47,6 +50,16 @@ const resolveAuthBaseUrl = (normalizedBaseUrl: string): string => {
   return `${normalizedBaseUrl}/v1/auth`;
 };
 
+const resolveSurveyBaseUrl = (normalizedBaseUrl: string): string => {
+  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/surveys`;
+  }
+  if (/\/api$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/surveys`;
+  }
+  return `${normalizedBaseUrl}/v1/surveys`;
+};
+
 const isAuthExpiredStatus = (status: number): boolean => status === 401 || status === 403;
 
 const redirectToLogin = (): void => {
@@ -78,6 +91,7 @@ export const createApiClient = ({
 }: ApiClientOptions) => {
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
   const authBaseUrl = resolveAuthBaseUrl(normalizedBaseUrl);
+  const surveyBaseUrl = resolveSurveyBaseUrl(normalizedBaseUrl);
   let refreshInFlight: Promise<void> | null = null;
 
   const sendRefreshRequest = async (): Promise<void> => {
@@ -215,6 +229,23 @@ export const createApiClient = ({
         method: "GET",
       }, {
         retryOnUnauthorized: true,
+      });
+    },
+
+    getSurveyDetail: async (surveyId: string): Promise<SurveyDetailResponse> => {
+      return requestJson<SurveyDetailResponse>(`${surveyBaseUrl}/${surveyId}`, {
+        method: "GET",
+      });
+    },
+
+    submitSurveyResponse: async (
+      surveyId: string,
+      body: SubmitResponseRequest,
+    ): Promise<ResponseDetailResponse> => {
+      return requestJson<ResponseDetailResponse>(`${surveyBaseUrl}/${surveyId}/responses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
     },
   };
