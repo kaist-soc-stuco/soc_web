@@ -1,6 +1,9 @@
 import type {
   ConsentDecisionRequest,
   ConsentDecisionResponse,
+  CreateQuestionRequest,
+  CreateSectionRequest,
+  CreateSurveyRequest,
   GreetingResponse,
   HealthResponse,
   LoginSessionResponse,
@@ -8,8 +11,16 @@ import type {
   LogoutResponse,
   RefreshResponse,
   ResponseDetailResponse,
+  ReviewResponseRequest,
   SubmitResponseRequest,
   SurveyDetailResponse,
+  SurveyQuestionRecord,
+  SurveyRecord,
+  SurveyResponseRecord,
+  SurveySectionRecord,
+  UpdateQuestionRequest,
+  UpdateSectionRequest,
+  UpdateSurveyRequest,
 } from "@soc/contracts";
 
 export interface ApiClientOptions {
@@ -247,6 +258,151 @@ export const createApiClient = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+    },
+
+    // --- Admin survey methods ---
+
+    listSurveys: async (): Promise<SurveyRecord[]> => {
+      return requestJson<SurveyRecord[]>(surveyBaseUrl, {
+        method: "GET",
+      }, { retryOnUnauthorized: true });
+    },
+
+    createSurvey: async (body: CreateSurveyRequest): Promise<SurveyRecord> => {
+      return requestJson<SurveyRecord>(surveyBaseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, { retryOnUnauthorized: true });
+    },
+
+    updateSurvey: async (surveyId: string, body: UpdateSurveyRequest): Promise<SurveyRecord> => {
+      return requestJson<SurveyRecord>(`${surveyBaseUrl}/${surveyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, { retryOnUnauthorized: true });
+    },
+
+    deleteSurvey: async (surveyId: string): Promise<void> => {
+      const res = await fetcher(`${surveyBaseUrl}/${surveyId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new ApiClientHttpError(res.status);
+    },
+
+    createSection: async (
+      surveyId: string,
+      body: CreateSectionRequest,
+    ): Promise<SurveySectionRecord> => {
+      return requestJson<SurveySectionRecord>(`${surveyBaseUrl}/${surveyId}/sections`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, { retryOnUnauthorized: true });
+    },
+
+    updateSection: async (
+      surveyId: string,
+      sectionId: string,
+      body: UpdateSectionRequest,
+    ): Promise<SurveySectionRecord> => {
+      return requestJson<SurveySectionRecord>(
+        `${surveyBaseUrl}/${surveyId}/sections/${sectionId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    deleteSection: async (surveyId: string, sectionId: string): Promise<void> => {
+      const res = await fetcher(`${surveyBaseUrl}/${surveyId}/sections/${sectionId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new ApiClientHttpError(res.status);
+    },
+
+    createQuestion: async (
+      surveyId: string,
+      sectionId: string,
+      body: CreateQuestionRequest,
+    ): Promise<SurveyQuestionRecord> => {
+      return requestJson<SurveyQuestionRecord>(
+        `${surveyBaseUrl}/${surveyId}/sections/${sectionId}/questions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    updateQuestion: async (
+      surveyId: string,
+      sectionId: string,
+      questionId: string,
+      body: UpdateQuestionRequest,
+    ): Promise<SurveyQuestionRecord> => {
+      return requestJson<SurveyQuestionRecord>(
+        `${surveyBaseUrl}/${surveyId}/sections/${sectionId}/questions/${questionId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    deleteQuestion: async (
+      surveyId: string,
+      sectionId: string,
+      questionId: string,
+    ): Promise<void> => {
+      const res = await fetcher(
+        `${surveyBaseUrl}/${surveyId}/sections/${sectionId}/questions/${questionId}`,
+        { method: "DELETE", credentials: "include" },
+      );
+      if (!res.ok) throw new ApiClientHttpError(res.status);
+    },
+
+    listResponses: async (surveyId: string): Promise<SurveyResponseRecord[]> => {
+      return requestJson<SurveyResponseRecord[]>(`${surveyBaseUrl}/${surveyId}/responses`, {
+        method: "GET",
+      }, { retryOnUnauthorized: true });
+    },
+
+    getResponseDetail: async (
+      surveyId: string,
+      responseId: string,
+    ): Promise<ResponseDetailResponse> => {
+      return requestJson<ResponseDetailResponse>(
+        `${surveyBaseUrl}/${surveyId}/responses/${responseId}`,
+        { method: "GET" },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    reviewResponse: async (
+      surveyId: string,
+      responseId: string,
+      body: ReviewResponseRequest,
+    ): Promise<SurveyResponseRecord> => {
+      return requestJson<SurveyResponseRecord>(
+        `${surveyBaseUrl}/${surveyId}/responses/${responseId}/review`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
     },
   };
 };

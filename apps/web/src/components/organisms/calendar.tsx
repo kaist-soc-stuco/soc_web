@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { nowMs, msToTimeObj, timeObjToMs, addMs, subtractMs } from '@soc/shared';
+import { nowMs, msToTimeObj, timeObjToMs, addMs, subtractMs, getDayOfWeek } from '@soc/shared';
 
 export function Calendar() {
   const todayMs = nowMs();
@@ -22,7 +22,7 @@ export function Calendar() {
     const lastDayTime = msToTimeObj(lastDayMs);
 
     // 첫날의 요일 (0: 일요일)
-    const firstDayOfWeek = new Date(firstDayMs).getDay();
+    const firstDayOfWeek = getDayOfWeek(firstDayMs);
 
     const days = [];
 

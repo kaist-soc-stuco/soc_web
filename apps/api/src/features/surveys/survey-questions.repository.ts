@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
+import { isoToDate, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -62,7 +63,7 @@ export class SurveyQuestionsRepository {
         options: dto.options ?? null,
         answerRegex: dto.answerRegex ?? null,
         isRequired: dto.isRequired ?? true,
-        editDeadlineAt: dto.editDeadlineAt ? new Date(dto.editDeadlineAt) : null,
+        editDeadlineAt: dto.editDeadlineAt ? isoToDate(dto.editDeadlineAt) : null,
         sortOrder: dto.sortOrder ?? 0,
       })
       .returning();
@@ -75,7 +76,7 @@ export class SurveyQuestionsRepository {
     dto: UpdateQuestionDto,
   ): Promise<SurveyQuestionRecord | null> {
     const set: Partial<typeof surveyQuestions.$inferInsert> & { updatedAt: Date } = {
-      updatedAt: new Date(),
+      updatedAt: nowDate(),
     };
 
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;
@@ -86,7 +87,7 @@ export class SurveyQuestionsRepository {
     if (dto.options !== undefined) set.options = dto.options;
     if (dto.answerRegex !== undefined) set.answerRegex = dto.answerRegex;
     if (dto.isRequired !== undefined) set.isRequired = dto.isRequired;
-    if (dto.editDeadlineAt !== undefined) set.editDeadlineAt = new Date(dto.editDeadlineAt);
+    if (dto.editDeadlineAt !== undefined) set.editDeadlineAt = isoToDate(dto.editDeadlineAt);
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
 
     const [row] = await this.db

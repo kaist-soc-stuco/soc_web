@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
+import { isoToDate, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -60,17 +61,21 @@ export class SurveysRepository {
         feePayersOnly: dto.feePayersOnly ?? false,
         allowAnonymous: dto.allowAnonymous ?? false,
         maxResponses: dto.maxResponses ?? null,
-        opensAt: dto.opensAt ? new Date(dto.opensAt) : null,
-        closesAt: dto.closesAt ? new Date(dto.closesAt) : null,
+        opensAt: dto.opensAt ? isoToDate(dto.opensAt) : null,
+        closesAt: dto.closesAt ? isoToDate(dto.closesAt) : null,
         connectedPostId: dto.connectedPostId ?? null,
       })
       .returning();
     return this.map(row);
   }
 
-  async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecord | null> {
+  async update(
+    id: string,
+    dto: UpdateSurveyDto,
+    publishedAt?: string,
+  ): Promise<SurveyRecord | null> {
     const set: Partial<typeof surveys.$inferInsert> & { updatedAt: Date } = {
-      updatedAt: new Date(),
+      updatedAt: nowDate(),
     };
 
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;
@@ -81,9 +86,10 @@ export class SurveysRepository {
     if (dto.feePayersOnly !== undefined) set.feePayersOnly = dto.feePayersOnly;
     if (dto.allowAnonymous !== undefined) set.allowAnonymous = dto.allowAnonymous;
     if (dto.maxResponses !== undefined) set.maxResponses = dto.maxResponses;
-    if (dto.opensAt !== undefined) set.opensAt = new Date(dto.opensAt);
-    if (dto.closesAt !== undefined) set.closesAt = new Date(dto.closesAt);
+    if (dto.opensAt !== undefined) set.opensAt = isoToDate(dto.opensAt);
+    if (dto.closesAt !== undefined) set.closesAt = isoToDate(dto.closesAt);
     if (dto.connectedPostId !== undefined) set.connectedPostId = dto.connectedPostId;
+    if (publishedAt !== undefined) set.publishedAt = isoToDate(publishedAt);
 
     const [row] = await this.db
       .update(surveys)
