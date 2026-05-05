@@ -368,9 +368,16 @@ export class AuthSessionService {
       };
     }
 
+    let permission: number | undefined;
+    if (session.mode === "persisted" && session.userId) {
+      const user = await this.usersService.findById(session.userId);
+      permission = user?.permission;
+    }
+
     return {
       authenticated: true,
       canUsePersistentFeatures: session.mode === "persisted",
+      permission,
       requiresConsent: session.mode === "temporary",
       storageMode: session.mode,
       userId: session.userId,

@@ -11,7 +11,7 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 
-import { AuthGuard, PermissionGuard, RequirePermission } from "../../shared/guards";
+import { AuthGuard, OptionalAuthGuard, PermissionGuard, RequirePermission } from "../../shared/guards";
 import { PermissionFlags } from "../../shared/guards/permission.guard";
 
 import { SurveyResponsesService } from "./survey-responses.service";
@@ -31,6 +31,7 @@ export class SurveyResponsesController {
   constructor(private readonly responsesService: SurveyResponsesService) {}
 
   @Post()
+  @UseGuards(OptionalAuthGuard)
   submit(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Body() dto: SubmitResponseDto,

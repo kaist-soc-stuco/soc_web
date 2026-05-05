@@ -158,6 +158,7 @@ export class SsoCallbackBodyDto {
 export interface AuthSessionSummary {
   authenticated: boolean;
   canUsePersistentFeatures: boolean;
+  permission?: number;
   requiresConsent: boolean;
   storageMode: StorageMode | null;
   userId?: string;
