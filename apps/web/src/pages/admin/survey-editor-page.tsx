@@ -310,7 +310,9 @@ export function SurveyEditorPage() {
           setMaxResponses(
             detail.maxResponses != null ? String(detail.maxResponses) : "",
           );
-          setOpensAt(detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "");
+          setOpensAt(
+            detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
+          );
           setClosesAt(
             detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "",
           );
