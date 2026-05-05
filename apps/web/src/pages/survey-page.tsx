@@ -11,6 +11,9 @@ import { Header } from '@/components/organisms/header';
 import { Footer } from '@/components/organisms/footer';
 import { Button } from '@/components/ui/button';
 import { resolveApiBaseUrl } from '@/lib/api';
+import { getAuthSessionSummary } from '@/lib/auth-session';
+
+const TUITION_PAYER_BIT = 256;
 
 // ─── 질문별 입력 컴포넌트 ────────────────────────────────────────────────────
 
@@ -198,6 +201,26 @@ function ClosedView() {
   );
 }
 
+function LoginRequiredView() {
+  return (
+    <div className="flex flex-col items-center gap-4 py-16 text-center">
+      <span className="text-5xl">🔑</span>
+      <h2 className="text-2xl font-semibold text-[var(--kaist-darkgreen)]">로그인이 필요합니다</h2>
+      <p className="text-[var(--kaist-greygreen)]">이 설문은 로그인한 사용자만 응답할 수 있습니다.</p>
+    </div>
+  );
+}
+
+function FeePayerRequiredView() {
+  return (
+    <div className="flex flex-col items-center gap-4 py-16 text-center">
+      <span className="text-5xl">💳</span>
+      <h2 className="text-2xl font-semibold text-[var(--kaist-darkgreen)]">과비 납부자 전용입니다</h2>
+      <p className="text-[var(--kaist-greygreen)]">이 설문은 과비를 납부한 학생만 응답할 수 있습니다.</p>
+    </div>
+  );
+}
+
 function SuccessView() {
   return (
     <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -216,6 +239,8 @@ export function SurveyPage() {
 
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sessionPermission, setSessionPermission] = useState<number | null>(null);
+  const [sessionAuthenticated, setSessionAuthenticated] = useState<boolean | null>(null);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -223,11 +248,15 @@ export function SurveyPage() {
 
   useEffect(() => {
     if (!id) return;
-    apiClient
-      .getSurveyDetail(id)
-      .then((data) => {
+
+    Promise.all([
+      apiClient.getSurveyDetail(id),
+      getAuthSessionSummary(apiClient),
+    ])
+      .then(([data, session]) => {
         setSurvey(data);
-        // 질문별 초기값 설정
+        setSessionAuthenticated(session.authenticated && session.canUsePersistentFeatures);
+        setSessionPermission(session.permission ?? 0);
         const init: Record<string, AnswerValue> = {};
         for (const section of data.sections) {
           for (const q of section.questions) {
@@ -267,7 +296,7 @@ export function SurveyPage() {
         <div className="py-16 text-center text-red-500">{loadError}</div>
       );
     }
-    if (!survey) {
+    if (!survey || sessionAuthenticated === null) {
       return (
         <div className="py-16 text-center text-[var(--kaist-greygreen)]">불러오는 중...</div>
       );
@@ -275,6 +304,9 @@ export function SurveyPage() {
     if (submitted) return <SuccessView />;
     if (survey.computedState === 'before_open') return <BeforeOpenView opensAt={survey.opensAt} />;
     if (survey.computedState === 'closed') return <ClosedView />;
+
+    if (!survey.allowAnonymous && !sessionAuthenticated) return <LoginRequiredView />;
+    if (survey.feePayersOnly && !((sessionPermission ?? 0) & TUITION_PAYER_BIT)) return <FeePayerRequiredView />;
 
     // open 상태 — 폼 렌더링
     return (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
@@ -45,7 +45,6 @@ interface QuestionFormState {
   answerRegex: string;
   isRequired: boolean;
   editDeadlineAt: string;
-  sortOrder: number;
 }
 
 const emptyQuestion = (): QuestionFormState => ({
@@ -58,7 +57,6 @@ const emptyQuestion = (): QuestionFormState => ({
   answerRegex: "",
   isRequired: true,
   editDeadlineAt: "",
-  sortOrder: 0,
 });
 
 // ─── 질문 편집 모달 ───────────────────────────────────────────────────────────
@@ -100,6 +98,18 @@ function QuestionEditor({ initial, onSave, onCancel }: QuestionEditorProps) {
     set("options", next);
   };
 
+  const handleSave = () => {
+    if (!form.titleKo.trim()) {
+      alert("국문 제목은 필수입니다.");
+      return;
+    }
+    if (!form.titleEn.trim()) {
+      alert("영문 제목은 필수입니다.");
+      return;
+    }
+    onSave(form);
+  };
+
   const inputCls =
     "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 
@@ -108,32 +118,51 @@ function QuestionEditor({ initial, onSave, onCancel }: QuestionEditorProps) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
         <h3 className="font-semibold text-gray-800">질문 편집</h3>
 
-        <label className="block text-xs font-medium text-gray-600">
-          제목 (국문) *
-        </label>
-        <input
-          className={inputCls}
-          value={form.titleKo}
-          onChange={(e) => set("titleKo", e.target.value)}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              제목 (국문) *
+            </label>
+            <input
+              className={inputCls}
+              value={form.titleKo}
+              onChange={(e) => set("titleKo", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              제목 (영문) *
+            </label>
+            <input
+              className={inputCls}
+              value={form.titleEn}
+              onChange={(e) => set("titleEn", e.target.value)}
+            />
+          </div>
+        </div>
 
-        <label className="block text-xs font-medium text-gray-600">
-          제목 (영문)
-        </label>
-        <input
-          className={inputCls}
-          value={form.titleEn}
-          onChange={(e) => set("titleEn", e.target.value)}
-        />
-
-        <label className="block text-xs font-medium text-gray-600">
-          설명 (국문)
-        </label>
-        <textarea
-          className={`${inputCls} min-h-[60px] resize-y`}
-          value={form.descriptionKo}
-          onChange={(e) => set("descriptionKo", e.target.value)}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              설명 (국문)
+            </label>
+            <textarea
+              className={`${inputCls} min-h-[60px] resize-y`}
+              value={form.descriptionKo}
+              onChange={(e) => set("descriptionKo", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              설명 (영문)
+            </label>
+            <textarea
+              className={`${inputCls} min-h-[60px] resize-y`}
+              value={form.descriptionEn}
+              onChange={(e) => set("descriptionEn", e.target.value)}
+            />
+          </div>
+        </div>
 
         <label className="block text-xs font-medium text-gray-600">
           질문 유형 *
@@ -204,40 +233,35 @@ function QuestionEditor({ initial, onSave, onCancel }: QuestionEditorProps) {
           </label>
         </div>
 
-        <label className="block text-xs font-medium text-gray-600">
-          응답 정규식
-        </label>
-        <input
-          className={inputCls}
-          placeholder="선택 사항"
-          value={form.answerRegex}
-          onChange={(e) => set("answerRegex", e.target.value)}
-        />
+        {form.questionType === "short_text" && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              응답 정규식
+            </label>
+            <input
+              className={inputCls}
+              placeholder="선택 사항"
+              value={form.answerRegex}
+              onChange={(e) => set("answerRegex", e.target.value)}
+            />
+          </div>
+        )}
 
-        <label className="block text-xs font-medium text-gray-600">
-          응답 마감 시각
-        </label>
-        <input
-          type="datetime-local"
-          className={inputCls}
-          value={form.editDeadlineAt}
-          onChange={(e) => set("editDeadlineAt", e.target.value)}
-        />
-
-        <label className="block text-xs font-medium text-gray-600">
-          정렬 순서
-        </label>
-        <input
-          type="number"
-          min={0}
-          className={inputCls}
-          value={form.sortOrder}
-          onChange={(e) => set("sortOrder", Number(e.target.value))}
-        />
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            응답 마감 시각
+          </label>
+          <input
+            type="datetime-local"
+            className={inputCls}
+            value={form.editDeadlineAt}
+            onChange={(e) => set("editDeadlineAt", e.target.value)}
+          />
+        </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button onClick={onCancel}>취소</Button>
-          <Button onClick={() => onSave(form)}>저장</Button>
+          <Button onClick={handleSave}>저장</Button>
         </div>
       </div>
     </div>
@@ -288,6 +312,9 @@ export function SurveyEditorPage() {
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [addingSection, setAddingSection] = useState(false);
 
+  // 드래그 상태
+  const dragItem = useRef<{ sectionId: string; index: number } | null>(null);
+
   useEffect(() => {
     (async () => {
       const session = await getAuthSessionSummary(client);
@@ -331,6 +358,10 @@ export function SurveyEditorPage() {
       setError("국문 제목은 필수입니다.");
       return;
     }
+    if (!titleEn.trim()) {
+      setError("영문 제목은 필수입니다.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -356,8 +387,8 @@ export function SurveyEditorPage() {
         await client.updateSurvey(loadedSurveyId, body);
         alert("저장되었습니다.");
       } else {
-        const created = await client.createSurvey(body);
-        navigate(`/admin/surveys/${created.id}/edit`, { replace: true });
+        await client.createSurvey(body);
+        navigate("/admin/surveys", { replace: true });
       }
     } catch {
       setError("저장에 실패했습니다.");
@@ -402,6 +433,7 @@ export function SurveyEditorPage() {
     if (!loadedSurveyId || !editingQuestion) return;
     const { sectionId, questionId } = editingQuestion;
 
+    const section = sections.find((s) => s.id === sectionId);
     const body = {
       titleKo: form.titleKo,
       titleEn: form.titleEn || undefined,
@@ -414,7 +446,9 @@ export function SurveyEditorPage() {
       editDeadlineAt: form.editDeadlineAt
         ? htmlDatetimeLocalToIso(form.editDeadlineAt)
         : undefined,
-      sortOrder: form.sortOrder,
+      sortOrder: questionId
+        ? undefined
+        : (section?.questions.length ?? 0),
     };
 
     try {
@@ -480,6 +514,46 @@ export function SurveyEditorPage() {
     }
   };
 
+  const handleReorderQuestion = async (
+    sectionId: string,
+    fromIndex: number,
+    toIndex: number,
+  ) => {
+    if (fromIndex === toIndex || !loadedSurveyId) return;
+
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+
+    const reordered = [...section.questions];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    // 낙관적 업데이트
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId ? { ...s, questions: reordered } : s,
+      ),
+    );
+
+    try {
+      await Promise.all(
+        reordered.map((q, idx) =>
+          client.updateQuestion(loadedSurveyId, sectionId, q.id, {
+            sortOrder: idx,
+          }),
+        ),
+      );
+    } catch {
+      // 실패 시 원상복구
+      setSections((prev) =>
+        prev.map((s) =>
+          s.id === sectionId ? { ...s, questions: section.questions } : s,
+        ),
+      );
+      alert("순서 변경에 실패했습니다.");
+    }
+  };
+
   const openNewQuestion = (sectionId: string) => {
     setEditingQuestion({
       sectionId,
@@ -508,7 +582,6 @@ export function SurveyEditorPage() {
         editDeadlineAt: q.editDeadlineAt
           ? isoToHtmlDatetimeLocal(q.editDeadlineAt)
           : "",
-        sortOrder: q.sortOrder,
       },
     });
   };
@@ -567,7 +640,7 @@ export function SurveyEditorPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">
-                  제목 (영문)
+                  제목 (영문) *
                 </label>
                 <input
                   className={inputCls}
@@ -728,25 +801,45 @@ export function SurveyEditorPage() {
                       <p className="text-gray-400 text-xs">질문이 없습니다.</p>
                     )}
 
-                    {section.questions.map((q) => (
+                    {section.questions.map((q, idx) => (
                       <div
                         key={q.id}
-                        className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
+                        draggable
+                        onDragStart={() => {
+                          dragItem.current = { sectionId: section.id, index: idx };
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (!dragItem.current) return;
+                          if (dragItem.current.sectionId !== section.id) return;
+                          void handleReorderQuestion(
+                            section.id,
+                            dragItem.current.index,
+                            idx,
+                          );
+                          dragItem.current = null;
+                        }}
+                        className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm cursor-grab active:cursor-grabbing group"
                       >
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            {q.titleKo}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-gray-300 group-hover:text-gray-400 flex-shrink-0 select-none">
+                            ⠿
                           </span>
-                          <span className="ml-2 text-xs text-gray-400">
-                            {
-                              QUESTION_TYPES.find(
-                                (t) => t.value === q.questionType,
-                              )?.label
-                            }
-                            {q.isRequired ? " · 필수" : ""}
-                          </span>
+                          <div className="min-w-0">
+                            <span className="font-medium text-gray-700 truncate">
+                              {q.titleKo}
+                            </span>
+                            <span className="ml-2 text-xs text-gray-400">
+                              {
+                                QUESTION_TYPES.find(
+                                  (t) => t.value === q.questionType,
+                                )?.label
+                              }
+                              {q.isRequired ? " · 필수" : ""}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 flex-shrink-0 ml-2">
                           <button
                             onClick={() => openEditQuestion(section.id, q)}
                             className="text-blue-500 hover:underline text-xs"

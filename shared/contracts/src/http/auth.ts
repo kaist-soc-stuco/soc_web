@@ -19,6 +19,7 @@ export interface LoginStartResponse {
 export interface LoginSessionResponse {
   authenticated: boolean;
   canUsePersistentFeatures: boolean;
+  permission?: number;
   requiresConsent: boolean;
   storageMode: AuthStorageMode | null;
   userId?: string;
