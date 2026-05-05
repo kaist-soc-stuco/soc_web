@@ -1,7 +1,7 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import Redis from 'ioredis';
-import { nowIso } from '@soc/shared';
+import { nowIso, nowMs } from '@soc/shared';
 
 import {
   DRIZZLE_DB,
@@ -35,26 +35,26 @@ export class HealthController {
   }
 
   private async checkPostgres(): Promise<DependencyHealth> {
-    const start = Date.now();
+    const start = nowMs();
 
     try {
       await this.db.execute(sql`SELECT 1`);
 
       return {
         ok: true,
-        latencyMs: Date.now() - start,
+        latencyMs: nowMs() - start,
       };
     } catch (error) {
       return {
         ok: false,
-        latencyMs: Date.now() - start,
+        latencyMs: nowMs() - start,
         message: error instanceof Error ? error.message : 'postgres check failed',
       };
     }
   }
 
   private async checkRedis(): Promise<DependencyHealth> {
-    const start = Date.now();
+    const start = nowMs();
 
     try {
       if (this.redis.status === 'wait') {
@@ -65,12 +65,12 @@ export class HealthController {
 
       return {
         ok: true,
-        latencyMs: Date.now() - start,
+        latencyMs: nowMs() - start,
       };
     } catch (error) {
       return {
         ok: false,
-        latencyMs: Date.now() - start,
+        latencyMs: nowMs() - start,
         message: error instanceof Error ? error.message : 'redis check failed',
       };
     }

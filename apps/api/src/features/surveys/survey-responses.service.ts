@@ -7,10 +7,13 @@ import {
 
 import { SurveyResponsesRepository } from "./survey-responses.repository";
 import { SurveysRepository } from "./surveys.repository";
+import { SurveySectionsRepository } from "./survey-sections.repository";
+import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { PermissionFlags } from "../../shared/guards/permission.guard";
 
 import type { ResponseDetailResponse } from "@soc/contracts";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
+import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { ReviewResponseDto } from "./dto/review-response.dto";
 import { isoToMs, isExpired, nowMs } from "@soc/shared";
@@ -20,7 +23,17 @@ export class SurveyResponsesService {
   constructor(
     private readonly responsesRepo: SurveyResponsesRepository,
     private readonly surveysRepo: SurveysRepository,
+    private readonly sectionsRepo: SurveySectionsRepository,
+    private readonly questionsRepo: SurveyQuestionsRepository,
   ) {}
+
+  private async getAllQuestionsForSurvey(surveyId: string): Promise<SurveyQuestionRecord[]> {
+    const sections = await this.sectionsRepo.findBySurveyId(surveyId);
+    const questionArrays = await Promise.all(
+      sections.map((s) => this.questionsRepo.findBySectionId(s.id)),
+    );
+    return questionArrays.flat();
+  }
 
   async submit(
     surveyId: string,
@@ -51,6 +64,14 @@ export class SurveyResponsesService {
     if (survey.maxResponses !== null) {
       const count = await this.responsesRepo.countSubmitted(surveyId);
       if (count >= survey.maxResponses) throw new ConflictException("survey_capacity_full");
+    }
+
+    const questions = await this.getAllQuestionsForSurvey(surveyId);
+    for (const answerInput of dto.answers) {
+      const question = questions.find((q) => q.id === answerInput.questionId);
+      if (question?.editDeadlineAt && isExpired(isoToMs(question.editDeadlineAt))) {
+        throw new ConflictException("question_edit_deadline_passed");
+      }
     }
 
     const response = await this.responsesRepo.insertResponse({

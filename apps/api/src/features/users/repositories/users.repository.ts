@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
+import { isoToDate, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -56,7 +57,7 @@ export class UsersRepository {
       .insert(users)
       .values({
         permission: input.permission,
-        privacyConsentAt: input.privacyConsentAt ? new Date(input.privacyConsentAt) : null,
+        privacyConsentAt: input.privacyConsentAt ? isoToDate(input.privacyConsentAt) : null,
         ssoUserId: input.ssoUserId,
         userEmail: input.userEmail,
         userMobile: input.userMobile,
@@ -76,7 +77,7 @@ export class UsersRepository {
     const upserted = await this.db
       .insert(users)
       .values({
-        privacyConsentAt: new Date(input.consentedAt),
+        privacyConsentAt: isoToDate(input.consentedAt),
         ssoUserId: input.ssoUserId,
         userEmail: input.userEmail ?? null,
         userMobile: input.userMobile ?? null,
@@ -100,8 +101,8 @@ export class UsersRepository {
     await this.db
       .update(users)
       .set({
-        privacyConsentAt: new Date(consentedAt),
-        updatedAt: new Date(),
+        privacyConsentAt: isoToDate(consentedAt),
+        updatedAt: nowDate(),
       })
       .where(eq(users.id, userId));
   }
@@ -119,7 +120,7 @@ export class UsersRepository {
       userEmail?: string | null;
       userMobile?: string | null;
     } = {
-      updatedAt: new Date(),
+      updatedAt: nowDate(),
     };
 
     if (input.userEmail !== undefined) {

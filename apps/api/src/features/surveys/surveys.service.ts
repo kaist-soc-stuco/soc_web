@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { isoToMs, isExpired, nowMs } from "@soc/shared";
+import { isoToMs, isExpired, nowMs, nowIso } from "@soc/shared";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -63,7 +63,15 @@ export class SurveysService {
   }
 
   async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecordWithState> {
-    const survey = await this.surveysRepo.update(id, dto);
+    const current = await this.surveysRepo.findById(id);
+    if (!current) throw new NotFoundException("survey_not_found");
+
+    let publishedAt: string | undefined;
+    if ((dto.status === "open" || dto.status === "scheduled") && !current.publishedAt) {
+      publishedAt = nowIso();
+    }
+
+    const survey = await this.surveysRepo.update(id, dto, publishedAt);
     if (!survey) throw new NotFoundException("survey_not_found");
     return { ...survey, computedState: this.computeState(survey) };
   }

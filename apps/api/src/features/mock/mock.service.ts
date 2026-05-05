@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import Redis from 'ioredis';
+import { msToIso, nowIso, nowMs } from '@soc/shared';
 
 import {
   DRIZZLE_DB,
@@ -40,9 +41,10 @@ export class MockService {
   private async readDbTime(): Promise<string> {
     try {
       const result = await this.db.execute<{ now: Date }>(sql`SELECT NOW() as now`);
-      return new Date(result.rows[0]?.now ?? Date.now()).toISOString();
+      const row = result.rows[0]?.now;
+      return msToIso(row instanceof Date ? row.valueOf() : nowMs());
     } catch {
-      return new Date().toISOString();
+      return nowIso();
     }
   }
 }

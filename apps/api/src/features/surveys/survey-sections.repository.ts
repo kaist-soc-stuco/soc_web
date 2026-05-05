@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
+import { nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -64,7 +65,7 @@ export class SurveySectionsRepository {
     dto: UpdateSectionDto,
   ): Promise<SurveySectionRecord | null> {
     const set: Partial<typeof surveySections.$inferInsert> & { updatedAt: Date } = {
-      updatedAt: new Date(),
+      updatedAt: nowDate(),
     };
 
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;

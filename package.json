@@ -11,6 +11,11 @@
     "db:seed": "bash infra/scripts/db-seed.sh",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
     "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.59.2",
+    "eslint": "^10.3.0"
   }
 }

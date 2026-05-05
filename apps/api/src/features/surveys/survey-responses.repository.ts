@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
+import { nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -81,7 +82,7 @@ export class SurveyResponsesRepository {
         userId: input.userId ?? null,
         externalPhone: input.externalPhone ?? null,
         status: "submitted",
-        submittedAt: new Date(),
+        submittedAt: nowDate(),
       })
       .returning();
     return this.mapResponse(row);
@@ -119,8 +120,8 @@ export class SurveyResponsesRepository {
         status,
         reviewAdminId,
         reviewReason: reason ?? null,
-        reviewedAt: new Date(),
-        updatedAt: new Date(),
+        reviewedAt: nowDate(),
+        updatedAt: nowDate(),
       })
       .where(and(eq(surveyResponses.id, id), eq(surveyResponses.surveyId, surveyId)))
       .returning();

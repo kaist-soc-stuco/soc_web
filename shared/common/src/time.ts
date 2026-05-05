@@ -116,6 +116,43 @@ export function expiresAtMs(ttlSeconds: number): number {
   return Date.now() + ttlSeconds * 1000;
 }
 
+// ─── ORM compatibility ────────────────────────────────────────────────────────
+// Drizzle ORM requires Date objects for timestamp columns.
+// Use these instead of new Date() directly in repositories.
+
+export function nowDate(): Date {
+  return new Date(nowMs());
+}
+
+export function isoToDate(iso: string): Date {
+  return new Date(isoToMs(iso));
+}
+
+// ─── Calendar helpers ─────────────────────────────────────────────────────────
+
+/** Returns day-of-week: 0 = Sunday … 6 = Saturday (same as Date.prototype.getDay). */
+export function getDayOfWeek(ms: number, tz = DEFAULT_TZ): number {
+  return tz === 'UTC' ? dayjs.utc(ms).day() : dayjs(ms).tz(tz).day();
+}
+
+// ─── HTML form helpers ────────────────────────────────────────────────────────
+
+// HTML <input type="datetime-local"> returns "YYYY-MM-DDTHH:mm" with no timezone.
+// These two functions convert between that format and UTC ISO strings.
+
+export function htmlDatetimeLocalToIso(value: string, tz = DEFAULT_TZ): string {
+  const [datePart, timePart = '00:00'] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  return timeObjToIso({ year, month, day, hour, minute, second: 0, millisecond: 0 }, tz);
+}
+
+export function isoToHtmlDatetimeLocal(iso: string, tz = DEFAULT_TZ): string {
+  const t = isoToTimeObj(iso, tz);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${t.year}-${p(t.month)}-${p(t.day)}T${p(t.hour)}:${p(t.minute)}`;
+}
+
 // ─── Formatting ───────────────────────────────────────────────────────────────
 
 export function formatKorean(input: number | string, tz = DEFAULT_TZ): string {
