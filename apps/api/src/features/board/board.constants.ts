@@ -1,0 +1,12 @@
+export const ARTICLE_STATUS = {
+  DRAFT: "DRAFT",
+  PUBLISHED: "PUBLISHED",
+  HIDDEN: "HIDDEN",
+  DELETED: "DELETED",
+} as const;
+
+export const COMMENT_STATUS = {
+  PUBLISHED: "PUBLISHED",
+  HIDDEN: "HIDDEN",
+  DELETED: "DELETED",
+} as const;
