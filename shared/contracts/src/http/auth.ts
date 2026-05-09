@@ -25,6 +25,15 @@ export interface LoginSessionResponse {
   userId?: string;
 }
 
+export interface CurrentUserResponse {
+  authenticated: boolean;
+  storageMode: AuthStorageMode | null;
+  user?: {
+    id: string;
+    permission: number;
+  };
+}
+
 export interface ConsentDecisionRequest {
   consent: boolean;
   pendingLoginToken: string;

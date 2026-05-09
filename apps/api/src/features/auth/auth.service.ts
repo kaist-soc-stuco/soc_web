@@ -10,7 +10,7 @@ import Redis from "ioredis";
 import { randomUUID } from "node:crypto";
 import { nowIso, expiresAtMs } from "@soc/shared";
 
-import { REDIS_CLIENT } from '../../infrastructure/redis/redis.provider';
+import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
@@ -87,7 +87,7 @@ export class AuthService {
   }
 
   /**
-    * SSO authorize 요청에 필요한 초기 payload를 생성합니다.
+   * SSO authorize 요청에 필요한 초기 payload를 생성합니다.
    */
   async createLoginStartPayload(): Promise<LoginStartPayload> {
     const config = this.readStartConfig();
@@ -108,7 +108,7 @@ export class AuthService {
   }
 
   /**
-    * SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
+   * SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
    */
   async handleLoginCallback(body: CallbackBody): Promise<string> {
     if (body.error || body.errorCode) {
@@ -180,24 +180,57 @@ export class AuthService {
       await this.deletePendingState(stateKey);
 
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
-      const ssoUserId =
-        typeof userInfo.user_id === "string" ? userInfo.user_id : "";
+      if (process.env.NODE_ENV !== "production") {
+        // Test-only: log full SSO userInfo payload for debugging.
+        // eslint-disable-next-line no-console
+        console.log("SSO userInfo", userInfo);
+      }
+      const ssoSubject = this.readRequiredUserInfoString(
+        userInfo,
+        "user_id",
+        "missing_user_id",
+      );
+      const kaistUid = this.readRequiredUserInfoString(
+        userInfo,
+        "kaist_uid",
+        "missing_kaist_uid",
+      );
       const userEmail =
-        typeof userInfo.user_email === "string" && userInfo.user_email.trim().length > 0
-          ? userInfo.user_email
-          : undefined;
-      const userMobile =
-        typeof userInfo.user_mbtlnum === "string" && userInfo.user_mbtlnum.trim().length > 0
-          ? userInfo.user_mbtlnum
-          : undefined;
+        this.readUserInfoString(userInfo, "email") ??
+        this.readUserInfoString(userInfo, "user_email");
+      const nameKo = this.readRequiredUserInfoString(
+        userInfo,
+        "user_nm",
+        "missing_user_nm",
+      );
+      const nameEn = this.readUserInfoString(userInfo, "user_eng_nm");
+      const stdNo = this.readUserInfoString(userInfo, "std_no");
+      const departmentKo = this.readUserInfoString(userInfo, "std_dept_kor_nm");
+      const departmentEn = this.readUserInfoString(userInfo, "std_dept_eng_nm");
+      const academicStatus = this.readUserInfoString(userInfo, "std_status_kor");
+      const identityCode = this.readUserInfoString(userInfo, "socps_cd");
+      const userMobile = this.readUserInfoString(userInfo, "user_mbtlnum");
 
-      if (!ssoUserId) {
-        return this.buildFrontendRedirect("error", "missing_sso_user_id");
+      if (!userEmail) {
+        return this.buildFrontendRedirect("error", "missing_email");
       }
 
-      const existingUser = await this.usersService.findBySsoUserId(ssoUserId);
+      const existingUser = await this.usersService.findByKaistUid(kaistUid);
 
       if (existingUser) {
+        if (nameKo || nameEn || userEmail) {
+          await this.usersService.updateProfileFromSso(existingUser.id, {
+            academicStatus,
+            departmentEn,
+            departmentKo,
+            email: userEmail,
+            identityCode,
+            nameEn,
+            nameKo,
+            stdNo,
+          });
+        }
+
         const issued = await this.authSessionService.issuePersistedSession(
           existingUser.id,
         );
@@ -220,9 +253,17 @@ export class AuthService {
 
       const pendingLoginToken = randomUUID();
       await this.pendingLoginRepository.save(pendingLoginToken, {
+        academicStatus,
+        departmentEn,
+        departmentKo,
         expiresAt: expiresAtMs(PENDING_LOGIN_TTL_SECONDS),
-        ssoUserId,
-        userEmail,
+        email: userEmail,
+        identityCode,
+        kaistUid,
+        nameEn,
+        nameKo,
+        ssoSubject,
+        stdNo,
         userMobile,
       }, PENDING_LOGIN_TTL_SECONDS);
 
@@ -292,6 +333,36 @@ export class AuthService {
     return userInfo;
   }
 
+  /** userInfo에서 비어 있지 않은 문자열만 꺼냅니다. */
+  private readUserInfoString(
+    userInfo: Record<string, unknown>,
+    key: string,
+  ): string | undefined {
+    const value = userInfo[key];
+
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private readRequiredUserInfoString(
+    userInfo: Record<string, unknown>,
+    key: string,
+    reason: string,
+  ): string {
+    const value = this.readUserInfoString(userInfo, key);
+
+    if (!value) {
+      throw new BadRequestException(reason);
+    }
+
+    return value;
+  }
+
   /** Redis에 저장된 state payload를 안전하게 파싱합니다. */
   private parseStoredState(rawValue: string): StoredLoginState | null {
     try {
@@ -357,7 +428,9 @@ export class AuthService {
   }
 
   /** resultToken으로 로그인 결과를 1회 소비하고 payload를 반환합니다. */
-  async consumeLoginResult(resultToken: string | undefined): Promise<LoginResultPayload> {
+  async consumeLoginResult(
+    resultToken: string | undefined,
+  ): Promise<LoginResultPayload> {
     if (!resultToken) {
       throw new BadRequestException("resultToken_is_required");
     }

@@ -21,8 +21,16 @@ export type StorageMode = "temporary" | "persisted";
  */
 export interface PendingSsoUser {
   expiresAt: number;
-  ssoUserId: string;
-  userEmail?: string;
+  ssoSubject: string;
+  kaistUid: string;
+  nameKo: string;
+  nameEn?: string;
+  email: string;
+  stdNo?: string;
+  departmentKo?: string;
+  departmentEn?: string;
+  academicStatus?: string;
+  identityCode?: string;
   userMobile?: string;
 }
 
@@ -162,4 +170,16 @@ export interface AuthSessionSummary {
   requiresConsent: boolean;
   storageMode: StorageMode | null;
   userId?: string;
+}
+
+/**
+ * access token 기반 현재 사용자 요약 응답입니다.
+ */
+export interface CurrentUserSummary {
+  authenticated: boolean;
+  storageMode: StorageMode | null;
+  user?: {
+    id: string;
+    permission: number;
+  };
 }

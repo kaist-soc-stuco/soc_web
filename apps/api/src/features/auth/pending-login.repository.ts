@@ -4,7 +4,12 @@ import {
   InternalServerErrorException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 import Redis from "ioredis";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
@@ -13,10 +18,18 @@ import type { PendingSsoUser } from "./auth.types";
 const PENDING_LOGIN_PREFIX = "auth:pending-login:";
 
 interface StoredPendingSsoUser {
-  encryptedUserEmail?: string;
+  encryptedEmail: string;
   encryptedUserMobile?: string;
   expiresAt: number;
-  ssoUserId: string;
+  kaistUid: string;
+  academicStatus?: string;
+  departmentEn?: string;
+  departmentKo?: string;
+  identityCode?: string;
+  nameEn?: string;
+  nameKo: string;
+  ssoSubject: string;
+  stdNo?: string;
 }
 
 @Injectable()
@@ -82,14 +95,20 @@ export class PendingLoginRepository {
 
   private serialize(payload: PendingSsoUser): StoredPendingSsoUser {
     return {
-      encryptedUserEmail: payload.userEmail
-        ? this.encrypt(payload.userEmail)
-        : undefined,
+      encryptedEmail: this.encrypt(payload.email),
       encryptedUserMobile: payload.userMobile
         ? this.encrypt(payload.userMobile)
         : undefined,
+      academicStatus: payload.academicStatus,
+      departmentEn: payload.departmentEn,
+      departmentKo: payload.departmentKo,
       expiresAt: payload.expiresAt,
-      ssoUserId: payload.ssoUserId,
+      identityCode: payload.identityCode,
+      kaistUid: payload.kaistUid,
+      nameEn: payload.nameEn,
+      nameKo: payload.nameKo,
+      ssoSubject: payload.ssoSubject,
+      stdNo: payload.stdNo,
     };
   }
 
@@ -98,11 +117,17 @@ export class PendingLoginRepository {
       const parsed = JSON.parse(rawValue) as StoredPendingSsoUser;
 
       return {
+        academicStatus: parsed.academicStatus,
+        departmentEn: parsed.departmentEn,
+        departmentKo: parsed.departmentKo,
+        email: this.decrypt(parsed.encryptedEmail),
         expiresAt: parsed.expiresAt,
-        ssoUserId: parsed.ssoUserId,
-        userEmail: parsed.encryptedUserEmail
-          ? this.decrypt(parsed.encryptedUserEmail)
-          : undefined,
+        identityCode: parsed.identityCode,
+        kaistUid: parsed.kaistUid,
+        nameEn: parsed.nameEn,
+        nameKo: parsed.nameKo,
+        ssoSubject: parsed.ssoSubject,
+        stdNo: parsed.stdNo,
         userMobile: parsed.encryptedUserMobile
           ? this.decrypt(parsed.encryptedUserMobile)
           : undefined,
@@ -112,7 +137,11 @@ export class PendingLoginRepository {
     }
   }
 
-  async save(pendingLoginToken: string, payload: PendingSsoUser, ttlSeconds: number): Promise<void> {
+  async save(
+    pendingLoginToken: string,
+    payload: PendingSsoUser,
+    ttlSeconds: number,
+  ): Promise<void> {
     const pendingKey = this.buildKey(pendingLoginToken);
 
     await this.redis.set(

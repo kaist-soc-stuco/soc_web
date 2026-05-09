@@ -3,6 +3,8 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { Request } from "express";
 import { isExpired } from "@soc/shared";
@@ -23,6 +25,7 @@ interface AuthenticatedRequest {
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly authSessionRepository: AuthSessionRepository,
+    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
   ) {}
 
@@ -56,7 +59,8 @@ export class AuthGuard implements CanActivate {
 
     request.user = {
       id: user.id,
-      permission: user.permission,
+      permission:
+        await this.usersService.resolvePermissionBitmaskByUserId(user.id),
     };
 
     return true;

@@ -1,9 +1,25 @@
 import type {
+  ArticleCreateRequest,
+  ArticleCreateResponse,
+  ArticleDeleteResponse,
+  ArticleDetailResponse,
+  ArticleListResponse,
+  ArticleUpdateRequest,
+  ArticleUpdateResponse,
+  BoardListResponse,
+  BoardSummary,
   ConsentDecisionRequest,
   ConsentDecisionResponse,
   CreateQuestionRequest,
   CreateSectionRequest,
   CreateSurveyRequest,
+  CommentCreateRequest,
+  CommentCreateResponse,
+  CommentDeleteResponse,
+  CommentListResponse,
+  CommentUpdateRequest,
+  CommentUpdateResponse,
+  CurrentUserResponse,
   GreetingResponse,
   HealthResponse,
   LoginSessionResponse,
@@ -45,11 +61,38 @@ interface AccessCheckResponse {
   ok: boolean;
 }
 
+interface ListQueryOptions {
+  limit?: number;
+  page?: number;
+}
+
+const buildListQuery = (options?: ListQueryOptions): string => {
+  if (!options) {
+    return "";
+  }
+
+  const params = new URLSearchParams();
+
+  if (options.page !== undefined) {
+    params.set("page", String(options.page));
+  }
+
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+};
+
 const withNoTrailingSlash = (value: string): string =>
   value.replace(/\/+$/, "");
 
 const resolveAuthBaseUrl = (normalizedBaseUrl: string): string => {
-  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+  if (
+    /\/api\/v1$/i.test(normalizedBaseUrl) ||
+    /\/v1$/i.test(normalizedBaseUrl)
+  ) {
     return `${normalizedBaseUrl}/auth`;
   }
 
@@ -117,14 +160,14 @@ export const createApiClient = ({
           method: "POST",
         });
 
-          if (!response.ok) {
-            const error = new ApiClientHttpError(response.status);
+        if (!response.ok) {
+          const error = new ApiClientHttpError(response.status);
 
-            if (isAuthExpiredStatus(response.status)) {
-              redirectToLogin();
-            }
+          if (isAuthExpiredStatus(response.status)) {
+            redirectToLogin();
+          }
 
-            throw error;
+          throw error;
         }
       })();
     }
@@ -171,36 +214,210 @@ export const createApiClient = ({
       const query = sessionId
         ? `?sessionId=${encodeURIComponent(sessionId)}`
         : "";
-      return requestJson<LoginSessionResponse>(`${authBaseUrl}/session${query}`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
+      return requestJson<LoginSessionResponse>(
+        `${authBaseUrl}/session${query}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
     },
 
     checkAccessToken: async (): Promise<AccessCheckResponse> => {
-      return requestJson<AccessCheckResponse>(`${authBaseUrl}/access-check`, {
+      return requestJson<AccessCheckResponse>(
+        `${authBaseUrl}/access-check`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    getBoards: async (): Promise<BoardListResponse> => {
+      return requestJson<BoardListResponse>(`${normalizedBaseUrl}/boards`, {
         method: "GET",
-      }, {
-        retryOnUnauthorized: true,
+      });
+    },
+
+    getBoard: async (code: string): Promise<BoardSummary> => {
+      return requestJson<BoardSummary>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}`,
+        {
+          method: "GET",
+        },
+      );
+    },
+
+    getArticles: async (
+      code: string,
+      options?: ListQueryOptions,
+    ): Promise<ArticleListResponse> => {
+      return requestJson<ArticleListResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles${buildListQuery(options)}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    getArticle: async (
+      code: string,
+      articleId: string,
+    ): Promise<ArticleDetailResponse> => {
+      return requestJson<ArticleDetailResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    createArticle: async (
+      code: string,
+      input: ArticleCreateRequest,
+    ): Promise<ArticleCreateResponse> => {
+      return requestJson<ArticleCreateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        },
+      );
+    },
+
+    updateArticle: async (
+      code: string,
+      articleId: string,
+      input: ArticleUpdateRequest,
+    ): Promise<ArticleUpdateResponse> => {
+      return requestJson<ArticleUpdateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+    },
+
+    deleteArticle: async (
+      code: string,
+      articleId: string,
+    ): Promise<ArticleDeleteResponse> => {
+      return requestJson<ArticleDeleteResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+    },
+
+    getComments: async (
+      code: string,
+      articleId: string,
+      options?: ListQueryOptions,
+    ): Promise<CommentListResponse> => {
+      return requestJson<CommentListResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments${buildListQuery(options)}`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
+    },
+
+    createComment: async (
+      code: string,
+      articleId: string,
+      input: CommentCreateRequest,
+    ): Promise<CommentCreateResponse> => {
+      return requestJson<CommentCreateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        },
+      );
+    },
+
+    updateComment: async (
+      code: string,
+      articleId: string,
+      commentId: string,
+      input: CommentUpdateRequest,
+    ): Promise<CommentUpdateResponse> => {
+      return requestJson<CommentUpdateResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+    },
+
+    deleteComment: async (
+      code: string,
+      articleId: string,
+      commentId: string,
+    ): Promise<CommentDeleteResponse> => {
+      return requestJson<CommentDeleteResponse>(
+        `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+    },
+
+    getCurrentUser: async (): Promise<CurrentUserResponse> => {
+      return requestJson<CurrentUserResponse>(`${authBaseUrl}/me`, {
+        method: "GET",
       });
     },
 
     submitConsentDecision: async (
       input: ConsentDecisionRequest,
     ): Promise<ConsentDecisionResponse> => {
-      return requestJson<ConsentDecisionResponse>(`${authBaseUrl}/login/consent`, {
-        body: JSON.stringify(input),
-        headers: {
-          "Content-Type": "application/json",
+      return requestJson<ConsentDecisionResponse>(
+        `${authBaseUrl}/login/consent`,
+        {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
         },
-        method: "POST",
-      }, {
-        retryOnUnauthorized: true,
-      });
+        {
+          retryOnUnauthorized: true,
+        },
+      );
     },
 
-    consumeLoginResult: async (resultToken: string): Promise<LoginResultResponse> => {
+    consumeLoginResult: async (
+      resultToken: string,
+    ): Promise<LoginResultResponse> => {
       return requestJson<LoginResultResponse>(
         `${authBaseUrl}/login/result?resultToken=${encodeURIComponent(resultToken)}`,
         {
@@ -236,11 +453,15 @@ export const createApiClient = ({
     },
 
     getGreeting: async (): Promise<GreetingResponse> => {
-      return requestJson<GreetingResponse>(`${normalizedBaseUrl}/v1/mock/greeting`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
+      return requestJson<GreetingResponse>(
+        `${normalizedBaseUrl}/v1/mock/greeting`,
+        {
+          method: "GET",
+        },
+        {
+          retryOnUnauthorized: true,
+        },
+      );
     },
 
     getSurveyDetail: async (surveyId: string): Promise<SurveyDetailResponse> => {
