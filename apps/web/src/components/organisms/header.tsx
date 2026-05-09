@@ -1,9 +1,6 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { createApiClient } from "@soc/api-client";
-import type { CurrentUserResponse } from "@soc/contracts";
 import { Logo } from "@/components/atoms/logo";
-import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
 interface HeaderProps {
   showLogo?: boolean;
@@ -13,44 +10,16 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
-  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
-    null,
-  );
 
-  const apiClient = useMemo(
-    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
-    [],
-  );
+  const updateNavLeft = () => {
+    if (navRef.current) setNavLeft(navRef.current.offsetLeft);
+  };
 
   useEffect(() => {
-    const update = () => {
-      if (navRef.current) setNavLeft(navRef.current.offsetLeft);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    updateNavLeft();
+    window.addEventListener("resize", updateNavLeft);
+    return () => window.removeEventListener("resize", updateNavLeft);
   }, [showLogo]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void apiClient
-      .getCurrentUser()
-      .then((response) => {
-        if (!cancelled) {
-          setCurrentUser(response);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCurrentUser(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient]);
 
   const navItems = [
     {
@@ -145,19 +114,13 @@ export function Header({ showLogo = false }: HeaderProps) {
               />
             </svg>
           </button>
-          {currentUser?.authenticated && currentUser.user ? (
-            <span className="text-sm lg:text-base font-extrabold tracking-tight text-kaist-darkgreen-main">
-              로그인: {currentUser.user.id}
-            </span>
-          ) : (
-            <Link
-              to="/login"
-              className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
-            >
-              <span className="py-2">로그인</span>
-              <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
-            </Link>
-          )}
+          <Link
+            to="/login"
+            className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
+          >
+            <span className="py-2">로그인</span>
+            <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
+          </Link>
         </div>
       </div>
 
