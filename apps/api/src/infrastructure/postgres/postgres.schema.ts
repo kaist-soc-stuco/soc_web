@@ -41,7 +41,7 @@ export const users = pgTable("users", {
 
 export const surveys = pgTable("survey", {
   // 1. 식별자 및 기본 정보 (최신 명세 기준)
-  surveyId: serial("survey_id").primaryKey(),
+  surveyId: uuid("survey_id").defaultRandom().primaryKey(),
   creatorId: integer("creator_id")
     .references(() => users.userId),
   kind: varchar("kind", { length: 20 }).notNull(), // SURVEY, VOTE, APPLICATION 등
