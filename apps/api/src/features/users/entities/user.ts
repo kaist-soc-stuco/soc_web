@@ -8,11 +8,17 @@
 export interface UserRecord {
   createdAt: string;
   id: string;
-  name: string | null;
-  permission: number;
-  privacyConsentAt: string | null;
-  ssoUserId: string;
+  kaistUid: string;
+  nameEn: string | null;
+  nameKo: string;
+  ssoSubject: string;
+  stdNo: string | null;
+  email: string;
+  departmentEn: string | null;
+  departmentKo: string | null;
+  academicStatus: string | null;
+  identityCode: string | null;
+  isActive: boolean;
+  lastLoginAt: string | null;
   updatedAt: string;
-  userEmail: string | null;
-  userMobile: string | null;
 }

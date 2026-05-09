@@ -323,12 +323,17 @@ export class AuthSessionService {
     }
 
     if (input.consent) {
-      const consentedAt = nowIso();
-      const persistedUser = await this.usersService.upsertConsentedSsoUser({
-        consentedAt,
-        name: pendingUser.name,
-        ssoUserId: pendingUser.ssoUserId,
-        userEmail: pendingUser.userEmail,
+      const persistedUser = await this.usersService.upsertUserFromConsent({
+        academicStatus: pendingUser.academicStatus,
+        departmentEn: pendingUser.departmentEn,
+        departmentKo: pendingUser.departmentKo,
+        kaistUid: pendingUser.kaistUid,
+        email: pendingUser.email,
+        identityCode: pendingUser.identityCode,
+        nameEn: pendingUser.nameEn,
+        nameKo: pendingUser.nameKo,
+        ssoSubject: pendingUser.ssoSubject,
+        stdNo: pendingUser.stdNo,
         userMobile: pendingUser.userMobile,
       });
 
@@ -419,7 +424,8 @@ export class AuthSessionService {
         storageMode: "persisted",
         user: {
           id: user.id,
-          permission: user.permission,
+          permission:
+            await this.usersService.resolvePermissionBitmaskByUserId(user.id),
         },
       };
     } catch {
