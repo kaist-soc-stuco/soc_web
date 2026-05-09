@@ -48,11 +48,11 @@ export class CommentRepository {
         status: comments.status,
         createdAt: comments.createdAt,
         updatedAt: comments.updatedAt,
-        authorId: users.id,
-        authorName: users.name,
+        authorId: users.userId,
+        authorName: users.nameKo,
       })
       .from(comments)
-      .leftJoin(users, eq(comments.authorUserId, users.id))
+      .leftJoin(users, eq(comments.authorUserId, users.userId))
       .where(baseFilter)
       .orderBy(asc(comments.createdAt))
       .limit(limit)

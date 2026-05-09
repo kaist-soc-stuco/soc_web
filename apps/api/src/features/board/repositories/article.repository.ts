@@ -55,8 +55,8 @@ export class ArticleRepository {
         pinOrder: articles.pinOrder,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
-        authorId: users.id,
-        authorName: users.name,
+        authorId: users.userId,
+        authorName: users.nameKo,
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -65,7 +65,7 @@ export class ArticleRepository {
         )`,
       })
       .from(articles)
-      .leftJoin(users, eq(articles.authorUserId, users.id))
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
       .where(baseFilter)
       .orderBy(
         desc(articles.isPinned),
@@ -116,8 +116,8 @@ export class ArticleRepository {
         pinOrder: articles.pinOrder,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
-        authorId: users.id,
-        authorName: users.name,
+        authorId: users.userId,
+        authorName: users.nameKo,
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -126,7 +126,7 @@ export class ArticleRepository {
         )`,
       })
       .from(articles)
-      .leftJoin(users, eq(articles.authorUserId, users.id))
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
       .where(
         and(
           eq(articles.boardId, boardId),

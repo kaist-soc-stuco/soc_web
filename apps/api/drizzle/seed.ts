@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, eq } from "drizzle-orm";
-import { articles, boards, users } from "../src/infrastructure/postgres/postgres.schema";
+import { articles, boards, permissions, users } from "../src/infrastructure/postgres/postgres.schema";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -12,15 +12,79 @@ if (!DATABASE_URL || DATABASE_URL.trim().length === 0) {
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
-const BOARD_SEEDS = [
+type BoardSeed = {
+  code: string;
+  nameKo: string;
+  description: string;
+  readScope: string;
+  writePermissionId: number | null;
+  commentPermissionId: number | null;
+  managePermissionId: number | null;
+  allowComment: boolean;
+  allowSecret: boolean;
+  allowLike: boolean;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+type PermissionSeed = {
+  permissionId: number;
+  code: string;
+  bitValue: number;
+  nameKo: string;
+  nameEn: string;
+  description: string;
+  isActive: boolean;
+};
+
+const PERMISSION_SEEDS: PermissionSeed[] = [
+  {
+    permissionId: 1,
+    code: "BOARD_NOTICE_WRITE",
+    bitValue: 1,
+    nameKo: "공지 작성",
+    nameEn: "Notice Write",
+    description: "공지 게시판 글 작성 권한",
+    isActive: true,
+  },
+  {
+    permissionId: 2,
+    code: "BOARD_HOC_WRITE",
+    bitValue: 2,
+    nameKo: "HoC 작성",
+    nameEn: "HoC Write",
+    description: "HoC 게시판 글 작성 권한",
+    isActive: true,
+  },
+  {
+    permissionId: 4,
+    code: "BOARD_LAB_WRITE",
+    bitValue: 4,
+    nameKo: "연구실 작성",
+    nameEn: "Lab Write",
+    description: "연구실 게시판 글 작성 권한",
+    isActive: true,
+  },
+  {
+    permissionId: 16,
+    code: "BOARD_QNA_WRITE",
+    bitValue: 16,
+    nameKo: "QnA 작성",
+    nameEn: "QnA Write",
+    description: "QnA 게시판 글 작성 권한",
+    isActive: true,
+  },
+];
+
+const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "공지",
     nameKo: "공지",
     description: "학생회 및 학교의 중요한 공지사항을 확인하세요",
     readScope: "PUBLIC",
     writePermissionId: 1,
-    commentPermissionId: 0,
-    managePermissionId: 0,
+    commentPermissionId: null,
+    managePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
@@ -33,8 +97,8 @@ const BOARD_SEEDS = [
     description: "전산학부의 다양한 행사 정보를 확인하세요",
     readScope: "PUBLIC",
     writePermissionId: 1,
-    commentPermissionId: 0,
-    managePermissionId: 0,
+    commentPermissionId: null,
+    managePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
@@ -47,8 +111,8 @@ const BOARD_SEEDS = [
     description: "Hall of Code 프로젝트 및 활동 내역",
     readScope: "PUBLIC",
     writePermissionId: 2,
-    commentPermissionId: 0,
-    managePermissionId: 0,
+    commentPermissionId: null,
+    managePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
@@ -61,8 +125,8 @@ const BOARD_SEEDS = [
     description: "학생회 및 학회의 홍보 게시물",
     readScope: "PUBLIC",
     writePermissionId: 2,
-    commentPermissionId: 0,
-    managePermissionId: 0,
+    commentPermissionId: null,
+    managePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
@@ -74,9 +138,9 @@ const BOARD_SEEDS = [
     nameKo: "건의사항",
     description: "학생들의 의견과 건의사항을 나눠주세요",
     readScope: "PUBLIC",
-    writePermissionId: 0,
-    commentPermissionId: 0,
-    managePermissionId: 0,
+    writePermissionId: null,
+    commentPermissionId: null,
+    managePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
@@ -89,8 +153,8 @@ const BOARD_SEEDS = [
     description: "각 연구실의 소식과 공지사항",
     readScope: "PUBLIC",
     writePermissionId: 4,
-    commentPermissionId: 0,
-    managePermissionId: 0,
+    commentPermissionId: null,
+    managePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
@@ -103,8 +167,8 @@ const BOARD_SEEDS = [
     description: "궁금한 점을 자유롭게 질문하세요",
     readScope: "PUBLIC",
     writePermissionId: 16,
-    commentPermissionId: 0,
-    managePermissionId: 0,
+    commentPermissionId: null,
+    managePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
@@ -113,76 +177,32 @@ const BOARD_SEEDS = [
   },
 ];
 
+async function seedPermissions() {
+  const existing = await db.select({ code: permissions.code }).from(permissions);
+  const existingCodes = new Set(existing.map((row) => row.code));
+  const toInsert = PERMISSION_SEEDS.filter((permissionSeed) => !existingCodes.has(permissionSeed.code));
+
+  if (toInsert.length === 0) {
+    console.log("No new permissions to insert");
+    return;
+  }
+
+  await db.insert(permissions).values(toInsert).onConflictDoNothing();
+  console.log(`Inserted ${toInsert.length} permission(s)`);
+}
+
 async function seedBoards() {
-  // Select only the code column to avoid failures when DB schema is slightly
-  // out-of-sync (e.g., missing non-critical columns like sort_order).
   const existing = await db.select({ code: boards.code }).from(boards);
-  const existingCodes = new Set(existing.map((r) => r.code));
-  const toInsert = BOARD_SEEDS.filter((b) => !existingCodes.has(b.code));
+  const existingCodes = new Set(existing.map((row) => row.code));
+  const toInsert = BOARD_SEEDS.filter((boardSeed) => !existingCodes.has(boardSeed.code));
+
   if (toInsert.length === 0) {
     console.log("No new boards to insert");
     return;
   }
-  // Some DBs may not yet have the `sort_order` column — detect and
-  // insert only the columns that exist to avoid errors.
-  const colCheck = await pool.query(
-    "SELECT column_name FROM information_schema.columns WHERE table_name='board' AND column_name='sort_order'"
-  );
-  if (!colCheck.rowCount) {
-    console.log("no rowcount");
-    return;
-  }
-  const hasSortOrder = colCheck.rowCount > 0;
 
-  if (hasSortOrder) {
-    await db.insert(boards).values(toInsert); 
+  await db.insert(boards).values(toInsert).onConflictDoNothing();
   console.log(`Inserted ${toInsert.length} board(s)`);
-  return;
-  }
-
-  // If sort_order (or other new columns) don't exist, build a raw INSERT
-  // using only columns that exist in the DB to avoid Drizzle generating
-  // column names that the database doesn't know yet.
-  const colRes = await pool.query(
-    "SELECT column_name FROM information_schema.columns WHERE table_name='board'"
-  );
-  const allowed = new Set(colRes.rows.map((r: any) => r.column_name));
-
-  const keyToCol: Record<string, string> = {
-    code: "code",
-    nameKo: "name_ko",
-    nameEn: "name_en",
-    description: "description",
-    readScope: "read_scope",
-    writePermissionId: "write_permission_id",
-    commentPermissionId: "comment_permission_id",
-    managePermissionId: "manage_permission_id",
-    allowComment: "allow_comment",
-    allowSecret: "allow_secret",
-    allowLike: "allow_like",
-    isActive: "is_active",
-    sortOrder: "sort_order",
-  };
-
-  const cols = Object.keys(keyToCol)
-    .map((k) => keyToCol[k])
-    .filter((c) => allowed.has(c));
-  if (cols.length === 0) throw new Error("No valid board columns found to insert");
-
-  const params: any[] = [];
-  const rowsPlaceholders = toInsert.map((seed) => {
-    const vals = cols.map((col) => {
-      const key = Object.keys(keyToCol).find((k) => keyToCol[k] === col)!;
-      const v = (seed as any)[key];
-      params.push(v === undefined ? null : v);
-      return `$${params.length}`;
-    });
-    return `(${vals.join(",")})`;
-  });
-
-  const sql = `INSERT INTO board (${cols.join(",")}) VALUES ${rowsPlaceholders.join(",")} ON CONFLICT (code) DO NOTHING;`;
-  await pool.query(sql, params);
-  console.log(`Inserted ${toInsert.length} board(s) (using raw SQL)`);
 }
 
 async function seedNoticeArticle() {
@@ -216,26 +236,27 @@ async function seedNoticeArticle() {
   const [seedAuthor] = await db
     .insert(users)
     .values({
-      ssoUserId: "seed-notice-author",
-      permission: 1,
-      userEmail: null,
-      userMobile: null,
-      privacyConsentAt: null,
+      ssoSubject: "seed-notice-author",
+      kaistUid: "seed-notice-author",
+      nameKo: "관리자",
+      email: "admin@kaist.ac.kr",
+      isActive: true,
     })
     .onConflictDoUpdate({
-      target: users.ssoUserId,
+      target: users.ssoSubject,
       set: {
-        permission: 1,
+        nameKo: "관리자",
+        email: "admin@kaist.ac.kr",
         updatedAt: new Date(),
       },
     })
-    .returning({ id: users.id });
+    .returning({ userId: users.userId });
 
   const [created] = await db
     .insert(articles)
     .values({
       boardId: noticeBoard.boardId,
-      authorUserId: seedAuthor.id,
+      authorUserId: seedAuthor.userId,
       titleKo: "공지 테스트 게시글",
       contentKo: "게시판 API와 정렬을 확인하기 위한 테스트 공지입니다.",
       visibilityScope: "PUBLIC",
@@ -248,7 +269,6 @@ async function seedNoticeArticle() {
 }
 
 async function seedDemoEventsIfExists() {
-  // demo_events is outside drizzle schema; use raw SQL to conditionally insert
   const sql = `DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'demo_events') THEN
@@ -262,9 +282,13 @@ END $$;`;
 }
 
 async function main() {
-  console.log("Using DATABASE_URL:", DATABASE_URL.replace(/:[^:@]+@/, ':****@'));
+  if (DATABASE_URL) {
+    console.log("Using DATABASE_URL:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
+  }
+
   try {
     await seedDemoEventsIfExists();
+    await seedPermissions();
     await seedBoards();
     await seedNoticeArticle();
     console.log("Seed finished");
@@ -272,11 +296,11 @@ async function main() {
     console.error("Seed failed:", err);
     process.exitCode = 1;
   } finally {
-      await pool.end();
+    await pool.end();
   }
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

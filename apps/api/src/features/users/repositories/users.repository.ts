@@ -1,13 +1,45 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
-import { users } from "../../../infrastructure/postgres/postgres.schema";
+import {
+  permissions,
+  roleGroupPermissions,
+  userRoleGroups,
+  users,
+} from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
+
+type UserUpsertInput = {
+  academicStatus?: string | null;
+  kaistUid: string;
+  lastLoginAt?: Date;
+  nameEn?: string | null;
+  nameKo: string;
+  ssoSubject: string;
+  stdNo?: string | null;
+  departmentEn?: string | null;
+  departmentKo?: string | null;
+  email: string;
+  identityCode?: string | null;
+  isActive?: boolean;
+};
+
+type UserProfileUpdateInput = {
+  academicStatus?: string | null;
+  departmentEn?: string | null;
+  departmentKo?: string | null;
+  email?: string;
+  identityCode?: string | null;
+  lastLoginAt?: Date;
+  nameEn?: string | null;
+  nameKo?: string;
+  stdNo?: string | null;
+};
 
 /**
  * PostgreSQL users 테이블 접근 로직입니다.
@@ -20,23 +52,27 @@ export class UsersRepository {
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
       createdAt: row.createdAt.toISOString(),
-      id: String(row.id),
-      name: row.name,
-      permission: row.permission,
-      privacyConsentAt: row.privacyConsentAt
-        ? row.privacyConsentAt.toISOString()
-        : null,
-      ssoUserId: row.ssoUserId,
+      id: String(row.userId),
+      kaistUid: row.kaistUid,
+      nameEn: row.nameEn,
+      nameKo: row.nameKo,
+      ssoSubject: row.ssoSubject,
+      stdNo: row.stdNo ?? null,
+      email: row.email,
+      departmentEn: row.departmentEn ?? null,
+      departmentKo: row.departmentKo ?? null,
+      academicStatus: row.academicStatus ?? null,
+      identityCode: row.identityCode ?? null,
+      isActive: row.isActive,
+      lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
       updatedAt: row.updatedAt.toISOString(),
-      userEmail: row.userEmail,
-      userMobile: row.userMobile,
     };
   }
 
-  /** SSO 식별자로 users 레코드를 조회합니다. */
-  async findBySsoUserId(ssoUserId: string): Promise<UserRecord | null> {
+  /** KAIST UID로 users 레코드를 조회합니다. */
+  async findByKaistUid(kaistUid: string): Promise<UserRecord | null> {
     const found = await this.db.query.users.findFirst({
-      where: eq(users.ssoUserId, ssoUserId),
+      where: eq(users.kaistUid, kaistUid),
     });
 
     return found ? this.mapRowToUserRecord(found) : null;
@@ -45,106 +81,172 @@ export class UsersRepository {
   /** 내부 사용자 ID로 users 레코드를 조회합니다. */
   async findById(userId: string): Promise<UserRecord | null> {
     const found = await this.db.query.users.findFirst({
-      where: eq(users.id, Number(userId)),
+      where: eq(users.userId, Number(userId)),
     });
 
     return found ? this.mapRowToUserRecord(found) : null;
   }
 
   /** 신규 users 레코드를 생성하고 생성 결과를 반환합니다. */
-  async insert(
-    input: Omit<UserRecord, "id" | "createdAt" | "updatedAt">,
-  ): Promise<UserRecord> {
+  async insert(input: UserUpsertInput): Promise<UserRecord> {
     const inserted = await this.db
       .insert(users)
       .values({
-        name: input.name,
-        permission: input.permission,
-        privacyConsentAt: input.privacyConsentAt
-          ? new Date(input.privacyConsentAt)
-          : null,
-        ssoUserId: input.ssoUserId,
-        userEmail: input.userEmail,
-        userMobile: input.userMobile,
+        academicStatus: input.academicStatus ?? null,
+        kaistUid: input.kaistUid,
+        lastLoginAt: input.lastLoginAt ?? new Date(),
+        nameEn: input.nameEn ?? null,
+        nameKo: input.nameKo,
+        ssoSubject: input.ssoSubject,
+        stdNo: input.stdNo ?? null,
+        departmentEn: input.departmentEn ?? null,
+        departmentKo: input.departmentKo ?? null,
+        email: input.email,
+        identityCode: input.identityCode ?? null,
+        isActive: input.isActive ?? true,
       })
       .returning();
 
     return this.mapRowToUserRecord(inserted[0]);
   }
 
-  /** 동의 사용자 정보를 ssoUserId 기준으로 생성/갱신합니다. */
-  async upsertConsentedUserBySso(input: {
-    consentedAt: string;
-    ssoUserId: string;
-    name?: string;
-    userEmail?: string;
-    userMobile?: string;
-  }): Promise<UserRecord> {
+  /** KAIST UID 기준으로 사용자 정보를 생성/갱신합니다. */
+  async upsertByKaistUid(input: UserUpsertInput): Promise<UserRecord> {
+    const insertValues: typeof users.$inferInsert = {
+      kaistUid: input.kaistUid,
+      ssoSubject: input.ssoSubject,
+      nameKo: input.nameKo,
+      email: input.email,
+      lastLoginAt: input.lastLoginAt ?? new Date(),
+      isActive: input.isActive ?? true,
+      nameEn: input.nameEn ?? null,
+      stdNo: input.stdNo ?? null,
+      departmentKo: input.departmentKo ?? null,
+      departmentEn: input.departmentEn ?? null,
+      academicStatus: input.academicStatus ?? null,
+      identityCode: input.identityCode ?? null,
+    };
+
+    const updateSet: typeof users.$inferInsert = {
+      email: input.email,
+      isActive: input.isActive ?? true,
+      kaistUid: input.kaistUid,
+      lastLoginAt: input.lastLoginAt ?? new Date(),
+      nameKo: input.nameKo,
+      ssoSubject: input.ssoSubject,
+      updatedAt: new Date(),
+      ...(input.nameEn !== undefined ? { nameEn: input.nameEn } : {}),
+      ...(input.stdNo !== undefined ? { stdNo: input.stdNo } : {}),
+      ...(input.departmentKo !== undefined
+        ? { departmentKo: input.departmentKo }
+        : {}),
+      ...(input.departmentEn !== undefined
+        ? { departmentEn: input.departmentEn }
+        : {}),
+      ...(input.academicStatus !== undefined
+        ? { academicStatus: input.academicStatus }
+        : {}),
+      ...(input.identityCode !== undefined
+        ? { identityCode: input.identityCode }
+        : {}),
+    };
+
     const upserted = await this.db
       .insert(users)
-      .values({
-        name: input.name ?? null,
-        privacyConsentAt: new Date(input.consentedAt),
-        ssoUserId: input.ssoUserId,
-        userEmail: input.userEmail ?? null,
-        userMobile: input.userMobile ?? null,
-      })
+      .values(insertValues)
       .onConflictDoUpdate({
-        target: users.ssoUserId,
-        set: {
-          name: sql`COALESCE(${users.name}, excluded.name)`,
-          userEmail: sql`COALESCE(${users.userEmail}, excluded.user_email)`,
-          userMobile: sql`COALESCE(${users.userMobile}, excluded.user_mobile)`,
-          privacyConsentAt: sql`COALESCE(${users.privacyConsentAt}, excluded.privacy_consent_at)`,
-          updatedAt: sql`NOW()`,
-        },
+        target: users.kaistUid,
+        set: updateSet,
       })
       .returning();
 
     return this.mapRowToUserRecord(upserted[0]);
   }
 
-  /** 개인정보 영구 저장 동의 시각을 기록합니다. */
-  async markConsent(userId: string, consentedAt: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({
-        privacyConsentAt: new Date(consentedAt),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, Number(userId)));
-  }
-
-  /** 이메일/휴대전화 필드만 선택적으로 갱신합니다. */
+  /** 이름/이메일을 선택적으로 갱신합니다. */
   async updateProfile(
     userId: string,
-    input: {
-      name?: string;
-      userEmail?: string;
-      userMobile?: string;
-    },
+    input: UserProfileUpdateInput,
   ): Promise<void> {
     const updateSet: {
+      academicStatus?: string | null;
+      departmentEn?: string | null;
+      departmentKo?: string | null;
       updatedAt: Date;
-      name?: string | null;
-      userEmail?: string | null;
-      userMobile?: string | null;
+      email?: string;
+      identityCode?: string | null;
+      lastLoginAt?: Date;
+      nameEn?: string | null;
+      nameKo?: string;
+      stdNo?: string | null;
     } = {
       updatedAt: new Date(),
     };
 
-    if (input.name !== undefined) {
-      updateSet.name = input.name;
+    if (input.nameKo !== undefined) {
+      updateSet.nameKo = input.nameKo;
     }
 
-    if (input.userEmail !== undefined) {
-      updateSet.userEmail = input.userEmail;
+    if (input.nameEn !== undefined) {
+      updateSet.nameEn = input.nameEn;
     }
 
-    if (input.userMobile !== undefined) {
-      updateSet.userMobile = input.userMobile;
+    if (input.email !== undefined) {
+      updateSet.email = input.email;
     }
 
-    await this.db.update(users).set(updateSet).where(eq(users.id, Number(userId)));
+    if (input.stdNo !== undefined) {
+      updateSet.stdNo = input.stdNo;
+    }
+
+    if (input.departmentKo !== undefined) {
+      updateSet.departmentKo = input.departmentKo;
+    }
+
+    if (input.departmentEn !== undefined) {
+      updateSet.departmentEn = input.departmentEn;
+    }
+
+    if (input.academicStatus !== undefined) {
+      updateSet.academicStatus = input.academicStatus;
+    }
+
+    if (input.identityCode !== undefined) {
+      updateSet.identityCode = input.identityCode;
+    }
+
+    if (input.lastLoginAt !== undefined) {
+      updateSet.lastLoginAt = input.lastLoginAt;
+    }
+
+    await this.db.update(users).set(updateSet).where(eq(users.userId, Number(userId)));
+  }
+
+  async resolvePermissionBitmaskByUserId(userId: string): Promise<number> {
+    const now = new Date();
+    const rows = await this.db
+      .select({
+        permissionBits: sql<number>`COALESCE(SUM(${permissions.bitValue}), 0)`,
+      })
+      .from(userRoleGroups)
+      .innerJoin(
+        roleGroupPermissions,
+        eq(userRoleGroups.roleGroupId, roleGroupPermissions.roleGroupId),
+      )
+      .innerJoin(
+        permissions,
+        eq(roleGroupPermissions.permissionId, permissions.permissionId),
+      )
+      .where(
+        and(
+          eq(userRoleGroups.userId, Number(userId)),
+          eq(userRoleGroups.isActive, true),
+          eq(permissions.isActive, true),
+          or(isNull(userRoleGroups.validFrom), lte(userRoleGroups.validFrom, now)),
+          or(isNull(userRoleGroups.validTo), gte(userRoleGroups.validTo, now)),
+        ),
+      );
+
+    return Number(rows[0]?.permissionBits ?? 0);
   }
 }

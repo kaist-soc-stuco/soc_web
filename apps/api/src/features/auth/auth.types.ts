@@ -21,9 +21,16 @@ export type StorageMode = "temporary" | "persisted";
  */
 export interface PendingSsoUser {
   expiresAt: number;
-  name?: string;
-  ssoUserId: string;
-  userEmail?: string;
+  ssoSubject: string;
+  kaistUid: string;
+  nameKo: string;
+  nameEn?: string;
+  email: string;
+  stdNo?: string;
+  departmentKo?: string;
+  departmentEn?: string;
+  academicStatus?: string;
+  identityCode?: string;
   userMobile?: string;
 }
 
