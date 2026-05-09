@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
+import type { CurrentUserResponse } from "@soc/contracts";
 
 import {
   clearStoredAuthState,
@@ -120,6 +121,9 @@ export function TreeLogin() {
     null,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
+    null,
+  );
   const [sessionSummary, setSessionSummary] = useState<{
     authenticated: boolean;
     canUsePersistentFeatures: boolean;
@@ -231,6 +235,27 @@ export function TreeLogin() {
     };
   }, [apiClient]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void apiClient
+      .getCurrentUser()
+      .then((response) => {
+        if (!cancelled) {
+          setCurrentUser(response);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentUser(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient]);
+
   const handleLogin = async () => {
     if (typeof window === "undefined") {
       return;
@@ -284,6 +309,7 @@ export function TreeLogin() {
       setSessionSummary({
         ...createEmptyAuthSession(),
       });
+      setCurrentUser(null);
 
       navigate("/login?status=success&reason=logged_out", { replace: true });
     } catch (error) {
@@ -294,6 +320,27 @@ export function TreeLogin() {
       );
     } finally {
       setLogoutLoading(false);
+    }
+  };
+
+  const handleDevLogin = async () => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await apiClient.loginWithMockSession();
+      clearStoredAuthState();
+      navigate("/admin/surveys", { replace: true });
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "개발용 로그인에 실패했습니다.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -389,6 +436,16 @@ export function TreeLogin() {
             >
               {loading ? "SSO 로그인 진행 중" : "SSO 로그인 시작"}
             </button>
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                onClick={() => void handleDevLogin()}
+                disabled={loading}
+                className="rounded-full border border-emerald-500 px-6 py-3 text-sm font-extrabold tracking-tight text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+              >
+                {loading ? "개발 로그인 중" : "개발용 SSO 우회 로그인"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => void handleLogout()}
@@ -487,6 +544,28 @@ export function TreeLogin() {
             </p>
             <p>userId: {sessionSummary?.userId ?? "없음"}</p>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-extrabold tracking-tight mb-4">
+            {currentUser?.authenticated ? "내 프로필 (전체 정보)" : "로그인된 사용자"}
+          </h2>
+          
+          {currentUser?.authenticated && currentUser.user ? (
+            <div className="flex flex-col gap-4">
+              {/* 객체 전체를 풀어서 보여주는 영역 */}
+              <div className="rounded-lg bg-gray-50 p-4 border border-gray-100 overflow-x-auto text-xs sm:text-sm font-mono">
+                <pre className="text-kaist-black whitespace-pre-wrap break-all">
+                  {JSON.stringify(currentUser.user, null, 2)}
+                </pre>
+              </div>
+            
+            </div>
+          ) : (
+            <p className="mt-4 text-sm font-medium leading-7 text-kaist-grey">
+              아직 로그인된 사용자가 없습니다. 로그인을 완료하면 여기에서 계정 정보를 확인할 수 있습니다.
+            </p>
+          )}
         </section>
       </div>
     </main>

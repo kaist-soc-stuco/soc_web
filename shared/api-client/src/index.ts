@@ -60,6 +60,11 @@ interface LoginResultResponse {
   userId?: string;
 }
 
+interface MockLoginResponse {
+  storageMode: "persisted";
+  userId: string;
+}
+
 interface AccessCheckResponse {
   mode: "persisted" | "temporary";
   ok: boolean;
@@ -118,6 +123,16 @@ const resolveSurveyBaseUrl = (normalizedBaseUrl: string): string => {
   return `${normalizedBaseUrl}/v1/surveys`;
 };
 
+const resolveRoleGroupsBaseUrl = (normalizedBaseUrl: string): string => {
+  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/role-groups`;
+  }
+  if (/\/api$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/role-groups`;
+  }
+  return `${normalizedBaseUrl}/v1/role-groups`;
+};
+
 const isAuthExpiredStatus = (status: number): boolean => status === 401 || status === 403;
 
 const redirectToLogin = (): void => {
@@ -150,6 +165,7 @@ export const createApiClient = ({
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
   const authBaseUrl = resolveAuthBaseUrl(normalizedBaseUrl);
   const surveyBaseUrl = resolveSurveyBaseUrl(normalizedBaseUrl);
+  const roleGroupsBaseUrl = resolveRoleGroupsBaseUrl(normalizedBaseUrl);
   let refreshInFlight: Promise<void> | null = null;
 
   const sendRefreshRequest = async (): Promise<void> => {
@@ -450,6 +466,16 @@ export const createApiClient = ({
       });
     },
 
+    loginWithMockSession: async (): Promise<MockLoginResponse> => {
+      return requestJson<MockLoginResponse>(`${authBaseUrl}/login/mock`, {
+        body: JSON.stringify({}),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      }, { retryOnUnauthorized: true });
+    },
+
     getHealth: async (): Promise<HealthResponse> => {
       return requestJson<HealthResponse>(`${normalizedBaseUrl}/health`, {
         method: "GET",
@@ -470,7 +496,7 @@ export const createApiClient = ({
 
     listPermissions: async (): Promise<PermissionRecord[]> => {
       return requestJson<PermissionRecord[]>(
-        `${normalizedBaseUrl}/v1/role-groups/permissions`,
+        `${roleGroupsBaseUrl}/permissions`,
         {
           method: "GET",
         },
@@ -480,7 +506,7 @@ export const createApiClient = ({
 
     listRoleGroups: async (): Promise<RoleGroupRecord[]> => {
       return requestJson<RoleGroupRecord[]>(
-        `${normalizedBaseUrl}/v1/role-groups`,
+        `${roleGroupsBaseUrl}`,
         {
           method: "GET",
         },
@@ -492,7 +518,7 @@ export const createApiClient = ({
       body: CreateRoleGroupRequest,
     ): Promise<RoleGroupRecord> => {
       return requestJson<RoleGroupRecord>(
-        `${normalizedBaseUrl}/v1/role-groups`,
+        `${roleGroupsBaseUrl}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -507,7 +533,7 @@ export const createApiClient = ({
       body: UpdateRoleGroupRequest,
     ): Promise<RoleGroupRecord> => {
       return requestJson<RoleGroupRecord>(
-        `${normalizedBaseUrl}/v1/role-groups/${roleGroupId}`,
+        `${roleGroupsBaseUrl}/${roleGroupId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -519,7 +545,7 @@ export const createApiClient = ({
 
     deleteRoleGroup: async (roleGroupId: number): Promise<void> => {
       const response = await fetcher(
-        `${normalizedBaseUrl}/v1/role-groups/${roleGroupId}`,
+        `${roleGroupsBaseUrl}/${roleGroupId}`,
         {
           credentials: "include",
           method: "DELETE",

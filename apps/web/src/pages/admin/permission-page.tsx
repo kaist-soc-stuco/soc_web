@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type { PermissionRecord, RoleGroupRecord } from "@soc/contracts";
 import { formatKoreanDateTime, hasPermission } from "@soc/shared";
@@ -240,24 +240,13 @@ export function PermissionPage() {
               </p>
 
               <div className="flex flex-wrap gap-3 pt-2">
-                <Link
-                  to="/admin/surveys"
-                  className="rounded-full bg-kaist-darkgreen px-5 py-3 text-sm font-extrabold text-kaist-white transition hover:bg-kaist-darkgreen2"
-                >
-                  설문조사 관리로 이동
-                </Link>
-                <Link
-                  to="/admin/surveys/new"
-                  className="rounded-full border border-kaist-darkgreen/20 px-5 py-3 text-sm font-extrabold text-kaist-darkgreen transition hover:bg-kaist-darkgreen/6"
-                >
-                  새 설문 만들기
-                </Link>
-                <Link
-                  to="/"
+                <button
+                  type="button"
+                  onClick={() => navigate("/")}
                   className="rounded-full border border-kaist-darkgreen/30 px-5 py-3 text-sm font-extrabold text-kaist-darkgreen transition hover:bg-kaist-darkgreen/6"
                 >
                   홈으로 돌아가기
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -301,44 +290,6 @@ export function PermissionPage() {
               </div>
             </div>
           </div>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-3">
-          {[
-            {
-              href: "/admin/surveys",
-              title: "설문조사 목록",
-              description: "설문을 확인하고 편집 페이지로 들어가는 기본 경로입니다.",
-            },
-            {
-              href: "/admin/surveys/:id/edit",
-              title: "설문조사 편집",
-              description: "설문 설정과 문항을 수정하는 화면입니다. SURVEY_MANAGE 권한이 필요합니다.",
-            },
-            {
-              href: "/admin/permissions",
-              title: "역할 그룹 / 권한",
-              description: "권한 비트를 확인하고, 설문 관리 권한이 있으면 역할 그룹을 수정할 수 있습니다.",
-            },
-          ].map((item) => (
-            <article
-              key={item.href}
-              className="rounded-2xl border border-kaist-grey/20 bg-white p-5 shadow-sm"
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-kaist-greygreen">
-                Access Path
-              </p>
-              <h2 className="mt-2 text-lg font-extrabold text-kaist-darkgreen">
-                {item.title}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-kaist-grey">
-                {item.description}
-              </p>
-              <p className="mt-3 rounded-full bg-kaist-darkgreen/5 px-3 py-1 text-xs font-semibold text-kaist-darkgreen">
-                {item.href}
-              </p>
-            </article>
-          ))}
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -412,7 +363,7 @@ export function PermissionPage() {
 
           {!canEditRoleGroups ? (
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-              역할 그룹 편집은 설문조사 관리 권한이 있는 계정에서만 가능합니다. 설문 편집으로 이동하려면 위의 "설문조사 관리로 이동" 버튼을 사용하세요.
+              역할 그룹 편집은 설문조사 관리 권한이 있는 계정에서만 가능합니다.
             </div>
           ) : (
             <div className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">

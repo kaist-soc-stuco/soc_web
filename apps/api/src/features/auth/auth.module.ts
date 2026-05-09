@@ -1,5 +1,6 @@
 import { Module, forwardRef } from "@nestjs/common";
 
+import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
 import { RedisModule } from "../../infrastructure/redis/redis.module";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
@@ -10,7 +11,7 @@ import { AuthService } from "./auth.service";
 import { AuthGuard } from "../../shared/guards";
 
 @Module({
-  imports: [RedisModule, forwardRef(() => UsersModule)],
+  imports: [PostgresModule, RedisModule, forwardRef(() => UsersModule)],
   controllers: [AuthController],
   providers: [
     AuthGuard,

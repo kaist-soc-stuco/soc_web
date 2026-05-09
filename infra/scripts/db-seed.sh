@@ -21,6 +21,7 @@ DATABASE_URL="${DATABASE_URL}"
 docker compose -p soc_web -f "$COMPOSE_FILE" up -d postgres
 
 cd "$ROOT_DIR"
+DATABASE_URL="$DATABASE_URL" pnpm --filter @soc/api db:migrate
 DATABASE_URL="$DATABASE_URL" pnpm --filter @soc/api db:seed
 
 echo "Seed completed"
