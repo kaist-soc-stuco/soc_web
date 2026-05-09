@@ -34,6 +34,10 @@ import type {
   SurveyRecord,
   SurveyResponseRecord,
   SurveySectionRecord,
+  PermissionRecord,
+  RoleGroupRecord,
+  CreateRoleGroupRequest,
+  UpdateRoleGroupRequest,
   UpdateQuestionRequest,
   UpdateSectionRequest,
   UpdateSurveyRequest,
@@ -462,6 +466,69 @@ export const createApiClient = ({
           retryOnUnauthorized: true,
         },
       );
+    },
+
+    listPermissions: async (): Promise<PermissionRecord[]> => {
+      return requestJson<PermissionRecord[]>(
+        `${normalizedBaseUrl}/v1/role-groups/permissions`,
+        {
+          method: "GET",
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    listRoleGroups: async (): Promise<RoleGroupRecord[]> => {
+      return requestJson<RoleGroupRecord[]>(
+        `${normalizedBaseUrl}/v1/role-groups`,
+        {
+          method: "GET",
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    createRoleGroup: async (
+      body: CreateRoleGroupRequest,
+    ): Promise<RoleGroupRecord> => {
+      return requestJson<RoleGroupRecord>(
+        `${normalizedBaseUrl}/v1/role-groups`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    updateRoleGroup: async (
+      roleGroupId: number,
+      body: UpdateRoleGroupRequest,
+    ): Promise<RoleGroupRecord> => {
+      return requestJson<RoleGroupRecord>(
+        `${normalizedBaseUrl}/v1/role-groups/${roleGroupId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    deleteRoleGroup: async (roleGroupId: number): Promise<void> => {
+      const response = await fetcher(
+        `${normalizedBaseUrl}/v1/role-groups/${roleGroupId}`,
+        {
+          credentials: "include",
+          method: "DELETE",
+        },
+      );
+
+      if (!response.ok) {
+        throw new ApiClientHttpError(response.status);
+      }
     },
 
     getSurveyDetail: async (surveyId: string): Promise<SurveyDetailResponse> => {

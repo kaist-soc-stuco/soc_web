@@ -67,6 +67,7 @@ export class UsersService {
     identityCode?: string;
     stdNo?: string;
     userMobile?: string;
+    consentedAt?: Date;
   }): Promise<UserRecord> {
     return this.usersRepository.upsertByKaistUid({
       academicStatus: input.academicStatus,
@@ -80,6 +81,7 @@ export class UsersService {
       stdNo: input.stdNo,
       email: input.email,
       lastLoginAt: new Date(),
+      privacyConsentAt: input.consentedAt ?? new Date(),
     });
   }
 

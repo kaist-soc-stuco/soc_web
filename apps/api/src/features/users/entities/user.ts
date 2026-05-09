@@ -7,7 +7,7 @@
  */
 export interface UserRecord {
   createdAt: string;
-  id: string;
+  userId: string;
   kaistUid: string;
   nameEn: string | null;
   nameKo: string;
@@ -18,6 +18,7 @@ export interface UserRecord {
   departmentKo: string | null;
   academicStatus: string | null;
   identityCode: string | null;
+  privacyConsentAt: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
   updatedAt: string;

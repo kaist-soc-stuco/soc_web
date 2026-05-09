@@ -10,6 +10,7 @@ import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
+import { hasSurveyManagePermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 type ReviewStatus = "approved" | "rejected" | "waitlisted";
@@ -69,6 +70,10 @@ export function SurveyResponseDetailPage() {
       const session = await getAuthSessionSummary(client);
       if (!hasPersistedProfile(session)) {
         navigate("/login");
+        return;
+      }
+      if (!hasSurveyManagePermission(session.permission)) {
+        navigate("/admin/permissions", { replace: true });
         return;
       }
       try {

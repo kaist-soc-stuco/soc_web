@@ -219,7 +219,7 @@ export class AuthService {
 
       if (existingUser) {
         if (nameKo || nameEn || userEmail) {
-          await this.usersService.updateProfileFromSso(existingUser.id, {
+          await this.usersService.updateProfileFromSso(existingUser.userId, {
             academicStatus,
             departmentEn,
             departmentKo,
@@ -232,7 +232,7 @@ export class AuthService {
         }
 
         const issued = await this.authSessionService.issuePersistedSession(
-          existingUser.id,
+          existingUser.userId,
         );
 
         const resultToken = randomUUID();
@@ -241,13 +241,13 @@ export class AuthService {
           refreshToken: issued.refreshToken,
           sessionId: issued.session.sessionId,
           storageMode: "persisted",
-          userId: existingUser.id,
+          userId: existingUser.userId,
         });
 
         return this.buildFrontendRedirect("success", "ok", {
           resultToken,
           storageMode: "persisted",
-          userId: existingUser.id,
+          userId: existingUser.userId,
         });
       }
 

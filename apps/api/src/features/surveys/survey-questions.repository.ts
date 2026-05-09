@@ -65,6 +65,8 @@ export class SurveyQuestionsRepository {
         isRequired: dto.isRequired ?? true,
         editDeadlineAt: dto.editDeadlineAt ? isoToDate(dto.editDeadlineAt) : null,
         sortOrder: dto.sortOrder ?? 0,
+        createdAt: nowDate(),
+        updatedAt: nowDate(),
       })
       .returning();
     return this.map(row);
@@ -89,6 +91,7 @@ export class SurveyQuestionsRepository {
     if (dto.isRequired !== undefined) set.isRequired = dto.isRequired;
     if (dto.editDeadlineAt !== undefined) set.editDeadlineAt = isoToDate(dto.editDeadlineAt);
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
+    set.updatedAt = nowDate();
 
     const [row] = await this.db
       .update(surveyQuestions)

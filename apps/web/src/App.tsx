@@ -8,6 +8,7 @@ import { SurveyListPage } from '@/pages/admin/survey-list-page';
 import { SurveyEditorPage } from '@/pages/admin/survey-editor-page';
 import { SurveyResponseListPage } from '@/pages/admin/survey-response-list-page';
 import { SurveyResponseDetailPage } from '@/pages/admin/survey-response-detail-page';
+import { PermissionPage } from '@/pages/admin/permission-page';
 
 export function App() {
   return (
@@ -19,6 +20,7 @@ export function App() {
         <Route path="/login" element={<TreeLogin />} />
         <Route path="/login/consent" element={<LoginConsentPage />} />
         <Route path="/admin/surveys" element={<SurveyListPage />} />
+        <Route path="/admin/permissions" element={<PermissionPage />} />
         <Route path="/admin/surveys/new" element={<SurveyEditorPage />} />
         <Route path="/admin/surveys/:id/edit" element={<SurveyEditorPage />} />
         <Route path="/admin/surveys/:id/responses" element={<SurveyResponseListPage />} />

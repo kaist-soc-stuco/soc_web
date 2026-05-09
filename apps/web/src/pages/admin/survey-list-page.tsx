@@ -7,6 +7,7 @@ import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
+import { hasSurveyManagePermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -37,6 +38,10 @@ export function SurveyListPage() {
       const session = await getAuthSessionSummary(client);
       if (!hasPersistedProfile(session)) {
         navigate("/login");
+        return;
+      }
+      if (!hasSurveyManagePermission(session.permission)) {
+        navigate("/admin/permissions", { replace: true });
         return;
       }
       try {
@@ -76,9 +81,14 @@ export function SurveyListPage() {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">설문조사 관리</h1>
-          <Button onClick={() => navigate("/admin/surveys/new")}>
-            + 새 설문조사
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/admin/permissions")}>
+              역할 그룹 / 권한
+            </Button>
+            <Button onClick={() => navigate("/admin/surveys/new")}>
+              + 새 설문조사
+            </Button>
+          </div>
         </div>
 
         {loading && <p className="text-gray-500">불러오는 중…</p>}

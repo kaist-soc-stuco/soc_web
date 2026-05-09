@@ -335,9 +335,10 @@ export class AuthSessionService {
         ssoSubject: pendingUser.ssoSubject,
         stdNo: pendingUser.stdNo,
         userMobile: pendingUser.userMobile,
+        consentedAt: new Date(),
       });
 
-      const issued = await this.issuePersistedSession(persistedUser.id);
+      const issued = await this.issuePersistedSession(persistedUser.userId);
       await this.pendingLoginRepository.delete(input.pendingLoginToken);
 
       return {
@@ -345,7 +346,7 @@ export class AuthSessionService {
         refreshToken: issued.refreshToken,
         sessionId: issued.session.sessionId,
         storageMode: "persisted",
-        userId: persistedUser.id,
+        userId: persistedUser.userId,
       };
     }
 
@@ -390,7 +391,9 @@ export class AuthSessionService {
     let permission: number | undefined;
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
-      permission = user?.permission;
+      permission = user
+        ? await this.usersService.resolvePermissionBitmaskByUserId(user.userId)
+        : undefined;
     }
 
     return {
@@ -430,9 +433,9 @@ export class AuthSessionService {
         authenticated: true,
         storageMode: "persisted",
         user: {
-          id: user.id,
+          id: user.userId,
           permission:
-            await this.usersService.resolvePermissionBitmaskByUserId(user.id),
+            await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
         },
       };
     } catch {

@@ -40,7 +40,11 @@ export class OptionalAuthGuard implements CanActivate {
 
     const user = await this.usersService.findById(session.userId);
     if (user) {
-      request.user = { id: user.id, permission: user.permission };
+      request.user = {
+        id: user.userId,
+        permission:
+          await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
+      };
     }
 
     return true;

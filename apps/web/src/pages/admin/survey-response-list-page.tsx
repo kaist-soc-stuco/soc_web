@@ -6,6 +6,7 @@ import { formatKoreanDateTime } from "@soc/shared";
 import { Header } from "@/components/organisms/header";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
+import { hasSurveyManagePermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -39,6 +40,10 @@ export function SurveyResponseListPage() {
       const session = await getAuthSessionSummary(client);
       if (!hasPersistedProfile(session)) {
         navigate("/login");
+        return;
+      }
+      if (!hasSurveyManagePermission(session.permission)) {
+        navigate("/admin/permissions", { replace: true });
         return;
       }
       try {

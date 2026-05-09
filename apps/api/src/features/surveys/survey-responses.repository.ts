@@ -20,12 +20,12 @@ export class SurveyResponsesRepository {
     return {
       id: row.id,
       surveyId: row.surveyId,
-      userId: row.userId,
+      userId: row.userId ? String(row.userId) : null,
       externalPhone: row.externalPhone,
       status: row.status as ResponseStatus,
       submittedAt: row.submittedAt ? row.submittedAt.toISOString() : null,
       reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
-      reviewAdminId: row.reviewAdminId,
+      reviewAdminId: row.reviewAdminId ? String(row.reviewAdminId) : null,
       reviewReason: row.reviewReason,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -79,10 +79,12 @@ export class SurveyResponsesRepository {
       .insert(surveyResponses)
       .values({
         surveyId: input.surveyId,
-        userId: input.userId ?? null,
+        userId: input.userId ? Number(input.userId) : null,
         externalPhone: input.externalPhone ?? null,
         status: "submitted",
+        createdAt: nowDate(),
         submittedAt: nowDate(),
+        updatedAt: nowDate(),
       })
       .returning();
     return this.mapResponse(row);
@@ -118,7 +120,7 @@ export class SurveyResponsesRepository {
       .update(surveyResponses)
       .set({
         status,
-        reviewAdminId,
+        reviewAdminId: Number(reviewAdminId),
         reviewReason: reason ?? null,
         reviewedAt: nowDate(),
         updatedAt: nowDate(),

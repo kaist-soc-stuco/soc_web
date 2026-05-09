@@ -12,6 +12,7 @@ import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
+import { hasSurveyManagePermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 // ─── 타입 정의 ────────────────────────────────────────────────────────────────
@@ -322,6 +323,10 @@ export function SurveyEditorPage() {
         navigate("/login");
         return;
       }
+      if (!hasSurveyManagePermission(session.permission)) {
+        navigate("/admin/permissions?source=survey-edit", { replace: true });
+        return;
+      }
 
       if (isEdit && surveyId) {
         try {
@@ -603,6 +608,17 @@ export function SurveyEditorPage() {
           <h1 className="text-xl font-bold text-gray-900">
             {isEdit ? "설문조사 편집" : "새 설문조사"}
           </h1>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+          설문 설정과 문항을 수정하려면 설문조사 관리 권한(SURVEY_MANAGE)이 필요합니다. 권한이 없다면 <button
+            type="button"
+            onClick={() => navigate("/admin/permissions")}
+            className="font-semibold underline underline-offset-2"
+          >
+            /admin/permissions
+          </button>
+          에서 역할 그룹을 조정한 뒤 다시 열어주세요.
         </div>
 
         {error && <p className="mb-4 text-red-500 text-sm">{error}</p>}

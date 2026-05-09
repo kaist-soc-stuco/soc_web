@@ -29,6 +29,7 @@ type UserUpsertInput = {
   email: string;
   identityCode?: string | null;
   isActive?: boolean;
+  privacyConsentAt?: Date | null;
 };
 
 type UserProfileUpdateInput = {
@@ -54,7 +55,7 @@ export class UsersRepository {
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
       createdAt: row.createdAt.toISOString(),
-      id: String(row.userId),
+      userId: String(row.userId),
       kaistUid: row.kaistUid,
       nameEn: row.nameEn,
       nameKo: row.nameKo,
@@ -65,6 +66,7 @@ export class UsersRepository {
       departmentKo: row.departmentKo ?? null,
       academicStatus: row.academicStatus ?? null,
       identityCode: row.identityCode ?? null,
+      privacyConsentAt: row.privacyConsentAt ? row.privacyConsentAt.toISOString() : null,
       isActive: row.isActive,
       lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
       updatedAt: row.updatedAt.toISOString(),
@@ -106,6 +108,7 @@ export class UsersRepository {
         email: input.email,
         identityCode: input.identityCode ?? null,
         isActive: input.isActive ?? true,
+        privacyConsentAt: input.privacyConsentAt ?? null,
       })
       .returning();
 
@@ -127,6 +130,7 @@ export class UsersRepository {
       departmentEn: input.departmentEn ?? null,
       academicStatus: input.academicStatus ?? null,
       identityCode: input.identityCode ?? null,
+      privacyConsentAt: input.privacyConsentAt ?? null,
     };
 
     const updateSet: typeof users.$inferInsert = {
@@ -151,6 +155,9 @@ export class UsersRepository {
       ...(input.identityCode !== undefined
         ? { identityCode: input.identityCode }
         : {}),
+      ...(input.privacyConsentAt !== undefined
+        ? { privacyConsentAt: input.privacyConsentAt }
+        : {}),
     };
 
     const upserted = await this.db
@@ -173,7 +180,7 @@ export class UsersRepository {
   //       privacyConsentAt: isoToDate(consentedAt),
   //       updatedAt: nowDate(),
   //     })
-  //     .where(eq(users.id, userId));
+  //     .where(eq(users.userId, Number(userId)));
   // }
 
   /** 이메일/휴대전화 필드만 선택적으로 갱신합니다. */
