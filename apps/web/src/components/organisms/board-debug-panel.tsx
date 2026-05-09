@@ -75,9 +75,9 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
     setBoardCode(defaultBoardCode);
   }, [defaultBoardCode]);
 
-  if (!(import.meta.env.DEV || import.meta.env.VITE_ENABLE_BOARD_DEBUG === "true")) {
-    return null;
-  }
+  // if (!(import.meta.env.DEV || import.meta.env.VITE_ENABLE_BOARD_DEBUG === "true")) {
+  //   return null;
+  // }
 
   const runAction = async (label: string, action: () => Promise<unknown>) => {
     setLoadingLabel(label);

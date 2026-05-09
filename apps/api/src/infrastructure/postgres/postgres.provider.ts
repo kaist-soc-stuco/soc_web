@@ -15,11 +15,11 @@ const postgresPoolProvider: Provider = {
   inject: [ConfigService],
   useFactory: (configService: ConfigService): Pool => {
     return new Pool({
-      host: configService.get<string>('POSTGRES_HOST', 'localhost'),
-      port: configService.get<number>('POSTGRES_PORT', 5432),
-      database: configService.get<string>('POSTGRES_DB', 'soc_web'),
-      user: configService.get<string>('POSTGRES_USER', 'soc'),
-      password: configService.get<string>('POSTGRES_PASSWORD', 'soc'),
+      host: configService.getOrThrow<string>('POSTGRES_HOST'),
+      port: configService.getOrThrow<number>('POSTGRES_PORT'),
+      database: configService.getOrThrow<string>('POSTGRES_DB'),
+      user: configService.getOrThrow<string>('POSTGRES_USER'),
+      password: configService.getOrThrow<string>('POSTGRES_PASSWORD'),
       max: 10,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5_000,

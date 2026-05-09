@@ -3,8 +3,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { and, eq } from "drizzle-orm";
 import { articles, boards, users } from "../src/infrastructure/postgres/postgres.schema";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL;
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL || DATABASE_URL.trim().length === 0) {
+  throw new Error("DATABASE_URL is required for seeding");
+}
 
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
@@ -214,7 +217,6 @@ async function seedNoticeArticle() {
     .insert(users)
     .values({
       ssoUserId: "seed-notice-author",
-      name: "seed-notice-author",
       permission: 1,
       userEmail: null,
       userMobile: null,
@@ -223,7 +225,6 @@ async function seedNoticeArticle() {
     .onConflictDoUpdate({
       target: users.ssoUserId,
       set: {
-        name: "seed-notice-author",
         permission: 1,
         updatedAt: new Date(),
       },
