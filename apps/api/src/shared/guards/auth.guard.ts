@@ -58,9 +58,9 @@ export class AuthGuard implements CanActivate {
     }
 
     request.user = {
-      id: user.id,
+      id: user.userId,
       permission:
-        await this.usersService.resolvePermissionBitmaskByUserId(user.id),
+        await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
     };
 
     return true;

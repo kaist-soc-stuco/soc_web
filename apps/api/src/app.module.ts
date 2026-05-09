@@ -8,6 +8,7 @@ import { HealthModule } from './features/health/health.module';
 import { MockModule } from './features/mock/mock.module';
 import { SurveysModule } from './features/surveys/surveys.module';
 import { UsersModule } from './features/users/users.module';
+import { RoleGroupsModule } from "./features/role-groups/role-groups.module";
 import { PostgresModule } from './infrastructure/postgres/postgres.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { validateEnv } from './shared/config/env.validation';
@@ -33,6 +34,7 @@ import { AssetModule } from "./features/asset/asset.module";
     BoardModule,
     UsersModule,
     SurveysModule,
+    RoleGroupsModule,
     HealthModule,
     MockModule,
   ],

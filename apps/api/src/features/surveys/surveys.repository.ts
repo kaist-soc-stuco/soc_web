@@ -18,20 +18,20 @@ export class SurveysRepository {
 
   private map(row: typeof surveys.$inferSelect): SurveyRecord {
     return {
-      id: row.id,
+      id: row.surveyId,
       titleKo: row.titleKo,
-      titleEn: row.titleEn,
+      titleEn: row.titleEn ?? "",
       descriptionKo: row.descriptionKo,
       descriptionEn: row.descriptionEn,
-      creatorId: row.creatorId,
-      status: row.status as SurveyRecord["status"],
-      publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
-      connectedPostId: row.connectedPostId,
-      feePayersOnly: row.feePayersOnly,
-      allowAnonymous: row.allowAnonymous,
-      maxResponses: row.maxResponses,
-      opensAt: row.opensAt ? row.opensAt.toISOString() : null,
-      closesAt: row.closesAt ? row.closesAt.toISOString() : null,
+      creatorId: row.creatorId ? String(row.creatorId) : null,
+      status: row.status.toLowerCase() as SurveyRecord["status"],
+      publishedAt: null,
+      connectedPostId: row.connectedArticleId ? String(row.connectedArticleId) : null,
+      feePayersOnly: row.feeRequirementPolicy === "PAID_ONLY",
+      allowAnonymous: row.allowGuestResponse,
+      maxResponses: row.maxResponseCount,
+      opensAt: row.openAt ? row.openAt.toISOString() : null,
+      closesAt: row.closeAt ? row.closeAt.toISOString() : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -44,7 +44,7 @@ export class SurveysRepository {
 
   async findById(id: string): Promise<SurveyRecord | null> {
     const row = await this.db.query.surveys.findFirst({
-      where: eq(surveys.id, id),
+      where: eq(surveys.surveyId, id),
     });
     return row ? this.map(row) : null;
   }
@@ -53,17 +53,21 @@ export class SurveysRepository {
     const [row] = await this.db
       .insert(surveys)
       .values({
+        creatorId: Number(creatorId),
+        kind: "SURVEY",
         titleKo: dto.titleKo,
         titleEn: dto.titleEn,
         descriptionKo: dto.descriptionKo ?? null,
         descriptionEn: dto.descriptionEn ?? null,
-        creatorId,
-        feePayersOnly: dto.feePayersOnly ?? false,
-        allowAnonymous: dto.allowAnonymous ?? false,
-        maxResponses: dto.maxResponses ?? null,
-        opensAt: dto.opensAt ? isoToDate(dto.opensAt) : null,
-        closesAt: dto.closesAt ? isoToDate(dto.closesAt) : null,
-        connectedPostId: dto.connectedPostId ?? null,
+        status: "DRAFT",
+        feeRequirementPolicy: dto.feePayersOnly ? "PAID_ONLY" : "NONE",
+        allowGuestResponse: dto.allowAnonymous ?? false,
+        resultVisibility: "PUBLIC",
+        maxResponseCount: dto.maxResponses ?? null,
+        openAt: dto.opensAt ? isoToDate(dto.opensAt) : null,
+        closeAt: dto.closesAt ? isoToDate(dto.closesAt) : null,
+        connectedArticleId: dto.connectedPostId ? Number(dto.connectedPostId) : null,
+        updatedAt: nowDate(),
       })
       .returning();
     return this.map(row);
@@ -82,32 +86,35 @@ export class SurveysRepository {
     if (dto.titleEn !== undefined) set.titleEn = dto.titleEn;
     if (dto.descriptionKo !== undefined) set.descriptionKo = dto.descriptionKo;
     if (dto.descriptionEn !== undefined) set.descriptionEn = dto.descriptionEn;
-    if (dto.status !== undefined) set.status = dto.status;
-    if (dto.feePayersOnly !== undefined) set.feePayersOnly = dto.feePayersOnly;
-    if (dto.allowAnonymous !== undefined) set.allowAnonymous = dto.allowAnonymous;
-    if (dto.maxResponses !== undefined) set.maxResponses = dto.maxResponses;
-    if (dto.opensAt !== undefined) set.opensAt = isoToDate(dto.opensAt);
-    if (dto.closesAt !== undefined) set.closesAt = isoToDate(dto.closesAt);
-    if (dto.connectedPostId !== undefined) set.connectedPostId = dto.connectedPostId;
-    if (publishedAt !== undefined) set.publishedAt = isoToDate(publishedAt);
+    if (dto.status !== undefined) set.status = dto.status.toUpperCase();
+    if (dto.feePayersOnly !== undefined) {
+      set.feeRequirementPolicy = dto.feePayersOnly ? "PAID_ONLY" : "NONE";
+    }
+    if (dto.allowAnonymous !== undefined) set.allowGuestResponse = dto.allowAnonymous;
+    if (dto.maxResponses !== undefined) set.maxResponseCount = dto.maxResponses;
+    if (dto.opensAt !== undefined) set.openAt = isoToDate(dto.opensAt);
+    if (dto.closesAt !== undefined) set.closeAt = isoToDate(dto.closesAt);
+    if (dto.connectedPostId !== undefined) {
+      set.connectedArticleId = dto.connectedPostId ? Number(dto.connectedPostId) : null;
+    }
 
     const [row] = await this.db
       .update(surveys)
       .set(set)
-      .where(eq(surveys.id, id))
+      .where(eq(surveys.surveyId, id))
       .returning();
     return row ? this.map(row) : null;
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.delete(surveys).where(eq(surveys.id, id));
+    await this.db.delete(surveys).where(eq(surveys.surveyId, id));
   }
 
   async countPublished(surveyId: string): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(surveys)
-      .where(eq(surveys.id, surveyId));
+      .where(eq(surveys.surveyId, surveyId));
     return result[0]?.count ?? 0;
   }
 }

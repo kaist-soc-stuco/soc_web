@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   nameKo: varchar("name_ko", { length: 100 }).notNull(),
   nameEn: varchar("name_en", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
+  privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }),
   
   departmentKo: varchar("dept_ko", { length: 100 }),
   departmentEn: varchar("dept_en", { length: 100 }),
@@ -122,6 +123,8 @@ export const surveyQuestions = pgTable("survey_questions", {
   isRequired: boolean("is_required").notNull().default(true),
   editDeadlineAt: timestamp("edit_deadline_at", { withTimezone: true }),
   sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const roleGroupPermissions = pgTable("role_group_permission", {
