@@ -29,7 +29,7 @@ async function bootstrap(): Promise<void> {
     exclude: [{ path: 'health', method: RequestMethod.GET }],
   });
 
-  const port = configService.get<number>('API_PORT') ?? 3000;
+  const port = configService.getOrThrow<number>('API_PORT');
   await app.listen(port);
 
   // eslint-disable-next-line no-console

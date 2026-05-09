@@ -14,14 +14,10 @@ export const resolveApiBaseUrl = (): string => {
     import.meta.env.VITE_SSO_START_URL as string | undefined
   )?.trim();
   if (startUrl) {
-    try {
-      const parsed = new URL(startUrl);
-      const path = parsed.pathname.replace(/\/auth\/login\/start$/, "");
-      return `${parsed.origin}${path}`;
-    } catch {
-      return "/api";
-    }
+    const parsed = new URL(startUrl);
+    const path = parsed.pathname.replace(/\/auth\/login\/start$/, "");
+    return `${parsed.origin}${path}`;
   }
 
-  return "/api";
+  throw new Error("Missing VITE_API_BASE_URL or VITE_SSO_START_URL");
 };
