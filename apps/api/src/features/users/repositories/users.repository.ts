@@ -85,7 +85,7 @@ export class UsersRepository {
   /** 내부 사용자 ID로 users 레코드를 조회합니다. */
   async findById(userId: string): Promise<UserRecord | null> {
     const found = await this.db.query.users.findFirst({
-      where: eq(users.userId, Number(userId)),
+      where: eq(users.userId, userId),
     });
 
     return found ? this.mapRowToUserRecord(found) : null;
@@ -238,7 +238,7 @@ export class UsersRepository {
       updateSet.lastLoginAt = input.lastLoginAt;
     }
 
-    await this.db.update(users).set(updateSet).where(eq(users.userId, Number(userId)));
+    await this.db.update(users).set(updateSet).where(eq(users.userId, userId));
   }
 
   async searchUsers(query: string | undefined, limit = 20): Promise<AdminUserRecord[]> {
@@ -295,7 +295,7 @@ export class UsersRepository {
       )
       .where(
         and(
-          eq(userRoleGroups.userId, Number(userId)),
+          eq(userRoleGroups.userId, userId),
           eq(userRoleGroups.isActive, true),
           eq(permissions.isActive, true),
           or(isNull(userRoleGroups.validFrom), lte(userRoleGroups.validFrom, now)),
@@ -306,7 +306,7 @@ export class UsersRepository {
     return Number(rows[0]?.permissionBits ?? 0);
   }
 
-  async getStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord | null> {
+  async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
     const found = await this.db
       .select()
       .from(studentFeeStatus)
@@ -331,7 +331,7 @@ export class UsersRepository {
   }
 
   async updateStudentFeeStatus(
-    userId: number,
+    userId: string,
     input: {
       status: FeeStatus;
       coverageSemesters?: number;
@@ -372,7 +372,7 @@ export class UsersRepository {
     return this.getStudentFeeStatus(userId) as Promise<StudentFeeStatusRecord>;
   }
 
-  async ensureStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord> {
+  async ensureStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord> {
     const existing = await this.getStudentFeeStatus(userId);
     if (existing) return existing;
 

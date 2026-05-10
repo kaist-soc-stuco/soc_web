@@ -16,7 +16,7 @@ export function FeeManagementPage() {
   const [selectedStatus, setSelectedStatus] = useState<FeeStatus | undefined>(undefined);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
-  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<FeeStatus>('UNPAID');
   const [editNote, setEditNote] = useState('');
   const students = feeData?.students ?? [];
@@ -54,13 +54,13 @@ export function FeeManagementPage() {
     }
   };
 
-  const handleEditClick = (userId: number, status: FeeStatus, note: string | null) => {
+  const handleEditClick = (userId: string, status: FeeStatus, note: string | null) => {
     setEditingUserId(userId);
     setEditStatus(status);
     setEditNote(note || '');
   };
 
-  const handleSaveClick = async (userId: number) => {
+  const handleSaveClick = async (userId: string) => {
     try {
       await apiClient.updateStudentFeeStatus(userId, {
         status: editStatus,

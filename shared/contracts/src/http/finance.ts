@@ -5,7 +5,7 @@
 export type FeeStatus = "PAID" | "UNPAID" | "WAIVED";
 
 export interface StudentFeeStatusRecord {
-  userId: number;
+  userId: string;
   status: FeeStatus;
   coverageSemesters: number;
   paidAt: string | null;
@@ -23,7 +23,7 @@ export interface UpdateStudentFeeStatusRequest {
 
 export interface StudentFeeListResponse {
   students: Array<{
-    userId: number;
+    userId: string;
     nameKo: string;
     nameEn?: string;
     stdNo?: string;

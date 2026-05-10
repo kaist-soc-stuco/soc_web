@@ -86,12 +86,12 @@ export class UsersService {
     await this.usersRepository.updateProfile(userId, input);
   }
 
-  async getStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord | null> {
+  async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
     return this.usersRepository.getStudentFeeStatus(userId);
   }
 
   async updateStudentFeeStatus(
-    userId: number,
+    userId: string,
     input: {
       status: FeeStatus;
       coverageSemesters?: number;
@@ -102,7 +102,7 @@ export class UsersService {
     return this.usersRepository.updateStudentFeeStatus(userId, input);
   }
 
-  async ensureStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord> {
+  async ensureStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord> {
     return this.usersRepository.ensureStudentFeeStatus(userId);
   }
 

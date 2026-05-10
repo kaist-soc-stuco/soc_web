@@ -45,7 +45,7 @@ export class RoleGroupsController {
   @Post(":roleGroupId/users")
   addMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
-    @Body("userId", ParseIntPipe) userId: number,
+    @Body("userId", ParseIntPipe) userId: string,
     @Req() request: Request & { user?: { id: string } },
   ) {
     return this.roleGroupsService.addUserToRoleGroup(
@@ -58,7 +58,7 @@ export class RoleGroupsController {
   @Delete(":roleGroupId/users/:userId")
   removeMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
-    @Param("userId", ParseIntPipe) userId: number,
+    @Param("userId", ParseIntPipe) userId: string,
   ) {
     return this.roleGroupsService.removeUserFromRoleGroup(roleGroupId, userId);
   }

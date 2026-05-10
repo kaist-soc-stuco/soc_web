@@ -64,7 +64,7 @@ export class UsersController {
   @Get(":userId/fee-status")
   @UseGuards(AuthGuard, PermissionGuard)
   @RequirePermission(PermissionFlags.MANAGE_FINANCE)
-  async getStudentFeeStatus(@Param("userId", ParseIntPipe) userId: number) {
+  async getStudentFeeStatus(@Param("userId", ParseIntPipe) userId: string) {
     const status = await this.usersService.getStudentFeeStatus(userId);
     if (!status) {
       // 없으면 기본값으로 생성
@@ -77,7 +77,7 @@ export class UsersController {
   @UseGuards(AuthGuard, PermissionGuard)
   @RequirePermission(PermissionFlags.MANAGE_FINANCE)
   async updateStudentFeeStatus(
-    @Param("userId", ParseIntPipe) userId: number,
+    @Param("userId", ParseIntPipe) userId: string,
     @Body() body: UpdateStudentFeeStatusRequest,
   ) {
     return this.usersService.updateStudentFeeStatus(userId, body);
