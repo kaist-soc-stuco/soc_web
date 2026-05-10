@@ -140,7 +140,9 @@ CREATE TABLE "survey_questions" (
 	"answer_regex" text,
 	"is_required" boolean DEFAULT true NOT NULL,
 	"edit_deadline_at" timestamp with time zone,
-	"sort_order" integer DEFAULT 0 NOT NULL
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "survey_responses" (
@@ -202,12 +204,12 @@ CREATE TABLE "user_role_group" (
 --> statement-breakpoint
 CREATE TABLE "users" (
 	"user_id" serial PRIMARY KEY NOT NULL,
-	"sso_subject" varchar(100) NOT NULL,
 	"kaist_uid" varchar(20) NOT NULL,
 	"std_no" varchar(20),
 	"name_ko" varchar(100) NOT NULL,
 	"name_en" varchar(100),
 	"email" varchar(255) NOT NULL,
+	"privacy_consent_at" timestamp with time zone,
 	"dept_ko" varchar(100),
 	"dept_en" varchar(100),
 	"academic_status" varchar(20),
@@ -216,7 +218,6 @@ CREATE TABLE "users" (
 	"last_login_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "users_sso_subject_unique" UNIQUE("sso_subject"),
 	CONSTRAINT "users_kaist_uid_unique" UNIQUE("kaist_uid"),
 	CONSTRAINT "users_std_no_unique" UNIQUE("std_no"),
 	CONSTRAINT "users_email_unique" UNIQUE("email")

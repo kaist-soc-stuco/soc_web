@@ -19,7 +19,6 @@ import {
 
 export const users = pgTable("users", {
   userId: serial("user_id").primaryKey(),
-  ssoSubject: varchar("sso_subject", { length: 100 }).notNull().unique(),
   kaistUid: varchar("kaist_uid", { length: 20 }).notNull().unique(),
   stdNo: varchar("std_no", { length: 20 }).unique(),
   nameKo: varchar("name_ko", { length: 100 }).notNull(),
@@ -162,7 +161,7 @@ export const studentFeeStatus = pgTable("student_fee_status", {
     .primaryKey()
     .references(() => users.userId),
   coverageSemesters: smallint("coverage_semesters").notNull().default(4),
-  status: varchar("status", { length: 20 }).notNull(), // PAID, UNPAID, WAIVED, UNKNOWN
+  status: varchar("status", { length: 20 }).notNull(), // PAID, UNPAID, WAIVED
   paidAt: timestamp("paid_at", { withTimezone: true }),
   verifiedBy: integer("verified_by")
     .references(() => users.userId),

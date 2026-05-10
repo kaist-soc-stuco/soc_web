@@ -2,8 +2,8 @@ import { Injectable } from "@nestjs/common";
 
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
-import type { AdminUserRecord } from "@soc/contracts";
-import { nowDate, nowIso } from "@soc/shared";
+import type { AdminUserRecord, StudentFeeStatusRecord, FeeStatus } from "@soc/contracts";
+import { nowDate } from "@soc/shared";
 
 /**
  * PostgreSQL user 저장/조회 로직을 담당합니다.
@@ -24,44 +24,10 @@ export class UsersService {
     return this.usersRepository.findById(userId);
   }
 
-  /**
-   * SSO userInfo를 바탕으로 새 사용자를 저장합니다.
-   */
-  async createFromSsoUser(input: {
-    kaistUid: string;
-    nameEn?: string;
-    nameKo: string;
-    ssoSubject: string;
-    email: string;
-    academicStatus?: string | null;
-    departmentEn?: string | null;
-    departmentKo?: string | null;
-    identityCode?: string | null;
-    isActive?: boolean;
-    lastLoginAt?: Date;
-    stdNo?: string | null;
-  }): Promise<UserRecord> {
-    return this.usersRepository.insert({
-      academicStatus: input.academicStatus ?? null,
-      kaistUid: input.kaistUid,
-      nameEn: input.nameEn ?? null,
-      nameKo: input.nameKo,
-      ssoSubject: input.ssoSubject,
-      stdNo: input.stdNo ?? null,
-      departmentEn: input.departmentEn ?? null,
-      departmentKo: input.departmentKo ?? null,
-      email: input.email,
-      identityCode: input.identityCode ?? null,
-      isActive: input.isActive,
-      lastLoginAt: input.lastLoginAt,
-    });
-  }
-
   async upsertUserFromConsent(input: {
     kaistUid: string;
     nameEn?: string;
     nameKo: string;
-    ssoSubject: string;
     email: string;
     academicStatus?: string;
     departmentEn?: string;
@@ -80,7 +46,6 @@ export class UsersService {
       identityCode: input.identityCode,
       nameEn: input.nameEn,
       nameKo: input.nameKo,
-      ssoSubject: input.ssoSubject,
       stdNo: input.stdNo,
       email: input.email,
       lastLoginAt: now,
@@ -119,5 +84,33 @@ export class UsersService {
     },
   ): Promise<void> {
     await this.usersRepository.updateProfile(userId, input);
+  }
+
+  async getStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord | null> {
+    return this.usersRepository.getStudentFeeStatus(userId);
+  }
+
+  async updateStudentFeeStatus(
+    userId: number,
+    input: {
+      status: FeeStatus;
+      coverageSemesters?: number;
+      note?: string | null;
+      verifiedBy?: number;
+    },
+  ): Promise<StudentFeeStatusRecord> {
+    return this.usersRepository.updateStudentFeeStatus(userId, input);
+  }
+
+  async ensureStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord> {
+    return this.usersRepository.ensureStudentFeeStatus(userId);
+  }
+
+  async listStudentsByFeeStatus(
+    status?: FeeStatus,
+    page?: number,
+    pageSize?: number,
+  ): Promise<{ students: any[]; total: number; page: number; pageSize: number }> {
+    return this.usersRepository.listStudentsByFeeStatus(status, page, pageSize);
   }
 }

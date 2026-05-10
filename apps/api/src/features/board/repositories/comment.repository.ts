@@ -18,7 +18,7 @@ import {
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { COMMENT_STATUS } from "../board.constants";
-import { msToIso, nowDate, nowIso } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 @Injectable()
 export class CommentRepository {

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
-import { isoToDate, nowDate } from "@soc/shared";
+import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -30,10 +30,10 @@ export class SurveysRepository {
       feePayersOnly: row.feeRequirementPolicy === "PAID_ONLY",
       allowAnonymous: row.allowGuestResponse,
       maxResponses: row.maxResponseCount,
-      opensAt: row.openAt ? row.openAt.toISOString() : null,
-      closesAt: row.closeAt ? row.closeAt.toISOString() : null,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      opensAt: row.openAt ? msToIso(row.openAt.valueOf()) : null,
+      closesAt: row.closeAt ? msToIso(row.closeAt.valueOf()) : null,
+      createdAt: msToIso(row.createdAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 

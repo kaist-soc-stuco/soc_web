@@ -283,9 +283,9 @@ async function seedNoticeArticle() {
   }
 
   const seedAuthorResult = await db.execute<{ userId: number }>(sql`
-    insert into users (sso_subject, kaist_uid, name_ko, email, is_active)
-    values ('seed-notice-author', 'seed-notice-author', '관리자', 'admin@kaist.ac.kr', true)
-    on conflict (sso_subject)
+    insert into users (kaist_uid, name_ko, email, is_active)
+    values ('seed-notice-author', '관리자', 'admin@kaist.ac.kr', true)
+    on conflict (kaist_uid)
     do update
       set name_ko = excluded.name_ko,
           email = excluded.email,

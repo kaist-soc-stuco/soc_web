@@ -121,7 +121,6 @@ export class AuthController {
       identityCode: "S",
       nameEn: "Development Admin",
       nameKo: "개발 관리자",
-      ssoSubject: "dev-mock-admin",
       stdNo: "20260001",
     });
 
@@ -139,7 +138,13 @@ export class AuthController {
       )
       .limit(1);
 
-    if (!adminPermission || !surveyManagePermission) {
+    const [financePermission] = await this.db
+      .select({ permissionId: permissions.permissionId })
+      .from(permissions)
+      .where(eq(permissions.code, "MANAGE_FINANCE"))
+      .limit(1);
+
+    if (!adminPermission || !surveyManagePermission || !financePermission) {
       throw new ForbiddenException("admin_permission_missing");
     }
 
@@ -178,6 +183,10 @@ export class AuthController {
         },
         {
           permissionId: surveyManagePermission.permissionId,
+          roleGroupId: existingRoleGroup.roleGroupId,
+        },
+        {
+          permissionId: financePermission.permissionId,
           roleGroupId: existingRoleGroup.roleGroupId,
         },
       ])

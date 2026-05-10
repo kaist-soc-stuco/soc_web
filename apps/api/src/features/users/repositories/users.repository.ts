@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 
-import { isoToDate, nowDate, nowIso } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 
 import {
@@ -10,19 +10,19 @@ import {
 import {
   permissions,
   roleGroupPermissions,
+  studentFeeStatus,
   userRoleGroups,
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
-import type { AdminUserRecord } from "@soc/contracts";
+import type { AdminUserRecord, StudentFeeStatusRecord, FeeStatus } from "@soc/contracts";
 
 type UserUpsertInput = {
   academicStatus?: string | null;
   kaistUid: string;
   nameEn?: string | null;
   nameKo: string;
-  ssoSubject: string;
   stdNo?: string | null;
   departmentEn?: string | null;
   departmentKo?: string | null;
@@ -55,22 +55,21 @@ export class UsersRepository {
   /** DB row를 서비스 계층에서 사용하는 UserRecord로 변환합니다. */
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
-      createdAt: row.createdAt.toISOString(),
+      createdAt: msToIso(row.createdAt.valueOf()),
       userId: String(row.userId),
       kaistUid: row.kaistUid,
       nameEn: row.nameEn,
       nameKo: row.nameKo,
-      ssoSubject: row.ssoSubject,
       stdNo: row.stdNo ?? null,
       email: row.email,
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       academicStatus: row.academicStatus ?? null,
       identityCode: row.identityCode ?? null,
-      privacyConsentAt: row.privacyConsentAt ? row.privacyConsentAt.toISOString() : null,
+      privacyConsentAt: row.privacyConsentAt ? msToIso(row.privacyConsentAt.valueOf()) : null,
       isActive: row.isActive,
-      lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
-      updatedAt: row.updatedAt.toISOString(),
+      lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 
@@ -102,7 +101,6 @@ export class UsersRepository {
         lastLoginAt: input.lastLoginAt ?? nowDate(),
         nameEn: input.nameEn ?? null,
         nameKo: input.nameKo,
-        ssoSubject: input.ssoSubject,
         stdNo: input.stdNo ?? null,
         departmentEn: input.departmentEn ?? null,
         departmentKo: input.departmentKo ?? null,
@@ -121,7 +119,6 @@ export class UsersRepository {
     const now = nowDate();
     const insertValues: typeof users.$inferInsert = {
       kaistUid: input.kaistUid,
-      ssoSubject: input.ssoSubject,
       nameKo: input.nameKo,
       email: input.email,
       lastLoginAt: input.lastLoginAt ?? now,
@@ -141,7 +138,6 @@ export class UsersRepository {
       kaistUid: input.kaistUid,
       lastLoginAt: input.lastLoginAt ?? now,
       nameKo: input.nameKo,
-      ssoSubject: input.ssoSubject,
       updatedAt: now,
       ...(input.nameEn !== undefined ? { nameEn: input.nameEn } : {}),
       ...(input.stdNo !== undefined ? { stdNo: input.stdNo } : {}),
@@ -265,7 +261,7 @@ export class UsersRepository {
       .limit(Math.min(Math.max(limit, 1), 50));
 
     return rows.map((row) => ({
-      createdAt: row.createdAt.toISOString(),
+      createdAt: msToIso(row.createdAt.valueOf()),
       userId: row.userId,
       kaistUid: row.kaistUid,
       nameEn: row.nameEn ?? null,
@@ -277,8 +273,8 @@ export class UsersRepository {
       academicStatus: row.academicStatus ?? null,
       identityCode: row.identityCode ?? null,
       isActive: row.isActive,
-      lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
-      updatedAt: row.updatedAt.toISOString(),
+      lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     }));
   }
 
@@ -308,5 +304,154 @@ export class UsersRepository {
       );
 
     return Number(rows[0]?.permissionBits ?? 0);
+  }
+
+  async getStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord | null> {
+    const found = await this.db
+      .select()
+      .from(studentFeeStatus)
+      .where(eq(studentFeeStatus.userId, userId))
+      .limit(1);
+
+    if (!found.length) return null;
+
+    const row = found[0];
+    const normalizedStatus: FeeStatus = row.status === "PAID" || row.status === "WAIVED" ? row.status : "UNPAID";
+
+    return {
+      userId: row.userId,
+      status: normalizedStatus,
+      coverageSemesters: row.coverageSemesters,
+      paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
+      verifiedBy: row.verifiedBy,
+      verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
+      note: row.note,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+    };
+  }
+
+  async updateStudentFeeStatus(
+    userId: number,
+    input: {
+      status: FeeStatus;
+      coverageSemesters?: number;
+      note?: string | null;
+      verifiedBy?: number;
+    },
+  ): Promise<StudentFeeStatusRecord> {
+    // 존재하지 않으면 기본 행을 먼저 생성하여 update가 동작하도록 보장합니다.
+    await this.ensureStudentFeeStatus(userId);
+
+    const now = nowDate();
+    const updateSet: any = {
+      status: input.status,
+      updatedAt: now,
+    };
+
+    if (input.coverageSemesters !== undefined) {
+      updateSet.coverageSemesters = input.coverageSemesters;
+    }
+    if (input.note !== undefined) {
+      updateSet.note = input.note;
+    }
+    if (input.verifiedBy !== undefined) {
+      updateSet.verifiedBy = input.verifiedBy;
+      updateSet.verifiedAt = now;
+    }
+    if (input.status === "PAID") {
+      updateSet.paidAt = now;
+    } else {
+      updateSet.paidAt = null;
+    }
+
+    await this.db
+      .update(studentFeeStatus)
+      .set(updateSet)
+      .where(eq(studentFeeStatus.userId, userId));
+
+    return this.getStudentFeeStatus(userId) as Promise<StudentFeeStatusRecord>;
+  }
+
+  async ensureStudentFeeStatus(userId: number): Promise<StudentFeeStatusRecord> {
+    const existing = await this.getStudentFeeStatus(userId);
+    if (existing) return existing;
+
+    // 존재하지 않으면 생성 (기본값: UNPAID)
+    const now = nowDate();
+    await this.db
+      .insert(studentFeeStatus)
+      .values({
+        userId,
+        status: "UNPAID",
+        coverageSemesters: 4,
+        updatedAt: now,
+      })
+      .onConflictDoNothing();
+
+    return this.getStudentFeeStatus(userId) as Promise<StudentFeeStatusRecord>;
+  }
+
+  async listStudentsByFeeStatus(
+    status?: FeeStatus,
+    page = 1,
+    pageSize = 20,
+  ): Promise<{ students: any[]; total: number; page: number; pageSize: number }> {
+    const offset = (page - 1) * pageSize;
+
+    const where = status
+      ? status === "UNPAID"
+        ? or(
+            eq(studentFeeStatus.status, "UNPAID"),
+            isNull(studentFeeStatus.status),
+          )
+        : eq(studentFeeStatus.status, status)
+      : undefined;
+
+    const rows = await this.db
+      .select({
+        userId: users.userId,
+        nameKo: users.nameKo,
+        nameEn: users.nameEn,
+        stdNo: users.stdNo,
+        email: users.email,
+        status: studentFeeStatus.status,
+        paidAt: studentFeeStatus.paidAt,
+        verifiedAt: studentFeeStatus.verifiedAt,
+        note: studentFeeStatus.note,
+      })
+      .from(users)
+      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
+      .where(where)
+      .orderBy(desc(studentFeeStatus.updatedAt))
+      .limit(pageSize)
+      .offset(offset);
+
+    const countResult = await this.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(users)
+      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
+      .where(where);
+
+    const total = Number(countResult[0]?.count ?? 0);
+
+    return {
+      students: rows.map((r) => ({
+        status:
+          r.status === "PAID" || r.status === "WAIVED"
+            ? r.status
+            : "UNPAID",
+        userId: r.userId,
+        nameKo: r.nameKo,
+        nameEn: r.nameEn ?? null,
+        stdNo: r.stdNo ?? null,
+        email: r.email,
+        paidAt: r.paidAt ? msToIso(r.paidAt.valueOf()) : null,
+        verifiedAt: r.verifiedAt ? msToIso(r.verifiedAt.valueOf()) : null,
+        note: r.note,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   }
 }

@@ -11,7 +11,6 @@ export interface UserRecord {
   kaistUid: string;
   nameEn: string | null;
   nameKo: string;
-  ssoSubject: string;
   stdNo: string | null;
   email: string;
   departmentEn: string | null;

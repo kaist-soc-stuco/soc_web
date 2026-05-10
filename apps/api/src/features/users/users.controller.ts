@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 
 import {
   AuthGuard,
@@ -7,6 +7,7 @@ import {
   RequirePermission,
 } from "../../shared/guards";
 import { UsersService } from "./users.service";
+import type { UpdateStudentFeeStatusRequest } from "@soc/contracts";
 
 /**
  * 사용자 조회 관련 API 골격입니다.
@@ -43,5 +44,42 @@ export class UsersController {
       limit: limit ? Number(limit) : undefined,
       query,
     });
+  }
+
+  @Get("fee-status/list")
+  @UseGuards(AuthGuard, PermissionGuard)
+  @RequirePermission(PermissionFlags.MANAGE_FINANCE)
+  async listStudentsByFeeStatus(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.usersService.listStudentsByFeeStatus(
+      (status as any) || undefined,
+      page ? Number(page) : 1,
+      pageSize ? Number(pageSize) : 20,
+    );
+  }
+
+  @Get(":userId/fee-status")
+  @UseGuards(AuthGuard, PermissionGuard)
+  @RequirePermission(PermissionFlags.MANAGE_FINANCE)
+  async getStudentFeeStatus(@Param("userId", ParseIntPipe) userId: number) {
+    const status = await this.usersService.getStudentFeeStatus(userId);
+    if (!status) {
+      // 없으면 기본값으로 생성
+      return this.usersService.ensureStudentFeeStatus(userId);
+    }
+    return status;
+  }
+
+  @Put(":userId/fee-status")
+  @UseGuards(AuthGuard, PermissionGuard)
+  @RequirePermission(PermissionFlags.MANAGE_FINANCE)
+  async updateStudentFeeStatus(
+    @Param("userId", ParseIntPipe) userId: number,
+    @Body() body: UpdateStudentFeeStatusRequest,
+  ) {
+    return this.usersService.updateStudentFeeStatus(userId, body);
   }
 }
