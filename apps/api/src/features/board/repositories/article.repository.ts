@@ -22,7 +22,7 @@ import {
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
-import { nowDate, nowIso } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 @Injectable()
 export class ArticleRepository {
@@ -88,8 +88,8 @@ export class ArticleRepository {
           row.visibilityScope as ArticleListItem["visibilityScope"],
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
-        postedAt: row.postedAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
+        postedAt: msToIso(row.postedAt.valueOf()),
+        updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
           userId: String(row.authorId ?? ""),
           name: row.authorName ?? "unknown",
@@ -168,8 +168,8 @@ export class ArticleRepository {
         .visibilityScope as ArticleDetailResponse["visibilityScope"],
       isPinned: row[0].isPinned,
       pinOrder: row[0].pinOrder ?? null,
-      postedAt: row[0].postedAt.toISOString(),
-      updatedAt: row[0].updatedAt.toISOString(),
+      postedAt: msToIso(row[0].postedAt.valueOf()),
+      updatedAt: msToIso(row[0].updatedAt.valueOf()),
       author: {
         userId: String(row[0].authorId ?? ""),
         name: row[0].authorName ?? "unknown",
@@ -232,7 +232,7 @@ export class ArticleRepository {
       return {
         articleId: String(created.articleId),
         boardId: created.boardId,
-        postedAt: created.postedAt.toISOString(),
+        postedAt: msToIso(created.postedAt.valueOf()),
       };
     });
   }
@@ -337,7 +337,7 @@ export class ArticleRepository {
 
       return {
         articleId: String(articleId),
-        updatedAt: now,
+        updatedAt: msToIso(now.valueOf()),
       };
     });
   }
@@ -346,7 +346,7 @@ export class ArticleRepository {
     boardId: number,
     articleId: string,
   ): Promise<ArticleDeleteResponse> {
-    const now = nowIso();
+    const now = nowDate();
 
     await this.db
       .update(articles)
@@ -362,7 +362,7 @@ export class ArticleRepository {
     return {
       ok: true,
       articleId: String(articleId),
-      deletedAt: now,
+      deletedAt: msToIso(now.valueOf()),
     };
   }
 

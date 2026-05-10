@@ -44,6 +44,9 @@ import type {
   UpdateQuestionRequest,
   UpdateSectionRequest,
   UpdateSurveyRequest,
+  StudentFeeStatusRecord,
+  UpdateStudentFeeStatusRequest,
+  StudentFeeListResponse,
 } from "@soc/contracts";
 
 export interface ApiClientOptions {
@@ -673,6 +676,52 @@ export const createApiClient = ({
 
       return requestJson<AdminUserRecord[]>(
         `${usersBaseUrl}${params.toString() ? `?${params.toString()}` : ""}`,
+        {
+          method: "GET",
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    getStudentFeeStatus: async (userId: number): Promise<StudentFeeStatusRecord> => {
+      return requestJson<StudentFeeStatusRecord>(
+        `${usersBaseUrl}/${userId}/fee-status`,
+        {
+          method: "GET",
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    updateStudentFeeStatus: async (
+      userId: number,
+      body: UpdateStudentFeeStatusRequest,
+    ): Promise<StudentFeeStatusRecord> => {
+      return requestJson<StudentFeeStatusRecord>(
+        `${usersBaseUrl}/${userId}/fee-status`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    listStudentsByFeeStatus: async (
+      status?: string,
+      page = 1,
+      pageSize = 20,
+    ): Promise<StudentFeeListResponse> => {
+      const params = new URLSearchParams();
+      if (status) {
+        params.set("status", status);
+      }
+      params.set("page", String(page));
+      params.set("pageSize", String(pageSize));
+
+      return requestJson<StudentFeeListResponse>(
+        `${usersBaseUrl}/fee-status/list?${params.toString()}`,
         {
           method: "GET",
         },

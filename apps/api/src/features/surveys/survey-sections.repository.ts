@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
-import { nowDate } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -25,8 +25,8 @@ export class SurveySectionsRepository {
       descriptionKo: row.descriptionKo,
       descriptionEn: row.descriptionEn,
       sortOrder: row.sortOrder,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: msToIso(row.createdAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 

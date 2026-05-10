@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
-import { nowDate } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -23,12 +23,12 @@ export class SurveyResponsesRepository {
       userId: row.userId ? String(row.userId) : null,
       externalPhone: row.externalPhone,
       status: row.status as ResponseStatus,
-      submittedAt: row.submittedAt ? row.submittedAt.toISOString() : null,
-      reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
+      submittedAt: row.submittedAt ? msToIso(row.submittedAt.valueOf()) : null,
+      reviewedAt: row.reviewedAt ? msToIso(row.reviewedAt.valueOf()) : null,
       reviewAdminId: row.reviewAdminId ? String(row.reviewAdminId) : null,
       reviewReason: row.reviewReason,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: msToIso(row.createdAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 
@@ -38,8 +38,8 @@ export class SurveyResponsesRepository {
       responseId: row.responseId,
       questionId: row.questionId,
       content: row.content as Record<string, unknown>,
-      submittedAt: row.submittedAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      submittedAt: msToIso(row.submittedAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
-import { isoToDate, nowDate } from "@soc/shared";
+import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -29,10 +29,10 @@ export class SurveyQuestionsRepository {
       options: row.options as QuestionOption[] | null,
       answerRegex: row.answerRegex,
       isRequired: row.isRequired,
-      editDeadlineAt: row.editDeadlineAt ? row.editDeadlineAt.toISOString() : null,
+      editDeadlineAt: row.editDeadlineAt ? msToIso(row.editDeadlineAt.valueOf()) : null,
       sortOrder: row.sortOrder,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: msToIso(row.createdAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
 

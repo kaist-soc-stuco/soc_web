@@ -23,7 +23,7 @@ import type {
   RoleGroupMemberRecord,
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
-import { nowDate, nowIso } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 @Injectable()
 export class RoleGroupsRepository {
@@ -114,7 +114,7 @@ export class RoleGroupsRepository {
       if (!grouped.has(row.roleGroupId)) {
         grouped.set(row.roleGroupId, {
           code: row.code,
-          createdAt: row.createdAt.toISOString(),
+          createdAt: msToIso(row.createdAt.valueOf()),
           description: row.description,
           isSystem: row.isSystem,
           nameEn: row.nameEn,
@@ -122,7 +122,7 @@ export class RoleGroupsRepository {
           permissionIds: [],
           permissionMask: 0,
           roleGroupId: row.roleGroupId,
-          updatedAt: row.updatedAt.toISOString(),
+          updatedAt: msToIso(row.updatedAt.valueOf()),
           userCount: userCountByRoleGroupId.get(row.roleGroupId) ?? 0,
         });
       }
@@ -238,26 +238,26 @@ export class RoleGroupsRepository {
 
     return rows.map((row) => ({
       academicStatus: row.academicStatus ?? null,
-      createdAt: row.createdAt.toISOString(),
+      createdAt: msToIso(row.createdAt.valueOf()),
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       email: row.email,
-      grantedAt: row.grantedAt.toISOString(),
+      grantedAt: msToIso(row.grantedAt.valueOf()),
       grantedBy: row.grantedBy ?? null,
       identityCode: row.identityCode ?? null,
       isActive: row.isActive,
       kaistUid: row.kaistUid,
-      lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
+      lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
       membershipActive: row.membershipActive,
       nameEn: row.nameEn ?? null,
       nameKo: row.nameKo,
       roleGroupId: row.roleGroupId,
       stdNo: row.stdNo ?? null,
-      updatedAt: row.updatedAt.toISOString(),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
       userId: row.userId,
       userRoleGroupId: row.userRoleGroupId,
-      validFrom: row.validFrom ? row.validFrom.toISOString() : null,
-      validTo: row.validTo ? row.validTo.toISOString() : null,
+      validFrom: row.validFrom ? msToIso(row.validFrom.valueOf()) : null,
+      validTo: row.validTo ? msToIso(row.validTo.valueOf()) : null,
     }));
   }
 

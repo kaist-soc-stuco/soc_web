@@ -333,7 +333,6 @@ export class AuthSessionService {
         identityCode: pendingUser.identityCode,
         nameEn: pendingUser.nameEn,
         nameKo: pendingUser.nameKo,
-        ssoSubject: pendingUser.ssoSubject,
         stdNo: pendingUser.stdNo,
         userMobile: pendingUser.userMobile,
         consentedAt: now,
