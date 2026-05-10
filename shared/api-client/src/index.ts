@@ -35,7 +35,10 @@ import type {
   SurveyResponseRecord,
   SurveySectionRecord,
   PermissionRecord,
+  AdminUserRecord,
+  AssignRoleGroupMemberRequest,
   RoleGroupRecord,
+  RoleGroupMemberRecord,
   CreateRoleGroupRequest,
   UpdateRoleGroupRequest,
   UpdateQuestionRequest,
@@ -123,6 +126,16 @@ const resolveSurveyBaseUrl = (normalizedBaseUrl: string): string => {
   return `${normalizedBaseUrl}/v1/surveys`;
 };
 
+const resolveUsersBaseUrl = (normalizedBaseUrl: string): string => {
+  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/users`;
+  }
+  if (/\/api$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/users`;
+  }
+  return `${normalizedBaseUrl}/v1/users`;
+};
+
 const resolveRoleGroupsBaseUrl = (normalizedBaseUrl: string): string => {
   if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
     return `${normalizedBaseUrl}/role-groups`;
@@ -165,6 +178,7 @@ export const createApiClient = ({
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
   const authBaseUrl = resolveAuthBaseUrl(normalizedBaseUrl);
   const surveyBaseUrl = resolveSurveyBaseUrl(normalizedBaseUrl);
+  const usersBaseUrl = resolveUsersBaseUrl(normalizedBaseUrl);
   const roleGroupsBaseUrl = resolveRoleGroupsBaseUrl(normalizedBaseUrl);
   let refreshInFlight: Promise<void> | null = null;
 
@@ -514,6 +528,50 @@ export const createApiClient = ({
       );
     },
 
+    listRoleGroupMembers: async (
+      roleGroupId: number,
+    ): Promise<RoleGroupMemberRecord[]> => {
+      return requestJson<RoleGroupMemberRecord[]>(
+        `${roleGroupsBaseUrl}/${roleGroupId}/users`,
+        {
+          method: "GET",
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    addRoleGroupMember: async (
+      roleGroupId: number,
+      body: AssignRoleGroupMemberRequest,
+    ): Promise<RoleGroupMemberRecord> => {
+      return requestJson<RoleGroupMemberRecord>(
+        `${roleGroupsBaseUrl}/${roleGroupId}/users`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    removeRoleGroupMember: async (
+      roleGroupId: number,
+      userId: number,
+    ): Promise<void> => {
+      const response = await fetcher(
+        `${roleGroupsBaseUrl}/${roleGroupId}/users/${userId}`,
+        {
+          credentials: "include",
+          method: "DELETE",
+        },
+      );
+
+      if (!response.ok) {
+        throw new ApiClientHttpError(response.status);
+      }
+    },
+
     createRoleGroup: async (
       body: CreateRoleGroupRequest,
     ): Promise<RoleGroupRecord> => {
@@ -604,6 +662,22 @@ export const createApiClient = ({
         credentials: "include",
       });
       if (!res.ok) throw new ApiClientHttpError(res.status);
+    },
+
+    searchUsers: async (query?: string, limit = 20): Promise<AdminUserRecord[]> => {
+      const params = new URLSearchParams();
+      if (query?.trim()) {
+        params.set("q", query.trim());
+      }
+      params.set("limit", String(limit));
+
+      return requestJson<AdminUserRecord[]>(
+        `${usersBaseUrl}${params.toString() ? `?${params.toString()}` : ""}`,
+        {
+          method: "GET",
+        },
+        { retryOnUnauthorized: true },
+      );
     },
 
     createSection: async (

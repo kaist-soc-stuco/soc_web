@@ -40,47 +40,83 @@ type PermissionSeed = {
 const PERMISSION_SEEDS: PermissionSeed[] = [
   {
     permissionId: 1,
-    code: "BOARD_NOTICE_WRITE",
+    code: "WRITE_NOTICE",
     bitValue: 1,
-    nameKo: "공지 작성",
-    nameEn: "Notice Write",
-    description: "공지 게시판 글 작성 권한",
+    nameKo: "공지/행사 작성",
+    nameEn: "Write Notice",
+    description: "공식 공지 및 행사 게시글 작성 권한",
     isActive: true,
   },
   {
     permissionId: 2,
-    code: "BOARD_HOC_WRITE",
+    code: "WRITE_GENERAL",
     bitValue: 2,
-    nameKo: "HoC 작성",
-    nameEn: "HoC Write",
-    description: "HoC 게시판 글 작성 권한",
+    nameKo: "일반/홍보 작성",
+    nameEn: "Write General",
+    description: "홍보, HoC, 연구실 등 일반 게시글 작성 권한",
     isActive: true,
   },
   {
     permissionId: 4,
-    code: "BOARD_LAB_WRITE",
+    code: "WRITE_REPLY",
     bitValue: 4,
-    nameKo: "연구실 작성",
-    nameEn: "Lab Write",
-    description: "연구실 게시판 글 작성 권한",
+    nameKo: "공식 답변",
+    nameEn: "Write Reply",
+    description: "QnA/건의사항 공식 답변 및 상태 변경 권한",
+    isActive: true,
+  },
+  {
+    permissionId: 8,
+    code: "MANAGE_SURVEY",
+    bitValue: 8,
+    nameKo: "설문조사 관리",
+    nameEn: "Manage Survey",
+    description: "설문조사, 투표, 단체구매 생성 및 결과 열람 권한",
     isActive: true,
   },
   {
     permissionId: 16,
-    code: "BOARD_QNA_WRITE",
+    code: "MANAGE_FINANCE",
     bitValue: 16,
-    nameKo: "QnA 작성",
-    nameEn: "QnA Write",
-    description: "QnA 게시판 글 작성 권한",
+    nameKo: "과비 관리",
+    nameEn: "Manage Finance",
+    description: "과비 납부 시트 관리 및 독촉 메일 발송 권한",
+    isActive: true,
+  },
+  {
+    permissionId: 32,
+    code: "MANAGE_CONTENT",
+    bitValue: 32,
+    nameKo: "콘텐츠 관리",
+    nameEn: "Manage Content",
+    description: "홈 화면, 배너, 로드맵, 캘린더 등 정보성 콘텐츠 수정 권한",
     isActive: true,
   },
   {
     permissionId: 64,
-    code: "SURVEY_MANAGE",
+    code: "MANAGE_TOOL",
     bitValue: 64,
-    nameKo: "설문 관리",
-    nameEn: "Survey Manage",
-    description: "설문 생성/수정/권한 관리 권한",
+    nameKo: "도구 관리",
+    nameEn: "Manage Tool",
+    description: "POM 채점기, 챗봇 등 기술 도구 데이터 관리 권한",
+    isActive: true,
+  },
+  {
+    permissionId: 128,
+    code: "MODERATOR",
+    bitValue: 128,
+    nameKo: "유저/게시글 관리",
+    nameEn: "Moderator",
+    description: "타인 게시글 삭제 및 일반 유저 제재 권한",
+    isActive: true,
+  },
+  {
+    permissionId: 256,
+    code: "ADMIN",
+    bitValue: 256,
+    nameKo: "최고 관리자",
+    nameEn: "Admin",
+    description: "역할 그룹 CRUD와 권한 부여 권한",
     isActive: true,
   },
 ];
@@ -187,17 +223,21 @@ const BOARD_SEEDS: BoardSeed[] = [
 ];
 
 async function seedPermissions() {
-  const existing = await db.select({ code: permissions.code }).from(permissions);
-  const existingCodes = new Set(existing.map((row) => row.code));
-  const toInsert = PERMISSION_SEEDS.filter((permissionSeed) => !existingCodes.has(permissionSeed.code));
+  await db
+    .insert(permissions)
+    .values(PERMISSION_SEEDS)
+    .onConflictDoUpdate({
+      target: permissions.bitValue,
+      set: {
+        code: sql`excluded.code`,
+        nameKo: sql`excluded.name_ko`,
+        nameEn: sql`excluded.name_en`,
+        description: sql`excluded.description`,
+        isActive: sql`excluded.is_active`,
+      },
+    });
 
-  if (toInsert.length === 0) {
-    console.log("No new permissions to insert");
-    return;
-  }
-
-  await db.insert(permissions).values(toInsert).onConflictDoNothing();
-  console.log(`Inserted ${toInsert.length} permission(s)`);
+  console.log(`Upserted ${PERMISSION_SEEDS.length} permission(s)`);
 }
 
 async function seedBoards() {

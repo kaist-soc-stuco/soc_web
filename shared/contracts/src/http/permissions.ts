@@ -8,6 +8,47 @@ export interface PermissionRecord {
   isActive: boolean;
 }
 
+export interface AdminUserRecord {
+  userId: number;
+  kaistUid: string;
+  stdNo: string | null;
+  nameKo: string;
+  nameEn: string | null;
+  email: string;
+  departmentKo: string | null;
+  departmentEn: string | null;
+  academicStatus: string | null;
+  identityCode: string | null;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoleGroupMemberRecord {
+  userRoleGroupId: number;
+  roleGroupId: number;
+  userId: number;
+  kaistUid: string;
+  stdNo: string | null;
+  nameKo: string;
+  nameEn: string | null;
+  email: string;
+  departmentKo: string | null;
+  departmentEn: string | null;
+  academicStatus: string | null;
+  identityCode: string | null;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  grantedAt: string;
+  grantedBy: number | null;
+  validFrom: string | null;
+  validTo: string | null;
+  membershipActive: boolean;
+}
+
 export interface RoleGroupRecord {
   roleGroupId: number;
   code: string;
@@ -36,4 +77,8 @@ export interface UpdateRoleGroupRequest {
   nameEn?: string;
   description?: string;
   permissionIds: number[];
+}
+
+export interface AssignRoleGroupMemberRequest {
+  userId: number;
 }
