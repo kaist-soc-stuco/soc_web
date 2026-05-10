@@ -19,6 +19,7 @@ import type {
   RoleGroupRecord,
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
+import { nowDate, nowIso } from "@soc/shared";
 
 @Injectable()
 export class RoleGroupsRepository {
@@ -172,6 +173,7 @@ export class RoleGroupsRepository {
     roleGroupId: number,
     input: UpdateRoleGroupRequest,
   ): Promise<RoleGroupRecord | null> {
+    const now = nowDate();
     await this.db.transaction(async (tx) => {
       await tx
         .update(roleGroups)
@@ -180,7 +182,7 @@ export class RoleGroupsRepository {
           description: input.description ?? null,
           nameEn: input.nameEn ?? null,
           nameKo: input.nameKo,
-          updatedAt: new Date(),
+          updatedAt: now,
         })
         .where(eq(roleGroups.roleGroupId, roleGroupId));
 

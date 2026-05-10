@@ -18,6 +18,7 @@ import {
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { COMMENT_STATUS } from "../board.constants";
+import { msToIso, nowDate, nowIso } from "@soc/shared";
 
 @Injectable()
 export class CommentRepository {
@@ -66,8 +67,8 @@ export class CommentRepository {
         parentCommentId: row.parentCommentId ? String(row.parentCommentId) : null,
         content: row.content,
         status: row.status as CommentItem["status"],
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
+        createdAt: msToIso(row.createdAt.valueOf()),
+        updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
           userId: String(row.authorId ?? ""),
           name: row.authorName ?? "unknown",
@@ -134,7 +135,7 @@ export class CommentRepository {
     authorUserId: string;
     payload: CommentCreateRequest;
   }): Promise<CommentCreateResponse> {
-    const now = new Date();
+    const now = nowDate();
     const [created] = await this.db
       .insert(comments)
       .values({
@@ -153,7 +154,7 @@ export class CommentRepository {
 
     return {
       commentId: String(created.commentId),
-      createdAt: created.createdAt.toISOString(),
+      createdAt: msToIso(created.createdAt.valueOf()),
     };
   }
 
@@ -161,7 +162,7 @@ export class CommentRepository {
     commentId: string,
     payload: CommentUpdateRequest,
   ): Promise<CommentUpdateResponse> {
-    const now = new Date();
+    const now = nowDate();
     await this.db
       .update(comments)
       .set({
@@ -172,12 +173,12 @@ export class CommentRepository {
 
     return {
       commentId,
-      updatedAt: now.toISOString(),
+      updatedAt: msToIso(now.valueOf()),
     };
   }
 
   async softDeleteComment(commentId: string): Promise<CommentDeleteResponse> {
-    const now = new Date();
+    const now = nowDate();
     await this.db
       .update(comments)
       .set({
@@ -190,7 +191,7 @@ export class CommentRepository {
     return {
       ok: true,
       commentId: String(commentId),
-      deletedAt: now.toISOString(),
+      deletedAt: msToIso(now.valueOf()),
     };
   }
 }
