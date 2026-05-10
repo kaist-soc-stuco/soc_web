@@ -140,7 +140,7 @@ export class CommentRepository {
       .insert(comments)
       .values({
         articleId: Number(input.articleId),
-        authorUserId: Number(input.authorUserId),
+        authorUserId: input.authorUserId,
         parentCommentId: input.payload.parentCommentId ? Number(input.payload.parentCommentId) : null,
         content: input.payload.content,
         status: COMMENT_STATUS.PUBLISHED,

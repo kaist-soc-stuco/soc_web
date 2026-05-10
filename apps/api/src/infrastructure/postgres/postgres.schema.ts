@@ -18,7 +18,7 @@ import {
 // --- 1. Auth / Permission 도메인 ---
 
 export const users = pgTable("users", {
-  userId: serial("user_id").primaryKey(),
+  userId: uuid("user_id").defaultRandom().primaryKey(),
   kaistUid: varchar("kaist_uid", { length: 20 }).notNull().unique(),
   stdNo: varchar("std_no", { length: 20 }).unique(),
   nameKo: varchar("name_ko", { length: 100 }).notNull(),
@@ -140,7 +140,7 @@ export const roleGroupPermissions = pgTable("role_group_permission", {
 
 export const userRoleGroups = pgTable("user_role_group", {
   userRoleGroupId: serial("user_role_group_id").primaryKey(),
-  userId: integer("user_id")
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.userId),
   roleGroupId: integer("role_group_id")
@@ -157,7 +157,7 @@ export const userRoleGroups = pgTable("user_role_group", {
 // --- 2. Fee 도메인 ---
 
 export const studentFeeStatus = pgTable("student_fee_status", {
-  userId: integer("user_id")
+  userId: uuid("user_id")
     .primaryKey()
     .references(() => users.userId),
   coverageSemesters: smallint("coverage_semesters").notNull().default(4),
@@ -198,7 +198,7 @@ export const articles = pgTable("article", {
   boardId: integer("board_id")
     .notNull()
     .references(() => boards.boardId, { onDelete: "cascade" }),
-  authorUserId: integer("author_user_id")
+  authorUserId: uuid("author_user_id")
     .notNull()
     .references(() => users.userId),
   titleKo: varchar("title_ko", { length: 255 }).notNull(),
@@ -249,7 +249,7 @@ export const comments = pgTable(
       .notNull()
       .references(() => articles.articleId, { onDelete: "cascade" }),
     parentCommentId: integer("parent_comment_id"),
-    authorUserId: integer("author_user_id")
+    authorUserId: uuid("author_user_id")
       .notNull()
       .references(() => users.userId),
     content: text("content").notNull(),
@@ -272,7 +272,7 @@ export const surveyResponses = pgTable("survey_responses", {
   surveyId: uuid("survey_id")
     .references(() => surveys.surveyId, { onDelete: "cascade" })
     .notNull(),
-  userId: integer("user_id").references(() => users.userId),
+  userId: uuid("user_id").references(() => users.userId),
   externalPhone: text("external_phone"),
   // 'draft' | 'submitted' | 'approved' | 'rejected' | 'waitlisted'
   status: text("status").notNull().default("draft"),
@@ -307,7 +307,7 @@ export const surveyAnswers = pgTable("survey_answers", {
 
 export const auditLogs = pgTable("audit_log", {
   auditLogId: serial("audit_log_id").primaryKey(),
-  actorUserId: integer("actor_user_id")
+  actorUserId: uuid("actor_user_id")
     .references(() => users.userId),
   action: varchar("action", { length: 50 }).notNull(),
   targetType: varchar("target_type", { length: 50 }).notNull(),

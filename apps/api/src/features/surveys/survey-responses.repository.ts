@@ -75,16 +75,17 @@ export class SurveyResponsesRepository {
     userId?: string;
     externalPhone?: string;
   }): Promise<SurveyResponseRecord> {
+    const now = nowDate();
     const [row] = await this.db
       .insert(surveyResponses)
       .values({
         surveyId: input.surveyId,
-        userId: input.userId ? Number(input.userId) : null,
+        userId: input.userId,
         externalPhone: input.externalPhone ?? null,
         status: "submitted",
-        createdAt: nowDate(),
-        submittedAt: nowDate(),
-        updatedAt: nowDate(),
+        createdAt: now,
+        submittedAt: now,
+        updatedAt: now,
       })
       .returning();
     return this.mapResponse(row);

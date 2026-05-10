@@ -282,7 +282,7 @@ async function seedNoticeArticle() {
     return;
   }
 
-  const seedAuthorResult = await db.execute<{ userId: number }>(sql`
+  const seedAuthorResult = await db.execute<{ userId: string }>(sql`
     insert into users (kaist_uid, name_ko, email, is_active)
     values ('seed-notice-author', '관리자', 'admin@kaist.ac.kr', true)
     on conflict (kaist_uid)

@@ -52,7 +52,7 @@ export function PermissionPage() {
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>([]);
   const [roleGroupLoading, setRoleGroupLoading] = useState(false);
   const [memberLoading, setMemberLoading] = useState(false);
-  const [memberSavingUserId, setMemberSavingUserId] = useState<number | null>(null);
+  const [memberSavingUserId, setMemberSavingUserId] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [roleGroupSaving, setRoleGroupSaving] = useState(false);
   const [roleGroupError, setRoleGroupError] = useState<string | null>(null);
@@ -199,7 +199,7 @@ export function PermissionPage() {
     }
   };
 
-  const handleRemoveMember = async (userId: number) => {
+  const handleRemoveMember = async (userId: string) => {
     if (!canEditRoleGroups || selectedRoleGroupId === null) {
       return;
     }

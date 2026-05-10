@@ -560,7 +560,7 @@ export const createApiClient = ({
 
     removeRoleGroupMember: async (
       roleGroupId: number,
-      userId: number,
+      userId: string,
     ): Promise<void> => {
       const response = await fetcher(
         `${roleGroupsBaseUrl}/${roleGroupId}/users/${userId}`,
@@ -683,7 +683,7 @@ export const createApiClient = ({
       );
     },
 
-    getStudentFeeStatus: async (userId: number): Promise<StudentFeeStatusRecord> => {
+    getStudentFeeStatus: async (userId: string): Promise<StudentFeeStatusRecord> => {
       return requestJson<StudentFeeStatusRecord>(
         `${usersBaseUrl}/${userId}/fee-status`,
         {
@@ -694,7 +694,7 @@ export const createApiClient = ({
     },
 
     updateStudentFeeStatus: async (
-      userId: number,
+      userId: string,
       body: UpdateStudentFeeStatusRequest,
     ): Promise<StudentFeeStatusRecord> => {
       return requestJson<StudentFeeStatusRecord>(

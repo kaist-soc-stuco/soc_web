@@ -297,7 +297,7 @@ export class RoleGroupsRepository {
     return members.find((member) => member.userId === input.userId) ?? null;
   }
 
-  async removeUserFromRoleGroup(roleGroupId: number, userId: number): Promise<void> {
+  async removeUserFromRoleGroup(roleGroupId: number, userId: string): Promise<void> {
     const now = nowDate();
 
     await this.db

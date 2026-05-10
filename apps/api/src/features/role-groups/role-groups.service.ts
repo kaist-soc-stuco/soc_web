@@ -101,7 +101,7 @@ export class RoleGroupsService {
     return added;
   }
 
-  async removeUserFromRoleGroup(roleGroupId: number, userId: number): Promise<void> {
+  async removeUserFromRoleGroup(roleGroupId: number, userId: string): Promise<void> {
     const roleGroup = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
     if (!roleGroup) {
       throw new NotFoundException("role_group_not_found");

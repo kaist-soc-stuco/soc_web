@@ -9,7 +9,7 @@ export interface PermissionRecord {
 }
 
 export interface AdminUserRecord {
-  userId: number;
+  userId: string;
   kaistUid: string;
   stdNo: string | null;
   nameKo: string;
@@ -28,7 +28,7 @@ export interface AdminUserRecord {
 export interface RoleGroupMemberRecord {
   userRoleGroupId: number;
   roleGroupId: number;
-  userId: number;
+  userId: string;
   kaistUid: string;
   stdNo: string | null;
   nameKo: string;
@@ -80,5 +80,5 @@ export interface UpdateRoleGroupRequest {
 }
 
 export interface AssignRoleGroupMemberRequest {
-  userId: number;
+  userId: string;
 }

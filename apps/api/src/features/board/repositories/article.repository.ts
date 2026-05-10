@@ -200,7 +200,7 @@ export class ArticleRepository {
         .insert(articles)
         .values({
           boardId: input.boardId,
-          authorUserId: Number(input.authorUserId),
+          authorUserId: input.authorUserId,
           titleKo: input.payload.titleKo,
           titleEn: input.payload.titleEn ?? null,
           contentKo: input.payload.contentKo,

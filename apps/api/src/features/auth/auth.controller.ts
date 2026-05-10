@@ -16,6 +16,7 @@ import {
   AUTH_REFRESH_TOKEN_TTL_SECONDS,
   AUTH_SESSION_COOKIE_NAME,
 } from "./auth.tokens";
+import { nowDate } from "@soc/shared";
 
 @Controller("auth")
 export class AuthController {
@@ -110,7 +111,7 @@ export class AuthController {
       throw new ForbiddenException("mock_login_disabled_in_production");
     }
 
-    const now = new Date();
+    const now = nowDate();
     const mockUser = await this.usersService.upsertUserFromConsent({
       academicStatus: "재학",
       consentedAt: now,
@@ -196,7 +197,7 @@ export class AuthController {
       .delete(userRoleGroups)
       .where(
         and(
-          eq(userRoleGroups.userId, Number(mockUser.userId)),
+          eq(userRoleGroups.userId, mockUser.userId),
           eq(userRoleGroups.roleGroupId, existingRoleGroup.roleGroupId),
         ),
       );
@@ -205,7 +206,7 @@ export class AuthController {
       grantedAt: now,
       isActive: true,
       roleGroupId: existingRoleGroup.roleGroupId,
-      userId: Number(mockUser.userId),
+      userId: mockUser.userId,
       validFrom: now,
       validTo: null,
     });
