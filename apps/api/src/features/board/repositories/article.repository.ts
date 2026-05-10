@@ -22,6 +22,7 @@ import {
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
+import { nowDate, nowIso } from "@soc/shared";
 
 @Injectable()
 export class ArticleRepository {
@@ -192,7 +193,7 @@ export class ArticleRepository {
     authorUserId: string;
     payload: ArticleCreateRequest;
   }): Promise<ArticleCreateResponse> {
-    const now = new Date();
+    const now = nowDate();
 
     return this.db.transaction(async (tx) => {
       const [created] = await tx
@@ -267,7 +268,7 @@ export class ArticleRepository {
     articleId: string,
     payload: ArticleUpdateRequest,
   ): Promise<ArticleUpdateResponse> {
-    const now = new Date();
+    const now = nowDate();
     const updateSet: {
       titleKo?: string;
       titleEn?: string | null;
@@ -336,7 +337,7 @@ export class ArticleRepository {
 
       return {
         articleId: String(articleId),
-        updatedAt: now.toISOString(),
+        updatedAt: now,
       };
     });
   }
@@ -345,7 +346,7 @@ export class ArticleRepository {
     boardId: number,
     articleId: string,
   ): Promise<ArticleDeleteResponse> {
-    const now = new Date();
+    const now = nowIso();
 
     await this.db
       .update(articles)
@@ -361,7 +362,7 @@ export class ArticleRepository {
     return {
       ok: true,
       articleId: String(articleId),
-      deletedAt: now.toISOString(),
+      deletedAt: now,
     };
   }
 

@@ -7,7 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 import jwt, { type JwtPayload } from "jsonwebtoken";
-import { nowIso, isExpired, secondsUntil, expiresAtMs } from "@soc/shared";
+import { nowIso, isExpired, secondsUntil, expiresAtMs, nowDate } from "@soc/shared";
 
 import type {
   AuthSessionRecord,
@@ -314,6 +314,7 @@ export class AuthSessionService {
     storageMode: "temporary" | "persisted";
     userId?: string;
   }> {
+    const now = nowDate();
     const pendingUser = await this.pendingLoginRepository.find(
       input.pendingLoginToken,
     );
@@ -335,7 +336,7 @@ export class AuthSessionService {
         ssoSubject: pendingUser.ssoSubject,
         stdNo: pendingUser.stdNo,
         userMobile: pendingUser.userMobile,
-        consentedAt: new Date(),
+        consentedAt: now,
       });
 
       const issued = await this.issuePersistedSession(persistedUser.userId);

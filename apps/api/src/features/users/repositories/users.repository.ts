@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 
-import { isoToDate, nowDate } from "@soc/shared";
+import { isoToDate, nowDate, nowIso } from "@soc/shared";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 
 import {
@@ -19,7 +19,6 @@ import type { UserRecord } from "../entities/user";
 type UserUpsertInput = {
   academicStatus?: string | null;
   kaistUid: string;
-  lastLoginAt?: Date;
   nameEn?: string | null;
   nameKo: string;
   ssoSubject: string;
@@ -30,6 +29,7 @@ type UserUpsertInput = {
   identityCode?: string | null;
   isActive?: boolean;
   privacyConsentAt?: Date | null;
+  lastLoginAt?: Date;
 };
 
 type UserProfileUpdateInput = {
@@ -38,10 +38,10 @@ type UserProfileUpdateInput = {
   departmentKo?: string | null;
   email?: string;
   identityCode?: string | null;
-  lastLoginAt?: Date;
   nameEn?: string | null;
   nameKo?: string;
   stdNo?: string | null;
+  lastLoginAt?: Date;
 };
 
 /**
@@ -98,7 +98,7 @@ export class UsersRepository {
       .values({
         academicStatus: input.academicStatus ?? null,
         kaistUid: input.kaistUid,
-        lastLoginAt: input.lastLoginAt ?? new Date(),
+        lastLoginAt: input.lastLoginAt ?? nowDate(),
         nameEn: input.nameEn ?? null,
         nameKo: input.nameKo,
         ssoSubject: input.ssoSubject,
@@ -117,12 +117,13 @@ export class UsersRepository {
 
   /** KAIST UID 기준으로 사용자 정보를 생성/갱신합니다. */
   async upsertByKaistUid(input: UserUpsertInput): Promise<UserRecord> {
+    const now = nowDate();
     const insertValues: typeof users.$inferInsert = {
       kaistUid: input.kaistUid,
       ssoSubject: input.ssoSubject,
       nameKo: input.nameKo,
       email: input.email,
-      lastLoginAt: input.lastLoginAt ?? new Date(),
+      lastLoginAt: input.lastLoginAt ?? now,
       isActive: input.isActive ?? true,
       nameEn: input.nameEn ?? null,
       stdNo: input.stdNo ?? null,
@@ -137,10 +138,10 @@ export class UsersRepository {
       email: input.email,
       isActive: input.isActive ?? true,
       kaistUid: input.kaistUid,
-      lastLoginAt: input.lastLoginAt ?? new Date(),
+      lastLoginAt: input.lastLoginAt ?? now,
       nameKo: input.nameKo,
       ssoSubject: input.ssoSubject,
-      updatedAt: new Date(),
+      updatedAt: now,
       ...(input.nameEn !== undefined ? { nameEn: input.nameEn } : {}),
       ...(input.stdNo !== undefined ? { stdNo: input.stdNo } : {}),
       ...(input.departmentKo !== undefined
@@ -244,7 +245,7 @@ export class UsersRepository {
   }
 
   async resolvePermissionBitmaskByUserId(userId: string): Promise<number> {
-    const now = new Date();
+    const now = nowDate();
     const rows = await this.db
       .select({
         permissionBits: sql<number>`COALESCE(SUM(${permissions.bitValue}), 0)`,

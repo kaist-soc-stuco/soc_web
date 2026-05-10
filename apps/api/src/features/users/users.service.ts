@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
+import { nowDate, nowIso } from "@soc/shared";
 
 /**
  * PostgreSQL user 저장/조회 로직을 담당합니다.
@@ -69,6 +70,7 @@ export class UsersService {
     userMobile?: string;
     consentedAt?: Date;
   }): Promise<UserRecord> {
+    const now = nowDate();
     return this.usersRepository.upsertByKaistUid({
       academicStatus: input.academicStatus,
       departmentEn: input.departmentEn,
@@ -80,8 +82,8 @@ export class UsersService {
       ssoSubject: input.ssoSubject,
       stdNo: input.stdNo,
       email: input.email,
-      lastLoginAt: new Date(),
-      privacyConsentAt: input.consentedAt ?? new Date(),
+      lastLoginAt: now,
+      privacyConsentAt: input.consentedAt ?? now,
     });
   }
 
