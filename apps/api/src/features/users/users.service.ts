@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
+import type { AdminUserRecord } from "@soc/contracts";
 import { nowDate, nowIso } from "@soc/shared";
 
 /**
@@ -89,6 +90,10 @@ export class UsersService {
 
   async resolvePermissionBitmaskByUserId(userId: string): Promise<number> {
     return this.usersRepository.resolvePermissionBitmaskByUserId(userId);
+  }
+
+  async searchUsers(input: { query?: string; limit?: number }): Promise<AdminUserRecord[]> {
+    return this.usersRepository.searchUsers(input.query, input.limit ?? 20);
   }
 
   /**

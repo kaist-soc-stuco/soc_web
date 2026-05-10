@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { PermissionRecord, RoleGroupRecord } from "@soc/contracts";
+import type {
+  AdminUserRecord,
+  PermissionRecord,
+  RoleGroupMemberRecord,
+  RoleGroupRecord,
+} from "@soc/contracts";
 import { formatKoreanDateTime, hasPermission } from "@soc/shared";
 
 import { Header } from "@/components/organisms/header";
@@ -9,9 +14,8 @@ import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
 import {
   PERMISSION_DEFINITIONS,
-  SURVEY_MANAGE_PERMISSION_BIT,
   getGrantedPermissions,
-  hasSurveyManagePermission,
+  hasAdminPermission,
 } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
@@ -31,7 +35,7 @@ const createEmptyRoleGroupForm = (): RoleGroupFormState => ({
 
 export function PermissionPage() {
   const navigate = useNavigate();
-  const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
+  const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [permission, setPermission] = useState<number>(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [storageMode, setStorageMode] = useState<"temporary" | "persisted" | null>(null);
@@ -39,13 +43,60 @@ export function PermissionPage() {
   const [roleGroups, setRoleGroups] = useState<RoleGroupRecord[]>([]);
   const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
   const [selectedRoleGroupId, setSelectedRoleGroupId] = useState<number | null>(null);
+  const [roleGroupMembers, setRoleGroupMembers] = useState<RoleGroupMemberRecord[]>([]);
+  const [memberQuery, setMemberQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<AdminUserRecord[]>([]);
   const [roleGroupForm, setRoleGroupForm] = useState<RoleGroupFormState>(
     createEmptyRoleGroupForm(),
   );
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>([]);
   const [roleGroupLoading, setRoleGroupLoading] = useState(false);
+  const [memberLoading, setMemberLoading] = useState(false);
+  const [memberSavingUserId, setMemberSavingUserId] = useState<number | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [roleGroupSaving, setRoleGroupSaving] = useState(false);
   const [roleGroupError, setRoleGroupError] = useState<string | null>(null);
+  const [memberError, setMemberError] = useState<string | null>(null);
+
+  const loadRoleGroupMembers = async (roleGroupId: number) => {
+    setMemberLoading(true);
+    setMemberError(null);
+
+    try {
+      const fetchedMembers = await client.listRoleGroupMembers(roleGroupId);
+      setRoleGroupMembers(fetchedMembers);
+    } catch {
+      setMemberError("그룹 사용자 정보를 불러오지 못했습니다.");
+      setRoleGroupMembers([]);
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  const loadRoleGroups = async (preferSelectedId?: number | null) => {
+    const [fetchedRoleGroups, fetchedPermissions] = await Promise.all([
+      client.listRoleGroups(),
+      client.listPermissions(),
+    ]);
+
+    setRoleGroups(fetchedRoleGroups);
+    setPermissions(fetchedPermissions);
+
+    const selectedId = preferSelectedId ?? selectedRoleGroupId;
+    const selected =
+      selectedId !== null
+        ? fetchedRoleGroups.find((roleGroup) => roleGroup.roleGroupId === selectedId)
+        : fetchedRoleGroups[0];
+
+    if (selected) {
+      openRoleGroupEditor(selected);
+      await loadRoleGroupMembers(selected.roleGroupId);
+      return;
+    }
+
+    resetRoleGroupEditor();
+    setRoleGroupMembers([]);
+  };
 
   useEffect(() => {
     (async () => {
@@ -59,28 +110,10 @@ export function PermissionPage() {
       setUserId(session.userId ?? null);
       setStorageMode(session.storageMode);
 
-      if (hasSurveyManagePermission(session.permission)) {
+      if (hasAdminPermission(session.permission)) {
         setRoleGroupLoading(true);
         try {
-          const [fetchedRoleGroups, fetchedPermissions] = await Promise.all([
-            client.listRoleGroups(),
-            client.listPermissions(),
-          ]);
-
-          setRoleGroups(fetchedRoleGroups);
-          setPermissions(fetchedPermissions);
-
-          if (fetchedRoleGroups.length > 0) {
-            const first = fetchedRoleGroups[0];
-            setSelectedRoleGroupId(first.roleGroupId);
-            setRoleGroupForm({
-              code: first.code,
-              description: first.description ?? "",
-              nameEn: first.nameEn ?? "",
-              nameKo: first.nameKo,
-            });
-            setSelectedPermissionIds(first.permissionIds);
-          }
+          await loadRoleGroups(null);
         } catch {
           setRoleGroupError("역할 그룹 데이터를 불러오지 못했습니다.");
         } finally {
@@ -92,7 +125,11 @@ export function PermissionPage() {
     })();
   }, []);
 
-  const canEditRoleGroups = hasSurveyManagePermission(permission);
+  const canEditRoleGroups = hasAdminPermission(permission);
+
+  const selectedRoleGroup = roleGroups.find(
+    (roleGroup) => roleGroup.roleGroupId === selectedRoleGroupId,
+  ) ?? null;
 
   const grantedPermissions = getGrantedPermissions(permission);
 
@@ -114,31 +151,73 @@ export function PermissionPage() {
   };
 
   const refreshRoleGroups = async () => {
-    const [fetchedRoleGroups, fetchedPermissions] = await Promise.all([
-      client.listRoleGroups(),
-      client.listPermissions(),
-    ]);
+    await loadRoleGroups(selectedRoleGroupId);
+  };
 
-    setRoleGroups(fetchedRoleGroups);
-    setPermissions(fetchedPermissions);
+  const handleSelectRoleGroup = async (roleGroup: RoleGroupRecord) => {
+    openRoleGroupEditor(roleGroup);
+    await loadRoleGroupMembers(roleGroup.roleGroupId);
+  };
 
-    if (selectedRoleGroupId !== null) {
-      const selected = fetchedRoleGroups.find(
-        (roleGroup) => roleGroup.roleGroupId === selectedRoleGroupId,
-      );
-
-      if (selected) {
-        openRoleGroupEditor(selected);
-        return;
-      }
-    }
-
-    if (fetchedRoleGroups.length > 0) {
-      openRoleGroupEditor(fetchedRoleGroups[0]);
+  const handleSearchUsers = async () => {
+    if (!canEditRoleGroups) {
       return;
     }
 
-    resetRoleGroupEditor();
+    setSearchLoading(true);
+    setMemberError(null);
+
+    try {
+      const fetchedUsers = await client.searchUsers(memberQuery, 20);
+      setSearchResults(fetchedUsers);
+    } catch {
+      setMemberError("사용자 검색에 실패했습니다.");
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleAddMember = async (user: AdminUserRecord) => {
+    if (!canEditRoleGroups || selectedRoleGroupId === null) {
+      return;
+    }
+
+    setMemberSavingUserId(user.userId);
+    setMemberError(null);
+
+    try {
+      await client.addRoleGroupMember(selectedRoleGroupId, { userId: user.userId });
+      await loadRoleGroupMembers(selectedRoleGroupId);
+      if (memberQuery.trim()) {
+        await handleSearchUsers();
+      }
+    } catch {
+      setMemberError("사용자를 그룹에 추가하지 못했습니다.");
+    } finally {
+      setMemberSavingUserId(null);
+    }
+  };
+
+  const handleRemoveMember = async (userId: number) => {
+    if (!canEditRoleGroups || selectedRoleGroupId === null) {
+      return;
+    }
+
+    setMemberSavingUserId(userId);
+    setMemberError(null);
+
+    try {
+      await client.removeRoleGroupMember(selectedRoleGroupId, userId);
+      await loadRoleGroupMembers(selectedRoleGroupId);
+      if (memberQuery.trim()) {
+        await handleSearchUsers();
+      }
+    } catch {
+      setMemberError("사용자를 그룹에서 제거하지 못했습니다.");
+    } finally {
+      setMemberSavingUserId(null);
+    }
   };
 
   const togglePermissionId = (permissionId: number) => {
@@ -235,8 +314,8 @@ export function PermissionPage() {
                 권한 관리
               </h1>
               <p className="max-w-2xl text-sm leading-7 text-kaist-grey md:text-base">
-                현재 세션이 가진 권한 비트를 확인하고, 설문 관리 권한이 있는 계정에서는
-                역할 그룹과 권한 매핑을 바로 편집할 수 있습니다.
+                현재 세션의 권한 비트를 확인하고, 관리자 계정에서는 역할 그룹,
+                그룹 내 사용자, 그리고 권한 매핑을 함께 편집할 수 있습니다.
               </p>
 
               <div className="flex flex-wrap gap-3 pt-2">
@@ -270,10 +349,10 @@ export function PermissionPage() {
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
-                    Survey Manage
+                    Admin
                   </p>
                   <p className="mt-2 text-base font-bold">
-                    {hasSurveyManagePermission(permission) ? "허용" : "불가"}
+                    {hasAdminPermission(permission) ? "허용" : "불가"}
                   </p>
                 </div>
               </div>
@@ -335,10 +414,10 @@ export function PermissionPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-extrabold tracking-tight">
-                역할 그룹 편집
+                역할 그룹 관리
               </h2>
               <p className="mt-1 text-sm text-kaist-grey">
-                설문조사 관리 권한이 있는 계정에서 역할 그룹 이름과 권한 매핑을 수정할 수 있습니다.
+                관리자 권한이 있는 계정에서 역할 그룹 이름, 권한 매핑, 그룹 내 사용자를 관리할 수 있습니다.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -363,7 +442,7 @@ export function PermissionPage() {
 
           {!canEditRoleGroups ? (
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-              역할 그룹 편집은 설문조사 관리 권한이 있는 계정에서만 가능합니다.
+              역할 그룹 편집과 사용자 관리는 관리자 권한이 있는 계정에서만 가능합니다.
             </div>
           ) : (
             <div className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
@@ -382,7 +461,7 @@ export function PermissionPage() {
                       <button
                         key={roleGroup.roleGroupId}
                         type="button"
-                        onClick={() => openRoleGroupEditor(roleGroup)}
+                        onClick={() => void handleSelectRoleGroup(roleGroup)}
                         className={`w-full rounded-2xl border p-4 text-left transition ${
                           isSelected
                             ? "border-kaist-darkgreen bg-kaist-darkgreen/5"
@@ -601,6 +680,155 @@ export function PermissionPage() {
 
           {roleGroupError && (
             <p className="mt-4 text-sm font-semibold text-red-600">{roleGroupError}</p>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-extrabold tracking-tight">
+                그룹 내 사용자 관리
+              </h2>
+              <p className="mt-1 text-sm text-kaist-grey">
+                선택한 역할 그룹에 사용자를 추가하거나 제거할 수 있습니다.
+              </p>
+            </div>
+            <div className="rounded-full bg-kaist-darkgreen/6 px-4 py-2 text-sm font-semibold text-kaist-darkgreen">
+              {selectedRoleGroup ? selectedRoleGroup.nameKo : "그룹 미선택"}
+            </div>
+          </div>
+
+          {selectedRoleGroupId === null ? (
+            <p className="mt-6 text-sm text-kaist-grey">
+              먼저 왼쪽에서 역할 그룹을 선택하세요.
+            </p>
+          ) : (
+            <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <input
+                    value={memberQuery}
+                    onChange={(event) => setMemberQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void handleSearchUsers();
+                      }
+                    }}
+                    className="w-full rounded-2xl border border-kaist-grey/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"
+                    placeholder="이름, KAIST UID, 이메일로 검색"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleSearchUsers()}
+                    disabled={searchLoading}
+                    className="rounded-2xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {searchLoading ? "검색 중" : "검색"}
+                  </button>
+                </div>
+
+                {memberError && (
+                  <p className="text-sm font-semibold text-red-600">{memberError}</p>
+                )}
+
+                <div className="rounded-2xl border border-kaist-grey/20 bg-kaist-grey/5 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-extrabold text-kaist-darkgreen">현재 멤버</h3>
+                    <span className="text-xs font-semibold text-kaist-greygreen">
+                      {memberLoading ? "불러오는 중" : `${roleGroupMembers.length}명`}
+                    </span>
+                  </div>
+
+                  {memberLoading ? (
+                    <p className="mt-4 text-sm text-kaist-grey">멤버를 불러오는 중…</p>
+                  ) : roleGroupMembers.length === 0 ? (
+                    <p className="mt-4 text-sm text-kaist-grey">아직 멤버가 없습니다.</p>
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {roleGroupMembers.map((member) => (
+                        <div
+                          key={member.userRoleGroupId}
+                          className="rounded-2xl border border-kaist-grey/20 bg-white p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-extrabold text-kaist-darkgreen">
+                                {member.nameKo}
+                              </p>
+                              <p className="mt-1 text-xs text-kaist-greygreen">
+                                {member.kaistUid} · {member.email}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleRemoveMember(member.userId)}
+                              disabled={memberSavingUserId === member.userId}
+                              className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {memberSavingUserId === member.userId ? "처리 중" : "제거"}
+                            </button>
+                          </div>
+                          <p className="mt-3 text-xs text-kaist-grey">
+                            부여 {formatKoreanDateTime(member.grantedAt)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-kaist-grey/20 bg-kaist-grey/5 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-extrabold text-kaist-darkgreen">검색 결과</h3>
+                  <span className="text-xs font-semibold text-kaist-greygreen">
+                    {searchResults.length}명
+                  </span>
+                </div>
+
+                {searchResults.length === 0 ? (
+                  <p className="mt-4 text-sm text-kaist-grey">
+                    검색어를 입력하고 검색 버튼을 누르면 사용자를 찾을 수 있습니다.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    {searchResults.map((user) => {
+                      const alreadyMember = roleGroupMembers.some(
+                        (member) => member.userId === user.userId,
+                      );
+
+                      return (
+                        <div key={user.userId} className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-extrabold text-kaist-darkgreen">
+                                {user.nameKo}
+                              </p>
+                              <p className="mt-1 text-xs text-kaist-greygreen">
+                                {user.kaistUid} · {user.email}
+                              </p>
+                              <p className="mt-2 text-xs text-kaist-grey">
+                                {user.departmentKo ?? "학과 미상"}
+                                {user.academicStatus ? ` · ${user.academicStatus}` : ""}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleAddMember(user)}
+                              disabled={alreadyMember || memberSavingUserId === user.userId}
+                              className="rounded-full bg-kaist-darkgreen px-3 py-1.5 text-xs font-semibold text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:bg-kaist-grey"
+                            >
+                              {alreadyMember ? "이미 멤버" : memberSavingUserId === user.userId ? "추가 중" : "추가"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </section>
 

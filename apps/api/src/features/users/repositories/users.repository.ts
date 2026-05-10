@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import { isoToDate, nowDate, nowIso } from "@soc/shared";
-import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -15,6 +15,7 @@ import {
 } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
+import type { AdminUserRecord } from "@soc/contracts";
 
 type UserUpsertInput = {
   academicStatus?: string | null;
@@ -242,6 +243,43 @@ export class UsersRepository {
     }
 
     await this.db.update(users).set(updateSet).where(eq(users.userId, Number(userId)));
+  }
+
+  async searchUsers(query: string | undefined, limit = 20): Promise<AdminUserRecord[]> {
+    const normalizedQuery = query?.trim() ?? "";
+    const whereClause = normalizedQuery
+      ? or(
+          ilike(users.nameKo, `%${normalizedQuery}%`),
+          ilike(users.nameEn, `%${normalizedQuery}%`),
+          ilike(users.kaistUid, `%${normalizedQuery}%`),
+          ilike(users.email, `%${normalizedQuery}%`),
+          ilike(users.stdNo, `%${normalizedQuery}%`),
+        )
+      : undefined;
+
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(whereClause)
+      .orderBy(desc(users.updatedAt))
+      .limit(Math.min(Math.max(limit, 1), 50));
+
+    return rows.map((row) => ({
+      createdAt: row.createdAt.toISOString(),
+      userId: row.userId,
+      kaistUid: row.kaistUid,
+      nameEn: row.nameEn ?? null,
+      nameKo: row.nameKo,
+      stdNo: row.stdNo ?? null,
+      email: row.email,
+      departmentEn: row.departmentEn ?? null,
+      departmentKo: row.departmentKo ?? null,
+      academicStatus: row.academicStatus ?? null,
+      identityCode: row.identityCode ?? null,
+      isActive: row.isActive,
+      lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
+      updatedAt: row.updatedAt.toISOString(),
+    }));
   }
 
   async resolvePermissionBitmaskByUserId(userId: string): Promise<number> {

@@ -125,14 +125,22 @@ export class AuthController {
       stdNo: "20260001",
     });
 
+    const [adminPermission] = await this.db
+      .select({ permissionId: permissions.permissionId })
+      .from(permissions)
+      .where(eq(permissions.code, "ADMIN"))
+      .limit(1);
+
     const [surveyManagePermission] = await this.db
       .select({ permissionId: permissions.permissionId })
       .from(permissions)
-      .where(eq(permissions.code, "SURVEY_MANAGE"))
+      .where(
+        eq(permissions.code, "MANAGE_SURVEY"),
+      )
       .limit(1);
 
-    if (!surveyManagePermission) {
-      throw new ForbiddenException("survey_manage_permission_missing");
+    if (!adminPermission || !surveyManagePermission) {
+      throw new ForbiddenException("admin_permission_missing");
     }
 
     const [roleGroup] = await this.db
@@ -161,10 +169,19 @@ export class AuthController {
       .delete(roleGroupPermissions)
       .where(eq(roleGroupPermissions.roleGroupId, existingRoleGroup.roleGroupId));
 
-    await this.db.insert(roleGroupPermissions).values({
-      permissionId: surveyManagePermission.permissionId,
-      roleGroupId: existingRoleGroup.roleGroupId,
-    }).onConflictDoNothing();
+    await this.db
+      .insert(roleGroupPermissions)
+      .values([
+        {
+          permissionId: adminPermission.permissionId,
+          roleGroupId: existingRoleGroup.roleGroupId,
+        },
+        {
+          permissionId: surveyManagePermission.permissionId,
+          roleGroupId: existingRoleGroup.roleGroupId,
+        },
+      ])
+      .onConflictDoNothing();
 
     await this.db
       .delete(userRoleGroups)

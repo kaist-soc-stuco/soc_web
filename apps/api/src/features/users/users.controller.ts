@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 
 import {
   AuthGuard,
@@ -30,5 +30,18 @@ export class UsersController {
       hasPersistedProfile: await this.usersService.hasPersistedProfile(userId),
       userId,
     };
+  }
+
+  @Get()
+  @UseGuards(AuthGuard, PermissionGuard)
+  @RequirePermission(PermissionFlags.ADMIN)
+  async searchUsers(
+    @Query("q") query?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.usersService.searchUsers({
+      limit: limit ? Number(limit) : undefined,
+      query,
+    });
   }
 }

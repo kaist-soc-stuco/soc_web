@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -11,12 +11,16 @@ import {
   roleGroupPermissions,
   roleGroups,
   userRoleGroups,
+  users,
 } from "../../infrastructure/postgres/postgres.schema";
 
 import type {
+  AdminUserRecord,
+  AssignRoleGroupMemberRequest,
   CreateRoleGroupRequest,
   PermissionRecord,
   RoleGroupRecord,
+  RoleGroupMemberRecord,
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
 import { nowDate, nowIso } from "@soc/shared";
@@ -200,5 +204,114 @@ export class RoleGroupsRepository {
         .where(eq(roleGroupPermissions.roleGroupId, roleGroupId));
       await tx.delete(roleGroups).where(eq(roleGroups.roleGroupId, roleGroupId));
     });
+  }
+
+  async listRoleGroupMembers(roleGroupId: number): Promise<RoleGroupMemberRecord[]> {
+    const rows = await this.db
+      .select({
+        academicStatus: users.academicStatus,
+        createdAt: users.createdAt,
+        departmentEn: users.departmentEn,
+        departmentKo: users.departmentKo,
+        email: users.email,
+        grantedAt: userRoleGroups.grantedAt,
+        grantedBy: userRoleGroups.grantedBy,
+        identityCode: users.identityCode,
+        isActive: users.isActive,
+        kaistUid: users.kaistUid,
+        lastLoginAt: users.lastLoginAt,
+        membershipActive: userRoleGroups.isActive,
+        nameEn: users.nameEn,
+        nameKo: users.nameKo,
+        roleGroupId: userRoleGroups.roleGroupId,
+        stdNo: users.stdNo,
+        updatedAt: users.updatedAt,
+        userId: users.userId,
+        userRoleGroupId: userRoleGroups.userRoleGroupId,
+        validFrom: userRoleGroups.validFrom,
+        validTo: userRoleGroups.validTo,
+      })
+      .from(userRoleGroups)
+      .innerJoin(users, eq(userRoleGroups.userId, users.userId))
+      .where(and(eq(userRoleGroups.roleGroupId, roleGroupId), eq(userRoleGroups.isActive, true)))
+      .orderBy(asc(users.nameKo), asc(users.kaistUid));
+
+    return rows.map((row) => ({
+      academicStatus: row.academicStatus ?? null,
+      createdAt: row.createdAt.toISOString(),
+      departmentEn: row.departmentEn ?? null,
+      departmentKo: row.departmentKo ?? null,
+      email: row.email,
+      grantedAt: row.grantedAt.toISOString(),
+      grantedBy: row.grantedBy ?? null,
+      identityCode: row.identityCode ?? null,
+      isActive: row.isActive,
+      kaistUid: row.kaistUid,
+      lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
+      membershipActive: row.membershipActive,
+      nameEn: row.nameEn ?? null,
+      nameKo: row.nameKo,
+      roleGroupId: row.roleGroupId,
+      stdNo: row.stdNo ?? null,
+      updatedAt: row.updatedAt.toISOString(),
+      userId: row.userId,
+      userRoleGroupId: row.userRoleGroupId,
+      validFrom: row.validFrom ? row.validFrom.toISOString() : null,
+      validTo: row.validTo ? row.validTo.toISOString() : null,
+    }));
+  }
+
+  async addUserToRoleGroup(
+    roleGroupId: number,
+    input: AssignRoleGroupMemberRequest & { grantedBy?: number | null },
+  ): Promise<RoleGroupMemberRecord | null> {
+    const now = nowDate();
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(userRoleGroups)
+        .set({
+          isActive: false,
+          validTo: now,
+        })
+        .where(
+          and(
+            eq(userRoleGroups.roleGroupId, roleGroupId),
+            eq(userRoleGroups.userId, input.userId),
+            eq(userRoleGroups.isActive, true),
+          ),
+        );
+
+      await tx.insert(userRoleGroups).values({
+        grantedAt: now,
+        grantedBy: input.grantedBy ?? null,
+        isActive: true,
+        roleGroupId,
+        userId: input.userId,
+        validFrom: now,
+        validTo: null,
+      });
+    });
+
+    const members = await this.listRoleGroupMembers(roleGroupId);
+    return members.find((member) => member.userId === input.userId) ?? null;
+  }
+
+  async removeUserFromRoleGroup(roleGroupId: number, userId: number): Promise<void> {
+    const now = nowDate();
+
+    await this.db
+      .update(userRoleGroups)
+      .set({
+        isActive: false,
+        validTo: now,
+      })
+      .where(
+        and(
+          eq(userRoleGroups.roleGroupId, roleGroupId),
+          eq(userRoleGroups.userId, userId),
+          eq(userRoleGroups.isActive, true),
+        ),
+      );
   }
 }
