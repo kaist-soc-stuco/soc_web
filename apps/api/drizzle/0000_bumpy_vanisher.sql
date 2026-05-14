@@ -9,7 +9,7 @@ CREATE TABLE "article_asset" (
 CREATE TABLE "article" (
 	"article_id" serial PRIMARY KEY NOT NULL,
 	"board_id" integer NOT NULL,
-	"author_user_id" integer NOT NULL,
+	"author_user_id" uuid NOT NULL,
 	"title_ko" varchar(255) NOT NULL,
 	"title_en" varchar(255),
 	"content_ko" text NOT NULL,
@@ -18,6 +18,7 @@ CREATE TABLE "article" (
 	"visibility_scope" varchar(20) DEFAULT 'PUBLIC' NOT NULL,
 	"is_pinned" boolean DEFAULT false NOT NULL,
 	"pin_order" integer,
+	"is_anonymous" boolean DEFAULT false NOT NULL,
 	"posted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone
@@ -31,13 +32,13 @@ CREATE TABLE "asset" (
 	"size_bytes" integer NOT NULL,
 	"checksum" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"uploaded_by" integer NOT NULL,
+	"uploaded_by" uuid NOT NULL,
 	CONSTRAINT "asset_storage_key_unique" UNIQUE("storage_key")
 );
 --> statement-breakpoint
 CREATE TABLE "audit_log" (
 	"audit_log_id" serial PRIMARY KEY NOT NULL,
-	"actor_user_id" integer,
+	"actor_user_id" uuid,
 	"action" varchar(50) NOT NULL,
 	"target_type" varchar(50) NOT NULL,
 	"target_id" varchar(50),
@@ -68,7 +69,7 @@ CREATE TABLE "comment" (
 	"comment_id" serial PRIMARY KEY NOT NULL,
 	"article_id" integer NOT NULL,
 	"parent_comment_id" integer,
-	"author_user_id" integer NOT NULL,
+	"author_user_id" uuid NOT NULL,
 	"content" text NOT NULL,
 	"status" varchar(20) DEFAULT 'PUBLISHED' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -109,11 +110,11 @@ CREATE TABLE "role_group" (
 );
 --> statement-breakpoint
 CREATE TABLE "student_fee_status" (
-	"user_id" integer PRIMARY KEY NOT NULL,
+	"user_id" uuid PRIMARY KEY NOT NULL,
 	"coverage_semesters" smallint DEFAULT 4 NOT NULL,
 	"status" varchar(20) NOT NULL,
 	"paid_at" timestamp with time zone,
-	"verified_by" integer,
+	"verified_by" uuid,
 	"verified_at" timestamp with time zone,
 	"note" text,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -148,12 +149,12 @@ CREATE TABLE "survey_questions" (
 CREATE TABLE "survey_responses" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"survey_id" uuid NOT NULL,
-	"user_id" integer,
+	"user_id" uuid,
 	"external_phone" text,
 	"status" text DEFAULT 'draft' NOT NULL,
 	"submitted_at" timestamp with time zone,
 	"reviewed_at" timestamp with time zone,
-	"review_admin_id" integer,
+	"review_admin_id" uuid,
 	"review_reason" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -173,7 +174,7 @@ CREATE TABLE "survey_sections" (
 --> statement-breakpoint
 CREATE TABLE "survey" (
 	"survey_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"creator_id" integer,
+	"creator_id" uuid,
 	"kind" varchar(20) NOT NULL,
 	"title_ko" varchar(255) NOT NULL,
 	"title_en" varchar(255),
@@ -193,9 +194,9 @@ CREATE TABLE "survey" (
 --> statement-breakpoint
 CREATE TABLE "user_role_group" (
 	"user_role_group_id" serial PRIMARY KEY NOT NULL,
-	"user_id" integer NOT NULL,
+	"user_id" uuid NOT NULL,
 	"role_group_id" integer NOT NULL,
-	"granted_by" integer,
+	"granted_by" uuid,
 	"granted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"valid_from" timestamp with time zone,
 	"valid_to" timestamp with time zone,
@@ -203,7 +204,7 @@ CREATE TABLE "user_role_group" (
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
-	"user_id" serial PRIMARY KEY NOT NULL,
+	"user_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"kaist_uid" varchar(20) NOT NULL,
 	"std_no" varchar(20),
 	"name_ko" varchar(100) NOT NULL,

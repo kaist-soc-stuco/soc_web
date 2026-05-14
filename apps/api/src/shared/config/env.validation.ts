@@ -27,6 +27,27 @@ const asPort = (value: unknown, name: string): number => {
   return port;
 };
 
+const asPositiveInt = (value: unknown, name: string): number => {
+  const raw =
+    typeof value === 'string'
+      ? value.trim()
+      : typeof value === 'number'
+        ? String(value)
+        : '';
+
+  if (!raw) {
+    throw new Error(`Missing environment variable: ${name}`);
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    throw new Error(`Invalid positive integer value for ${name}: ${raw}`);
+  }
+
+  return parsed;
+};
+
 export const validateEnv = (config: Record<string, unknown>): Record<string, unknown> => {
   const postgresHost = asString(config.POSTGRES_HOST, 'POSTGRES_HOST');
   const postgresPort = asPort(config.POSTGRES_PORT, 'POSTGRES_PORT');
@@ -57,6 +78,10 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     AUTH_PENDING_LOGIN_ENCRYPTION_KEY: asString(
       config.AUTH_PENDING_LOGIN_ENCRYPTION_KEY,
       'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
+    ),
+    REDIS_AUTH_TTL_SECONDS: asPositiveInt(
+      config.REDIS_AUTH_TTL_SECONDS ?? 300,
+      'REDIS_AUTH_TTL_SECONDS',
     ),
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,

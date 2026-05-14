@@ -43,7 +43,7 @@ export interface RoleGroupMemberRecord {
   createdAt: string;
   updatedAt: string;
   grantedAt: string;
-  grantedBy: number | null;
+  grantedBy: string | null;
   validFrom: string | null;
   validTo: string | null;
   membershipActive: boolean;

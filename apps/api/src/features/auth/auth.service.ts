@@ -235,6 +235,9 @@ export class AuthService {
           existingUser.userId,
         );
 
+        // 로그인 직후에 권한 캐시가 오래된 값을 가지고 있을 수 있으므로 무효화합니다.
+        await this.usersService.invalidatePermissionCache(existingUser.userId);
+
         const resultToken = randomUUID();
         await this.storeLoginResult(resultToken, {
           accessToken: issued.accessToken,

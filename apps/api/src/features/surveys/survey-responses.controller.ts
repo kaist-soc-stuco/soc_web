@@ -9,10 +9,12 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { SubmitResponseSchema, ReviewResponseSchema } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 import { Request } from "express";
 
-import { AuthGuard, OptionalAuthGuard, PermissionGuard, RequirePermission } from "../../shared/guards";
-import { PermissionFlags } from "../../shared/guards/permission.guard";
+import { OptionalAuthGuard, RequirePermissions } from "../../shared/guards";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveyResponsesService } from "./survey-responses.service";
 import { SubmitResponseDto } from "./dto/submit-response.dto";
@@ -34,22 +36,20 @@ export class SurveyResponsesController {
   @UseGuards(OptionalAuthGuard)
   submit(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
-    @Body() dto: SubmitResponseDto,
+    @Body(new ZodValidationPipe(SubmitResponseSchema)) dto: SubmitResponseDto,
     @Req() req: MaybeAuthedRequest,
   ) {
     return this.responsesService.submit(surveyId, dto, req.user);
   }
 
   @Get()
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.SURVEY_MANAGE)
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
   findAll(@Param("surveyId", ParseUUIDPipe) surveyId: string) {
     return this.responsesService.findAll(surveyId);
   }
 
   @Get(":responseId")
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.SURVEY_MANAGE)
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
   findDetail(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Param("responseId", ParseUUIDPipe) responseId: string,
@@ -58,12 +58,11 @@ export class SurveyResponsesController {
   }
 
   @Patch(":responseId/review")
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.SURVEY_MANAGE)
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
   review(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Param("responseId", ParseUUIDPipe) responseId: string,
-    @Body() dto: ReviewResponseDto,
+    @Body(new ZodValidationPipe(ReviewResponseSchema)) dto: ReviewResponseDto,
     @Req() req: AuthedRequest,
   ) {
     return this.responsesService.review(surveyId, responseId, req.user.id, dto);

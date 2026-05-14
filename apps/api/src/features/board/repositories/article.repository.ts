@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type {
   ArticleCreateRequest,
   ArticleCreateResponse,
@@ -20,6 +20,7 @@ import {
   assets,
   comments,
   users,
+  surveys,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
 import { msToIso, nowDate } from "@soc/shared";
@@ -32,11 +33,21 @@ export class ArticleRepository {
     boardId: number,
     page: number,
     limit: number,
+    query?: string,
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     const offset = (page - 1) * limit;
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(articles.titleKo, `%${normalizedQuery}%`),
+          ilike(articles.titleEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
+
     const baseFilter = and(
       eq(articles.boardId, boardId),
       eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+      searchFilter,
     );
 
     const totalResult = await this.db
@@ -54,6 +65,7 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        isAnonymous: articles.isAnonymous,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
         authorId: users.userId,
@@ -88,6 +100,7 @@ export class ArticleRepository {
           row.visibilityScope as ArticleListItem["visibilityScope"],
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
+        isAnonymous: row.isAnonymous,
         postedAt: msToIso(row.postedAt.valueOf()),
         updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
@@ -97,6 +110,66 @@ export class ArticleRepository {
         commentCount: Number(row.commentCount ?? 0),
       })),
     };
+  }
+
+  async findAllArticles(
+    limit: number,
+    query?: string,
+  ): Promise<ArticleListItem[]> {
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(articles.titleKo, `%${normalizedQuery}%`),
+          ilike(articles.titleEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
+
+    const baseFilter = and(
+      eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+      searchFilter,
+    );
+
+    const rows = await this.db
+      .select({
+        articleId: articles.articleId,
+        boardId: articles.boardId,
+        titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
+        status: articles.status,
+        visibilityScope: articles.visibilityScope,
+        isPinned: articles.isPinned,
+        pinOrder: articles.pinOrder,
+        isAnonymous: articles.isAnonymous,
+        postedAt: articles.postedAt,
+        updatedAt: articles.updatedAt,
+        authorId: users.userId,
+        authorName: users.nameKo,
+      })
+      .from(articles)
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .where(baseFilter)
+      .orderBy(desc(articles.postedAt))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      articleId: String(row.articleId),
+      boardId: row.boardId,
+      titleKo: row.titleKo,
+      titleEn: row.titleEn ?? undefined,
+      status: row.status as ArticleListItem["status"],
+      visibilityScope:
+        row.visibilityScope as ArticleListItem["visibilityScope"],
+      isPinned: row.isPinned,
+      pinOrder: row.pinOrder ?? null,
+      isAnonymous: row.isAnonymous,
+      postedAt: msToIso(row.postedAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+      author: {
+        userId: String(row.authorId ?? ""),
+        name: row.authorName ?? "unknown",
+      },
+      commentCount: 0, // Not needed for search
+    }));
   }
 
   async findDetailById(
@@ -115,6 +188,7 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        isAnonymous: articles.isAnonymous,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
         authorId: users.userId,
@@ -156,6 +230,12 @@ export class ArticleRepository {
       .where(eq(articleAssets.articleId, Number(articleId)))
       .orderBy(asc(articleAssets.sortOrder));
 
+    const surveyRow = await this.db
+      .select()
+      .from(surveys)
+      .where(eq(surveys.connectedArticleId, Number(articleId)))
+      .limit(1);
+
     return {
       articleId: String(row[0].articleId),
       boardId: row[0].boardId,
@@ -168,6 +248,7 @@ export class ArticleRepository {
         .visibilityScope as ArticleDetailResponse["visibilityScope"],
       isPinned: row[0].isPinned,
       pinOrder: row[0].pinOrder ?? null,
+      isAnonymous: row[0].isAnonymous,
       postedAt: msToIso(row[0].postedAt.valueOf()),
       updatedAt: msToIso(row[0].updatedAt.valueOf()),
       author: {
@@ -185,6 +266,31 @@ export class ArticleRepository {
         storageKey: assetRow.storageKey,
       })),
       commentCount: Number(row[0].commentCount ?? 0),
+      survey: surveyRow[0]
+        ? {
+            surveyId: surveyRow[0].surveyId,
+            kind: surveyRow[0].kind,
+            titleKo: surveyRow[0].titleKo,
+            titleEn: surveyRow[0].titleEn ?? undefined,
+            descriptionKo: surveyRow[0].descriptionKo ?? undefined,
+            descriptionEn: surveyRow[0].descriptionEn ?? undefined,
+            status: surveyRow[0].status,
+            computedState: (() => {
+              const now = Date.now();
+              const openAt = surveyRow[0].openAt?.getTime();
+              const closeAt = surveyRow[0].closeAt?.getTime();
+              const status = surveyRow[0].status.toLowerCase();
+              if (openAt && openAt > now) return "before_open";
+              if (closeAt && closeAt <= now) return "closed";
+              if (status === "open") return "open";
+              if (status === "scheduled" && openAt && openAt <= now) return "open";
+              return "closed";
+            })(),
+            feeRequirementPolicy: surveyRow[0].feeRequirementPolicy,
+            openAt: surveyRow[0].openAt ? msToIso(surveyRow[0].openAt.valueOf()) : undefined,
+            closeAt: surveyRow[0].closeAt ? msToIso(surveyRow[0].closeAt.valueOf()) : undefined,
+          }
+        : null,
     };
   }
 
@@ -209,6 +315,7 @@ export class ArticleRepository {
           visibilityScope: input.payload.visibilityScope,
           isPinned: input.payload.isPinned ?? false,
           pinOrder: input.payload.pinOrder ?? null,
+          isAnonymous: input.payload.isAnonymous ?? false,
           postedAt: now,
           updatedAt: now,
         })
@@ -277,6 +384,7 @@ export class ArticleRepository {
       visibilityScope?: string;
       isPinned?: boolean;
       pinOrder?: number | null;
+      isAnonymous?: boolean;
       updatedAt: Date;
     } = {
       updatedAt: now,
@@ -308,6 +416,10 @@ export class ArticleRepository {
 
     if (payload.pinOrder !== undefined) {
       updateSet.pinOrder = payload.pinOrder ?? null;
+    }
+
+    if (payload.isAnonymous !== undefined) {
+      updateSet.isAnonymous = payload.isAnonymous;
     }
 
     return this.db.transaction(async (tx) => {

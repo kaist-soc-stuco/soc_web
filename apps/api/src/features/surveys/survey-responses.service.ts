@@ -9,7 +9,8 @@ import { SurveyResponsesRepository } from "./survey-responses.repository";
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
-import { PermissionFlags } from "../../shared/guards/permission.guard";
+import { UsersService } from "../users/users.service";
+
 
 import type { ResponseDetailResponse } from "@soc/contracts";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
@@ -25,6 +26,7 @@ export class SurveyResponsesService {
     private readonly surveysRepo: SurveysRepository,
     private readonly sectionsRepo: SurveySectionsRepository,
     private readonly questionsRepo: SurveyQuestionsRepository,
+    private readonly usersService: UsersService,
   ) {}
 
   private async getAllQuestionsForSurvey(surveyId: string): Promise<SurveyQuestionRecord[]> {
@@ -56,7 +58,12 @@ export class SurveyResponsesService {
     }
 
     if (survey.feePayersOnly) {
-      if (!caller || (caller.permission & PermissionFlags.TUITION_PAYER) === 0) {
+      if (!caller) {
+        throw new ForbiddenException("fee_payer_only");
+      }
+
+      const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
+      if (!feeStatus || feeStatus.status !== "PAID") {
         throw new ForbiddenException("fee_payer_only");
       }
     }

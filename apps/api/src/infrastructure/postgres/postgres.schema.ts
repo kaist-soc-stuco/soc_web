@@ -25,12 +25,12 @@ export const users = pgTable("users", {
   nameEn: varchar("name_en", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
   privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }),
-  
+
   departmentKo: varchar("dept_ko", { length: 100 }),
   departmentEn: varchar("dept_en", { length: 100 }),
   academicStatus: varchar("academic_status", { length: 20 }), // 재학/휴학 등
   identityCode: varchar("identity_code", { length: 10 }),      // S: 학생 등
-  
+
   isActive: boolean("is_active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -42,7 +42,7 @@ export const users = pgTable("users", {
 export const surveys = pgTable("survey", {
   // 1. 식별자 및 기본 정보 (최신 명세 기준)
   surveyId: uuid("survey_id").defaultRandom().primaryKey(),
-  creatorId: integer("creator_id")
+  creatorId: uuid("creator_id")
     .references(() => users.userId),
   kind: varchar("kind", { length: 20 }).notNull(), // SURVEY, VOTE, APPLICATION 등
   titleKo: varchar("title_ko", { length: 255 }).notNull(),
@@ -52,14 +52,14 @@ export const surveys = pgTable("survey", {
 
   // 2. 상태 및 게시 설정
   status: varchar("status", { length: 20 }).notNull().default("DRAFT"), // DRAFT, OPEN, CLOSED 등
-  connectedArticleId: integer("connected_article_id") 
+  connectedArticleId: integer("connected_article_id")
     .references(() => articles.articleId, { onDelete: "set null" }),
-  
+
   // 3. 참여 및 제한 정책 (명세서의 확장된 정책 반영)
   feeRequirementPolicy: varchar("fee_requirement_policy", { length: 20 })
     .notNull()
     .default("NONE"), // NONE, PAID_ONLY 등 (feat/form의 feePayersOnly 대체)
-    
+
   allowGuestResponse: boolean("allow_guest_response").notNull().default(false),
   resultVisibility: varchar("result_visibility", { length: 20 }).notNull(), // PUBLIC, PRIVATE 등
   maxResponseCount: integer("max_response_count"), // 정원 제한
@@ -68,7 +68,7 @@ export const surveys = pgTable("survey", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
-  
+
 export const permissions = pgTable("permission", {
   permissionId: serial("permission_id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
@@ -146,7 +146,7 @@ export const userRoleGroups = pgTable("user_role_group", {
   roleGroupId: integer("role_group_id")
     .notNull()
     .references(() => roleGroups.roleGroupId),
-  grantedBy: integer("granted_by")
+  grantedBy: uuid("granted_by")
     .references(() => users.userId),
   grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
   validFrom: timestamp("valid_from", { withTimezone: true }),
@@ -163,7 +163,7 @@ export const studentFeeStatus = pgTable("student_fee_status", {
   coverageSemesters: smallint("coverage_semesters").notNull().default(4),
   status: varchar("status", { length: 20 }).notNull(), // PAID, UNPAID, WAIVED
   paidAt: timestamp("paid_at", { withTimezone: true }),
-  verifiedBy: integer("verified_by")
+  verifiedBy: uuid("verified_by")
     .references(() => users.userId),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   note: text("note"),
@@ -209,6 +209,7 @@ export const articles = pgTable("article", {
   visibilityScope: varchar("visibility_scope", { length: 20 }).notNull().default("PUBLIC"),
   isPinned: boolean("is_pinned").notNull().default(false),
   pinOrder: integer("pin_order"),
+  isAnonymous: boolean("is_anonymous").notNull().default(false),
   postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -224,7 +225,7 @@ export const assets = pgTable("asset", {
   sizeBytes: integer("size_bytes").notNull(),
   checksum: text("checksum"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  uploadedBy: integer("uploaded_by")
+  uploadedBy: uuid("uploaded_by")
     .notNull()
     .references(() => users.userId),
 });
@@ -278,7 +279,7 @@ export const surveyResponses = pgTable("survey_responses", {
   status: text("status").notNull().default("draft"),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-  reviewAdminId: integer("review_admin_id").references(() => users.userId),
+  reviewAdminId: uuid("review_admin_id").references(() => users.userId),
   reviewReason: text("review_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

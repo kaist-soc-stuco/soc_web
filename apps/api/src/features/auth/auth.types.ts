@@ -1,5 +1,3 @@
-import { IsBoolean, IsOptional, IsString } from "class-validator";
-
 /**
  * SSO 로그인 이후 개인정보 동의 / 임시 로그인 / 영구 로그인 흐름에서
  * 공통으로 사용할 타입 정의 모음입니다.
@@ -100,13 +98,7 @@ export interface ConsentDecisionRequest {
   pendingLoginToken: string;
 }
 
-export class ConsentDecisionRequestDto implements ConsentDecisionRequest {
-  @IsBoolean()
-  consent!: boolean;
-
-  @IsString()
-  pendingLoginToken!: string;
-}
+export type ConsentDecisionRequestDto = ConsentDecisionRequest;
 
 /**
  * refresh 요청 DTO입니다.
@@ -119,15 +111,7 @@ export interface RefreshSessionRequest {
   sessionId?: string;
 }
 
-export class RefreshSessionRequestDto implements RefreshSessionRequest {
-  @IsOptional()
-  @IsString()
-  refreshToken?: string;
-
-  @IsOptional()
-  @IsString()
-  sessionId?: string;
-}
+export type RefreshSessionRequestDto = RefreshSessionRequest;
 
 /**
  * 로그아웃 요청 DTO입니다.
@@ -136,27 +120,12 @@ export interface LogoutRequest {
   sessionId?: string;
 }
 
-export class LogoutRequestDto implements LogoutRequest {
-  @IsOptional()
-  @IsString()
-  sessionId?: string;
-}
+export type LogoutRequestDto = LogoutRequest;
 
-export class SsoCallbackBodyDto {
-  @IsOptional()
-  @IsString()
+export interface SsoCallbackBodyDto {
   code?: string;
-
-  @IsOptional()
-  @IsString()
   error?: string;
-
-  @IsOptional()
-  @IsString()
   errorCode?: string;
-
-  @IsOptional()
-  @IsString()
   state?: string;
 }
 
@@ -180,6 +149,7 @@ export interface CurrentUserSummary {
   storageMode: StorageMode | null;
   user?: {
     id: string;
+    name?: string;
     permission: number;
   };
 }

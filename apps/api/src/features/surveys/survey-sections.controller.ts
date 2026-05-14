@@ -6,26 +6,26 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  UseGuards,
 } from "@nestjs/common";
+import { CreateSectionSchema, UpdateSectionSchema } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 
-import { AuthGuard, PermissionGuard, RequirePermission } from "../../shared/guards";
-import { PermissionFlags } from "../../shared/guards/permission.guard";
+import { RequirePermissions } from "../../shared/guards";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveySectionsService } from "./survey-sections.service";
 import { CreateSectionDto } from "./dto/create-section.dto";
 import { UpdateSectionDto } from "./dto/update-section.dto";
 
 @Controller("surveys/:surveyId/sections")
-@UseGuards(AuthGuard, PermissionGuard)
-@RequirePermission(PermissionFlags.SURVEY_MANAGE)
+@RequirePermissions(Permissions.MANAGE_SURVEY)
 export class SurveySectionsController {
   constructor(private readonly sectionsService: SurveySectionsService) {}
 
   @Post()
   create(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
-    @Body() dto: CreateSectionDto,
+    @Body(new ZodValidationPipe(CreateSectionSchema)) dto: CreateSectionDto,
   ) {
     return this.sectionsService.create(surveyId, dto);
   }
@@ -34,7 +34,7 @@ export class SurveySectionsController {
   update(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Param("sectionId", ParseUUIDPipe) sectionId: string,
-    @Body() dto: UpdateSectionDto,
+    @Body(new ZodValidationPipe(UpdateSectionSchema)) dto: UpdateSectionDto,
   ) {
     return this.sectionsService.update(surveyId, sectionId, dto);
   }

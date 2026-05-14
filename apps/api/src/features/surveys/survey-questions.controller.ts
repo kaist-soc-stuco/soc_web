@@ -6,19 +6,19 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  UseGuards,
 } from "@nestjs/common";
+import { CreateQuestionSchema, UpdateQuestionSchema } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 
-import { AuthGuard, PermissionGuard, RequirePermission } from "../../shared/guards";
-import { PermissionFlags } from "../../shared/guards/permission.guard";
+import { RequirePermissions } from "../../shared/guards";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveyQuestionsService } from "./survey-questions.service";
 import { CreateQuestionDto } from "./dto/create-question.dto";
 import { UpdateQuestionDto } from "./dto/update-question.dto";
 
 @Controller("surveys/:surveyId/sections/:sectionId/questions")
-@UseGuards(AuthGuard, PermissionGuard)
-@RequirePermission(PermissionFlags.SURVEY_MANAGE)
+@RequirePermissions(Permissions.MANAGE_SURVEY)
 export class SurveyQuestionsController {
   constructor(private readonly questionsService: SurveyQuestionsService) {}
 
@@ -26,7 +26,7 @@ export class SurveyQuestionsController {
   create(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Param("sectionId", ParseUUIDPipe) sectionId: string,
-    @Body() dto: CreateQuestionDto,
+    @Body(new ZodValidationPipe(CreateQuestionSchema)) dto: CreateQuestionDto,
   ) {
     return this.questionsService.create(surveyId, sectionId, dto);
   }
@@ -36,7 +36,7 @@ export class SurveyQuestionsController {
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Param("sectionId", ParseUUIDPipe) sectionId: string,
     @Param("questionId", ParseUUIDPipe) questionId: string,
-    @Body() dto: UpdateQuestionDto,
+    @Body(new ZodValidationPipe(UpdateQuestionSchema)) dto: UpdateQuestionDto,
   ) {
     return this.questionsService.update(surveyId, sectionId, questionId, dto);
   }

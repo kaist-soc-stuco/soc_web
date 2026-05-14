@@ -1,4 +1,5 @@
 import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
+import { Permissions } from "@soc/contracts";
 
 interface CurrentUserContext {
   authenticated: boolean;
@@ -10,7 +11,7 @@ interface CurrentUserContext {
 
 interface ReadScopeSource {
   readScope: string;
-  managePermissionId: number;
+  managePermissionBit: number;
 }
 
 export const assertBoardReadable = (
@@ -29,12 +30,11 @@ export const assertBoardReadable = (
     return;
   }
 
-  const requiredPermission = board.managePermissionId ?? 0;
-  if (!user.user || requiredPermission <= 0) {
+  if (!user.user || board.managePermissionBit <= 0) {
     throw new ForbiddenException("insufficient_permission");
   }
 
-  if ((user.user.permission & requiredPermission) !== requiredPermission) {
+  if (!Permissions.has(user.user.permission, board.managePermissionBit)) {
     throw new ForbiddenException("insufficient_permission");
   }
 };

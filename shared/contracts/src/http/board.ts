@@ -7,9 +7,12 @@ export interface BoardSummary {
   nameEn?: string;
   description?: string;
   readScope: BoardReadScope;
-  writePermissionId: number;
-  commentPermissionId: number;
-  managePermissionId: number;
+  /** 글쓰기에 필요한 permission bit 값. 0이면 제한 없음. */
+  writePermissionBit: number;
+  /** 댓글에 필요한 permission bit 값. 0이면 제한 없음. */
+  commentPermissionBit: number;
+  /** 관리에 필요한 permission bit 값. 0이면 제한 없음. */
+  managePermissionBit: number;
   allowComment: boolean;
   allowSecret: boolean;
   allowLike: boolean;
@@ -40,6 +43,7 @@ export interface ArticleListItem {
   postedAt: string;
   updatedAt: string;
   author: ArticleAuthorSummary;
+  isAnonymous: boolean;
   commentCount: number;
 }
 
@@ -60,6 +64,20 @@ export interface ArticleAssetItem {
   storageKey: string;
 }
 
+export interface SurveySummary {
+  surveyId: string;
+  kind: string;
+  titleKo: string;
+  titleEn?: string;
+  descriptionKo?: string;
+  descriptionEn?: string;
+  status: string;
+  computedState: string;
+  feeRequirementPolicy: string;
+  openAt?: string;
+  closeAt?: string;
+}
+
 export interface ArticleDetailResponse {
   articleId: string;
   boardId: number;
@@ -74,8 +92,10 @@ export interface ArticleDetailResponse {
   postedAt: string;
   updatedAt: string;
   author: ArticleAuthorSummary;
+  isAnonymous: boolean;
   assets: ArticleAssetItem[];
   commentCount: number;
+  survey?: SurveySummary | null;
 }
 
 export interface ArticleAssetRequest {
@@ -92,6 +112,7 @@ export interface ArticleCreateRequest {
   visibilityScope: VisibilityScope;
   isPinned?: boolean;
   pinOrder?: number | null;
+  isAnonymous?: boolean;
   assets?: ArticleAssetRequest[];
 }
 
@@ -109,6 +130,7 @@ export interface ArticleUpdateRequest {
   visibilityScope?: VisibilityScope;
   isPinned?: boolean;
   pinOrder?: number | null;
+  isAnonymous?: boolean;
   assets?: ArticleAssetRequest[];
 }
 

@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import type { StudentFeeListResponse, FeeStatus } from '@soc/contracts';
-import { Header } from '@/components/organisms/header';
 import { Button } from '@/components/ui/button';
 import { resolveApiBaseUrl } from '@/lib/api';
-import { MANAGE_FINANCE_PERMISSION_BIT } from '@/lib/permissions';
+import { Permissions } from '@/lib/permissions';
 
 export function FeeManagementPage() {
   const navigate = useNavigate();
@@ -23,7 +22,6 @@ export function FeeManagementPage() {
   const totalCount = feeData?.total ?? 0;
   const paidCount = students.filter((student) => student.status === 'PAID').length;
   const unpaidCount = students.filter((student) => student.status === 'UNPAID').length;
-  const waivedCount = students.filter((student) => student.status === 'WAIVED').length;
 
   useEffect(() => {
     loadData();
@@ -35,7 +33,7 @@ export function FeeManagementPage() {
 
       const me = await apiClient.getCurrentUser();
       const permission = me?.user?.permission ?? 0;
-      if (!(permission & MANAGE_FINANCE_PERMISSION_BIT)) {
+      if (!Permissions.has(permission, Permissions.MANAGE_FINANCE)) {
         setError('과비 관리 권한이 없습니다.');
         navigate('/');
         return;
@@ -83,8 +81,6 @@ export function FeeManagementPage() {
         return 'bg-green-100 text-green-800';
       case 'UNPAID':
         return 'bg-red-100 text-red-800';
-      case 'WAIVED':
-        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -96,8 +92,6 @@ export function FeeManagementPage() {
         return '납부 완료';
       case 'UNPAID':
         return '미납부';
-      case 'WAIVED':
-        return '면제';
       default:
         return '미납부';
     }
@@ -105,48 +99,45 @@ export function FeeManagementPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
-        <Header showLogo />
-        <main className="mx-auto flex w-full max-w-6xl items-center justify-center px-4 py-20 md:px-8">
-          <div className="rounded-3xl border border-kaist-darkgreen/10 bg-white px-8 py-10 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-kaist-greygreen">
-              Fee Console
-            </p>
-            <p className="mt-3 text-lg font-bold text-kaist-black">과비 데이터를 불러오는 중입니다.</p>
-            <p className="mt-2 text-sm text-kaist-grey">잠시만 기다려 주세요.</p>
-          </div>
-        </main>
-      </div>
+        <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
+          <main className="mx-auto flex w-full max-w-6xl items-center justify-center px-4 py-20 md:px-8">
+            <div className="rounded-3xl border border-kaist-darkgreen/10 bg-white px-8 py-10 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-kaist-greygreen">
+                Fee Console
+              </p>
+              <p className="mt-3 text-lg font-bold text-kaist-black">과비 데이터를 불러오는 중입니다.</p>
+              <p className="mt-2 text-sm text-kaist-grey">잠시만 기다려 주세요.</p>
+            </div>
+          </main>
+        </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
-        <Header showLogo />
-        <main className="mx-auto flex w-full max-w-4xl px-4 py-10 md:px-8">
-          <div className="w-full rounded-3xl border border-red-200 bg-white p-6 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
-            <p className="text-xs font-extrabold uppercase tracking-[0.28em] text-kaist-greygreen">
-              Fee Console
-            </p>
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-              {error}
+        <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
+          <main className="mx-auto flex w-full max-w-4xl px-4 py-10 md:px-8">
+            <div className="w-full rounded-3xl border border-red-200 bg-white p-6 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
+              <p className="text-xs font-extrabold uppercase tracking-[0.28em] text-kaist-greygreen">
+                Fee Console
+              </p>
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+                {error}
+              </div>
+              <div className="mt-6">
+                <Button onClick={() => navigate('/')} variant="outline">
+                  홈으로 돌아가기
+                </Button>
+              </div>
             </div>
-            <div className="mt-6">
-              <Button onClick={() => navigate('/')} variant="outline">
-                홈으로 돌아가기
-              </Button>
-            </div>
-          </div>
-        </main>
-      </div>
+          </main>
+        </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
-      <Header showLogo />
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-10 md:px-8">
+      <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
+        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-10 md:px-8">
         <section className="overflow-hidden rounded-3xl border border-kaist-darkgreen/10 bg-white shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
           <div className="grid gap-6 p-6 md:grid-cols-[1.25fr_0.95fr] md:p-8">
             <div className="space-y-4">
@@ -163,7 +154,6 @@ export function FeeManagementPage() {
                 <span className="rounded-full bg-kaist-darkgreen/6 px-4 py-2">전체 {totalCount}명</span>
                 <span className="rounded-full bg-green-50 px-4 py-2 text-green-700">납부 완료 {paidCount}명</span>
                 <span className="rounded-full bg-red-50 px-4 py-2 text-red-700">미납부 {unpaidCount}명</span>
-                <span className="rounded-full bg-blue-50 px-4 py-2 text-blue-700">면제 {waivedCount}명</span>
               </div>
             </div>
 
@@ -181,7 +171,6 @@ export function FeeManagementPage() {
                   { key: undefined, label: '전체' },
                   { key: 'UNPAID', label: '미납부' },
                   { key: 'PAID', label: '납부 완료' },
-                  { key: 'WAIVED', label: '면제' },
                 ] as Array<{ key: FeeStatus | undefined; label: string }>).map((item) => (
                   <button
                     key={item.label}
@@ -265,7 +254,6 @@ export function FeeManagementPage() {
                           >
                             <option value="PAID">납부 완료</option>
                             <option value="UNPAID">미납부</option>
-                            <option value="WAIVED">면제</option>
                           </select>
                         ) : (
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getStatusBadgeColor(student.status)}`}>
@@ -338,7 +326,7 @@ export function FeeManagementPage() {
             </div>
           )}
         </section>
-      </main>
-    </div>
+        </main>
+      </div>
   );
 }

@@ -19,10 +19,12 @@ import type {
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
+import { CommentCreateSchema, CommentUpdateSchema } from "@soc/contracts";
 import { Request } from "express";
 
 import { AuthGuard } from "../../shared/guards";
 import { Cookies } from "../../shared/decorators/cookies.decorator";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { AUTH_ACCESS_COOKIE_NAME } from "../auth/auth.tokens";
 import { AuthSessionService } from "../auth/auth-session.service";
 import { CommentService } from "./comment.service";
@@ -67,7 +69,7 @@ export class CommentController {
   async createComment(
     @Param("code") code: string,
     @Param("articleId") articleId: string,
-    @Body() body: CommentCreateRequest,
+    @Body(new ZodValidationPipe(CommentCreateSchema)) body: CommentCreateRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<CommentCreateResponse> {
     return this.commentService.createComment(
@@ -84,7 +86,7 @@ export class CommentController {
     @Param("code") code: string,
     @Param("articleId") articleId: string,
     @Param("commentId") commentId: string,
-    @Body() body: CommentUpdateRequest,
+    @Body(new ZodValidationPipe(CommentUpdateSchema)) body: CommentUpdateRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<CommentUpdateResponse> {
     return this.commentService.updateComment(

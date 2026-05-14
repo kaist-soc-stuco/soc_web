@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { createApiClient } from "@soc/api-client";
-import type { CurrentUserResponse } from "@soc/contracts";
+import type { CurrentUserResponse, ArticleListItem } from "@soc/contracts";
 import { hasPermission } from "@soc/shared";
 import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
@@ -64,6 +64,8 @@ export function BoardPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
     null,
   );
+  const [articles, setArticles] = useState<ArticleListItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -72,16 +74,6 @@ export function BoardPage() {
 
   const postsPerPage = 10;
 
-  // TODO: MySQL에서 게시글 데이터 가져오기
-  const mockPosts: BoardPost[] = Array.from({ length: 50 }, (_, i) => ({
-    id: i + 1,
-    category: category,
-    title: `${category} 게시글 제목 ${i + 1}`,
-    author: "조성원",
-    date: "26.03.04",
-    views: Math.floor(Math.random() * 1000),
-  }));
-
   // TODO: MySQL에서 진행중인 행사 가져오기
   const ongoingEvents: Event[] = [
     { id: 1, title: "전산학부 간식 이벤트", date: "03.10", image: "/temp.png" },
@@ -89,16 +81,7 @@ export function BoardPage() {
     { id: 3, title: "학생회 총회", date: "03.20", image: "/temp.png" },
   ];
 
-  const filteredPosts = mockPosts.filter((post) =>
-    post.title.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
-  const startIndex = (currentPage - 1) * postsPerPage;
-  const currentPosts = filteredPosts.slice(
-    startIndex,
-    startIndex + postsPerPage,
-  );
+  const totalPages = Math.ceil(totalCount / postsPerPage);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -136,6 +119,26 @@ export function BoardPage() {
       cancelled = true;
     };
   }, [apiClient]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    apiClient.getArticles(category, { page: currentPage, limit: postsPerPage, q: searchQuery }).then((data) => {
+      if (!cancelled) {
+        setArticles(data.items);
+        setTotalCount(data.total);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, category, currentPage, searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSearchQuery("");
+  }, [category]);
 
   const requiredPermission = BOARD_WRITE_PERMISSION[category as BoardType] ?? 0;
   const userPermission = currentUser?.user?.permission ?? 0;
@@ -175,21 +178,19 @@ export function BoardPage() {
                     onMouseLeave={() => setHoveredIndex(null)}
                   >
                     <div
-                      className={`relative flex items-center justify-center h-full text-lg font-extrabold tracking-tight transition-colors ${
-                        category === board
-                          ? "text-kaist-darkgreen"
-                          : "text-kaist-greygreen hover:text-kaist-darkgreen"
-                      }`}
+                      className={`relative flex items-center justify-center h-full text-lg font-extrabold tracking-tight transition-colors ${category === board
+                        ? "text-kaist-darkgreen"
+                        : "text-kaist-greygreen hover:text-kaist-darkgreen"
+                        }`}
                     >
                       <span className="py-4">{board}</span>
                       <span
-                        className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
-                          category === board
+                        className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${category === board
+                          ? "scale-x-100"
+                          : hoveredIndex === index
                             ? "scale-x-100"
-                            : hoveredIndex === index
-                              ? "scale-x-100"
-                              : "scale-x-0"
-                        }`}
+                            : "scale-x-0"
+                          }`}
                       />
                     </div>
                   </Link>
@@ -204,7 +205,10 @@ export function BoardPage() {
                     type="text"
                     placeholder="검색..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setCurrentPage(1);
+                      setSearchQuery(e.target.value);
+                    }}
                     className="pl-9 pr-4 py-2 w-72 border-b border-kaist-grey/30 text-sm font-medium tracking-tight focus:outline-none focus:border-kaist-darkgreen transition-colors"
                   />
                 </div>
@@ -221,41 +225,41 @@ export function BoardPage() {
               {/* Table Header */}
               <div className="grid grid-cols-12 gap-4 py-4 bg-kaist-white border-b-2 border-kaist-darkgreen-main font-extrabold text-sm tracking-tight text-kaist-darkgreen">
                 <div className="col-span-1 text-center">번호</div>
-                <div className="col-span-1 text-center">말머리</div>
+                <div className="col-span-1 text-center">분류</div>
                 <div className="col-span-7 text-center">제목</div>
                 <div className="col-span-1 text-center">글쓴이</div>
                 <div className="col-span-1 text-center">작성일</div>
-                <div className="col-span-1 text-center">조회</div>
+                <div className="col-span-1 text-center">댓글</div>
               </div>
 
               {/* Table Body */}
               <div className="divide-y divide-kaist-grey/20 border-b border-kaist-grey/20">
-                {currentPosts.length > 0 ? (
-                  currentPosts.map((post) => (
+                {articles.length > 0 ? (
+                  articles.map((post) => (
                     <Link
-                      key={post.id}
-                      to={`/board/${category}/${post.id}`}
+                      key={post.articleId}
+                      to={`/board/${category}/${post.articleId}`}
                       className="grid grid-cols-12 gap-4 py-4 hover:bg-kaist-grey/5 transition-colors group"
                     >
                       <div className="col-span-1 grid place-content-center text-center text-sm font-semibold text-kaist-grey">
-                        {post.id}
+                        {post.articleId}
                       </div>
                       <div className="col-span-1 text-center">
                         <span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-semibold tracking-tight">
-                          {post.category}
+                          {category}
                         </span>
                       </div>
                       <div className="col-span-7 flex ml-8 items-center text-left text-sm font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
-                        {post.title}
+                        {post.titleKo}
                       </div>
                       <div className="col-span-1 grid place-content-center text-center text-sm font-semibold tracking-tight text-kaist-black">
-                        {post.author}
+                        {post.isAnonymous ? "익명" : post.author.name}
                       </div>
                       <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
-                        {post.date}
+                        {new Date(post.postedAt).toLocaleDateString()}
                       </div>
                       <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
-                        {post.views}
+                        {post.commentCount}
                       </div>
                     </Link>
                   ))
@@ -275,11 +279,10 @@ export function BoardPage() {
                         handlePageChange(Math.max(1, currentPage - 1))
                       }
                       disabled={currentPage === 1}
-                      className={`p-1 rounded-md transition-colors ${
-                        currentPage === 1
-                          ? "text-kaist-grey/30 cursor-not-allowed"
-                          : "text-kaist-darkgreen hover:bg-kaist-grey/10"
-                      }`}
+                      className={`p-1 rounded-md transition-colors ${currentPage === 1
+                        ? "text-kaist-grey/30 cursor-not-allowed"
+                        : "text-kaist-darkgreen hover:bg-kaist-grey/10"
+                        }`}
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>
@@ -288,11 +291,10 @@ export function BoardPage() {
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                        className={`min-w-10 h-10 px-3 rounded-md text-sm font-semibold tracking-tight transition-colors ${
-                          currentPage === page
-                            ? "bg-kaist-darkgreen text-kaist-white"
-                            : "text-kaist-greygreen hover:bg-kaist-grey/10"
-                        }`}
+                        className={`min-w-10 h-10 px-3 rounded-md text-sm font-semibold tracking-tight transition-colors ${currentPage === page
+                          ? "bg-kaist-darkgreen text-kaist-white"
+                          : "text-kaist-greygreen hover:bg-kaist-grey/10"
+                          }`}
                       >
                         {page}
                       </button>
@@ -303,28 +305,30 @@ export function BoardPage() {
                         handlePageChange(Math.min(totalPages, currentPage + 1))
                       }
                       disabled={currentPage === totalPages}
-                      className={`p-2 rounded-md transition-colors ${
-                        currentPage === totalPages
-                          ? "text-kaist-grey/30 cursor-not-allowed"
-                          : "text-kaist-darkgreen hover:bg-kaist-grey/10"
-                      }`}
+                      className={`p-2 rounded-md transition-colors ${currentPage === totalPages
+                        ? "text-kaist-grey/30 cursor-not-allowed"
+                        : "text-kaist-darkgreen hover:bg-kaist-grey/10"
+                        }`}
                     >
                       <ChevronRight className="h-5 w-5" />
                     </button>
                   </div>
                 )}
                 {canWrite && (
-                  <button className="absolute right-0 px-6 py-2 bg-kaist-white border border-kaist-darkgreen text-kaist-darkgreen rounded-sm text-sm font-extrabold tracking-tight hover:bg-kaist-darkgreen hover:text-kaist-white transition-colors">
+                  <Link
+                    to={`/board/${category}/write`}
+                    className="absolute right-0 px-6 py-2 bg-kaist-white border border-kaist-darkgreen text-kaist-darkgreen rounded-sm text-sm font-extrabold tracking-tight hover:bg-kaist-darkgreen hover:text-kaist-white transition-colors"
+                  >
                     글쓰기
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>
           </div>
-        
-          <div className="max-w-7xl mx-auto px-4 pb-16">
+
+          {/* <div className="max-w-7xl mx-auto px-4 pb-16">
             <BoardDebugPanel defaultBoardCode={category} />
-          </div>
+          </div> */}
         </div>
       </main>
     </div>

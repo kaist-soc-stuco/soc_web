@@ -25,7 +25,7 @@ export class AssetRepository {
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
         checksum: null,
-        uploadedBy: Number(input.uploadedBy),
+        uploadedBy: input.uploadedBy,
       })
       .returning({ assetId: assets.assetId });
 

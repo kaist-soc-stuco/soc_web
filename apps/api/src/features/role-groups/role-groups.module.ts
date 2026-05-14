@@ -5,7 +5,7 @@ import { RedisModule } from "../../infrastructure/redis/redis.module";
 import { AuthSessionRepository } from "../auth/auth-session.repository";
 import { UsersRepository } from "../users/repositories/users.repository";
 import { UsersService } from "../users/users.service";
-import { AuthGuard, PermissionGuard } from "../../shared/guards";
+import { AuthGuard, PermissionBitsGuard } from "../../shared/guards";
 
 import { RoleGroupsController } from "./role-groups.controller";
 import { RoleGroupsRepository } from "./role-groups.repository";
@@ -19,7 +19,7 @@ import { RoleGroupsService } from "./role-groups.service";
     UsersRepository,
     UsersService,
     AuthGuard,
-    PermissionGuard,
+    PermissionBitsGuard,
     RoleGroupsRepository,
     RoleGroupsService,
   ],

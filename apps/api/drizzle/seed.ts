@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, eq, sql } from "drizzle-orm";
 import { articles, boards, permissions } from "../src/infrastructure/postgres/postgres.schema";
+import { PERMISSION_REGISTRY } from "@soc/contracts";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -27,99 +28,19 @@ type BoardSeed = {
   sortOrder: number;
 };
 
-type PermissionSeed = {
-  permissionId: number;
-  code: string;
-  bitValue: number;
-  nameKo: string;
-  nameEn: string;
-  description: string;
-  isActive: boolean;
-};
-
-const PERMISSION_SEEDS: PermissionSeed[] = [
-  {
-    permissionId: 1,
-    code: "WRITE_NOTICE",
-    bitValue: 1,
-    nameKo: "공지/행사 작성",
-    nameEn: "Write Notice",
-    description: "공식 공지 및 행사 게시글 작성 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 2,
-    code: "WRITE_GENERAL",
-    bitValue: 2,
-    nameKo: "일반/홍보 작성",
-    nameEn: "Write General",
-    description: "홍보, HoC, 연구실 등 일반 게시글 작성 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 4,
-    code: "WRITE_REPLY",
-    bitValue: 4,
-    nameKo: "공식 답변",
-    nameEn: "Write Reply",
-    description: "QnA/건의사항 공식 답변 및 상태 변경 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 8,
-    code: "MANAGE_SURVEY",
-    bitValue: 8,
-    nameKo: "설문조사 관리",
-    nameEn: "Manage Survey",
-    description: "설문조사, 투표, 단체구매 생성 및 결과 열람 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 16,
-    code: "MANAGE_FINANCE",
-    bitValue: 16,
-    nameKo: "과비 관리",
-    nameEn: "Manage Finance",
-    description: "과비 납부 시트 관리 및 독촉 메일 발송 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 32,
-    code: "MANAGE_CONTENT",
-    bitValue: 32,
-    nameKo: "콘텐츠 관리",
-    nameEn: "Manage Content",
-    description: "홈 화면, 배너, 로드맵, 캘린더 등 정보성 콘텐츠 수정 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 64,
-    code: "MANAGE_TOOL",
-    bitValue: 64,
-    nameKo: "도구 관리",
-    nameEn: "Manage Tool",
-    description: "POM 채점기, 챗봇 등 기술 도구 데이터 관리 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 128,
-    code: "MODERATOR",
-    bitValue: 128,
-    nameKo: "유저/게시글 관리",
-    nameEn: "Moderator",
-    description: "타인 게시글 삭제 및 일반 유저 제재 권한",
-    isActive: true,
-  },
-  {
-    permissionId: 256,
-    code: "ADMIN",
-    bitValue: 256,
-    nameKo: "최고 관리자",
-    nameEn: "Admin",
-    description: "역할 그룹 CRUD와 권한 부여 권한",
-    isActive: true,
-  },
-];
+/**
+ * SSOT(permissions-registry.ts)에서 자동 생성되는 시드 데이터.
+ * 새 권한을 추가하려면 permissions-registry.ts만 수정하면 됩니다.
+ */
+const PERMISSION_SEEDS = PERMISSION_REGISTRY.map((def) => ({
+  permissionId: def.bit, // permissionId와 bitValue를 동일하게 유지
+  code: def.code,
+  bitValue: def.bit,
+  nameKo: def.labelKo,
+  nameEn: def.labelEn,
+  description: def.description,
+  isActive: true,
+}));
 
 const BOARD_SEEDS: BoardSeed[] = [
   {
@@ -308,6 +229,7 @@ async function seedNoticeArticle() {
       visibilityScope: "PUBLIC",
       isPinned: true,
       pinOrder: 0,
+      isAnonymous: false,
     })
     .returning({ articleId: articles.articleId });
 

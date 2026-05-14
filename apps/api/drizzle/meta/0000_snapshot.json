@@ -1,5 +1,5 @@
 {
-  "id": "8c3f1057-4666-48df-8abb-ef8c269ae705",
+  "id": "bf73fccc-cd8f-467d-a218-9030221a017f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -93,7 +93,7 @@
         },
         "author_user_id": {
           "name": "author_user_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -147,6 +147,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_anonymous": {
+          "name": "is_anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "posted_at": {
           "name": "posted_at",
@@ -269,7 +276,7 @@
         },
         "uploaded_by": {
           "name": "uploaded_by",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         }
@@ -316,7 +323,7 @@
         },
         "actor_user_id": {
           "name": "actor_user_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -555,7 +562,7 @@
         },
         "author_user_id": {
           "name": "author_user_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -864,7 +871,7 @@
       "columns": {
         "user_id": {
           "name": "user_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": true,
           "notNull": true
         },
@@ -889,7 +896,7 @@
         },
         "verified_by": {
           "name": "verified_by",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1162,7 +1169,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1193,7 +1200,7 @@
         },
         "review_admin_id": {
           "name": "review_admin_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1364,7 +1371,7 @@
         },
         "creator_id": {
           "name": "creator_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1511,7 +1518,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -1523,7 +1530,7 @@
         },
         "granted_by": {
           "name": "granted_by",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1608,9 +1615,10 @@
       "columns": {
         "user_id": {
           "name": "user_id",
-          "type": "serial",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
         "kaist_uid": {
           "name": "kaist_uid",

@@ -92,30 +92,34 @@ export interface SurveyAnswerRecord {
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
 export interface CreateSurveyRequest {
+  kind: string;
   titleKo: string;
   titleEn: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  feePayersOnly?: boolean;
-  allowAnonymous?: boolean;
-  maxResponses?: number;
-  opensAt?: string;
-  closesAt?: string;
-  connectedPostId?: string;
+  feeRequirementPolicy?: string;
+  allowGuestResponse?: boolean;
+  resultVisibility: string;
+  maxResponseCount?: number;
+  openAt?: string;
+  closeAt?: string;
+  connectedArticleId?: string;
 }
 
 export interface UpdateSurveyRequest {
+  kind?: string;
   titleKo?: string;
   titleEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
   status?: SurveyStatus;
-  feePayersOnly?: boolean;
-  allowAnonymous?: boolean;
-  maxResponses?: number;
-  opensAt?: string;
-  closesAt?: string;
-  connectedPostId?: string;
+  feeRequirementPolicy?: string;
+  allowGuestResponse?: boolean;
+  resultVisibility?: string;
+  maxResponseCount?: number;
+  openAt?: string;
+  closeAt?: string;
+  connectedArticleId?: string;
 }
 
 export interface CreateSectionRequest {

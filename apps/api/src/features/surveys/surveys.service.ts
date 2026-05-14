@@ -26,9 +26,26 @@ export class SurveysService {
     closesAt: string | null;
   }): ComputedSurveyState {
     const now = nowMs();
-    if (survey.opensAt && isoToMs(survey.opensAt) > now) return "before_open";
-    if (survey.closesAt && isExpired(isoToMs(survey.closesAt))) return "closed";
-    if (survey.status === "open") return "open";
+    const status = survey.status.toLowerCase();
+
+    // 1. 기간 기반 체크
+    if (survey.opensAt && isoToMs(survey.opensAt) > now) {
+      return "before_open";
+    }
+    if (survey.closesAt && isoToMs(survey.closesAt) <= now) {
+      return "closed";
+    }
+
+    // 2. 상태 기반 체크
+    if (status === "open") return "open";
+    if (status === "scheduled") {
+      // scheduled는 기간 내에 있으면 open으로 간주
+      if (survey.opensAt && isoToMs(survey.opensAt) <= now) {
+        return "open";
+      }
+      return "before_open";
+    }
+
     return "closed";
   }
 

@@ -10,10 +10,12 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { CreateSurveySchema, UpdateSurveySchema } from "@soc/contracts";
 import { Request } from "express";
 
-import { AuthGuard, PermissionGuard, RequirePermission } from "../../shared/guards";
-import { PermissionFlags } from "../../shared/guards/permission.guard";
+import { RequirePermissions } from "../../shared/guards";
+import { Permissions } from "@soc/contracts";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveysService } from "./surveys.service";
 import { CreateSurveyDto } from "./dto/create-survey.dto";
@@ -28,8 +30,7 @@ export class SurveysController {
   constructor(private readonly surveysService: SurveysService) {}
 
   @Get()
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.SURVEY_MANAGE)
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
   findAll() {
     return this.surveysService.findAll();
   }
@@ -40,22 +41,25 @@ export class SurveysController {
   }
 
   @Post()
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.SURVEY_MANAGE)
-  create(@Req() req: AuthedRequest, @Body() dto: CreateSurveyDto) {
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  create(
+    @Req() req: AuthedRequest,
+    @Body(new ZodValidationPipe(CreateSurveySchema)) dto: CreateSurveyDto,
+  ) {
     return this.surveysService.create(req.user.id, dto);
   }
 
   @Patch(":id")
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.SURVEY_MANAGE)
-  update(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateSurveyDto) {
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  update(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(UpdateSurveySchema)) dto: UpdateSurveyDto,
+  ) {
     return this.surveysService.update(id, dto);
   }
 
   @Delete(":id")
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.SURVEY_MANAGE)
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
   delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.surveysService.delete(id);
   }

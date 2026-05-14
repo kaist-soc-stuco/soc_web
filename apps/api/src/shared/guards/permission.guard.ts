@@ -7,30 +7,32 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { Permissions } from "@soc/contracts";
 
 const REQUIRED_PERMISSION_KEY = "requiredPermission";
 
+/**
+ * @deprecated RequirePermissions 데코레이터를 사용하세요.
+ * @see {import("../decorators/require-permissions.decorator").RequirePermissions}
+ */
 export const RequirePermission = (permission: number) =>
   SetMetadata(REQUIRED_PERMISSION_KEY, permission);
 
+/**
+ * 권한 비트 상수.
+ * @deprecated `import { Permissions } from "@soc/contracts"` 를 사용하세요.
+ * 호환을 위해 유지되며, 값은 Permissions 래퍼에서 가져옵니다.
+ */
 export const PermissionFlags = {
-  WRITE_NOTICE: 1,
-  BOARD_STUDENT_COUNCIL_WRITE: 1,
-  WRITE_GENERAL: 2,
-  BOARD_HOC_PROMO_ESCAMP_WRITE: 2,
-  BOARD_HOC_PROMO_WRITE: 2,
-  WRITE_REPLY: 4,
-  BOARD_SUGGESTION_REPLY: 4,
-  MANAGE_SURVEY: 8,
-  SURVEY_MANAGE: 8,
-  MANAGE_FINANCE: 16,
-  TUITION_MANAGE: 16,
-  MANAGE_CONTENT: 32,
-  MANAGE_TOOL: 64,
-  MODERATOR: 128,
-  POST_DELETE: 128,
-  ADMIN: 256,
-  TUITION_PAYER: 256,
+  WRITE_NOTICE: Permissions.WRITE_NOTICE,
+  WRITE_GENERAL: Permissions.WRITE_GENERAL,
+  WRITE_REPLY: Permissions.WRITE_REPLY,
+  MANAGE_SURVEY: Permissions.MANAGE_SURVEY,
+  MANAGE_FINANCE: Permissions.MANAGE_FINANCE,
+  MANAGE_CONTENT: Permissions.MANAGE_CONTENT,
+  MANAGE_TOOL: Permissions.MANAGE_TOOL,
+  MODERATOR: Permissions.MODERATOR,
+  ADMIN: Permissions.ADMIN,
 } as const;
 
 @Injectable()
@@ -58,9 +60,7 @@ export class PermissionGuard implements CanActivate {
       throw new UnauthorizedException("user_not_found_in_request");
     }
 
-    const grantedPermission = request.user.permission ?? 0;
-
-    if ((grantedPermission & requiredPermission) !== requiredPermission) {
+    if (!Permissions.has(request.user.permission ?? 0, requiredPermission)) {
       throw new ForbiddenException("insufficient_permission");
     }
 

@@ -57,6 +57,14 @@ export class UsersService {
     return this.usersRepository.resolvePermissionBitmaskByUserId(userId);
   }
 
+  async invalidatePermissionCache(userId: string): Promise<void> {
+    await this.usersRepository.invalidatePermissionBitmask(userId);
+  }
+
+  async invalidatePermissionCaches(userIds: string[]): Promise<void> {
+    await this.usersRepository.invalidatePermissionBitmasks(userIds);
+  }
+
   async searchUsers(input: { query?: string; limit?: number }): Promise<AdminUserRecord[]> {
     return this.usersRepository.searchUsers(input.query, input.limit ?? 20);
   }
@@ -96,7 +104,7 @@ export class UsersService {
       status: FeeStatus;
       coverageSemesters?: number;
       note?: string | null;
-      verifiedBy?: number;
+      verifiedBy?: string;
     },
   ): Promise<StudentFeeStatusRecord> {
     return this.usersRepository.updateStudentFeeStatus(userId, input);
@@ -112,5 +120,23 @@ export class UsersService {
     pageSize?: number,
   ): Promise<{ students: any[]; total: number; page: number; pageSize: number }> {
     return this.usersRepository.listStudentsByFeeStatus(status, page, pageSize);
+  }
+
+  async getMyArticles(userId: string, options: { page: number; limit: number }) {
+    const offset = Math.max(0, (options.page - 1) * options.limit);
+    const items = await this.usersRepository.getMyArticles(userId, options.limit, offset);
+    return { items };
+  }
+
+  async getMyComments(userId: string, options: { page: number; limit: number }) {
+    const offset = Math.max(0, (options.page - 1) * options.limit);
+    const items = await this.usersRepository.getMyComments(userId, options.limit, offset);
+    return { items };
+  }
+
+  async getMySurveyResponses(userId: string, options: { page: number; limit: number }) {
+    const offset = Math.max(0, (options.page - 1) * options.limit);
+    const items = await this.usersRepository.getMySurveyResponses(userId, options.limit, offset);
+    return { items };
   }
 }

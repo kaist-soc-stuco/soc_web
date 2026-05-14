@@ -9,7 +9,6 @@ import type {
 } from "@soc/contracts";
 import { formatKoreanDateTime, hasPermission } from "@soc/shared";
 
-import { Header } from "@/components/organisms/header";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
 import {
@@ -301,9 +300,7 @@ export function PermissionPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
-      <Header showLogo />
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
         <section className="overflow-hidden rounded-3xl border border-kaist-darkgreen/10 bg-white shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
           <div className="grid gap-6 p-6 md:grid-cols-[1.35fr_0.9fr] md:p-8">
             <div className="space-y-4">
@@ -857,16 +854,15 @@ export function PermissionPage() {
             <div className="mt-6 flex flex-wrap gap-3">
               {grantedPermissions.map((item) => (
                 <span
-                  key={item.key}
+                  key={item.code}
                   className="rounded-full border border-kaist-darkgreen/20 bg-kaist-darkgreen/5 px-4 py-2 text-sm font-semibold text-kaist-darkgreen"
                 >
-                  {item.label}
+                  {item.labelKo}
                 </span>
               ))}
             </div>
           )}
         </section>
       </main>
-    </div>
   );
 }

@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type { SurveyResponseRecord } from "@soc/contracts";
 import { formatKoreanDateTime } from "@soc/shared";
-import { Header } from "@/components/organisms/header";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
 import { hasSurveyManagePermission } from "@/lib/permissions";
@@ -58,9 +57,7 @@ export function SurveyResponseListPage() {
   }, [surveyId]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
+    <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate("/admin/surveys")}
@@ -128,8 +125,7 @@ export function SurveyResponseListPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </main>
-    </div>
+      )}
+    </main>
   );
 }

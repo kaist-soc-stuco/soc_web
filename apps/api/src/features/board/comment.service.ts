@@ -12,6 +12,7 @@ import type {
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
@@ -110,10 +111,9 @@ export class CommentService {
       throw new NotFoundException("article_not_found");
     }
 
-    const requiredPermission = board.commentPermissionId ?? 0;
     if (
-      requiredPermission > 0 &&
-      (user.permission & requiredPermission) !== requiredPermission
+      board.commentPermissionBit > 0 &&
+      !Permissions.has(user.permission, board.commentPermissionBit)
     ) {
       throw new ForbiddenException("insufficient_permission");
     }
@@ -165,11 +165,10 @@ export class CommentService {
       throw new NotFoundException("comment_not_found");
     }
 
-    const managePermission = board.managePermissionId ?? 0;
     const isOwner = comment.authorUserId === user.id;
     const isManager =
-      managePermission > 0 &&
-      (user.permission & managePermission) === managePermission;
+      board.managePermissionBit > 0 &&
+      Permissions.has(user.permission, board.managePermissionBit);
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
@@ -199,11 +198,10 @@ export class CommentService {
       throw new NotFoundException("comment_not_found");
     }
 
-    const managePermission = board.managePermissionId ?? 0;
     const isOwner = comment.authorUserId === user.id;
     const isManager =
-      managePermission > 0 &&
-      (user.permission & managePermission) === managePermission;
+      board.managePermissionBit > 0 &&
+      Permissions.has(user.permission, board.managePermissionBit);
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
