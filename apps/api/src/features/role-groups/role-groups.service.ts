@@ -41,11 +41,16 @@ export class RoleGroupsService {
     roleGroupId: number,
     input: UpdateRoleGroupRequest,
   ): Promise<RoleGroupRecord> {
+    const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(
+      (member) => member.userId,
+    );
     const updated = await this.roleGroupsRepository.updateRoleGroup(roleGroupId, input);
 
     if (!updated) {
       throw new NotFoundException("role_group_not_found");
     }
+
+    await this.usersService.invalidatePermissionCaches(memberIds);
 
     return updated;
   }
@@ -61,7 +66,12 @@ export class RoleGroupsService {
       throw new ForbiddenException("system_role_group_cannot_be_deleted");
     }
 
+    const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(
+      (member) => member.userId,
+    );
+
     await this.roleGroupsRepository.deleteRoleGroup(roleGroupId);
+    await this.usersService.invalidatePermissionCaches(memberIds);
   }
 
   async listRoleGroupMembers(roleGroupId: number): Promise<RoleGroupMemberRecord[]> {
@@ -77,7 +87,7 @@ export class RoleGroupsService {
   async addUserToRoleGroup(
     roleGroupId: number,
     input: AssignRoleGroupMemberRequest,
-    grantedByUserId?: number,
+    grantedByUserId?: string,
   ): Promise<RoleGroupMemberRecord> {
     const roleGroup = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
     if (!roleGroup) {
@@ -98,6 +108,8 @@ export class RoleGroupsService {
       throw new NotFoundException("role_group_member_add_failed");
     }
 
+    await this.usersService.invalidatePermissionCache(added.userId);
+
     return added;
   }
 
@@ -108,5 +120,6 @@ export class RoleGroupsService {
     }
 
     await this.roleGroupsRepository.removeUserFromRoleGroup(roleGroupId, userId);
+    await this.usersService.invalidatePermissionCache(userId);
   }
 }

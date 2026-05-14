@@ -6,11 +6,12 @@ import { RedisModule } from "../../infrastructure/redis/redis.module";
 import { UsersRepository } from "./repositories/users.repository";
 import { UsersController } from "./users.controller";
 import { UsersService } from "./users.service";
+import { PermissionBitsGuard } from "../../shared/guards";
 
 @Module({
   imports: [PostgresModule, RedisModule, forwardRef(() => AuthModule)],
   controllers: [UsersController],
-  providers: [UsersRepository, UsersService],
+  providers: [UsersRepository, UsersService, PermissionBitsGuard],
   exports: [UsersService],
 })
 export class UsersModule {}

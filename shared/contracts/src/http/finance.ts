@@ -2,14 +2,14 @@
  * Finance / Fee Management HTTP Contracts
  */
 
-export type FeeStatus = "PAID" | "UNPAID" | "WAIVED";
+export type FeeStatus = "PAID" | "UNPAID";
 
 export interface StudentFeeStatusRecord {
   userId: string;
   status: FeeStatus;
   coverageSemesters: number;
   paidAt: string | null;
-  verifiedBy: number | null;
+  verifiedBy: string | null;
   verifiedAt: string | null;
   note: string | null;
   updatedAt: string;

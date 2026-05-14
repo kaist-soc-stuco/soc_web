@@ -30,6 +30,7 @@ export interface CurrentUserResponse {
   storageMode: AuthStorageMode | null;
   user?: {
     id: string;
+    name?: string;
     permission: number;
   };
 }

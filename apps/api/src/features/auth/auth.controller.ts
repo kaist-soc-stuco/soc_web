@@ -211,6 +211,9 @@ export class AuthController {
       validTo: null,
     });
 
+    // 권한 테이블을 직접 변경했으므로 사용자 권한 캐시를 무효화합니다.
+    await this.usersService.invalidatePermissionCache(mockUser.userId);
+
     const issued = await this.authSessionService.issuePersistedSession(mockUser.userId);
 
     this.setAuthCookies(response, {

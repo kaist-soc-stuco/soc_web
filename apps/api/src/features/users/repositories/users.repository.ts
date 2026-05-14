@@ -1,4 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import Redis from "ioredis";
 
 import { msToIso, nowDate } from "@soc/shared";
 import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
@@ -7,12 +9,18 @@ import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
+import { REDIS_CLIENT } from "../../../infrastructure/redis/redis.provider";
 import {
   permissions,
   roleGroupPermissions,
   studentFeeStatus,
   userRoleGroups,
   users,
+  articles,
+  boards,
+  comments,
+  surveyResponses,
+  surveys,
 } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
@@ -50,7 +58,40 @@ type UserProfileUpdateInput = {
  */
 @Injectable()
 export class UsersRepository {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private buildPermissionCacheKey(userId: string): string {
+    return `permission:bitmask:${userId}`;
+  }
+
+  private async cachePermissionBitmask(userId: string, permissionBits: number): Promise<void> {
+    const ttlSeconds = this.configService.get<number>("REDIS_AUTH_TTL_SECONDS", 300);
+
+    await this.redis.set(
+      this.buildPermissionCacheKey(userId),
+      String(permissionBits),
+      "EX",
+      ttlSeconds,
+    );
+  }
+
+  async invalidatePermissionBitmask(userId: string): Promise<void> {
+    await this.redis.del(this.buildPermissionCacheKey(userId));
+  }
+
+  async invalidatePermissionBitmasks(userIds: string[]): Promise<void> {
+    const uniqueUserIds = [...new Set(userIds)].filter((userId) => userId.trim().length > 0);
+
+    if (uniqueUserIds.length === 0) {
+      return;
+    }
+
+    await this.redis.del(...uniqueUserIds.map((userId) => this.buildPermissionCacheKey(userId)));
+  }
 
   /** DB row를 서비스 계층에서 사용하는 UserRecord로 변환합니다. */
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
@@ -170,17 +211,6 @@ export class UsersRepository {
     return this.mapRowToUserRecord(upserted[0]);
   }
 
-  /** 개인정보 영구 저장 동의 시각을 기록합니다. */
-  // async markConsent(userId: string, consentedAt: string): Promise<void> {
-  //   await this.db
-  //     .update(users)
-  //     .set({
-  //       privacyConsentAt: isoToDate(consentedAt),
-  //       updatedAt: nowDate(),
-  //     })
-  //     .where(eq(users.userId, Number(userId)));
-  // }
-
   /** 이메일/휴대전화 필드만 선택적으로 갱신합니다. */
   /** 이름/이메일을 선택적으로 갱신합니다. */
   async updateProfile(
@@ -279,6 +309,15 @@ export class UsersRepository {
   }
 
   async resolvePermissionBitmaskByUserId(userId: string): Promise<number> {
+    const cachedPermissionBits = await this.redis.get(this.buildPermissionCacheKey(userId));
+
+    if (cachedPermissionBits !== null) {
+      const parsedPermissionBits = Number(cachedPermissionBits);
+      if (Number.isFinite(parsedPermissionBits)) {
+        return parsedPermissionBits;
+      }
+    }
+
     const now = nowDate();
     const rows = await this.db
       .select({
@@ -303,7 +342,10 @@ export class UsersRepository {
         ),
       );
 
-    return Number(rows[0]?.permissionBits ?? 0);
+      const permissionBits = Number(rows[0]?.permissionBits ?? 0);
+      await this.cachePermissionBitmask(userId, permissionBits);
+
+      return permissionBits;
   }
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
@@ -316,7 +358,7 @@ export class UsersRepository {
     if (!found.length) return null;
 
     const row = found[0];
-    const normalizedStatus: FeeStatus = row.status === "PAID" || row.status === "WAIVED" ? row.status : "UNPAID";
+    const normalizedStatus: FeeStatus = row.status === "PAID" ? "PAID" : "UNPAID";
 
     return {
       userId: row.userId,
@@ -336,49 +378,69 @@ export class UsersRepository {
       status: FeeStatus;
       coverageSemesters?: number;
       note?: string | null;
-      verifiedBy?: number;
+      verifiedBy?: string;
     },
   ): Promise<StudentFeeStatusRecord> {
-    // 존재하지 않으면 기본 행을 먼저 생성하여 update가 동작하도록 보장합니다.
-    await this.ensureStudentFeeStatus(userId);
-
     const now = nowDate();
-    const updateSet: any = {
-      status: input.status,
-      updatedAt: now,
-    };
+    await this.db.transaction(async (tx) => {
+      const existing = await tx
+        .select()
+        .from(studentFeeStatus)
+        .where(eq(studentFeeStatus.userId, userId))
+        .limit(1);
 
-    if (input.coverageSemesters !== undefined) {
-      updateSet.coverageSemesters = input.coverageSemesters;
-    }
-    if (input.note !== undefined) {
-      updateSet.note = input.note;
-    }
-    if (input.verifiedBy !== undefined) {
-      updateSet.verifiedBy = input.verifiedBy;
-      updateSet.verifiedAt = now;
-    }
-    if (input.status === "PAID") {
-      updateSet.paidAt = now;
-    } else {
-      updateSet.paidAt = null;
-    }
+      const current = existing[0];
+      const nextRecord = {
+        coverageSemesters: input.coverageSemesters ?? current?.coverageSemesters ?? 4,
+        note: input.note !== undefined ? input.note : current?.note ?? null,
+        paidAt:
+          input.status === "PAID"
+            ? now
+            : input.status === "UNPAID"
+              ? null
+              : current?.paidAt ?? null,
+        status: input.status,
+        updatedAt: now,
+        verifiedAt:
+          input.verifiedBy !== undefined ? now : current?.verifiedAt ?? null,
+        verifiedBy:
+          input.verifiedBy !== undefined ? input.verifiedBy : current?.verifiedBy ?? null,
+      };
 
-    await this.db
-      .update(studentFeeStatus)
-      .set(updateSet)
-      .where(eq(studentFeeStatus.userId, userId));
+      if (current) {
+        await tx
+          .update(studentFeeStatus)
+          .set(nextRecord)
+          .where(eq(studentFeeStatus.userId, userId));
+      } else {
+        await tx.insert(studentFeeStatus).values({
+          coverageSemesters: nextRecord.coverageSemesters,
+          note: nextRecord.note,
+          paidAt: nextRecord.paidAt,
+          status: nextRecord.status,
+          updatedAt: nextRecord.updatedAt,
+          userId,
+          verifiedAt: nextRecord.verifiedAt,
+          verifiedBy: nextRecord.verifiedBy,
+        });
+      }
+    });
 
-    return this.getStudentFeeStatus(userId) as Promise<StudentFeeStatusRecord>;
+    const record = await this.getStudentFeeStatus(userId);
+    if (!record) {
+      throw new InternalServerErrorException("Can't load data");
+    }
+    return record;
+    // return this.getStudentFeeStatus(userId) as Promise<StudentFeeStatusRecord>;
   }
 
   async ensureStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord> {
-    const existing = await this.getStudentFeeStatus(userId);
-    if (existing) return existing;
-
-    // 존재하지 않으면 생성 (기본값: UNPAID)
     const now = nowDate();
-    await this.db
+    
+    // ON CONFLICT (userId) DO UPDATE SET userId = EXCLUDED.userId
+    // 무의미한 업데이트(자기 자신의 ID로 덮어쓰기)를 발생시켜 
+    // 기존 로우가 있든 새로 삽입되든 항상 RETURNING을 발동시킵니다.
+    const rows = await this.db
       .insert(studentFeeStatus)
       .values({
         userId,
@@ -386,9 +448,24 @@ export class UsersRepository {
         coverageSemesters: 4,
         updatedAt: now,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: studentFeeStatus.userId,
+        set: { userId: sql`EXCLUDED.user_id` } 
+      })
+      .returning();
 
-    return this.getStudentFeeStatus(userId) as Promise<StudentFeeStatusRecord>;
+    const row = rows[0];
+
+    return {
+      userId: row.userId,
+      status: row.status as FeeStatus,
+      coverageSemesters: row.coverageSemesters,
+      paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
+      verifiedBy: row.verifiedBy,
+      verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
+      note: row.note,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+    };
   }
 
   async listStudentsByFeeStatus(
@@ -437,7 +514,7 @@ export class UsersRepository {
     return {
       students: rows.map((r) => ({
         status:
-          r.status === "PAID" || r.status === "WAIVED"
+          r.status === "PAID"
             ? r.status
             : "UNPAID",
         userId: r.userId,
@@ -453,5 +530,102 @@ export class UsersRepository {
       page,
       pageSize,
     };
+  }
+
+  async getMyArticles(userId: string, limit: number, offset: number) {
+    const rows = await this.db
+      .select({
+        articleId: articles.articleId,
+        boardId: articles.boardId,
+        titleKo: articles.titleKo,
+        status: articles.status,
+        visibilityScope: articles.visibilityScope,
+        postedAt: articles.postedAt,
+        boardNameKo: boards.nameKo,
+        boardCode: boards.code,
+        commentCount: sql<number>`(
+          select count(*)
+          from ${comments}
+          where ${comments.articleId} = ${articles.articleId}
+            and ${comments.status} = 'PUBLISHED'
+        )`,
+      })
+      .from(articles)
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .where(and(eq(articles.authorUserId, userId), eq(articles.status, 'PUBLISHED')))
+      .orderBy(desc(articles.postedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return rows.map((r) => ({
+      articleId: String(r.articleId),
+      boardId: r.boardId,
+      boardNameKo: r.boardNameKo,
+      boardCode: r.boardCode,
+      titleKo: r.titleKo,
+      status: r.status as any,
+      visibilityScope: r.visibilityScope as any,
+      postedAt: msToIso(r.postedAt.valueOf()),
+      commentCount: Number(r.commentCount),
+    }));
+  }
+
+  async getMyComments(userId: string, limit: number, offset: number) {
+    const rows = await this.db
+      .select({
+        commentId: comments.commentId,
+        content: comments.content,
+        status: comments.status,
+        createdAt: comments.createdAt,
+        articleId: articles.articleId,
+        articleTitleKo: articles.titleKo,
+        boardId: boards.boardId,
+        boardNameKo: boards.nameKo,
+        boardCode: boards.code,
+      })
+      .from(comments)
+      .innerJoin(articles, eq(comments.articleId, articles.articleId))
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, 'PUBLISHED')))
+      .orderBy(desc(comments.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return rows.map((r) => ({
+      commentId: String(r.commentId),
+      articleId: String(r.articleId),
+      boardId: r.boardId,
+      boardNameKo: r.boardNameKo,
+      boardCode: r.boardCode,
+      articleTitleKo: r.articleTitleKo,
+      content: r.content,
+      status: r.status as any,
+      createdAt: msToIso(r.createdAt.valueOf()),
+    }));
+  }
+
+  async getMySurveyResponses(userId: string, limit: number, offset: number) {
+    const rows = await this.db
+      .select({
+        responseId: surveyResponses.id,
+        surveyId: surveys.surveyId,
+        surveyTitleKo: surveys.titleKo,
+        status: surveyResponses.status,
+        submittedAt: surveyResponses.submittedAt,
+      })
+      .from(surveyResponses)
+      .innerJoin(surveys, eq(surveyResponses.surveyId, surveys.surveyId))
+      .where(eq(surveyResponses.userId, userId))
+      .orderBy(desc(surveyResponses.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return rows.map((r) => ({
+      responseId: r.responseId,
+      surveyId: r.surveyId,
+      surveyTitleKo: r.surveyTitleKo,
+      status: r.status as any,
+      submittedAt: r.submittedAt ? msToIso(r.submittedAt.valueOf()) : null,
+    }));
   }
 }

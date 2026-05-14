@@ -263,7 +263,7 @@ export class RoleGroupsRepository {
 
   async addUserToRoleGroup(
     roleGroupId: number,
-    input: AssignRoleGroupMemberRequest & { grantedBy?: number | null },
+    input: AssignRoleGroupMemberRequest & { grantedBy?: string | null },
   ): Promise<RoleGroupMemberRecord | null> {
     const now = nowDate();
 

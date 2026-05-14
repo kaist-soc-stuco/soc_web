@@ -5,7 +5,7 @@ import { RedisModule } from "../../infrastructure/redis/redis.module";
 import { AuthSessionRepository } from "../auth/auth-session.repository";
 import { UsersRepository } from "../users/repositories/users.repository";
 import { UsersService } from "../users/users.service";
-import { AuthGuard, OptionalAuthGuard, PermissionGuard } from "../../shared/guards";
+import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "../../shared/guards";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -37,7 +37,7 @@ import { SurveyResponsesController } from "./survey-responses.controller";
     UsersService,
     AuthGuard,
     OptionalAuthGuard,
-    PermissionGuard,
+    PermissionBitsGuard,
     // Survey repositories
     SurveysRepository,
     SurveySectionsRepository,

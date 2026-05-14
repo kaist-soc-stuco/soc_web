@@ -1,16 +1,17 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from "@nestjs/common";
+import { CreateRoleGroupSchema, UpdateRoleGroupSchema, AssignRoleGroupMemberSchema } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 import { Request } from "express";
 
-import { AuthGuard, PermissionGuard, RequirePermission } from "../../shared/guards";
-import { PermissionFlags } from "../../shared/guards/permission.guard";
+import { RequirePermissions } from "../../shared/guards";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { CreateRoleGroupDto } from "./dto/create-role-group.dto";
 import { UpdateRoleGroupDto } from "./dto/update-role-group.dto";
 import { RoleGroupsService } from "./role-groups.service";
 
 @Controller("role-groups")
-@UseGuards(AuthGuard, PermissionGuard)
-@RequirePermission(PermissionFlags.ADMIN)
+@RequirePermissions(Permissions.ADMIN)
 export class RoleGroupsController {
   constructor(private readonly roleGroupsService: RoleGroupsService) {}
 
@@ -25,14 +26,14 @@ export class RoleGroupsController {
   }
 
   @Post()
-  create(@Body() dto: CreateRoleGroupDto) {
+  create(@Body(new ZodValidationPipe(CreateRoleGroupSchema)) dto: CreateRoleGroupDto) {
     return this.roleGroupsService.createRoleGroup(dto);
   }
 
   @Patch(":roleGroupId")
   update(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
-    @Body() dto: UpdateRoleGroupDto,
+    @Body(new ZodValidationPipe(UpdateRoleGroupSchema)) dto: UpdateRoleGroupDto,
   ) {
     return this.roleGroupsService.updateRoleGroup(roleGroupId, dto);
   }
@@ -45,20 +46,20 @@ export class RoleGroupsController {
   @Post(":roleGroupId/users")
   addMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
-    @Body("userId", ParseIntPipe) userId: string,
+    @Body("userId") userId: string,
     @Req() request: Request & { user?: { id: string } },
   ) {
     return this.roleGroupsService.addUserToRoleGroup(
       roleGroupId,
       { userId },
-      request.user ? Number(request.user.id) : undefined,
+      request.user?.id,
     );
   }
 
   @Delete(":roleGroupId/users/:userId")
   removeMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
-    @Param("userId", ParseIntPipe) userId: string,
+    @Param("userId") userId: string,
   ) {
     return this.roleGroupsService.removeUserFromRoleGroup(roleGroupId, userId);
   }

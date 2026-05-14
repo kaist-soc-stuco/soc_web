@@ -6,7 +6,6 @@ import type {
   SurveyDetailResponse,
 } from "@soc/contracts";
 import { formatKoreanDateTime } from "@soc/shared";
-import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
@@ -122,9 +121,7 @@ export function SurveyResponseDetailPage() {
     "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+    <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(`/admin/surveys/${surveyId}/responses`)}
@@ -238,6 +235,5 @@ export function SurveyResponseDetailPage() {
           </div>
         )}
       </main>
-    </div>
   );
 }

@@ -4,6 +4,7 @@ import type {
   ArticleDeleteResponse,
   ArticleDetailResponse,
   ArticleListResponse,
+  ArticleListItem,
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   BoardListResponse,
@@ -47,6 +48,9 @@ import type {
   StudentFeeStatusRecord,
   UpdateStudentFeeStatusRequest,
   StudentFeeListResponse,
+  MyArticleListResponse,
+  MyCommentListResponse,
+  MySurveyResponseListResponse,
 } from "@soc/contracts";
 
 export interface ApiClientOptions {
@@ -79,6 +83,7 @@ interface AccessCheckResponse {
 interface ListQueryOptions {
   limit?: number;
   page?: number;
+  q?: string;
 }
 
 const buildListQuery = (options?: ListQueryOptions): string => {
@@ -94,6 +99,10 @@ const buildListQuery = (options?: ListQueryOptions): string => {
 
   if (options.limit !== undefined) {
     params.set("limit", String(options.limit));
+  }
+
+  if (options.q !== undefined && options.q.trim()) {
+    params.set("q", options.q.trim());
   }
 
   const query = params.toString();
@@ -280,6 +289,17 @@ export const createApiClient = ({
       });
     },
 
+    searchArticles: async (query?: string, limit = 20): Promise<ArticleListItem[]> => {
+      const params = new URLSearchParams();
+      if (query?.trim()) params.set("q", query.trim());
+      params.set("limit", String(limit));
+      return requestJson<ArticleListItem[]>(
+        `${normalizedBaseUrl}/articles/search?${params.toString()}`,
+        { method: "GET" },
+        { retryOnUnauthorized: true },
+      );
+    },
+
     getBoard: async (code: string): Promise<BoardSummary> => {
       return requestJson<BoardSummary>(
         `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}`,
@@ -432,6 +452,30 @@ export const createApiClient = ({
       return requestJson<CurrentUserResponse>(`${authBaseUrl}/me`, {
         method: "GET",
       });
+    },
+
+    getMyArticles: async (options?: ListQueryOptions): Promise<MyArticleListResponse> => {
+      return requestJson<MyArticleListResponse>(
+        `${usersBaseUrl}/me/articles${buildListQuery(options)}`,
+        { method: "GET" },
+        { retryOnUnauthorized: true }
+      );
+    },
+
+    getMyComments: async (options?: ListQueryOptions): Promise<MyCommentListResponse> => {
+      return requestJson<MyCommentListResponse>(
+        `${usersBaseUrl}/me/comments${buildListQuery(options)}`,
+        { method: "GET" },
+        { retryOnUnauthorized: true }
+      );
+    },
+
+    getMySurveyResponses: async (options?: ListQueryOptions): Promise<MySurveyResponseListResponse> => {
+      return requestJson<MySurveyResponseListResponse>(
+        `${usersBaseUrl}/me/survey-responses${buildListQuery(options)}`,
+        { method: "GET" },
+        { retryOnUnauthorized: true }
+      );
     },
 
     submitConsentDecision: async (

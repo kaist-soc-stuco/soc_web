@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
@@ -8,7 +8,6 @@ import type {
   QuestionType,
 } from "@soc/contracts";
 import { htmlDatetimeLocalToIso, isoToHtmlDatetimeLocal } from "@soc/shared";
-import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { getAuthSessionSummary } from "@/lib/auth-session";
@@ -34,6 +33,17 @@ const SURVEY_STATUSES = [
   { value: "open", label: "진행 중" },
   { value: "closed", label: "마감" },
   { value: "archived", label: "보관됨" },
+];
+
+const SURVEY_KINDS = [
+  { value: "SURVEY", label: "일반 설문" },
+  { value: "VOTE", label: "투표" },
+  { value: "APPLICATION", label: "신청서/행사 접수" },
+];
+
+const SURVEY_VISIBILITIES = [
+  { value: "PUBLIC", label: "공개 (전체 공개)" },
+  { value: "PRIVATE", label: "비공개 (결과 숨김)" },
 ];
 
 interface QuestionFormState {
@@ -76,19 +86,16 @@ function QuestionEditor({ initial, onSave, onCancel }: QuestionEditorProps) {
     val: QuestionFormState[K],
   ) => setForm((prev) => ({ ...prev, [key]: val }));
 
-  const needsOptions = [
-    "single_choice",
-    "multiple_choice",
-    "dropdown",
-  ].includes(form.questionType);
+  const needsOptions = ["single_choice", "multiple_choice", "dropdown"].includes(form.questionType);
 
-  const addOption = () =>
+  const addOption = () => {
     set("options", [...form.options, { value: "", labelKo: "", labelEn: "" }]);
-  const removeOption = (i: number) =>
-    set(
-      "options",
-      form.options.filter((_, idx) => idx !== i),
-    );
+  };
+
+  const removeOption = (i: number) => {
+    set("options", form.options.filter((_, idx) => idx !== i));
+  };
+
   const updateOption = (
     i: number,
     field: "value" | "labelKo" | "labelEn",
@@ -121,143 +128,69 @@ function QuestionEditor({ initial, onSave, onCancel }: QuestionEditorProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              제목 (국문) *
-            </label>
-            <input
-              className={inputCls}
-              value={form.titleKo}
-              onChange={(e) => set("titleKo", e.target.value)}
-            />
+            <label className="block text-xs font-medium text-gray-600 mb-1">제목 (국문) *</label>
+            <input className={inputCls} value={form.titleKo} onChange={(e) => set("titleKo", e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              제목 (영문) *
-            </label>
-            <input
-              className={inputCls}
-              value={form.titleEn}
-              onChange={(e) => set("titleEn", e.target.value)}
-            />
+            <label className="block text-xs font-medium text-gray-600 mb-1">제목 (영문) *</label>
+            <input className={inputCls} value={form.titleEn} onChange={(e) => set("titleEn", e.target.value)} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              설명 (국문)
-            </label>
-            <textarea
-              className={`${inputCls} min-h-[60px] resize-y`}
-              value={form.descriptionKo}
-              onChange={(e) => set("descriptionKo", e.target.value)}
-            />
+            <label className="block text-xs font-medium text-gray-600 mb-1">설명 (국문)</label>
+            <textarea className={`${inputCls} min-h-[60px] resize-y`} value={form.descriptionKo} onChange={(e) => set("descriptionKo", e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              설명 (영문)
-            </label>
-            <textarea
-              className={`${inputCls} min-h-[60px] resize-y`}
-              value={form.descriptionEn}
-              onChange={(e) => set("descriptionEn", e.target.value)}
-            />
+            <label className="block text-xs font-medium text-gray-600 mb-1">설명 (영문)</label>
+            <textarea className={`${inputCls} min-h-[60px] resize-y`} value={form.descriptionEn} onChange={(e) => set("descriptionEn", e.target.value)} />
           </div>
         </div>
 
-        <label className="block text-xs font-medium text-gray-600">
-          질문 유형 *
-        </label>
+        <label className="block text-xs font-medium text-gray-600 mb-1">질문 유형 *</label>
         <select
           className={inputCls}
           value={form.questionType}
           onChange={(e) => set("questionType", e.target.value as QuestionType)}
         >
           {QUESTION_TYPES.map((qt) => (
-            <option key={qt.value} value={qt.value}>
-              {qt.label}
-            </option>
+            <option key={qt.value} value={qt.value}>{qt.label}</option>
           ))}
         </select>
 
         {needsOptions && (
-          <div className="space-y-2">
-            <label className="block text-xs font-medium text-gray-600">
-              선택지
-            </label>
-            {form.options.map((opt, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <input
-                  className={`${inputCls} flex-1`}
-                  placeholder="value"
-                  value={opt.value}
-                  onChange={(e) => updateOption(i, "value", e.target.value)}
-                />
-                <input
-                  className={`${inputCls} flex-1`}
-                  placeholder="국문"
-                  value={opt.labelKo}
-                  onChange={(e) => updateOption(i, "labelKo", e.target.value)}
-                />
-                <input
-                  className={`${inputCls} flex-1`}
-                  placeholder="영문"
-                  value={opt.labelEn}
-                  onChange={(e) => updateOption(i, "labelEn", e.target.value)}
-                />
-                <button
-                  onClick={() => removeOption(i)}
-                  className="text-red-400 text-sm hover:text-red-600"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={addOption}
-              className="text-blue-500 text-xs hover:underline"
-            >
-              + 선택지 추가
-            </button>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">선택지</label>
+            <div className="space-y-2 mb-2">
+              {form.options.map((opt, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input className={`${inputCls} flex-1`} placeholder="value" value={opt.value} onChange={(e) => updateOption(i, "value", e.target.value)} />
+                  <input className={`${inputCls} flex-1`} placeholder="국문" value={opt.labelKo} onChange={(e) => updateOption(i, "labelKo", e.target.value)} />
+                  <input className={`${inputCls} flex-1`} placeholder="영문" value={opt.labelEn} onChange={(e) => updateOption(i, "labelEn", e.target.value)} />
+                  <button onClick={() => removeOption(i)} className="text-red-400 text-sm hover:text-red-600">✕</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={addOption} className="text-blue-500 text-xs hover:underline">+ 선택지 추가</button>
           </div>
         )}
 
         <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="isRequired"
-            checked={form.isRequired}
-            onChange={(e) => set("isRequired", e.target.checked)}
-          />
-          <label htmlFor="isRequired" className="text-xs text-gray-600">
-            필수 응답
-          </label>
+          <input type="checkbox" id="isRequired" checked={form.isRequired} onChange={(e) => set("isRequired", e.target.checked)} />
+          <label htmlFor="isRequired" className="text-xs text-gray-600">필수 응답</label>
         </div>
 
         {form.questionType === "short_text" && (
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              응답 정규식
-            </label>
-            <input
-              className={inputCls}
-              placeholder="선택 사항"
-              value={form.answerRegex}
-              onChange={(e) => set("answerRegex", e.target.value)}
-            />
+            <label className="block text-xs font-medium text-gray-600 mb-1">응답 정규식</label>
+            <input className={inputCls} placeholder="선택 사항" value={form.answerRegex} onChange={(e) => set("answerRegex", e.target.value)} />
           </div>
         )}
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            응답 마감 시각
-          </label>
-          <input
-            type="datetime-local"
-            className={inputCls}
-            value={form.editDeadlineAt}
-            onChange={(e) => set("editDeadlineAt", e.target.value)}
-          />
+          <label className="block text-xs font-medium text-gray-600 mb-1">응답 마감 시각</label>
+          <input type="datetime-local" className={inputCls} value={form.editDeadlineAt} onChange={(e) => set("editDeadlineAt", e.target.value)} />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
@@ -276,44 +209,40 @@ export function SurveyEditorPage() {
   const { id: surveyId } = useParams<{ id: string }>();
   const isEdit = Boolean(surveyId);
 
-  const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
+  const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
 
-  // 설문 설정 폼
   const [titleKo, setTitleKo] = useState("");
   const [titleEn, setTitleEn] = useState("");
   const [descriptionKo, setDescriptionKo] = useState("");
   const [descriptionEn, setDescriptionEn] = useState("");
   const [status, setStatus] = useState<string>("draft");
-  const [feePayersOnly, setFeePayersOnly] = useState(false);
-  const [allowAnonymous, setAllowAnonymous] = useState(false);
-  const [maxResponses, setMaxResponses] = useState("");
-  const [opensAt, setOpensAt] = useState("");
-  const [closesAt, setClosesAt] = useState("");
-  const [connectedPostId, setConnectedPostId] = useState("");
+  const [kind, setKind] = useState<string>("SURVEY");
+  const [resultVisibility, setResultVisibility] = useState<string>("PUBLIC");
+  const [feeRequirementPolicy, setFeeRequirementPolicy] = useState<string>("NONE");
+  const [allowGuestResponse, setAllowGuestResponse] = useState(false);
+  const [maxResponseCount, setMaxResponseCount] = useState("");
+  const [openAt, setOpenAt] = useState("");
+  const [closeAt, setCloseAt] = useState("");
+  const [connectedArticleId, setConnectedArticleId] = useState("");
+  const [articleSearchResults, setArticleSearchResults] = useState<any[]>([]);
+  const [showArticleSearch, setShowArticleSearch] = useState(false);
+  const [selectedArticleTitle, setSelectedArticleTitle] = useState<string | null>(null);
 
-  // 섹션 / 질문
-  const [sections, setSections] = useState<
-    (SurveySectionRecord & { questions: SurveyQuestionRecord[] })[]
-  >([]);
-
-  // 편집 상태
+  const [sections, setSections] = useState<(SurveySectionRecord & { questions: SurveyQuestionRecord[] })[]>([]);
   const [tab, setTab] = useState<"settings" | "content">("settings");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
 
-  // 질문 편집 모달
   const [editingQuestion, setEditingQuestion] = useState<{
     sectionId: string;
     questionId: string | null;
     initial: QuestionFormState;
   } | null>(null);
 
-  // 섹션 추가 중
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [addingSection, setAddingSection] = useState(false);
 
-  // 드래그 상태
   const dragItem = useRef<{ sectionId: string; index: number } | null>(null);
 
   useEffect(() => {
@@ -330,33 +259,33 @@ export function SurveyEditorPage() {
 
       if (isEdit && surveyId) {
         try {
-          const detail: SurveyDetailResponse =
-            await client.getSurveyDetail(surveyId);
+          const detail: SurveyDetailResponse = await client.getSurveyDetail(surveyId);
           setTitleKo(detail.titleKo);
           setTitleEn(detail.titleEn);
           setDescriptionKo(detail.descriptionKo ?? "");
           setDescriptionEn(detail.descriptionEn ?? "");
           setStatus(detail.status);
-          setFeePayersOnly(detail.feePayersOnly);
-          setAllowAnonymous(detail.allowAnonymous);
-          setMaxResponses(
-            detail.maxResponses != null ? String(detail.maxResponses) : "",
-          );
-          setOpensAt(
-            detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
-          );
-          setClosesAt(
-            detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "",
-          );
-          setConnectedPostId(detail.connectedPostId ?? "");
+          setFeeRequirementPolicy(detail.feePayersOnly ? "PAID_ONLY" : "NONE");
+          setAllowGuestResponse(detail.allowAnonymous);
+          setMaxResponseCount(detail.maxResponses != null ? String(detail.maxResponses) : "");
+          setOpenAt(detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "");
+          setCloseAt(detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "");
+          setConnectedArticleId(detail.connectedPostId ?? "");
           setSections(detail.sections);
           setLoadedSurveyId(surveyId);
+
+          if (detail.connectedPostId) {
+            client.searchArticles(detail.connectedPostId, 1).then(results => {
+              const matched = results.find(r => r.articleId === detail.connectedPostId);
+              if (matched) setSelectedArticleTitle(matched.titleKo);
+            });
+          }
         } catch {
           setError("설문조사를 불러오지 못했습니다.");
         }
       }
     })();
-  }, []);
+  }, [isEdit, surveyId, client, navigate]);
 
   const handleSaveSettings = async () => {
     if (!titleKo.trim()) {
@@ -371,29 +300,28 @@ export function SurveyEditorPage() {
     setError(null);
     try {
       const body = {
+        kind,
         titleKo: titleKo.trim(),
         titleEn: titleEn.trim(),
         descriptionKo: descriptionKo.trim() || undefined,
         descriptionEn: descriptionEn.trim() || undefined,
-        status: status as
-          | "draft"
-          | "scheduled"
-          | "open"
-          | "closed"
-          | "archived",
-        feePayersOnly,
-        allowAnonymous,
-        maxResponses: maxResponses ? Number(maxResponses) : undefined,
-        opensAt: opensAt ? htmlDatetimeLocalToIso(opensAt) : undefined,
-        closesAt: closesAt ? htmlDatetimeLocalToIso(closesAt) : undefined,
-        connectedPostId: connectedPostId.trim() || undefined,
+        status: status as any,
+        feeRequirementPolicy,
+        allowGuestResponse,
+        resultVisibility,
+        maxResponseCount: maxResponseCount ? Number(maxResponseCount) : undefined,
+        openAt: openAt ? htmlDatetimeLocalToIso(openAt) : undefined,
+        closeAt: closeAt ? htmlDatetimeLocalToIso(closeAt) : undefined,
+        connectedArticleId: connectedArticleId.trim() || undefined,
       };
       if (isEdit && loadedSurveyId) {
         await client.updateSurvey(loadedSurveyId, body);
         alert("저장되었습니다.");
+        navigate("/admin/surveys");
       } else {
         await client.createSurvey(body);
-        navigate("/admin/surveys", { replace: true });
+        alert("설문이 생성되었습니다.");
+        navigate("/admin/surveys");
       }
     } catch {
       setError("저장에 실패했습니다.");
@@ -437,7 +365,6 @@ export function SurveyEditorPage() {
   const handleSaveQuestion = async (form: QuestionFormState) => {
     if (!loadedSurveyId || !editingQuestion) return;
     const { sectionId, questionId } = editingQuestion;
-
     const section = sections.find((s) => s.id === sectionId);
     const body = {
       titleKo: form.titleKo,
@@ -448,46 +375,22 @@ export function SurveyEditorPage() {
       options: form.options.length > 0 ? form.options : undefined,
       answerRegex: form.answerRegex || undefined,
       isRequired: form.isRequired,
-      editDeadlineAt: form.editDeadlineAt
-        ? htmlDatetimeLocalToIso(form.editDeadlineAt)
-        : undefined,
-      sortOrder: questionId
-        ? undefined
-        : (section?.questions.length ?? 0),
+      editDeadlineAt: form.editDeadlineAt ? htmlDatetimeLocalToIso(form.editDeadlineAt) : undefined,
+      sortOrder: questionId ? undefined : (section?.questions.length ?? 0),
     };
 
     try {
       if (questionId) {
-        const updated = await client.updateQuestion(
-          loadedSurveyId,
-          sectionId,
-          questionId,
-          body,
-        );
+        const updated = await client.updateQuestion(loadedSurveyId, sectionId, questionId, body);
         setSections((prev) =>
           prev.map((s) =>
-            s.id === sectionId
-              ? {
-                  ...s,
-                  questions: s.questions.map((q) =>
-                    q.id === questionId ? updated : q,
-                  ),
-                }
-              : s,
+            s.id === sectionId ? { ...s, questions: s.questions.map((q) => (q.id === questionId ? updated : q)) } : s,
           ),
         );
       } else {
-        const created = await client.createQuestion(
-          loadedSurveyId,
-          sectionId,
-          body,
-        );
+        const created = await client.createQuestion(loadedSurveyId, sectionId, body);
         setSections((prev) =>
-          prev.map((s) =>
-            s.id === sectionId
-              ? { ...s, questions: [...s.questions, created] }
-              : s,
-          ),
+          prev.map((s) => (s.id === sectionId ? { ...s, questions: [...s.questions, created] } : s)),
         );
       }
       setEditingQuestion(null);
@@ -496,22 +399,14 @@ export function SurveyEditorPage() {
     }
   };
 
-  const handleDeleteQuestion = async (
-    sectionId: string,
-    questionId: string,
-  ) => {
+  const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
     if (!loadedSurveyId) return;
     if (!confirm("질문을 삭제하시겠습니까?")) return;
     try {
       await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
       setSections((prev) =>
         prev.map((s) =>
-          s.id === sectionId
-            ? {
-                ...s,
-                questions: s.questions.filter((q) => q.id !== questionId),
-              }
-            : s,
+          s.id === sectionId ? { ...s, questions: s.questions.filter((q) => q.id !== questionId) } : s,
         ),
       );
     } catch {
@@ -519,13 +414,8 @@ export function SurveyEditorPage() {
     }
   };
 
-  const handleReorderQuestion = async (
-    sectionId: string,
-    fromIndex: number,
-    toIndex: number,
-  ) => {
+  const handleReorderQuestion = async (sectionId: string, fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex || !loadedSurveyId) return;
-
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;
 
@@ -533,38 +423,20 @@ export function SurveyEditorPage() {
     const [moved] = reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
 
-    // 낙관적 업데이트
-    setSections((prev) =>
-      prev.map((s) =>
-        s.id === sectionId ? { ...s, questions: reordered } : s,
-      ),
-    );
+    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, questions: reordered } : s)));
 
     try {
       await Promise.all(
-        reordered.map((q, idx) =>
-          client.updateQuestion(loadedSurveyId, sectionId, q.id, {
-            sortOrder: idx,
-          }),
-        ),
+        reordered.map((q, idx) => client.updateQuestion(loadedSurveyId, sectionId, q.id, { sortOrder: idx })),
       );
     } catch {
-      // 실패 시 원상복구
-      setSections((prev) =>
-        prev.map((s) =>
-          s.id === sectionId ? { ...s, questions: section.questions } : s,
-        ),
-      );
+      setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, questions: section.questions } : s)));
       alert("순서 변경에 실패했습니다.");
     }
   };
 
   const openNewQuestion = (sectionId: string) => {
-    setEditingQuestion({
-      sectionId,
-      questionId: null,
-      initial: emptyQuestion(),
-    });
+    setEditingQuestion({ sectionId, questionId: null, initial: emptyQuestion() });
   };
 
   const openEditQuestion = (sectionId: string, q: SurveyQuestionRecord) => {
@@ -577,45 +449,29 @@ export function SurveyEditorPage() {
         descriptionKo: q.descriptionKo ?? "",
         descriptionEn: q.descriptionEn ?? "",
         questionType: q.questionType,
-        options: (q.options ?? []).map((o) => ({
-          value: o.value,
-          labelKo: o.labelKo,
-          labelEn: o.labelEn ?? "",
-        })),
+        options: (q.options ?? []).map((o) => ({ value: o.value, labelKo: o.labelKo, labelEn: o.labelEn ?? "" })),
         answerRegex: q.answerRegex ?? "",
         isRequired: q.isRequired,
-        editDeadlineAt: q.editDeadlineAt
-          ? isoToHtmlDatetimeLocal(q.editDeadlineAt)
-          : "",
+        editDeadlineAt: q.editDeadlineAt ? isoToHtmlDatetimeLocal(q.editDeadlineAt) : "",
       },
     });
   };
 
-  const inputCls =
-    "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
+  const inputCls = "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate("/admin/surveys")}
-            className="text-sm text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={() => navigate("/admin/surveys")} className="text-sm text-gray-400 hover:text-gray-600">
             ← 목록
           </button>
-          <h1 className="text-xl font-bold text-gray-900">
-            {isEdit ? "설문조사 편집" : "새 설문조사"}
-          </h1>
+          <h1 className="text-xl font-bold text-gray-900">{isEdit ? "설문조사 편집" : "새 설문조사"}</h1>
         </div>
 
         <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
-          설문 설정과 문항을 수정하려면 설문조사 관리 권한(SURVEY_MANAGE)이 필요합니다. 권한이 없다면 <button
-            type="button"
-            onClick={() => navigate("/admin/permissions")}
-            className="font-semibold underline underline-offset-2"
-          >
+          설문 설정과 문항을 수정하려면 설문조사 관리 권한(SURVEY_MANAGE)이 필요합니다. 권한이 없다면
+          <button type="button" onClick={() => navigate("/admin/permissions")} className="mx-1 font-semibold underline underline-offset-2">
             /admin/permissions
           </button>
           에서 역할 그룹을 조정한 뒤 다시 열어주세요.
@@ -623,126 +479,85 @@ export function SurveyEditorPage() {
 
         {error && <p className="mb-4 text-red-500 text-sm">{error}</p>}
 
-        {/* 탭 */}
         <div className="flex gap-4 border-b border-gray-200 mb-6">
           {(["settings", "content"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                tab === t
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+              className={`pb-2 text-sm font-medium border-b-2 transition-colors ${tab === t ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
             >
               {t === "settings" ? "설정" : "문항 구성"}
             </button>
           ))}
         </div>
 
-        {/* ── 설정 탭 ─────────────────────────────────────────────── */}
         {tab === "settings" && (
           <div className="space-y-4 bg-white rounded-xl border border-gray-200 p-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  제목 (국문) *
-                </label>
-                <input
-                  className={inputCls}
-                  value={titleKo}
-                  onChange={(e) => setTitleKo(e.target.value)}
-                />
+                <label className="text-xs font-medium text-gray-600 block mb-1">제목 (국문) *</label>
+                <input className={inputCls} value={titleKo} onChange={(e) => setTitleKo(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  제목 (영문) *
-                </label>
-                <input
-                  className={inputCls}
-                  value={titleEn}
-                  onChange={(e) => setTitleEn(e.target.value)}
-                />
+                <label className="text-xs font-medium text-gray-600 block mb-1">제목 (영문) *</label>
+                <input className={inputCls} value={titleEn} onChange={(e) => setTitleEn(e.target.value)} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  설명 (국문)
-                </label>
-                <textarea
-                  className={`${inputCls} min-h-[80px] resize-y`}
-                  value={descriptionKo}
-                  onChange={(e) => setDescriptionKo(e.target.value)}
-                />
+                <label className="text-xs font-medium text-gray-600 block mb-1">설명 (국문)</label>
+                <textarea className={`${inputCls} min-h-[80px] resize-y`} value={descriptionKo} onChange={(e) => setDescriptionKo(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  설명 (영문)
-                </label>
-                <textarea
-                  className={`${inputCls} min-h-[80px] resize-y`}
-                  value={descriptionEn}
-                  onChange={(e) => setDescriptionEn(e.target.value)}
-                />
+                <label className="text-xs font-medium text-gray-600 block mb-1">설명 (영문)</label>
+                <textarea className={`${inputCls} min-h-[80px] resize-y`} value={descriptionEn} onChange={(e) => setDescriptionEn(e.target.value)} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  상태
-                </label>
-                <select
-                  className={inputCls}
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  {SURVEY_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
+                <label className="text-xs font-medium text-gray-600 block mb-1">유형 *</label>
+                <select className={inputCls} value={kind} onChange={(e) => setKind(e.target.value)}>
+                  {SURVEY_KINDS.map((k) => (
+                    <option key={k.value} value={k.value}>{k.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  최대 응답 수
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  className={inputCls}
-                  placeholder="제한 없음"
-                  value={maxResponses}
-                  onChange={(e) => setMaxResponses(e.target.value)}
-                />
+                <label className="text-xs font-medium text-gray-600 block mb-1">결과 공개 범위 *</label>
+                <select className={inputCls} value={resultVisibility} onChange={(e) => setResultVisibility(e.target.value)}>
+                  {SURVEY_VISIBILITIES.map((v) => (
+                    <option key={v.value} value={v.value}>{v.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  시작 시각 (Asia/Seoul)
-                </label>
-                <input
-                  type="datetime-local"
-                  className={inputCls}
-                  value={opensAt}
-                  onChange={(e) => setOpensAt(e.target.value)}
-                />
+                <label className="text-xs font-medium text-gray-600 block mb-1">상태</label>
+                <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
+                  {SURVEY_STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  마감 시각 (Asia/Seoul)
-                </label>
-                <input
-                  type="datetime-local"
-                  className={inputCls}
-                  value={closesAt}
-                  onChange={(e) => setClosesAt(e.target.value)}
-                />
+                <label className="text-xs font-medium text-gray-600 block mb-1">최대 응답 수</label>
+                <input type="number" className={inputCls} placeholder="제한 없음" value={maxResponseCount} onChange={(e) => setMaxResponseCount(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">시작 시각 (Asia/Seoul)</label>
+                <input type="datetime-local" className={inputCls} value={openAt} onChange={(e) => setOpenAt(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">마감 시각 (Asia/Seoul)</label>
+                <input type="datetime-local" className={inputCls} value={closeAt} onChange={(e) => setCloseAt(e.target.value)} />
               </div>
             </div>
 
@@ -750,31 +565,72 @@ export function SurveyEditorPage() {
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
-                  checked={feePayersOnly}
-                  onChange={(e) => setFeePayersOnly(e.target.checked)}
+                  checked={feeRequirementPolicy === "PAID_ONLY"}
+                  onChange={(e) => setFeeRequirementPolicy(e.target.checked ? "PAID_ONLY" : "NONE")}
                 />
                 과비 납부자만 응답 가능
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={allowAnonymous}
-                  onChange={(e) => setAllowAnonymous(e.target.checked)}
-                />
+                <input type="checkbox" checked={allowGuestResponse} onChange={(e) => setAllowGuestResponse(e.target.checked)} />
                 로그인 없이 응답 가능
               </label>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">
-                연결 게시글 ID
-              </label>
-              <input
-                className={inputCls}
-                placeholder="선택 사항"
-                value={connectedPostId}
-                onChange={(e) => setConnectedPostId(e.target.value)}
-              />
+              <label className="text-xs font-medium text-gray-600 block mb-1">연결 게시글</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    className={inputCls}
+                    placeholder="게시글 ID 또는 제목 검색"
+                    value={connectedArticleId}
+                    onChange={(e) => {
+                      setConnectedArticleId(e.target.value);
+                      setSelectedArticleTitle(null);
+                    }}
+                  />
+                  {selectedArticleTitle && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-500 font-medium">
+                      {selectedArticleTitle}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const results = await client.searchArticles(undefined, 30);
+                    setArticleSearchResults(results);
+                    setShowArticleSearch(!showArticleSearch);
+                  }}
+                >
+                  {showArticleSearch ? "목록 닫기" : "게시글 목록"}
+                </Button>
+              </div>
+              <div className="relative">
+                {showArticleSearch && (
+                  <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm max-h-60 overflow-y-auto z-20 absolute w-full top-0">
+                    <div className="p-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">최근 게시글 (최대 30개)</span>
+                      <button onClick={() => setShowArticleSearch(false)} className="text-gray-400 hover:text-gray-600 text-xs">닫기</button>
+                    </div>
+                    {articleSearchResults.length === 0 && <p className="p-3 text-xs text-gray-400 text-center">불러온 게시글이 없습니다.</p>}
+                    {articleSearchResults.map((art) => (
+                      <button
+                        key={art.articleId}
+                        onClick={() => {
+                          setConnectedArticleId(art.articleId);
+                          setSelectedArticleTitle(art.titleKo);
+                          setShowArticleSearch(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors"
+                      >
+                        <span className="font-semibold text-gray-400 mr-2">#{art.articleId}</span>
+                        <span className="text-gray-700">{art.titleKo}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end pt-2">
@@ -785,105 +641,55 @@ export function SurveyEditorPage() {
           </div>
         )}
 
-        {/* ── 문항 구성 탭 ───────────────────────────────────────── */}
         {tab === "content" && (
           <div className="space-y-6">
-            {!loadedSurveyId && (
-              <p className="text-gray-500 text-sm">
-                설정 탭에서 설문을 먼저 저장하세요.
-              </p>
-            )}
+            {!loadedSurveyId && <p className="text-gray-500 text-sm">설정 탭에서 설문을 먼저 저장하세요.</p>}
 
             {loadedSurveyId && (
               <>
                 {sections.map((section) => (
-                  <div
-                    key={section.id}
-                    className="bg-white rounded-xl border border-gray-200 p-5 space-y-3"
-                  >
+                  <div key={section.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-800">
-                        {section.titleKo}
-                      </h3>
-                      <button
-                        onClick={() => handleDeleteSection(section.id)}
-                        className="text-red-400 hover:text-red-600 text-xs"
-                      >
-                        섹션 삭제
-                      </button>
+                      <h3 className="font-semibold text-gray-800">{section.titleKo}</h3>
+                      <button onClick={() => handleDeleteSection(section.id)} className="text-red-400 hover:text-red-600 text-xs">섹션 삭제</button>
                     </div>
 
-                    {section.questions.length === 0 && (
-                      <p className="text-gray-400 text-xs">질문이 없습니다.</p>
-                    )}
+                    {section.questions.length === 0 && <p className="text-gray-400 text-xs">질문이 없습니다.</p>}
 
                     {section.questions.map((q, idx) => (
                       <div
                         key={q.id}
                         draggable
-                        onDragStart={() => {
-                          dragItem.current = { sectionId: section.id, index: idx };
-                        }}
+                        onDragStart={() => { dragItem.current = { sectionId: section.id, index: idx }; }}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => {
                           if (!dragItem.current) return;
                           if (dragItem.current.sectionId !== section.id) return;
-                          void handleReorderQuestion(
-                            section.id,
-                            dragItem.current.index,
-                            idx,
-                          );
+                          void handleReorderQuestion(section.id, dragItem.current.index, idx);
                           dragItem.current = null;
                         }}
                         className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm cursor-grab active:cursor-grabbing group"
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-gray-300 group-hover:text-gray-400 flex-shrink-0 select-none">
-                            ⠿
-                          </span>
+                          <span className="text-gray-300 group-hover:text-gray-400 flex-shrink-0 select-none">⠿</span>
                           <div className="min-w-0">
-                            <span className="font-medium text-gray-700 truncate">
-                              {q.titleKo}
-                            </span>
+                            <span className="font-medium text-gray-700 truncate">{q.titleKo}</span>
                             <span className="ml-2 text-xs text-gray-400">
-                              {
-                                QUESTION_TYPES.find(
-                                  (t) => t.value === q.questionType,
-                                )?.label
-                              }
+                              {QUESTION_TYPES.find((t) => t.value === q.questionType)?.label}
                               {q.isRequired ? " · 필수" : ""}
                             </span>
                           </div>
                         </div>
                         <div className="flex gap-3 flex-shrink-0 ml-2">
-                          <button
-                            onClick={() => openEditQuestion(section.id, q)}
-                            className="text-blue-500 hover:underline text-xs"
-                          >
-                            편집
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDeleteQuestion(section.id, q.id)
-                            }
-                            className="text-red-400 hover:text-red-600 text-xs"
-                          >
-                            삭제
-                          </button>
+                          <button onClick={() => openEditQuestion(section.id, q)} className="text-blue-500 hover:underline text-xs">편집</button>
+                          <button onClick={() => handleDeleteQuestion(section.id, q.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
                         </div>
                       </div>
                     ))}
-
-                    <button
-                      onClick={() => openNewQuestion(section.id)}
-                      className="text-blue-500 text-xs hover:underline"
-                    >
-                      + 질문 추가
-                    </button>
+                    <button onClick={() => openNewQuestion(section.id)} className="text-blue-500 text-xs hover:underline">+ 질문 추가</button>
                   </div>
                 ))}
 
-                {/* 새 섹션 추가 */}
                 <div className="flex gap-2">
                   <input
                     className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -892,10 +698,7 @@ export function SurveyEditorPage() {
                     onChange={(e) => setNewSectionTitle(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
                   />
-                  <Button
-                    onClick={handleAddSection}
-                    disabled={addingSection || !newSectionTitle.trim()}
-                  >
+                  <Button onClick={handleAddSection} disabled={addingSection || !newSectionTitle.trim()}>
                     {addingSection ? "추가 중…" : "섹션 추가"}
                   </Button>
                 </div>

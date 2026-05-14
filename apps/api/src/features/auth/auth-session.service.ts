@@ -434,6 +434,7 @@ export class AuthSessionService {
         storageMode: "persisted",
         user: {
           id: user.userId,
+          name: user.nameKo,
           permission:
             await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
         },

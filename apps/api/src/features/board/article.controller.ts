@@ -20,10 +20,12 @@ import type {
   ArticleUpdateResponse,
   ArticleDeleteResponse,
 } from "@soc/contracts";
+import { ArticleCreateSchema, ArticleUpdateSchema } from "@soc/contracts";
 import { Request } from "express";
 
 import { AuthGuard } from "../../shared/guards";
 import { Cookies } from "../../shared/decorators/cookies.decorator";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { AUTH_ACCESS_COOKIE_NAME } from "../auth/auth.tokens";
 import { AuthSessionService } from "../auth/auth-session.service";
 import { ArticleService } from "./article.service";
@@ -47,6 +49,7 @@ export class ArticleController {
     @Param("code") code: string,
     @Query("page", new ParseIntPipe({ optional: true })) page?: number,
     @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
+    @Query("q") q?: string,
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListResponse> {
     const currentUser =
@@ -56,6 +59,7 @@ export class ArticleController {
       {
         page,
         limit,
+        q,
       },
       currentUser,
     );
@@ -76,7 +80,7 @@ export class ArticleController {
   @UseGuards(AuthGuard)
   async createArticle(
     @Param("code") code: string,
-    @Body() body: ArticleCreateRequest,
+    @Body(new ZodValidationPipe(ArticleCreateSchema)) body: ArticleCreateRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<ArticleCreateResponse> {
     return this.articleService.createArticle(code, body, request.user!);
@@ -87,7 +91,7 @@ export class ArticleController {
   async updateArticle(
     @Param("code") code: string,
     @Param("articleId") articleId: string,
-    @Body() body: ArticleUpdateRequest,
+    @Body(new ZodValidationPipe(ArticleUpdateSchema)) body: ArticleUpdateRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<ArticleUpdateResponse> {
     return this.articleService.updateArticle(

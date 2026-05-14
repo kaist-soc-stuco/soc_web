@@ -121,7 +121,7 @@ export class SurveyResponsesRepository {
       .update(surveyResponses)
       .set({
         status,
-        reviewAdminId: Number(reviewAdminId),
+        reviewAdminId: reviewAdminId,
         reviewReason: reason ?? null,
         reviewedAt: nowDate(),
         updatedAt: nowDate(),

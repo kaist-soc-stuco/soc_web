@@ -10,10 +10,12 @@ import type {
   ArticleCreateResponse,
   ArticleDetailResponse,
   ArticleListResponse,
+  ArticleListItem,
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   ArticleDeleteResponse,
 } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
@@ -23,6 +25,7 @@ import { ARTICLE_STATUS } from "./board.constants";
 interface ArticleQueryParams {
   page?: number;
   limit?: number;
+  q?: string;
 }
 
 interface AuthenticatedUser {
@@ -56,11 +59,13 @@ export class ArticleService {
     const page = params.page && params.page > 0 ? params.page : 1;
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
     const limit = Math.min(rawLimit, MAX_PAGE_SIZE);
+    const query = params.q?.trim();
 
     const result = await this.articleRepository.listByBoardId(
       board.boardId,
       page,
       limit,
+      query,
     );
 
     return {
@@ -115,10 +120,9 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
-    const requiredPermission = board.writePermissionId ?? 0;
     if (
-      requiredPermission > 0 &&
-      (user.permission & requiredPermission) !== requiredPermission
+      board.writePermissionBit > 0 &&
+      !Permissions.has(user.permission, board.writePermissionBit)
     ) {
       throw new ForbiddenException("insufficient_permission");
     }
@@ -159,11 +163,10 @@ export class ArticleService {
       throw new NotFoundException("article_not_found");
     }
 
-    const managePermission = board.managePermissionId ?? 0;
     const isOwner = article.authorUserId === user.id;
     const isManager =
-      managePermission > 0 &&
-      (user.permission & managePermission) === managePermission;
+      board.managePermissionBit > 0 &&
+      Permissions.has(user.permission, board.managePermissionBit);
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
@@ -196,16 +199,19 @@ export class ArticleService {
       throw new NotFoundException("article_not_found");
     }
 
-    const managePermission = board.managePermissionId ?? 0;
     const isOwner = article.authorUserId === user.id;
     const isManager =
-      managePermission > 0 &&
-      (user.permission & managePermission) === managePermission;
+      board.managePermissionBit > 0 &&
+      Permissions.has(user.permission, board.managePermissionBit);
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
     }
 
     return this.articleRepository.softDeleteArticle(board.boardId, articleId);
+  }
+
+  async searchArticles(query?: string, limit = 20): Promise<ArticleListItem[]> {
+    return this.articleRepository.findAllArticles(limit, query);
   }
 }

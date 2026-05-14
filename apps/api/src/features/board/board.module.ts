@@ -4,6 +4,7 @@ import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
 import { AuthModule } from "../auth/auth.module";
 import { BoardController } from "./board.controller";
 import { ArticleController } from "./article.controller";
+import { ArticleSearchController } from "./article-search.controller";
 import { CommentController } from "./comment.controller";
 import { BoardService } from "./board.service";
 import { ArticleService } from "./article.service";
@@ -15,7 +16,7 @@ import { UsersModule } from "../users/users.module";
 
 @Module({
   imports: [PostgresModule, UsersModule, AuthModule],
-  controllers: [ArticleController, CommentController, BoardController],
+  controllers: [ArticleController, CommentController, BoardController, ArticleSearchController],
   providers: [
     BoardRepository,
     ArticleRepository,

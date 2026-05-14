@@ -53,20 +53,20 @@ export class SurveysRepository {
     const [row] = await this.db
       .insert(surveys)
       .values({
-        creatorId: Number(creatorId),
-        kind: "SURVEY",
+        creatorId: creatorId,
+        kind: dto.kind,
         titleKo: dto.titleKo,
         titleEn: dto.titleEn,
         descriptionKo: dto.descriptionKo ?? null,
         descriptionEn: dto.descriptionEn ?? null,
         status: "DRAFT",
-        feeRequirementPolicy: dto.feePayersOnly ? "PAID_ONLY" : "NONE",
-        allowGuestResponse: dto.allowAnonymous ?? false,
-        resultVisibility: "PUBLIC",
-        maxResponseCount: dto.maxResponses ?? null,
-        openAt: dto.opensAt ? isoToDate(dto.opensAt) : null,
-        closeAt: dto.closesAt ? isoToDate(dto.closesAt) : null,
-        connectedArticleId: dto.connectedPostId ? Number(dto.connectedPostId) : null,
+        feeRequirementPolicy: dto.feeRequirementPolicy ?? "NONE",
+        allowGuestResponse: dto.allowGuestResponse ?? false,
+        resultVisibility: dto.resultVisibility,
+        maxResponseCount: dto.maxResponseCount ?? null,
+        openAt: dto.openAt ? isoToDate(dto.openAt) : null,
+        closeAt: dto.closeAt ? isoToDate(dto.closeAt) : null,
+        connectedArticleId: dto.connectedArticleId ? Number(dto.connectedArticleId) : null,
         updatedAt: nowDate(),
       })
       .returning();
@@ -82,20 +82,22 @@ export class SurveysRepository {
       updatedAt: nowDate(),
     };
 
+    if (dto.kind !== undefined) set.kind = dto.kind;
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;
     if (dto.titleEn !== undefined) set.titleEn = dto.titleEn;
     if (dto.descriptionKo !== undefined) set.descriptionKo = dto.descriptionKo;
     if (dto.descriptionEn !== undefined) set.descriptionEn = dto.descriptionEn;
     if (dto.status !== undefined) set.status = dto.status.toUpperCase();
-    if (dto.feePayersOnly !== undefined) {
-      set.feeRequirementPolicy = dto.feePayersOnly ? "PAID_ONLY" : "NONE";
+    if (dto.feeRequirementPolicy !== undefined) {
+      set.feeRequirementPolicy = dto.feeRequirementPolicy;
     }
-    if (dto.allowAnonymous !== undefined) set.allowGuestResponse = dto.allowAnonymous;
-    if (dto.maxResponses !== undefined) set.maxResponseCount = dto.maxResponses;
-    if (dto.opensAt !== undefined) set.openAt = isoToDate(dto.opensAt);
-    if (dto.closesAt !== undefined) set.closeAt = isoToDate(dto.closesAt);
-    if (dto.connectedPostId !== undefined) {
-      set.connectedArticleId = dto.connectedPostId ? Number(dto.connectedPostId) : null;
+    if (dto.allowGuestResponse !== undefined) set.allowGuestResponse = dto.allowGuestResponse;
+    if (dto.resultVisibility !== undefined) set.resultVisibility = dto.resultVisibility;
+    if (dto.maxResponseCount !== undefined) set.maxResponseCount = dto.maxResponseCount;
+    if (dto.openAt !== undefined) set.openAt = dto.openAt ? isoToDate(dto.openAt) : null;
+    if (dto.closeAt !== undefined) set.closeAt = dto.closeAt ? isoToDate(dto.closeAt) : null;
+    if (dto.connectedArticleId !== undefined) {
+      set.connectedArticleId = dto.connectedArticleId ? Number(dto.connectedArticleId) : null;
     }
 
     const [row] = await this.db

@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/atoms/logo";
+import { createApiClient } from "@soc/api-client";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
 interface HeaderProps {
   showLogo?: boolean;
@@ -10,6 +12,34 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
+  const [user, setUser] = useState<{ id: string; name: string; permission: number } | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // 인증 상태 fetch
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const apiClient = createApiClient({ baseUrl: resolveApiBaseUrl() });
+        const res = await apiClient.getCurrentUser();
+        const userName =
+          res.user && "name" in res.user
+            ? (res.user as { name?: string }).name
+            : undefined;
+        if (res.authenticated && res.user) {
+          setUser({
+            id: res.user.id,
+            name: userName ?? "사용자",
+            permission: res.user.permission,
+          });
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const updateNavLeft = () => {
     if (navRef.current) setNavLeft(navRef.current.offsetLeft);
@@ -82,45 +112,74 @@ export function Header({ showLogo = false }: HeaderProps) {
           </nav>
         </div>
 
-        {/* Right Section: Search, Notification, Login */}
-        <div className="flex items-center gap-2 md:gap-6 pr-6">
+        {/* Right Section: Search, Notification, Login/User */}
+        <div className="flex items-center gap-2 md:gap-6 pr-6 relative">
           <button className="text-kaist-black hover:text-kaist-darkgreen transition-colors p-2">
-            <svg
-              className="h-4 w-4 md:h-5 md:w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
+            {/* 검색 아이콘 */}
+            <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </button>
           <button className="text-kaist-black hover:text-kaist-darkgreen transition-colors p-2">
-            <svg
-              className="h-4 w-4 md:h-5 md:w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
+            {/* 알림 아이콘 */}
+            <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
           </button>
-          <Link
-            to="/login"
-            className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
-          >
-            <span className="py-2">로그인</span>
-            <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
-          </Link>
+          {user ? (
+            <div className="relative">
+              <button
+                className="flex items-center gap-2 px-3 py-1 rounded hover:bg-kaist-darkgreen/5 font-bold text-kaist-black"
+                onClick={() => setDropdownOpen((v) => !v)}
+                onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
+              >
+                <span>{user.name}</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-kaist-grey shadow-lg rounded z-50">
+                  <ul className="py-1">
+                    <li>
+                      <Link to="/mypage" className="block px-4 py-2 hover:bg-kaist-darkgreen/5" onClick={() => setDropdownOpen(false)}>
+                        마이페이지
+                      </Link>
+                    </li>
+
+                    {user.permission & 256 ? (
+                      <li>
+                        <Link to="/admin/surveys" className="block px-4 py-2 hover:bg-kaist-darkgreen/5" onClick={() => setDropdownOpen(false)}>
+                          관리자 대시보드
+                        </Link>
+                      </li>
+                    ) : null}
+                    <li>
+                      <button
+                        className="w-full text-left px-4 py-2 hover:bg-kaist-darkgreen/5"
+                        onClick={async () => {
+                          const apiClient = createApiClient({ baseUrl: resolveApiBaseUrl() });
+                          await apiClient.logout();
+                          setUser(null);
+                          window.location.reload();
+                        }}
+                      >
+                        로그아웃
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
+            >
+              <span className="py-2">로그인</span>
+              <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
+            </Link>
+          )}
         </div>
       </div>
 
