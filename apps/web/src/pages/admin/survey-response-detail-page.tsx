@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
@@ -7,10 +7,10 @@ import type {
 } from "@soc/contracts";
 import { formatKoreanDateTime } from "@soc/shared";
 import { Button } from "@/components/ui/button";
-import { resolveApiBaseUrl } from "@/lib/api";
-import { getAuthSessionSummary } from "@/lib/auth-session";
-import { hasSurveyManagePermission } from "@/lib/permissions";
-import { hasPersistedProfile } from "@/lib/require-persisted-profile";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { AuthGuard } from "@/components/guards/auth-guard";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 
 type ReviewStatus = "approved" | "rejected" | "waitlisted";
 
@@ -52,7 +52,10 @@ export function SurveyResponseDetailPage() {
     responseId: string;
   }>();
 
-  const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
+  const client = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
 
   const [response, setResponse] = useState<ResponseDetailResponse | null>(null);
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
@@ -62,17 +65,12 @@ export function SurveyResponseDetailPage() {
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("approved");
   const [reviewReason, setReviewReason] = useState("");
   const [reviewing, setReviewing] = useState(false);
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
 
   useEffect(() => {
     if (!surveyId || !responseId) return;
     (async () => {
-      const session = await getAuthSessionSummary(client);
-      if (!hasPersistedProfile(session)) {
-        navigate("/login");
-        return;
-      }
-      if (!hasSurveyManagePermission(session.permission)) {
-        navigate("/admin/permissions", { replace: true });
+      if (sessionLoading || !hasSurveyManagePermission(session?.permission)) {
         return;
       }
       try {
@@ -88,7 +86,7 @@ export function SurveyResponseDetailPage() {
         setLoading(false);
       }
     })();
-  }, [surveyId, responseId]);
+  }, [surveyId, responseId, client, session, sessionLoading]);
 
   const handleReview = async () => {
     if (!surveyId || !responseId) return;
@@ -121,7 +119,8 @@ export function SurveyResponseDetailPage() {
     "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 
   return (
-    <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+    <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(`/admin/surveys/${surveyId}/responses`)}
@@ -235,5 +234,6 @@ export function SurveyResponseDetailPage() {
           </div>
         )}
       </main>
+    </AuthGuard>
   );
 }

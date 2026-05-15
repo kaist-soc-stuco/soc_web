@@ -23,6 +23,7 @@ export interface LoginSessionResponse {
   requiresConsent: boolean;
   storageMode: AuthStorageMode | null;
   userId?: string;
+  userName?: string;
 }
 
 export interface CurrentUserResponse {

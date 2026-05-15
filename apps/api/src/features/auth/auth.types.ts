@@ -139,6 +139,7 @@ export interface AuthSessionSummary {
   requiresConsent: boolean;
   storageMode: StorageMode | null;
   userId?: string;
+  userName?: string;
 }
 
 /**

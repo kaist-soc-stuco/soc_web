@@ -389,11 +389,14 @@ export class AuthSessionService {
     }
 
     let permission: number | undefined;
+    let userName: string | undefined;
+
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
-      permission = user
-        ? await this.usersService.resolvePermissionBitmaskByUserId(user.userId)
-        : undefined;
+      if (user) {
+        permission = await this.usersService.resolvePermissionBitmaskByUserId(user.userId);
+        userName = user.nameKo;
+      }
     }
 
     return {
@@ -403,6 +406,7 @@ export class AuthSessionService {
       requiresConsent: session.mode === "temporary",
       storageMode: session.mode,
       userId: session.userId,
+      userName,
     };
   }
 

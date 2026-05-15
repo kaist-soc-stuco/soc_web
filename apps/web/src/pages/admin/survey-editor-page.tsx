@@ -7,12 +7,15 @@ import type {
   SurveyQuestionRecord,
   QuestionType,
 } from "@soc/contracts";
+import { z } from "zod";
+import { FormProvider, useForm, useFormContext } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { htmlDatetimeLocalToIso, isoToHtmlDatetimeLocal } from "@soc/shared";
 import { Button } from "@/components/ui/button";
+import { AuthGuard } from "@/components/guards/auth-guard";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
-import { getAuthSessionSummary } from "@/lib/auth-session";
-import { hasSurveyManagePermission } from "@/lib/permissions";
-import { hasPersistedProfile } from "@/lib/require-persisted-profile";
+import { Permissions } from "@/lib/permissions";
 
 // ─── 타입 정의 ────────────────────────────────────────────────────────────────
 
@@ -45,6 +48,29 @@ const SURVEY_VISIBILITIES = [
   { value: "PUBLIC", label: "공개 (전체 공개)" },
   { value: "PRIVATE", label: "비공개 (결과 숨김)" },
 ];
+
+const SurveySettingsSchema = z.object({
+  titleKo: z.string().min(1, "국문 제목은 필수입니다.").max(255),
+  titleEn: z.string().min(1, "영문 제목은 필수입니다.").max(255),
+  descriptionKo: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  status: z.string().max(20).optional(),
+  kind: z.string().min(1).max(20),
+  resultVisibility: z.string().min(1).max(20),
+  feePayersOnly: z.boolean().optional(),
+  allowGuestResponse: z.boolean().optional(),
+  maxResponseCount: z
+    .string()
+    .optional()
+    .refine((value: string | undefined) => !value || /^[0-9]+$/.test(value), {
+      message: "숫자만 입력하세요.",
+    }),
+  openAt: z.string().min(1, "시작 시각을 입력해주세요."),
+  closeAt: z.string().min(1, "마감 시각을 입력해주세요."),
+  connectedArticleId: z.string().optional(),
+});
+
+type SurveySettingsFormValues = z.infer<typeof SurveySettingsSchema>;
 
 interface QuestionFormState {
   titleKo: string;
@@ -202,28 +228,262 @@ function QuestionEditor({ initial, onSave, onCancel }: QuestionEditorProps) {
   );
 }
 
+interface SurveySettingsFormProps {
+  saving: boolean;
+  isEdit: boolean;
+  showArticleSearch: boolean;
+  articleSearchResults: any[];
+  selectedArticleTitle: string | null;
+  onToggleArticleSearch: () => void;
+  onFetchArticles: () => Promise<void>;
+  onSelectArticle: (articleId: string, title: string) => void;
+  onConnectedArticleChange: () => void;
+  onSubmit: (values: SurveySettingsFormValues) => void;
+}
+
+function SurveySettingsForm({
+  saving,
+  isEdit,
+  showArticleSearch,
+  articleSearchResults,
+  selectedArticleTitle,
+  onToggleArticleSearch,
+  onFetchArticles,
+  onSelectArticle,
+  onConnectedArticleChange,
+  onSubmit,
+}: SurveySettingsFormProps) {
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<SurveySettingsFormValues>();
+
+  const feePayersOnly = Boolean(watch("feePayersOnly"));
+  const allowGuestResponse = Boolean(watch("allowGuestResponse"));
+  const connectedArticleId = watch("connectedArticleId") ?? "";
+
+  const inputCls =
+    "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
+
+  return (
+    <form
+      className="space-y-4 bg-white rounded-xl border border-gray-200 p-6"
+      onSubmit={handleSubmit(onSubmit, () => {})}
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">제목 (국문) *</label>
+          <input className={inputCls} {...register("titleKo")} />
+          {errors.titleKo && (
+            <p className="mt-1 text-xs text-red-500">{errors.titleKo.message}</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">제목 (영문) *</label>
+          <input className={inputCls} {...register("titleEn")} />
+          {errors.titleEn && (
+            <p className="mt-1 text-xs text-red-500">{errors.titleEn.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">설명 (국문)</label>
+          <textarea className={`${inputCls} min-h-[80px] resize-y`} {...register("descriptionKo")} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">설명 (영문)</label>
+          <textarea className={`${inputCls} min-h-[80px] resize-y`} {...register("descriptionEn")} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">유형 *</label>
+          <select className={inputCls} {...register("kind")}>
+            {SURVEY_KINDS.map((k) => (
+              <option key={k.value} value={k.value}>{k.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">결과 공개 범위 *</label>
+          <select className={inputCls} {...register("resultVisibility")}>
+            {SURVEY_VISIBILITIES.map((v) => (
+              <option key={v.value} value={v.value}>{v.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">상태</label>
+          <select className={inputCls} {...register("status")}>
+            {SURVEY_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">최대 응답 수</label>
+          <input
+            type="number"
+            className={inputCls}
+            placeholder="제한 없음"
+            {...register("maxResponseCount")}
+          />
+          {errors.maxResponseCount && (
+            <p className="mt-1 text-xs text-red-500">{errors.maxResponseCount.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">시작 시각 (Asia/Seoul)</label>
+          <input type="datetime-local" className={inputCls} {...register("openAt")} />
+          {errors.openAt && (
+            <p className="mt-1 text-xs text-red-500">{errors.openAt.message}</p>
+          )}
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">마감 시각 (Asia/Seoul)</label>
+          <input type="datetime-local" className={inputCls} {...register("closeAt")} />
+          {errors.closeAt && (
+            <p className="mt-1 text-xs text-red-500">{errors.closeAt.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" {...register("feePayersOnly")} />
+          과비 납부자만 응답 가능
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" {...register("allowGuestResponse")} />
+          로그인 없이 응답 가능
+        </label>
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">연결 게시글</label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              className={inputCls}
+              placeholder="게시글 ID 또는 제목 검색"
+              value={connectedArticleId}
+              onChange={(event) => {
+                setValue("connectedArticleId", event.target.value);
+                onConnectedArticleChange();
+              }}
+            />
+            {selectedArticleTitle && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-500 font-medium">
+                {selectedArticleTitle}
+              </div>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={async () => {
+              await onFetchArticles();
+              onToggleArticleSearch();
+            }}
+          >
+            {showArticleSearch ? "목록 닫기" : "게시글 목록"}
+          </Button>
+        </div>
+        <div className="relative">
+          {showArticleSearch && (
+            <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm max-h-60 overflow-y-auto z-20 absolute w-full top-0">
+              <div className="p-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">최근 게시글 (최대 30개)</span>
+                <button onClick={onToggleArticleSearch} className="text-gray-400 hover:text-gray-600 text-xs">닫기</button>
+              </div>
+              {articleSearchResults.length === 0 && (
+                <p className="p-3 text-xs text-gray-400 text-center">불러온 게시글이 없습니다.</p>
+              )}
+              {articleSearchResults.map((art) => (
+                <button
+                  key={art.articleId}
+                  type="button"
+                  onClick={() => onSelectArticle(String(art.articleId), art.titleKo)}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors"
+                >
+                  <span className="font-semibold text-gray-400 mr-2">#{art.articleId}</span>
+                  <span className="text-gray-700">{art.titleKo}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 에러 요약 박스 (Refined Error Summary) */}
+      {Object.keys(errors).length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-start gap-3">
+            <div className="text-red-500 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-red-800 mb-1">입력 내용을 확인해주세요</h4>
+              <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
+                {Object.entries(errors).map(([key, error]) => (
+                  <li key={key}>{error?.message as string}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end pt-2">
+        <Button type="submit" disabled={saving}>
+          {saving ? "저장 중…" : isEdit ? "설정 저장" : "설문 생성"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
+
+const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
 
 export function SurveyEditorPage() {
   const navigate = useNavigate();
   const { id: surveyId } = useParams<{ id: string }>();
   const isEdit = Boolean(surveyId);
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
 
-  const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const form = useForm<SurveySettingsFormValues>({
+    resolver: zodResolver(SurveySettingsSchema),
+    defaultValues: {
+      titleKo: "",
+      titleEn: "",
+      descriptionKo: "",
+      descriptionEn: "",
+      status: "draft",
+      kind: "SURVEY",
+      resultVisibility: "PUBLIC",
+      feePayersOnly: false,
+      allowGuestResponse: false,
+      maxResponseCount: "",
+      openAt: "",
+      closeAt: "",
+      connectedArticleId: "",
+    },
+  });
 
-  const [titleKo, setTitleKo] = useState("");
-  const [titleEn, setTitleEn] = useState("");
-  const [descriptionKo, setDescriptionKo] = useState("");
-  const [descriptionEn, setDescriptionEn] = useState("");
-  const [status, setStatus] = useState<string>("draft");
-  const [kind, setKind] = useState<string>("SURVEY");
-  const [resultVisibility, setResultVisibility] = useState<string>("PUBLIC");
-  const [feeRequirementPolicy, setFeeRequirementPolicy] = useState<string>("NONE");
-  const [allowGuestResponse, setAllowGuestResponse] = useState(false);
-  const [maxResponseCount, setMaxResponseCount] = useState("");
-  const [openAt, setOpenAt] = useState("");
-  const [closeAt, setCloseAt] = useState("");
-  const [connectedArticleId, setConnectedArticleId] = useState("");
   const [articleSearchResults, setArticleSearchResults] = useState<any[]>([]);
   const [showArticleSearch, setShowArticleSearch] = useState(false);
   const [selectedArticleTitle, setSelectedArticleTitle] = useState<string | null>(null);
@@ -247,30 +507,33 @@ export function SurveyEditorPage() {
 
   useEffect(() => {
     (async () => {
-      const session = await getAuthSessionSummary(client);
-      if (!hasPersistedProfile(session)) {
-        navigate("/login");
+      if (sessionLoading || !session) {
         return;
       }
-      if (!hasSurveyManagePermission(session.permission)) {
-        navigate("/admin/permissions?source=survey-edit", { replace: true });
+
+      if (!Permissions.has(session.permission ?? 0, Permissions.MANAGE_SURVEY)) {
         return;
       }
 
       if (isEdit && surveyId) {
         try {
           const detail: SurveyDetailResponse = await client.getSurveyDetail(surveyId);
-          setTitleKo(detail.titleKo);
-          setTitleEn(detail.titleEn);
-          setDescriptionKo(detail.descriptionKo ?? "");
-          setDescriptionEn(detail.descriptionEn ?? "");
-          setStatus(detail.status);
-          setFeeRequirementPolicy(detail.feePayersOnly ? "PAID_ONLY" : "NONE");
-          setAllowGuestResponse(detail.allowAnonymous);
-          setMaxResponseCount(detail.maxResponses != null ? String(detail.maxResponses) : "");
-          setOpenAt(detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "");
-          setCloseAt(detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "");
-          setConnectedArticleId(detail.connectedPostId ?? "");
+          form.reset({
+            titleKo: detail.titleKo,
+            titleEn: detail.titleEn,
+            descriptionKo: detail.descriptionKo ?? "",
+            descriptionEn: detail.descriptionEn ?? "",
+            status: detail.status,
+            kind: form.getValues("kind"),
+            resultVisibility: form.getValues("resultVisibility"),
+            feePayersOnly: detail.feePayersOnly,
+            allowGuestResponse: detail.allowAnonymous,
+            maxResponseCount:
+              detail.maxResponses != null ? String(detail.maxResponses) : "",
+            openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
+            closeAt: detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "",
+            connectedArticleId: detail.connectedPostId ?? "",
+          });
           setSections(detail.sections);
           setLoadedSurveyId(surveyId);
 
@@ -285,34 +548,29 @@ export function SurveyEditorPage() {
         }
       }
     })();
-  }, [isEdit, surveyId, client, navigate]);
+  }, [isEdit, surveyId, client, navigate, form, session, sessionLoading]);
 
-  const handleSaveSettings = async () => {
-    if (!titleKo.trim()) {
-      setError("국문 제목은 필수입니다.");
-      return;
-    }
-    if (!titleEn.trim()) {
-      setError("영문 제목은 필수입니다.");
-      return;
-    }
+  const handleSaveSettings = async (values: SurveySettingsFormValues) => {
     setSaving(true);
     setError(null);
     try {
+      const maxResponseCount = values.maxResponseCount?.trim()
+        ? Number(values.maxResponseCount)
+        : undefined;
       const body = {
-        kind,
-        titleKo: titleKo.trim(),
-        titleEn: titleEn.trim(),
-        descriptionKo: descriptionKo.trim() || undefined,
-        descriptionEn: descriptionEn.trim() || undefined,
-        status: status as any,
-        feeRequirementPolicy,
-        allowGuestResponse,
-        resultVisibility,
-        maxResponseCount: maxResponseCount ? Number(maxResponseCount) : undefined,
-        openAt: openAt ? htmlDatetimeLocalToIso(openAt) : undefined,
-        closeAt: closeAt ? htmlDatetimeLocalToIso(closeAt) : undefined,
-        connectedArticleId: connectedArticleId.trim() || undefined,
+        kind: values.kind,
+        titleKo: values.titleKo.trim(),
+        titleEn: values.titleEn.trim(),
+        descriptionKo: values.descriptionKo?.trim() || undefined,
+        descriptionEn: values.descriptionEn?.trim() || undefined,
+        status: values.status as any,
+        feeRequirementPolicy: values.feePayersOnly ? "PAID_ONLY" : "NONE",
+        allowGuestResponse: values.allowGuestResponse,
+        resultVisibility: values.resultVisibility,
+        maxResponseCount,
+        openAt: values.openAt ? htmlDatetimeLocalToIso(values.openAt) : undefined,
+        closeAt: values.closeAt ? htmlDatetimeLocalToIso(values.closeAt) : undefined,
+        connectedArticleId: values.connectedArticleId?.trim() || undefined,
       };
       if (isEdit && loadedSurveyId) {
         await client.updateSurvey(loadedSurveyId, body);
@@ -457,264 +715,139 @@ export function SurveyEditorPage() {
     });
   };
 
-  const inputCls = "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
+  const handleFetchArticles = async () => {
+    const results = await client.searchArticles(undefined, 30);
+    setArticleSearchResults(results);
+  };
+
+  const handleSelectArticle = (articleId: string, title: string) => {
+    form.setValue("connectedArticleId", articleId);
+    setSelectedArticleTitle(title);
+    setShowArticleSearch(false);
+  };
+
+  const handleConnectedArticleChange = () => {
+    setSelectedArticleTitle(null);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate("/admin/surveys")} className="text-sm text-gray-400 hover:text-gray-600">
-            ← 목록
-          </button>
-          <h1 className="text-xl font-bold text-gray-900">{isEdit ? "설문조사 편집" : "새 설문조사"}</h1>
-        </div>
-
-        <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
-          설문 설정과 문항을 수정하려면 설문조사 관리 권한(SURVEY_MANAGE)이 필요합니다. 권한이 없다면
-          <button type="button" onClick={() => navigate("/admin/permissions")} className="mx-1 font-semibold underline underline-offset-2">
-            /admin/permissions
-          </button>
-          에서 역할 그룹을 조정한 뒤 다시 열어주세요.
-        </div>
-
-        {error && <p className="mb-4 text-red-500 text-sm">{error}</p>}
-
-        <div className="flex gap-4 border-b border-gray-200 mb-6">
-          {(["settings", "content"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`pb-2 text-sm font-medium border-b-2 transition-colors ${tab === t ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-            >
-              {t === "settings" ? "설정" : "문항 구성"}
+    <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={() => navigate("/admin/surveys")} className="text-sm text-gray-400 hover:text-gray-600">
+              ← 목록
             </button>
-          ))}
-        </div>
-
-        {tab === "settings" && (
-          <div className="space-y-4 bg-white rounded-xl border border-gray-200 p-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">제목 (국문) *</label>
-                <input className={inputCls} value={titleKo} onChange={(e) => setTitleKo(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">제목 (영문) *</label>
-                <input className={inputCls} value={titleEn} onChange={(e) => setTitleEn(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">설명 (국문)</label>
-                <textarea className={`${inputCls} min-h-[80px] resize-y`} value={descriptionKo} onChange={(e) => setDescriptionKo(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">설명 (영문)</label>
-                <textarea className={`${inputCls} min-h-[80px] resize-y`} value={descriptionEn} onChange={(e) => setDescriptionEn(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">유형 *</label>
-                <select className={inputCls} value={kind} onChange={(e) => setKind(e.target.value)}>
-                  {SURVEY_KINDS.map((k) => (
-                    <option key={k.value} value={k.value}>{k.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">결과 공개 범위 *</label>
-                <select className={inputCls} value={resultVisibility} onChange={(e) => setResultVisibility(e.target.value)}>
-                  {SURVEY_VISIBILITIES.map((v) => (
-                    <option key={v.value} value={v.value}>{v.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">상태</label>
-                <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
-                  {SURVEY_STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">최대 응답 수</label>
-                <input type="number" className={inputCls} placeholder="제한 없음" value={maxResponseCount} onChange={(e) => setMaxResponseCount(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">시작 시각 (Asia/Seoul)</label>
-                <input type="datetime-local" className={inputCls} value={openAt} onChange={(e) => setOpenAt(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">마감 시각 (Asia/Seoul)</label>
-                <input type="datetime-local" className={inputCls} value={closeAt} onChange={(e) => setCloseAt(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={feeRequirementPolicy === "PAID_ONLY"}
-                  onChange={(e) => setFeeRequirementPolicy(e.target.checked ? "PAID_ONLY" : "NONE")}
-                />
-                과비 납부자만 응답 가능
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" checked={allowGuestResponse} onChange={(e) => setAllowGuestResponse(e.target.checked)} />
-                로그인 없이 응답 가능
-              </label>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">연결 게시글</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    className={inputCls}
-                    placeholder="게시글 ID 또는 제목 검색"
-                    value={connectedArticleId}
-                    onChange={(e) => {
-                      setConnectedArticleId(e.target.value);
-                      setSelectedArticleTitle(null);
-                    }}
-                  />
-                  {selectedArticleTitle && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-500 font-medium">
-                      {selectedArticleTitle}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    const results = await client.searchArticles(undefined, 30);
-                    setArticleSearchResults(results);
-                    setShowArticleSearch(!showArticleSearch);
-                  }}
-                >
-                  {showArticleSearch ? "목록 닫기" : "게시글 목록"}
-                </Button>
-              </div>
-              <div className="relative">
-                {showArticleSearch && (
-                  <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm max-h-60 overflow-y-auto z-20 absolute w-full top-0">
-                    <div className="p-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">최근 게시글 (최대 30개)</span>
-                      <button onClick={() => setShowArticleSearch(false)} className="text-gray-400 hover:text-gray-600 text-xs">닫기</button>
-                    </div>
-                    {articleSearchResults.length === 0 && <p className="p-3 text-xs text-gray-400 text-center">불러온 게시글이 없습니다.</p>}
-                    {articleSearchResults.map((art) => (
-                      <button
-                        key={art.articleId}
-                        onClick={() => {
-                          setConnectedArticleId(art.articleId);
-                          setSelectedArticleTitle(art.titleKo);
-                          setShowArticleSearch(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors"
-                      >
-                        <span className="font-semibold text-gray-400 mr-2">#{art.articleId}</span>
-                        <span className="text-gray-700">{art.titleKo}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSaveSettings} disabled={saving}>
-                {saving ? "저장 중…" : isEdit ? "설정 저장" : "설문 생성"}
-              </Button>
-            </div>
+            <h1 className="text-xl font-bold text-gray-900">{isEdit ? "설문조사 편집" : "새 설문조사"}</h1>
           </div>
-        )}
 
-        {tab === "content" && (
-          <div className="space-y-6">
-            {!loadedSurveyId && <p className="text-gray-500 text-sm">설정 탭에서 설문을 먼저 저장하세요.</p>}
+          {error && <p className="mb-4 text-red-500 text-sm">{error}</p>}
 
-            {loadedSurveyId && (
-              <>
-                {sections.map((section) => (
-                  <div key={section.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-800">{section.titleKo}</h3>
-                      <button onClick={() => handleDeleteSection(section.id)} className="text-red-400 hover:text-red-600 text-xs">섹션 삭제</button>
-                    </div>
+          <div className="flex gap-4 border-b border-gray-200 mb-6">
+            {(["settings", "content"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${tab === t ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                {t === "settings" ? "설정" : "문항 구성"}
+              </button>
+            ))}
+          </div>
 
-                    {section.questions.length === 0 && <p className="text-gray-400 text-xs">질문이 없습니다.</p>}
+          {tab === "settings" && (
+            <FormProvider {...form}>
+              <SurveySettingsForm
+                saving={saving}
+                isEdit={isEdit}
+                showArticleSearch={showArticleSearch}
+                articleSearchResults={articleSearchResults}
+                selectedArticleTitle={selectedArticleTitle}
+                onToggleArticleSearch={() => setShowArticleSearch((prev) => !prev)}
+                onFetchArticles={handleFetchArticles}
+                onSelectArticle={handleSelectArticle}
+                onConnectedArticleChange={handleConnectedArticleChange}
+                onSubmit={handleSaveSettings}
+              />
+            </FormProvider>
+          )}
 
-                    {section.questions.map((q, idx) => (
-                      <div
-                        key={q.id}
-                        draggable
-                        onDragStart={() => { dragItem.current = { sectionId: section.id, index: idx }; }}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => {
-                          if (!dragItem.current) return;
-                          if (dragItem.current.sectionId !== section.id) return;
-                          void handleReorderQuestion(section.id, dragItem.current.index, idx);
-                          dragItem.current = null;
-                        }}
-                        className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm cursor-grab active:cursor-grabbing group"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-gray-300 group-hover:text-gray-400 flex-shrink-0 select-none">⠿</span>
-                          <div className="min-w-0">
-                            <span className="font-medium text-gray-700 truncate">{q.titleKo}</span>
-                            <span className="ml-2 text-xs text-gray-400">
-                              {QUESTION_TYPES.find((t) => t.value === q.questionType)?.label}
-                              {q.isRequired ? " · 필수" : ""}
-                            </span>
+          {tab === "content" && (
+            <div className="space-y-6">
+              {!loadedSurveyId && <p className="text-gray-500 text-sm">설정 탭에서 설문을 먼저 저장하세요.</p>}
+
+              {loadedSurveyId && (
+                <>
+                  {sections.map((section) => (
+                    <div key={section.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-800">{section.titleKo}</h3>
+                        <button onClick={() => handleDeleteSection(section.id)} className="text-red-400 hover:text-red-600 text-xs">섹션 삭제</button>
+                      </div>
+
+                      {section.questions.length === 0 && <p className="text-gray-400 text-xs">질문이 없습니다.</p>}
+
+                      {section.questions.map((q, idx) => (
+                        <div
+                          key={q.id}
+                          draggable
+                          onDragStart={() => { dragItem.current = { sectionId: section.id, index: idx }; }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (!dragItem.current) return;
+                            if (dragItem.current.sectionId !== section.id) return;
+                            void handleReorderQuestion(section.id, dragItem.current.index, idx);
+                            dragItem.current = null;
+                          }}
+                          className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm cursor-grab active:cursor-grabbing group"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-gray-300 group-hover:text-gray-400 flex-shrink-0 select-none">⠿</span>
+                            <div className="min-w-0">
+                              <span className="font-medium text-gray-700 truncate">{q.titleKo}</span>
+                              <span className="ml-2 text-xs text-gray-400">
+                                {QUESTION_TYPES.find((t) => t.value === q.questionType)?.label}
+                                {q.isRequired ? " · 필수" : ""}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-3 flex-shrink-0 ml-2">
+                            <button onClick={() => openEditQuestion(section.id, q)} className="text-blue-500 hover:underline text-xs">편집</button>
+                            <button onClick={() => handleDeleteQuestion(section.id, q.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
                           </div>
                         </div>
-                        <div className="flex gap-3 flex-shrink-0 ml-2">
-                          <button onClick={() => openEditQuestion(section.id, q)} className="text-blue-500 hover:underline text-xs">편집</button>
-                          <button onClick={() => handleDeleteQuestion(section.id, q.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
-                        </div>
-                      </div>
-                    ))}
-                    <button onClick={() => openNewQuestion(section.id)} className="text-blue-500 text-xs hover:underline">+ 질문 추가</button>
+                      ))}
+                      <button onClick={() => openNewQuestion(section.id)} className="text-blue-500 text-xs hover:underline">+ 질문 추가</button>
+                    </div>
+                  ))}
+
+                  <div className="flex gap-2">
+                    <input
+                      className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="섹션 제목 (국문)"
+                      value={newSectionTitle}
+                      onChange={(e) => setNewSectionTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
+                    />
+                    <Button onClick={handleAddSection} disabled={addingSection || !newSectionTitle.trim()}>
+                      {addingSection ? "추가 중…" : "섹션 추가"}
+                    </Button>
                   </div>
-                ))}
+                </>
+              )}
+            </div>
+          )}
+        </main>
 
-                <div className="flex gap-2">
-                  <input
-                    className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    placeholder="섹션 제목 (국문)"
-                    value={newSectionTitle}
-                    onChange={(e) => setNewSectionTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
-                  />
-                  <Button onClick={handleAddSection} disabled={addingSection || !newSectionTitle.trim()}>
-                    {addingSection ? "추가 중…" : "섹션 추가"}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
+        {editingQuestion && (
+          <QuestionEditor
+            initial={editingQuestion.initial}
+            onSave={handleSaveQuestion}
+            onCancel={() => setEditingQuestion(null)}
+          />
         )}
-      </main>
-
-      {editingQuestion && (
-        <QuestionEditor
-          initial={editingQuestion.initial}
-          onSave={handleSaveQuestion}
-          onCancel={() => setEditingQuestion(null)}
-        />
-      )}
-    </div>
+      </div>
+    </AuthGuard>
   );
 }

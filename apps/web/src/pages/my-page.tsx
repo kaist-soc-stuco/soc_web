@@ -10,6 +10,7 @@ import type {
 
 import { Header } from "@/components/organisms/header";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 type Tab = "info" | "posts" | "comments" | "activities";
 
@@ -18,6 +19,7 @@ export function MyPage() {
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
+  const { data: session } = useCurrentSession();
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("info");
 
@@ -25,7 +27,10 @@ export function MyPage() {
   const [comments, setComments] = useState<MyCommentListResponse | null>(null);
   const [activities, setActivities] = useState<MySurveyResponseListResponse | null>(null);
 
+  // 세션 인증 상태에 따라 사용자 정보 조회
   useEffect(() => {
+    if (!session?.authenticated) return;
+    
     let cancelled = false;
     apiClient
       .getCurrentUser()
@@ -42,10 +47,10 @@ export function MyPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiClient]);
+  }, [apiClient, session?.authenticated]);
 
   useEffect(() => {
-    if (!user?.authenticated) return;
+    if (!session?.authenticated) return;
     let cancelled = false;
 
     if (activeTab === "posts" && !articles) {
@@ -77,7 +82,7 @@ export function MyPage() {
       <main className="mx-auto w-full max-w-5xl px-4 py-10">
         <h1 className="text-3xl font-black text-kaist-black">마이페이지</h1>
 
-        {!user?.authenticated ? (
+        {!session?.authenticated ? (
           <div className="mt-8 rounded-2xl border border-kaist-grey/30 bg-white p-6 text-center">
             <p className="text-sm text-kaist-grey">로그인이 필요합니다.</p>
             <Link
