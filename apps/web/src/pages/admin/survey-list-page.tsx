@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type { SurveyRecord } from "@soc/contracts";
 import { formatKoreanDateTime } from "@soc/shared";
 import { Button } from "@/components/ui/button";
 import { resolveApiBaseUrl } from "@/lib/api";
-import { getAuthSessionSummary } from "@/lib/auth-session";
-import { hasSurveyManagePermission } from "@/lib/permissions";
-import { hasPersistedProfile } from "@/lib/require-persisted-profile";
+import { AuthGuard } from "@/components/guards/auth-guard";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "초안",
@@ -30,17 +30,12 @@ export function SurveyListPage() {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
+  const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
 
   useEffect(() => {
     (async () => {
-      const session = await getAuthSessionSummary(client);
-      if (!hasPersistedProfile(session)) {
-        navigate("/login");
-        return;
-      }
-      if (!hasSurveyManagePermission(session.permission)) {
-        navigate("/admin/permissions", { replace: true });
+      if (sessionLoading || !hasSurveyManagePermission(session?.permission)) {
         return;
       }
       try {
@@ -52,7 +47,7 @@ export function SurveyListPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [client, session, sessionLoading]);
 
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`"${title}" 설문조사를 삭제하시겠습니까?`)) return;
@@ -75,7 +70,8 @@ export function SurveyListPage() {
   };
 
   return (
-    <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
+    <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">설문조사 관리</h1>
         <div className="flex gap-2">
@@ -163,6 +159,7 @@ export function SurveyListPage() {
           </table>
         </div>
       )}
-    </main>
+      </main>
+    </AuthGuard>
   );
 }

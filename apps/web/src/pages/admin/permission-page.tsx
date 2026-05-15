@@ -9,14 +9,15 @@ import type {
 } from "@soc/contracts";
 import { formatKoreanDateTime, hasPermission } from "@soc/shared";
 
-import { resolveApiBaseUrl } from "@/lib/api";
-import { getAuthSessionSummary } from "@/lib/auth-session";
+import { AuthGuard } from "@/components/guards/auth-guard";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
   PERMISSION_DEFINITIONS,
   getGrantedPermissions,
   hasAdminPermission,
+  Permissions,
 } from "@/lib/permissions";
-import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 type RoleGroupFormState = {
   code: string;
@@ -56,6 +57,7 @@ export function PermissionPage() {
   const [roleGroupSaving, setRoleGroupSaving] = useState(false);
   const [roleGroupError, setRoleGroupError] = useState<string | null>(null);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
 
   const loadRoleGroupMembers = async (roleGroupId: number) => {
     setMemberLoading(true);
@@ -99,9 +101,7 @@ export function PermissionPage() {
 
   useEffect(() => {
     (async () => {
-      const session = await getAuthSessionSummary(client);
-      if (!hasPersistedProfile(session)) {
-        navigate("/login", { replace: true });
+      if (sessionLoading || !session) {
         return;
       }
 
@@ -122,7 +122,7 @@ export function PermissionPage() {
 
       setLoading(false);
     })();
-  }, []);
+  }, [session, sessionLoading]);
 
   const canEditRoleGroups = hasAdminPermission(permission);
 
@@ -300,7 +300,8 @@ export function PermissionPage() {
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
+     <AuthGuard requirePermission={Permissions.ADMIN}>
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
         <section className="overflow-hidden rounded-3xl border border-kaist-darkgreen/10 bg-white shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
           <div className="grid gap-6 p-6 md:grid-cols-[1.35fr_0.9fr] md:p-8">
             <div className="space-y-4">
@@ -863,6 +864,7 @@ export function PermissionPage() {
             </div>
           )}
         </section>
-      </main>
+        </main>
+      </AuthGuard>
   );
 }

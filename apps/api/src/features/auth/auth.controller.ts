@@ -25,7 +25,7 @@ export class AuthController {
     private readonly authSessionService: AuthSessionService,
     private readonly usersService: UsersService,
     @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
-  ) {}
+  ) { }
 
   /** 환경에 맞는 인증 쿠키 공통 옵션을 생성합니다. */
   private getCookieOptions(maxAgeMs: number) {
@@ -121,7 +121,7 @@ export class AuthController {
       email: "dev-admin@kaist.ac.kr",
       identityCode: "S",
       nameEn: "Development Admin",
-      nameKo: "개발 관리자",
+      nameKo: "관리자",
       stdNo: "20260001",
     });
 
@@ -265,10 +265,10 @@ export class AuthController {
       temporarySession:
         result.storageMode === "temporary"
           ? {
-              accessToken: result.accessToken,
-              refreshToken: result.refreshToken,
-              sessionId: result.sessionId,
-            }
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+            sessionId: result.sessionId,
+          }
           : undefined,
       userId: result.userId,
     };

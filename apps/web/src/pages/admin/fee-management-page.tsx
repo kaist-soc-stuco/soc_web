@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import type { StudentFeeListResponse, FeeStatus } from '@soc/contracts';
 import { Button } from '@/components/ui/button';
+import { AuthGuard } from '@/components/guards/auth-guard';
+import { useCurrentSession } from '@/hooks/use-current-session';
 import { resolveApiBaseUrl } from '@/lib/api';
 import { Permissions } from '@/lib/permissions';
 
@@ -18,26 +20,25 @@ export function FeeManagementPage() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<FeeStatus>('UNPAID');
   const [editNote, setEditNote] = useState('');
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const students = feeData?.students ?? [];
   const totalCount = feeData?.total ?? 0;
   const paidCount = students.filter((student) => student.status === 'PAID').length;
   const unpaidCount = students.filter((student) => student.status === 'UNPAID').length;
 
   useEffect(() => {
+    if (sessionLoading) {
+      return;
+    }
+    if (!Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) {
+      return;
+    }
     loadData();
-  }, [selectedStatus, currentPage]);
+  }, [selectedStatus, currentPage, session, sessionLoading]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-
-      const me = await apiClient.getCurrentUser();
-      const permission = me?.user?.permission ?? 0;
-      if (!Permissions.has(permission, Permissions.MANAGE_FINANCE)) {
-        setError('과비 관리 권한이 없습니다.');
-        navigate('/');
-        return;
-      }
 
       const data = await apiClient.listStudentsByFeeStatus(
         selectedStatus,
@@ -136,6 +137,7 @@ export function FeeManagementPage() {
   }
 
   return (
+    <AuthGuard requirePermission={Permissions.MANAGE_FINANCE}>
       <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
         <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-10 md:px-8">
         <section className="overflow-hidden rounded-3xl border border-kaist-darkgreen/10 bg-white shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
@@ -328,5 +330,6 @@ export function FeeManagementPage() {
         </section>
         </main>
       </div>
+    </AuthGuard>
   );
 }

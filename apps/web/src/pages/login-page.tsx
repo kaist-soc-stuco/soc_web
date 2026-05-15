@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import type { CurrentUserResponse } from "@soc/contracts";
 
@@ -8,11 +9,9 @@ import {
   readStoredAuthState,
   writeStoredAuthState,
 } from "@/lib/auth-storage";
-import {
-  createEmptyAuthSession,
-  getAuthSessionSummary,
-} from "@/lib/auth-session";
+import { createEmptyAuthSession } from "@/lib/auth-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 const stripTrailingSlashes = (value: string): string =>
   value.replace(/\/+$/, "");
@@ -131,11 +130,13 @@ export function TreeLogin() {
     storageMode: "persisted" | "temporary" | null;
     userId?: string;
   } | null>(null);
+  const { data: currentSession } = useCurrentSession();
 
   const startUrlEnv = import.meta.env.VITE_SSO_START_URL ?? "";
   const redirectUri = import.meta.env.VITE_SSO_REDIRECT_URI ?? "";
   const startUrl = resolveStartUrl(startUrlEnv, redirectUri);
   const consumedResultTokenRef = useRef<Set<string>>(new Set());
+  const queryClient = useQueryClient();
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
@@ -216,24 +217,10 @@ export function TreeLogin() {
   }, [navigate, apiClient, pendingLoginToken, resultToken, status]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    void getAuthSessionSummary(apiClient)
-      .then((summary) => {
-        if (!cancelled) {
-          setSessionSummary(summary);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSessionSummary(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient]);
+    if (currentSession) {
+      setSessionSummary(currentSession);
+    }
+  }, [currentSession]);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,6 +298,9 @@ export function TreeLogin() {
       });
       setCurrentUser(null);
 
+      // 쿼리 캐시 초기화
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+
       navigate("/login?status=success&reason=logged_out", { replace: true });
     } catch (error) {
       setErrorMessage(
@@ -334,7 +324,8 @@ export function TreeLogin() {
     try {
       await apiClient.loginWithMockSession();
       clearStoredAuthState();
-      navigate("/admin/surveys", { replace: true });
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+      navigate("/", { replace: true });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "개발용 로그인에 실패했습니다.",

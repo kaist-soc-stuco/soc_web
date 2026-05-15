@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Logo } from "@/components/atoms/logo";
 import { createApiClient } from "@soc/api-client";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface HeaderProps {
   showLogo?: boolean;
@@ -12,34 +14,16 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
-  const [user, setUser] = useState<{ id: string; name: string; permission: number } | null>(null);
+  const { data: session } = useCurrentSession();
+  const queryClient = useQueryClient();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // 인증 상태 fetch
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const apiClient = createApiClient({ baseUrl: resolveApiBaseUrl() });
-        const res = await apiClient.getCurrentUser();
-        const userName =
-          res.user && "name" in res.user
-            ? (res.user as { name?: string }).name
-            : undefined;
-        if (res.authenticated && res.user) {
-          setUser({
-            id: res.user.id,
-            name: userName ?? "사용자",
-            permission: res.user.permission,
-          });
-        } else {
-          setUser(null);
-        }
-      } catch {
-        setUser(null);
-      }
-    };
-    fetchUser();
-  }, []);
+  // 세션 정보를 기반으로 유저 정보 계산
+  const user = session?.authenticated && session.userId ? {
+    id: session.userId,
+    name: session.userName ?? "사용자",
+    permission: session.permission ?? 0,
+  } : null;
 
   const updateNavLeft = () => {
     if (navRef.current) setNavLeft(navRef.current.offsetLeft);
@@ -102,9 +86,8 @@ export function Header({ showLogo = false }: HeaderProps) {
                 >
                   <span className="py-2">{item.label}</span>
                   <span
-                    className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${
-                      hoveredIndex === index ? "scale-x-100" : "scale-x-0"
-                    }`}
+                    className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${hoveredIndex === index ? "scale-x-100" : "scale-x-0"
+                      }`}
                   />
                 </Link>
               </div>
@@ -142,14 +125,14 @@ export function Header({ showLogo = false }: HeaderProps) {
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-kaist-grey shadow-lg rounded z-50">
                   <ul className="py-1">
                     <li>
-                      <Link to="/mypage" className="block px-4 py-2 hover:bg-kaist-darkgreen/5" onClick={() => setDropdownOpen(false)}>
+                      <Link to="/mypage" className="block px-4 py-2 hover:bg-kaist-darkgreen/5">
                         마이페이지
                       </Link>
                     </li>
 
                     {user.permission & 256 ? (
                       <li>
-                        <Link to="/admin/surveys" className="block px-4 py-2 hover:bg-kaist-darkgreen/5" onClick={() => setDropdownOpen(false)}>
+                        <Link to="/admin/surveys" className="block px-4 py-2 hover:bg-kaist-darkgreen/5">
                           관리자 대시보드
                         </Link>
                       </li>
@@ -160,7 +143,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                         onClick={async () => {
                           const apiClient = createApiClient({ baseUrl: resolveApiBaseUrl() });
                           await apiClient.logout();
-                          setUser(null);
+                          await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
                           window.location.reload();
                         }}
                       >
@@ -185,38 +168,33 @@ export function Header({ showLogo = false }: HeaderProps) {
 
       {/* Full Dropdown Menu - DDP Style */}
       <div
-        className={`absolute left-0 w-full bg-kaist-white shadow-lg overflow-hidden transition-all duration-300 ease-out ${
-          hoveredIndex !== null
+        className={`absolute left-0 w-full bg-kaist-white shadow-lg overflow-hidden transition-all duration-300 ease-out ${hoveredIndex !== null
             ? "max-h-96 opacity-100 translate-y-0"
             : "max-h-0 opacity-0 -translate-y-4"
-        }`}
+          }`}
         style={{ top: "calc(100% + 1px)", zIndex: 40 }}
       >
         <div className="flex gap-0" style={{ paddingLeft: navLeft }}>
           {navItems.map((item, index) => (
             <div
               key={index}
-              className={`w-48 px-4 ${
-                index === 0 ? "border-l border-kaist-grey/30" : ""
-              } ${
-                index < navItems.length - 1
+              className={`w-48 px-4 ${index === 0 ? "border-l border-kaist-grey/30" : ""
+                } ${index < navItems.length - 1
                   ? "border-r border-kaist-grey/30"
                   : "border-r border-kaist-grey/30"
-              }`}
+                }`}
             >
               <ul className="space-y-1">
                 {item.dropdown.map((subItem, subIndex) => (
                   <li
                     key={subIndex}
-                    className={`transition-all duration-200 pb-1 mx-2 ${
-                      hoveredIndex !== null
+                    className={`transition-all duration-200 pb-1 mx-2 ${hoveredIndex !== null
                         ? "opacity-100 translate-x-0"
                         : "opacity-0 -translate-x-2"
-                    } ${
-                      subIndex < item.dropdown.length - 1
+                      } ${subIndex < item.dropdown.length - 1
                         ? "border-b border-kaist-grey/30"
                         : "pb-10"
-                    } ${subIndex === 0 ? "pt-1" : ""}`}
+                      } ${subIndex === 0 ? "pt-1" : ""}`}
                     style={{
                       transitionDelay:
                         hoveredIndex !== null
@@ -230,11 +208,10 @@ export function Header({ showLogo = false }: HeaderProps) {
                           ? `/board/${subItem}`
                           : `${item.href}/${subItem}`
                       }
-                      className={`block text-sm font-semibold tracking-tight text-center py-2 transition-all ${
-                        hoveredIndex === index
+                      className={`block text-sm font-semibold tracking-tight text-center py-2 transition-all ${hoveredIndex === index
                           ? "text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1"
                           : "text-kaist-grey"
-                      }`}
+                        }`}
                     >
                       {subItem}
                     </Link>

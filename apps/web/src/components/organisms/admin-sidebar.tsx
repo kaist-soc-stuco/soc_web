@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { createApiClient } from "@soc/api-client";
 
-import { resolveApiBaseUrl } from "@/lib/api";
-import { getAuthSessionSummary } from "@/lib/auth-session";
 import { Permissions } from "@/lib/permissions";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 const ADMIN_MENU = [
   { label: "설문조사 관리", to: "/admin/surveys", bit: Permissions.MANAGE_SURVEY },
@@ -14,15 +11,8 @@ const ADMIN_MENU = [
 
 export function AdminSidebar() {
   const location = useLocation();
-  const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
-  const [permission, setPermission] = useState<number>(0);
-
-  useEffect(() => {
-    (async () => {
-      const session = await getAuthSessionSummary(client);
-      setPermission(session.permission ?? 0);
-    })();
-  }, [client]);
+  const { data: session } = useCurrentSession();
+  const permission = session?.permission ?? 0;
 
   const canShow = Permissions.hasAny(
     permission,

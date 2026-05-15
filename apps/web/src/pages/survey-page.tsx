@@ -10,8 +10,8 @@ import { formatKoreanDateTime } from '@soc/shared';
 import { Header } from '@/components/organisms/header';
 import { Footer } from '@/components/organisms/footer';
 import { Button } from '@/components/ui/button';
-import { resolveApiBaseUrl } from '@/lib/api';
-import { getAuthSessionSummary } from '@/lib/auth-session';
+import { resolveApiBaseUrl } from '@/lib/api-base-url';
+import { useCurrentSession } from '@/hooks/use-current-session';
 
 const TUITION_PAYER_BIT = 256;
 
@@ -239,24 +239,19 @@ export function SurveyPage() {
 
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [sessionPermission, setSessionPermission] = useState<number | null>(null);
-  const [sessionAuthenticated, setSessionAuthenticated] = useState<boolean | null>(null);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
 
   useEffect(() => {
     if (!id) return;
 
-    Promise.all([
-      apiClient.getSurveyDetail(id),
-      getAuthSessionSummary(apiClient),
-    ])
-      .then(([data, session]) => {
+    apiClient
+      .getSurveyDetail(id)
+      .then((data) => {
         setSurvey(data);
-        setSessionAuthenticated(session.authenticated && session.canUsePersistentFeatures);
-        setSessionPermission(session.permission ?? 0);
         const init: Record<string, AnswerValue> = {};
         for (const section of data.sections) {
           for (const q of section.questions) {
@@ -296,7 +291,7 @@ export function SurveyPage() {
         <div className="py-16 text-center text-red-500">{loadError}</div>
       );
     }
-    if (!survey || sessionAuthenticated === null) {
+    if (!survey || sessionLoading) {
       return (
         <div className="py-16 text-center text-[var(--kaist-greygreen)]">불러오는 중...</div>
       );
@@ -305,8 +300,13 @@ export function SurveyPage() {
     if (survey.computedState === 'before_open') return <BeforeOpenView opensAt={survey.opensAt} />;
     if (survey.computedState === 'closed') return <ClosedView />;
 
+    const sessionAuthenticated = Boolean(
+      session?.authenticated && session.canUsePersistentFeatures,
+    );
+    const sessionPermission = session?.permission ?? 0;
+
     if (!survey.allowAnonymous && !sessionAuthenticated) return <LoginRequiredView />;
-    if (survey.feePayersOnly && !((sessionPermission ?? 0) & TUITION_PAYER_BIT)) return <FeePayerRequiredView />;
+    if (survey.feePayersOnly && !(sessionPermission & TUITION_PAYER_BIT)) return <FeePayerRequiredView />;
 
     // open 상태 — 폼 렌더링
     return (
@@ -368,7 +368,7 @@ export function SurveyPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <Header showLogo />
       <main className="flex-1 px-4 py-10 lg:px-0">
         <div className="mx-auto max-w-2xl">
           {survey && (
