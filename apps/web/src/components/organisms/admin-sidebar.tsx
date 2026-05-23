@@ -5,6 +5,8 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 
 const ADMIN_MENU = [
   { label: "설문조사 관리", to: "/admin/surveys", bit: Permissions.MANAGE_SURVEY },
+  { label: "집행위연락망 관리", to: "/admin/contacts", bit: Permissions.MANAGE_CONTENT },
+  { label: "이메일 일괄발송", to: "/admin/emails", bit: Permissions.ADMIN },
   { label: "권한 관리", to: "/admin/permissions", bit: Permissions.ADMIN },
   { label: "과비 납부 관리", to: "/admin/finance", bit: Permissions.MANAGE_FINANCE },
 ];
@@ -17,6 +19,7 @@ export function AdminSidebar() {
   const canShow = Permissions.hasAny(
     permission,
     Permissions.MANAGE_SURVEY,
+    Permissions.MANAGE_CONTENT,
     Permissions.MANAGE_FINANCE,
     Permissions.ADMIN,
   );

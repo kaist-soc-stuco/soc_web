@@ -9,7 +9,7 @@
   --card-foreground: oklch(0.26 0.03 240);
   --popover: oklch(0.98 0.008 220);
   --popover-foreground: oklch(0.26 0.03 240);
-  --primary: oklch(0.48 0.11 232);
+  --primary: oklch(0.4173 0.12863 157.503);
   --primary-foreground: oklch(0.98 0.005 220);
   --secondary: oklch(0.92 0.02 224);
   --secondary-foreground: oklch(0.33 0.03 240);
@@ -20,7 +20,7 @@
   --destructive: oklch(0.64 0.23 30);
   --border: oklch(0.86 0.02 230);
   --input: oklch(0.88 0.02 230);
-  --ring: oklch(0.58 0.09 228);
+  --ring: oklch(0.4173 0.12863 157.503);
   
   /* KAIST SoC Custom Colors */
   --kaist-white: oklch(0.99 0.007 220);

@@ -53,15 +53,18 @@ export class SurveyResponsesService {
     if (survey.closesAt && isExpired(isoToMs(survey.closesAt)))
       throw new ConflictException("survey_closed");
 
-    if (!survey.allowAnonymous && !caller) {
+    if (!caller) {
       throw new ForbiddenException("login_required");
     }
 
-    if (survey.feePayersOnly) {
-      if (!caller) {
-        throw new ForbiddenException("fee_payer_only");
+    if (!survey.allowMultipleResponses) {
+      const existing = await this.responsesRepo.findByUserAndSurvey(surveyId, caller.id);
+      if (existing) {
+        throw new ConflictException("already_submitted");
       }
+    }
 
+    if (survey.feePayersOnly) {
       const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
       if (!feeStatus || feeStatus.status !== "PAID") {
         throw new ForbiddenException("fee_payer_only");
@@ -96,6 +99,26 @@ export class SurveyResponsesService {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
     return this.responsesRepo.findBySurveyId(surveyId);
+  }
+
+  async findAllWithAnswers(surveyId: string): Promise<Array<SurveyResponseRecord & { answers: any[] }>> {
+    const survey = await this.surveysRepo.findById(surveyId);
+    if (!survey) throw new NotFoundException("survey_not_found");
+    const responses = await this.responsesRepo.findBySurveyId(surveyId);
+    const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);
+
+    const answersMap: Record<string, any[]> = {};
+    for (const a of answers) {
+      if (!answersMap[a.responseId]) {
+        answersMap[a.responseId] = [];
+      }
+      answersMap[a.responseId].push(a);
+    }
+
+    return responses.map((r) => ({
+      ...r,
+      answers: answersMap[r.id] || [],
+    }));
   }
 
   async findDetail(surveyId: string, responseId: string): Promise<ResponseDetailResponse> {

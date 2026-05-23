@@ -4,17 +4,41 @@ import type { ArticleDetailResponse } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
 import { Header } from "@/components/organisms/header";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { List, ChevronUp, ChevronDown, Calendar, ArrowRight } from "lucide-react";
+import { List, ChevronUp, ChevronDown, Calendar, ArrowRight, Edit2 } from "lucide-react";
+import { useLanguage } from "@/hooks/use-language";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { Permissions } from "@/lib/permissions";
 
-const BOARD_INFO: Record<string, { description: string }> = {
-  공지: { description: "카이스트 전산학부의 다양한 소식을 알려 드립니다" },
-  행사: { description: "전산학부의 다양한 행사 정보를 확인하세요" },
-  HoC: { description: "Hall of Code 프로젝트 및 활동 내역" },
-  홍보글: { description: "학생회 및 학회의 홍보 게시물" },
-  건의사항: { description: "학생들의 의견과 건의사항을 나눠주세요" },
-  연구실: { description: "각 연구실의 소식과 공지사항" },
-  QnA: { description: "궁금한 점을 자유롭게 질문하세요" },
+const BOARD_INFO: Record<string, { descriptionKo: string; descriptionEn: string }> = {
+  공지: { descriptionKo: "카이스트 전산학부의 다양한 소식을 알려 드립니다", descriptionEn: "Get updates on various news from KAIST School of Computing" },
+  행사: { descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요", descriptionEn: "Discover various events organized by the School of Computing" },
+  HoC: { descriptionKo: "Hall of Code 프로젝트 및 활동 내역", descriptionEn: "Hall of Code projects and activity logs" },
+  홍보글: { descriptionKo: "학생회 및 학회의 홍보 게시물", descriptionEn: "Promotional posts from the Student Council and societies" },
+  건의사항: { descriptionKo: "학생들의 의견과 건의사항을 나눠주세요", descriptionEn: "Share your opinions and suggestions with us" },
+  연구실: { descriptionKo: "각 연구실의 소식과 공지사항", descriptionEn: "News and announcements from research labs" },
+  QnA: { descriptionKo: "궁금한 점을 자유롭게 질문하세요", descriptionEn: "Ask questions and get answers freely" },
 };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  공지: "Notice",
+  행사: "Event",
+  HoC: "HoC",
+  홍보글: "Promo",
+  건의사항: "Suggestions",
+  연구실: "Labs",
+  QnA: "QnA",
+};
+
+function formatDateTimeMinutes(isoString: string) {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const MM = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${MM}-${dd} ${hh}:${mm}`;
+}
 
 export function BoardDetailPage() {
   const { category = "공지", articleId } = useParams<{
@@ -24,58 +48,81 @@ export function BoardDetailPage() {
 
   const [article, setArticle] = useState<ArticleDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const { lang } = useLanguage();
+  const { data: session } = useCurrentSession();
 
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+
+  const canEdit = useMemo(() => {
+    if (!article) return false;
+    if (!session || !session.authenticated || !session.userId) return false;
+    if (session.userId === article.author.userId) return true;
+    const permission = session.permission ?? 0;
+    return Permissions.has(permission, Permissions.MANAGE_CONTENT) || Permissions.has(permission, Permissions.ADMIN);
+  }, [session, article]);
+
+  const posterAsset = useMemo(() => {
+    return article?.assets?.find((a) => a.usageType === "THUMBNAIL" || a.usageType === "IMAGE");
+  }, [article]);
 
   useEffect(() => {
     if (!articleId) return;
     setLoading(true);
-    apiClient.getArticle(category, articleId)
-      .then(data => setArticle(data))
-      .catch(err => console.error("Failed to load article:", err))
-      .finally(() => setLoading(false));
+    setArticle(null);
+    apiClient
+      .getArticle(category, articleId)
+      .then((res) => {
+        setArticle(res);
+        setLoading(false);
+      })
+      .catch((err: any) => {
+        console.error(err);
+        setLoading(false);
+      });
   }, [category, articleId, apiClient]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-kaist-white flex flex-col items-center justify-center">
-        <Header showLogo />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-kaist-grey font-semibold">게시글을 불러오는 중입니다...</p>
-        </div>
+      <div className="min-h-screen flex flex-col bg-kaist-white">
+        <Header showLogo={true} />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-kaist-grey font-bold">{lang === "ko" ? "불러오는 중..." : "Loading..."}</p>
+        </main>
       </div>
     );
   }
 
   if (!article) {
     return (
-      <div className="min-h-screen bg-kaist-white flex flex-col items-center justify-center">
-        <Header showLogo />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-kaist-grey font-semibold">게시글을 찾을 수 없습니다.</p>
-        </div>
+      <div className="min-h-screen flex flex-col bg-kaist-white">
+        <Header showLogo={true} />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-red-500 font-bold">{lang === "ko" ? "존재하지 않는 게시글입니다." : "Post not found."}</p>
+        </main>
       </div>
     );
   }
 
-  const posterAsset = article.assets?.find(a => a.usageType === "THUMBNAIL");
-
   return (
-    <div className="min-h-screen bg-kaist-white flex flex-col">
-      <Header showLogo />
+    <div className="min-h-screen flex flex-col bg-kaist-white">
+      <Header showLogo={true} />
 
-      <main className="flex-1 w-full mx-auto">
-        {/* 1. 상단 배너 영역 */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-4 md:px-8">
+      <main className="flex-1 w-full mx-auto relative">
+        {/* 1. 배너 영역 */}
+        <div className="bg-linear-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-8 relative overflow-hidden">
           <div className="max-w-6xl mx-auto relative z-10">
-            <h1 className="text-3xl font-extrabold tracking-tight text-kaist-white mb-2">
-              {category} 게시판
+            <span className="text-sm font-bold text-kaist-white/70 uppercase tracking-widest mb-1 block">
+              {lang === "ko" ? category : (CATEGORY_LABELS[category] || category)}
+            </span>
+            <h1 className="text-3xl font-extrabold text-kaist-white tracking-tight">
+              {lang === "ko" ? `${category} 게시판` : `${CATEGORY_LABELS[category] || category} Board`}
             </h1>
-            <p className="text-sm font-semibold tracking-tight text-kaist-white/90">
-              {BOARD_INFO[category]?.description || "전산학부의 다양한 소식을 알려 드립니다"}
+            <p className="text-sm text-kaist-white/90 mt-2 font-medium">
+              {lang === "ko" 
+                ? (BOARD_INFO[category]?.descriptionKo || "") 
+                : (BOARD_INFO[category]?.descriptionEn || "")}
             </p>
           </div>
-          {/* 우측 KAIST 워터마크 로고 느낌 */}
           <div className="absolute -right-10 -top-10 opacity-20 pointer-events-none select-none">
             <span className="text-[150px] font-black text-kaist-white italic">KAIST</span>
           </div>
@@ -83,21 +130,43 @@ export function BoardDetailPage() {
 
         {/* 2. 게시글 타이틀 & 글 목록 버튼 */}
         <div className="border-b border-kaist-grey/30 bg-kaist-white px-4 md:px-8">
-          <div className="max-w-6xl mx-auto flex items-center justify-between py-6">
-            <h2 className="text-2xl font-extrabold text-kaist-black tracking-tight">
-              {article.titleKo}
-            </h2>
-            <Link
-              to={`/board/${category}`}
-              className="flex items-center gap-2 text-kaist-grey hover:text-kaist-darkgreen transition-colors font-semibold text-sm"
-            >
-              <List className="w-5 h-5" />
-              글 목록
-            </Link>
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
+            <div>
+              <h2 className="text-2xl font-extrabold text-kaist-black tracking-tight mb-2">
+                {lang === "ko" ? article.titleKo : (article.titleEn || article.titleKo)}
+              </h2>
+              <div className="flex items-center gap-4 text-sm font-medium text-kaist-grey">
+                <span className="text-kaist-darkgreen">
+                  {article.isAnonymous ? (lang === "ko" ? "익명" : "Anonymous") : article.author.name}
+                </span>
+                <span>{formatDateTimeMinutes(article.postedAt)}</span>
+                <span className="flex items-center gap-1">
+                  {lang === "ko" ? "조회수" : "Views"} {article.viewCount}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 self-start md:self-auto">
+              {canEdit && (
+                <Link
+                  to={`/board/${category}/${articleId}/edit`}
+                  className="flex items-center gap-2 text-kaist-grey hover:text-kaist-darkgreen transition-colors font-semibold text-sm"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  {lang === "ko" ? "수정" : "Edit"}
+                </Link>
+              )}
+              <Link
+                to={`/board/${category}`}
+                className="flex items-center gap-2 text-kaist-grey hover:text-kaist-darkgreen transition-colors font-semibold text-sm"
+              >
+                <List className="w-5 h-5" />
+                {lang === "ko" ? "글 목록" : "List"}
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* 3. 본문 영역 (좌측 포스터 + 우측 텍스트) */}
+        {/* 3. 본문 영역 */}
         <div className="max-w-6xl mx-auto px-4 py-12 md:px-8">
           <div className="flex flex-col md:flex-row gap-12">
             {/* 좌측 포스터 영역 */}
@@ -106,7 +175,7 @@ export function BoardDetailPage() {
                 <div className="aspect-[3/4] bg-kaist-grey/10 rounded-lg overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
                   <img
                     src={posterAsset.storageKey}
-                    alt="포스터"
+                    alt="Poster"
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
@@ -118,11 +187,8 @@ export function BoardDetailPage() {
 
             {/* 우측 텍스트 영역 */}
             <div className="flex-1 flex flex-col gap-6">
-              <h3 className="text-xl font-extrabold text-kaist-black tracking-tight">
-                {article.titleEn}
-              </h3>
               <div className="text-base font-medium leading-relaxed text-kaist-black whitespace-pre-line">
-                {article.contentKo}
+                {lang === "ko" ? article.contentKo : (article.contentEn || article.contentKo)}
               </div>
             </div>
           </div>
@@ -142,17 +208,22 @@ export function BoardDetailPage() {
                       <div className="flex items-center gap-2">
                         <span className={`flex h-2 w-2 rounded-full ${article.survey.computedState === 'open' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
                         <span className={`text-xs font-bold tracking-wider uppercase ${article.survey.computedState === 'open' ? 'text-green-600' : 'text-gray-500'}`}>
-                          {article.survey.computedState === 'open' ? '진행 중인 설문' : 
-                           article.survey.computedState === 'before_open' ? '진행 예정 설문' : '종료된 설문'}
+                          {article.survey.computedState === 'open' 
+                            ? (lang === "ko" ? "진행 중" : "Ongoing") 
+                            : article.survey.computedState === 'before_open' 
+                              ? (lang === "ko" ? "예정" : "Upcoming") 
+                              : (lang === "ko" ? "마감" : "Closed")}
                         </span>
                       </div>
 
                       {/* 제목 및 설명 */}
                       <h3 className="text-xl font-extrabold text-kaist-black tracking-tight">
-                        {article.survey.titleKo}
+                        {lang === "ko" ? article.survey.titleKo : (article.survey.titleEn || article.survey.titleKo)}
                       </h3>
                       <p className="text-sm font-medium text-kaist-grey leading-relaxed max-w-lg">
-                        {article.survey.descriptionKo || "본 게시글과 연관된 설문조사입니다. 학우 여러분의 많은 참여 부탁드립니다."}
+                        {lang === "ko" 
+                          ? (article.survey.descriptionKo)
+                          : (article.survey.descriptionEn || article.survey.descriptionKo)}
                       </p>
 
                       {/* 기간 안내 정보 */}
@@ -160,7 +231,11 @@ export function BoardDetailPage() {
                         {article.survey.closeAt && (
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3.5 h-3.5" />
-                            <span>마감: {new Date(article.survey.closeAt).toLocaleString('ko-KR')} 까지</span>
+                            <span>
+                              {lang === "ko" 
+                                ? `마감: ${formatDateTimeMinutes(article.survey.closeAt)} 까지`
+                                : `Deadline: until ${formatDateTimeMinutes(article.survey.closeAt)}`}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -172,17 +247,10 @@ export function BoardDetailPage() {
                         to={`/survey/${article.survey.surveyId}`}
                         className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-kaist-darkgreen text-white rounded-xl font-bold text-base shadow-lg shadow-kaist-darkgreen/20 hover:bg-opacity-90 hover:-translate-y-0.5 transition-all"
                       >
-                        설문 참여하기
+                        {lang === "ko" ? "설문 참여하기" : "Take Survey"}
                         <ArrowRight className="w-4 h-4" />
                       </Link>
                     </div>
-                  </div>
-
-                  {/* 안내 문구 */}
-                  <div className="mt-6 pt-5 border-t border-kaist-grey/10">
-                    <p className="text-[11px] text-kaist-grey/60 font-medium italic">
-                      * 본 설문조사는 게시글 내용과 연관된 공식 설문입니다. 중복 참여는 불가하며, 작성된 내용은 학생회 운영의 기초 자료로 활용됩니다.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -195,42 +263,48 @@ export function BoardDetailPage() {
           <div className="border-t-2 border-kaist-grey/30 divide-y divide-kaist-grey/20">
             
             {/* 이전글 */}
-            {/* TODO: 이전글 ID로 라우팅 연결 */}
-            <Link 
-              to={`/board/${category}`} 
-              className="flex flex-col sm:flex-row sm:items-center py-4 hover:bg-kaist-grey/5 transition-colors group"
-            >
-              <div className="flex items-center gap-4 sm:w-32 font-semibold text-kaist-grey group-hover:text-kaist-black transition-colors">
-                <ChevronUp className="w-5 h-5" />
-                이전글
-              </div>
-              <div className="flex-1 mt-2 sm:mt-0 font-semibold text-kaist-black truncate pr-4">
-                이전 제목이 들어가는 공간입니다
-              </div>
-              <div className="flex items-center gap-6 text-sm font-semibold text-kaist-grey mt-2 sm:mt-0">
-                <span>26.04.27</span>
-                <span className="w-12 text-right">변희승</span>
-              </div>
-            </Link>
+            {article.prevArticle && (
+              <Link 
+                to={`/board/${category}/${article.prevArticle.articleId}`} 
+                className="flex flex-col sm:flex-row sm:items-center py-4 hover:bg-kaist-grey/5 transition-colors group"
+              >
+                <div className="flex items-center gap-4 sm:w-32 font-semibold text-kaist-grey group-hover:text-kaist-black transition-colors">
+                  <ChevronUp className="w-5 h-5" />
+                  {lang === "ko" ? "이전글" : "Prev"}
+                </div>
+                <div className="flex-1 mt-2 sm:mt-0 font-semibold text-kaist-black truncate pr-4">
+                  {article.prevArticle.titleKo}
+                </div>
+                <div className="flex items-center gap-6 text-sm font-semibold text-kaist-grey mt-2 sm:mt-0">
+                  <span>{new Date(article.prevArticle.postedAt).toLocaleDateString()}</span>
+                  <span className="w-12 text-right">
+                    {article.prevArticle.isAnonymous ? (lang === "ko" ? "익명" : "Anonymous") : article.prevArticle.author.name}
+                  </span>
+                </div>
+              </Link>
+            )}
 
             {/* 다음글 */}
-            {/* TODO: 다음글 ID로 라우팅 연결 */}
-            <Link 
-              to={`/board/${category}`} 
-              className="flex flex-col sm:flex-row sm:items-center py-4 hover:bg-kaist-grey/5 transition-colors group border-b border-kaist-grey/20"
-            >
-              <div className="flex items-center gap-4 sm:w-32 font-semibold text-kaist-grey group-hover:text-kaist-black transition-colors">
-                <ChevronDown className="w-5 h-5" />
-                다음글
-              </div>
-              <div className="flex-1 mt-2 sm:mt-0 font-semibold text-kaist-black truncate pr-4">
-                다음 제목이 들어가는 공간입니다
-              </div>
-              <div className="flex items-center gap-6 text-sm font-semibold text-kaist-grey mt-2 sm:mt-0">
-                <span>26.04.27</span>
-                <span className="w-12 text-right">김서호</span>
-              </div>
-            </Link>
+            {article.nextArticle && (
+              <Link 
+                to={`/board/${category}/${article.nextArticle.articleId}`} 
+                className="flex flex-col sm:flex-row sm:items-center py-4 hover:bg-kaist-grey/5 transition-colors group border-b border-kaist-grey/20"
+              >
+                <div className="flex items-center gap-4 sm:w-32 font-semibold text-kaist-grey group-hover:text-kaist-black transition-colors">
+                  <ChevronDown className="w-5 h-5" />
+                  {lang === "ko" ? "다음글" : "Next"}
+                </div>
+                <div className="flex-1 mt-2 sm:mt-0 font-semibold text-kaist-black truncate pr-4">
+                  {article.nextArticle.titleKo}
+                </div>
+                <div className="flex items-center gap-6 text-sm font-semibold text-kaist-grey mt-2 sm:mt-0">
+                  <span>{new Date(article.nextArticle.postedAt).toLocaleDateString()}</span>
+                  <span className="w-12 text-right">
+                    {article.nextArticle.isAnonymous ? (lang === "ko" ? "익명" : "Anonymous") : article.nextArticle.author.name}
+                  </span>
+                </div>
+              </Link>
+            )}
             
           </div>
         </div>

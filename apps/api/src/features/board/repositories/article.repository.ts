@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, sql, lt, gt } from "drizzle-orm";
 import type {
   ArticleCreateRequest,
   ArticleCreateResponse,
@@ -70,6 +70,7 @@ export class ArticleRepository {
         updatedAt: articles.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        viewCount: articles.viewCount,
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -108,6 +109,7 @@ export class ArticleRepository {
           name: row.authorName ?? "unknown",
         },
         commentCount: Number(row.commentCount ?? 0),
+        viewCount: row.viewCount,
       })),
     };
   }
@@ -144,6 +146,7 @@ export class ArticleRepository {
         updatedAt: articles.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        viewCount: articles.viewCount,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -169,6 +172,7 @@ export class ArticleRepository {
         name: row.authorName ?? "unknown",
       },
       commentCount: 0, // Not needed for search
+      viewCount: row.viewCount,
     }));
   }
 
@@ -193,6 +197,7 @@ export class ArticleRepository {
         updatedAt: articles.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        viewCount: articles.viewCount,
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -236,6 +241,48 @@ export class ArticleRepository {
       .where(eq(surveys.connectedArticleId, Number(articleId)))
       .limit(1);
 
+    const prevRow = await this.db
+      .select({
+        articleId: articles.articleId,
+        titleKo: articles.titleKo,
+        postedAt: articles.postedAt,
+        authorId: users.userId,
+        authorName: users.nameKo,
+        isAnonymous: articles.isAnonymous,
+      })
+      .from(articles)
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .where(
+        and(
+          eq(articles.boardId, boardId),
+          eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          lt(articles.postedAt, row[0].postedAt)
+        )
+      )
+      .orderBy(desc(articles.postedAt))
+      .limit(1);
+
+    const nextRow = await this.db
+      .select({
+        articleId: articles.articleId,
+        titleKo: articles.titleKo,
+        postedAt: articles.postedAt,
+        authorId: users.userId,
+        authorName: users.nameKo,
+        isAnonymous: articles.isAnonymous,
+      })
+      .from(articles)
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .where(
+        and(
+          eq(articles.boardId, boardId),
+          eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          gt(articles.postedAt, row[0].postedAt)
+        )
+      )
+      .orderBy(asc(articles.postedAt))
+      .limit(1);
+
     return {
       articleId: String(row[0].articleId),
       boardId: row[0].boardId,
@@ -266,6 +313,7 @@ export class ArticleRepository {
         storageKey: assetRow.storageKey,
       })),
       commentCount: Number(row[0].commentCount ?? 0),
+      viewCount: row[0].viewCount,
       survey: surveyRow[0]
         ? {
             surveyId: surveyRow[0].surveyId,
@@ -289,6 +337,30 @@ export class ArticleRepository {
             feeRequirementPolicy: surveyRow[0].feeRequirementPolicy,
             openAt: surveyRow[0].openAt ? msToIso(surveyRow[0].openAt.valueOf()) : undefined,
             closeAt: surveyRow[0].closeAt ? msToIso(surveyRow[0].closeAt.valueOf()) : undefined,
+          }
+        : null,
+      prevArticle: prevRow[0]
+        ? {
+            articleId: String(prevRow[0].articleId),
+            titleKo: prevRow[0].titleKo,
+            postedAt: msToIso(prevRow[0].postedAt.valueOf()),
+            isAnonymous: prevRow[0].isAnonymous,
+            author: {
+              userId: String(prevRow[0].authorId ?? ""),
+              name: prevRow[0].authorName ?? "unknown",
+            },
+          }
+        : null,
+      nextArticle: nextRow[0]
+        ? {
+            articleId: String(nextRow[0].articleId),
+            titleKo: nextRow[0].titleKo,
+            postedAt: msToIso(nextRow[0].postedAt.valueOf()),
+            isAnonymous: nextRow[0].isAnonymous,
+            author: {
+              userId: String(nextRow[0].authorId ?? ""),
+              name: nextRow[0].authorName ?? "unknown",
+            },
           }
         : null,
     };
@@ -495,5 +567,12 @@ export class ArticleRepository {
       .limit(1);
 
     return Boolean(row[0]);
+  }
+
+  async incrementViewCount(articleId: string): Promise<void> {
+    await this.db
+      .update(articles)
+      .set({ viewCount: sql`${articles.viewCount} + 1` })
+      .where(eq(articles.articleId, Number(articleId)));
   }
 }

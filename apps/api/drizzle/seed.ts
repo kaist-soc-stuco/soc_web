@@ -3,16 +3,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { and, eq, sql } from "drizzle-orm";
 import { articles, boards, permissions } from "../src/infrastructure/postgres/postgres.schema";
 import { PERMISSION_REGISTRY } from "@soc/contracts";
-
 const DATABASE_URL = process.env.DATABASE_URL;
-
 if (!DATABASE_URL || DATABASE_URL.trim().length === 0) {
   throw new Error("DATABASE_URL is required for seeding");
 }
-
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
-
 type BoardSeed = {
   code: string;
   nameKo: string;
@@ -27,7 +23,6 @@ type BoardSeed = {
   isActive: boolean;
   sortOrder: number;
 };
-
 /**
  * SSOT(permissions-registry.ts)에서 자동 생성되는 시드 데이터.
  * 새 권한을 추가하려면 permissions-registry.ts만 수정하면 됩니다.
@@ -41,7 +36,6 @@ const PERMISSION_SEEDS = PERMISSION_REGISTRY.map((def) => ({
   description: def.description,
   isActive: true,
 }));
-
 const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "공지",
@@ -142,7 +136,6 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 6,
   },
 ];
-
 async function seedPermissions() {
   await db
     .insert(permissions)
@@ -157,36 +150,29 @@ async function seedPermissions() {
         isActive: sql`excluded.is_active`,
       },
     });
-
   console.log(`Upserted ${PERMISSION_SEEDS.length} permission(s)`);
 }
-
 async function seedBoards() {
   const existing = await db.select({ code: boards.code }).from(boards);
   const existingCodes = new Set(existing.map((row) => row.code));
   const toInsert = BOARD_SEEDS.filter((boardSeed) => !existingCodes.has(boardSeed.code));
-
   if (toInsert.length === 0) {
     console.log("No new boards to insert");
     return;
   }
-
   await db.insert(boards).values(toInsert).onConflictDoNothing();
   console.log(`Inserted ${toInsert.length} board(s)`);
 }
-
 async function seedNoticeArticle() {
   const [noticeBoard] = await db
     .select({ boardId: boards.boardId })
     .from(boards)
     .where(eq(boards.code, "공지"))
     .limit(1);
-
   if (!noticeBoard) {
     console.log("공지 board not found, skipping notice article seed");
     return;
   }
-
   const existing = await db
     .select({ articleId: articles.articleId })
     .from(articles)
@@ -197,15 +183,13 @@ async function seedNoticeArticle() {
       ),
     )
     .limit(1);
-
   if (existing.length > 0) {
     console.log("Notice test article already exists");
     return;
   }
-
   const seedAuthorResult = await db.execute<{ userId: string }>(sql`
     insert into users (kaist_uid, name_ko, email, is_active)
-    values ('seed-notice-author', '관리자', 'admin@kaist.ac.kr', true)
+    values ('seed-notice-author', '관리자', 'dev-admin@kaist.ac.kr', true)
     on conflict (kaist_uid)
     do update
       set name_ko = excluded.name_ko,
@@ -213,12 +197,10 @@ async function seedNoticeArticle() {
           updated_at = now()
     returning user_id as "userId"
   `);
-
   const seedAuthor = seedAuthorResult.rows[0];
   if (!seedAuthor) {
     throw new Error("Failed to upsert seed notice author");
   }
-
   const [created] = await db
     .insert(articles)
     .values({
@@ -232,10 +214,8 @@ async function seedNoticeArticle() {
       isAnonymous: false,
     })
     .returning({ articleId: articles.articleId });
-
   console.log(`Inserted notice test article: ${created.articleId}`);
 }
-
 async function seedDemoEventsIfExists() {
   const sql = `DO $$
 BEGIN
@@ -248,12 +228,10 @@ END $$;`;
   await pool.query(sql);
   console.log("demo_events seed attempted (if table existed)");
 }
-
 async function main() {
   if (DATABASE_URL) {
     console.log("Using DATABASE_URL:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
   }
-
   try {
     await seedDemoEventsIfExists();
     await seedPermissions();
@@ -267,7 +245,6 @@ async function main() {
     await pool.end();
   }
 }
-
 main().catch((error) => {
   console.error(error);
   process.exit(1);

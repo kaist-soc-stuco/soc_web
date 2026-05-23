@@ -1,25 +1,24 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
   SurveyDetailResponse,
   SurveySectionRecord,
   SurveyQuestionRecord,
-  QuestionType,
 } from "@soc/contracts";
 import { z } from "zod";
-import { FormProvider, useForm, useFormContext } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { htmlDatetimeLocalToIso, isoToHtmlDatetimeLocal } from "@soc/shared";
-import { Button } from "@/components/ui/button";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { Permissions } from "@/lib/permissions";
+import { SurveySettingsForm } from "@/components/organisms/survey-settings-form";
+import { QuestionEditorModal, QuestionFormState } from "@/components/organisms/question-editor-modal";
+import { GripVertical, Plus } from "lucide-react";
 
-// ─── 타입 정의 ────────────────────────────────────────────────────────────────
-
-const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
+const QUESTION_TYPES = [
   { value: "short_text", label: "단답형" },
   { value: "long_text", label: "장문형" },
   { value: "single_choice", label: "단일 선택" },
@@ -30,28 +29,9 @@ const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: "datetime", label: "날짜+시간" },
 ];
 
-const SURVEY_STATUSES = [
-  { value: "draft", label: "초안" },
-  { value: "scheduled", label: "예약됨" },
-  { value: "open", label: "진행 중" },
-  { value: "closed", label: "마감" },
-  { value: "archived", label: "보관됨" },
-];
-
-const SURVEY_KINDS = [
-  { value: "SURVEY", label: "일반 설문" },
-  { value: "VOTE", label: "투표" },
-  { value: "APPLICATION", label: "신청서/행사 접수" },
-];
-
-const SURVEY_VISIBILITIES = [
-  { value: "PUBLIC", label: "공개 (전체 공개)" },
-  { value: "PRIVATE", label: "비공개 (결과 숨김)" },
-];
-
 const SurveySettingsSchema = z.object({
   titleKo: z.string().min(1, "국문 제목은 필수입니다.").max(255),
-  titleEn: z.string().min(1, "영문 제목은 필수입니다.").max(255),
+  titleEn: z.string().max(255).optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
   status: z.string().max(20).optional(),
@@ -59,6 +39,8 @@ const SurveySettingsSchema = z.object({
   resultVisibility: z.string().min(1).max(20),
   feePayersOnly: z.boolean().optional(),
   allowGuestResponse: z.boolean().optional(),
+  isKoreanOnly: z.boolean().optional(),
+  isPublished: z.boolean().optional(),
   maxResponseCount: z
     .string()
     .optional()
@@ -68,21 +50,17 @@ const SurveySettingsSchema = z.object({
   openAt: z.string().min(1, "시작 시각을 입력해주세요."),
   closeAt: z.string().min(1, "마감 시각을 입력해주세요."),
   connectedArticleId: z.string().optional(),
+}).refine((data) => {
+  if (!data.isKoreanOnly) {
+    return !!data.titleEn?.trim();
+  }
+  return true;
+}, {
+  message: "영문 제목은 필수입니다 (Korean Only가 아닐 경우).",
+  path: ["titleEn"],
 });
 
 type SurveySettingsFormValues = z.infer<typeof SurveySettingsSchema>;
-
-interface QuestionFormState {
-  titleKo: string;
-  titleEn: string;
-  descriptionKo: string;
-  descriptionEn: string;
-  questionType: QuestionType;
-  options: { value: string; labelKo: string; labelEn: string }[];
-  answerRegex: string;
-  isRequired: boolean;
-  editDeadlineAt: string;
-}
 
 const emptyQuestion = (): QuestionFormState => ({
   titleKo: "",
@@ -95,367 +73,6 @@ const emptyQuestion = (): QuestionFormState => ({
   isRequired: true,
   editDeadlineAt: "",
 });
-
-// ─── 질문 편집 모달 ───────────────────────────────────────────────────────────
-
-interface QuestionEditorProps {
-  initial: QuestionFormState;
-  onSave: (q: QuestionFormState) => void;
-  onCancel: () => void;
-}
-
-function QuestionEditor({ initial, onSave, onCancel }: QuestionEditorProps) {
-  const [form, setForm] = useState<QuestionFormState>(initial);
-
-  const set = <K extends keyof QuestionFormState>(
-    key: K,
-    val: QuestionFormState[K],
-  ) => setForm((prev) => ({ ...prev, [key]: val }));
-
-  const needsOptions = ["single_choice", "multiple_choice", "dropdown"].includes(form.questionType);
-
-  const addOption = () => {
-    set("options", [...form.options, { value: "", labelKo: "", labelEn: "" }]);
-  };
-
-  const removeOption = (i: number) => {
-    set("options", form.options.filter((_, idx) => idx !== i));
-  };
-
-  const updateOption = (
-    i: number,
-    field: "value" | "labelKo" | "labelEn",
-    val: string,
-  ) => {
-    const next = [...form.options];
-    next[i] = { ...next[i], [field]: val };
-    set("options", next);
-  };
-
-  const handleSave = () => {
-    if (!form.titleKo.trim()) {
-      alert("국문 제목은 필수입니다.");
-      return;
-    }
-    if (!form.titleEn.trim()) {
-      alert("영문 제목은 필수입니다.");
-      return;
-    }
-    onSave(form);
-  };
-
-  const inputCls =
-    "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
-        <h3 className="font-semibold text-gray-800">질문 편집</h3>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">제목 (국문) *</label>
-            <input className={inputCls} value={form.titleKo} onChange={(e) => set("titleKo", e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">제목 (영문) *</label>
-            <input className={inputCls} value={form.titleEn} onChange={(e) => set("titleEn", e.target.value)} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">설명 (국문)</label>
-            <textarea className={`${inputCls} min-h-[60px] resize-y`} value={form.descriptionKo} onChange={(e) => set("descriptionKo", e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">설명 (영문)</label>
-            <textarea className={`${inputCls} min-h-[60px] resize-y`} value={form.descriptionEn} onChange={(e) => set("descriptionEn", e.target.value)} />
-          </div>
-        </div>
-
-        <label className="block text-xs font-medium text-gray-600 mb-1">질문 유형 *</label>
-        <select
-          className={inputCls}
-          value={form.questionType}
-          onChange={(e) => set("questionType", e.target.value as QuestionType)}
-        >
-          {QUESTION_TYPES.map((qt) => (
-            <option key={qt.value} value={qt.value}>{qt.label}</option>
-          ))}
-        </select>
-
-        {needsOptions && (
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">선택지</label>
-            <div className="space-y-2 mb-2">
-              {form.options.map((opt, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <input className={`${inputCls} flex-1`} placeholder="value" value={opt.value} onChange={(e) => updateOption(i, "value", e.target.value)} />
-                  <input className={`${inputCls} flex-1`} placeholder="국문" value={opt.labelKo} onChange={(e) => updateOption(i, "labelKo", e.target.value)} />
-                  <input className={`${inputCls} flex-1`} placeholder="영문" value={opt.labelEn} onChange={(e) => updateOption(i, "labelEn", e.target.value)} />
-                  <button onClick={() => removeOption(i)} className="text-red-400 text-sm hover:text-red-600">✕</button>
-                </div>
-              ))}
-            </div>
-            <button onClick={addOption} className="text-blue-500 text-xs hover:underline">+ 선택지 추가</button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2">
-          <input type="checkbox" id="isRequired" checked={form.isRequired} onChange={(e) => set("isRequired", e.target.checked)} />
-          <label htmlFor="isRequired" className="text-xs text-gray-600">필수 응답</label>
-        </div>
-
-        {form.questionType === "short_text" && (
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">응답 정규식</label>
-            <input className={inputCls} placeholder="선택 사항" value={form.answerRegex} onChange={(e) => set("answerRegex", e.target.value)} />
-          </div>
-        )}
-
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">응답 마감 시각</label>
-          <input type="datetime-local" className={inputCls} value={form.editDeadlineAt} onChange={(e) => set("editDeadlineAt", e.target.value)} />
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button onClick={onCancel}>취소</Button>
-          <Button onClick={handleSave}>저장</Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface SurveySettingsFormProps {
-  saving: boolean;
-  isEdit: boolean;
-  showArticleSearch: boolean;
-  articleSearchResults: any[];
-  selectedArticleTitle: string | null;
-  onToggleArticleSearch: () => void;
-  onFetchArticles: () => Promise<void>;
-  onSelectArticle: (articleId: string, title: string) => void;
-  onConnectedArticleChange: () => void;
-  onSubmit: (values: SurveySettingsFormValues) => void;
-}
-
-function SurveySettingsForm({
-  saving,
-  isEdit,
-  showArticleSearch,
-  articleSearchResults,
-  selectedArticleTitle,
-  onToggleArticleSearch,
-  onFetchArticles,
-  onSelectArticle,
-  onConnectedArticleChange,
-  onSubmit,
-}: SurveySettingsFormProps) {
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useFormContext<SurveySettingsFormValues>();
-
-  const feePayersOnly = Boolean(watch("feePayersOnly"));
-  const allowGuestResponse = Boolean(watch("allowGuestResponse"));
-  const connectedArticleId = watch("connectedArticleId") ?? "";
-
-  const inputCls =
-    "w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
-
-  return (
-    <form
-      className="space-y-4 bg-white rounded-xl border border-gray-200 p-6"
-      onSubmit={handleSubmit(onSubmit, () => {})}
-    >
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">제목 (국문) *</label>
-          <input className={inputCls} {...register("titleKo")} />
-          {errors.titleKo && (
-            <p className="mt-1 text-xs text-red-500">{errors.titleKo.message}</p>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">제목 (영문) *</label>
-          <input className={inputCls} {...register("titleEn")} />
-          {errors.titleEn && (
-            <p className="mt-1 text-xs text-red-500">{errors.titleEn.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">설명 (국문)</label>
-          <textarea className={`${inputCls} min-h-[80px] resize-y`} {...register("descriptionKo")} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">설명 (영문)</label>
-          <textarea className={`${inputCls} min-h-[80px] resize-y`} {...register("descriptionEn")} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">유형 *</label>
-          <select className={inputCls} {...register("kind")}>
-            {SURVEY_KINDS.map((k) => (
-              <option key={k.value} value={k.value}>{k.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">결과 공개 범위 *</label>
-          <select className={inputCls} {...register("resultVisibility")}>
-            {SURVEY_VISIBILITIES.map((v) => (
-              <option key={v.value} value={v.value}>{v.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">상태</label>
-          <select className={inputCls} {...register("status")}>
-            {SURVEY_STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">최대 응답 수</label>
-          <input
-            type="number"
-            className={inputCls}
-            placeholder="제한 없음"
-            {...register("maxResponseCount")}
-          />
-          {errors.maxResponseCount && (
-            <p className="mt-1 text-xs text-red-500">{errors.maxResponseCount.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">시작 시각 (Asia/Seoul)</label>
-          <input type="datetime-local" className={inputCls} {...register("openAt")} />
-          {errors.openAt && (
-            <p className="mt-1 text-xs text-red-500">{errors.openAt.message}</p>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">마감 시각 (Asia/Seoul)</label>
-          <input type="datetime-local" className={inputCls} {...register("closeAt")} />
-          {errors.closeAt && (
-            <p className="mt-1 text-xs text-red-500">{errors.closeAt.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex gap-6">
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" {...register("feePayersOnly")} />
-          과비 납부자만 응답 가능
-        </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" {...register("allowGuestResponse")} />
-          로그인 없이 응답 가능
-        </label>
-      </div>
-
-      <div>
-        <label className="text-xs font-medium text-gray-600 block mb-1">연결 게시글</label>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <input
-              className={inputCls}
-              placeholder="게시글 ID 또는 제목 검색"
-              value={connectedArticleId}
-              onChange={(event) => {
-                setValue("connectedArticleId", event.target.value);
-                onConnectedArticleChange();
-              }}
-            />
-            {selectedArticleTitle && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-500 font-medium">
-                {selectedArticleTitle}
-              </div>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            type="button"
-            onClick={async () => {
-              await onFetchArticles();
-              onToggleArticleSearch();
-            }}
-          >
-            {showArticleSearch ? "목록 닫기" : "게시글 목록"}
-          </Button>
-        </div>
-        <div className="relative">
-          {showArticleSearch && (
-            <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm max-h-60 overflow-y-auto z-20 absolute w-full top-0">
-              <div className="p-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">최근 게시글 (최대 30개)</span>
-                <button onClick={onToggleArticleSearch} className="text-gray-400 hover:text-gray-600 text-xs">닫기</button>
-              </div>
-              {articleSearchResults.length === 0 && (
-                <p className="p-3 text-xs text-gray-400 text-center">불러온 게시글이 없습니다.</p>
-              )}
-              {articleSearchResults.map((art) => (
-                <button
-                  key={art.articleId}
-                  type="button"
-                  onClick={() => onSelectArticle(String(art.articleId), art.titleKo)}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors"
-                >
-                  <span className="font-semibold text-gray-400 mr-2">#{art.articleId}</span>
-                  <span className="text-gray-700">{art.titleKo}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 에러 요약 박스 (Refined Error Summary) */}
-      {Object.keys(errors).length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="flex items-start gap-3">
-            <div className="text-red-500 mt-0.5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-red-800 mb-1">입력 내용을 확인해주세요</h4>
-              <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
-                {Object.entries(errors).map(([key, error]) => (
-                  <li key={key}>{error?.message as string}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? "저장 중…" : isEdit ? "설정 저장" : "설문 생성"}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-// ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 
 const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
 
@@ -477,6 +94,8 @@ export function SurveyEditorPage() {
       resultVisibility: "PUBLIC",
       feePayersOnly: false,
       allowGuestResponse: false,
+      isKoreanOnly: false,
+      isPublished: false,
       maxResponseCount: "",
       openAt: "",
       closeAt: "",
@@ -484,34 +103,44 @@ export function SurveyEditorPage() {
     },
   });
 
+  const isKoreanOnly = Boolean(form.watch("isKoreanOnly"));
+  const isPublished = Boolean(form.watch("isPublished"));
+  const isOngoing = isEdit && isPublished;
+
   const [articleSearchResults, setArticleSearchResults] = useState<any[]>([]);
   const [showArticleSearch, setShowArticleSearch] = useState(false);
   const [selectedArticleTitle, setSelectedArticleTitle] = useState<string | null>(null);
 
   const [sections, setSections] = useState<(SurveySectionRecord & { questions: SurveyQuestionRecord[] })[]>([]);
   const [tab, setTab] = useState<"settings" | "content">("settings");
+
+  const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
+
+  const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [newSectionTitleEn, setNewSectionTitleEn] = useState("");
+  const [addingSection, setAddingSection] = useState(false);
 
   const [editingQuestion, setEditingQuestion] = useState<{
     sectionId: string;
-    questionId: string | null;
+    questionId?: string;
     initial: QuestionFormState;
   } | null>(null);
-
-  const [newSectionTitle, setNewSectionTitle] = useState("");
-  const [addingSection, setAddingSection] = useState(false);
 
   const dragItem = useRef<{ sectionId: string; index: number } | null>(null);
 
   useEffect(() => {
     (async () => {
-      if (sessionLoading || !session) {
+      if (sessionLoading) return;
+      if (!session?.authenticated) {
+        navigate("/login");
         return;
       }
-
-      if (!Permissions.has(session.permission ?? 0, Permissions.MANAGE_SURVEY)) {
+      const userPermission = session.permission ?? 0;
+      if (!(userPermission & Permissions.MANAGE_SURVEY)) {
+        alert("권한이 없습니다.");
+        navigate("/");
         return;
       }
 
@@ -520,14 +149,16 @@ export function SurveyEditorPage() {
           const detail: SurveyDetailResponse = await client.getSurveyDetail(surveyId);
           form.reset({
             titleKo: detail.titleKo,
-            titleEn: detail.titleEn,
+            titleEn: detail.titleEn ?? "",
             descriptionKo: detail.descriptionKo ?? "",
             descriptionEn: detail.descriptionEn ?? "",
             status: detail.status,
-            kind: form.getValues("kind"),
-            resultVisibility: form.getValues("resultVisibility"),
+            kind: detail.kind ?? "SURVEY",
+            resultVisibility: detail.resultVisibility ?? "PUBLIC",
             feePayersOnly: detail.feePayersOnly,
             allowGuestResponse: detail.allowAnonymous,
+            isKoreanOnly: (detail as any).isKoreanOnly ?? false,
+            isPublished: detail.isPublished ?? false,
             maxResponseCount:
               detail.maxResponses != null ? String(detail.maxResponses) : "",
             openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
@@ -543,12 +174,13 @@ export function SurveyEditorPage() {
               if (matched) setSelectedArticleTitle(matched.titleKo);
             });
           }
-        } catch {
+        } catch (err) {
+          console.error(err);
           setError("설문조사를 불러오지 못했습니다.");
         }
       }
     })();
-  }, [isEdit, surveyId, client, navigate, form, session, sessionLoading]);
+  }, [isEdit, surveyId, navigate, form, session, sessionLoading]);
 
   const handleSaveSettings = async (values: SurveySettingsFormValues) => {
     setSaving(true);
@@ -560,12 +192,14 @@ export function SurveyEditorPage() {
       const body = {
         kind: values.kind,
         titleKo: values.titleKo.trim(),
-        titleEn: values.titleEn.trim(),
+        titleEn: values.titleEn?.trim() || undefined,
         descriptionKo: values.descriptionKo?.trim() || undefined,
         descriptionEn: values.descriptionEn?.trim() || undefined,
-        status: values.status as any,
+        status: "open" as any,
         feeRequirementPolicy: values.feePayersOnly ? "PAID_ONLY" : "NONE",
         allowGuestResponse: values.allowGuestResponse,
+        isKoreanOnly: values.isKoreanOnly,
+        isPublished: values.isPublished,
         resultVisibility: values.resultVisibility,
         maxResponseCount,
         openAt: values.openAt ? htmlDatetimeLocalToIso(values.openAt) : undefined,
@@ -574,36 +208,39 @@ export function SurveyEditorPage() {
       };
       if (isEdit && loadedSurveyId) {
         await client.updateSurvey(loadedSurveyId, body);
-        alert("저장되었습니다.");
         navigate("/admin/surveys");
       } else {
         await client.createSurvey(body);
-        alert("설문이 생성되었습니다.");
         navigate("/admin/surveys");
       }
-    } catch {
-      setError("저장에 실패했습니다.");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "저장 중 오류가 발생했습니다.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleAddSection = async () => {
-    if (!loadedSurveyId) {
-      alert("설문 설정을 먼저 저장해주세요.");
+    if (!loadedSurveyId || !newSectionTitle.trim()) return;
+    if (!isKoreanOnly && !newSectionTitleEn.trim()) {
+      setError("영문 섹션 제목을 입력해주세요.");
       return;
     }
-    if (!newSectionTitle.trim()) return;
     setAddingSection(true);
+    setError(null);
     try {
-      const section = await client.createSection(loadedSurveyId, {
+      await client.createSection(loadedSurveyId, {
         titleKo: newSectionTitle.trim(),
-        sortOrder: sections.length,
+        titleEn: newSectionTitleEn.trim() || undefined,
       });
-      setSections((prev) => [...prev, { ...section, questions: [] }]);
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
       setNewSectionTitle("");
-    } catch {
-      alert("섹션 추가에 실패했습니다.");
+      setNewSectionTitleEn("");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "섹션 추가 실패");
     } finally {
       setAddingSection(false);
     }
@@ -611,90 +248,23 @@ export function SurveyEditorPage() {
 
   const handleDeleteSection = async (sectionId: string) => {
     if (!loadedSurveyId) return;
-    if (!confirm("섹션을 삭제하면 안에 있는 질문도 모두 삭제됩니다.")) return;
+    if (!confirm("정말 이 섹션을 삭제하시겠습니까? (섹션 내 모든 문항이 함께 삭제됩니다)")) return;
+    setError(null);
     try {
       await client.deleteSection(loadedSurveyId, sectionId);
-      setSections((prev) => prev.filter((s) => s.id !== sectionId));
-    } catch {
-      alert("섹션 삭제에 실패했습니다.");
-    }
-  };
-
-  const handleSaveQuestion = async (form: QuestionFormState) => {
-    if (!loadedSurveyId || !editingQuestion) return;
-    const { sectionId, questionId } = editingQuestion;
-    const section = sections.find((s) => s.id === sectionId);
-    const body = {
-      titleKo: form.titleKo,
-      titleEn: form.titleEn || undefined,
-      descriptionKo: form.descriptionKo || undefined,
-      descriptionEn: form.descriptionEn || undefined,
-      questionType: form.questionType,
-      options: form.options.length > 0 ? form.options : undefined,
-      answerRegex: form.answerRegex || undefined,
-      isRequired: form.isRequired,
-      editDeadlineAt: form.editDeadlineAt ? htmlDatetimeLocalToIso(form.editDeadlineAt) : undefined,
-      sortOrder: questionId ? undefined : (section?.questions.length ?? 0),
-    };
-
-    try {
-      if (questionId) {
-        const updated = await client.updateQuestion(loadedSurveyId, sectionId, questionId, body);
-        setSections((prev) =>
-          prev.map((s) =>
-            s.id === sectionId ? { ...s, questions: s.questions.map((q) => (q.id === questionId ? updated : q)) } : s,
-          ),
-        );
-      } else {
-        const created = await client.createQuestion(loadedSurveyId, sectionId, body);
-        setSections((prev) =>
-          prev.map((s) => (s.id === sectionId ? { ...s, questions: [...s.questions, created] } : s)),
-        );
-      }
-      setEditingQuestion(null);
-    } catch {
-      alert("질문 저장에 실패했습니다.");
-    }
-  };
-
-  const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
-    if (!loadedSurveyId) return;
-    if (!confirm("질문을 삭제하시겠습니까?")) return;
-    try {
-      await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
-      setSections((prev) =>
-        prev.map((s) =>
-          s.id === sectionId ? { ...s, questions: s.questions.filter((q) => q.id !== questionId) } : s,
-        ),
-      );
-    } catch {
-      alert("질문 삭제에 실패했습니다.");
-    }
-  };
-
-  const handleReorderQuestion = async (sectionId: string, fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex || !loadedSurveyId) return;
-    const section = sections.find((s) => s.id === sectionId);
-    if (!section) return;
-
-    const reordered = [...section.questions];
-    const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, moved);
-
-    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, questions: reordered } : s)));
-
-    try {
-      await Promise.all(
-        reordered.map((q, idx) => client.updateQuestion(loadedSurveyId, sectionId, q.id, { sortOrder: idx })),
-      );
-    } catch {
-      setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, questions: section.questions } : s)));
-      alert("순서 변경에 실패했습니다.");
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "섹션 삭제 실패");
     }
   };
 
   const openNewQuestion = (sectionId: string) => {
-    setEditingQuestion({ sectionId, questionId: null, initial: emptyQuestion() });
+    setEditingQuestion({
+      sectionId,
+      initial: emptyQuestion(),
+    });
   };
 
   const openEditQuestion = (sectionId: string, q: SurveyQuestionRecord) => {
@@ -707,17 +277,100 @@ export function SurveyEditorPage() {
         descriptionKo: q.descriptionKo ?? "",
         descriptionEn: q.descriptionEn ?? "",
         questionType: q.questionType,
-        options: (q.options ?? []).map((o) => ({ value: o.value, labelKo: o.labelKo, labelEn: o.labelEn ?? "" })),
+        options: (q.options ?? []).map((opt) => ({
+          value: opt.value,
+          labelKo: opt.labelKo,
+          labelEn: opt.labelEn ?? "",
+        })),
         answerRegex: q.answerRegex ?? "",
-        isRequired: q.isRequired,
+        isRequired: q.isRequired ?? true,
         editDeadlineAt: q.editDeadlineAt ? isoToHtmlDatetimeLocal(q.editDeadlineAt) : "",
       },
     });
   };
 
+  const handleSaveQuestion = async (qForm: QuestionFormState) => {
+    if (!loadedSurveyId || !editingQuestion) return;
+    setError(null);
+    const { sectionId, questionId } = editingQuestion;
+    const body = {
+      titleKo: qForm.titleKo.trim(),
+      titleEn: qForm.titleEn.trim() || undefined,
+      descriptionKo: qForm.descriptionKo.trim() || undefined,
+      descriptionEn: qForm.descriptionEn.trim() || undefined,
+      questionType: qForm.questionType,
+      options: qForm.options.length > 0 ? qForm.options : undefined,
+      answerRegex: qForm.answerRegex.trim() || undefined,
+      isRequired: qForm.isRequired,
+      editDeadlineAt: qForm.editDeadlineAt ? htmlDatetimeLocalToIso(qForm.editDeadlineAt) : undefined,
+    };
+
+    try {
+      if (questionId) {
+        await client.updateQuestion(loadedSurveyId, sectionId, questionId, body);
+      } else {
+        await client.createQuestion(loadedSurveyId, sectionId, body);
+      }
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
+      setEditingQuestion(null);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "문항 저장 실패");
+    }
+  };
+
+  const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
+    if (!loadedSurveyId) return;
+    if (!confirm("정말 이 문항을 삭제하시겠습니까?")) return;
+    setError(null);
+    try {
+      await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "문항 삭제 실패");
+    }
+  };
+
+  const handleReorderQuestion = async (sectionId: string, oldIdx: number, newIdx: number) => {
+    if (!loadedSurveyId || oldIdx === newIdx) return;
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+
+    const list = [...section.questions];
+    const [moved] = list.splice(oldIdx, 1);
+    list.splice(newIdx, 0, moved);
+
+    const backup = sections;
+    setSections((prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, questions: list } : s)),
+    );
+
+    try {
+      // Update sortOrder of all questions in the section to persist the new order
+      await Promise.all(
+        list.map((q, idx) =>
+          client.updateQuestion(loadedSurveyId, sectionId, q.id, {
+            sortOrder: idx,
+          })
+        )
+      );
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "순서 변경 실패");
+      setSections(backup);
+    }
+  };
+
   const handleFetchArticles = async () => {
-    const results = await client.searchArticles(undefined, 30);
-    setArticleSearchResults(results);
+    try {
+      const results = await client.searchArticles("", 30);
+      setArticleSearchResults(results);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleSelectArticle = (articleId: string, title: string) => {
@@ -732,35 +385,64 @@ export function SurveyEditorPage() {
 
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-          <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => navigate("/admin/surveys")} className="text-sm text-gray-400 hover:text-gray-600">
-              ← 목록
-            </button>
-            <h1 className="text-xl font-bold text-gray-900">{isEdit ? "설문조사 편집" : "새 설문조사"}</h1>
-          </div>
-
-          {error && <p className="mb-4 text-red-500 text-sm">{error}</p>}
-
-          <div className="flex gap-4 border-b border-gray-200 mb-6">
-            {(["settings", "content"] as const).map((t) => (
+      <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black pb-20">
+        <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
+          
+          {/* Header Banner */}
+          <div className="rounded-3xl bg-gradient-to-r from-kaist-darkgreen to-emerald-950 p-8 md:p-10 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute right-0 bottom-0 translate-y-12 translate-x-12 opacity-10 blur-2xl w-72 h-72 rounded-full bg-kaist-lightgreen" />
+            <div className="relative z-10">
               <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${tab === t ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
+                onClick={() => navigate("/admin/surveys")}
+                className="text-xs font-bold text-white/80 hover:text-white transition-colors mb-3 inline-flex items-center gap-1 bg-transparent border-0 cursor-pointer"
               >
-                {t === "settings" ? "설정" : "문항 구성"}
+                ← 설문조사 목록으로
               </button>
-            ))}
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
+                {isEdit ? "설문조사 편집" : "새 설문조사 작성"}
+              </h1>
+              <p className="mt-2 text-white/80 font-medium text-sm md:text-base">
+                설문의 기본 정보 설정 및 상세 문항 구성을 수정할 수 있습니다.
+              </p>
+            </div>
           </div>
+
+          {/* Tab Navigation */}
+          <div className="flex bg-gray-100/80 p-1.5 rounded-2xl w-full max-w-xs border border-kaist-darkgreen/10 shadow-inner">
+            <button
+              onClick={() => setTab("settings")}
+              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all cursor-pointer ${
+                tab === "settings"
+                  ? "bg-white text-kaist-darkgreen shadow-md shadow-kaist-grey/10 font-extrabold"
+                  : "text-kaist-grey hover:bg-white/50"
+              }`}
+            >
+              설문 설정
+            </button>
+            <button
+              onClick={() => setTab("content")}
+              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all cursor-pointer ${
+                tab === "content"
+                  ? "bg-white text-kaist-darkgreen shadow-md shadow-kaist-grey/10 font-extrabold"
+                  : "text-kaist-grey hover:bg-white/50"
+              }`}
+            >
+              상세 문항
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-2xl text-sm font-semibold">
+              {error}
+            </div>
+          )}
 
           {tab === "settings" && (
             <FormProvider {...form}>
               <SurveySettingsForm
                 saving={saving}
                 isEdit={isEdit}
+                isOngoing={isOngoing}
                 showArticleSearch={showArticleSearch}
                 articleSearchResults={articleSearchResults}
                 selectedArticleTitle={selectedArticleTitle}
@@ -774,75 +456,169 @@ export function SurveyEditorPage() {
           )}
 
           {tab === "content" && (
-            <div className="space-y-6">
-              {!loadedSurveyId && <p className="text-gray-500 text-sm">설정 탭에서 설문을 먼저 저장하세요.</p>}
+            <div className="space-y-6 bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 md:p-8 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
+              {!loadedSurveyId && (
+                <div className="bg-gray-50 border border-kaist-grey/10 p-12 rounded-2xl text-center text-sm font-bold text-kaist-grey/60">
+                  설정 탭에서 설문을 먼저 저장해주세요.
+                </div>
+              )}
 
-              {loadedSurveyId && (
-                <>
-                  {sections.map((section) => (
-                    <div key={section.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-800">{section.titleKo}</h3>
-                        <button onClick={() => handleDeleteSection(section.id)} className="text-red-400 hover:text-red-600 text-xs">섹션 삭제</button>
-                      </div>
-
-                      {section.questions.length === 0 && <p className="text-gray-400 text-xs">질문이 없습니다.</p>}
-
-                      {section.questions.map((q, idx) => (
+                {loadedSurveyId && (
+                  <>
+                    <div className="space-y-6">
+                      {sections.map((section) => (
                         <div
-                          key={q.id}
-                          draggable
-                          onDragStart={() => { dragItem.current = { sectionId: section.id, index: idx }; }}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={() => {
-                            if (!dragItem.current) return;
-                            if (dragItem.current.sectionId !== section.id) return;
-                            void handleReorderQuestion(section.id, dragItem.current.index, idx);
-                            dragItem.current = null;
-                          }}
-                          className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm cursor-grab active:cursor-grabbing group"
+                          key={section.id}
+                          className="bg-white rounded-2xl border border-kaist-grey/20 overflow-hidden shadow-sm"
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-gray-300 group-hover:text-gray-400 flex-shrink-0 select-none">⠿</span>
-                            <div className="min-w-0">
-                              <span className="font-medium text-gray-700 truncate">{q.titleKo}</span>
-                              <span className="ml-2 text-xs text-gray-400">
-                                {QUESTION_TYPES.find((t) => t.value === q.questionType)?.label}
-                                {q.isRequired ? " · 필수" : ""}
-                              </span>
+                          {/* 섹션 헤더 (국문/영문 제목 지원) */}
+                          <div className="px-6 py-4 border-b border-kaist-grey/10 bg-gray-50/50 flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                              <h3 className="font-bold text-kaist-black text-base">
+                                {section.titleKo}
+                              </h3>
+                              {section.titleEn && (
+                                <span className="text-xs font-semibold text-kaist-grey/70">
+                                  {section.titleEn}
+                                </span>
+                              )}
                             </div>
+                            {!isOngoing && (
+                              <button
+                                onClick={() => handleDeleteSection(section.id)}
+                                className="text-kaist-grey hover:text-red-500 text-xs font-bold transition-all bg-gray-100 hover:bg-red-50 px-3.5 py-2 rounded-xl border border-transparent hover:border-red-100 cursor-pointer"
+                              >
+                                섹션 삭제
+                              </button>
+                            )}
                           </div>
-                          <div className="flex gap-3 flex-shrink-0 ml-2">
-                            <button onClick={() => openEditQuestion(section.id, q)} className="text-blue-500 hover:underline text-xs">편집</button>
-                            <button onClick={() => handleDeleteQuestion(section.id, q.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
+
+                          {/* 섹션 질문 목록 */}
+                          <div className="p-6 space-y-3">
+                            {section.questions.length === 0 && (
+                              <p className="text-kaist-grey/40 text-sm text-center py-6 font-bold">
+                                등록된 질문이 없습니다.
+                              </p>
+                            )}
+
+                            {section.questions.map((q, idx) => (
+                              <div
+                                key={q.id}
+                                draggable={!isOngoing}
+                                onDragStart={() => {
+                                  if (isOngoing) return;
+                                  dragItem.current = { sectionId: section.id, index: idx };
+                                }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={() => {
+                                  if (isOngoing) return;
+                                  if (!dragItem.current) return;
+                                  if (dragItem.current.sectionId !== section.id) return;
+                                  void handleReorderQuestion(section.id, dragItem.current.index, idx);
+                                  dragItem.current = null;
+                                }}
+                                className={`flex items-center justify-between rounded-xl border border-kaist-grey/15 bg-white px-5 py-4 text-sm transition-all group ${
+                                  isOngoing ? "cursor-default" : "cursor-grab active:cursor-grabbing hover:border-kaist-darkgreen/30 hover:shadow-md"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {!isOngoing && (
+                                    <span className="text-kaist-grey/30 group-hover:text-kaist-grey/80 flex-shrink-0 select-none transition-colors">
+                                      <GripVertical className="w-4 h-4" />
+                                    </span>
+                                  )}
+                                  <div className="min-w-0 flex items-center gap-2">
+                                    <span className="font-bold text-kaist-black truncate text-sm">
+                                      {q.titleKo}
+                                    </span>
+                                    {q.titleEn && (
+                                      <span className="text-xs text-kaist-grey/60 font-semibold hidden md:inline truncate">
+                                        ({q.titleEn})
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-kaist-lightgreen/20 text-kaist-darkgreen shrink-0">
+                                      {QUESTION_TYPES.find((t) => t.value === q.questionType)?.label}
+                                    </span>
+                                    {q.isRequired && (
+                                      <span className="text-[10px] font-bold text-red-500 shrink-0">
+                                        *필수
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 flex-shrink-0 ml-2">
+                                  <button
+                                    onClick={() => openEditQuestion(section.id, q)}
+                                    className="px-3.5 py-2 text-xs font-bold text-kaist-black bg-gray-100 hover:bg-kaist-lightgreen/20 rounded-xl transition-all cursor-pointer border-0"
+                                  >
+                                    {isOngoing ? "보기" : "편집"}
+                                  </button>
+                                  {!isOngoing && (
+                                    <button
+                                      onClick={() => handleDeleteQuestion(section.id, q.id)}
+                                      className="px-3.5 py-2 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all cursor-pointer border-0"
+                                    >
+                                      삭제
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            {!isOngoing && (
+                              <div className="pt-2">
+                                <button
+                                  onClick={() => openNewQuestion(section.id)}
+                                  className="inline-flex items-center gap-1.5 text-sm font-bold text-kaist-darkgreen bg-kaist-lightgreen/20 hover:bg-kaist-lightgreen/30 px-4.5 py-2.5 rounded-xl transition-all border border-kaist-darkgreen/10 cursor-pointer"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  질문 추가하기
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
-                      <button onClick={() => openNewQuestion(section.id)} className="text-blue-500 text-xs hover:underline">+ 질문 추가</button>
                     </div>
-                  ))}
 
-                  <div className="flex gap-2">
-                    <input
-                      className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      placeholder="섹션 제목 (국문)"
-                      value={newSectionTitle}
-                      onChange={(e) => setNewSectionTitle(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
-                    />
-                    <Button onClick={handleAddSection} disabled={addingSection || !newSectionTitle.trim()}>
-                      {addingSection ? "추가 중…" : "섹션 추가"}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                    {/* 새 섹션 추가 영역 */}
+                    {!isOngoing && (
+                      <div className="flex flex-col md:flex-row gap-3 bg-gray-50 p-4 rounded-2xl border border-kaist-grey/15">
+                        <input
+                          className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-kaist-black bg-white border border-kaist-grey/10 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen/30 transition-all placeholder:text-kaist-grey/40"
+                          placeholder="새로운 섹션 제목 (국문)"
+                          value={newSectionTitle}
+                          onChange={(e) => setNewSectionTitle(e.target.value)}
+                        />
+                        <input
+                          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-kaist-black bg-white border border-kaist-grey/10 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen/30 transition-all placeholder:text-kaist-grey/40 ${
+                             isKoreanOnly ? "opacity-35 cursor-not-allowed bg-gray-100" : ""
+                           }`}
+                          placeholder={isKoreanOnly ? "한국어 전용 설문입니다 (English disabled)" : "New Section Title (English)"}
+                          value={newSectionTitleEn}
+                          disabled={isKoreanOnly}
+                          onChange={(e) => setNewSectionTitleEn(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
+                        />
+                        <button
+                          onClick={handleAddSection}
+                          disabled={addingSection || !newSectionTitle.trim()}
+                          className="px-6 py-2.5 text-sm font-bold text-white bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 rounded-xl transition-all disabled:opacity-50 shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0"
+                        >
+                          {addingSection ? "추가 중…" : "섹션 추가"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
         </main>
 
         {editingQuestion && (
-          <QuestionEditor
+          <QuestionEditorModal
             initial={editingQuestion.initial}
+            isKoreanOnly={isKoreanOnly}
+            isOngoing={isOngoing}
             onSave={handleSaveQuestion}
             onCancel={() => setEditingQuestion(null)}
           />

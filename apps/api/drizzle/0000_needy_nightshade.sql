@@ -19,6 +19,7 @@ CREATE TABLE "article" (
 	"is_pinned" boolean DEFAULT false NOT NULL,
 	"pin_order" integer,
 	"is_anonymous" boolean DEFAULT false NOT NULL,
+	"view_count" integer DEFAULT 0 NOT NULL,
 	"posted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone
@@ -65,6 +66,16 @@ CREATE TABLE "board" (
 	CONSTRAINT "board_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
+CREATE TABLE "bulk_email" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"subject" varchar(255) NOT NULL,
+	"content" text NOT NULL,
+	"sender_id" uuid,
+	"recipient_count" integer NOT NULL,
+	"status" varchar(20) NOT NULL,
+	"sent_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "comment" (
 	"comment_id" serial PRIMARY KEY NOT NULL,
 	"article_id" integer NOT NULL,
@@ -75,6 +86,19 @@ CREATE TABLE "comment" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "executive_contact" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"name_ko" varchar(100) NOT NULL,
+	"name_en" varchar(100),
+	"role_ko" varchar(100) NOT NULL,
+	"role_en" varchar(100),
+	"email" varchar(255),
+	"phone_number" varchar(50),
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "permission" (
@@ -184,6 +208,9 @@ CREATE TABLE "survey" (
 	"connected_article_id" integer,
 	"fee_requirement_policy" varchar(20) DEFAULT 'NONE' NOT NULL,
 	"allow_guest_response" boolean DEFAULT false NOT NULL,
+	"allow_multiple_responses" boolean DEFAULT false NOT NULL,
+	"is_korean_only" boolean DEFAULT false NOT NULL,
+	"is_published" boolean DEFAULT false NOT NULL,
 	"result_visibility" varchar(20) NOT NULL,
 	"max_response_count" integer,
 	"open_at" timestamp with time zone,
@@ -233,6 +260,7 @@ ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_actor_user_id_users_user_id_fk
 ALTER TABLE "board" ADD CONSTRAINT "board_write_permission_id_permission_permission_id_fk" FOREIGN KEY ("write_permission_id") REFERENCES "public"."permission"("permission_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "board" ADD CONSTRAINT "board_comment_permission_id_permission_permission_id_fk" FOREIGN KEY ("comment_permission_id") REFERENCES "public"."permission"("permission_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "board" ADD CONSTRAINT "board_manage_permission_id_permission_permission_id_fk" FOREIGN KEY ("manage_permission_id") REFERENCES "public"."permission"("permission_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "bulk_email" ADD CONSTRAINT "bulk_email_sender_id_users_user_id_fk" FOREIGN KEY ("sender_id") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment" ADD CONSTRAINT "comment_article_id_article_article_id_fk" FOREIGN KEY ("article_id") REFERENCES "public"."article"("article_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment" ADD CONSTRAINT "comment_author_user_id_users_user_id_fk" FOREIGN KEY ("author_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment" ADD CONSTRAINT "comment_parent_comment_id_comment_comment_id_fk" FOREIGN KEY ("parent_comment_id") REFERENCES "public"."comment"("comment_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

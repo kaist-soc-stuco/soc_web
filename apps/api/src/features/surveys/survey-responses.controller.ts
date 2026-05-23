@@ -48,6 +48,12 @@ export class SurveyResponsesController {
     return this.responsesService.findAll(surveyId);
   }
 
+  @Get("with-answers")
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  findAllWithAnswers(@Param("surveyId", ParseUUIDPipe) surveyId: string) {
+    return this.responsesService.findAllWithAnswers(surveyId);
+  }
+
   @Get(":responseId")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
   findDetail(

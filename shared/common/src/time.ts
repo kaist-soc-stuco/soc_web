@@ -164,7 +164,7 @@ export function formatKorean(input: number | string, tz = DEFAULT_TZ): string {
 
   return new Intl.DateTimeFormat('ko-KR', {
     dateStyle: 'medium',
-    timeStyle: 'medium',
+    timeStyle: 'short',
     timeZone: tz,
   }).format(new Date(ms));
 }

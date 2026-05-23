@@ -80,6 +80,7 @@ export class ArticleService {
     code: string,
     articleId: string,
     currentUser: CurrentUserContext,
+    incrementView?: boolean,
   ): Promise<ArticleDetailResponse> {
     const board = await this.boardRepository.findByCode(code);
 
@@ -88,6 +89,10 @@ export class ArticleService {
     }
 
     assertBoardReadable(board, currentUser);
+
+    if (incrementView) {
+      await this.articleRepository.incrementViewCount(articleId);
+    }
 
     const article = await this.articleRepository.findDetailById(
       board.boardId,

@@ -19,8 +19,10 @@ export interface QuestionOption {
 
 export interface SurveyRecord {
   id: string;
+  kind: string;
+  resultVisibility: string;
   titleKo: string;
-  titleEn: string;
+  titleEn: string | null;
   descriptionKo: string | null;
   descriptionEn: string | null;
   creatorId: string | null;
@@ -30,11 +32,15 @@ export interface SurveyRecord {
   connectedPostId: string | null;
   feePayersOnly: boolean;
   allowAnonymous: boolean;
+  allowMultipleResponses: boolean;
+  isKoreanOnly: boolean;
+  isPublished: boolean;
   maxResponses: number | null;
   opensAt: string | null;
   closesAt: string | null;
   createdAt: string;
   updatedAt: string;
+  responseCount?: number;
 }
 
 export interface SurveySectionRecord {
@@ -94,11 +100,14 @@ export interface SurveyAnswerRecord {
 export interface CreateSurveyRequest {
   kind: string;
   titleKo: string;
-  titleEn: string;
+  titleEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
   feeRequirementPolicy?: string;
   allowGuestResponse?: boolean;
+  allowMultipleResponses?: boolean;
+  isKoreanOnly?: boolean;
+  isPublished?: boolean;
   resultVisibility: string;
   maxResponseCount?: number;
   openAt?: string;
@@ -115,6 +124,9 @@ export interface UpdateSurveyRequest {
   status?: SurveyStatus;
   feeRequirementPolicy?: string;
   allowGuestResponse?: boolean;
+  allowMultipleResponses?: boolean;
+  isKoreanOnly?: boolean;
+  isPublished?: boolean;
   resultVisibility?: string;
   maxResponseCount?: number;
   openAt?: string;
@@ -183,6 +195,7 @@ export interface ReviewResponseRequest {
 
 export interface SurveyDetailResponse extends SurveyRecord {
   sections: Array<SurveySectionRecord & { questions: SurveyQuestionRecord[] }>;
+  hasSubmitted?: boolean;
 }
 
 export interface ResponseDetailResponse extends SurveyResponseRecord {

@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -18,6 +18,8 @@ COPY shared/api-client shared/api-client
 COPY shared/contracts shared/contracts
 COPY shared/common shared/common
 COPY shared/config shared/config
+
+RUN pnpm --filter @soc/contracts build
 
 WORKDIR /app/apps/web
 

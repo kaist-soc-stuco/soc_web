@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
   AdminUserRecord,
@@ -7,39 +6,31 @@ import type {
   RoleGroupMemberRecord,
   RoleGroupRecord,
 } from "@soc/contracts";
-import { formatKoreanDateTime, hasPermission } from "@soc/shared";
+import { formatKoreanDateTime } from "@soc/shared";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { maskUuid } from "@/lib/utils";
 import {
-  PERMISSION_DEFINITIONS,
-  getGrantedPermissions,
   hasAdminPermission,
   Permissions,
 } from "@/lib/permissions";
 
 type RoleGroupFormState = {
-  code: string;
   description: string;
-  nameEn: string;
   nameKo: string;
 };
 
 const createEmptyRoleGroupForm = (): RoleGroupFormState => ({
-  code: "",
   description: "",
-  nameEn: "",
   nameKo: "",
 });
 
 export function PermissionPage() {
-  const navigate = useNavigate();
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [permission, setPermission] = useState<number>(0);
   const [userId, setUserId] = useState<string | null>(null);
-  const [storageMode, setStorageMode] = useState<"temporary" | "persisted" | null>(null);
-  const [loading, setLoading] = useState(true);
   const [roleGroups, setRoleGroups] = useState<RoleGroupRecord[]>([]);
   const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
   const [selectedRoleGroupId, setSelectedRoleGroupId] = useState<number | null>(null);
@@ -107,7 +98,6 @@ export function PermissionPage() {
 
       setPermission(session.permission ?? 0);
       setUserId(session.userId ?? null);
-      setStorageMode(session.storageMode);
 
       if (hasAdminPermission(session.permission)) {
         setRoleGroupLoading(true);
@@ -119,8 +109,6 @@ export function PermissionPage() {
           setRoleGroupLoading(false);
         }
       }
-
-      setLoading(false);
     })();
   }, [session, sessionLoading]);
 
@@ -129,8 +117,6 @@ export function PermissionPage() {
   const selectedRoleGroup = roleGroups.find(
     (roleGroup) => roleGroup.roleGroupId === selectedRoleGroupId,
   ) ?? null;
-
-  const grantedPermissions = getGrantedPermissions(permission);
 
   const resetRoleGroupEditor = () => {
     setSelectedRoleGroupId(null);
@@ -141,9 +127,7 @@ export function PermissionPage() {
   const openRoleGroupEditor = (roleGroup: RoleGroupRecord) => {
     setSelectedRoleGroupId(roleGroup.roleGroupId);
     setRoleGroupForm({
-      code: roleGroup.code,
       description: roleGroup.description ?? "",
-      nameEn: roleGroup.nameEn ?? "",
       nameKo: roleGroup.nameKo,
     });
     setSelectedPermissionIds(roleGroup.permissionIds);
@@ -232,8 +216,8 @@ export function PermissionPage() {
       return;
     }
 
-    if (!roleGroupForm.code.trim() || !roleGroupForm.nameKo.trim()) {
-      setRoleGroupError("역할 그룹 코드와 국문 이름은 필수입니다.");
+    if (!roleGroupForm.nameKo.trim()) {
+      setRoleGroupError("역할 그룹 이름은 필수입니다.");
       return;
     }
 
@@ -242,9 +226,7 @@ export function PermissionPage() {
 
     try {
       const payload = {
-        code: roleGroupForm.code.trim(),
         description: roleGroupForm.description.trim() || undefined,
-        nameEn: roleGroupForm.nameEn.trim() || undefined,
         nameKo: roleGroupForm.nameKo.trim(),
         permissionIds: selectedPermissionIds,
       };
@@ -300,261 +282,303 @@ export function PermissionPage() {
   );
 
   return (
-     <AuthGuard requirePermission={Permissions.ADMIN}>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
-        <section className="overflow-hidden rounded-3xl border border-kaist-darkgreen/10 bg-white shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
-          <div className="grid gap-6 p-6 md:grid-cols-[1.35fr_0.9fr] md:p-8">
-            <div className="space-y-4">
-              <p className="text-xs font-extrabold uppercase tracking-[0.28em] text-kaist-greygreen">
-                Permission Console
+    <AuthGuard requirePermission={Permissions.ADMIN}>
+      <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
+        <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-8">
+          
+          {/* Compact Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 pb-5 gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">권한 관리</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                현재 세션의 권한을 확인하고, 역할 그룹, 그룹 내 사용자, 그리고 권한 매핑을 편집합니다.
               </p>
-              <h1 className="text-3xl font-black tracking-tight md:text-4xl">
-                권한 관리
-              </h1>
-              <p className="max-w-2xl text-sm leading-7 text-kaist-grey md:text-base">
-                현재 세션의 권한 비트를 확인하고, 관리자 계정에서는 역할 그룹,
-                그룹 내 사용자, 그리고 권한 매핑을 함께 편집할 수 있습니다.
-              </p>
-
-              <div className="flex flex-wrap gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => navigate("/")}
-                  className="rounded-full border border-kaist-darkgreen/30 px-5 py-3 text-sm font-extrabold text-kaist-darkgreen transition hover:bg-kaist-darkgreen/6"
-                >
-                  홈으로 돌아가기
-                </button>
-              </div>
-            </div>
-
-            <div className="grid gap-3 rounded-2xl bg-kaist-darkgreen/5 p-5 md:p-6">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-kaist-greygreen">
-                  Current User
-                </p>
-                <p className="mt-2 text-lg font-extrabold">
-                  {userId ?? "알 수 없음"}
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
-                    Storage
-                  </p>
-                  <p className="mt-2 text-base font-bold">
-                    {storageMode ?? "미확인"}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
-                    Admin
-                  </p>
-                  <p className="mt-2 text-base font-bold">
-                    {hasAdminPermission(permission) ? "허용" : "불가"}
-                  </p>
-                </div>
-              </div>
-              <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
-                  Permission Mask
-                </p>
-                <p className="mt-2 text-2xl font-black tracking-tight">
-                  {permission}
-                </p>
-                <p className="mt-1 text-xs text-kaist-grey">
-                  binary: {permission.toString(2).padStart(8, "0")}
-                </p>
-              </div>
             </div>
           </div>
-        </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {PERMISSION_DEFINITIONS.map((item) => {
-            const granted = hasPermission(permission, item.bit);
-            return (
-              <article
-                key={item.key}
-                className={`rounded-2xl border p-5 shadow-sm transition ${
-                  granted
-                    ? "border-kaist-darkgreen/20 bg-kaist-darkgreen/5"
-                    : "border-kaist-grey/20 bg-white"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-extrabold text-kaist-darkgreen">
-                      {item.label}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
-                      {item.key}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-                      granted
-                        ? "bg-kaist-darkgreen text-kaist-white"
-                        : "bg-kaist-grey/10 text-kaist-grey"
-                    }`}
-                  >
-                    bit {item.bit}
-                  </span>
-                </div>
-                <p className="mt-4 text-sm leading-6 text-kaist-grey">
-                  {item.description}
-                </p>
-              </article>
-            );
-          })}
-        </section>
-
-        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Compact User Info */}
+          <div className="grid gap-4 sm:grid-cols-2 rounded-2xl bg-white border border-gray-200 p-5 shadow-xs">
             <div>
-              <h2 className="text-lg font-extrabold tracking-tight">
-                역할 그룹 관리
-              </h2>
-              <p className="mt-1 text-sm text-kaist-grey">
-                관리자 권한이 있는 계정에서 역할 그룹 이름, 권한 매핑, 그룹 내 사용자를 관리할 수 있습니다.
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Current User</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">{maskUuid(userId) || "알 수 없음"}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void refreshRoleGroups()}
-                disabled={!canEditRoleGroups || roleGroupLoading || roleGroupSaving}
-                className="rounded-full border border-kaist-darkgreen/20 px-4 py-2 text-sm font-semibold text-kaist-darkgreen transition hover:bg-kaist-darkgreen/6 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                새로고침
-              </button>
-              <button
-                type="button"
-                onClick={resetRoleGroupEditor}
-                disabled={!canEditRoleGroups || roleGroupSaving}
-                className="rounded-full bg-kaist-darkgreen px-4 py-2 text-sm font-semibold text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                새 역할 그룹
-              </button>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Admin</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">{hasAdminPermission(permission) ? "허용" : "불가"}</p>
             </div>
           </div>
 
           {!canEditRoleGroups ? (
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
               역할 그룹 편집과 사용자 관리는 관리자 권한이 있는 계정에서만 가능합니다.
             </div>
           ) : (
-            <div className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-              <div className="space-y-3">
-                {roleGroupLoading ? (
-                  <p className="text-sm text-kaist-grey">역할 그룹을 불러오는 중…</p>
-                ) : roleGroups.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-kaist-grey/30 bg-kaist-grey/5 p-4 text-sm text-kaist-grey">
-                    등록된 역할 그룹이 없습니다. 새 역할 그룹을 만들어 시작하세요.
-                  </p>
-                ) : (
-                  roleGroups.map((roleGroup) => {
-                    const isSelected = roleGroup.roleGroupId === selectedRoleGroupId;
-
-                    return (
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start">
+              {/* Left Column: List of Groups and Members of selected group */}
+              <div className="space-y-6">
+                {/* 역할 그룹 목록 */}
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
+                    <div>
+                      <h2 className="text-lg font-extrabold tracking-tight">역할 그룹 목록</h2>
+                      <p className="mt-0.5 text-xs text-kaist-grey">현재 등록된 역할 그룹 목록입니다.</p>
+                    </div>
+                    <div className="flex gap-2">
                       <button
-                        key={roleGroup.roleGroupId}
                         type="button"
-                        onClick={() => void handleSelectRoleGroup(roleGroup)}
-                        className={`w-full rounded-2xl border p-4 text-left transition ${
-                          isSelected
-                            ? "border-kaist-darkgreen bg-kaist-darkgreen/5"
-                            : "border-kaist-grey/20 bg-white hover:border-kaist-darkgreen/20 hover:bg-kaist-darkgreen/4"
-                        }`}
+                        onClick={() => void refreshRoleGroups()}
+                        disabled={roleGroupLoading || roleGroupSaving}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 font-bold px-3 py-1.5 text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-extrabold text-kaist-darkgreen">
-                              {roleGroup.nameKo}
-                            </p>
-                            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
-                              {roleGroup.code}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                            {roleGroup.isSystem && (
-                              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
-                                system
-                              </span>
-                            )}
-                            <span className="rounded-full bg-kaist-darkgreen/10 px-3 py-1 text-kaist-darkgreen">
-                              사용자 {roleGroup.userCount}명
-                            </span>
-                          </div>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-kaist-grey">
-                          {roleGroup.description ?? "설명이 없습니다."}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {roleGroup.permissionIds.length === 0 ? (
-                            <span className="rounded-full bg-kaist-grey/10 px-3 py-1 text-xs font-semibold text-kaist-grey">
-                              권한 없음
-                            </span>
-                          ) : (
-                            roleGroup.permissionIds.map((permissionId) => {
-                              const item = permissionLabelById.get(permissionId);
-                              return (
-                                <span
-                                  key={permissionId}
-                                  className="rounded-full bg-kaist-darkgreen/8 px-3 py-1 text-xs font-semibold text-kaist-darkgreen"
-                                >
-                                  {item?.nameKo ?? item?.code ?? `#${permissionId}`}
-                                </span>
-                              );
-                            })
-                          )}
-                        </div>
-                        <p className="mt-3 text-xs text-kaist-greygreen">
-                          수정 {formatKoreanDateTime(roleGroup.updatedAt)}
-                        </p>
+                        새로고침
                       </button>
-                    );
-                  })
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-kaist-grey/20 bg-kaist-grey/5 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-extrabold tracking-tight">
-                      {selectedRoleGroupId === null ? "새 역할 그룹" : "역할 그룹 수정"}
-                    </h3>
-                    <p className="mt-1 text-sm text-kaist-grey">
-                      코드와 이름을 수정하고, 아래 권한 목록에서 매핑을 선택하세요.
-                    </p>
+                      <button
+                        type="button"
+                        onClick={resetRoleGroupEditor}
+                        disabled={roleGroupSaving}
+                        className="bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-3 py-1.5 text-xs rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        새 역할 그룹
+                      </button>
+                    </div>
                   </div>
-                  {selectedRoleGroupId !== null && (
-                    <button
-                      type="button"
-                      onClick={resetRoleGroupEditor}
-                      className="rounded-full border border-kaist-darkgreen/20 px-3 py-1.5 text-xs font-semibold text-kaist-darkgreen transition hover:bg-kaist-darkgreen/6"
-                    >
-                      새로 작성
-                    </button>
-                  )}
+
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                    {roleGroupLoading ? (
+                      <p className="text-sm text-kaist-grey">역할 그룹을 불러오는 중…</p>
+                    ) : roleGroups.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-kaist-grey/30 bg-kaist-grey/5 p-4 text-sm text-kaist-grey">
+                        등록된 역할 그룹이 없습니다. 새 역할 그룹을 만들어 시작하세요.
+                      </p>
+                    ) : (
+                      roleGroups.map((roleGroup) => {
+                        const isSelected = roleGroup.roleGroupId === selectedRoleGroupId;
+
+                        return (
+                          <button
+                            key={roleGroup.roleGroupId}
+                            type="button"
+                            onClick={() => void handleSelectRoleGroup(roleGroup)}
+                            className={`w-full rounded-xl border p-4 text-left transition ${
+                              isSelected
+                                ? "border-kaist-darkgreen bg-kaist-darkgreen/5"
+                                : "border-gray-200 bg-white hover:border-kaist-darkgreen/20 hover:bg-kaist-darkgreen/5"
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-extrabold text-kaist-darkgreen">
+                                  {roleGroup.nameKo}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                                {roleGroup.isSystem && (
+                                  <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
+                                    system
+                                  </span>
+                                )}
+                                <span className="rounded-full bg-kaist-darkgreen/10 px-3 py-1 text-kaist-darkgreen">
+                                  사용자 {roleGroup.userCount}명
+                                </span>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-kaist-grey">
+                              {roleGroup.description ?? "설명이 없습니다."}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {roleGroup.permissionIds.length === 0 ? (
+                                <span className="rounded-full bg-kaist-grey/10 px-2.5 py-0.5 text-xs font-semibold text-kaist-grey">
+                                  권한 없음
+                                </span>
+                              ) : (
+                                roleGroup.permissionIds.map((permissionId) => {
+                                  const item = permissionLabelById.get(permissionId);
+                                  return (
+                                    <span
+                                      key={permissionId}
+                                      className="rounded-full bg-kaist-darkgreen/8 px-2.5 py-0.5 text-xs font-semibold text-kaist-darkgreen"
+                                    >
+                                      {item?.nameKo ?? item?.code ?? `#${permissionId}`}
+                                    </span>
+                                  );
+                                })
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs text-kaist-greygreen">
+                              수정 {formatKoreanDateTime(roleGroup.updatedAt)}
+                            </p>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
 
-                <div className="mt-5 grid gap-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-2 text-sm font-semibold text-kaist-darkgreen">
-                      <span>코드</span>
-                      <input
-                        value={roleGroupForm.code}
-                        onChange={(event) =>
-                          setRoleGroupForm((prev) => ({
-                            ...prev,
-                            code: event.target.value,
-                          }))
-                        }
-                        className="w-full rounded-2xl border border-kaist-grey/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"
-                        placeholder="staff"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm font-semibold text-kaist-darkgreen">
+                {/* 그룹 내 사용자 관리 */}
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
+                    <div>
+                      <h2 className="text-lg font-extrabold tracking-tight">그룹 내 사용자 관리</h2>
+                      <p className="mt-0.5 text-xs text-kaist-grey">
+                        {selectedRoleGroup ? `"${selectedRoleGroup.nameKo}" 그룹 구성원 설정` : "역할 그룹을 선택해 주세요."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedRoleGroupId === null ? (
+                    <p className="text-sm text-kaist-grey py-4">
+                      위 목록에서 역할 그룹을 먼저 선택하시면 사용자 관리 기능이 활성화됩니다.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <input
+                          value={memberQuery}
+                          onChange={(event) => setMemberQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void handleSearchUsers();
+                            }
+                          }}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-kaist-darkgreen"
+                          placeholder="이름 또는 학번으로 검색"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleSearchUsers()}
+                          disabled={searchLoading}
+                          className="bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {searchLoading ? "검색 중" : "검색"}
+                        </button>
+                      </div>
+
+                      {memberError && (
+                        <p className="text-sm font-semibold text-red-600">{memberError}</p>
+                      )}
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {/* 현재 멤버 */}
+                        <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                          <div className="flex items-center justify-between gap-3 border-b border-gray-200/60 pb-2 mb-3">
+                            <h3 className="text-xs font-bold text-kaist-darkgreen">현재 멤버</h3>
+                            <span className="text-xs font-semibold text-kaist-greygreen">
+                              {memberLoading ? "로딩 중" : `${roleGroupMembers.length}명`}
+                            </span>
+                          </div>
+
+                          {memberLoading ? (
+                            <p className="text-xs text-kaist-grey py-2">멤버를 불러오는 중…</p>
+                          ) : roleGroupMembers.length === 0 ? (
+                            <p className="text-xs text-kaist-grey py-2">아직 멤버가 없습니다.</p>
+                          ) : (
+                            <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                              {roleGroupMembers.map((member) => (
+                                <div
+                                  key={member.userRoleGroupId}
+                                  className="rounded-xl border border-gray-200 bg-white p-3 shadow-xs"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-xs font-extrabold text-kaist-darkgreen">
+                                        {member.nameKo}
+                                      </p>
+                                      <p className="mt-0.5 text-[10px] leading-relaxed text-kaist-greygreen">
+                                        {member.stdNo ? `학번: ${member.stdNo}` : maskUuid(member.kaistUid)}<br />{member.email}
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleRemoveMember(member.userId)}
+                                      disabled={memberSavingUserId === member.userId}
+                                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-bold px-2 py-1 text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {memberSavingUserId === member.userId ? "대기" : "제거"}
+                                    </button>
+                                  </div>
+                                  <p className="mt-2 text-[10px] text-kaist-grey">
+                                    부여 {formatKoreanDateTime(member.grantedAt)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 검색 결과 */}
+                        <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                          <div className="flex items-center justify-between gap-3 border-b border-gray-200/60 pb-2 mb-3">
+                            <h3 className="text-xs font-bold text-kaist-darkgreen">검색 결과</h3>
+                            <span className="text-xs font-semibold text-kaist-greygreen">
+                              {searchResults.length}명
+                            </span>
+                          </div>
+
+                          {searchResults.length === 0 ? (
+                            <p className="text-xs text-kaist-grey py-2">
+                              검색어를 입력하고 검색해 주세요.
+                            </p>
+                          ) : (
+                            <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                              {searchResults.map((user) => {
+                                const alreadyMember = roleGroupMembers.some(
+                                  (member) => member.userId === user.userId,
+                                );
+
+                                return (
+                                  <div key={user.userId} className="rounded-xl border border-gray-200 bg-white p-3 shadow-xs">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div>
+                                        <p className="text-xs font-extrabold text-kaist-darkgreen">
+                                          {user.nameKo}
+                                        </p>
+                                        <p className="mt-0.5 text-[10px] leading-relaxed text-kaist-greygreen">
+                                          {user.stdNo ? `학번: ${user.stdNo}` : maskUuid(user.kaistUid)}<br />{user.email}
+                                        </p>
+                                        <p className="mt-1 text-[10px] text-kaist-grey">
+                                          {user.departmentKo ?? "학과 미상"}
+                                          {user.academicStatus ? ` · ${user.academicStatus}` : ""}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleAddMember(user)}
+                                        disabled={alreadyMember || memberSavingUserId === user.userId}
+                                        className="bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-2 py-1 text-xs rounded-xl transition-all disabled:cursor-not-allowed disabled:bg-kaist-grey"
+                                      >
+                                        {alreadyMember ? "참여됨" : memberSavingUserId === user.userId ? "대기" : "추가"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Role Group Form */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs sticky top-4">
+                <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-extrabold tracking-tight">
+                      {selectedRoleGroupId === null ? "새 역할 그룹 생성" : "역할 그룹 정보 수정"}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-kaist-grey">
+                      이름을 수정하고, 부여할 권한들을 매핑해 주세요.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  {/* Single column layout for Form Fields */}
+                  <div className="flex flex-col gap-4">
+                    <label className="space-y-1.5 text-xs font-semibold text-kaist-darkgreen">
                       <span>국문 이름</span>
                       <input
                         value={roleGroupForm.nameKo}
@@ -564,28 +588,11 @@ export function PermissionPage() {
                             nameKo: event.target.value,
                           }))
                         }
-                        className="w-full rounded-2xl border border-kaist-grey/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-kaist-darkgreen"
                         placeholder="운영진"
                       />
                     </label>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-2 text-sm font-semibold text-kaist-darkgreen">
-                      <span>영문 이름</span>
-                      <input
-                        value={roleGroupForm.nameEn}
-                        onChange={(event) =>
-                          setRoleGroupForm((prev) => ({
-                            ...prev,
-                            nameEn: event.target.value,
-                          }))
-                        }
-                        className="w-full rounded-2xl border border-kaist-grey/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"
-                        placeholder="Operating Team"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm font-semibold text-kaist-darkgreen">
+                    <label className="space-y-1.5 text-xs font-semibold text-kaist-darkgreen">
                       <span>설명</span>
                       <input
                         value={roleGroupForm.description}
@@ -595,23 +602,23 @@ export function PermissionPage() {
                             description: event.target.value,
                           }))
                         }
-                        className="w-full rounded-2xl border border-kaist-grey/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-kaist-darkgreen"
                         placeholder="설명은 선택 사항입니다."
                       />
                     </label>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-extrabold text-kaist-darkgreen">
+                    <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-2 mb-3">
+                      <h4 className="text-xs font-extrabold text-kaist-darkgreen">
                         권한 목록
                       </h4>
                       <p className="text-xs text-kaist-greygreen">
-                        선택된 권한 {selectedPermissionIds.length}개
+                        선택됨 {selectedPermissionIds.length}개
                       </p>
                     </div>
 
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-2 max-h-[300px] overflow-y-auto pr-1">
                       {permissions.map((item) => {
                         const active = selectedPermissionIds.includes(item.permissionId);
 
@@ -620,30 +627,30 @@ export function PermissionPage() {
                             key={item.permissionId}
                             type="button"
                             onClick={() => togglePermissionId(item.permissionId)}
-                            className={`rounded-2xl border p-4 text-left transition ${
+                            className={`relative rounded-xl border p-3 text-left transition ${
                               active
-                                ? "border-kaist-darkgreen bg-kaist-darkgreen/6"
-                                : "border-kaist-grey/20 bg-white hover:border-kaist-darkgreen/20"
+                                ? "border-kaist-darkgreen bg-kaist-darkgreen/5"
+                                : "border-gray-200 bg-white hover:border-kaist-darkgreen/20"
                             }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-sm font-bold text-kaist-darkgreen">
+                                <p className="text-xs font-bold text-kaist-darkgreen pr-6">
                                   {item.nameKo}
                                 </p>
-                                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
+                                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-kaist-greygreen">
                                   {item.code}
                                 </p>
                               </div>
-                              <span className="rounded-full bg-kaist-grey/10 px-2 py-1 text-xs font-semibold text-kaist-grey">
-                                bit {item.bitValue}
-                              </span>
+                              <input
+                                type="checkbox"
+                                checked={active}
+                                readOnly
+                                className="w-4 h-4 rounded border-gray-300 text-kaist-darkgreen focus:ring-kaist-darkgreen pointer-events-none mt-0.5"
+                              />
                             </div>
-                            <p className="mt-3 text-xs leading-5 text-kaist-grey">
+                            <p className="mt-2 text-[10px] leading-normal text-kaist-grey">
                               {item.description ?? "설명이 없습니다."}
-                            </p>
-                            <p className="mt-3 text-xs font-semibold text-kaist-darkgreen">
-                              {active ? "선택됨" : "미선택"}
                             </p>
                           </button>
                         );
@@ -651,22 +658,31 @@ export function PermissionPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-                    {selectedRoleGroupId !== null && (
-                      <button
-                        type="button"
-                        onClick={() => void handleDeleteRoleGroup()}
-                        disabled={roleGroupSaving}
-                        className="rounded-full border border-red-200 px-5 py-3 text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        삭제
-                      </button>
-                    )}
+                  {roleGroupError && (
+                    <p className="text-sm font-semibold text-red-600">{roleGroupError}</p>
+                  )}
+
+                  {/* Redesigned delete / save buttons bottom layout */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
+                    <div>
+                      {selectedRoleGroupId !== null && (
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteRoleGroup()}
+                          disabled={roleGroupSaving}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-semibold px-4 py-2 text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => void handleSaveRoleGroup()}
                       disabled={roleGroupSaving}
-                      className="rounded-full bg-kaist-darkgreen px-5 py-3 text-sm font-extrabold text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className={`bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-6 py-2 text-sm rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        selectedRoleGroupId === null ? "ml-auto" : ""
+                      }`}
                     >
                       {roleGroupSaving ? "저장 중…" : "저장"}
                     </button>
@@ -675,196 +691,8 @@ export function PermissionPage() {
               </div>
             </div>
           )}
-
-          {roleGroupError && (
-            <p className="mt-4 text-sm font-semibold text-red-600">{roleGroupError}</p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-extrabold tracking-tight">
-                그룹 내 사용자 관리
-              </h2>
-              <p className="mt-1 text-sm text-kaist-grey">
-                선택한 역할 그룹에 사용자를 추가하거나 제거할 수 있습니다.
-              </p>
-            </div>
-            <div className="rounded-full bg-kaist-darkgreen/6 px-4 py-2 text-sm font-semibold text-kaist-darkgreen">
-              {selectedRoleGroup ? selectedRoleGroup.nameKo : "그룹 미선택"}
-            </div>
-          </div>
-
-          {selectedRoleGroupId === null ? (
-            <p className="mt-6 text-sm text-kaist-grey">
-              먼저 왼쪽에서 역할 그룹을 선택하세요.
-            </p>
-          ) : (
-            <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <input
-                    value={memberQuery}
-                    onChange={(event) => setMemberQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void handleSearchUsers();
-                      }
-                    }}
-                    className="w-full rounded-2xl border border-kaist-grey/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"
-                    placeholder="이름, KAIST UID, 이메일로 검색"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleSearchUsers()}
-                    disabled={searchLoading}
-                    className="rounded-2xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {searchLoading ? "검색 중" : "검색"}
-                  </button>
-                </div>
-
-                {memberError && (
-                  <p className="text-sm font-semibold text-red-600">{memberError}</p>
-                )}
-
-                <div className="rounded-2xl border border-kaist-grey/20 bg-kaist-grey/5 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-extrabold text-kaist-darkgreen">현재 멤버</h3>
-                    <span className="text-xs font-semibold text-kaist-greygreen">
-                      {memberLoading ? "불러오는 중" : `${roleGroupMembers.length}명`}
-                    </span>
-                  </div>
-
-                  {memberLoading ? (
-                    <p className="mt-4 text-sm text-kaist-grey">멤버를 불러오는 중…</p>
-                  ) : roleGroupMembers.length === 0 ? (
-                    <p className="mt-4 text-sm text-kaist-grey">아직 멤버가 없습니다.</p>
-                  ) : (
-                    <div className="mt-4 space-y-3">
-                      {roleGroupMembers.map((member) => (
-                        <div
-                          key={member.userRoleGroupId}
-                          className="rounded-2xl border border-kaist-grey/20 bg-white p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-extrabold text-kaist-darkgreen">
-                                {member.nameKo}
-                              </p>
-                              <p className="mt-1 text-xs text-kaist-greygreen">
-                                {member.kaistUid} · {member.email}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void handleRemoveMember(member.userId)}
-                              disabled={memberSavingUserId === member.userId}
-                              className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {memberSavingUserId === member.userId ? "처리 중" : "제거"}
-                            </button>
-                          </div>
-                          <p className="mt-3 text-xs text-kaist-grey">
-                            부여 {formatKoreanDateTime(member.grantedAt)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-kaist-grey/20 bg-kaist-grey/5 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-extrabold text-kaist-darkgreen">검색 결과</h3>
-                  <span className="text-xs font-semibold text-kaist-greygreen">
-                    {searchResults.length}명
-                  </span>
-                </div>
-
-                {searchResults.length === 0 ? (
-                  <p className="mt-4 text-sm text-kaist-grey">
-                    검색어를 입력하고 검색 버튼을 누르면 사용자를 찾을 수 있습니다.
-                  </p>
-                ) : (
-                  <div className="mt-4 grid gap-3">
-                    {searchResults.map((user) => {
-                      const alreadyMember = roleGroupMembers.some(
-                        (member) => member.userId === user.userId,
-                      );
-
-                      return (
-                        <div key={user.userId} className="rounded-2xl border border-white bg-white p-4 shadow-sm">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-extrabold text-kaist-darkgreen">
-                                {user.nameKo}
-                              </p>
-                              <p className="mt-1 text-xs text-kaist-greygreen">
-                                {user.kaistUid} · {user.email}
-                              </p>
-                              <p className="mt-2 text-xs text-kaist-grey">
-                                {user.departmentKo ?? "학과 미상"}
-                                {user.academicStatus ? ` · ${user.academicStatus}` : ""}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void handleAddMember(user)}
-                              disabled={alreadyMember || memberSavingUserId === user.userId}
-                              className="rounded-full bg-kaist-darkgreen px-3 py-1.5 text-xs font-semibold text-kaist-white transition hover:bg-kaist-darkgreen2 disabled:cursor-not-allowed disabled:bg-kaist-grey"
-                            >
-                              {alreadyMember ? "이미 멤버" : memberSavingUserId === user.userId ? "추가 중" : "추가"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-extrabold tracking-tight">
-                현재 활성 권한
-              </h2>
-              <p className="mt-1 text-sm text-kaist-grey">
-                세션에 부여된 권한만 표시합니다.
-              </p>
-            </div>
-            <div className="rounded-full bg-kaist-darkgreen/6 px-4 py-2 text-sm font-semibold text-kaist-darkgreen">
-              {grantedPermissions.length}개 활성
-            </div>
-          </div>
-
-          {loading ? (
-            <p className="mt-6 text-sm text-kaist-grey">불러오는 중…</p>
-          ) : grantedPermissions.length === 0 ? (
-            <p className="mt-6 text-sm text-kaist-grey">
-              현재 세션에는 활성화된 권한이 없습니다.
-            </p>
-          ) : (
-            <div className="mt-6 flex flex-wrap gap-3">
-              {grantedPermissions.map((item) => (
-                <span
-                  key={item.code}
-                  className="rounded-full border border-kaist-darkgreen/20 bg-kaist-darkgreen/5 px-4 py-2 text-sm font-semibold text-kaist-darkgreen"
-                >
-                  {item.labelKo}
-                </span>
-              ))}
-            </div>
-          )}
-        </section>
         </main>
-      </AuthGuard>
+      </div>
+    </AuthGuard>
   );
 }

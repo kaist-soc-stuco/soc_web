@@ -61,6 +61,9 @@ export const surveys = pgTable("survey", {
     .default("NONE"), // NONE, PAID_ONLY 등 (feat/form의 feePayersOnly 대체)
 
   allowGuestResponse: boolean("allow_guest_response").notNull().default(false),
+  allowMultipleResponses: boolean("allow_multiple_responses").notNull().default(false),
+  isKoreanOnly: boolean("is_korean_only").notNull().default(false),
+  isPublished: boolean("is_published").notNull().default(false),
   resultVisibility: varchar("result_visibility", { length: 20 }).notNull(), // PUBLIC, PRIVATE 등
   maxResponseCount: integer("max_response_count"), // 정원 제한
   openAt: timestamp("open_at", { withTimezone: true }),
@@ -82,9 +85,7 @@ export const permissions = pgTable("permission", {
 
 export const roleGroups = pgTable("role_group", {
   roleGroupId: serial("role_group_id").primaryKey(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
-  nameKo: varchar("name_ko", { length: 100 }).notNull(),
-  nameEn: varchar("name_en", { length: 100 }),
+  nameKo: varchar("name_ko", { length: 100 }).notNull().unique(),
   description: text("description"),
   isSystem: boolean("is_system").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -210,6 +211,7 @@ export const articles = pgTable("article", {
   isPinned: boolean("is_pinned").notNull().default(false),
   pinOrder: integer("pin_order"),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
+  viewCount: integer("view_count").notNull().default(0),
   postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -316,4 +318,28 @@ export const auditLogs = pgTable("audit_log", {
   payload: text("payload"),
   ipAddress: varchar("ip_address", { length: 45 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const executiveContacts = pgTable("executive_contact", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  nameKo: varchar("name_ko", { length: 100 }).notNull(),
+  nameEn: varchar("name_en", { length: 100 }),
+  roleKo: varchar("role_ko", { length: 100 }).notNull(),
+  roleEn: varchar("role_en", { length: 100 }),
+  email: varchar("email", { length: 255 }),
+  phoneNumber: varchar("phone_number", { length: 50 }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const bulkEmails = pgTable("bulk_email", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  senderId: uuid("sender_id")
+    .references(() => users.userId, { onDelete: "set null" }),
+  recipientCount: integer("recipient_count").notNull(),
+  status: varchar("status", { length: 20 }).notNull(), // 'SUCCESS' | 'FAILED'
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
 });

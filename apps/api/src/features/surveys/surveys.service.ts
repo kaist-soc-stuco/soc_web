@@ -1,16 +1,18 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { isoToMs, isExpired, nowMs, nowIso } from "@soc/shared";
+import { Permissions } from "@soc/contracts";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
+import { SurveyResponsesRepository } from "./survey-responses.repository";
 
 import type { SurveyRecordWithState } from "./entities/survey.entity";
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateSurveyDto } from "./dto/create-survey.dto";
 import type { UpdateSurveyDto } from "./dto/update-survey.dto";
-import type { ComputedSurveyState, SurveyDetailResponse } from "@soc/contracts";
+import type { ComputedSurveyState, SurveyDetailResponse, SurveyStatus } from "@soc/contracts";
 
 @Injectable()
 export class SurveysService {
@@ -18,49 +20,54 @@ export class SurveysService {
     private readonly surveysRepo: SurveysRepository,
     private readonly sectionsRepo: SurveySectionsRepository,
     private readonly questionsRepo: SurveyQuestionsRepository,
+    private readonly responsesRepo: SurveyResponsesRepository,
   ) {}
 
-  private computeState(survey: {
-    status: string;
+  private computeStatusAndState(survey: {
+    isPublished: boolean;
     opensAt: string | null;
     closesAt: string | null;
-  }): ComputedSurveyState {
-    const now = nowMs();
-    const status = survey.status.toLowerCase();
+  }): { status: SurveyStatus; computedState: ComputedSurveyState } {
+    if (!survey.isPublished) {
+      return { status: "draft", computedState: "closed" };
+    }
 
-    // 1. 기간 기반 체크
+    const now = nowMs();
+
     if (survey.opensAt && isoToMs(survey.opensAt) > now) {
-      return "before_open";
+      return { status: "scheduled", computedState: "before_open" };
     }
     if (survey.closesAt && isoToMs(survey.closesAt) <= now) {
-      return "closed";
+      return { status: "closed", computedState: "closed" };
     }
 
-    // 2. 상태 기반 체크
-    if (status === "open") return "open";
-    if (status === "scheduled") {
-      // scheduled는 기간 내에 있으면 open으로 간주
-      if (survey.opensAt && isoToMs(survey.opensAt) <= now) {
-        return "open";
-      }
-      return "before_open";
-    }
-
-    return "closed";
+    return { status: "open", computedState: "open" };
   }
 
   async findAll(): Promise<SurveyRecordWithState[]> {
     const surveys = await this.surveysRepo.findAll();
-    return surveys.map((s) => ({ ...s, computedState: this.computeState(s) }));
+    return surveys.map((s) => {
+      const { status, computedState } = this.computeStatusAndState(s);
+      return { ...s, status, computedState };
+    });
+  }
+
+  async findPublished(): Promise<SurveyRecordWithState[]> {
+    const surveys = await this.surveysRepo.findPublished();
+    return surveys.map((s) => {
+      const { status, computedState } = this.computeStatusAndState(s);
+      return { ...s, status, computedState };
+    });
   }
 
   async findById(id: string): Promise<SurveyRecordWithState> {
     const survey = await this.surveysRepo.findById(id);
     if (!survey) throw new NotFoundException("survey_not_found");
-    return { ...survey, computedState: this.computeState(survey) };
+    const { status, computedState } = this.computeStatusAndState(survey);
+    return { ...survey, status, computedState };
   }
 
-  async findDetail(id: string): Promise<SurveyDetailResponse> {
+  async findDetail(id: string, callerId?: string): Promise<SurveyDetailResponse> {
     const survey = await this.findById(id);
     const sections = await this.sectionsRepo.findBySurveyId(id);
 
@@ -71,12 +78,17 @@ export class SurveysService {
       }),
     );
 
-    return { ...survey, sections: sectionsWithQuestions };
+    const hasSubmitted = callerId
+      ? !!(await this.responsesRepo.findByUserAndSurvey(id, callerId))
+      : false;
+
+    return { ...survey, sections: sectionsWithQuestions, hasSubmitted };
   }
 
   async create(creatorId: string, dto: CreateSurveyDto): Promise<SurveyRecordWithState> {
     const survey = await this.surveysRepo.insert(creatorId, dto);
-    return { ...survey, computedState: this.computeState(survey) };
+    const { status, computedState } = this.computeStatusAndState(survey);
+    return { ...survey, status, computedState, responseCount: 0 };
   }
 
   async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecordWithState> {
@@ -84,19 +96,70 @@ export class SurveysService {
     if (!current) throw new NotFoundException("survey_not_found");
 
     let publishedAt: string | undefined;
-    if ((dto.status === "open" || dto.status === "scheduled") && !current.publishedAt) {
+    if (dto.isPublished === true && !current.isPublished && !current.publishedAt) {
       publishedAt = nowIso();
     }
 
     const survey = await this.surveysRepo.update(id, dto, publishedAt);
     if (!survey) throw new NotFoundException("survey_not_found");
-    return { ...survey, computedState: this.computeState(survey) };
+    const { status, computedState } = this.computeStatusAndState(survey);
+    return { ...survey, status, computedState, responseCount: current.responseCount ?? 0 };
   }
 
   async delete(id: string): Promise<void> {
     const survey = await this.surveysRepo.findById(id);
     if (!survey) throw new NotFoundException("survey_not_found");
     await this.surveysRepo.delete(id);
+  }
+
+  async duplicate(id: string, creatorId: string): Promise<SurveyRecordWithState> {
+    const original = await this.findDetail(id);
+
+    const newSurvey = await this.surveysRepo.insert(creatorId, {
+      kind: original.kind,
+      titleKo: `${original.titleKo} (복사본)`,
+      titleEn: original.titleEn ? `${original.titleEn} (Copy)` : undefined,
+      descriptionKo: original.descriptionKo ?? undefined,
+      descriptionEn: original.descriptionEn ?? undefined,
+      feeRequirementPolicy: original.feePayersOnly ? "PAID_ONLY" : "NONE",
+      allowGuestResponse: original.allowAnonymous,
+      allowMultipleResponses: original.allowMultipleResponses,
+      isKoreanOnly: original.isKoreanOnly,
+      isPublished: false,
+      resultVisibility: original.resultVisibility,
+      maxResponseCount: original.maxResponses ?? undefined,
+      openAt: original.opensAt ?? undefined,
+      closeAt: original.closesAt ?? undefined,
+      connectedArticleId: original.connectedPostId ?? undefined,
+    });
+
+    for (const section of original.sections) {
+      const newSection = await this.sectionsRepo.insert(newSurvey.id, {
+        titleKo: section.titleKo,
+        titleEn: section.titleEn ?? undefined,
+        descriptionKo: section.descriptionKo ?? undefined,
+        descriptionEn: section.descriptionEn ?? undefined,
+        sortOrder: section.sortOrder,
+      });
+
+      for (const question of section.questions) {
+        await this.questionsRepo.insert(newSection.id, {
+          titleKo: question.titleKo,
+          titleEn: question.titleEn ?? undefined,
+          descriptionKo: question.descriptionKo ?? undefined,
+          descriptionEn: question.descriptionEn ?? undefined,
+          questionType: question.questionType,
+          options: question.options ?? undefined,
+          answerRegex: question.answerRegex ?? undefined,
+          isRequired: question.isRequired,
+          editDeadlineAt: question.editDeadlineAt ?? undefined,
+          sortOrder: question.sortOrder,
+        });
+      }
+    }
+
+    const { status, computedState } = this.computeStatusAndState(newSurvey);
+    return { ...newSurvey, status, computedState, responseCount: 0 };
   }
 
   async findSectionWithQuestions(
@@ -107,5 +170,121 @@ export class SurveysService {
     if (!section) throw new NotFoundException("section_not_found");
     const questions = await this.questionsRepo.findBySectionId(sectionId);
     return { ...section, questions };
+  }
+
+  async getAnalytics(
+    surveyId: string,
+    caller?: { id: string; permission: number },
+  ) {
+    const survey = await this.findById(surveyId);
+    if (!survey) throw new NotFoundException("survey_not_found");
+
+    const hasAdminPermission =
+      caller && Permissions.has(caller.permission, Permissions.MANAGE_SURVEY);
+
+    if (survey.resultVisibility !== "PUBLIC" && !hasAdminPermission) {
+      throw new ForbiddenException("analytics_access_forbidden");
+    }
+
+    const responses = await this.responsesRepo.findBySurveyId(surveyId);
+    const submittedResponses = responses.filter((r) => r.status !== "draft");
+    const totalResponses = submittedResponses.length;
+
+    const sections = await this.sectionsRepo.findBySurveyId(surveyId);
+    const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);
+
+    const questionsAnalytics = await Promise.all(
+      sections.map(async (section) => {
+        const questions = await this.questionsRepo.findBySectionId(section.id);
+        return Promise.all(
+          questions.map(async (q) => {
+            const questionAnswers = answers.filter((a) => a.questionId === q.id);
+            const totalAnswers = questionAnswers.length;
+
+            const isChoice =
+              q.questionType === "single_choice" ||
+              q.questionType === "multiple_choice" ||
+              q.questionType === "dropdown";
+
+            if (isChoice) {
+              const options = (q.options as Array<{
+                value: string;
+                labelKo: string;
+                labelEn?: string;
+              }>) || [];
+
+              const choiceCounts: Record<string, number> = {};
+              for (const opt of options) {
+                choiceCounts[opt.value] = 0;
+              }
+
+              for (const ans of questionAnswers) {
+                const content = ans.content as Record<string, unknown>;
+                if (q.questionType === "multiple_choice") {
+                  const values = (content.values as string[]) || [];
+                  for (const val of values) {
+                    choiceCounts[val] = (choiceCounts[val] ?? 0) + 1;
+                  }
+                } else {
+                  const val = content.value as string;
+                  if (val !== undefined) {
+                    choiceCounts[val] = (choiceCounts[val] ?? 0) + 1;
+                  }
+                }
+              }
+
+              const choices = options.map((opt) => {
+                const count = choiceCounts[opt.value] ?? 0;
+                const percentage =
+                  totalAnswers > 0 ? (count / totalAnswers) * 100 : 0;
+                return {
+                  value: opt.value,
+                  labelKo: opt.labelKo,
+                  labelEn: opt.labelEn || null,
+                  count,
+                  percentage: Math.round(percentage * 10) / 10,
+                };
+              });
+
+              return {
+                questionId: q.id,
+                questionType: q.questionType,
+                titleKo: q.titleKo,
+                titleEn: q.titleEn,
+                totalAnswers,
+                choices,
+              };
+            } else {
+              const texts = questionAnswers.map((ans) => {
+                const content = ans.content as Record<string, unknown>;
+                if ("text" in content) return String(content.text);
+                if ("value" in content) return String(content.value);
+                if ("date" in content) return String(content.date);
+                if ("time" in content) return String(content.time);
+                if ("datetime" in content) return String(content.datetime);
+                return JSON.stringify(content);
+              });
+
+              return {
+                questionId: q.id,
+                questionType: q.questionType,
+                titleKo: q.titleKo,
+                titleEn: q.titleEn,
+                totalAnswers,
+                texts,
+              };
+            }
+          }),
+        );
+      }),
+    );
+
+    return {
+      surveyId: survey.id,
+      titleKo: survey.titleKo,
+      titleEn: survey.titleEn,
+      totalResponses,
+      questions: questionsAnalytics.flat(2),
+    };
   }
 }

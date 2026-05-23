@@ -140,6 +140,8 @@ export interface AuthSessionSummary {
   storageMode: StorageMode | null;
   userId?: string;
   userName?: string;
+  nameKo?: string;
+  nameEn?: string | null;
 }
 
 /**
@@ -152,5 +154,14 @@ export interface CurrentUserSummary {
     id: string;
     name?: string;
     permission: number;
+    email: string;
+    nameKo: string;
+    nameEn: string | null;
+    userMobile: string | null;
+    studentNumber: string | null;
+    departmentKo: string | null;
+    departmentEn: string | null;
+    academicStatus: string | null;
+    identityCode: string | null;
   };
 }

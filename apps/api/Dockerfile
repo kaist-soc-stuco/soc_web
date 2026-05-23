@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -17,8 +17,9 @@ RUN pnpm install --filter @soc/api... --no-frozen-lockfile
 COPY apps/api apps/api
 COPY shared/contracts shared/contracts
 COPY shared/common shared/common
-COPY shared/contracts shared/contracts
 COPY shared/config shared/config
+
+RUN pnpm --filter @soc/contracts build
 
 WORKDIR /app/apps/api
 

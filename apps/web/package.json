@@ -11,8 +11,8 @@
     "test": "echo 'no tests yet'"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-slot": "^1.2.4",
-    "@hookform/resolvers": "^3.10.0",
     "@soc/api-client": "workspace:*",
     "@soc/contracts": "workspace:*",
     "@soc/shared": "workspace:*",

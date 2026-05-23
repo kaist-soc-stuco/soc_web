@@ -12,6 +12,7 @@ import {
 import { createEmptyAuthSession } from "@/lib/auth-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useCurrentSession } from "@/hooks/use-current-session";
+import { maskUuid } from "@/lib/utils";
 
 const stripTrailingSlashes = (value: string): string =>
   value.replace(/\/+$/, "");
@@ -496,13 +497,16 @@ export function TreeLogin() {
               <p>status: {status ?? "없음"}</p>
               <p>message: {resultMessage}</p>
               <p>reason: {reason ?? "없음"}</p>
-              <p>resultToken: {resultToken ?? "없음"}</p>
+              <p>resultToken: {resultToken ? maskUuid(resultToken) : "없음"}</p>
               <p>errorCode: {errorCode ?? "없음"}</p>
-              <p>userId: {userId ?? "없음"}</p>
+              <p>userId: {userId ? maskUuid(userId) : "없음"}</p>
               <p>storageMode: {storageMode ?? "없음"}</p>
               <p>
                 temporarySessionId:{" "}
-                {readStoredAuthState()?.temporarySession?.sessionId ?? "없음"}
+                {(() => {
+                  const sid = readStoredAuthState()?.temporarySession?.sessionId;
+                  return sid ? maskUuid(sid) : "없음";
+                })()}
               </p>
             </div>
           </section>
@@ -533,7 +537,7 @@ export function TreeLogin() {
               requiresConsent:{" "}
               {String(sessionSummary?.requiresConsent ?? false)}
             </p>
-            <p>userId: {sessionSummary?.userId ?? "없음"}</p>
+            <p>userId: {sessionSummary?.userId ? maskUuid(sessionSummary.userId) : "없음"}</p>
           </div>
         </section>
 

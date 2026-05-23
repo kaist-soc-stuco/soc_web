@@ -390,12 +390,16 @@ export class AuthSessionService {
 
     let permission: number | undefined;
     let userName: string | undefined;
+    let nameKo: string | undefined;
+    let nameEn: string | null | undefined;
 
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
       if (user) {
         permission = await this.usersService.resolvePermissionBitmaskByUserId(user.userId);
         userName = user.nameKo;
+        nameKo = user.nameKo;
+        nameEn = user.nameEn;
       }
     }
 
@@ -407,6 +411,8 @@ export class AuthSessionService {
       storageMode: session.mode,
       userId: session.userId,
       userName,
+      nameKo,
+      nameEn,
     };
   }
 
@@ -441,6 +447,15 @@ export class AuthSessionService {
           name: user.nameKo,
           permission:
             await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
+          email: user.email,
+          nameKo: user.nameKo,
+          nameEn: user.nameEn,
+          userMobile: null,
+          studentNumber: user.stdNo,
+          departmentKo: user.departmentKo,
+          departmentEn: user.departmentEn,
+          academicStatus: user.academicStatus,
+          identityCode: user.identityCode,
         },
       };
     } catch {
