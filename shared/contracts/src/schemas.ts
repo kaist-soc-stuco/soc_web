@@ -76,9 +76,12 @@ export const CreateSurveySchema = z.object({
   titleEn: z.string().max(255).optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
-  status: z.string().max(20).optional(),
+  status: z.enum(["draft", "open", "closed"]).optional(),
   feeRequirementPolicy: z.string().max(20).optional(),
   allowGuestResponse: z.boolean().optional(),
+  allowMultipleResponses: z.boolean().optional(),
+  isKoreanOnly: z.boolean().optional(),
+  isPublished: z.boolean().optional(),
   resultVisibility: z.string().min(1).max(20),
   maxResponseCount: z.number().int().positive().nullable().optional(),
   openAt: z.string().optional(),
@@ -131,9 +134,7 @@ export const ReviewResponseSchema = z.object({
 // ─── Role Groups ─────────────────────────────────────────────────────────────
 
 export const CreateRoleGroupSchema = z.object({
-  code: z.string().min(1).max(50),
   nameKo: z.string().min(1).max(100),
-  nameEn: z.string().max(100).optional(),
   description: z.string().optional(),
   permissionIds: z.array(z.number().int().positive()),
 });
@@ -150,4 +151,26 @@ export const UpdateStudentFeeStatusSchema = z.object({
   status: z.enum(["PAID", "UNPAID"]),
   coverageSemesters: z.number().int().positive().optional(),
   note: z.string().nullable().optional(),
+});
+
+// ─── Executive Contacts ──────────────────────────────────────────────────────
+
+export const CreateContactSchema = z.object({
+  nameKo: z.string().min(1).max(100),
+  nameEn: z.string().max(100).nullable().optional(),
+  roleKo: z.string().min(1).max(100),
+  roleEn: z.string().max(100).nullable().optional(),
+  email: z.string().email().or(z.literal("")).nullable().optional(),
+  phoneNumber: z.string().max(50).nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const UpdateContactSchema = CreateContactSchema.partial();
+
+// ─── Bulk Email ──────────────────────────────────────────────────────────────
+
+export const SendBulkEmailSchema = z.object({
+  subject: z.string().min(1).max(255),
+  content: z.string().min(1),
+  recipientType: z.enum(["ALL", "PAID_STUDENTS", "UNPAID_STUDENTS"]),
 });

@@ -138,78 +138,55 @@ export function FeeManagementPage() {
 
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_FINANCE}>
-      <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black">
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-10 md:px-8">
-        <section className="overflow-hidden rounded-3xl border border-kaist-darkgreen/10 bg-white shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
-          <div className="grid gap-6 p-6 md:grid-cols-[1.25fr_0.95fr] md:p-8">
-            <div className="space-y-4">
-              <p className="text-xs font-extrabold uppercase tracking-[0.28em] text-kaist-greygreen">
-                Fee Console
+      <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
+        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
+          
+          {/* Compact Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 pb-5 gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">과비 관리</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                학생별 과비 납부 상태를 한 화면에서 확인하고 바로 수정합니다.
               </p>
-              <h1 className="text-3xl font-black tracking-tight md:text-4xl">
-                과비 관리
-              </h1>
-              <p className="max-w-2xl text-sm leading-7 text-kaist-grey md:text-base">
-                학생별 과비 납부 상태를 한 화면에서 확인하고, 필요할 때 바로 수정할 수 있습니다.
-              </p>
-              <div className="flex flex-wrap gap-3 pt-2 text-sm font-semibold text-kaist-darkgreen/80">
-                <span className="rounded-full bg-kaist-darkgreen/6 px-4 py-2">전체 {totalCount}명</span>
-                <span className="rounded-full bg-green-50 px-4 py-2 text-green-700">납부 완료 {paidCount}명</span>
-                <span className="rounded-full bg-red-50 px-4 py-2 text-red-700">미납부 {unpaidCount}명</span>
-              </div>
             </div>
-
-            <div className="grid gap-3 rounded-2xl bg-kaist-darkgreen/5 p-5 md:p-6">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-kaist-greygreen">
-                  Filter
-                </p>
-                <p className="mt-2 text-lg font-extrabold">
-                  {selectedStatus ? getStatusLabel(selectedStatus) : '전체 보기'}
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {([
-                  { key: undefined, label: '전체' },
-                  { key: 'UNPAID', label: '미납부' },
-                  { key: 'PAID', label: '납부 완료' },
-                ] as Array<{ key: FeeStatus | undefined; label: string }>).map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => {
-                      setSelectedStatus(item.key);
-                      setCurrentPage(1);
-                    }}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm font-bold transition ${
-                      selectedStatus === item.key
-                        ? 'border-kaist-darkgreen bg-kaist-darkgreen text-white shadow-lg shadow-kaist-darkgreen/20'
-                        : 'border-kaist-darkgreen/10 bg-white text-kaist-black hover:border-kaist-darkgreen/30 hover:bg-kaist-darkgreen/5'
-                    }`}
-                  >
-                    <span className="block text-xs uppercase tracking-[0.2em] opacity-70">
-                      Status
-                    </span>
-                    <span className="mt-1 block">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
-                    Page
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-kaist-black">
-                    {currentPage} / {Math.max(1, Math.ceil(totalCount / pageSize))}
-                  </p>
-                </div>
-                <Button variant="outline" onClick={loadData}>
-                  새로고침
-                </Button>
-              </div>
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-gray-700">전체 {totalCount}명</span>
+              <span className="rounded-lg bg-green-50 px-3 py-1.5 text-green-700">납부 완료 {paidCount}명</span>
+              <span className="rounded-lg bg-red-50 px-3 py-1.5 text-red-700">미납부 {unpaidCount}명</span>
             </div>
           </div>
-        </section>
+
+          {/* Filters and Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-gray-200 p-4 rounded-xl shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-gray-500 mr-2">필터:</span>
+              {([
+                { key: undefined, label: '전체' },
+                { key: 'UNPAID', label: '미납부' },
+                { key: 'PAID', label: '납부 완료' },
+              ] as Array<{ key: FeeStatus | undefined; label: string }>).map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setSelectedStatus(item.key);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
+                    selectedStatus === item.key
+                      ? 'border-kaist-darkgreen bg-kaist-darkgreen text-white shadow-xs'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 text-sm font-medium text-gray-500">
+              <span>페이지: {currentPage} / {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
+              <Button variant="outline" size="sm" onClick={loadData}>새로고침</Button>
+            </div>
+          </div>
 
         <section className="overflow-hidden rounded-3xl border border-kaist-darkgreen/10 bg-white shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
           <div className="border-b border-kaist-darkgreen/10 px-6 py-4 md:px-8">

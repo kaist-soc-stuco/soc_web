@@ -14,6 +14,8 @@ import { RedisModule } from './infrastructure/redis/redis.module';
 import { validateEnv } from './shared/config/env.validation';
 import { BoardModule } from "./features/board/board.module";
 import { AssetModule } from "./features/asset/asset.module";
+import { ContactsModule } from "./features/contacts/contacts.module";
+import { BulkEmailModule } from "./features/email/bulk-email.module";
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { AssetModule } from "./features/asset/asset.module";
     BoardModule,
     UsersModule,
     SurveysModule,
+    ContactsModule,
+    BulkEmailModule,
     RoleGroupsModule,
     HealthModule,
     MockModule,

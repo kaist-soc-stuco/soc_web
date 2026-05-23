@@ -7,16 +7,8 @@ import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { BoardDebugPanel } from '@/components/organisms/board-debug-panel';
-
-interface BoardPost {
-  id: number;
-  category: string;
-  title: string;
-  author: string;
-  date: string;
-  views: number;
-}
+import { useLanguage } from "@/hooks/use-language";
+import { PageHero } from "@/components/organisms/page-hero";
 
 interface Event {
   id: number;
@@ -46,14 +38,24 @@ const BOARD_WRITE_PERMISSION: Record<BoardType, number> = {
   QnA: 16,
 };
 
-const BOARD_INFO: Record<string, { description: string }> = {
-  공지: { description: "학생회 및 학교의 중요한 공지사항을 확인하세요" },
-  행사: { description: "전산학부의 다양한 행사 정보를 확인하세요" },
-  HoC: { description: "Hall of Code 프로젝트 및 활동 내역" },
-  홍보글: { description: "학생회 및 학회의 홍보 게시물" },
-  건의사항: { description: "학생들의 의견과 건의사항을 나눠주세요" },
-  연구실: { description: "각 연구실의 소식과 공지사항" },
-  QnA: { description: "궁금한 점을 자유롭게 질문하세요" },
+const BOARD_INFO: Record<string, { descriptionKo: string; descriptionEn: string }> = {
+  공지: { descriptionKo: "학생회 및 학교의 중요한 공지사항을 확인하세요", descriptionEn: "Check out important notices from the Student Council and school" },
+  행사: { descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요", descriptionEn: "Discover various events organized by the School of Computing" },
+  HoC: { descriptionKo: "Hall of Code 프로젝트 및 활동 내역", descriptionEn: "Hall of Code projects and activity logs" },
+  홍보글: { descriptionKo: "학생회 및 학회의 홍보 게시물", descriptionEn: "Promotional posts from the Student Council and societies" },
+  건의사항: { descriptionKo: "학생들의 의견과 건의사항을 나눠주세요", descriptionEn: "Share your opinions and suggestions with us" },
+  연구실: { descriptionKo: "각 연구실의 소식과 공지사항", descriptionEn: "News and announcements from research labs" },
+  QnA: { descriptionKo: "궁금한 점을 자유롭게 질문하세요", descriptionEn: "Ask questions and get answers freely" },
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  공지: "Notice",
+  행사: "Event",
+  HoC: "HoC",
+  홍보글: "Promo",
+  건의사항: "Suggestions",
+  연구실: "Labs",
+  QnA: "QnA",
 };
 
 export function BoardPage() {
@@ -66,6 +68,7 @@ export function BoardPage() {
   );
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const { lang } = useLanguage();
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -73,14 +76,6 @@ export function BoardPage() {
   );
 
   const postsPerPage = 10;
-
-  // TODO: MySQL에서 진행중인 행사 가져오기
-  const ongoingEvents: Event[] = [
-    { id: 1, title: "전산학부 간식 이벤트", date: "03.10", image: "/temp.png" },
-    { id: 2, title: "HoC 프로젝트 발표", date: "03.15", image: "/temp.png" },
-    { id: 3, title: "학생회 총회", date: "03.20", image: "/temp.png" },
-  ];
-
   const totalPages = Math.ceil(totalCount / postsPerPage);
 
   const handlePageChange = (page: number) => {
@@ -152,17 +147,12 @@ export function BoardPage() {
       <Header showLogo={true} />
 
       <main className="flex-1 w-full mx-auto">
-        {/* Banner */}
-        <div className="bg-linear-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-8">
-          <div className="max-w-7xl mx-auto">
-            <h1 className="text-4xl font-extrabold tracking-tight text-kaist-white mb-2">
-              {category} 게시판
-            </h1>
-            <p className="text-base font-medium tracking-tight text-kaist-white/90">
-              {BOARD_INFO[category]?.description || ""}
-            </p>
-          </div>
-        </div>
+        <PageHero
+          title={lang === "ko" ? `${category} 게시판` : `${CATEGORY_LABELS[category] || category} Board`}
+          description={lang === "ko"
+            ? (BOARD_INFO[category]?.descriptionKo || "")
+            : (BOARD_INFO[category]?.descriptionEn || "")}
+        />
 
         {/* Board Tabs */}
         <div className="border-b-2 border-kaist-grey/30 bg-kaist-white">
@@ -183,7 +173,9 @@ export function BoardPage() {
                         : "text-kaist-greygreen hover:text-kaist-darkgreen"
                         }`}
                     >
-                      <span className="py-4">{board}</span>
+                      <span className="py-4">
+                        {lang === "ko" ? board : (CATEGORY_LABELS[board] || board)}
+                      </span>
                       <span
                         className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${category === board
                           ? "scale-x-100"
@@ -199,17 +191,17 @@ export function BoardPage() {
 
               {/* Search */}
               <div className="flex items-center">
-                <div className="relative">
+                <div className="relative ml-2 md:ml-4">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-kaist-grey" />
                   <input
                     type="text"
-                    placeholder="검색..."
+                    placeholder={lang === "ko" ? "검색..." : "Search..."}
                     value={searchQuery}
                     onChange={(e) => {
                       setCurrentPage(1);
                       setSearchQuery(e.target.value);
                     }}
-                    className="pl-9 pr-4 py-2 w-72 border-b border-kaist-grey/30 text-sm font-medium tracking-tight focus:outline-none focus:border-kaist-darkgreen transition-colors"
+                    className="pl-10 pr-4 py-2.5 w-72 rounded-lg border border-kaist-grey/35 bg-white text-sm font-medium tracking-tight text-kaist-black shadow-sm focus:outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10 transition-colors"
                   />
                 </div>
               </div>
@@ -220,16 +212,16 @@ export function BoardPage() {
         {/* Main Content */}
         <div className="max-w-7xl mx-auto pb-16">
           <div className="flex gap-6">
-            {/* Board List - 5/6 width */}
-            <div className="flex-5">
+            {/* Board List */}
+            <div className="flex-1">
               {/* Table Header */}
               <div className="grid grid-cols-12 gap-4 py-4 bg-kaist-white border-b-2 border-kaist-darkgreen-main font-extrabold text-sm tracking-tight text-kaist-darkgreen">
-                <div className="col-span-1 text-center">번호</div>
-                <div className="col-span-1 text-center">분류</div>
-                <div className="col-span-7 text-center">제목</div>
-                <div className="col-span-1 text-center">글쓴이</div>
-                <div className="col-span-1 text-center">작성일</div>
-                <div className="col-span-1 text-center">댓글</div>
+                <div className="col-span-1 text-center">{lang === "ko" ? "번호" : "No."}</div>
+                <div className="col-span-1 text-center">{lang === "ko" ? "분류" : "Category"}</div>
+                <div className="col-span-7 text-center">{lang === "ko" ? "제목" : "Title"}</div>
+                <div className="col-span-1 text-center">{lang === "ko" ? "글쓴이" : "Author"}</div>
+                <div className="col-span-1 text-center">{lang === "ko" ? "작성일" : "Date"}</div>
+                <div className="col-span-1 text-center">{lang === "ko" ? "댓글" : "Replies"}</div>
               </div>
 
               {/* Table Body */}
@@ -239,33 +231,33 @@ export function BoardPage() {
                     <Link
                       key={post.articleId}
                       to={`/board/${category}/${post.articleId}`}
-                      className="grid grid-cols-12 gap-4 py-4 hover:bg-kaist-grey/5 transition-colors group"
+                      className="grid grid-cols-12 gap-4 py-4 px-3 rounded-2xl transition-colors group hover:bg-kaist-darkgreen/5"
                     >
                       <div className="col-span-1 grid place-content-center text-center text-sm font-semibold text-kaist-grey">
                         {post.articleId}
                       </div>
                       <div className="col-span-1 text-center">
-                        <span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-semibold tracking-tight">
-                          {category}
+                        <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold tracking-tight bg-kaist-darkgreen text-kaist-white">
+                          {lang === "ko" ? category : (CATEGORY_LABELS[category] || category)}
                         </span>
                       </div>
-                      <div className="col-span-7 flex ml-8 items-center text-left text-sm font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
-                        {post.titleKo}
+                      <div className="col-span-7 flex ml-8 items-center text-left text-sm font-bold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
+                        <span className="truncate">{lang === "ko" ? post.titleKo : (post.titleEn || post.titleKo)}</span>
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-sm font-semibold tracking-tight text-kaist-black">
-                        {post.isAnonymous ? "익명" : post.author.name}
+                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium tracking-tight text-kaist-grey/80">
+                        {post.isAnonymous ? (lang === "ko" ? "익명" : "Anonymous") : post.author.name}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey/70">
                         {new Date(post.postedAt).toLocaleDateString()}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey/70">
                         {post.commentCount}
                       </div>
                     </Link>
                   ))
                 ) : (
                   <div className="py-20 text-center text-kaist-grey">
-                    <p className="text-base font-semibold">게시글이 없습니다</p>
+                    <p className="text-base font-semibold">{lang === "ko" ? "게시글이 없습니다" : "No posts available"}</p>
                   </div>
                 )}
               </div>
@@ -319,18 +311,15 @@ export function BoardPage() {
                     to={`/board/${category}/write`}
                     className="absolute right-0 px-6 py-2 bg-kaist-white border border-kaist-darkgreen text-kaist-darkgreen rounded-sm text-sm font-extrabold tracking-tight hover:bg-kaist-darkgreen hover:text-kaist-white transition-colors"
                   >
-                    글쓰기
+                    {lang === "ko" ? "글쓰기" : "Write"}
                   </Link>
                 )}
               </div>
             </div>
           </div>
-
-          {/* <div className="max-w-7xl mx-auto px-4 pb-16">
-            <BoardDebugPanel defaultBoardCode={category} />
-          </div> */}
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

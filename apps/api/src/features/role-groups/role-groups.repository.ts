@@ -72,15 +72,12 @@ export class RoleGroupsRepository {
       permissionId: row.permissionId,
     }));
   }
-
   async listRoleGroups(): Promise<RoleGroupRecord[]> {
     const rows = await this.db
       .select({
-        code: roleGroups.code,
         createdAt: roleGroups.createdAt,
         description: roleGroups.description,
         isSystem: roleGroups.isSystem,
-        nameEn: roleGroups.nameEn,
         nameKo: roleGroups.nameKo,
         permissionBitValue: permissions.bitValue,
         permissionId: permissions.permissionId,
@@ -93,7 +90,7 @@ export class RoleGroupsRepository {
         eq(roleGroups.roleGroupId, roleGroupPermissions.roleGroupId),
       )
       .leftJoin(permissions, eq(roleGroupPermissions.permissionId, permissions.permissionId))
-      .orderBy(asc(roleGroups.code), asc(permissions.bitValue));
+      .orderBy(asc(roleGroups.roleGroupId), asc(permissions.bitValue));
 
     const userCountRows = await this.db
       .select({
@@ -113,11 +110,9 @@ export class RoleGroupsRepository {
     for (const row of rows) {
       if (!grouped.has(row.roleGroupId)) {
         grouped.set(row.roleGroupId, {
-          code: row.code,
           createdAt: msToIso(row.createdAt.valueOf()),
           description: row.description,
           isSystem: row.isSystem,
-          nameEn: row.nameEn,
           nameKo: row.nameKo,
           permissionIds: [],
           permissionMask: 0,
@@ -137,7 +132,7 @@ export class RoleGroupsRepository {
     }
 
     return [...grouped.values()].sort((left, right) =>
-      left.code.localeCompare(right.code),
+      left.roleGroupId - right.roleGroupId,
     );
   }
 
@@ -151,9 +146,7 @@ export class RoleGroupsRepository {
       const [row] = await tx
         .insert(roleGroups)
         .values({
-          code: input.code,
           description: input.description ?? null,
-          nameEn: input.nameEn ?? null,
           nameKo: input.nameKo,
         })
         .returning({ roleGroupId: roleGroups.roleGroupId });
@@ -182,9 +175,7 @@ export class RoleGroupsRepository {
       await tx
         .update(roleGroups)
         .set({
-          code: input.code,
           description: input.description ?? null,
-          nameEn: input.nameEn ?? null,
           nameKo: input.nameKo,
           updatedAt: now,
         })

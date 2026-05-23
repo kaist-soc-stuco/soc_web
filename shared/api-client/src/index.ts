@@ -51,6 +51,14 @@ import type {
   MyArticleListResponse,
   MyCommentListResponse,
   MySurveyResponseListResponse,
+  ContactRecord,
+  CreateContactRequest,
+  UpdateContactRequest,
+  ContactListResponse,
+  BulkEmailRecord,
+  SendBulkEmailRequest,
+  SendBulkEmailResponse,
+  BulkEmailListResponse,
 } from "@soc/contracts";
 
 export interface ApiClientOptions {
@@ -138,6 +146,26 @@ const resolveSurveyBaseUrl = (normalizedBaseUrl: string): string => {
   return `${normalizedBaseUrl}/v1/surveys`;
 };
 
+const resolveContactsBaseUrl = (normalizedBaseUrl: string): string => {
+  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/contacts`;
+  }
+  if (/\/api$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/contacts`;
+  }
+  return `${normalizedBaseUrl}/v1/contacts`;
+};
+
+const resolveEmailsBaseUrl = (normalizedBaseUrl: string): string => {
+  if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/admin/emails`;
+  }
+  if (/\/api$/i.test(normalizedBaseUrl)) {
+    return `${normalizedBaseUrl}/admin/emails`;
+  }
+  return `${normalizedBaseUrl}/v1/admin/emails`;
+};
+
 const resolveUsersBaseUrl = (normalizedBaseUrl: string): string => {
   if (/\/api\/v1$/i.test(normalizedBaseUrl) || /\/v1$/i.test(normalizedBaseUrl)) {
     return `${normalizedBaseUrl}/users`;
@@ -190,6 +218,8 @@ export const createApiClient = ({
   const normalizedBaseUrl = withNoTrailingSlash(baseUrl);
   const authBaseUrl = resolveAuthBaseUrl(normalizedBaseUrl);
   const surveyBaseUrl = resolveSurveyBaseUrl(normalizedBaseUrl);
+  const contactsBaseUrl = resolveContactsBaseUrl(normalizedBaseUrl);
+  const emailsBaseUrl = resolveEmailsBaseUrl(normalizedBaseUrl);
   const usersBaseUrl = resolveUsersBaseUrl(normalizedBaseUrl);
   const roleGroupsBaseUrl = resolveRoleGroupsBaseUrl(normalizedBaseUrl);
   let refreshInFlight: Promise<void> | null = null;
@@ -711,6 +741,12 @@ export const createApiClient = ({
       if (!res.ok) throw new ApiClientHttpError(res.status);
     },
 
+    duplicateSurvey: async (surveyId: string): Promise<SurveyRecord> => {
+      return requestJson<SurveyRecord>(`${surveyBaseUrl}/${surveyId}/duplicate`, {
+        method: "POST",
+      }, { retryOnUnauthorized: true });
+    },
+
     searchUsers: async (query?: string, limit = 20): Promise<AdminUserRecord[]> => {
       const params = new URLSearchParams();
       if (query?.trim()) {
@@ -883,6 +919,90 @@ export const createApiClient = ({
           body: JSON.stringify(body),
         },
         { retryOnUnauthorized: true },
+      );
+    },
+
+    listResponsesWithAnswers: async (surveyId: string): Promise<Array<SurveyResponseRecord & { answers: any[] }>> => {
+      return requestJson<Array<SurveyResponseRecord & { answers: any[] }>>(
+        `${surveyBaseUrl}/${surveyId}/responses/with-answers`,
+        { method: "GET" },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    getSurveyAnalytics: async (surveyId: string): Promise<any> => {
+      return requestJson<any>(
+        `${surveyBaseUrl}/${surveyId}/analytics`,
+        { method: "GET" },
+        { retryOnUnauthorized: true },
+      );
+    },
+
+    getPublicSurveys: async (): Promise<any[]> => {
+      return requestJson<any[]>(
+        `${surveyBaseUrl}/list/public`,
+        { method: "GET" }
+      );
+    },
+
+    getContacts: async (): Promise<ContactListResponse> => {
+      return requestJson<ContactListResponse>(
+        contactsBaseUrl,
+        { method: "GET" }
+      );
+    },
+
+    createContact: async (body: CreateContactRequest): Promise<ContactRecord> => {
+      return requestJson<ContactRecord>(
+        contactsBaseUrl,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true }
+      );
+    },
+
+    updateContact: async (id: string, body: UpdateContactRequest): Promise<ContactRecord> => {
+      return requestJson<ContactRecord>(
+        `${contactsBaseUrl}/${id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true }
+      );
+    },
+
+    deleteContact: async (id: string): Promise<{ success: boolean }> => {
+      return requestJson<{ success: boolean }>(
+        `${contactsBaseUrl}/${id}`,
+        {
+          method: "DELETE",
+        },
+        { retryOnUnauthorized: true }
+      );
+    },
+
+    sendBulkEmail: async (body: SendBulkEmailRequest): Promise<SendBulkEmailResponse> => {
+      return requestJson<SendBulkEmailResponse>(
+        `${emailsBaseUrl}/send`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        { retryOnUnauthorized: true }
+      );
+    },
+
+    getBulkEmailHistory: async (): Promise<BulkEmailListResponse> => {
+      return requestJson<BulkEmailListResponse>(
+        `${emailsBaseUrl}/history`,
+        { method: "GET" },
+        { retryOnUnauthorized: true }
       );
     },
   };

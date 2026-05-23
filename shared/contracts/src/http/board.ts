@@ -45,6 +45,7 @@ export interface ArticleListItem {
   author: ArticleAuthorSummary;
   isAnonymous: boolean;
   commentCount: number;
+  viewCount: number;
 }
 
 export interface ArticleListResponse {
@@ -95,7 +96,10 @@ export interface ArticleDetailResponse {
   isAnonymous: boolean;
   assets: ArticleAssetItem[];
   commentCount: number;
+  viewCount: number;
   survey?: SurveySummary | null;
+  prevArticle?: { articleId: string; titleKo: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
+  nextArticle?: { articleId: string; titleKo: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
 }
 
 export interface ArticleAssetRequest {

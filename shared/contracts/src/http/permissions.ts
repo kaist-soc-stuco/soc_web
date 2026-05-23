@@ -51,9 +51,7 @@ export interface RoleGroupMemberRecord {
 
 export interface RoleGroupRecord {
   roleGroupId: number;
-  code: string;
   nameKo: string;
-  nameEn: string | null;
   description: string | null;
   isSystem: boolean;
   createdAt: string;
@@ -64,17 +62,13 @@ export interface RoleGroupRecord {
 }
 
 export interface CreateRoleGroupRequest {
-  code: string;
   nameKo: string;
-  nameEn?: string;
   description?: string;
   permissionIds: number[];
 }
 
 export interface UpdateRoleGroupRequest {
-  code: string;
   nameKo: string;
-  nameEn?: string;
   description?: string;
   permissionIds: number[];
 }

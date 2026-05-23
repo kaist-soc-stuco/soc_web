@@ -13,7 +13,7 @@ import {
 import { CreateSurveySchema, UpdateSurveySchema } from "@soc/contracts";
 import { Request } from "express";
 
-import { RequirePermissions } from "../../shared/guards";
+import { RequirePermissions, OptionalAuthGuard } from "../../shared/guards";
 import { Permissions } from "@soc/contracts";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
@@ -35,9 +35,21 @@ export class SurveysController {
     return this.surveysService.findAll();
   }
 
+  @Get("list/public")
+  findPublic() {
+    return this.surveysService.findPublished();
+  }
+
   @Get(":id")
-  findDetail(@Param("id", ParseUUIDPipe) id: string) {
-    return this.surveysService.findDetail(id);
+  @UseGuards(OptionalAuthGuard)
+  findDetail(@Param("id", ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.surveysService.findDetail(id, req.user?.id);
+  }
+
+  @Get(":id/analytics")
+  @UseGuards(OptionalAuthGuard)
+  getAnalytics(@Param("id", ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.surveysService.getAnalytics(id, req.user);
   }
 
   @Post()
@@ -62,5 +74,14 @@ export class SurveysController {
   @RequirePermissions(Permissions.MANAGE_SURVEY)
   delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.surveysService.delete(id);
+  }
+
+  @Post(":id/duplicate")
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  duplicate(
+    @Req() req: AuthedRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.surveysService.duplicate(id, req.user.id);
   }
 }

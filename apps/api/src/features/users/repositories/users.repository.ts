@@ -123,6 +123,15 @@ export class UsersRepository {
     return found ? this.mapRowToUserRecord(found) : null;
   }
 
+  /** 이메일로 users 레코드를 조회합니다. */
+  async findByEmail(email: string): Promise<UserRecord | null> {
+    const found = await this.db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+
+    return found ? this.mapRowToUserRecord(found) : null;
+  }
+
   /** 내부 사용자 ID로 users 레코드를 조회합니다. */
   async findById(userId: string): Promise<UserRecord | null> {
     const found = await this.db.query.users.findFirst({
@@ -158,22 +167,7 @@ export class UsersRepository {
   /** KAIST UID 기준으로 사용자 정보를 생성/갱신합니다. */
   async upsertByKaistUid(input: UserUpsertInput): Promise<UserRecord> {
     const now = nowDate();
-    const insertValues: typeof users.$inferInsert = {
-      kaistUid: input.kaistUid,
-      nameKo: input.nameKo,
-      email: input.email,
-      lastLoginAt: input.lastLoginAt ?? now,
-      isActive: input.isActive ?? true,
-      nameEn: input.nameEn ?? null,
-      stdNo: input.stdNo ?? null,
-      departmentKo: input.departmentKo ?? null,
-      departmentEn: input.departmentEn ?? null,
-      academicStatus: input.academicStatus ?? null,
-      identityCode: input.identityCode ?? null,
-      privacyConsentAt: input.privacyConsentAt ?? null,
-    };
-
-    const updateSet: typeof users.$inferInsert = {
+    const updateSet: Partial<typeof users.$inferInsert> = {
       email: input.email,
       isActive: input.isActive ?? true,
       kaistUid: input.kaistUid,
@@ -199,16 +193,55 @@ export class UsersRepository {
         : {}),
     };
 
-    const upserted = await this.db
-      .insert(users)
-      .values(insertValues)
-      .onConflictDoUpdate({
-        target: users.kaistUid,
-        set: updateSet,
-      })
-      .returning();
+    return this.db.transaction(async (tx) => {
+      const existingByKaistUid = await tx.query.users.findFirst({
+        where: eq(users.kaistUid, input.kaistUid),
+      });
 
-    return this.mapRowToUserRecord(upserted[0]);
+      if (existingByKaistUid) {
+        const [updated] = await tx
+          .update(users)
+          .set(updateSet)
+          .where(eq(users.userId, existingByKaistUid.userId))
+          .returning();
+
+        return this.mapRowToUserRecord(updated);
+      }
+
+      const existingByEmail = await tx.query.users.findFirst({
+        where: eq(users.email, input.email),
+      });
+
+      if (existingByEmail) {
+        const [updated] = await tx
+          .update(users)
+          .set(updateSet)
+          .where(eq(users.userId, existingByEmail.userId))
+          .returning();
+
+        return this.mapRowToUserRecord(updated);
+      }
+
+      const [inserted] = await tx
+        .insert(users)
+        .values({
+          kaistUid: input.kaistUid,
+          nameKo: input.nameKo,
+          email: input.email,
+          lastLoginAt: input.lastLoginAt ?? now,
+          isActive: input.isActive ?? true,
+          nameEn: input.nameEn ?? null,
+          stdNo: input.stdNo ?? null,
+          departmentKo: input.departmentKo ?? null,
+          departmentEn: input.departmentEn ?? null,
+          academicStatus: input.academicStatus ?? null,
+          identityCode: input.identityCode ?? null,
+          privacyConsentAt: input.privacyConsentAt ?? null,
+        })
+        .returning();
+
+      return this.mapRowToUserRecord(inserted);
+    });
   }
 
   /** 이메일/휴대전화 필드만 선택적으로 갱신합니다. */
@@ -277,8 +310,6 @@ export class UsersRepository {
       ? or(
           ilike(users.nameKo, `%${normalizedQuery}%`),
           ilike(users.nameEn, `%${normalizedQuery}%`),
-          ilike(users.kaistUid, `%${normalizedQuery}%`),
-          ilike(users.email, `%${normalizedQuery}%`),
           ilike(users.stdNo, `%${normalizedQuery}%`),
         )
       : undefined;

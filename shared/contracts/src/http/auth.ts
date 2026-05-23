@@ -24,6 +24,8 @@ export interface LoginSessionResponse {
   storageMode: AuthStorageMode | null;
   userId?: string;
   userName?: string;
+  nameKo?: string;
+  nameEn?: string | null;
 }
 
 export interface CurrentUserResponse {
@@ -33,6 +35,15 @@ export interface CurrentUserResponse {
     id: string;
     name?: string;
     permission: number;
+    email: string;
+    nameKo: string;
+    nameEn: string | null;
+    userMobile: string | null;
+    studentNumber: string | null;
+    departmentKo: string | null;
+    departmentEn: string | null;
+    academicStatus: string | null;
+    identityCode: string | null;
   };
 }
 

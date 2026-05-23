@@ -1,33 +1,52 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
+import { resolveApiBaseUrl } from '@/lib/api';
 
 interface NoticeItemProps {
+  id: string;
   category: string;
   title: string;
   date: string;
 }
 
-function NoticeItem({ category, title, date }: NoticeItemProps) {
+function NoticeItem({ id, category, title, date }: NoticeItemProps) {
   return (
-    <div className="flex items-center justify-between py-[14px] gap-2">
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <span className="inline-flex items-center rounded-full bg-kaist-darkgreen px-2 py-0.5 text-xs font-semibold tracking-tight text-kaist-white flex-shrink-0">
-          {category}
-        </span>
-        <span className="text-sm font-semibold tracking-tight text-kaist-black truncate">
-          {title}
+    <Link
+      to={`/board/${category}/${id}`}
+      className="block hover:bg-kaist-lightgreen/10 transition-colors px-2 rounded-lg"
+    >
+      <div className="flex items-center justify-between py-[14px] gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="inline-flex items-center rounded-full bg-kaist-darkgreen px-2 py-0.5 text-xs font-semibold tracking-tight text-kaist-white flex-shrink-0">
+            {category}
+          </span>
+          <span className="text-sm font-semibold tracking-tight text-kaist-black truncate">
+            {title}
+          </span>
+        </div>
+        <span className="text-xs font-semibold tracking-tight text-kaist-grey flex-shrink-0">
+          {date}
         </span>
       </div>
-      <span className="text-xs font-semibold tracking-tight text-kaist-grey flex-shrink-0">
-        {date}
-      </span>
-    </div>
+    </Link>
   );
+}
+
+function formatDate(dateIso: string) {
+  const d = new Date(dateIso);
+  if (isNaN(d.getTime())) return "";
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}.${mm}.${dd}`;
 }
 
 export function NoticeBoard() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [notices, setNotices] = useState<Record<string, NoticeItemProps[]>>({});
+  const [loading, setLoading] = useState(false);
 
   const tabs = [
     { label: '공지' },
@@ -39,18 +58,39 @@ export function NoticeBoard() {
     { label: 'QnA' },
   ];
 
-  // TODO: MySQL에서 각 탭별 데이터 가져오기
-  const noticesByTab: Record<number, NoticeItemProps[]> = {
-    0: Array(5).fill({ category: '공지', title: '전산학부 홈페이지 완료 공지', date: '26.02.08' }),
-    1: Array(5).fill({ category: '행사', title: '전산학부 간식 이벤트', date: '26.03.01' }),
-    2: Array(5).fill({ category: 'HoC', title: 'Hall of Code 프로젝트', date: '26.02.28' }),
-    3: Array(5).fill({ category: '홍보글', title: '전산학부 홍보 내용', date: '26.02.25' }),
-    4: Array(5).fill({ category: '건의사항', title: '학생 건의사항 접수', date: '26.02.20' }),
-    5: Array(5).fill({ category: '연구실', title: '연구실 공지사항', date: '26.02.15' }),
-    6: Array(5).fill({ category: 'QnA', title: '자주 묻는 질문', date: '26.02.10' }),
-  };
+  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const activeCategory = tabs[activeTab].label;
+  const currentNotices = notices[activeCategory] || [];
 
-  const currentNotices = noticesByTab[activeTab] || [];
+  useEffect(() => {
+    let active = true;
+    const fetchNotices = async () => {
+      setLoading(true);
+      try {
+        const res = await apiClient.getArticles(activeCategory, { limit: 5 });
+        const items = res.items.map((item) => ({
+          id: item.articleId,
+          category: activeCategory,
+          title: item.titleKo,
+          date: formatDate(item.postedAt),
+        }));
+        if (active) {
+          setNotices((prev) => ({ ...prev, [activeCategory]: items }));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Fetch notice list only if not cached yet
+    if (!notices[activeCategory]) {
+      void fetchNotices();
+    }
+  }, [activeCategory, notices, apiClient]);
 
   return (
     <section className="bg-kaist-white">
@@ -67,7 +107,7 @@ export function NoticeBoard() {
               >
                 <button
                   onClick={() => setActiveTab(index)}
-                  className={`relative flex items-center justify-center h-full text-base font-extrabold tracking-tight transition-colors ${
+                  className={`relative flex items-center justify-center h-full text-base font-extrabold tracking-tight transition-colors border-0 bg-transparent cursor-pointer ${
                     activeTab === index 
                       ? 'text-kaist-darkgreen' 
                       : 'text-kaist-greygreen hover:text-kaist-darkgreen'
@@ -103,10 +143,20 @@ export function NoticeBoard() {
         </div>
 
         {/* Notice List */}
-        <div className="flex-1 divide-y divide-kaist-grey/20 border-b border-kaist-grey/20 overflow-y-auto">
-          {currentNotices.map((notice, index) => (
-            <NoticeItem key={`${activeTab}-${index}`} {...notice} />
-          ))}
+        <div className="flex-1 divide-y divide-kaist-grey/20 border-b border-kaist-grey/20 overflow-y-auto min-h-[220px]">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-kaist-darkgreen"></div>
+            </div>
+          ) : currentNotices.length === 0 ? (
+            <div className="flex items-center justify-center py-16 text-sm text-kaist-grey font-bold">
+              등록된 게시글이 없습니다.
+            </div>
+          ) : (
+            currentNotices.map((notice) => (
+              <NoticeItem key={notice.id} {...notice} />
+            ))
+          )}
         </div>
       </div>
     </section>

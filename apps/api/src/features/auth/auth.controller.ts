@@ -145,6 +145,18 @@ export class AuthController {
       .where(eq(permissions.code, "MANAGE_FINANCE"))
       .limit(1);
 
+    const [writeNoticePermission] = await this.db
+      .select({ permissionId: permissions.permissionId })
+      .from(permissions)
+      .where(eq(permissions.code, "WRITE_NOTICE"))
+      .limit(1);
+
+    const [writeGeneralPermission] = await this.db
+      .select({ permissionId: permissions.permissionId })
+      .from(permissions)
+      .where(eq(permissions.code, "WRITE_GENERAL"))
+      .limit(1);
+
     if (!adminPermission || !surveyManagePermission || !financePermission) {
       throw new ForbiddenException("admin_permission_missing");
     }
@@ -152,11 +164,9 @@ export class AuthController {
     const [roleGroup] = await this.db
       .insert(roleGroups)
       .values({
-        code: "DEV_MOCK_ADMIN",
         description: "개발 환경용 권한 테스트 그룹",
         isSystem: true,
         nameKo: "개발 관리자",
-        nameEn: "Development Admin",
       })
       .onConflictDoNothing()
       .returning({ roleGroupId: roleGroups.roleGroupId });
@@ -164,7 +174,7 @@ export class AuthController {
     const existingRoleGroup =
       roleGroup ??
       (await this.db.query.roleGroups.findFirst({
-        where: eq(roleGroups.code, "DEV_MOCK_ADMIN"),
+        where: eq(roleGroups.nameKo, "개발 관리자"),
       }));
 
     if (!existingRoleGroup) {
@@ -175,22 +185,38 @@ export class AuthController {
       .delete(roleGroupPermissions)
       .where(eq(roleGroupPermissions.roleGroupId, existingRoleGroup.roleGroupId));
 
+    const insertPermissions = [
+      {
+        permissionId: adminPermission.permissionId,
+        roleGroupId: existingRoleGroup.roleGroupId,
+      },
+      {
+        permissionId: surveyManagePermission.permissionId,
+        roleGroupId: existingRoleGroup.roleGroupId,
+      },
+      {
+        permissionId: financePermission.permissionId,
+        roleGroupId: existingRoleGroup.roleGroupId,
+      },
+    ];
+
+    if (writeNoticePermission) {
+      insertPermissions.push({
+        permissionId: writeNoticePermission.permissionId,
+        roleGroupId: existingRoleGroup.roleGroupId,
+      });
+    }
+
+    if (writeGeneralPermission) {
+      insertPermissions.push({
+        permissionId: writeGeneralPermission.permissionId,
+        roleGroupId: existingRoleGroup.roleGroupId,
+      });
+    }
+
     await this.db
       .insert(roleGroupPermissions)
-      .values([
-        {
-          permissionId: adminPermission.permissionId,
-          roleGroupId: existingRoleGroup.roleGroupId,
-        },
-        {
-          permissionId: surveyManagePermission.permissionId,
-          roleGroupId: existingRoleGroup.roleGroupId,
-        },
-        {
-          permissionId: financePermission.permissionId,
-          roleGroupId: existingRoleGroup.roleGroupId,
-        },
-      ])
+      .values(insertPermissions)
       .onConflictDoNothing();
 
     await this.db

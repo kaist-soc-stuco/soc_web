@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Query,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import type {
@@ -21,7 +22,7 @@ import type {
   ArticleDeleteResponse,
 } from "@soc/contracts";
 import { ArticleCreateSchema, ArticleUpdateSchema } from "@soc/contracts";
-import { Request } from "express";
+import { Request, Response } from "express";
 
 import { AuthGuard } from "../../shared/guards";
 import { Cookies } from "../../shared/decorators/cookies.decorator";
@@ -69,11 +70,43 @@ export class ArticleController {
   async getArticle(
     @Param("code") code: string,
     @Param("articleId") articleId: string,
-    @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
+    @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken: string | undefined,
+    @Cookies("viewed_articles") viewedArticlesCookie: string | undefined,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<ArticleDetailResponse> {
     const currentUser =
       await this.authSessionService.getCurrentUser(accessToken);
-    return this.articleService.getArticle(code, articleId, currentUser);
+
+    let viewedIds: string[] = [];
+    if (viewedArticlesCookie) {
+      try {
+        viewedIds = JSON.parse(viewedArticlesCookie);
+        if (!Array.isArray(viewedIds)) {
+          viewedIds = [];
+        }
+      } catch {
+        viewedIds = [];
+      }
+    }
+
+    const hasViewed = viewedIds.includes(articleId);
+    let incrementView = false;
+    if (!hasViewed) {
+      incrementView = true;
+      viewedIds.push(articleId);
+      res.cookie("viewed_articles", JSON.stringify(viewedIds), {
+        maxAge: 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        path: "/",
+      });
+    }
+
+    return this.articleService.getArticle(
+      code,
+      articleId,
+      currentUser,
+      incrementView,
+    );
   }
 
   @Post()

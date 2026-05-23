@@ -57,6 +57,13 @@ export class SurveyResponsesRepository {
     return row ? this.mapResponse(row) : null;
   }
 
+  async findByUserAndSurvey(surveyId: string, userId: string): Promise<SurveyResponseRecord | null> {
+    const row = await this.db.query.surveyResponses.findFirst({
+      where: and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.userId, userId)),
+    });
+    return row ? this.mapResponse(row) : null;
+  }
+
   async countSubmitted(surveyId: string): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)::int` })
@@ -107,6 +114,27 @@ export class SurveyResponsesRepository {
     const rows = await this.db.query.surveyAnswers.findMany({
       where: eq(surveyAnswers.responseId, responseId),
     });
+    return rows.map((r) => this.mapAnswer(r));
+  }
+
+  async findAnswersBySurveyId(surveyId: string): Promise<SurveyAnswerRecord[]> {
+    const rows = await this.db
+      .select({
+        id: surveyAnswers.id,
+        responseId: surveyAnswers.responseId,
+        questionId: surveyAnswers.questionId,
+        content: surveyAnswers.content,
+        submittedAt: surveyAnswers.submittedAt,
+        updatedAt: surveyAnswers.updatedAt,
+      })
+      .from(surveyAnswers)
+      .innerJoin(surveyResponses, eq(surveyAnswers.responseId, surveyResponses.id))
+      .where(
+        and(
+          eq(surveyResponses.surveyId, surveyId),
+          sql`${surveyResponses.status} != 'draft'`
+        )
+      );
     return rows.map((r) => this.mapAnswer(r));
   }
 

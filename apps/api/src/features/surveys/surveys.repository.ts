@@ -1,12 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
-import { surveys } from "../../infrastructure/postgres/postgres.schema";
+import { surveys, surveyResponses } from "../../infrastructure/postgres/postgres.schema";
 
 import type { SurveyRecord } from "./entities/survey.entity";
 import type { CreateSurveyDto } from "./dto/create-survey.dto";
@@ -19,8 +19,10 @@ export class SurveysRepository {
   private map(row: typeof surveys.$inferSelect): SurveyRecord {
     return {
       id: row.surveyId,
+      kind: row.kind,
+      resultVisibility: row.resultVisibility,
       titleKo: row.titleKo,
-      titleEn: row.titleEn ?? "",
+      titleEn: row.titleEn,
       descriptionKo: row.descriptionKo,
       descriptionEn: row.descriptionEn,
       creatorId: row.creatorId ? String(row.creatorId) : null,
@@ -29,6 +31,9 @@ export class SurveysRepository {
       connectedPostId: row.connectedArticleId ? String(row.connectedArticleId) : null,
       feePayersOnly: row.feeRequirementPolicy === "PAID_ONLY",
       allowAnonymous: row.allowGuestResponse,
+      allowMultipleResponses: row.allowMultipleResponses,
+      isKoreanOnly: row.isKoreanOnly,
+      isPublished: row.isPublished,
       maxResponses: row.maxResponseCount,
       opensAt: row.openAt ? msToIso(row.openAt.valueOf()) : null,
       closesAt: row.closeAt ? msToIso(row.closeAt.valueOf()) : null,
@@ -38,15 +43,30 @@ export class SurveysRepository {
   }
 
   async findAll(): Promise<SurveyRecord[]> {
-    const rows = await this.db.query.surveys.findMany();
-    return rows.map((r) => this.map(r));
+    const rows = await this.db
+      .select({
+        survey: surveys,
+        responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`
+      })
+      .from(surveys);
+    return rows.map((r) => ({
+      ...this.map(r.survey),
+      responseCount: r.responseCount,
+    }));
   }
 
   async findById(id: string): Promise<SurveyRecord | null> {
     const row = await this.db.query.surveys.findFirst({
       where: eq(surveys.surveyId, id),
     });
-    return row ? this.map(row) : null;
+    if (!row) return null;
+    const mapped = this.map(row);
+    const countResult = await this.db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(surveyResponses)
+      .where(and(eq(surveyResponses.surveyId, id), sql`${surveyResponses.status} != 'draft'`));
+    mapped.responseCount = countResult[0]?.count ?? 0;
+    return mapped;
   }
 
   async insert(creatorId: string, dto: CreateSurveyDto): Promise<SurveyRecord> {
@@ -62,6 +82,9 @@ export class SurveysRepository {
         status: "DRAFT",
         feeRequirementPolicy: dto.feeRequirementPolicy ?? "NONE",
         allowGuestResponse: dto.allowGuestResponse ?? false,
+        allowMultipleResponses: dto.allowMultipleResponses ?? false,
+        isKoreanOnly: dto.isKoreanOnly ?? false,
+        isPublished: dto.isPublished ?? false,
         resultVisibility: dto.resultVisibility,
         maxResponseCount: dto.maxResponseCount ?? null,
         openAt: dto.openAt ? isoToDate(dto.openAt) : null,
@@ -92,6 +115,9 @@ export class SurveysRepository {
       set.feeRequirementPolicy = dto.feeRequirementPolicy;
     }
     if (dto.allowGuestResponse !== undefined) set.allowGuestResponse = dto.allowGuestResponse;
+    if (dto.allowMultipleResponses !== undefined) set.allowMultipleResponses = dto.allowMultipleResponses;
+    if (dto.isKoreanOnly !== undefined) set.isKoreanOnly = dto.isKoreanOnly;
+    if (dto.isPublished !== undefined) set.isPublished = dto.isPublished;
     if (dto.resultVisibility !== undefined) set.resultVisibility = dto.resultVisibility;
     if (dto.maxResponseCount !== undefined) set.maxResponseCount = dto.maxResponseCount;
     if (dto.openAt !== undefined) set.openAt = dto.openAt ? isoToDate(dto.openAt) : null;
@@ -118,5 +144,19 @@ export class SurveysRepository {
       .from(surveys)
       .where(eq(surveys.surveyId, surveyId));
     return result[0]?.count ?? 0;
+  }
+
+  async findPublished(): Promise<SurveyRecord[]> {
+    const rows = await this.db
+      .select({
+        survey: surveys,
+        responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`
+      })
+      .from(surveys)
+      .where(eq(surveys.isPublished, true));
+    return rows.map((r) => ({
+      ...this.map(r.survey),
+      responseCount: r.responseCount,
+    }));
   }
 }
