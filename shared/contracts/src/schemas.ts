@@ -82,6 +82,7 @@ export const CreateSurveySchema = z.object({
   allowMultipleResponses: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
   isPublished: z.boolean().optional(),
+  showOnCalendar: z.boolean().optional(),
   resultVisibility: z.string().min(1).max(20),
   maxResponseCount: z.number().int().positive().nullable().optional(),
   openAt: z.string().optional(),
@@ -124,11 +125,6 @@ export const SubmitResponseSchema = z.object({
     }),
   ),
   externalPhone: z.string().optional(),
-});
-
-export const ReviewResponseSchema = z.object({
-  status: z.enum(["approved", "rejected", "waitlisted"]),
-  reviewReason: z.string().optional(),
 });
 
 // ─── Role Groups ─────────────────────────────────────────────────────────────

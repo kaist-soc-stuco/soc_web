@@ -301,8 +301,6 @@ export function MyPage() {
                             </div>
                             <div className="shrink-0 ml-4">
                               <span className={`text-xs px-2 py-1 rounded font-semibold ${
-                                item.status === "approved" ? "bg-kaist-darkgreen/10 text-kaist-darkgreen" :
-                                item.status === "rejected" ? "bg-red-100 text-red-700" :
                                 item.status === "submitted" ? "bg-gray-100 text-gray-700" :
                                 "bg-kaist-grey/10 text-kaist-greygreen"
                               }`}>

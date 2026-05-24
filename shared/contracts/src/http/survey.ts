@@ -1,5 +1,5 @@
 export type SurveyStatus = 'draft' | 'scheduled' | 'open' | 'closed' | 'archived';
-export type ResponseStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'waitlisted';
+export type ResponseStatus = 'submitted';
 export type QuestionType =
   | 'short_text'
   | 'long_text'
@@ -35,6 +35,7 @@ export interface SurveyRecord {
   allowMultipleResponses: boolean;
   isKoreanOnly: boolean;
   isPublished: boolean;
+  showOnCalendar: boolean;
   maxResponses: number | null;
   opensAt: string | null;
   closesAt: string | null;
@@ -79,11 +80,16 @@ export interface SurveyResponseRecord {
   externalPhone: string | null;
   status: ResponseStatus;
   submittedAt: string | null;
-  reviewedAt: string | null;
-  reviewAdminId: string | null;
-  reviewReason: string | null;
+  user: SurveyResponseUserRecord | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SurveyResponseUserRecord {
+  nameKo: string | null;
+  email: string | null;
+  departmentKo: string | null;
+  stdNo: string | null;
 }
 
 export interface SurveyAnswerRecord {
@@ -108,6 +114,7 @@ export interface CreateSurveyRequest {
   allowMultipleResponses?: boolean;
   isKoreanOnly?: boolean;
   isPublished?: boolean;
+  showOnCalendar?: boolean;
   resultVisibility: string;
   maxResponseCount?: number;
   openAt?: string;
@@ -127,6 +134,7 @@ export interface UpdateSurveyRequest {
   allowMultipleResponses?: boolean;
   isKoreanOnly?: boolean;
   isPublished?: boolean;
+  showOnCalendar?: boolean;
   resultVisibility?: string;
   maxResponseCount?: number;
   openAt?: string;
@@ -184,11 +192,6 @@ export interface AnswerInput {
 export interface SubmitResponseRequest {
   externalPhone?: string;
   answers: AnswerInput[];
-}
-
-export interface ReviewResponseRequest {
-  status: 'approved' | 'rejected' | 'waitlisted';
-  reason?: string;
 }
 
 // ─── Response DTOs ────────────────────────────────────────────────────────────

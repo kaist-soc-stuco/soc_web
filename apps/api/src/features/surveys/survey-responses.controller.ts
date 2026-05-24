@@ -4,12 +4,11 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
-  Patch,
   Post,
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { SubmitResponseSchema, ReviewResponseSchema } from "@soc/contracts";
+import { SubmitResponseSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { Request } from "express";
 
@@ -18,7 +17,6 @@ import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveyResponsesService } from "./survey-responses.service";
 import { SubmitResponseDto } from "./dto/submit-response.dto";
-import { ReviewResponseDto } from "./dto/review-response.dto";
 
 interface MaybeAuthedRequest extends Request {
   user?: { id: string; permission: number };
@@ -61,16 +59,5 @@ export class SurveyResponsesController {
     @Param("responseId", ParseUUIDPipe) responseId: string,
   ) {
     return this.responsesService.findDetail(surveyId, responseId);
-  }
-
-  @Patch(":responseId/review")
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
-  review(
-    @Param("surveyId", ParseUUIDPipe) surveyId: string,
-    @Param("responseId", ParseUUIDPipe) responseId: string,
-    @Body(new ZodValidationPipe(ReviewResponseSchema)) dto: ReviewResponseDto,
-    @Req() req: AuthedRequest,
-  ) {
-    return this.responsesService.review(surveyId, responseId, req.user.id, dto);
   }
 }

@@ -55,6 +55,7 @@ export function SurveySettingsForm({
   const allowGuestResponse = Boolean(watch("allowGuestResponse"));
   const isKoreanOnly = Boolean(watch("isKoreanOnly"));
   const isPublished = Boolean(watch("isPublished"));
+  const showOnCalendar = Boolean(watch("showOnCalendar"));
   const connectedArticleId = watch("connectedArticleId") ?? "";
 
   useEffect(() => {
@@ -131,7 +132,7 @@ export function SurveySettingsForm({
                   }}
                 />
                 <span className={`text-sm font-bold ${isKoreanOnly ? 'text-red-600' : 'text-kaist-black'}`}>
-                  Korean Only
+                  Korean Speakers Only
                 </span>
               </label>
             </div>
@@ -317,6 +318,25 @@ export function SurveySettingsForm({
                   onChange={(e) => !isOngoing && setValue("allowGuestResponse", e.target.checked)}
                 />
                 <span className="text-sm font-bold text-kaist-black">로그인 없이 응답 가능</span>
+              </label>
+
+              <label className="flex items-center gap-3 group cursor-pointer">
+                <div
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                    showOnCalendar
+                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
+                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
+                  }`}
+                >
+                  {showOnCalendar && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
+                </div>
+                <input
+                  type="checkbox"
+                  className="hidden"
+                  checked={showOnCalendar}
+                  onChange={(e) => setValue("showOnCalendar", e.target.checked)}
+                />
+                <span className="text-sm font-bold text-kaist-black">캘린더에 표시</span>
               </label>
             </div>
 

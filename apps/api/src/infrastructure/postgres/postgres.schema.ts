@@ -64,6 +64,7 @@ export const surveys = pgTable("survey", {
   allowMultipleResponses: boolean("allow_multiple_responses").notNull().default(false),
   isKoreanOnly: boolean("is_korean_only").notNull().default(false),
   isPublished: boolean("is_published").notNull().default(false),
+  showOnCalendar: boolean("show_on_calendar").notNull().default(false),
   resultVisibility: varchar("result_visibility", { length: 20 }).notNull(), // PUBLIC, PRIVATE 등
   maxResponseCount: integer("max_response_count"), // 정원 제한
   openAt: timestamp("open_at", { withTimezone: true }),
@@ -277,12 +278,9 @@ export const surveyResponses = pgTable("survey_responses", {
     .notNull(),
   userId: uuid("user_id").references(() => users.userId),
   externalPhone: text("external_phone"),
-  // 'draft' | 'submitted' | 'approved' | 'rejected' | 'waitlisted'
-  status: text("status").notNull().default("draft"),
+  // 'draft' | 'submitted'
+  status: text("status").notNull().default("submitted"),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
-  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-  reviewAdminId: uuid("review_admin_id").references(() => users.userId),
-  reviewReason: text("review_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

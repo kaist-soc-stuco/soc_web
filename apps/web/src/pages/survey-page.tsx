@@ -288,7 +288,7 @@ function LoginRequiredView({ lang, feePayersOnly }: { lang: string; feePayersOnl
         {feePayersOnly
           ? (lang === 'ko'
               ? '이 설문은 과비 납부 회원만 응답할 수 있습니다. 로그인하여 납부 여부를 확인해 주세요.'
-              : 'This survey is restricted to student fee payers. Please log in to verify your status.')
+              : 'This survey is restricted to Paid Members Only. Please log in to verify your status.')
           : (lang === 'ko'
               ? '이 설문조사에 참여하기 위해서는 로그인이 필요합니다.'
               : 'To participate in this survey, please log in to your account first.')}
@@ -310,12 +310,12 @@ function FeePayerRequiredView({ lang }: { lang: string }) {
         <CreditCard className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-bold text-kaist-black mb-3">
-        {lang === 'ko' ? '과비 납부자 전용입니다' : 'Student Fee Payers Only'}
+        {lang === 'ko' ? '과비 납부자 전용 (Paid Members Only)' : 'Paid Members Only'}
       </h2>
       <p className="text-sm text-kaist-grey/80 leading-relaxed">
         {lang === 'ko'
-          ? '이 설문은 과비를 납부한 회원만 참여하실 수 있습니다. 학생회비 납부 내역을 확인해 주세요.'
-          : 'This survey is only available for students who have paid the student fee. Please check your payment status.'}
+          ? '이 설문은 과비를 납부한 회원만 참여하실 수 있습니다. 집행위원회비 납부 내역을 확인해 주세요.'
+          : 'This survey is only available for Paid Members Only. Please check your payment status.'}
       </p>
     </div>
   );

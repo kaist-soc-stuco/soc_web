@@ -71,35 +71,11 @@ export class ArticleController {
     @Param("code") code: string,
     @Param("articleId") articleId: string,
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken: string | undefined,
-    @Cookies("viewed_articles") viewedArticlesCookie: string | undefined,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<ArticleDetailResponse> {
     const currentUser =
       await this.authSessionService.getCurrentUser(accessToken);
 
-    let viewedIds: string[] = [];
-    if (viewedArticlesCookie) {
-      try {
-        viewedIds = JSON.parse(viewedArticlesCookie);
-        if (!Array.isArray(viewedIds)) {
-          viewedIds = [];
-        }
-      } catch {
-        viewedIds = [];
-      }
-    }
-
-    const hasViewed = viewedIds.includes(articleId);
-    let incrementView = false;
-    if (!hasViewed) {
-      incrementView = true;
-      viewedIds.push(articleId);
-      res.cookie("viewed_articles", JSON.stringify(viewedIds), {
-        maxAge: 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        path: "/",
-      });
-    }
+    const incrementView = true;
 
     return this.articleService.getArticle(
       code,

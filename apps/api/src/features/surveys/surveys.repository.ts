@@ -34,6 +34,7 @@ export class SurveysRepository {
       allowMultipleResponses: row.allowMultipleResponses,
       isKoreanOnly: row.isKoreanOnly,
       isPublished: row.isPublished,
+      showOnCalendar: row.showOnCalendar,
       maxResponses: row.maxResponseCount,
       opensAt: row.openAt ? msToIso(row.openAt.valueOf()) : null,
       closesAt: row.closeAt ? msToIso(row.closeAt.valueOf()) : null,
@@ -85,6 +86,7 @@ export class SurveysRepository {
         allowMultipleResponses: dto.allowMultipleResponses ?? false,
         isKoreanOnly: dto.isKoreanOnly ?? false,
         isPublished: dto.isPublished ?? false,
+        showOnCalendar: dto.showOnCalendar ?? false,
         resultVisibility: dto.resultVisibility,
         maxResponseCount: dto.maxResponseCount ?? null,
         openAt: dto.openAt ? isoToDate(dto.openAt) : null,
@@ -118,6 +120,7 @@ export class SurveysRepository {
     if (dto.allowMultipleResponses !== undefined) set.allowMultipleResponses = dto.allowMultipleResponses;
     if (dto.isKoreanOnly !== undefined) set.isKoreanOnly = dto.isKoreanOnly;
     if (dto.isPublished !== undefined) set.isPublished = dto.isPublished;
+    if (dto.showOnCalendar !== undefined) set.showOnCalendar = dto.showOnCalendar;
     if (dto.resultVisibility !== undefined) set.resultVisibility = dto.resultVisibility;
     if (dto.maxResponseCount !== undefined) set.maxResponseCount = dto.maxResponseCount;
     if (dto.openAt !== undefined) set.openAt = dto.openAt ? isoToDate(dto.openAt) : null;

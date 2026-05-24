@@ -101,7 +101,7 @@ export function AboutPage() {
             <div className="space-y-12 animate-in fade-in duration-300">
               <div className="space-y-4">
                 <h2 className="text-2xl font-black text-kaist-black">
-                  {lang === "ko" ? "KAIST 전산학부 학생회 'SOC'" : "KAIST School of Computing Student Council 'SOC'"}
+                  {lang === "ko" ? "KAIST 전산학부 집행위원회 'SOC'" : "KAIST School of Computing Student Council 'SOC'"}
                 </h2>
                 <p className="text-base text-gray-700 leading-relaxed font-medium">
                   {lang === "ko"
@@ -211,7 +211,7 @@ export function AboutPage() {
                 {/* Executive Council (Top Node) */}
                 <div className="bg-gradient-to-r from-kaist-darkgreen to-kaist-darkgreen/80 text-white px-8 py-3 rounded-2xl shadow-md text-center max-w-xs border border-kaist-darkgreen/20">
                   <div className="text-xs opacity-75 font-semibold">{lang === "ko" ? "학생 대표단" : "Representatives"}</div>
-                  <div className="font-bold mt-0.5">{lang === "ko" ? "학생회장 & 부학생회장" : "President & Vice President"}</div>
+                  <div className="font-bold mt-0.5">{lang === "ko" ? "집행위원회장 & 부집행위원회장" : "President & Vice President"}</div>
                 </div>
 
                 {/* Vertical Line */}
@@ -235,7 +235,7 @@ export function AboutPage() {
                     <h3 className="font-bold text-kaist-black text-sm">{lang === "ko" ? "사무/재정국" : "Finance"}</h3>
                     <p className="text-xs text-gray-500 leading-relaxed">
                       {lang === "ko"
-                        ? "학생회비 정산, 예결산 공고 등 투명한 재정을 담당합니다."
+                        ? "집행위원회비 정산, 예결산 공고 등 투명한 재정을 담당합니다."
                         : "Manages student fees, budget announcements, and finances."}
                     </p>
                   </div>
@@ -245,7 +245,7 @@ export function AboutPage() {
                     <h3 className="font-bold text-kaist-black text-sm">{lang === "ko" ? "홍보/디자인국" : "Content & Design"}</h3>
                     <p className="text-xs text-gray-500 leading-relaxed">
                       {lang === "ko"
-                        ? "학생회 디자인 자산 제작 및 SNS 홍보 채널을 운영합니다."
+                        ? "집행위원회 디자인 자산 제작 및 SNS 홍보 채널을 운영합니다."
                         : "Produces student council graphics and manages social media channels."}
                     </p>
                   </div>
@@ -271,7 +271,7 @@ export function AboutPage() {
               <h2 className="text-2xl font-black text-kaist-black">{lang === "ko" ? "집행위원회 구성원" : "Executive Committee Members"}</h2>
               <p className="text-sm text-kaist-grey -mt-4">
                 {lang === "ko"
-                  ? "이번 학기 KAIST 전산학부 발전을 위해 활동하고 있는 학생회 집행위원회 명단입니다."
+                  ? "이번 학기 KAIST 전산학부 발전을 위해 활동하고 있는 집행위원회 집행위원회 명단입니다."
                   : "Members of the student council executive committee working for School of Computing."}
               </p>
 

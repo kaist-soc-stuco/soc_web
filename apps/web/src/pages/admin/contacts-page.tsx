@@ -112,7 +112,7 @@ export function ContactsPage() {
       <div className="flex justify-between items-center border-b border-gray-100 pb-5">
         <div>
           <h1 className="text-2xl font-black text-kaist-black tracking-tight">집행위연락망 관리</h1>
-          <p className="text-sm text-kaist-grey mt-1">About 페이지 구성원 탭에 노출될 학생회 집행부원 연락망을 관리합니다.</p>
+          <p className="text-sm text-kaist-grey mt-1">About 페이지 구성원 탭에 노출될 집행위원회 집행부원 연락망을 관리합니다.</p>
         </div>
         <button
           onClick={handleNewClick}

@@ -284,27 +284,27 @@ export function PermissionPage() {
   return (
     <AuthGuard requirePermission={Permissions.ADMIN}>
       <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
-        <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-8">
+        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
           
           {/* Compact Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 pb-5 gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-5 gap-4 select-none">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900">권한 관리</h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <h1 className="text-2xl font-black tracking-tight text-slate-800">권한 관리</h1>
+              <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-400">
                 현재 세션의 권한을 확인하고, 역할 그룹, 그룹 내 사용자, 그리고 권한 매핑을 편집합니다.
               </p>
             </div>
           </div>
 
           {/* Compact User Info */}
-          <div className="grid gap-4 sm:grid-cols-2 rounded-2xl bg-white border border-gray-200 p-5 shadow-xs">
+          <div className="grid gap-4 sm:grid-cols-2 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Current User</p>
-              <p className="mt-1 text-lg font-bold text-gray-900">{maskUuid(userId) || "알 수 없음"}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-slate-400">Current User</p>
+              <p className="mt-1 text-lg font-black text-slate-800">{maskUuid(userId) || "알 수 없음"}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Admin</p>
-              <p className="mt-1 text-lg font-bold text-gray-900">{hasAdminPermission(permission) ? "허용" : "불가"}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-slate-400">Admin</p>
+              <p className="mt-1 text-lg font-black text-slate-800">{hasAdminPermission(permission) ? "허용" : "불가"}</p>
             </div>
           </div>
 
@@ -317,26 +317,19 @@ export function PermissionPage() {
               {/* Left Column: List of Groups and Members of selected group */}
               <div className="space-y-6">
                 {/* 역할 그룹 목록 */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
                     <div>
-                      <h2 className="text-lg font-extrabold tracking-tight">역할 그룹 목록</h2>
-                      <p className="mt-0.5 text-xs text-kaist-grey">현재 등록된 역할 그룹 목록입니다.</p>
+                      <h2 className="text-lg font-black tracking-tight text-slate-800">역할 그룹 목록</h2>
+                      <p className="mt-0.5 text-[12px] font-semibold text-slate-400">현재 등록된 역할 그룹 목록입니다.</p>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void refreshRoleGroups()}
-                        disabled={roleGroupLoading || roleGroupSaving}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 font-bold px-3 py-1.5 text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        새로고침
-                      </button>
+
                       <button
                         type="button"
                         onClick={resetRoleGroupEditor}
                         disabled={roleGroupSaving}
-                        className="bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-3 py-1.5 text-xs rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="rounded-xl border-0 bg-kaist-darkgreen px-3 py-1.5 text-xs font-extrabold text-white transition-all cursor-pointer shadow-sm hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         새 역할 그룹
                       </button>
@@ -347,7 +340,7 @@ export function PermissionPage() {
                     {roleGroupLoading ? (
                       <p className="text-sm text-kaist-grey">역할 그룹을 불러오는 중…</p>
                     ) : roleGroups.length === 0 ? (
-                      <p className="rounded-xl border border-dashed border-kaist-grey/30 bg-kaist-grey/5 p-4 text-sm text-kaist-grey">
+                      <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-4 text-sm font-semibold text-slate-400">
                         등록된 역할 그룹이 없습니다. 새 역할 그룹을 만들어 시작하세요.
                       </p>
                     ) : (
@@ -362,12 +355,12 @@ export function PermissionPage() {
                             className={`w-full rounded-xl border p-4 text-left transition ${
                               isSelected
                                 ? "border-kaist-darkgreen bg-kaist-darkgreen/5"
-                                : "border-gray-200 bg-white hover:border-kaist-darkgreen/20 hover:bg-kaist-darkgreen/5"
+                                : "border-slate-200 bg-white hover:border-kaist-darkgreen/20 hover:bg-kaist-darkgreen/5"
                             }`}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-3">
                               <div>
-                                <p className="text-sm font-extrabold text-kaist-darkgreen">
+                                <p className="text-sm font-extrabold text-slate-800">
                                   {roleGroup.nameKo}
                                 </p>
                               </div>
@@ -382,12 +375,12 @@ export function PermissionPage() {
                                 </span>
                               </div>
                             </div>
-                            <p className="mt-2 text-sm leading-6 text-kaist-grey">
+                            <p className="mt-2 text-sm leading-6 text-slate-400">
                               {roleGroup.description ?? "설명이 없습니다."}
                             </p>
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {roleGroup.permissionIds.length === 0 ? (
-                                <span className="rounded-full bg-kaist-grey/10 px-2.5 py-0.5 text-xs font-semibold text-kaist-grey">
+                                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-400">
                                   권한 없음
                                 </span>
                               ) : (
@@ -404,7 +397,7 @@ export function PermissionPage() {
                                 })
                               )}
                             </div>
-                            <p className="mt-2 text-xs text-kaist-greygreen">
+                            <p className="mt-2 text-xs text-slate-400">
                               수정 {formatKoreanDateTime(roleGroup.updatedAt)}
                             </p>
                           </button>
@@ -415,18 +408,18 @@ export function PermissionPage() {
                 </div>
 
                 {/* 그룹 내 사용자 관리 */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
                     <div>
-                      <h2 className="text-lg font-extrabold tracking-tight">그룹 내 사용자 관리</h2>
-                      <p className="mt-0.5 text-xs text-kaist-grey">
+                      <h2 className="text-lg font-black tracking-tight text-slate-800">그룹 내 사용자 관리</h2>
+                      <p className="mt-0.5 text-[12px] font-semibold text-slate-400">
                         {selectedRoleGroup ? `"${selectedRoleGroup.nameKo}" 그룹 구성원 설정` : "역할 그룹을 선택해 주세요."}
                       </p>
                     </div>
                   </div>
 
                   {selectedRoleGroupId === null ? (
-                    <p className="text-sm text-kaist-grey py-4">
+                    <p className="py-4 text-sm font-semibold text-slate-400">
                       위 목록에서 역할 그룹을 먼저 선택하시면 사용자 관리 기능이 활성화됩니다.
                     </p>
                   ) : (
@@ -441,14 +434,14 @@ export function PermissionPage() {
                               void handleSearchUsers();
                             }
                           }}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-kaist-darkgreen"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
                           placeholder="이름 또는 학번으로 검색"
                         />
                         <button
                           type="button"
                           onClick={() => void handleSearchUsers()}
                           disabled={searchLoading}
-                          className="bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="rounded-xl border-0 bg-kaist-darkgreen px-4 py-2.5 text-sm font-extrabold text-white transition-all shadow-sm cursor-pointer hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {searchLoading ? "검색 중" : "검색"}
                         </button>
@@ -460,31 +453,31 @@ export function PermissionPage() {
 
                       <div className="grid gap-4 md:grid-cols-2">
                         {/* 현재 멤버 */}
-                        <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
-                          <div className="flex items-center justify-between gap-3 border-b border-gray-200/60 pb-2 mb-3">
-                            <h3 className="text-xs font-bold text-kaist-darkgreen">현재 멤버</h3>
-                            <span className="text-xs font-semibold text-kaist-greygreen">
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
+                          <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                            <h3 className="text-xs font-extrabold text-slate-800">현재 멤버</h3>
+                            <span className="text-xs font-semibold text-slate-400">
                               {memberLoading ? "로딩 중" : `${roleGroupMembers.length}명`}
                             </span>
                           </div>
 
                           {memberLoading ? (
-                            <p className="text-xs text-kaist-grey py-2">멤버를 불러오는 중…</p>
+                            <p className="py-2 text-xs font-semibold text-slate-400">멤버를 불러오는 중…</p>
                           ) : roleGroupMembers.length === 0 ? (
-                            <p className="text-xs text-kaist-grey py-2">아직 멤버가 없습니다.</p>
+                            <p className="py-2 text-xs font-semibold text-slate-400">아직 멤버가 없습니다.</p>
                           ) : (
                             <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
                               {roleGroupMembers.map((member) => (
                                 <div
                                   key={member.userRoleGroupId}
-                                  className="rounded-xl border border-gray-200 bg-white p-3 shadow-xs"
+                                  className="rounded-xl border border-slate-100 bg-white p-3 shadow-[0_4px_18px_rgba(0,0,0,0.03)]"
                                 >
                                   <div className="flex items-start justify-between gap-2">
                                     <div>
-                                      <p className="text-xs font-extrabold text-kaist-darkgreen">
+                                      <p className="text-xs font-extrabold text-slate-800">
                                         {member.nameKo}
                                       </p>
-                                      <p className="mt-0.5 text-[10px] leading-relaxed text-kaist-greygreen">
+                                      <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
                                         {member.stdNo ? `학번: ${member.stdNo}` : maskUuid(member.kaistUid)}<br />{member.email}
                                       </p>
                                     </div>
@@ -492,12 +485,12 @@ export function PermissionPage() {
                                       type="button"
                                       onClick={() => void handleRemoveMember(member.userId)}
                                       disabled={memberSavingUserId === member.userId}
-                                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-bold px-2 py-1 text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                      className="rounded-xl border border-red-100 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 transition-all cursor-pointer hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       {memberSavingUserId === member.userId ? "대기" : "제거"}
                                     </button>
                                   </div>
-                                  <p className="mt-2 text-[10px] text-kaist-grey">
+                                  <p className="mt-2 text-[10px] text-slate-400">
                                     부여 {formatKoreanDateTime(member.grantedAt)}
                                   </p>
                                 </div>
@@ -507,16 +500,16 @@ export function PermissionPage() {
                         </div>
 
                         {/* 검색 결과 */}
-                        <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
-                          <div className="flex items-center justify-between gap-3 border-b border-gray-200/60 pb-2 mb-3">
-                            <h3 className="text-xs font-bold text-kaist-darkgreen">검색 결과</h3>
-                            <span className="text-xs font-semibold text-kaist-greygreen">
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
+                          <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                            <h3 className="text-xs font-extrabold text-slate-800">검색 결과</h3>
+                            <span className="text-xs font-semibold text-slate-400">
                               {searchResults.length}명
                             </span>
                           </div>
 
                           {searchResults.length === 0 ? (
-                            <p className="text-xs text-kaist-grey py-2">
+                            <p className="py-2 text-xs font-semibold text-slate-400">
                               검색어를 입력하고 검색해 주세요.
                             </p>
                           ) : (
@@ -527,16 +520,16 @@ export function PermissionPage() {
                                 );
 
                                 return (
-                                  <div key={user.userId} className="rounded-xl border border-gray-200 bg-white p-3 shadow-xs">
+                                  <div key={user.userId} className="rounded-xl border border-slate-100 bg-white p-3 shadow-[0_4px_18px_rgba(0,0,0,0.03)]">
                                     <div className="flex items-start justify-between gap-2">
                                       <div>
-                                        <p className="text-xs font-extrabold text-kaist-darkgreen">
+                                        <p className="text-xs font-extrabold text-slate-800">
                                           {user.nameKo}
                                         </p>
-                                        <p className="mt-0.5 text-[10px] leading-relaxed text-kaist-greygreen">
+                                        <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
                                           {user.stdNo ? `학번: ${user.stdNo}` : maskUuid(user.kaistUid)}<br />{user.email}
                                         </p>
-                                        <p className="mt-1 text-[10px] text-kaist-grey">
+                                        <p className="mt-1 text-[10px] text-slate-400">
                                           {user.departmentKo ?? "학과 미상"}
                                           {user.academicStatus ? ` · ${user.academicStatus}` : ""}
                                         </p>
@@ -545,7 +538,7 @@ export function PermissionPage() {
                                         type="button"
                                         onClick={() => void handleAddMember(user)}
                                         disabled={alreadyMember || memberSavingUserId === user.userId}
-                                        className="bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-2 py-1 text-xs rounded-xl transition-all disabled:cursor-not-allowed disabled:bg-kaist-grey"
+                                        className="rounded-xl border-0 bg-kaist-darkgreen px-2 py-1 text-xs font-bold text-white transition-all hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:bg-slate-300"
                                       >
                                         {alreadyMember ? "참여됨" : memberSavingUserId === user.userId ? "대기" : "추가"}
                                       </button>
@@ -563,13 +556,13 @@ export function PermissionPage() {
               </div>
 
               {/* Right Column: Role Group Form */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs sticky top-4">
-                <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
+              <div className="sticky top-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+                <div className="mb-4 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                   <div>
-                    <h3 className="text-lg font-extrabold tracking-tight">
+                    <h3 className="text-lg font-black tracking-tight text-slate-800">
                       {selectedRoleGroupId === null ? "새 역할 그룹 생성" : "역할 그룹 정보 수정"}
                     </h3>
-                    <p className="mt-0.5 text-xs text-kaist-grey">
+                    <p className="mt-0.5 text-[12px] font-semibold text-slate-400">
                       이름을 수정하고, 부여할 권한들을 매핑해 주세요.
                     </p>
                   </div>
@@ -578,7 +571,7 @@ export function PermissionPage() {
                 <div className="grid gap-4">
                   {/* Single column layout for Form Fields */}
                   <div className="flex flex-col gap-4">
-                    <label className="space-y-1.5 text-xs font-semibold text-kaist-darkgreen">
+                      <label className="space-y-1.5 text-xs font-semibold text-slate-400">
                       <span>국문 이름</span>
                       <input
                         value={roleGroupForm.nameKo}
@@ -588,11 +581,11 @@ export function PermissionPage() {
                             nameKo: event.target.value,
                           }))
                         }
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-kaist-darkgreen"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
                         placeholder="운영진"
                       />
                     </label>
-                    <label className="space-y-1.5 text-xs font-semibold text-kaist-darkgreen">
+                      <label className="space-y-1.5 text-xs font-semibold text-slate-400">
                       <span>설명</span>
                       <input
                         value={roleGroupForm.description}
@@ -602,18 +595,18 @@ export function PermissionPage() {
                             description: event.target.value,
                           }))
                         }
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-kaist-darkgreen"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
                         placeholder="설명은 선택 사항입니다."
                       />
                     </label>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-2 mb-3">
-                      <h4 className="text-xs font-extrabold text-kaist-darkgreen">
+                      <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                        <h4 className="text-xs font-extrabold text-slate-800">
                         권한 목록
                       </h4>
-                      <p className="text-xs text-kaist-greygreen">
+                        <p className="text-xs text-slate-400">
                         선택됨 {selectedPermissionIds.length}개
                       </p>
                     </div>
@@ -630,15 +623,15 @@ export function PermissionPage() {
                             className={`relative rounded-xl border p-3 text-left transition ${
                               active
                                 ? "border-kaist-darkgreen bg-kaist-darkgreen/5"
-                                : "border-gray-200 bg-white hover:border-kaist-darkgreen/20"
+                                : "border-slate-200 bg-white hover:border-kaist-darkgreen/20"
                             }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-xs font-bold text-kaist-darkgreen pr-6">
+                                <p className="pr-6 text-xs font-bold text-slate-800">
                                   {item.nameKo}
                                 </p>
-                                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-kaist-greygreen">
+                                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                                   {item.code}
                                 </p>
                               </div>
@@ -646,10 +639,10 @@ export function PermissionPage() {
                                 type="checkbox"
                                 checked={active}
                                 readOnly
-                                className="w-4 h-4 rounded border-gray-300 text-kaist-darkgreen focus:ring-kaist-darkgreen pointer-events-none mt-0.5"
+                                className="pointer-events-none mt-0.5 h-4 w-4 rounded border-gray-300 text-kaist-darkgreen focus:ring-kaist-darkgreen"
                               />
                             </div>
-                            <p className="mt-2 text-[10px] leading-normal text-kaist-grey">
+                            <p className="mt-2 text-[10px] leading-normal text-slate-400">
                               {item.description ?? "설명이 없습니다."}
                             </p>
                           </button>
@@ -663,14 +656,14 @@ export function PermissionPage() {
                   )}
 
                   {/* Redesigned delete / save buttons bottom layout */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
                     <div>
                       {selectedRoleGroupId !== null && (
                         <button
                           type="button"
                           onClick={() => void handleDeleteRoleGroup()}
                           disabled={roleGroupSaving}
-                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-semibold px-4 py-2 text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition-all cursor-pointer hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           삭제
                         </button>
@@ -680,7 +673,7 @@ export function PermissionPage() {
                       type="button"
                       onClick={() => void handleSaveRoleGroup()}
                       disabled={roleGroupSaving}
-                      className={`bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold px-6 py-2 text-sm rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`rounded-xl border-0 bg-kaist-darkgreen px-6 py-2 text-sm font-extrabold text-white transition-all shadow-sm cursor-pointer hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:opacity-50 ${
                         selectedRoleGroupId === null ? "ml-auto" : ""
                       }`}
                     >

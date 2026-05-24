@@ -17,6 +17,7 @@ export interface SurveyRecord {
   allowMultipleResponses: boolean;
   isKoreanOnly: boolean;
   isPublished: boolean;
+  showOnCalendar: boolean;
   maxResponses: number | null;
   opensAt: string | null;
   closesAt: string | null;

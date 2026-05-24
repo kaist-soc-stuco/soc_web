@@ -1,4 +1,5 @@
 import type { ResponseStatus } from "@soc/contracts";
+import type { SurveyResponseUserRecord } from "@soc/contracts";
 
 export interface SurveyResponseRecord {
   id: string;
@@ -7,9 +8,7 @@ export interface SurveyResponseRecord {
   externalPhone: string | null;
   status: ResponseStatus;
   submittedAt: string | null;
-  reviewedAt: string | null;
-  reviewAdminId: string | null;
-  reviewReason: string | null;
+  user: SurveyResponseUserRecord | null;
   createdAt: string;
   updatedAt: string;
 }
