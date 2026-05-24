@@ -16,7 +16,6 @@ import type { ResponseDetailResponse } from "@soc/contracts";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
-import type { ReviewResponseDto } from "./dto/review-response.dto";
 import { isoToMs, isExpired, nowMs } from "@soc/shared";
 
 @Injectable()
@@ -126,22 +125,5 @@ export class SurveyResponsesService {
     if (!response) throw new NotFoundException("response_not_found");
     const answers = await this.responsesRepo.findAnswersByResponseId(responseId);
     return { ...response, answers };
-  }
-
-  async review(
-    surveyId: string,
-    responseId: string,
-    adminId: string,
-    dto: ReviewResponseDto,
-  ): Promise<SurveyResponseRecord> {
-    const response = await this.responsesRepo.updateReview(
-      responseId,
-      surveyId,
-      adminId,
-      dto.status,
-      dto.reason,
-    );
-    if (!response) throw new NotFoundException("response_not_found");
-    return response;
   }
 }

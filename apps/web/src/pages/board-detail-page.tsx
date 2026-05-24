@@ -13,7 +13,7 @@ const BOARD_INFO: Record<string, { descriptionKo: string; descriptionEn: string 
   공지: { descriptionKo: "카이스트 전산학부의 다양한 소식을 알려 드립니다", descriptionEn: "Get updates on various news from KAIST School of Computing" },
   행사: { descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요", descriptionEn: "Discover various events organized by the School of Computing" },
   HoC: { descriptionKo: "Hall of Code 프로젝트 및 활동 내역", descriptionEn: "Hall of Code projects and activity logs" },
-  홍보글: { descriptionKo: "학생회 및 학회의 홍보 게시물", descriptionEn: "Promotional posts from the Student Council and societies" },
+  홍보글: { descriptionKo: "집행위원회 및 학회의 홍보 게시물", descriptionEn: "Promotional posts from the Student Council and societies" },
   건의사항: { descriptionKo: "학생들의 의견과 건의사항을 나눠주세요", descriptionEn: "Share your opinions and suggestions with us" },
   연구실: { descriptionKo: "각 연구실의 소식과 공지사항", descriptionEn: "News and announcements from research labs" },
   QnA: { descriptionKo: "궁금한 점을 자유롭게 질문하세요", descriptionEn: "Ask questions and get answers freely" },

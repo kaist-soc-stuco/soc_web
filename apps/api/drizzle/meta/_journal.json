@@ -15,6 +15,20 @@
       "when": 1779379047831,
       "tag": "0001_sad_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779568380224,
+      "tag": "0002_damp_namora",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779635974473,
+      "tag": "0003_remove_survey_review_fields",
+      "breakpoints": true
     }
   ]
 }

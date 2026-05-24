@@ -41,6 +41,7 @@ const SurveySettingsSchema = z.object({
   allowGuestResponse: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
   isPublished: z.boolean().optional(),
+  showOnCalendar: z.boolean().optional(),
   maxResponseCount: z
     .string()
     .optional()
@@ -56,7 +57,7 @@ const SurveySettingsSchema = z.object({
   }
   return true;
 }, {
-  message: "영문 제목은 필수입니다 (Korean Only가 아닐 경우).",
+  message: "영문 제목은 필수입니다 (Korean Speakers Only가 아닐 경우).",
   path: ["titleEn"],
 });
 
@@ -96,6 +97,7 @@ export function SurveyEditorPage() {
       allowGuestResponse: false,
       isKoreanOnly: false,
       isPublished: false,
+      showOnCalendar: false,
       maxResponseCount: "",
       openAt: "",
       closeAt: "",
@@ -159,6 +161,7 @@ export function SurveyEditorPage() {
             allowGuestResponse: detail.allowAnonymous,
             isKoreanOnly: (detail as any).isKoreanOnly ?? false,
             isPublished: detail.isPublished ?? false,
+            showOnCalendar: (detail as any).showOnCalendar ?? false,
             maxResponseCount:
               detail.maxResponses != null ? String(detail.maxResponses) : "",
             openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
@@ -200,6 +203,7 @@ export function SurveyEditorPage() {
         allowGuestResponse: values.allowGuestResponse,
         isKoreanOnly: values.isKoreanOnly,
         isPublished: values.isPublished,
+        showOnCalendar: values.showOnCalendar,
         resultVisibility: values.resultVisibility,
         maxResponseCount,
         openAt: values.openAt ? htmlDatetimeLocalToIso(values.openAt) : undefined,

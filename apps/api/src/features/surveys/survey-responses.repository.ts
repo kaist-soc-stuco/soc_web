@@ -1,36 +1,71 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
-import { surveyAnswers, surveyResponses } from "../../infrastructure/postgres/postgres.schema";
+import { surveyAnswers, surveyResponses, users } from "../../infrastructure/postgres/postgres.schema";
 
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { ResponseStatus } from "@soc/contracts";
 
+type SurveyResponseQueryRow = {
+  id: string;
+  surveyId: string;
+  userId: string | null;
+  externalPhone: string | null;
+  status: string;
+  submittedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  userNameKo: string | null;
+  userEmail: string | null;
+  userDepartmentKo: string | null;
+  userStdNo: string | null;
+};
+
 @Injectable()
 export class SurveyResponsesRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
 
-  private mapResponse(row: typeof surveyResponses.$inferSelect): SurveyResponseRecord {
+  private mapResponse(row: SurveyResponseQueryRow): SurveyResponseRecord {
     return {
       id: row.id,
       surveyId: row.surveyId,
-      userId: row.userId ? String(row.userId) : null,
+      userId: row.userId,
       externalPhone: row.externalPhone,
       status: row.status as ResponseStatus,
       submittedAt: row.submittedAt ? msToIso(row.submittedAt.valueOf()) : null,
-      reviewedAt: row.reviewedAt ? msToIso(row.reviewedAt.valueOf()) : null,
-      reviewAdminId: row.reviewAdminId ? String(row.reviewAdminId) : null,
-      reviewReason: row.reviewReason,
+      user: row.userId
+        ? {
+            nameKo: row.userNameKo,
+            email: row.userEmail,
+            departmentKo: row.userDepartmentKo,
+            stdNo: row.userStdNo,
+          }
+        : null,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
     };
   }
+
+  private responseSelectFields = {
+    id: surveyResponses.id,
+    surveyId: surveyResponses.surveyId,
+    userId: surveyResponses.userId,
+    externalPhone: surveyResponses.externalPhone,
+    status: surveyResponses.status,
+    submittedAt: surveyResponses.submittedAt,
+    createdAt: surveyResponses.createdAt,
+    updatedAt: surveyResponses.updatedAt,
+    userNameKo: users.nameKo,
+    userEmail: users.email,
+    userDepartmentKo: users.departmentKo,
+    userStdNo: users.stdNo,
+  };
 
   private mapAnswer(row: typeof surveyAnswers.$inferSelect): SurveyAnswerRecord {
     return {
@@ -44,24 +79,33 @@ export class SurveyResponsesRepository {
   }
 
   async findBySurveyId(surveyId: string): Promise<SurveyResponseRecord[]> {
-    const rows = await this.db.query.surveyResponses.findMany({
-      where: eq(surveyResponses.surveyId, surveyId),
-    });
+    const rows = await this.db
+      .select(this.responseSelectFields)
+      .from(surveyResponses)
+      .leftJoin(users, eq(surveyResponses.userId, users.userId))
+      .where(eq(surveyResponses.surveyId, surveyId))
+      .orderBy(desc(surveyResponses.submittedAt), desc(surveyResponses.createdAt));
     return rows.map((r) => this.mapResponse(r));
   }
 
   async findById(id: string, surveyId: string): Promise<SurveyResponseRecord | null> {
-    const row = await this.db.query.surveyResponses.findFirst({
-      where: and(eq(surveyResponses.id, id), eq(surveyResponses.surveyId, surveyId)),
-    });
-    return row ? this.mapResponse(row) : null;
+    const rows = await this.db
+      .select(this.responseSelectFields)
+      .from(surveyResponses)
+      .leftJoin(users, eq(surveyResponses.userId, users.userId))
+      .where(and(eq(surveyResponses.id, id), eq(surveyResponses.surveyId, surveyId)))
+      .limit(1);
+    return rows[0] ? this.mapResponse(rows[0]) : null;
   }
 
   async findByUserAndSurvey(surveyId: string, userId: string): Promise<SurveyResponseRecord | null> {
-    const row = await this.db.query.surveyResponses.findFirst({
-      where: and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.userId, userId)),
-    });
-    return row ? this.mapResponse(row) : null;
+    const rows = await this.db
+      .select(this.responseSelectFields)
+      .from(surveyResponses)
+      .leftJoin(users, eq(surveyResponses.userId, users.userId))
+      .where(and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.userId, userId)))
+      .limit(1);
+    return rows[0] ? this.mapResponse(rows[0]) : null;
   }
 
   async countSubmitted(surveyId: string): Promise<number> {
@@ -71,7 +115,7 @@ export class SurveyResponsesRepository {
       .where(
         and(
           eq(surveyResponses.surveyId, surveyId),
-          sql`${surveyResponses.status} != 'draft'`,
+          eq(surveyResponses.status, "submitted"),
         ),
       );
     return result[0]?.count ?? 0;
@@ -95,7 +139,22 @@ export class SurveyResponsesRepository {
         updatedAt: now,
       })
       .returning();
-    return this.mapResponse(row);
+    const inserted = await this.findById(row.id, row.surveyId);
+    if (inserted) return inserted;
+    return this.mapResponse({
+      id: row.id,
+      surveyId: row.surveyId,
+      userId: row.userId,
+      externalPhone: row.externalPhone,
+      status: row.status,
+      submittedAt: row.submittedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      userNameKo: null,
+      userEmail: null,
+      userDepartmentKo: null,
+      userStdNo: null,
+    });
   }
 
   async insertAnswers(
@@ -132,30 +191,9 @@ export class SurveyResponsesRepository {
       .where(
         and(
           eq(surveyResponses.surveyId, surveyId),
-          sql`${surveyResponses.status} != 'draft'`
+          eq(surveyResponses.status, "submitted")
         )
       );
     return rows.map((r) => this.mapAnswer(r));
-  }
-
-  async updateReview(
-    id: string,
-    surveyId: string,
-    reviewAdminId: string,
-    status: "approved" | "rejected" | "waitlisted",
-    reason?: string,
-  ): Promise<SurveyResponseRecord | null> {
-    const [row] = await this.db
-      .update(surveyResponses)
-      .set({
-        status,
-        reviewAdminId: reviewAdminId,
-        reviewReason: reason ?? null,
-        reviewedAt: nowDate(),
-        updatedAt: nowDate(),
-      })
-      .where(and(eq(surveyResponses.id, id), eq(surveyResponses.surveyId, surveyId)))
-      .returning();
-    return row ? this.mapResponse(row) : null;
   }
 }

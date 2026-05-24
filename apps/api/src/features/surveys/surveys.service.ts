@@ -46,17 +46,35 @@ export class SurveysService {
 
   async findAll(): Promise<SurveyRecordWithState[]> {
     const surveys = await this.surveysRepo.findAll();
+    const responseCounts = await Promise.all(
+      surveys.map(async (survey) => ({
+        surveyId: survey.id,
+        responseCount: await this.responsesRepo.countSubmitted(survey.id),
+      })),
+    );
+
+    const responseCountMap = new Map(responseCounts.map((item) => [item.surveyId, item.responseCount]));
+
     return surveys.map((s) => {
       const { status, computedState } = this.computeStatusAndState(s);
-      return { ...s, status, computedState };
+      return { ...s, status, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
     });
   }
 
   async findPublished(): Promise<SurveyRecordWithState[]> {
     const surveys = await this.surveysRepo.findPublished();
+    const responseCounts = await Promise.all(
+      surveys.map(async (survey) => ({
+        surveyId: survey.id,
+        responseCount: await this.responsesRepo.countSubmitted(survey.id),
+      })),
+    );
+
+    const responseCountMap = new Map(responseCounts.map((item) => [item.surveyId, item.responseCount]));
+
     return surveys.map((s) => {
       const { status, computedState } = this.computeStatusAndState(s);
-      return { ...s, status, computedState };
+      return { ...s, status, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
     });
   }
 

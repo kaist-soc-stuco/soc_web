@@ -102,28 +102,28 @@ export function BulkEmailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-8">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
         {/* Unified Compact Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 pb-5 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-5 gap-4 select-none">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">이메일 일괄발송</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-black tracking-tight text-slate-800">이메일 일괄발송</h1>
+            <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-400">
               특정 그룹(전체, 과비 납부자, 과비 미납자)을 지정하여 공식 공지 메일을 일괄적으로 발송합니다.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
           {/* Left Column: Form */}
           <div className="lg:col-span-2 space-y-6">
-            <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
-              <h2 className="text-lg font-bold text-kaist-black flex items-center gap-2">
+            <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+              <h2 className="flex items-center gap-2 border-b border-slate-100 pb-3 text-lg font-extrabold text-slate-800">
                 <Mail className="w-5 h-5 text-kaist-darkgreen" />
                 메일 작성
               </h2>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-medium flex items-start gap-2">
+                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
@@ -131,7 +131,7 @@ export function BulkEmailPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">수신 대상 *</label>
+                  <label className="mb-1.5 block text-xs font-bold text-slate-400">수신 대상 *</label>
                   <div className="grid grid-cols-3 gap-3">
                     {(["ALL", "PAID_STUDENTS", "UNPAID_STUDENTS"] as const).map((type) => (
                       <button
@@ -140,8 +140,8 @@ export function BulkEmailPage() {
                         onClick={() => setFormData({ ...formData, recipientType: type })}
                         className={`py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all text-center cursor-pointer ${
                           formData.recipientType === type
-                            ? "bg-kaist-darkgreen text-white border-0 hover:bg-kaist-darkgreen/90 shadow-md shadow-kaist-darkgreen/15"
-                            : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
+                            ? "bg-kaist-darkgreen text-white border-0 hover:bg-[#0f5c29] shadow-sm"
+                            : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
                         }`}
                       >
                         {getRecipientTypeLabel(type)}
@@ -151,26 +151,26 @@ export function BulkEmailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">메일 제목 *</label>
+                  <label className="mb-1.5 block text-xs font-bold text-slate-400">메일 제목 *</label>
                   <input
                     type="text"
                     required
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    placeholder="[KAIST 전산학부 학생회] 공지 제목을 입력하세요."
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-kaist-darkgreen focus:ring-1 focus:ring-kaist-darkgreen"
+                    placeholder="[KAIST 전산학부 집행위원회] 공지 제목을 입력하세요."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">메일 본문 내용 *</label>
+                  <label className="mb-1.5 block text-xs font-bold text-slate-400">메일 본문 내용 *</label>
                   <textarea
                     required
                     rows={12}
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     placeholder="메일 본문 내용을 상세히 작성하세요. (텍스트 포맷 지원)"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-kaist-darkgreen focus:ring-1 focus:ring-kaist-darkgreen"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
                   />
                 </div>
               </div>
@@ -179,7 +179,7 @@ export function BulkEmailPage() {
                 <button
                   type="submit"
                   disabled={sending}
-                  className="flex items-center gap-2 bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl border-0 bg-kaist-darkgreen px-6 py-3 text-sm font-extrabold text-white transition-all shadow-sm cursor-pointer hover:bg-[#0f5c29] disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
                   {sending ? "전송 중..." : "일괄 전송하기"}
@@ -190,22 +190,22 @@ export function BulkEmailPage() {
 
           {/* Right Column: Sending Logs History */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <h2 className="text-lg font-bold text-kaist-black flex items-center gap-2 border-b border-gray-50 pb-3">
+            <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+              <h2 className="flex items-center gap-2 border-b border-slate-100 pb-3 text-lg font-extrabold text-slate-800">
                 <History className="w-5 h-5 text-kaist-greygreen" />
                 최근 발송 내역
               </h2>
 
               {historyLoading ? (
-                <div className="text-center py-8 text-kaist-grey/60 text-sm font-medium">불러오는 중...</div>
+                <div className="py-8 text-center text-sm font-semibold text-slate-400">불러오는 중...</div>
               ) : history.length === 0 ? (
-                <div className="text-center py-8 text-kaist-grey/60 text-sm font-medium">이전 발송 이력이 없습니다.</div>
+                <div className="py-8 text-center text-sm font-semibold text-slate-400">이전 발송 이력이 없습니다.</div>
               ) : (
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                   {history.map((record) => (
                     <div
                       key={record.id}
-                      className="p-4 border border-gray-100 rounded-2xl hover:border-kaist-lightgreen/30 transition-all space-y-2 bg-slate-50/30"
+                      className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/30 p-4 transition-all hover:border-kaist-darkgreen/15"
                     >
                       <div className="flex justify-between items-start gap-2">
                         <span
@@ -222,11 +222,11 @@ export function BulkEmailPage() {
                         </span>
                       </div>
 
-                      <h3 className="font-bold text-gray-900 text-xs sm:text-sm line-clamp-1">
+                      <h3 className="line-clamp-1 text-xs font-extrabold text-slate-800 sm:text-sm">
                         {record.subject}
                       </h3>
 
-                      <div className="flex justify-between items-center text-xs text-kaist-grey pt-1 border-t border-gray-100/50">
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-1 text-xs text-slate-500">
                         <span className="flex items-center gap-1">
                           <Users className="w-3.5 h-3.5" />
                           수신: {record.recipientCount}명

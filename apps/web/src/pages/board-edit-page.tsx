@@ -61,8 +61,8 @@ export function BoardEditPage() {
 
     if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
       alert(lang === "ko" 
-        ? "영문 제목과 내용을 입력하거나, 'Korean Only'를 체크해주세요." 
-        : "Please enter English title and content, or check 'Korean Only'.");
+        ? "영문 제목과 내용을 입력하거나, 'Korean Speakers Only'를 체크해주세요." 
+        : "Please enter English title and content, or check 'Korean Speakers Only'.");
       setActiveTab("en");
       return;
     }
@@ -197,7 +197,7 @@ export function BoardEditPage() {
                       }}
                     />
                     <span className={`text-xs font-bold ${isKoreanOnly ? "text-red-600" : "text-kaist-black"}`}>
-                      Korean Only
+                      Korean Speakers Only
                     </span>
                   </label>
                 </div>

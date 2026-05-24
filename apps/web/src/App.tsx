@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HomePage } from '@/pages/home-page';
 import { BoardPage } from '@/pages/board-page';
 import { TreeLogin } from '@/pages/login-page';
@@ -17,6 +17,7 @@ import { BoardEditPage } from '@/pages/board-edit-page';
 import { MyPage } from '@/pages/my-page';
 import { AboutPage } from '@/pages/about-page';
 import { EventsSurveysPage } from '@/pages/events-surveys-page';
+
 import { ContactsPage } from '@/pages/admin/contacts-page';
 import { BulkEmailPage } from '@/pages/admin/bulk-email-page';
 
@@ -29,6 +30,7 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/events-surveys" element={<EventsSurveysPage />} />
+        <Route path="/calendar" element={<Navigate to="/events-surveys?tab=calendar" replace />} />
         <Route path="/board/:category" element={<BoardPage />} />
         <Route path="/board/:category/write" element={<BoardWritePage />} />
         <Route path="/board/:category/:articleId" element={<BoardDetailPage />} />

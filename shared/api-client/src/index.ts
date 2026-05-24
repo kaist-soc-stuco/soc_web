@@ -28,7 +28,6 @@ import type {
   LogoutResponse,
   RefreshResponse,
   ResponseDetailResponse,
-  ReviewResponseRequest,
   SubmitResponseRequest,
   SurveyDetailResponse,
   SurveyQuestionRecord,
@@ -902,22 +901,6 @@ export const createApiClient = ({
       return requestJson<ResponseDetailResponse>(
         `${surveyBaseUrl}/${surveyId}/responses/${responseId}`,
         { method: "GET" },
-        { retryOnUnauthorized: true },
-      );
-    },
-
-    reviewResponse: async (
-      surveyId: string,
-      responseId: string,
-      body: ReviewResponseRequest,
-    ): Promise<SurveyResponseRecord> => {
-      return requestJson<SurveyResponseRecord>(
-        `${surveyBaseUrl}/${surveyId}/responses/${responseId}/review`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
         { retryOnUnauthorized: true },
       );
     },

@@ -48,7 +48,7 @@ export function AdminLayout() {
         </Link>
         <span className="text-xs text-kaist-grey/60 font-semibold px-1">|</span>
         <span className="text-xs font-extrabold text-kaist-darkgreen-main uppercase tracking-wider">
-          {lang === "ko" ? "학생회 관리자 포탈" : "Student Council Admin Portal"}
+          {lang === "ko" ? "집행위원회 관리자 포탈" : "Student Council Admin Portal"}
         </span>
       </div>
 

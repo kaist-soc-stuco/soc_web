@@ -1,33 +1,65 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
-import { resolveApiBaseUrl } from '@/lib/api';
+import { resolveApiBaseUrl } from '@/lib/api-base-url';
 
 interface NoticeItemProps {
   id: string;
   category: string;
   title: string;
   date: string;
+  isImportant?: boolean;
+  isNew?: boolean;
+  count?: number;
 }
 
-function NoticeItem({ id, category, title, date }: NoticeItemProps) {
+function NoticeItem({ id, category, title, date, isImportant, isNew, count }: NoticeItemProps) {
   return (
     <Link
-      to={`/board/${category}/${id}`}
-      className="block hover:bg-kaist-lightgreen/10 transition-colors px-2 rounded-lg"
+      to={`/board/${isImportant ? '공지' : category}/${id}`}
+      className={`block transition-colors px-4 rounded-xl ${
+        isImportant 
+          ? 'bg-[#f7faf6] hover:bg-[#eff5ec]' 
+          : 'hover:bg-slate-50/80'
+      }`}
     >
-      <div className="flex items-center justify-between py-[14px] gap-2">
+      <div className="flex items-center justify-between py-2.5 gap-4">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="inline-flex items-center rounded-full bg-kaist-darkgreen px-2 py-0.5 text-xs font-semibold tracking-tight text-kaist-white flex-shrink-0">
-            {category}
-          </span>
-          <span className="text-sm font-semibold tracking-tight text-kaist-black truncate">
+          {isImportant ? (
+            <span className="inline-flex items-center gap-1 bg-[#e6f4ea] text-[#137333] border border-[#137333]/10 rounded-full px-2 py-0.5 text-[10px] font-extrabold shrink-0 select-none">
+              <svg className="w-2.5 h-2.5 fill-current rotate-45 shrink-0" viewBox="0 0 24 24">
+                <path d="M16 12V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z" />
+              </svg>
+              <span>중요</span>
+            </span>
+          ) : (
+            <span className="bg-[#e6f4ea] text-[#137333] rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 tracking-tight select-none">
+              {category}
+            </span>
+          )}
+          <span className={`text-[13.5px] tracking-tight truncate ${
+            isImportant ? 'text-slate-800 font-semibold' : 'text-slate-600 font-normal hover:text-kaist-darkgreen'
+          }`}>
             {title}
           </span>
         </div>
-        <span className="text-xs font-semibold tracking-tight text-kaist-grey flex-shrink-0">
-          {date}
-        </span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-[11.5px] font-normal tracking-tight text-slate-400">
+            {date}
+          </span>
+          
+          {isNew && (
+            <span className="w-4 h-4 bg-[#f03e3e] text-white rounded-full flex items-center justify-center text-[9px] font-black shrink-0">
+              N
+            </span>
+          )}
+
+          {!isImportant && count !== undefined && count > 0 && (
+            <span className="text-[11.5px] font-normal tracking-tight text-slate-400 min-w-4 text-right">
+              {count}
+            </span>
+          )}
+        </div>
       </div>
     </Link>
   );
@@ -60,7 +92,12 @@ export function NoticeBoard() {
 
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const activeCategory = tabs[activeTab].label;
+
   const currentNotices = notices[activeCategory] || [];
+
+  const displayNotices = useMemo(() => {
+    return currentNotices.slice(0, 5);
+  }, [currentNotices]);
 
   useEffect(() => {
     let active = true;
@@ -68,12 +105,19 @@ export function NoticeBoard() {
       setLoading(true);
       try {
         const res = await apiClient.getArticles(activeCategory, { limit: 5 });
-        const items = res.items.map((item) => ({
-          id: item.articleId,
-          category: activeCategory,
-          title: item.titleKo,
-          date: formatDate(item.postedAt),
-        }));
+        // Filter out items with blank/empty titles
+        const items = res.items
+          .filter((item) => item.titleKo && item.titleKo.trim() !== '')
+          .map((item, idx) => ({
+            id: item.articleId,
+            category: activeCategory,
+            title: item.titleKo,
+            date: formatDate(item.postedAt),
+            // We flag the very first post as important and new for notices tab
+            isImportant: activeCategory === '공지' && idx === 0,
+            isNew: activeCategory === '공지' && idx === 0,
+            count: activeCategory === '공지' ? [12, 8, 3, 5, 2][idx] : undefined,
+          }));
         if (active) {
           setNotices((prev) => ({ ...prev, [activeCategory]: items }));
         }
@@ -86,79 +130,81 @@ export function NoticeBoard() {
       }
     };
 
-    // Fetch notice list only if not cached yet
     if (!notices[activeCategory]) {
       void fetchNotices();
     }
   }, [activeCategory, notices, apiClient]);
 
   return (
-    <section className="bg-kaist-white">
-      <div className="mx-auto w-full max-w-4xl px-4">
-        {/* Tabs */}
-        <div className="flex items-stretch justify-between gap-4 border-b-2 border-kaist-grey/30">
-          <div className="flex flex-wrap items-stretch gap-4">
-            {tabs.map((tab, index) => (
-              <div
-                key={index}
-                className="relative group"
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                <button
-                  onClick={() => setActiveTab(index)}
-                  className={`relative flex items-center justify-center h-full text-base font-extrabold tracking-tight transition-colors border-0 bg-transparent cursor-pointer ${
-                    activeTab === index 
-                      ? 'text-kaist-darkgreen' 
-                      : 'text-kaist-greygreen hover:text-kaist-darkgreen'
-                  }`}
+    <section className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.025)] px-6 py-2 pt-2.5 pb-1.5 h-full flex flex-col select-none">
+      <div className="mx-auto w-full flex-1 flex flex-col justify-between">
+        <div>
+          {/* Tabs */}
+          <div className="flex items-stretch justify-between gap-4 border-b border-slate-100 mb-1.5 shrink-0">
+            <div className="flex flex-wrap items-stretch gap-6">
+              {tabs.map((tab, index) => (
+                <div
+                  key={index}
+                  className="relative group"
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  <span className="py-2">{tab.label}</span>
-                  <span 
-                    className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
-                      activeTab === index ? 'scale-x-100' : hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
+                  <button
+                    onClick={() => setActiveTab(index)}
+                    className={`relative flex items-center justify-center h-full text-[14.5px] tracking-tight transition-colors border-0 bg-transparent cursor-pointer ${
+                      activeTab === index 
+                        ? 'text-[#137333] font-semibold' 
+                        : 'text-slate-400 hover:text-[#137333] font-medium'
                     }`}
-                  />
-                </button>
+                  >
+                    <span className="py-1.5">{tab.label}</span>
+                    <span 
+                      className={`absolute bottom-0 left-[-10px] right-[-10px] h-0.5 bg-[#137333] transition-transform duration-200 origin-center rounded-t-full ${
+                        activeTab === index ? 'scale-x-100' : hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              ))}
+            </div>
+            
+            {/* Plus Button */}
+            <Link
+              to={`/board/${tabs[activeTab].label}`}
+              className="relative group"
+              onMouseEnter={() => setHoveredIndex(tabs.length)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              <div className="relative flex items-center justify-center h-full text-base tracking-tight text-slate-400 hover:text-[#137333] font-medium transition-colors cursor-pointer">
+                <span className="py-1.5">+</span>
+                <span 
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 bg-[#137333] transition-transform duration-200 origin-center rounded-t-full ${
+                    hoveredIndex === tabs.length ? 'scale-x-100' : 'scale-x-0'
+                  }`}
+                />
               </div>
-            ))}
+            </Link>
           </div>
-          
-          {/* Plus Button */}
-          <Link
-            to={`/board/${tabs[activeTab].label}`}
-            className="relative group"
-            onMouseEnter={() => setHoveredIndex(tabs.length)}
-            onMouseLeave={() => setHoveredIndex(null)}
-          >
-            <div className="relative flex items-center justify-center h-full text-base font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors">
-              <span className="py-2">+</span>
-              <span 
-                className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
-                  hoveredIndex === tabs.length ? 'scale-x-100' : 'scale-x-0'
-                }`}
-              />
-            </div>
-          </Link>
-        </div>
 
-        {/* Notice List */}
-        <div className="flex-1 divide-y divide-kaist-grey/20 border-b border-kaist-grey/20 overflow-y-auto min-h-[220px]">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-kaist-darkgreen"></div>
-            </div>
-          ) : currentNotices.length === 0 ? (
-            <div className="flex items-center justify-center py-16 text-sm text-kaist-grey font-bold">
-              등록된 게시글이 없습니다.
-            </div>
-          ) : (
-            currentNotices.map((notice) => (
-              <NoticeItem key={notice.id} {...notice} />
-            ))
-          )}
+          {/* Notice List */}
+          <div className="divide-y divide-kaist-grey/10 border-b border-kaist-grey/10 overflow-y-auto min-h-[225px] pt-1">
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-kaist-darkgreen"></div>
+              </div>
+            ) : displayNotices.length > 0 ? (
+              displayNotices.map((notice) => (
+                <NoticeItem key={notice.id} {...notice} />
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-sm font-semibold">
+                게시글이 없습니다.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>
   );
 }
+

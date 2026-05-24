@@ -1,137 +1,72 @@
-import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export function Hero() {
-  const [currentImageIndex, setCurrentImageIndex] = useState(1);
-  const [isTransitioning, setIsTransitioning] = useState(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  // TODO: MySQL에서 Hero 배경 이미지 가져오기
-  // useEffect(() => {
-  //   const fetchHeroImages = async () => {
-  //     try {
-  //       const response = await fetch('/api/hero-images');
-  //       const data = await response.json();
-  //       // data 형식 예상: [{ id: 1, imageUrl: '/uploads/hero_1.jpg', order: 1 }, ...]
-  //       const imageUrls = data.map((item: any) => item.imageUrl);
-  //       setOriginalImages(imageUrls);
-  //     } catch (error) {
-  //       console.error('Failed to fetch hero images:', error);
-  //       // 에러 시 기본 이미지 사용
-  //     }
-  //   };
-  //   
-  //   fetchHeroImages();
-  // }, []);
-
-  // 임시 하드코딩된 이미지 
-  const originalImages = [
-    '/hero_background_1.jpg',
-    '/hero_background2.jpeg',
-    '/hero_background3.jpeg',
-    '/hero_background4.jpeg',
-  ];
-
-  // 무한 루프를 위해 첫 번째와 마지막 이미지를 양 끝에 추가
-  const images = [
-    originalImages[originalImages.length - 1], // 마지막 이미지 복사
-    ...originalImages,
-    originalImages[0], // 첫 번째 이미지 복사
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => prevIndex + 1);
-    }, 5000); // 5초마다 이미지 변경
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    // 마지막 복사본에 도달하면 첫 번째 실제 이미지로 점프
-    if (currentImageIndex === images.length - 1) {
-      timeoutRef.current = setTimeout(() => {
-        setIsTransitioning(false);
-        setCurrentImageIndex(1);
-      }, 800); // transition 완료 후
-    }
-    // 첫 번째 복사본에 도달하면 마지막 실제 이미지로 점프
-    else if (currentImageIndex === 0) {
-      timeoutRef.current = setTimeout(() => {
-        setIsTransitioning(false);
-        setCurrentImageIndex(images.length - 2);
-      }, 800); // transition 완료 후
-    }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [currentImageIndex, images.length]);
-
-  useEffect(() => {
-    // transition 없이 점프한 후 다시 transition 활성화
-    if (!isTransitioning) {
-      const timeout = setTimeout(() => {
-        setIsTransitioning(true);
-      }, 50);
-      return () => clearTimeout(timeout);
-    }
-  }, [isTransitioning]);
+  const navigate = useNavigate();
 
   return (
-    <section className="relative h-full w-full overflow-hidden bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900">
-      {/* Background Images - Sliding */}
+    <section className="relative h-full w-full overflow-hidden bg-slate-950 select-none">
+      {/* Background Image - goes all the way to the top! */}
       <div 
-        className="absolute inset-0 flex"
+        className="absolute inset-0 bg-cover bg-center opacity-40 transition-transform duration-500 hover:scale-101"
         style={{
-          transform: `translateX(-${currentImageIndex * 100}%)`,
-          transition: isTransitioning ? 'transform 800ms ease-in-out' : 'none',
+          backgroundImage: `url('/hero_background_1.jpg')`,
         }}
-      >
-        {images.map((image, index) => (
-          <div
-            key={`${image}-${index}`}
-            className="w-full h-full flex-shrink-0 bg-cover bg-center opacity-40"
-            style={{
-              backgroundImage: `url(${image})`,
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Logo section */}
-      <div className="relative z-10 flex h-14 items-center justify-start px-4">
-        <div className="flex items-center gap-2 md:gap-4">
+      />
+
+      {/* Top Logo Area layered absolute on top of the hero image */}
+      <div className="absolute top-0 left-0 right-0 h-14 flex items-center px-8 z-20">
+        <div className="flex items-center gap-3">
           <img 
             src="/kaist_logo.png" 
             alt="KAIST Logo" 
-            className="h-6 w-auto"
+            className="h-5 w-auto brightness-0 invert"
           />
-          <div className="h-6 w-px bg-gray-300" />
+          <div className="h-4 w-px bg-white/30" />
           <img 
             src="/logo.png" 
-            alt="SOC Logo" 
-            className="h-7 w-auto"
+            alt="TREE Logo" 
+            className="h-6 w-auto bg-transparent brightness-0 invert"
           />
         </div>
       </div>
 
-      {/* Content - Vertically centered */}
-      <div className="absolute inset-0 z-10 flex items-center px-6 md:px-12 lg:px-24">
-        <div className="max-w-7xl flex items-start gap-8">
-          {/* Green Accent Bar */}
-          <div className="mt-8 h-12 w-4 bg-kaist-lightgreen2" />
-          
-          {/* Title */}
-          <h1 
-            className="mt-4 text-5xl font-black leading-[150%] tracking-[-0.011em] text-kaist-white max-w-md md:max-w-lg lg:max-w-xl"
-            style={{ fontFamily: "'Roboto Slab', serif" }}
-          >
-            KAIST School Of Computing
-          </h1>
+        {/* Content - Vertically centered */}
+        <div className="absolute inset-0 z-10 flex flex-col justify-center px-10 lg:px-14">
+          {/* Accent Bar + Title Group */}
+          <div className="flex items-stretch gap-3.5 mb-6">
+            {/* Green Accent Bar - Thin, Premium Line */}
+            <div className="w-[3px] bg-[#40c057] rounded-sm shrink-0" />
+            
+            {/* Title */}
+            <h1 
+              className="text-4xl lg:text-[46px] font-black leading-[1.15] tracking-tight text-white"
+              style={{ fontFamily: "'Roboto Slab', serif" }}
+            >
+              KAIST School<br />
+              Of Computing
+            </h1>
+          </div>
+
+          {/* Subtitle - Left aligned with the Accent Bar */}
+          <p className="text-[14px] lg:text-base text-white/90 leading-[1.6] font-medium tracking-tight whitespace-pre-line mt-2">
+            학생들의 목소리를 대변하고,<br />
+            더 나은 학업 및 문화 환경을 만들어갑니다.
+          </p>
+
+          {/* Button - Left aligned with the Accent Bar */}
+          <div>
+            <button 
+              onClick={() => navigate('/about')}
+              className="mt-8 flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-[#05260f] text-white text-xs lg:text-sm font-black hover:bg-[#0c3c16] transition-all shadow-md cursor-pointer hover:scale-102"
+            >
+              {/* White circle background with green play triangle */}
+              <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[8px] text-[#2b8a3e] shrink-0 select-none shadow-2xs">
+                ▶
+              </span>
+              <span className="font-extrabold tracking-tight">집행위원회 소개 보기</span>
+            </button>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
   );
 }
