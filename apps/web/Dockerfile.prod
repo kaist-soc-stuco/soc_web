@@ -1,0 +1,31 @@
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/package.json
+COPY shared/api-client/package.json shared/api-client/package.json
+COPY shared/contracts/package.json shared/contracts/package.json
+COPY shared/common/package.json shared/common/package.json
+COPY shared/config/package.json shared/config/package.json
+COPY shared/config/tsconfig/base.json shared/config/tsconfig/base.json
+
+RUN pnpm install --filter @soc/web... --frozen-lockfile
+
+COPY apps/web apps/web
+COPY shared/api-client shared/api-client
+COPY shared/contracts shared/contracts
+COPY shared/common shared/common
+COPY shared/config shared/config
+
+RUN pnpm --filter @soc/contracts build
+RUN pnpm --filter @soc/web build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+
+EXPOSE 5173

@@ -65,6 +65,19 @@ export class UsersController {
     });
   }
 
+  @Get("me/activity")
+  @UseGuards(AuthGuard)
+  async getMyActivities(
+    @Req() req: AuthenticatedRequest,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.usersService.getMyActivities(req.user!.id, {
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+    });
+  }
+
   /**
     * 사용자 영구 저장 여부 확인용 예시 endpoint입니다.
    */

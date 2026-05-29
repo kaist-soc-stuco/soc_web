@@ -20,6 +20,8 @@ temp/
 .temp/
 **/tmp/
 **/.cache/
+uploads/
+**/uploads/
 
 # Logs
 logs/
@@ -50,3 +52,6 @@ lerna-debug.log*
 # Claude
 ./CLAUDE.md
 **/CLAUDE.md
+
+images/
+/docs

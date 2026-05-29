@@ -1,10 +1,14 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { and, asc, eq, inArray, isNull, lt } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
-import { assets } from "../../../infrastructure/postgres/postgres.schema";
+import {
+  articleAssets,
+  assets,
+} from "../../../infrastructure/postgres/postgres.schema";
 
 @Injectable()
 export class AssetRepository {
@@ -30,5 +34,46 @@ export class AssetRepository {
       .returning({ assetId: assets.assetId });
 
     return { assetId: String(created.assetId) };
+  }
+
+  async findUnlinkedAssetsBefore(
+    cutoff: Date,
+    limit: number,
+  ): Promise<Array<{ assetId: string; storageKey: string }>> {
+    const rows = await this.db
+      .select({
+        assetId: assets.assetId,
+        storageKey: assets.storageKey,
+      })
+      .from(assets)
+      .leftJoin(articleAssets, eq(articleAssets.assetId, assets.assetId))
+      .where(
+        and(isNull(articleAssets.articleAssetId), lt(assets.createdAt, cutoff)),
+      )
+      .orderBy(asc(assets.createdAt))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      assetId: String(row.assetId),
+      storageKey: row.storageKey,
+    }));
+  }
+
+  async deleteAssetsByIds(assetIds: string[]): Promise<number> {
+    if (assetIds.length === 0) {
+      return 0;
+    }
+
+    const deleted = await this.db
+      .delete(assets)
+      .where(
+        inArray(
+          assets.assetId,
+          assetIds.map((assetId) => Number(assetId)),
+        ),
+      )
+      .returning({ assetId: assets.assetId });
+
+    return deleted.length;
   }
 }

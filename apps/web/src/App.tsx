@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HomePage } from '@/pages/home-page';
 import { BoardPage } from '@/pages/board-page';
-import { TreeLogin } from '@/pages/login-page';
+import { LoginCallbackPage } from '@/pages/login-callback-page';
 import { LoginConsentPage } from '@/pages/login-consent-page';
 import { SurveyPage } from '@/pages/survey-page';
 import { SurveyResultsPage } from '@/pages/survey-results-page';
@@ -17,11 +17,14 @@ import { BoardEditPage } from '@/pages/board-edit-page';
 import { MyPage } from '@/pages/my-page';
 import { AboutPage } from '@/pages/about-page';
 import { EventsSurveysPage } from '@/pages/events-surveys-page';
+import { PrivacyPage } from '@/pages/privacy-page';
 
 import { ContactsPage } from '@/pages/admin/contacts-page';
 import { BulkEmailPage } from '@/pages/admin/bulk-email-page';
+import { AdminIndexPage } from '@/pages/admin/admin-index-page';
 
 import { AdminLayout } from '@/components/organisms/admin-layout';
+import { AuthGuard } from '@/components/guards/auth-guard';
 
 export function App() {
   return (
@@ -30,19 +33,44 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/events-surveys" element={<EventsSurveysPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/calendar" element={<Navigate to="/events-surveys?tab=calendar" replace />} />
+        <Route path="/board" element={<BoardPage />} />
+        <Route
+          path="/board/write"
+          element={
+            <AuthGuard>
+              <BoardWritePage />
+            </AuthGuard>
+          }
+        />
         <Route path="/board/:category" element={<BoardPage />} />
-        <Route path="/board/:category/write" element={<BoardWritePage />} />
+        <Route
+          path="/board/:category/write"
+          element={
+            <AuthGuard>
+              <BoardWritePage />
+            </AuthGuard>
+          }
+        />
         <Route path="/board/:category/:articleId" element={<BoardDetailPage />} />
-        <Route path="/board/:category/:articleId/edit" element={<BoardEditPage />} />
+        <Route
+          path="/board/:category/:articleId/edit"
+          element={
+            <AuthGuard>
+              <BoardEditPage />
+            </AuthGuard>
+          }
+        />
         <Route path="/survey/:id" element={<SurveyPage />} />
         <Route path="/survey/:id/results" element={<SurveyResultsPage />} />
-        <Route path="/login" element={<TreeLogin />} />
+        <Route path="/login" element={<LoginCallbackPage />} />
         <Route path="/login/consent" element={<LoginConsentPage />} />
         <Route path="/mypage" element={<MyPage />} />
 
         {/* Admin Routes with nested Outlet */}
         <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminIndexPage />} />
           <Route path="surveys" element={<SurveyListPage />} />
           <Route path="permissions" element={<PermissionPage />} />
           <Route path="finance" element={<FeeManagementPage />} />
@@ -57,4 +85,3 @@ export function App() {
     </BrowserRouter>
   );
 }
-

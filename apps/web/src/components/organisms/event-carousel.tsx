@@ -313,9 +313,10 @@ export function EventCarousel() {
         </h2>
         <Link 
           to="/events-surveys" 
-          className="text-[10px] font-bold text-kaist-grey hover:text-kaist-darkgreen transition-colors cursor-pointer"
+          className="text-[10px] font-bold text-kaist-grey hover:text-kaist-darkgreen transition-colors cursor-pointer flex items-center gap-0.5"
         >
-          더보기 &gt;
+          <span>더보기</span>
+          <svg className="w-2.5 h-2.5 text-slate-450" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
         </Link>
       </div>
 

@@ -19,13 +19,20 @@ import { Permissions } from "@soc/contracts";
 
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
-import { assertBoardReadable, type CurrentUserContext } from "./board-access";
+import {
+  assertBoardReadable,
+  canReadBoard,
+  type CurrentUserContext,
+} from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
 
 interface ArticleQueryParams {
   page?: number;
   limit?: number;
   q?: string;
+  period?: "all" | "7days" | "30days";
+  searchBy?: "title" | "author" | "title_content";
+  sortBy?: "latest" | "views";
 }
 
 interface AuthenticatedUser {
@@ -66,6 +73,47 @@ export class ArticleService {
       page,
       limit,
       query,
+    );
+
+    return {
+      page,
+      limit,
+      total: result.total,
+      items: result.items,
+    };
+  }
+
+  async getAllArticles(
+    params: ArticleQueryParams,
+    currentUser: CurrentUserContext,
+  ): Promise<ArticleListResponse> {
+    const readableBoards = (await this.boardRepository.listBoards()).filter(
+      (board) => canReadBoard(board, currentUser),
+    );
+
+    const page = params.page && params.page > 0 ? params.page : 1;
+    const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
+    const limit = Math.min(rawLimit, MAX_PAGE_SIZE);
+    const query = params.q?.trim();
+    const searchBy = params.searchBy ?? "title";
+    const sortBy = params.sortBy ?? "latest";
+    const cutoffDate =
+      params.period === "7days"
+        ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        : params.period === "30days"
+          ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          : undefined;
+
+    const result = await this.articleRepository.listByBoardIds(
+      readableBoards.map((board) => board.boardId),
+      {
+        cutoffDate,
+        limit,
+        page,
+        query,
+        searchBy,
+        sortBy,
+      },
     );
 
     return {

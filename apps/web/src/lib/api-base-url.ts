@@ -10,14 +10,5 @@ export const resolveApiBaseUrl = (): string => {
     return withNoTrailingSlash(apiBaseUrl);
   }
 
-  const startUrl = (
-    import.meta.env.VITE_SSO_START_URL as string | undefined
-  )?.trim();
-  if (startUrl) {
-    const parsed = new URL(startUrl);
-    const path = parsed.pathname.replace(/\/auth\/login\/start$/, "");
-    return `${parsed.origin}${path}`;
-  }
-
-  throw new Error("Missing VITE_API_BASE_URL or VITE_SSO_START_URL");
+  return "/api";
 };

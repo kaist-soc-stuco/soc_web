@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from "@nestjs/common";
 import { CreateRoleGroupSchema, UpdateRoleGroupSchema, AssignRoleGroupMemberSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
+import type { AssignRoleGroupMemberRequest } from "@soc/contracts";
 import { Request } from "express";
 
 import { RequirePermissions } from "../../shared/guards";
@@ -46,12 +47,13 @@ export class RoleGroupsController {
   @Post(":roleGroupId/users")
   addMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
-    @Body("userId") userId: string,
+    @Body(new ZodValidationPipe(AssignRoleGroupMemberSchema))
+    dto: AssignRoleGroupMemberRequest,
     @Req() request: Request & { user?: { id: string } },
   ) {
     return this.roleGroupsService.addUserToRoleGroup(
       roleGroupId,
-      { userId },
+      dto,
       request.user?.id,
     );
   }

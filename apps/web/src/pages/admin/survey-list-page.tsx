@@ -5,6 +5,9 @@ import { createApiClient } from "@soc/api-client";
 import type { SurveyRecord } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Pagination } from "@/components/ui/pagination";
+import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import { 
@@ -15,8 +18,6 @@ import {
   Trash2, 
   Link2, 
   Loader2,
-  ChevronLeft,
-  ChevronRight,
   Search,
   MoreVertical,
   Calendar,
@@ -148,65 +149,6 @@ function formatRelativeTime(dateIso: string | null) {
   return `${year}.${month}.${day}`;
 }
 
-// Single line consolidated status badge ( 진행중 · D-7 )
-function renderStatusBadgeSingleLine(s: SurveyRecord) {
-  if (s.status === "draft") {
-    return (
-      <span className="inline-flex items-center justify-center rounded-md bg-slate-50 px-2.5 py-0.5 text-[11.5px] font-extrabold text-slate-600 border border-slate-200">
-        임시저장
-      </span>
-    );
-  }
-
-  if (s.status === "closed" || s.closesAt && new Date(s.closesAt) < new Date()) {
-    return (
-      <span className="inline-flex items-center justify-center rounded-md bg-rose-50 px-2.5 py-0.5 text-[11.5px] font-extrabold text-rose-700 border border-rose-200">
-        마감
-      </span>
-    );
-  }
-
-  const isOpenState = s.status === "open" || s.isPublished;
-  const isBeforeOpen = s.opensAt && new Date(s.opensAt) > new Date();
-
-  if (isBeforeOpen) {
-    return (
-      <span className="inline-flex items-center justify-center rounded-md bg-amber-50 px-2.5 py-0.5 text-[11.5px] font-extrabold text-amber-700 border border-amber-200">
-        개시 전
-      </span>
-    );
-  }
-
-  if (isOpenState) {
-    let dDayText = "";
-    if (s.closesAt) {
-      const now = new Date();
-      const closeDate = new Date(s.closesAt);
-      const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const d2 = new Date(closeDate.getFullYear(), closeDate.getMonth(), closeDate.getDate());
-      const diffMs = d2.getTime() - d1.getTime();
-      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-      if (diffDays > 0) {
-        dDayText = ` · D-${diffDays}`;
-      } else if (diffDays === 0) {
-        dDayText = " · D-Day";
-      }
-    }
-    return (
-      <span className="inline-flex items-center justify-center rounded-md bg-emerald-50 px-2.5 py-0.5 text-[11.5px] font-extrabold text-emerald-700 border border-emerald-200 whitespace-nowrap">
-        진행중{dDayText}
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex items-center justify-center rounded-md bg-rose-50 px-2.5 py-0.5 text-[11.5px] font-extrabold text-rose-700 border border-rose-200">
-      마감
-    </span>
-  );
-}
-
 // Standardized single kind badge (removed anonymity badge)
 function renderTypeBadge(s: SurveyRecord) {
   let kindBadge = { label: "설문", color: "bg-teal-50 text-teal-700 border-teal-200" };
@@ -251,6 +193,7 @@ export function SurveyListPage() {
 
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
+  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
 
   const fetchSurveys = async () => {
     try {
@@ -271,7 +214,14 @@ export function SurveyListPage() {
   }, [client, session, sessionLoading]);
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`"${title}" 설문조사를 삭제하시겠습니까?`)) return;
+    const confirmed = await requestConfirm({
+      confirmLabel: "삭제",
+      description: "삭제한 설문조사는 복구할 수 없습니다.",
+      title: `"${title}" 설문조사를 삭제하시겠습니까?`,
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
     setDeleting(id);
     try {
       await client.deleteSurvey(id);
@@ -284,7 +234,13 @@ export function SurveyListPage() {
   };
 
   const handleDuplicate = async (id: string, title: string) => {
-    if (!confirm(`"${title}" 설문조사를 복제하시겠습니까?`)) return;
+    const confirmed = await requestConfirm({
+      confirmLabel: "복제",
+      description: "기존 설문 설정과 문항을 복사한 새 설문조사를 만듭니다.",
+      title: `"${title}" 설문조사를 복제하시겠습니까?`,
+    });
+    if (!confirmed) return;
+
     setDuplicating(id);
     try {
       await client.duplicateSurvey(id);
@@ -435,52 +391,14 @@ export function SurveyListPage() {
   }, [filteredSurveys, totalPages, currentPage]);
 
   // Generate page items exactly as `< 1 2 3 ... 13 >`
-  const getPaginationItems = () => {
-    const items: (number | string)[] = [];
-    const total = totalPages || 1;
-    
-    if (total <= 7) {
-      for (let i = 1; i <= total; i++) {
-        items.push(i);
-      }
-    } else {
-      if (currentPage <= 4) {
-        for (let i = 1; i <= 5; i++) {
-          items.push(i);
-        }
-        items.push("...");
-        items.push(total);
-      } else if (currentPage >= total - 3) {
-        items.push(1);
-        items.push("...");
-        for (let i = total - 4; i <= total; i++) {
-          items.push(i);
-        }
-      } else {
-        items.push(1);
-        items.push("...");
-        items.push(currentPage - 1);
-        items.push(currentPage);
-        items.push(currentPage + 1);
-        items.push("...");
-        items.push(total);
-      }
-    }
-    return items;
-  };
-
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <div className="min-h-screen bg-slate-50/50 text-kaist-black">
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-5.5 px-4 py-8 md:px-8">
+        {ConfirmDialog}
+        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
           
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 select-none">
-            <span className="text-slate-600 font-extrabold">설문조사 관리</span>
-          </div>
-
           {/* Compact Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between pb-1 gap-4 select-none">
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 select-none md:flex-row md:items-center">
             <div>
               <h1 className="text-2xl font-black tracking-tight text-slate-800">설문조사 관리</h1>
               <p className="mt-1 text-[13px] font-semibold text-slate-400 leading-relaxed">
@@ -680,7 +598,7 @@ export function SurveyListPage() {
 
                           {/* Status Badge (center-aligned, single line) */}
                           <td className="px-4 py-4 text-center">
-                            {renderStatusBadgeSingleLine(s)}
+                            <SurveyStatusBadge survey={s} />
                           </td>
 
                           {/* Type Badge (center-aligned, single kind badge) */}
@@ -840,58 +758,11 @@ export function SurveyListPage() {
 
             {/* Premium Pagination Footer block (inside the card container, separated by a top border, styled exactly like the bulletin board) */}
             <div className="border-t border-slate-100 bg-slate-50/10 px-6 py-4 flex items-center justify-center gap-2 select-none">
-              <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                        currentPage === 1
-                          ? "bg-white border-slate-100 text-slate-300 cursor-not-allowed"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer shadow-sm animate-all"
-                      }`}
-                    >
-                      <ChevronLeft className="h-4 w-4 stroke-[2.5px]" />
-                    </button>
-
-                    <div className="flex items-center gap-1.5">
-                      {getPaginationItems().map((item, idx) => {
-                        if (item === "...") {
-                          return (
-                            <span key={`dots-${idx}`} className="text-slate-400 text-xs px-1.5 select-none w-9 h-9 flex items-center justify-center">
-                              ...
-                            </span>
-                          );
-                        }
-                        const page = item as number;
-                        const isActive = currentPage === page;
-                        return (
-                          <button
-                            key={page}
-                            onClick={() => setCurrentPage(page)}
-                            className={`w-9 h-9 rounded-xl text-[13px] font-extrabold tracking-tight transition-all flex items-center justify-center cursor-pointer ${
-                              isActive
-                                ? "bg-kaist-darkgreen text-white shadow-sm border-0"
-                                : "text-slate-500 hover:text-slate-800 bg-transparent border-0"
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                      className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                        currentPage === totalPages
-                          ? "bg-white border-slate-100 text-slate-300 cursor-not-allowed"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer shadow-sm animate-all"
-                      }`}
-                    >
-                      <ChevronRight className="h-4 w-4 stroke-[2.5px]" />
-                    </button>
-              </div>
+              <Pagination
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                totalPages={totalPages}
+              />
             </div>
 
           </div>

@@ -1,5 +1,17 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, or, sql, lt, gt } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  or,
+  sql,
+  lt,
+  gt,
+} from "drizzle-orm";
 import type {
   ArticleCreateRequest,
   ArticleCreateResponse,
@@ -21,6 +33,7 @@ import {
   comments,
   users,
   surveys,
+  boards,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
 import { msToIso, nowDate } from "@soc/shared";
@@ -77,9 +90,20 @@ export class ArticleRepository {
           where ${comments.articleId} = ${articles.articleId}
             and ${comments.status} = ${COMMENT_STATUS.PUBLISHED}
         )`,
+        hasAttachment: sql<boolean>`exists (
+          select 1
+          from ${articleAssets}
+          where ${articleAssets.articleId} = ${articles.articleId}
+            and ${articleAssets.usageType} = 'ATTACHMENT'
+        )`,
+        eventStartDate: articles.eventStartDate,
+        eventEndDate: articles.eventEndDate,
+        eventDescription: articles.eventDescription,
+        surveyId: surveys.surveyId,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .leftJoin(surveys, eq(surveys.connectedArticleId, articles.articleId))
       .where(baseFilter)
       .orderBy(
         desc(articles.isPinned),
@@ -110,6 +134,139 @@ export class ArticleRepository {
         },
         commentCount: Number(row.commentCount ?? 0),
         viewCount: row.viewCount,
+        hasAttachment: Boolean(row.hasAttachment),
+        eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
+        eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
+        eventDescription: row.eventDescription ?? undefined,
+        surveyId: row.surveyId ?? undefined,
+      })),
+    };
+  }
+
+  async listByBoardIds(
+    boardIds: number[],
+    params: {
+      cutoffDate?: Date;
+      limit: number;
+      page: number;
+      query?: string;
+      searchBy: "title" | "author" | "title_content";
+      sortBy: "latest" | "views";
+    },
+  ): Promise<{ items: ArticleListItem[]; total: number }> {
+    if (boardIds.length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    const offset = (params.page - 1) * params.limit;
+    const normalizedQuery = params.query?.trim();
+    const searchFilter = normalizedQuery
+      ? params.searchBy === "author"
+        ? or(
+            ilike(users.nameKo, `%${normalizedQuery}%`),
+            ilike(users.nameEn, `%${normalizedQuery}%`),
+          )
+        : or(
+            ilike(articles.titleKo, `%${normalizedQuery}%`),
+            ilike(articles.titleEn, `%${normalizedQuery}%`),
+          )
+      : undefined;
+    const cutoffFilter = params.cutoffDate
+      ? gte(articles.postedAt, params.cutoffDate)
+      : undefined;
+
+    const baseFilter = and(
+      inArray(articles.boardId, boardIds),
+      eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+      searchFilter,
+      cutoffFilter,
+    );
+
+    const totalResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(articles)
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .where(baseFilter);
+
+    const rows = await this.db
+      .select({
+        articleId: articles.articleId,
+        boardId: articles.boardId,
+        boardCode: boards.code,
+        titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
+        status: articles.status,
+        visibilityScope: articles.visibilityScope,
+        isPinned: articles.isPinned,
+        pinOrder: articles.pinOrder,
+        isAnonymous: articles.isAnonymous,
+        postedAt: articles.postedAt,
+        updatedAt: articles.updatedAt,
+        authorId: users.userId,
+        authorName: users.nameKo,
+        viewCount: articles.viewCount,
+        commentCount: sql<number>`(
+          select count(*)
+          from ${comments}
+          where ${comments.articleId} = ${articles.articleId}
+            and ${comments.status} = ${COMMENT_STATUS.PUBLISHED}
+        )`,
+        hasAttachment: sql<boolean>`exists (
+          select 1
+          from ${articleAssets}
+          where ${articleAssets.articleId} = ${articles.articleId}
+            and ${articleAssets.usageType} = 'ATTACHMENT'
+        )`,
+        eventStartDate: articles.eventStartDate,
+        eventEndDate: articles.eventEndDate,
+        eventDescription: articles.eventDescription,
+        surveyId: surveys.surveyId,
+      })
+      .from(articles)
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .leftJoin(boards, eq(articles.boardId, boards.boardId))
+      .leftJoin(surveys, eq(surveys.connectedArticleId, articles.articleId))
+      .where(baseFilter)
+      .orderBy(
+        params.sortBy === "views"
+          ? desc(articles.viewCount)
+          : desc(articles.postedAt),
+        desc(articles.postedAt),
+      )
+      .limit(params.limit)
+      .offset(offset);
+
+    return {
+      total: Number(totalResult[0]?.count ?? 0),
+      items: rows.map((row) => ({
+        articleId: String(row.articleId),
+        boardId: row.boardId,
+        boardCode: row.boardCode ?? undefined,
+        titleKo: row.titleKo,
+        titleEn: row.titleEn ?? undefined,
+        status: row.status as ArticleListItem["status"],
+        visibilityScope:
+          row.visibilityScope as ArticleListItem["visibilityScope"],
+        isPinned: row.isPinned,
+        pinOrder: row.pinOrder ?? null,
+        isAnonymous: row.isAnonymous,
+        postedAt: msToIso(row.postedAt.valueOf()),
+        updatedAt: msToIso(row.updatedAt.valueOf()),
+        author: {
+          userId: String(row.authorId ?? ""),
+          name: row.authorName ?? "unknown",
+        },
+        commentCount: Number(row.commentCount ?? 0),
+        viewCount: row.viewCount,
+        hasAttachment: Boolean(row.hasAttachment),
+        eventStartDate: row.eventStartDate
+          ? msToIso(row.eventStartDate.valueOf())
+          : undefined,
+        eventEndDate: row.eventEndDate
+          ? msToIso(row.eventEndDate.valueOf())
+          : undefined,
+        eventDescription: row.eventDescription ?? undefined,
+        surveyId: row.surveyId ?? undefined,
       })),
     };
   }
@@ -135,6 +292,7 @@ export class ArticleRepository {
       .select({
         articleId: articles.articleId,
         boardId: articles.boardId,
+        boardCode: boards.code,
         titleKo: articles.titleKo,
         titleEn: articles.titleEn,
         status: articles.status,
@@ -147,9 +305,21 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         viewCount: articles.viewCount,
+        hasAttachment: sql<boolean>`exists (
+          select 1
+          from ${articleAssets}
+          where ${articleAssets.articleId} = ${articles.articleId}
+            and ${articleAssets.usageType} = 'ATTACHMENT'
+        )`,
+        eventStartDate: articles.eventStartDate,
+        eventEndDate: articles.eventEndDate,
+        eventDescription: articles.eventDescription,
+        surveyId: surveys.surveyId,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .leftJoin(boards, eq(articles.boardId, boards.boardId))
+      .leftJoin(surveys, eq(surveys.connectedArticleId, articles.articleId))
       .where(baseFilter)
       .orderBy(desc(articles.postedAt))
       .limit(limit);
@@ -157,6 +327,7 @@ export class ArticleRepository {
     return rows.map((row) => ({
       articleId: String(row.articleId),
       boardId: row.boardId,
+      boardCode: row.boardCode ?? undefined,
       titleKo: row.titleKo,
       titleEn: row.titleEn ?? undefined,
       status: row.status as ArticleListItem["status"],
@@ -173,6 +344,11 @@ export class ArticleRepository {
       },
       commentCount: 0, // Not needed for search
       viewCount: row.viewCount,
+      hasAttachment: Boolean(row.hasAttachment),
+      eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
+      eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
+      eventDescription: row.eventDescription ?? undefined,
+      surveyId: row.surveyId ?? undefined,
     }));
   }
 
@@ -204,6 +380,9 @@ export class ArticleRepository {
           where ${comments.articleId} = ${articles.articleId}
             and ${comments.status} = ${COMMENT_STATUS.PUBLISHED}
         )`,
+        eventStartDate: articles.eventStartDate,
+        eventEndDate: articles.eventEndDate,
+        eventDescription: articles.eventDescription,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -314,6 +493,9 @@ export class ArticleRepository {
       })),
       commentCount: Number(row[0].commentCount ?? 0),
       viewCount: row[0].viewCount,
+      eventStartDate: row[0].eventStartDate ? msToIso(row[0].eventStartDate.valueOf()) : undefined,
+      eventEndDate: row[0].eventEndDate ? msToIso(row[0].eventEndDate.valueOf()) : undefined,
+      eventDescription: row[0].eventDescription ?? undefined,
       survey: surveyRow[0]
         ? {
             surveyId: surveyRow[0].surveyId,
@@ -387,9 +569,12 @@ export class ArticleRepository {
           visibilityScope: input.payload.visibilityScope,
           isPinned: input.payload.isPinned ?? false,
           pinOrder: input.payload.pinOrder ?? null,
-          isAnonymous: input.payload.isAnonymous ?? false,
+                  isAnonymous: input.payload.isAnonymous ?? false,
           postedAt: now,
           updatedAt: now,
+          eventStartDate: input.payload.eventStartDate ? new Date(input.payload.eventStartDate) : null,
+          eventEndDate: input.payload.eventEndDate ? new Date(input.payload.eventEndDate) : null,
+          eventDescription: input.payload.eventDescription ?? null,
         })
         .returning({
           articleId: articles.articleId,
@@ -458,6 +643,9 @@ export class ArticleRepository {
       pinOrder?: number | null;
       isAnonymous?: boolean;
       updatedAt: Date;
+      eventStartDate?: Date | null;
+      eventEndDate?: Date | null;
+      eventDescription?: string | null;
     } = {
       updatedAt: now,
     };
@@ -492,6 +680,18 @@ export class ArticleRepository {
 
     if (payload.isAnonymous !== undefined) {
       updateSet.isAnonymous = payload.isAnonymous;
+    }
+
+    if (payload.eventStartDate !== undefined) {
+      updateSet.eventStartDate = payload.eventStartDate ? new Date(payload.eventStartDate) : null;
+    }
+
+    if (payload.eventEndDate !== undefined) {
+      updateSet.eventEndDate = payload.eventEndDate ? new Date(payload.eventEndDate) : null;
+    }
+
+    if (payload.eventDescription !== undefined) {
+      updateSet.eventDescription = payload.eventDescription ?? null;
     }
 
     return this.db.transaction(async (tx) => {

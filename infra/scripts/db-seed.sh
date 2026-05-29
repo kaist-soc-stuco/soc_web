@@ -11,18 +11,11 @@ if [ -f "$ROOT_DIR/.env" ]; then
   export $(grep -v '^#' "$ROOT_DIR/.env" | xargs)
 fi
 
-POSTGRES_USER="${POSTGRES_USER}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
-POSTGRES_DB="${POSTGRES_DB}"
-POSTGRES_HOST="${POSTGRES_HOST}"
-POSTGRES_PORT="${POSTGRES_PORT}"
-DATABASE_URL="${DATABASE_URL}"
-
 docker compose -p soc_web -f "$COMPOSE_FILE" up -d postgres
 
 cd "$ROOT_DIR"
-DATABASE_URL="$DATABASE_URL" pnpm --filter @soc/api db:migrate
-DATABASE_URL="$DATABASE_URL" pnpm --filter @soc/api db:seed
+pnpm --filter @soc/api db:migrate
+pnpm --filter @soc/api db:seed
 
 echo "Seed completed"
 exit 0

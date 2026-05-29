@@ -601,6 +601,15 @@ export class UsersRepository {
     }));
   }
 
+  async countMyArticles(userId: string): Promise<number> {
+    const rows = await this.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(articles)
+      .where(and(eq(articles.authorUserId, userId), eq(articles.status, "PUBLISHED")));
+
+    return Number(rows[0]?.count ?? 0);
+  }
+
   async getMyComments(userId: string, limit: number, offset: number) {
     const rows = await this.db
       .select({
@@ -635,6 +644,15 @@ export class UsersRepository {
     }));
   }
 
+  async countMyComments(userId: string): Promise<number> {
+    const rows = await this.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(comments)
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, "PUBLISHED")));
+
+    return Number(rows[0]?.count ?? 0);
+  }
+
   async getMySurveyResponses(userId: string, limit: number, offset: number) {
     const rows = await this.db
       .select({
@@ -657,6 +675,92 @@ export class UsersRepository {
       surveyTitleKo: r.surveyTitleKo,
       status: r.status as any,
       submittedAt: r.submittedAt ? msToIso(r.submittedAt.valueOf()) : null,
+    }));
+  }
+
+  async countMySurveyResponses(userId: string): Promise<number> {
+    const rows = await this.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(surveyResponses)
+      .where(eq(surveyResponses.userId, userId));
+
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  async getMyActivities(userId: string, limit: number, offset: number) {
+    type MyActivityRow = {
+      activityType: "survey" | "post" | "comment";
+      resourceId: string;
+      title: string;
+      occurredAt: Date | string;
+      articleId: string | null;
+      boardCode: string | null;
+      surveyId: string | null;
+    };
+
+    const result = await this.db.execute<MyActivityRow>(sql`
+      WITH my_activity AS (
+        SELECT
+          'post' AS "activityType",
+          ${articles.articleId}::text AS "resourceId",
+          ${articles.titleKo} AS "title",
+          ${articles.postedAt} AS "occurredAt",
+          ${articles.articleId}::text AS "articleId",
+          ${boards.code} AS "boardCode",
+          NULL::text AS "surveyId"
+        FROM ${articles}
+        INNER JOIN ${boards} ON ${articles.boardId} = ${boards.boardId}
+        WHERE ${articles.authorUserId} = ${userId}
+          AND ${articles.status} = 'PUBLISHED'
+
+        UNION ALL
+
+        SELECT
+          'comment' AS "activityType",
+          ${comments.commentId}::text AS "resourceId",
+          ${comments.content} AS "title",
+          ${comments.createdAt} AS "occurredAt",
+          ${articles.articleId}::text AS "articleId",
+          ${boards.code} AS "boardCode",
+          NULL::text AS "surveyId"
+        FROM ${comments}
+        INNER JOIN ${articles} ON ${comments.articleId} = ${articles.articleId}
+        INNER JOIN ${boards} ON ${articles.boardId} = ${boards.boardId}
+        WHERE ${comments.authorUserId} = ${userId}
+          AND ${comments.status} = 'PUBLISHED'
+
+        UNION ALL
+
+        SELECT
+          'survey' AS "activityType",
+          ${surveyResponses.id}::text AS "resourceId",
+          ${surveys.titleKo} AS "title",
+          COALESCE(${surveyResponses.submittedAt}, ${surveyResponses.createdAt}) AS "occurredAt",
+          NULL::text AS "articleId",
+          NULL::text AS "boardCode",
+          ${surveys.surveyId}::text AS "surveyId"
+        FROM ${surveyResponses}
+        INNER JOIN ${surveys} ON ${surveyResponses.surveyId} = ${surveys.surveyId}
+        WHERE ${surveyResponses.userId} = ${userId}
+      )
+      SELECT *
+      FROM my_activity
+      ORDER BY "occurredAt" DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `);
+
+    return result.rows.map((row) => ({
+      articleId: row.articleId,
+      boardCode: row.boardCode,
+      occurredAt:
+        row.occurredAt instanceof Date
+          ? msToIso(row.occurredAt.valueOf())
+          : msToIso(new Date(row.occurredAt).valueOf()),
+      resourceId: row.resourceId,
+      surveyId: row.surveyId,
+      title: row.title,
+      type: row.activityType,
     }));
   }
 }

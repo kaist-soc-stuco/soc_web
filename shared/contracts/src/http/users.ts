@@ -1,6 +1,12 @@
 import type { ArticleStatus, VisibilityScope, CommentStatus } from "./board.js";
 import type { SurveyStatus, ResponseStatus } from "./survey.js";
 
+export interface MyPageListMeta {
+  page: number;
+  limit: number;
+  total: number;
+}
+
 export interface MyArticleItem {
   articleId: string;
   boardId: number;
@@ -13,7 +19,7 @@ export interface MyArticleItem {
   commentCount: number;
 }
 
-export interface MyArticleListResponse {
+export interface MyArticleListResponse extends MyPageListMeta {
   items: MyArticleItem[];
 }
 
@@ -29,7 +35,7 @@ export interface MyCommentItem {
   createdAt: string;
 }
 
-export interface MyCommentListResponse {
+export interface MyCommentListResponse extends MyPageListMeta {
   items: MyCommentItem[];
 }
 
@@ -41,6 +47,22 @@ export interface MySurveyResponseItem {
   submittedAt: string | null;
 }
 
-export interface MySurveyResponseListResponse {
+export interface MySurveyResponseListResponse extends MyPageListMeta {
   items: MySurveyResponseItem[];
+}
+
+export type MyActivityType = "survey" | "post" | "comment";
+
+export interface MyActivityItem {
+  type: MyActivityType;
+  resourceId: string;
+  title: string;
+  occurredAt: string;
+  articleId: string | null;
+  boardCode: string | null;
+  surveyId: string | null;
+}
+
+export interface MyActivityListResponse extends MyPageListMeta {
+  items: MyActivityItem[];
 }

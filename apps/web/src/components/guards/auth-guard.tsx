@@ -8,6 +8,7 @@ import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 interface AuthGuardProps {
   children: React.ReactNode;
   requirePermission?: number;
+  requireAnyPermission?: number[];
   redirectTo?: string;
   permissionRedirectTo?: string;
   fallback?: React.ReactNode;
@@ -16,18 +17,25 @@ interface AuthGuardProps {
 export function AuthGuard({
   children,
   requirePermission,
+  requireAnyPermission,
   redirectTo = "/login",
-  permissionRedirectTo = "/admin/permissions",
+  permissionRedirectTo = "/mypage",
   fallback = null,
 }: AuthGuardProps) {
   const navigate = useNavigate();
   const { data: session, isLoading } = useCurrentSession();
 
   const isAuthenticated = hasPersistedProfile(session ?? null);
-  const hasPermission =
+  const permission = session?.permission ?? 0;
+  const hasRequiredPermission =
     requirePermission === undefined
       ? true
-      : Permissions.has(session?.permission ?? 0, requirePermission);
+      : Permissions.has(permission, requirePermission);
+  const hasAnyRequiredPermission =
+    requireAnyPermission === undefined || requireAnyPermission.length === 0
+      ? true
+      : Permissions.hasAny(permission, ...requireAnyPermission);
+  const hasPermission = hasRequiredPermission && hasAnyRequiredPermission;
 
   useEffect(() => {
     if (isLoading) {

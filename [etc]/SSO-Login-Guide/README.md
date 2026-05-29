@@ -11,7 +11,7 @@
 
 ## Login Flow
 
-1. 브라우저는 `VITE_SSO_START_URL`이 있으면 그 값을, 없으면 `VITE_SSO_REDIRECT_URI`로부터 파생한 `/start` URL을 `fetch`한다.
+1. 브라우저는 API의 `GET /auth/login/start`를 호출한다.
 2. 서버는 `state`와 `nonce`를 생성해 Redis에 저장하고, authorize payload를 반환한다.
 3. 반환 payload는 JSON init payload이거나 vendor-compatible HTML form payload일 수 있다.
 4. 프런트는 반환된 `loginUrl`, `client_id`, `redirect_uri`, `state`, `nonce`를 사용해 hidden `POST` form을 직접 만들어 SSO authorize로 제출한다.
@@ -72,11 +72,10 @@
 
 ## Project Decision
 
-현재 프로젝트에서는 `/login` 페이지가 **SSO 시작 버튼과 결과 확인 화면** 역할만 담당한다.
+현재 프로젝트에서는 헤더 로그인 버튼이 곧바로 API의 SSO 시작 endpoint를 호출하고, `/login` 페이지는 callback 결과 확인 화면 역할을 담당한다.
 
 - 브라우저에서 할 일
-- `VITE_SSO_START_URL` 우선 사용, 없으면 `VITE_SSO_REDIRECT_URI`로부터 `/start`를 계산
-- start/init endpoint를 `fetch`
+- `VITE_API_BASE_URL` 기준으로 API start endpoint를 `fetch`
 - 반환된 JSON 또는 HTML form payload를 정규화한 뒤 hidden `POST` form 생성 및 SSO authorize submit
   - `status`, `reason`, `errorCode` 등 결과 쿼리 표시
 - 서버에서 할 일
@@ -98,22 +97,20 @@
 예:
 
 ```env
-VITE_SSO_START_URL=https://soc-student-council.kws.inet.sparcs.net/api/auth/login/start
-VITE_SSO_REDIRECT_URI=https://soc-student-council.kws.inet.sparcs.net/api/auth/login
-VITE_SSO_LOGIN_URL=https://sso.kaist.ac.kr/auth/user/single/login/authorize
-VITE_SSO_CLIENT_ID=your-client-id
+VITE_API_BASE_URL=/api
+SSO_REDIRECT_URI=https://soc-student-council.kws.inet.sparcs.net/api/auth/login
+SSO_LOGIN_URL=https://sso.kaist.ac.kr/auth/user/single/login/authorize
+SSO_CLIENT_ID=your-client-id
 SSO_CLIENT_SECRET=your-client-secret
 SSO_AUTH_API_URL=https://sso.kaist.ac.kr/auth/api/single/auth
 ```
 
 ## Current Frontend Behavior
 
-현재 `apps/web/src/pages/login-page.tsx`와 `apps/web/src/pages/login-consent-page.tsx`는 다음을 구현한다.
+현재 `apps/web/src/pages/login-callback-page.tsx`와 `apps/web/src/pages/login-consent-page.tsx`는 다음을 구현한다.
 
-- `VITE_SSO_START_URL` 또는 `VITE_SSO_REDIRECT_URI`에서 파생한 start URL 표시
 - start/init endpoint `fetch` 후 authorize form submit
 - `/login?status=...&reason=...` 결과 표시
-++
 - `status=consent-required` + `pendingLoginToken` 수신 시 동의 페이지(`/login/consent`)로 이동
 - `status=success` + `resultToken` 수신 시 `GET /auth/login/result`로 1회 교환 후 access/refresh/session 저장
 - 저장된 sessionId로 `GET /auth/session` 호출해 세션 상태 표시

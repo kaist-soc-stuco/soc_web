@@ -11,12 +11,12 @@ import {
 import {
   ParseFilePipe,
   MaxFileSizeValidator,
-  FileTypeValidator,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { Permissions } from "@soc/contracts";
 import { Request } from "express";
 
-import { AuthGuard } from "../../shared/guards";
+import { AuthGuard, RequirePermissions } from "../../shared/guards";
 import { AssetService } from "./asset.service";
 
 interface AuthenticatedRequest extends Request {
@@ -33,16 +33,30 @@ type UploadedAssetFile = {
   size: number;
 };
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_FILE_TYPES =
-  /^(image\/(png|jpeg|jpg|gif|webp)|application\/pdf)$/i;
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+const ALLOWED_ASSET_MIME_TYPES = new Set([
+  "application/msword",
+  "application/pdf",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/zip",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/csv",
+  "text/plain",
+]);
 
 @Controller("assets")
 export class AssetController {
   constructor(private readonly assetService: AssetService) {}
 
   @Post("upload")
-  //@UseGuards(AuthGuard)
+  @UseGuards(AuthGuard)
   @UseInterceptors(FileInterceptor("file"))
   async upload(
     @UploadedFile(
@@ -50,7 +64,6 @@ export class AssetController {
         fileIsRequired: true,
         validators: [
           new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE_BYTES }),
-          new FileTypeValidator({ fileType: ALLOWED_FILE_TYPES }),
         ],
         exceptionFactory: (error) => new BadRequestException(error),
       }),
@@ -62,9 +75,19 @@ export class AssetController {
       throw new UnauthorizedException("user_not_found_in_request");
     }
 
+    if (!ALLOWED_ASSET_MIME_TYPES.has(file.mimetype)) {
+      throw new BadRequestException("unsupported_asset_mime_type");
+    }
+
     return this.assetService.uploadFile({
       file,
       userId: request.user.id,
     });
+  }
+
+  @Post("cleanup-orphans")
+  @RequirePermissions(Permissions.ADMIN)
+  async cleanupOrphans() {
+    return this.assetService.cleanupUnlinkedAssets();
   }
 }

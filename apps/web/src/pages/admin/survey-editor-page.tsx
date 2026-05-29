@@ -11,12 +11,27 @@ import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { htmlDatetimeLocalToIso, isoToHtmlDatetimeLocal } from "@soc/shared";
 import { AuthGuard } from "@/components/guards/auth-guard";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { Permissions } from "@/lib/permissions";
 import { SurveySettingsForm } from "@/components/organisms/survey-settings-form";
 import { QuestionEditorModal, QuestionFormState } from "@/components/organisms/question-editor-modal";
-import { GripVertical, Plus } from "lucide-react";
+import { GripVertical, Plus, Calendar as CalendarIcon } from "lucide-react";
+
+const formatCompactDateTime = (value: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}.${month}.${day} ${hour}:${minute}`;
+};
 
 const QUESTION_TYPES = [
   { value: "short_text", label: "단답형" },
@@ -82,6 +97,7 @@ export function SurveyEditorPage() {
   const { id: surveyId } = useParams<{ id: string }>();
   const isEdit = Boolean(surveyId);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
+  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
 
   const form = useForm<SurveySettingsFormValues>({
     resolver: zodResolver(SurveySettingsSchema),
@@ -112,6 +128,12 @@ export function SurveyEditorPage() {
   const [articleSearchResults, setArticleSearchResults] = useState<any[]>([]);
   const [showArticleSearch, setShowArticleSearch] = useState(false);
   const [selectedArticleTitle, setSelectedArticleTitle] = useState<string | null>(null);
+  const [overwriteTarget, setOverwriteTarget] = useState<{
+    articleId: string;
+    title: string;
+    eventStartDate: string;
+    eventEndDate: string;
+  } | null>(null);
 
   const [sections, setSections] = useState<(SurveySectionRecord & { questions: SurveyQuestionRecord[] })[]>([]);
   const [tab, setTab] = useState<"settings" | "content">("settings");
@@ -252,7 +274,14 @@ export function SurveyEditorPage() {
 
   const handleDeleteSection = async (sectionId: string) => {
     if (!loadedSurveyId) return;
-    if (!confirm("정말 이 섹션을 삭제하시겠습니까? (섹션 내 모든 문항이 함께 삭제됩니다)")) return;
+    const confirmed = await requestConfirm({
+      confirmLabel: "삭제",
+      description: "섹션 안의 모든 문항이 함께 삭제됩니다.",
+      title: "이 섹션을 삭제하시겠습니까?",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
     setError(null);
     try {
       await client.deleteSection(loadedSurveyId, sectionId);
@@ -326,7 +355,14 @@ export function SurveyEditorPage() {
 
   const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
     if (!loadedSurveyId) return;
-    if (!confirm("정말 이 문항을 삭제하시겠습니까?")) return;
+    const confirmed = await requestConfirm({
+      confirmLabel: "삭제",
+      description: "삭제한 문항은 복구할 수 없습니다.",
+      title: "이 문항을 삭제하시겠습니까?",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
     setError(null);
     try {
       await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
@@ -378,8 +414,39 @@ export function SurveyEditorPage() {
   };
 
   const handleSelectArticle = (articleId: string, title: string) => {
+    const selectedArticle = articleSearchResults.find(a => a.articleId === articleId);
+    if (
+      selectedArticle &&
+      selectedArticle.boardCode === "행사" &&
+      selectedArticle.eventStartDate &&
+      selectedArticle.eventEndDate
+    ) {
+      setOverwriteTarget({
+        articleId,
+        title,
+        eventStartDate: selectedArticle.eventStartDate,
+        eventEndDate: selectedArticle.eventEndDate,
+      });
+    } else {
+      form.setValue("connectedArticleId", articleId);
+      setSelectedArticleTitle(title);
+      setShowArticleSearch(false);
+    }
+  };
+
+  const handleConfirmOverwrite = (yes: boolean) => {
+    if (!overwriteTarget) return;
+    const { articleId, title, eventStartDate, eventEndDate } = overwriteTarget;
+
     form.setValue("connectedArticleId", articleId);
     setSelectedArticleTitle(title);
+    
+    if (yes) {
+      form.setValue("openAt", isoToHtmlDatetimeLocal(eventStartDate));
+      form.setValue("closeAt", isoToHtmlDatetimeLocal(eventEndDate));
+    }
+    
+    setOverwriteTarget(null);
     setShowArticleSearch(false);
   };
 
@@ -390,6 +457,7 @@ export function SurveyEditorPage() {
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black pb-20">
+        {ConfirmDialog}
         <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
           
           {/* Header Banner */}
@@ -626,6 +694,51 @@ export function SurveyEditorPage() {
             onSave={handleSaveQuestion}
             onCancel={() => setEditingQuestion(null)}
           />
+        )}
+
+        {overwriteTarget && (
+          <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200 select-none">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-500/20 flex flex-col gap-4 text-center animate-in zoom-in-95 duration-200 text-kaist-black">
+              <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center mx-auto text-kaist-darkgreen animate-bounce">
+                <CalendarIcon className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-extrabold text-slate-800 leading-snug">
+                일정 정보 덮어쓰기
+              </h3>
+              <p className="text-xs font-semibold text-slate-500 leading-relaxed">
+                선택한 행사 게시글에 등록된 일정이 있습니다.<br />
+                이 일정으로 설문조사의 시작 및 마감 시각을 덮어쓰시겠습니까?
+              </p>
+              
+              <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4.5 text-left text-xs font-bold text-slate-600 flex flex-col gap-2 shadow-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">행사 시작:</span>
+                  <span className="text-slate-700">{formatCompactDateTime(overwriteTarget.eventStartDate)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">행사 마감:</span>
+                  <span className="text-slate-700">{formatCompactDateTime(overwriteTarget.eventEndDate)}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => handleConfirmOverwrite(true)}
+                  className="flex-1 px-4 py-2.5 bg-kaist-darkgreen text-white font-bold rounded-xl text-xs hover:opacity-95 transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0"
+                >
+                  덮어쓰기 (Yes)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmOverwrite(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-200 text-slate-750 font-bold rounded-xl text-xs hover:bg-slate-350 transition-all cursor-pointer border-0"
+                >
+                  유지하기 (No)
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </AuthGuard>

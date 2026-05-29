@@ -1,43 +1,56 @@
-import { Link, useParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
-import type { ArticleDetailResponse } from "@soc/contracts";
+import type {
+  ArticleDetailResponse,
+  BoardSummary,
+  CommentItem,
+} from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
+import {
+  ChevronDown,
+  ChevronUp,
+  ClipboardCheck,
+  Edit2,
+  Eye,
+  Loader2,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+
 import { Header } from "@/components/organisms/header";
-import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { List, ChevronUp, ChevronDown, Calendar, ArrowRight, Edit2 } from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
+import { Footer } from "@/components/organisms/footer";
 import { useCurrentSession } from "@/hooks/use-current-session";
+import { useLanguage } from "@/hooks/use-language";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
+import {
+  getBoardFallbackMetadata,
+  getBoardDescriptionFromMetadata,
+  getBoardLabelFromMetadata,
+  getBoardTitleFromMetadata,
+} from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
+import { PageHero } from "@/components/organisms/page-hero";
+import { AttachmentList } from "@/components/ui/attachment-list";
+import { CommentSection } from "@/components/ui/comment-section";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useBoardCatalog } from "@/hooks/use-board-catalog";
 
-const BOARD_INFO: Record<string, { descriptionKo: string; descriptionEn: string }> = {
-  공지: { descriptionKo: "카이스트 전산학부의 다양한 소식을 알려 드립니다", descriptionEn: "Get updates on various news from KAIST School of Computing" },
-  행사: { descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요", descriptionEn: "Discover various events organized by the School of Computing" },
-  HoC: { descriptionKo: "Hall of Code 프로젝트 및 활동 내역", descriptionEn: "Hall of Code projects and activity logs" },
-  홍보글: { descriptionKo: "집행위원회 및 학회의 홍보 게시물", descriptionEn: "Promotional posts from the Student Council and societies" },
-  건의사항: { descriptionKo: "학생들의 의견과 건의사항을 나눠주세요", descriptionEn: "Share your opinions and suggestions with us" },
-  연구실: { descriptionKo: "각 연구실의 소식과 공지사항", descriptionEn: "News and announcements from research labs" },
-  QnA: { descriptionKo: "궁금한 점을 자유롭게 질문하세요", descriptionEn: "Ask questions and get answers freely" },
-};
+function formatDate(isoString: string) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const MM = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}.${MM}.${dd}`;
+}
 
-const CATEGORY_LABELS: Record<string, string> = {
-  공지: "Notice",
-  행사: "Event",
-  HoC: "HoC",
-  홍보글: "Promo",
-  건의사항: "Suggestions",
-  연구실: "Labs",
-  QnA: "QnA",
-};
-
-function formatDateTimeMinutes(isoString: string) {
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return "";
-  const yyyy = d.getFullYear();
-  const MM = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${yyyy}-${MM}-${dd} ${hh}:${mm}`;
+function formatDateSlash(isoString: string) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const MM = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}/${MM}/${dd}`;
 }
 
 export function BoardDetailPage() {
@@ -45,48 +58,204 @@ export function BoardDetailPage() {
     category: string;
     articleId: string;
   }>();
-
   const [article, setArticle] = useState<ArticleDetailResponse | null>(null);
+  const [board, setBoard] = useState<BoardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
+  const navigate = useNavigate();
+  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
 
-  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
+  const { boards, boardByCode } = useBoardCatalog(apiClient);
+
+  const boardInfo = getBoardFallbackMetadata(category);
+  const catalogBoard = boardByCode.get(category);
 
   const canEdit = useMemo(() => {
-    if (!article) return false;
-    if (!session || !session.authenticated || !session.userId) return false;
+    if (!article || !board) return false;
+    if (!session?.authenticated || !session.userId) return false;
     if (session.userId === article.author.userId) return true;
-    const permission = session.permission ?? 0;
-    return Permissions.has(permission, Permissions.MANAGE_CONTENT) || Permissions.has(permission, Permissions.ADMIN);
-  }, [session, article]);
 
-  const posterAsset = useMemo(() => {
-    return article?.assets?.find((a) => a.usageType === "THUMBNAIL" || a.usageType === "IMAGE");
-  }, [article]);
+    const permission = session.permission ?? 0;
+    return (
+      board.managePermissionBit > 0 &&
+      Permissions.has(permission, board.managePermissionBit)
+    );
+  }, [article, board, session]);
+
+  const canManageComments = useMemo(() => {
+    if (!board) return false;
+    const permission = session?.permission ?? 0;
+    return (
+      board.managePermissionBit > 0 &&
+      Permissions.has(permission, board.managePermissionBit)
+    );
+  }, [board, session]);
+
+  const canCreateComment = useMemo(() => {
+    if (!board?.allowComment) return false;
+    if (!session?.canUsePersistentFeatures) return false;
+
+    const permission = session.permission ?? 0;
+    return (
+      board.commentPermissionBit <= 0 ||
+      Permissions.has(permission, board.commentPermissionBit)
+    );
+  }, [board, session]);
+
+  const posterAsset = useMemo(
+    () =>
+      article?.assets?.find(
+        (asset) =>
+          asset.usageType === "THUMBNAIL" || asset.usageType === "IMAGE",
+      ),
+    [article],
+  );
+
+  const attachmentAssets = useMemo(
+    () =>
+      article?.assets?.filter(
+        (asset) => asset.assetId !== posterAsset?.assetId,
+      ) ?? [],
+    [article, posterAsset],
+  );
 
   useEffect(() => {
     if (!articleId) return;
+
+    let cancelled = false;
     setLoading(true);
     setArticle(null);
-    apiClient
-      .getArticle(category, articleId)
-      .then((res) => {
-        setArticle(res);
-        setLoading(false);
+    setBoard(null);
+
+    Promise.all([
+      apiClient.getArticle(category, articleId),
+      apiClient.getBoard(category).catch(() => null),
+    ])
+      .then(([articleResponse, boardResponse]) => {
+        if (!cancelled) {
+          setArticle(articleResponse);
+          setBoard(boardResponse);
+        }
       })
-      .catch((err: any) => {
-        console.error(err);
-        setLoading(false);
+      .catch(() => {
+        if (!cancelled) {
+          setArticle(null);
+          setBoard(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
-  }, [category, articleId, apiClient]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, articleId, category]);
+
+  useEffect(() => {
+    if (!articleId || !article) return;
+
+    let cancelled = false;
+    setCommentsLoading(true);
+    setCommentError(null);
+
+    apiClient
+      .getComments(category, articleId, { page: 1, limit: 50 })
+      .then((response) => {
+        if (!cancelled) setComments(response.items);
+      })
+      .catch(() => {
+        if (!cancelled) setCommentError("댓글을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setCommentsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, article, articleId, category]);
+
+  const refreshComments = async () => {
+    if (!articleId) return;
+    const response = await apiClient.getComments(category, articleId, {
+      page: 1,
+      limit: 50,
+    });
+    setComments(response.items);
+  };
+
+  const handleCreateComment = async () => {
+    if (!articleId || !commentText.trim()) return;
+
+    setCommentSubmitting(true);
+    setCommentError(null);
+    try {
+      await apiClient.createComment(category, articleId, {
+        content: commentText.trim(),
+      });
+      setCommentText("");
+      await refreshComments();
+    } catch {
+      setCommentError("댓글 작성에 실패했습니다.");
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!articleId) return;
+    const confirmed = await requestConfirm({
+      confirmLabel: "삭제",
+      description: "삭제한 댓글은 되돌릴 수 없습니다.",
+      title: "댓글을 삭제하시겠습니까?",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setCommentError(null);
+    try {
+      await apiClient.deleteComment(category, articleId, commentId);
+      await refreshComments();
+    } catch {
+      setCommentError("댓글 삭제에 실패했습니다.");
+    }
+  };
+
+  const handleDeleteArticle = async () => {
+    if (!articleId || !canEdit) return;
+    const confirmed = await requestConfirm({
+      confirmLabel: "삭제",
+      description: "게시글과 연결된 댓글 정보가 함께 삭제됩니다.",
+      title: "게시글을 삭제하시겠습니까?",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    try {
+      await apiClient.deleteArticle(category, articleId);
+      navigate(`/board/${category}`, { replace: true });
+    } catch {
+      alert("게시글 삭제에 실패했습니다.");
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-kaist-white">
-        <Header showLogo={true} />
-        <main className="flex-1 flex items-center justify-center">
-          <p className="text-kaist-grey font-bold">{lang === "ko" ? "불러오는 중..." : "Loading..."}</p>
+      <div className="flex min-h-screen flex-col bg-white">
+        <Header showLogo />
+        <main className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-kaist-darkgreen" />
         </main>
       </div>
     );
@@ -94,221 +263,333 @@ export function BoardDetailPage() {
 
   if (!article) {
     return (
-      <div className="min-h-screen flex flex-col bg-kaist-white">
-        <Header showLogo={true} />
-        <main className="flex-1 flex items-center justify-center">
-          <p className="text-red-500 font-bold">{lang === "ko" ? "존재하지 않는 게시글입니다." : "Post not found."}</p>
+      <div className="flex min-h-screen flex-col bg-white">
+        <Header showLogo />
+        <main className="flex flex-1 items-center justify-center">
+          <p className="text-sm font-bold text-slate-500">
+            존재하지 않는 게시글입니다.
+          </p>
         </main>
       </div>
     );
   }
 
+  const boardLabel =
+    lang === "ko"
+      ? (board?.nameKo ?? category)
+      : (board?.nameEn ?? boardInfo.labelEn);
+  const displayBoardLabel =
+    lang === "ko" && category === "공지" ? "공지사항" : boardLabel;
+  const title =
+    lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
+  const content =
+    lang === "ko" ? article.contentKo : article.contentEn || article.contentKo;
+
+  const boardTitle = getBoardTitleFromMetadata(
+    board ?? catalogBoard,
+    category,
+    lang,
+  );
+  const boardDescription = getBoardDescriptionFromMetadata(
+    board ?? catalogBoard,
+    category,
+    lang,
+  );
+
   return (
-    <div className="min-h-screen flex flex-col bg-kaist-white">
-      <Header showLogo={true} />
+    <div className="min-h-screen bg-[#fafafa] flex flex-col text-slate-950">
+      {ConfirmDialog}
+      <Header showLogo />
 
-      <main className="flex-1 w-full mx-auto relative">
-        {/* 1. 배너 영역 */}
-        <div className="bg-linear-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-8 relative overflow-hidden">
-          <div className="max-w-6xl mx-auto relative z-10">
-            <span className="text-sm font-bold text-kaist-white/70 uppercase tracking-widest mb-1 block">
-              {lang === "ko" ? category : (CATEGORY_LABELS[category] || category)}
-            </span>
-            <h1 className="text-3xl font-extrabold text-kaist-white tracking-tight">
-              {lang === "ko" ? `${category} 게시판` : `${CATEGORY_LABELS[category] || category} Board`}
-            </h1>
-            <p className="text-sm text-kaist-white/90 mt-2 font-medium">
-              {lang === "ko" 
-                ? (BOARD_INFO[category]?.descriptionKo || "") 
-                : (BOARD_INFO[category]?.descriptionEn || "")}
-            </p>
-          </div>
-          <div className="absolute -right-10 -top-10 opacity-20 pointer-events-none select-none">
-            <span className="text-[150px] font-black text-kaist-white italic">KAIST</span>
-          </div>
-        </div>
+      <main className="flex-1 w-full mx-auto pb-16">
+        <PageHero title={boardTitle} description={boardDescription} />
 
-        {/* 2. 게시글 타이틀 & 글 목록 버튼 */}
-        <div className="border-b border-kaist-grey/30 bg-kaist-white px-4 md:px-8">
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
-            <div>
-              <h2 className="text-2xl font-extrabold text-kaist-black tracking-tight mb-2">
-                {lang === "ko" ? article.titleKo : (article.titleEn || article.titleKo)}
-              </h2>
-              <div className="flex items-center gap-4 text-sm font-medium text-kaist-grey">
-                <span className="text-kaist-darkgreen">
-                  {article.isAnonymous ? (lang === "ko" ? "익명" : "Anonymous") : article.author.name}
-                </span>
-                <span>{formatDateTimeMinutes(article.postedAt)}</span>
-                <span className="flex items-center gap-1">
-                  {lang === "ko" ? "조회수" : "Views"} {article.viewCount}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 self-start md:self-auto">
-              {canEdit && (
-                <Link
-                  to={`/board/${category}/${articleId}/edit`}
-                  className="flex items-center gap-2 text-kaist-grey hover:text-kaist-darkgreen transition-colors font-semibold text-sm"
+        {/* Board Underlined Tabs Navigation */}
+        <div className="border-b border-slate-200 bg-white mb-6">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row md:items-stretch md:justify-between gap-4 select-none">
+            {/* Category tabs */}
+            <div className="flex flex-wrap items-stretch gap-6 lg:gap-8">
+              {/* "전체" Tab */}
+              <Link to="/board" className="relative group flex items-center">
+                <div
+                  className={`relative flex items-center justify-center h-full text-[14px] lg:text-[14.5px] tracking-tight transition-all py-4 cursor-pointer ${
+                    !category
+                      ? "text-kaist-darkgreen font-semibold"
+                      : "text-slate-400 hover:text-kaist-darkgreen font-medium"
+                  }`}
                 >
-                  <Edit2 className="w-4 h-4" />
-                  {lang === "ko" ? "수정" : "Edit"}
-                </Link>
-              )}
-              <Link
-                to={`/board/${category}`}
-                className="flex items-center gap-2 text-kaist-grey hover:text-kaist-darkgreen transition-colors font-semibold text-sm"
-              >
-                <List className="w-5 h-5" />
-                {lang === "ko" ? "글 목록" : "List"}
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. 본문 영역 */}
-        <div className="max-w-6xl mx-auto px-4 py-12 md:px-8">
-          <div className="flex flex-col md:flex-row gap-12">
-            {/* 좌측 포스터 영역 */}
-            {posterAsset && (
-              <div className="w-full md:w-[380px] flex-shrink-0">
-                <div className="aspect-[3/4] bg-kaist-grey/10 rounded-lg overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-                  <img
-                    src={posterAsset.storageKey}
-                    alt="Poster"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
+                  <span>{lang === "ko" ? "전체" : "All"}</span>
+                  <span
+                    className={`absolute bottom-0 left-0 right-0 h-[3px] bg-kaist-darkgreen transition-transform duration-200 origin-center ${
+                      !category
+                        ? "scale-x-100"
+                        : "scale-x-0 group-hover:scale-x-100"
+                    }`}
                   />
                 </div>
-              </div>
-            )}
+              </Link>
 
-            {/* 우측 텍스트 영역 */}
-            <div className="flex-1 flex flex-col gap-6">
-              <div className="text-base font-medium leading-relaxed text-kaist-black whitespace-pre-line">
-                {lang === "ko" ? article.contentKo : (article.contentEn || article.contentKo)}
-              </div>
+              {boards.map((boardItem) => {
+                const isActive = category === boardItem.code;
+                return (
+                  <Link
+                    key={boardItem.code}
+                    to={`/board/${boardItem.code}`}
+                    className="relative group flex items-center"
+                  >
+                    <div
+                      className={`relative flex items-center justify-center h-full text-[14px] lg:text-[14.5px] tracking-tight transition-all py-4 cursor-pointer ${
+                        isActive
+                          ? "text-kaist-darkgreen font-semibold"
+                          : "text-slate-400 hover:text-kaist-darkgreen font-medium"
+                      }`}
+                    >
+                      <span>
+                        {getBoardLabelFromMetadata(
+                          boardItem,
+                          boardItem.code,
+                          lang,
+                        )}
+                      </span>
+                      <span
+                        className={`absolute bottom-0 left-0 right-0 h-[3px] bg-kaist-darkgreen transition-transform duration-200 origin-center ${
+                          isActive
+                            ? "scale-x-100"
+                            : "scale-x-0 group-hover:scale-x-100"
+                        }`}
+                      />
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
-
-          {/* 설문조사 임베드 카드 */}
-          {article.survey && (
-            <section className="mt-16 mb-8 border-t border-kaist-grey/10 pt-16">
-              <div className="max-w-4xl mx-auto">
-                <div className="relative overflow-hidden rounded-2xl border-2 border-kaist-darkgreen/20 bg-white p-8 shadow-sm transition-all hover:shadow-md">
-                  
-                  {/* 배경 장식 */}
-                  <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-kaist-darkgreen/5 pointer-events-none"></div>
-                  
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                    <div className="space-y-3">
-                      {/* 상태 뱃지 */}
-                      <div className="flex items-center gap-2">
-                        <span className={`flex h-2 w-2 rounded-full ${article.survey.computedState === 'open' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                        <span className={`text-xs font-bold tracking-wider uppercase ${article.survey.computedState === 'open' ? 'text-green-600' : 'text-gray-500'}`}>
-                          {article.survey.computedState === 'open' 
-                            ? (lang === "ko" ? "진행 중" : "Ongoing") 
-                            : article.survey.computedState === 'before_open' 
-                              ? (lang === "ko" ? "예정" : "Upcoming") 
-                              : (lang === "ko" ? "마감" : "Closed")}
-                        </span>
-                      </div>
-
-                      {/* 제목 및 설명 */}
-                      <h3 className="text-xl font-extrabold text-kaist-black tracking-tight">
-                        {lang === "ko" ? article.survey.titleKo : (article.survey.titleEn || article.survey.titleKo)}
-                      </h3>
-                      <p className="text-sm font-medium text-kaist-grey leading-relaxed max-w-lg">
-                        {lang === "ko" 
-                          ? (article.survey.descriptionKo)
-                          : (article.survey.descriptionEn || article.survey.descriptionKo)}
-                      </p>
-
-                      {/* 기간 안내 정보 */}
-                      <div className="flex items-center gap-4 text-xs font-semibold text-kaist-grey/80">
-                        {article.survey.closeAt && (
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>
-                              {lang === "ko" 
-                                ? `마감: ${formatDateTimeMinutes(article.survey.closeAt)} 까지`
-                                : `Deadline: until ${formatDateTimeMinutes(article.survey.closeAt)}`}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 버튼 영역 */}
-                    <div className="flex-shrink-0">
-                      <Link
-                        to={`/survey/${article.survey.surveyId}`}
-                        className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-kaist-darkgreen text-white rounded-xl font-bold text-base shadow-lg shadow-kaist-darkgreen/20 hover:bg-opacity-90 hover:-translate-y-0.5 transition-all"
-                      >
-                        {lang === "ko" ? "설문 참여하기" : "Take Survey"}
-                        <ArrowRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
         </div>
 
-        {/* 4. 하단 이전글 / 다음글 네비게이션 */}
-        <div className="max-w-6xl mx-auto px-4 pb-20 md:px-8">
-          <div className="border-t-2 border-kaist-grey/30 divide-y divide-kaist-grey/20">
-            
-            {/* 이전글 */}
-            {article.prevArticle && (
-              <Link 
-                to={`/board/${category}/${article.prevArticle.articleId}`} 
-                className="flex flex-col sm:flex-row sm:items-center py-4 hover:bg-kaist-grey/5 transition-colors group"
-              >
-                <div className="flex items-center gap-4 sm:w-32 font-semibold text-kaist-grey group-hover:text-kaist-black transition-colors">
-                  <ChevronUp className="w-5 h-5" />
-                  {lang === "ko" ? "이전글" : "Prev"}
-                </div>
-                <div className="flex-1 mt-2 sm:mt-0 font-semibold text-kaist-black truncate pr-4">
-                  {article.prevArticle.titleKo}
-                </div>
-                <div className="flex items-center gap-6 text-sm font-semibold text-kaist-grey mt-2 sm:mt-0">
-                  <span>{new Date(article.prevArticle.postedAt).toLocaleDateString()}</span>
-                  <span className="w-12 text-right">
-                    {article.prevArticle.isAnonymous ? (lang === "ko" ? "익명" : "Anonymous") : article.prevArticle.author.name}
-                  </span>
-                </div>
-              </Link>
-            )}
+        <div className="mx-auto max-w-[1040px] px-6 lg:px-8 pt-1 pb-16 flex flex-col gap-3 w-full">
+          {/* Breadcrumb Path */}
+          <div className="flex items-center gap-1.5 text-[13px] text-slate-400 font-semibold select-none">
+            <Link
+              to="/board"
+              className="hover:text-kaist-darkgreen transition-colors"
+            >
+              게시판
+            </Link>
+            <svg
+              className="w-2.5 h-2.5 text-slate-350"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth="2.5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+            <span className="text-slate-500 font-bold">
+              {displayBoardLabel}
+            </span>
+          </div>
 
-            {/* 다음글 */}
-            {article.nextArticle && (
-              <Link 
-                to={`/board/${category}/${article.nextArticle.articleId}`} 
-                className="flex flex-col sm:flex-row sm:items-center py-4 hover:bg-kaist-grey/5 transition-colors group border-b border-kaist-grey/20"
-              >
-                <div className="flex items-center gap-4 sm:w-32 font-semibold text-kaist-grey group-hover:text-kaist-black transition-colors">
-                  <ChevronDown className="w-5 h-5" />
-                  {lang === "ko" ? "다음글" : "Next"}
-                </div>
-                <div className="flex-1 mt-2 sm:mt-0 font-semibold text-kaist-black truncate pr-4">
-                  {article.nextArticle.titleKo}
-                </div>
-                <div className="flex items-center gap-6 text-sm font-semibold text-kaist-grey mt-2 sm:mt-0">
-                  <span>{new Date(article.nextArticle.postedAt).toLocaleDateString()}</span>
-                  <span className="w-12 text-right">
-                    {article.nextArticle.isAnonymous ? (lang === "ko" ? "익명" : "Anonymous") : article.nextArticle.author.name}
+          <article className="w-full rounded-xl border border-slate-200 bg-white px-6 md:px-[52px] py-6 md:py-[32px] shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+            <header>
+              <span className="inline-flex rounded-md bg-[#e6f4ea] px-2 py-1 text-xs font-bold text-[#137333]">
+                {category}
+              </span>
+              <h1 className="mt-3 text-[1.18rem] font-bold leading-snug tracking-tight text-slate-950 md:text-[1.45rem]">
+                {title}
+              </h1>
+              <div className="mt-3 flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-x-2 text-xs font-bold text-slate-500">
+                  <span>
+                    {article.isAnonymous ? "익명" : article.author.name}
+                  </span>
+                  <span className="text-slate-300">·</span>
+                  <span>{formatDateSlash(article.postedAt)}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="h-3.5 w-3.5" />
+                    {article.viewCount}
                   </span>
                 </div>
-              </Link>
+
+                {canEdit && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Link
+                      to={`/board/${category}/${articleId}/edit`}
+                      className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-bold leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                      title="수정"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                      수정
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteArticle()}
+                      className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-bold leading-none text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                      title="삭제"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      삭제
+                    </button>
+                  </div>
+                )}
+              </div>
+            </header>
+
+            <div className="pt-5">
+              {posterAsset && (
+                <figure className="w-full mb-6 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  <img
+                    src={resolveAssetUrl(posterAsset.storageKey)}
+                    alt={posterAsset.originalFilename}
+                    className="w-full object-cover max-h-[640px]"
+                  />
+                </figure>
+              )}
+
+              <div className="whitespace-pre-line text-[0.94rem] font-medium leading-7 text-slate-800 [overflow-wrap:anywhere]">
+                {content}
+              </div>
+            </div>
+
+            <AttachmentList
+              assets={attachmentAssets}
+              className="mt-6 border-t border-slate-100 pt-5"
+            />
+
+            {article.survey && (
+              <section className="mt-6 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4 shadow-none">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <ClipboardCheck className="h-6 w-6 text-kaist-darkgreen/80 shrink-0" />
+                    <div>
+                      <h2 className="text-[13.5px] font-bold text-slate-800 leading-none">
+                        설문조사 참여 안내
+                      </h2>
+                      <p className="mt-1.5 text-[11.5px] font-medium leading-relaxed text-slate-500">
+                        학생회 운영·행사에 대한 여러분의 소중한 의견을
+                        들려주세요. 더 나은 학부 문화를 함께 만들어갑니다.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to={`/survey/${article.survey.surveyId}`}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3.5 py-1.5 text-[12px] font-bold text-white transition hover:opacity-90 shrink-0 shadow-sm"
+                  >
+                    <span>설문조사 참여하기</span>
+                    <svg
+                      className="w-2.5 h-2.5 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      strokeWidth="3"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </Link>
+                </div>
+              </section>
             )}
-            
+          </article>
+
+          <CommentSection
+            comments={comments}
+            commentsLoading={commentsLoading}
+            canManageComments={canManageComments}
+            canCreateComment={canCreateComment}
+            currentUserId={session?.userId ?? null}
+            commentText={commentText}
+            commentError={commentError}
+            commentSubmitting={commentSubmitting}
+            isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
+            onCommentTextChange={setCommentText}
+            onCreateComment={handleCreateComment}
+            onDeleteComment={handleDeleteComment}
+          />
+
+          {/* 이전글 / 다음글 & 목록으로 버튼 */}
+          <div className="w-full flex flex-col gap-2 mt-2">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-[0_8px_28px_rgba(15,23,42,0.03)] divide-y divide-slate-100">
+              {/* 이전글 */}
+              {article.prevArticle ? (
+                <Link
+                  to={`/board/${category}/${article.prevArticle.articleId}`}
+                  className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors group text-sm"
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <span className="font-bold text-slate-400 shrink-0 select-none flex items-center gap-1">
+                      <ChevronUp className="h-4 w-4" />
+                      이전글
+                    </span>
+                    <span className="text-slate-700 font-semibold truncate group-hover:text-kaist-darkgreen transition-colors">
+                      {article.prevArticle.titleKo}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 shrink-0 font-medium ml-4">
+                    {formatDate(article.prevArticle.postedAt)}
+                  </span>
+                </Link>
+              ) : (
+                <div className="flex items-center px-5 py-3.5 text-sm text-slate-400 select-none">
+                  <span className="font-bold text-slate-350 shrink-0 mr-4 flex items-center gap-1">
+                    <ChevronUp className="h-4 w-4 text-slate-300" />
+                    이전글
+                  </span>
+                  <span className="font-medium">이전 게시글이 없습니다.</span>
+                </div>
+              )}
+
+              {/* 다음글 */}
+              {article.nextArticle ? (
+                <Link
+                  to={`/board/${category}/${article.nextArticle.articleId}`}
+                  className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors group text-sm"
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <span className="font-bold text-slate-400 shrink-0 select-none flex items-center gap-1">
+                      <ChevronDown className="h-4 w-4" />
+                      다음글
+                    </span>
+                    <span className="text-slate-700 font-semibold truncate group-hover:text-kaist-darkgreen transition-colors">
+                      {article.nextArticle.titleKo}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 shrink-0 font-medium ml-4">
+                    {formatDate(article.nextArticle.postedAt)}
+                  </span>
+                </Link>
+              ) : (
+                <div className="flex items-center px-5 py-3.5 text-sm text-slate-400 select-none">
+                  <span className="font-bold text-slate-350 shrink-0 mr-4 flex items-center gap-1">
+                    <ChevronDown className="h-4 w-4 text-slate-300" />
+                    다음글
+                  </span>
+                  <span className="font-medium">다음 게시글이 없습니다.</span>
+                </div>
+              )}
+            </div>
+
+            {/* 목록으로 버튼 */}
+            <div className="flex justify-end mt-1">
+              <Link
+                to={`/board/${category}`}
+                className="inline-flex items-center justify-center gap-1 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-lg text-[13px] font-bold text-slate-600 hover:text-slate-800 transition shadow-sm cursor-pointer"
+              >
+                목록으로
+              </Link>
+            </div>
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

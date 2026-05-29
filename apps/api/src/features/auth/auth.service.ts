@@ -458,16 +458,16 @@ export class AuthService {
   private loadStartConfig(): SsoConfig {
     return {
       clientId: this.ensureRequired(
-        this.configService.get<string>("VITE_SSO_CLIENT_ID"),
-        "VITE_SSO_CLIENT_ID",
+        this.configService.get<string>("SSO_CLIENT_ID"),
+        "SSO_CLIENT_ID",
       ),
       loginUrl: this.ensureRequired(
-        this.configService.get<string>("VITE_SSO_LOGIN_URL"),
-        "VITE_SSO_LOGIN_URL",
+        this.configService.get<string>("SSO_LOGIN_URL"),
+        "SSO_LOGIN_URL",
       ),
       redirectUri: this.ensureRequired(
-        this.configService.get<string>("VITE_SSO_REDIRECT_URI"),
-        "VITE_SSO_REDIRECT_URI",
+        this.configService.get<string>("SSO_REDIRECT_URI"),
+        "SSO_REDIRECT_URI",
       ),
     };
   }

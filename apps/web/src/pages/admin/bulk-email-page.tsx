@@ -2,11 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { createApiClient } from "@soc/api-client";
 import type { BulkEmailRecord, SendBulkEmailRequest } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { Send, History, CheckCircle, AlertTriangle, Users, Mail } from "lucide-react";
+import { Send, History, AlertTriangle, Users, Mail } from "lucide-react";
 import { formatKoreanDateTime } from "@soc/shared";
+import { AuthGuard } from "@/components/guards/auth-guard";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Permissions } from "@/lib/permissions";
 
 export function BulkEmailPage() {
+  return (
+    <AuthGuard requirePermission={Permissions.ADMIN}>
+      <BulkEmailPageContent />
+    </AuthGuard>
+  );
+}
+
+function BulkEmailPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
 
   const [history, setHistory] = useState<BulkEmailRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -56,13 +68,13 @@ export function BulkEmailPage() {
       UNPAID_STUDENTS: "과비 미납자",
     };
 
-    if (
-      !confirm(
-        `정말로 ${typeLabels[formData.recipientType]} 대상에게 이메일을 일괄 발송하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await requestConfirm({
+      confirmLabel: "발송",
+      description: `${typeLabels[formData.recipientType]} 대상에게 이메일을 일괄 발송합니다. 이 작업은 되돌릴 수 없습니다.`,
+      title: "이메일을 발송하시겠습니까?",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setSending(true);
     setError(null);
@@ -102,6 +114,7 @@ export function BulkEmailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
+      {ConfirmDialog}
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
         {/* Unified Compact Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-5 gap-4 select-none">

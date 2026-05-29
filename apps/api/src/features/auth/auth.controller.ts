@@ -3,7 +3,12 @@ import { Response } from "express";
 import { and, eq } from "drizzle-orm";
 
 import { Cookies } from "../../shared/decorators/cookies.decorator";
-import { ConsentDecisionRequestDto, SsoCallbackBodyDto } from "./auth.types";
+import {
+  ConsentDecisionRequestDto,
+  LogoutRequestDto,
+  RefreshSessionRequestDto,
+  SsoCallbackBodyDto,
+} from "./auth.types";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
 import { UsersService } from "../users/users.service";
@@ -306,8 +311,9 @@ export class AuthController {
   @Get("session")
   async getSession(
     @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
+    @Query("sessionId") querySessionId: string | undefined,
   ) {
-    return this.authSessionService.getSession(cookieSessionId);
+    return this.authSessionService.getSession(cookieSessionId ?? querySessionId);
   }
 
   /**
@@ -342,10 +348,12 @@ export class AuthController {
   @Post("refresh")
   async refreshSession(
     @Cookies(AUTH_REFRESH_COOKIE_NAME) cookieRefreshToken: string | undefined,
+    @Body() body: RefreshSessionRequestDto,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authSessionService.refreshSession({
-      refreshToken: cookieRefreshToken,
+      refreshToken: cookieRefreshToken ?? body?.refreshToken,
+      sessionId: body?.sessionId,
     });
 
     if (result.storageMode === "persisted") {
@@ -378,10 +386,11 @@ export class AuthController {
   @Post("logout")
   async logout(
     @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
+    @Body() body: LogoutRequestDto,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authSessionService.logout({
-      sessionId: cookieSessionId,
+      sessionId: cookieSessionId ?? body?.sessionId,
     });
 
     this.clearAuthCookies(response);

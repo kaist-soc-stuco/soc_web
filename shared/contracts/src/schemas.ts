@@ -43,6 +43,9 @@ export const ArticleCreateSchema = z.object({
   pinOrder: z.number().int().nullable().optional(),
   isAnonymous: z.boolean().optional(),
   assets: z.array(ArticleAssetRequestSchema).optional(),
+  eventStartDate: z.string().nullable().optional(),
+  eventEndDate: z.string().nullable().optional(),
+  eventDescription: z.string().nullable().optional(),
 });
 
 export const ArticleUpdateSchema = z.object({
@@ -55,6 +58,9 @@ export const ArticleUpdateSchema = z.object({
   pinOrder: z.number().int().nullable().optional(),
   isAnonymous: z.boolean().optional(),
   assets: z.array(ArticleAssetRequestSchema).optional(),
+  eventStartDate: z.string().nullable().optional(),
+  eventEndDate: z.string().nullable().optional(),
+  eventDescription: z.string().nullable().optional(),
 });
 
 // ─── Comment ─────────────────────────────────────────────────────────────────

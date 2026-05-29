@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -6,21 +6,17 @@ import { useLanguage } from "@/hooks/use-language";
 import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { PageHero } from "@/components/organisms/page-hero";
-import { 
-  Calendar as CalendarIcon, 
-  Clock, 
-  Users, 
-  CheckCircle, 
-  BarChart3, 
+import {
+  Calendar as CalendarIcon,
+  Clock,
   ArrowRight,
   Vote,
   FileText,
   FileCheck,
   AlertCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
-import { formatKoreanDateTime } from "@soc/shared";
 
 interface SurveyRecordWithState {
   id: string;
@@ -41,18 +37,95 @@ interface SurveyRecordWithState {
   maxResponses?: number | null;
 }
 
+interface UnifiedItem {
+  id: string;
+  kind: string; // "SURVEY" | "VOTE" | "EVENT"
+  titleKo: string;
+  titleEn: string | null;
+  descriptionKo: string | null;
+  descriptionEn: string | null;
+  computedState: string; // "before_open" | "open" | "closed"
+  opensAt: string | null;
+  closesAt: string | null;
+  surveyId?: string | null; // For EVENT tab to link connected survey
+  feePayersOnly?: boolean;
+  isKoreanOnly?: boolean;
+  resultVisibility?: string;
+  status?: string;
+  maxResponses?: number | null;
+  responseCount?: number;
+}
+
+const getEventArticleState = (ev: any) => {
+  if (!ev.eventStartDate || !ev.eventEndDate) return "closed";
+  const now = new Date().getTime();
+  const start = new Date(ev.eventStartDate).getTime();
+  const end = new Date(ev.eventEndDate).getTime();
+  if (now < start) return "before_open";
+  if (now > end) return "closed";
+  return "open";
+};
+
+const getItemStartTime = (item: UnifiedItem) => {
+  const raw = item.opensAt ?? item.closesAt;
+  if (!raw) return 0;
+  const time = new Date(raw).getTime();
+  return Number.isNaN(time) ? 0 : time;
+};
+
+const getItemDeadlineTime = (item: UnifiedItem) => {
+  const raw = item.closesAt ?? item.opensAt;
+  if (!raw) return Number.MAX_SAFE_INTEGER;
+  const time = new Date(raw).getTime();
+  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+};
+
+const isClosedItem = (item: UnifiedItem) =>
+  item.computedState === "closed" || item.status === "closed";
+
+const isOpenItem = (item: UnifiedItem) =>
+  item.computedState === "open";
+
+const formatCompactDateTime = (value: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}.${month}.${day} ${hour}:${minute}`;
+};
+
+const getPeriodText = (item: UnifiedItem) => {
+  const start = formatCompactDateTime(item.opensAt);
+  const end = formatCompactDateTime(item.closesAt);
+
+  if (start && end) return `${start} ~ ${end}`;
+  return start || end || "";
+};
+
 export function EventsSurveysPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { lang } = useLanguage();
-  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
 
   const currentTab = searchParams.get("tab") || "event";
   const selectedParam = searchParams.get("selected");
 
-  const [items, setItems] = useState<SurveyRecordWithState[]>([]);
+  const [surveys, setSurveys] = useState<SurveyRecordWithState[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"latest" | "deadline">("latest");
+  const [showOpenOnly, setShowOpenOnly] = useState(false);
 
   // Calendar navigation states
   const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -72,14 +145,21 @@ export function EventsSurveysPage() {
 
   const fetchItems = () => {
     setLoading(true);
-    apiClient
-      .getPublicSurveys()
-      .then((res) => {
-        setItems(res as SurveyRecordWithState[]);
+    Promise.all([
+      apiClient.getPublicSurveys(),
+      apiClient.getArticles("행사", { page: 1, limit: 100 }).catch(() => ({ items: [], total: 0 })),
+    ])
+      .then(([surveysData, eventsData]) => {
+        setSurveys(surveysData as SurveyRecordWithState[]);
+        setEvents(eventsData.items);
         setError(null);
       })
       .catch(() => {
-        setError(lang === "ko" ? "목록을 불러오는 중 오류가 발생했습니다." : "Failed to load events and surveys.");
+        setError(
+          lang === "ko"
+            ? "목록을 불러오는 중 오류가 발생했습니다."
+            : "Failed to load events and surveys.",
+        );
       })
       .finally(() => {
         setLoading(false);
@@ -105,58 +185,136 @@ export function EventsSurveysPage() {
     setSearchParams({ tab });
   };
 
+  const unifiedItems = useMemo<UnifiedItem[]>(() => {
+    // 1. Map surveys
+    const mappedSurveys = surveys.map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      titleKo: s.titleKo,
+      titleEn: s.titleEn,
+      descriptionKo: s.descriptionKo,
+      descriptionEn: s.descriptionEn,
+      computedState: s.computedState || s.status,
+      opensAt: s.opensAt,
+      closesAt: s.closesAt,
+      feePayersOnly: s.feePayersOnly,
+      isKoreanOnly: s.isKoreanOnly,
+      resultVisibility: s.resultVisibility,
+      status: s.status,
+      maxResponses: s.maxResponses,
+      responseCount: s.responseCount,
+    }));
+
+    // 2. Map events
+    const mappedEvents = events.map((e) => {
+      const state = getEventArticleState(e);
+      return {
+        id: e.articleId,
+        kind: "EVENT",
+        titleKo: e.titleKo,
+        titleEn: e.titleEn,
+        descriptionKo: e.eventDescription || e.contentKo || null,
+        descriptionEn: e.eventDescription || e.contentEn || null,
+        computedState: state,
+        opensAt: e.eventStartDate,
+        closesAt: e.eventEndDate,
+        surveyId: e.surveyId,
+        feePayersOnly: false,
+        isKoreanOnly: e.visibilityScope === "MEMBERS",
+        resultVisibility: "PRIVATE",
+        status: state === "closed" ? "closed" : "open",
+        maxResponses: null,
+        responseCount: 0,
+      };
+    });
+
+    return [...mappedSurveys, ...mappedEvents];
+  }, [surveys, events]);
+
   // Filter items based on tab
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    return unifiedItems.filter((item) => {
       if (currentTab === "survey") {
         return item.kind === "SURVEY" || item.kind === "VOTE";
       }
-      return item.kind === "APPLICATION";
+      return item.kind === "EVENT";
     });
-  }, [items, currentTab]);
+  }, [unifiedItems, currentTab]);
+
+  const visibleItems = useMemo(() => {
+    return filteredItems
+      .filter((item) => (showOpenOnly ? isOpenItem(item) : true))
+      .sort((a, b) => {
+        if (isClosedItem(a) !== isClosedItem(b)) {
+          return Number(isClosedItem(a)) - Number(isClosedItem(b));
+        }
+        if (sortBy === "deadline") {
+          return getItemDeadlineTime(a) - getItemDeadlineTime(b);
+        }
+        return getItemStartTime(b) - getItemStartTime(a);
+      });
+  }, [filteredItems, showOpenOnly, sortBy]);
+
+  const activeItems = useMemo(
+    () => visibleItems.filter((item) => !isClosedItem(item)),
+    [visibleItems],
+  );
+
+  const closedItems = useMemo(
+    () => visibleItems.filter((item) => isClosedItem(item)),
+    [visibleItems],
+  );
 
   // Dynamic calendar events parsed from items list
   const calendarEvents = useMemo(() => {
     const parsed: any[] = [];
-    items.forEach((survey) => {
-      const title = lang === "ko" ? survey.titleKo : (survey.titleEn || survey.titleKo);
-      const description = lang === "ko" ? (survey.descriptionKo || "") : (survey.descriptionEn || survey.descriptionKo || "");
+    unifiedItems.forEach((item) => {
+      const title =
+        lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
+      const description =
+        lang === "ko"
+          ? item.descriptionKo || ""
+          : item.descriptionEn || item.descriptionKo || "";
 
-      if (survey.opensAt) {
+      if (item.opensAt) {
         parsed.push({
-          id: survey.id,
-          kind: survey.kind,
+          id: item.id,
+          kind: item.kind,
           title: `${lang === "ko" ? "[시작]" : "[Start]"} ${title}`,
           description,
           dateType: "open",
-          rawDate: survey.opensAt,
-          date: new Date(survey.opensAt),
-          status: survey.status,
-          computedState: survey.computedState,
+          rawDate: item.opensAt,
+          date: new Date(item.opensAt),
+          status: item.status || "open",
+          computedState: item.computedState,
+          surveyId: item.surveyId,
         });
       }
 
-      if (survey.closesAt) {
+      if (item.closesAt) {
         parsed.push({
-          id: survey.id,
-          kind: survey.kind,
+          id: item.id,
+          kind: item.kind,
           title: `${lang === "ko" ? "[마감]" : "[Deadline]"} ${title}`,
           description,
           dateType: "close",
-          rawDate: survey.closesAt,
-          date: new Date(survey.closesAt),
-          status: survey.status,
-          computedState: survey.computedState,
+          rawDate: item.closesAt,
+          date: new Date(item.closesAt),
+          status: item.status || "closed",
+          computedState: item.computedState,
+          surveyId: item.surveyId,
         });
       }
     });
     return parsed;
-  }, [items, lang]);
+  }, [unifiedItems, lang]);
 
   // Sync selected day details when calendarEvents load or selectedDate changes
   useEffect(() => {
     if (selectedDate) {
-      const dayEvents = calendarEvents.filter((e) => isSameDay(e.date, selectedDate));
+      const dayEvents = calendarEvents.filter((e) =>
+        isSameDay(e.date, selectedDate),
+      );
       setSelectedDayEvents(dayEvents);
       setSelectedDateStr(
         selectedDate.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", {
@@ -164,40 +322,16 @@ export function EventsSurveysPage() {
           month: "long",
           day: "numeric",
           weekday: "short",
-        })
+        }),
       );
     }
   }, [calendarEvents, selectedDate, lang]);
 
-  const getKindBadge = (kind: string) => {
-    switch (kind) {
-      case "VOTE":
-        return {
-          label: lang === "ko" ? "투표" : "Vote",
-          color: "bg-purple-50 text-purple-700 border-purple-200",
-          icon: Vote
-        };
-      case "APPLICATION":
-        return {
-          label: lang === "ko" ? "신청" : "Application",
-          color: "bg-blue-50 text-blue-700 border-blue-200",
-          icon: FileCheck
-        };
-      case "SURVEY":
-      default:
-        return {
-          label: lang === "ko" ? "설문" : "Survey",
-          color: "bg-teal-50 text-teal-700 border-teal-200",
-          icon: FileText
-        };
-    }
-  };
-
-  const getStatusBadge = (item: SurveyRecordWithState) => {
+  const getStatusBadge = (item: UnifiedItem) => {
     if (item.computedState === "before_open") {
       return {
         label: lang === "ko" ? "시작 전" : "Upcoming",
-        color: "bg-amber-50 text-amber-700 border-amber-200"
+        color: "bg-amber-50 text-amber-700 border-amber-200",
       };
     }
     if (item.computedState === "open") {
@@ -206,7 +340,11 @@ export function EventsSurveysPage() {
         const now = new Date();
         const closeDate = new Date(item.closesAt);
         const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const d2 = new Date(closeDate.getFullYear(), closeDate.getMonth(), closeDate.getDate());
+        const d2 = new Date(
+          closeDate.getFullYear(),
+          closeDate.getMonth(),
+          closeDate.getDate(),
+        );
         const diffMs = d2.getTime() - d1.getTime();
         const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
@@ -219,13 +357,17 @@ export function EventsSurveysPage() {
         }
       }
       return {
-        label: dDayText ? `${lang === "ko" ? "진행중" : "Ongoing"} (${dDayText})` : (lang === "ko" ? "진행중" : "Ongoing"),
-        color: "bg-emerald-50 text-emerald-700 border-emerald-200"
+        label: dDayText
+          ? `${lang === "ko" ? "진행중" : "Ongoing"} (${dDayText})`
+          : lang === "ko"
+            ? "진행중"
+            : "Ongoing",
+        color: "bg-emerald-50 text-emerald-700 border-emerald-200",
       };
     }
     return {
       label: lang === "ko" ? "마감" : "Closed",
-      color: "bg-gray-100 text-gray-600 border-gray-200"
+      color: "bg-gray-100 text-gray-600 border-gray-200",
     };
   };
 
@@ -288,14 +430,21 @@ export function EventsSurveysPage() {
           bg: "bg-purple-100 border-purple-300 font-extrabold text-purple-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
           bullet: "bg-purple-600",
           label: lang === "ko" ? "투표" : "Vote",
-          icon: Vote
+          icon: Vote,
+        };
+      case "EVENT":
+        return {
+          bg: "bg-emerald-100 border-emerald-300 font-extrabold text-emerald-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
+          bullet: "bg-emerald-600",
+          label: lang === "ko" ? "행사" : "Event",
+          icon: CalendarIcon,
         };
       case "APPLICATION":
         return {
           bg: "bg-blue-100 border-blue-300 font-extrabold text-blue-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
           bullet: "bg-blue-600",
           label: lang === "ko" ? "신청" : "Application",
-          icon: FileCheck
+          icon: FileCheck,
         };
       case "SURVEY":
       default:
@@ -303,7 +452,7 @@ export function EventsSurveysPage() {
           bg: "bg-teal-100 border-teal-300 font-extrabold text-teal-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
           bullet: "bg-teal-600",
           label: lang === "ko" ? "설문" : "Survey",
-          icon: FileText
+          icon: FileText,
         };
     }
   };
@@ -320,9 +469,10 @@ export function EventsSurveysPage() {
     setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
   };
 
-  const weekHeaders = lang === "ko" 
-    ? ["일", "월", "화", "수", "목", "금", "토"]
-    : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekHeaders =
+    lang === "ko"
+      ? ["일", "월", "화", "수", "목", "금", "토"]
+      : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const tabs = [
     { id: "event", labelKo: "행사", labelEn: "Events" },
@@ -330,15 +480,39 @@ export function EventsSurveysPage() {
     { id: "calendar", labelKo: "일정", labelEn: "Calendar" },
   ];
 
+  const getItemHref = (item: UnifiedItem) => {
+    if (item.kind === "EVENT") {
+      return `/board/행사/${item.id}`;
+    }
+    return isClosedItem(item) && item.resultVisibility === "PUBLIC"
+      ? `/survey/${item.id}/results`
+      : `/survey/${item.id}`;
+  };
+
+  const getActionLabel = (item: UnifiedItem) => {
+    if (item.kind === "EVENT") {
+      return lang === "ko" ? "자세히 보기" : "View details";
+    }
+    if (isClosedItem(item) && item.resultVisibility === "PUBLIC") {
+      return lang === "ko" ? "결과 보기" : "View results";
+    }
+    if (isOpenItem(item)) {
+      return lang === "ko" ? "참여하기" : "Participate";
+    }
+    return lang === "ko" ? "자세히 보기" : "View details";
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50/40">
       <Header showLogo />
 
       <PageHero
         title={lang === "ko" ? "행사 / 설문·투표" : "Events / Surveys & Votes"}
-        description={lang === "ko"
-          ? "집행위원회가 진행하는 행사와 설문·투표를 한 곳에서 확인하고 참여하세요."
-          : "Browse and join student council events, surveys, and votes in one place."}
+        description={
+          lang === "ko"
+            ? "집행위원회가 진행하는 행사와 설문·투표를 한 곳에서 확인하고 참여하세요."
+            : "Browse and join student council events, surveys, and votes in one place."
+        }
       />
 
       {/* Underlined Tab-style Navigation matching the rest of the application */}
@@ -372,6 +546,58 @@ export function EventsSurveysPage() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 md:px-8">
+        {currentTab !== "calendar" && !loading && !error ? (
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.015)] md:flex-row md:items-center md:justify-between">
+            <div className="text-[13px] font-bold text-slate-600">
+              {lang === "ko" ? (
+                <span>
+                  전체{" "}
+                  <strong className="text-kaist-darkgreen">
+                    {visibleItems.length}
+                  </strong>
+                  개
+                </span>
+              ) : (
+                <span>
+                  <strong className="text-kaist-darkgreen">
+                    {visibleItems.length}
+                  </strong>{" "}
+                  items
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <label className="flex cursor-pointer items-center gap-2 text-[12px] font-bold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={showOpenOnly}
+                  onChange={(event) => setShowOpenOnly(event.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-kaist-darkgreen focus:ring-kaist-darkgreen/20"
+                />
+                <span>
+                  {lang === "ko" ? "진행 중인 행사만 보기" : "Ongoing only"}
+                </span>
+              </label>
+
+              <select
+                value={sortBy}
+                onChange={(event) =>
+                  setSortBy(event.target.value as "latest" | "deadline")
+                }
+                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
+              >
+                <option value="latest">
+                  {lang === "ko" ? "최신순" : "Newest"}
+                </option>
+                <option value="deadline">
+                  {lang === "ko" ? "마감 임박순" : "Deadline"}
+                </option>
+              </select>
+            </div>
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="w-8 h-8 border-3 border-kaist-darkgreen border-t-transparent rounded-full animate-spin" />
@@ -387,16 +613,14 @@ export function EventsSurveysPage() {
         ) : currentTab === "calendar" ? (
           /* High-Fidelity Integrated Calendar Layout matching the revised design */
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-            
             {/* 1. Large Month Calendar Box (3/4 width) */}
             <div className="lg:col-span-3 bg-white rounded-3xl border border-kaist-grey/15 p-6 shadow-sm flex flex-col">
-              
               {/* Calendar Grid Controller Header */}
               <div className="flex items-center justify-between pb-4 border-b border-kaist-grey/10 mb-5 select-none">
                 <h3 className="text-lg md:text-xl font-extrabold tracking-tight text-kaist-darkgreen-main whitespace-nowrap">
                   {currentYear}년 {currentMonth + 1}월
                 </h3>
-                
+
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handlePrevMonth}
@@ -426,10 +650,14 @@ export function EventsSurveysPage() {
               {/* Weekday Labels Header */}
               <div className="grid grid-cols-7 gap-1 text-center mb-2 select-none">
                 {weekHeaders.map((week, idx) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     className={`text-xs font-extrabold py-1.5 ${
-                      idx === 0 ? "text-red-500" : idx === 6 ? "text-blue-500" : "text-kaist-greygreen"
+                      idx === 0
+                        ? "text-red-500"
+                        : idx === 6
+                          ? "text-blue-500"
+                          : "text-kaist-greygreen"
                     }`}
                   >
                     {week}
@@ -440,40 +668,49 @@ export function EventsSurveysPage() {
               {/* Monthly Day Grid */}
               <div className="grid grid-cols-7 grid-rows-6 gap-1.5 min-h-[430px]">
                 {calendarGrid.map((cell, idx) => {
-                  const dayEvents = calendarEvents.filter((e) => isSameDay(e.date, cell.date));
+                  const dayEvents = calendarEvents.filter((e) =>
+                    isSameDay(e.date, cell.date),
+                  );
                   const isToday = isSameDay(new Date(), cell.date);
-                  const isSelected = selectedDate && isSameDay(selectedDate, cell.date);
+                  const isSelected =
+                    selectedDate && isSameDay(selectedDate, cell.date);
 
                   return (
                     <button
                       key={idx}
                       onClick={() => handleSelectDay(cell.date)}
                       className={`min-h-[75px] p-2 rounded-xl text-left border flex flex-col justify-between items-start transition-all cursor-pointer relative group ${
-                        cell.isCurrentMonth 
-                          ? isSelected 
+                        cell.isCurrentMonth
+                          ? isSelected
                             ? "bg-[#e6f4ea]/30 border-kaist-darkgreen/30"
-                            : "bg-white hover:bg-slate-50/50 border-kaist-grey/10" 
+                            : "bg-white hover:bg-slate-50/50 border-kaist-grey/10"
                           : isSelected
                             ? "bg-[#e6f4ea]/20 border-kaist-darkgreen/20 text-kaist-grey/40"
                             : "bg-slate-50/40 border-transparent text-kaist-grey/40"
                       }`}
                     >
-                      {/* Day Label (No extra pill padding wrapper to guarantee constant cell grid height!) */}
+                      {/* Day Label */}
                       <div className="flex items-center justify-between w-full select-none">
-                        <span 
-                          className={`text-xs leading-none ${
-                            isSelected 
-                              ? "text-kaist-darkgreen font-extrabold" 
-                              : cell.isCurrentMonth
-                              ? cell.date.getDay() === 0 ? "text-red-500" : cell.date.getDay() === 6 ? "text-blue-500" : "text-kaist-black"
-                              : "text-kaist-grey/40 font-bold"
-                          } ${cell.isCurrentMonth && !isSelected ? "font-bold" : ""}`}
-                        >
-                          {cell.day}
-                        </span>
-                        
-                        {isToday && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#137333] shrink-0" title={lang === "ko" ? "오늘" : "Today"} />
+                        {isToday ? (
+                          <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                            {cell.day}
+                          </div>
+                        ) : (
+                          <span
+                            className={`text-xs leading-none ${
+                              isSelected
+                                ? "text-kaist-darkgreen font-extrabold"
+                                : cell.isCurrentMonth
+                                  ? cell.date.getDay() === 0
+                                    ? "text-red-500"
+                                    : cell.date.getDay() === 6
+                                      ? "text-blue-500"
+                                      : "text-kaist-black"
+                                  : "text-kaist-grey/40 font-bold"
+                            } ${cell.isCurrentMonth && !isSelected ? "font-bold" : ""}`}
+                          >
+                            {cell.day}
+                          </span>
                         )}
                       </div>
 
@@ -488,12 +725,14 @@ export function EventsSurveysPage() {
                             .replace(/^\[Deadline\]\s*/, "");
 
                           return (
-                            <div 
+                            <div
                               key={eventIdx}
                               className="w-full text-[9.5px] font-bold truncate leading-relaxed flex items-center gap-1.5 text-slate-600 hover:text-kaist-darkgreen"
                               title={event.title}
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-green-500" : "bg-red-500"}`} />
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-green-500" : "bg-red-500"}`}
+                              />
                               <span className="truncate">{shortTitle}</span>
                             </div>
                           );
@@ -510,17 +749,27 @@ export function EventsSurveysPage() {
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-slate-900/95 text-white text-[10px] rounded-xl p-3 shadow-xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 z-30 select-none flex flex-col gap-2 border border-white/10">
                           <div className="font-extrabold border-b border-white/15 pb-1 flex items-center justify-between text-[#5cdb7d]">
                             <span>
-                              {cell.date.toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
+                              {cell.date.toLocaleDateString(
+                                lang === "ko" ? "ko-KR" : "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
                             </span>
                             <span>{dayEvents.length}개 일정</span>
                           </div>
                           <div className="flex flex-col gap-1.5 text-[9px] font-medium text-stone-200">
                             {dayEvents.map((e: any, eIdx) => {
                               const isStart = e.dateType === "open";
-                              const label = e.kind === "VOTE" ? "투표" : e.kind === "APPLICATION" ? "신청" : "설문";
+                              const label =
+                                e.kind === "VOTE"
+                                  ? "투표"
+                                  : e.kind === "APPLICATION"
+                                    ? "신청"
+                                    : e.kind === "EVENT"
+                                      ? "행사"
+                                      : "설문";
                               const titleText = e.title
                                 .replace(/^\[시작\]\s*/, "")
                                 .replace(/^\[마감\]\s*/, "")
@@ -528,10 +777,17 @@ export function EventsSurveysPage() {
                                 .replace(/^\[Deadline\]\s*/, "");
 
                               return (
-                                <div key={eIdx} className="flex items-center justify-between gap-2">
+                                <div
+                                  key={eIdx}
+                                  className="flex items-center justify-between gap-2"
+                                >
                                   <div className="truncate flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-green-500" : "bg-red-500"}`} />
-                                    <span className="truncate">{titleText}</span>
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-green-500" : "bg-red-500"}`}
+                                    />
+                                    <span className="truncate">
+                                      {titleText}
+                                    </span>
                                   </div>
                                   <span className="text-[8px] font-extrabold px-1 rounded-sm bg-white/10 text-white/85 shrink-0 uppercase select-none">
                                     {label}
@@ -553,7 +809,9 @@ export function EventsSurveysPage() {
               <div className="flex flex-col min-h-0 flex-1">
                 <h3 className="text-base font-extrabold text-kaist-black border-b border-kaist-grey/10 pb-2.5 mb-3.5 flex items-center gap-2 select-none shrink-0">
                   <CalendarIcon className="w-4 h-4 text-kaist-darkgreen" />
-                  <span>{lang === "ko" ? "일정 상세조회" : "Day Schedule Details"}</span>
+                  <span>
+                    {lang === "ko" ? "일정 상세조회" : "Day Schedule Details"}
+                  </span>
                 </h3>
 
                 {selectedDateStr ? (
@@ -565,17 +823,25 @@ export function EventsSurveysPage() {
                       </span>
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-kaist-darkgreen text-white shadow-xs mt-1">
                         <CalendarIcon className="w-3 h-3" />
-                        <span>{lang === "ko" ? `총 ${selectedDayEvents.length}개 일정` : `${selectedDayEvents.length} Events`}</span>
+                        <span>
+                          {lang === "ko"
+                            ? `총 ${selectedDayEvents.length}개 일정`
+                            : `${selectedDayEvents.length} Events`}
+                        </span>
                       </span>
                     </div>
 
                     {selectedDayEvents.length === 0 ? (
                       <div className="text-center py-12 space-y-2 flex-1 flex flex-col justify-center select-none">
                         <p className="text-sm font-semibold text-slate-400">
-                          {lang === "ko" ? "등록된 일정이 없습니다." : "No events scheduled."}
+                          {lang === "ko"
+                            ? "등록된 일정이 없습니다."
+                            : "No events scheduled."}
                         </p>
                         <p className="text-xs text-slate-400/70">
-                          {lang === "ko" ? "다른 날짜를 선택해보세요." : "Select another date."}
+                          {lang === "ko"
+                            ? "다른 날짜를 선택해보세요."
+                            : "Select another date."}
                         </p>
                       </div>
                     ) : (
@@ -583,12 +849,15 @@ export function EventsSurveysPage() {
                         {selectedDayEvents.map((event, idx) => {
                           const style = getEventStyles(event.kind);
                           const eventDate = new Date(event.rawDate);
-                          const formattedTime = eventDate.toLocaleTimeString(lang === "ko" ? "ko-KR" : "en-US", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false
-                          });
-                          
+                          const formattedTime = eventDate.toLocaleTimeString(
+                            lang === "ko" ? "ko-KR" : "en-US",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: false,
+                            },
+                          );
+
                           const isStateOpen = event.computedState === "open";
                           const shortTitle = event.title
                             .replace(/^\[시작\]\s*/, "")
@@ -597,21 +866,36 @@ export function EventsSurveysPage() {
                             .replace(/^\[Deadline\]\s*/, "");
 
                           return (
-                            <div key={idx} className="bg-white border border-slate-100 rounded-xl p-3.5 space-y-2 shadow-xs hover:shadow-sm transition-shadow relative overflow-hidden shrink-0">
+                            <div
+                              key={idx}
+                              className="bg-white border border-slate-100 rounded-xl p-3.5 space-y-2 shadow-xs hover:shadow-sm transition-shadow relative overflow-hidden shrink-0"
+                            >
                               {/* Top border strip for event type branding */}
-                              <div className={`absolute top-0 left-0 right-0 h-0.5 ${style.bullet}`} />
+                              <div
+                                className={`absolute top-0 left-0 right-0 h-0.5 ${style.bullet}`}
+                              />
 
                               <div className="flex items-center justify-between select-none">
-                                <span className={`text-[9px] font-black px-2 py-0.2 rounded-full border ${style.bg}`}>
+                                <span
+                                  className={`text-[9px] font-black px-2 py-0.2 rounded-full border ${style.bg}`}
+                                >
                                   {style.label}
                                 </span>
-                                
-                                <span className={`text-[9px] font-black px-2 py-0.2 rounded-full ${
-                                  isStateOpen 
-                                    ? "bg-[#e6f4ea] text-[#137333]" 
-                                    : "bg-slate-100 text-slate-500"
-                                }`}>
-                                  {isStateOpen ? (lang === "ko" ? "진행중" : "Ongoing") : (lang === "ko" ? "마감됨" : "Closed")}
+
+                                <span
+                                  className={`text-[9px] font-black px-2 py-0.2 rounded-full ${
+                                    isStateOpen
+                                      ? "bg-[#e6f4ea] text-[#137333]"
+                                      : "bg-slate-100 text-slate-500"
+                                  }`}
+                                >
+                                  {isStateOpen
+                                    ? lang === "ko"
+                                      ? "진행중"
+                                      : "Ongoing"
+                                    : lang === "ko"
+                                      ? "마감됨"
+                                      : "Closed"}
                                 </span>
                               </div>
 
@@ -631,16 +915,38 @@ export function EventsSurveysPage() {
                                   <Clock className="w-3 h-3 text-slate-300 animate-pulse" />
                                   <span>{formattedTime}</span>
                                   <span className="text-slate-200">|</span>
-                                  <span>{event.dateType === "open" ? (lang === "ko" ? "시작" : "Starts") : (lang === "ko" ? "마감" : "Ends")}</span>
+                                  <span>
+                                    {event.dateType === "open"
+                                      ? lang === "ko"
+                                        ? "시작"
+                                        : "Starts"
+                                      : lang === "ko"
+                                        ? "마감"
+                                        : "Ends"}
+                                  </span>
                                 </div>
 
-                                <Link
-                                  to={`/survey/${event.id}`}
-                                  className="inline-flex items-center gap-0.5 text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer"
-                                >
-                                  <span>{lang === "ko" ? "참여하기" : "View"}</span>
-                                  <ArrowRight className="w-3 h-3" />
-                                </Link>
+                                <div className="flex gap-2">
+                                  {event.kind === "EVENT" && event.surveyId && (
+                                    <Link
+                                      to={`/survey/${event.surveyId}`}
+                                      className="inline-flex items-center gap-0.5 text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer mr-2 text-[10px]"
+                                    >
+                                      <span>{lang === "ko" ? "참여하기" : "Participate"}</span>
+                                    </Link>
+                                  )}
+                                  <Link
+                                    to={event.kind === "EVENT" ? `/board/행사/${event.id}` : `/survey/${event.id}`}
+                                    className="inline-flex items-center gap-0.5 text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer text-[10px]"
+                                  >
+                                    <span>
+                                      {event.kind === "EVENT"
+                                        ? lang === "ko" ? "자세히 보기" : "View"
+                                        : lang === "ko" ? "참여하기" : "View"}
+                                    </span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </Link>
+                                </div>
                               </div>
                             </div>
                           );
@@ -654,7 +960,7 @@ export function EventsSurveysPage() {
                       <CalendarIcon className="w-6 h-6" />
                     </div>
                     <p className="text-sm font-semibold text-slate-400 leading-relaxed px-4">
-                      {lang === "ko" 
+                      {lang === "ko"
                         ? "달력에서 날짜를 선택하여 상세 마감 일정을 확인해보세요."
                         : "Select a date on the calendar to view its detailed schedule."}
                     </p>
@@ -662,145 +968,180 @@ export function EventsSurveysPage() {
                 )}
               </div>
             </div>
-
           </div>
-        ) : filteredItems.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-gray-200 rounded-3xl bg-white space-y-4">
             <div className="text-gray-300 font-medium text-lg">
-              {lang === "ko" ? "표시할 항목이 없습니다." : "No events or surveys to display."}
+              {lang === "ko"
+                ? "표시할 항목이 없습니다."
+                : "No events or surveys to display."}
             </div>
             <p className="text-sm text-kaist-grey">
-              {lang === "ko" ? "다른 탭을 확인해 보세요." : "Please check out the other tab."}
+              {lang === "ko"
+                ? "다른 탭을 확인해 보세요."
+                : "Please check out the other tab."}
             </p>
           </div>
         ) : (
           /* Cards Grid Layout */
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {filteredItems.map((item) => {
-              const kindInfo = getKindBadge(item.kind);
+            {visibleItems.map((item, index) => {
               const statusInfo = getStatusBadge(item);
-              const Icon = kindInfo.icon;
 
-              const title = lang === "ko" ? item.titleKo : (item.titleEn || item.titleKo);
-              const desc = lang === "ko" ? item.descriptionKo : (item.descriptionEn || item.descriptionKo);
+              const title =
+                lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
+              const desc =
+                lang === "ko"
+                  ? item.descriptionKo
+                  : item.descriptionEn || item.descriptionKo;
 
               const hasCapacity = item.maxResponses && item.maxResponses > 0;
               const currentResponses = item.responseCount ?? 0;
-              const fillPercentage = hasCapacity ? Math.min(100, (currentResponses / (item.maxResponses || 1)) * 100) : 0;
+              const fillPercentage = hasCapacity
+                ? Math.min(
+                    100,
+                    (currentResponses / (item.maxResponses || 1)) * 100,
+                  )
+                : 0;
+              const closed = isClosedItem(item);
+              const previousItem = visibleItems[index - 1];
+              const startsActiveSection = index === 0 && !closed;
+              const startsClosedSection =
+                closed && (index === 0 || !isClosedItem(previousItem));
 
               return (
-                <div 
-                  key={item.id}
-                  className="bg-white border border-gray-200 rounded-3xl p-5 md:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-5"
-                >
-                  <div className="space-y-3.5">
-                    {/* Badge Row */}
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${kindInfo.color}`}>
-                          <Icon className="w-3 h-3" />
-                          {kindInfo.label}
-                        </span>
-                        {item.feePayersOnly && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            {lang === "ko" ? "Paid Members Only" : "Paid Members Only"}
-                          </span>
-                        )}
-                        {item.isKoreanOnly && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            {lang === "ko" ? "Korean Speakers Only" : "Korean Speakers Only"}
-                          </span>
-                        )}
-                      </div>
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${statusInfo.color}`}>
-                        {statusInfo.label}
+                <Fragment key={item.id}>
+                  {startsActiveSection ? (
+                    <div className="col-span-full flex items-center justify-between pt-1">
+                      <h2 className="text-base font-extrabold text-slate-900">
+                        {lang === "ko" ? "진행 중" : "Ongoing"}
+                      </h2>
+                      <span className="text-xs font-bold text-slate-400">
+                        {activeItems.length}
                       </span>
                     </div>
+                  ) : null}
 
-                    {/* Title & Description */}
-                    <div className="space-y-2">
-                      <h3 className="text-xl md:text-[1.35rem] font-extrabold text-kaist-black line-clamp-1 leading-tight">
-                        {title}
-                      </h3>
-                      {desc && (
-                        <p className="text-sm text-kaist-grey/80 line-clamp-2 leading-relaxed font-normal">
-                          {desc}
-                        </p>
-                      )}
+                  {startsClosedSection ? (
+                    <div className="col-span-full flex items-center justify-between pt-3">
+                      <h2 className="text-base font-extrabold text-slate-900">
+                        {lang === "ko" ? "마감됨" : "Closed"}
+                      </h2>
+                      <span className="text-xs font-bold text-slate-400">
+                        {closedItems.length}
+                      </span>
                     </div>
-                  </div>
+                  ) : null}
 
-                  {/* Progress & Metadata */}
-                  <div className="space-y-4 pt-4 border-t border-gray-100">
-                    {/* Response capacity bar if applicable */}
-                    {hasCapacity && (
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-semibold text-kaist-grey/80">
-                          <span>{lang === "ko" ? "신청 현황" : "Registration Status"}</span>
-                          <span>{currentResponses} / {item.maxResponses} ({Math.round(fillPercentage)}%)</span>
-                        </div>
-                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-kaist-darkgreen/80 h-full rounded-full transition-all duration-300"
-                            style={{ width: `${fillPercentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Dates */}
-                    <div className="flex flex-col gap-1.5 text-xs text-kaist-grey/75 font-medium">
-                      {item.opensAt && (
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-kaist-greygreen/80" />
-                          <span>
-                            {lang === "ko" ? "시작:" : "Start:"} {formatKoreanDateTime(item.opensAt)}
-                          </span>
-                        </div>
-                      )}
-                      {item.closesAt && (
-                        <div className="flex items-center gap-1.5">
-                          <CalendarIcon className="w-3.5 h-3.5 text-kaist-greygreen/80" />
-                          <span>
-                            {lang === "ko" ? "마감:" : "End:"} {formatKoreanDateTime(item.closesAt)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="pt-2">
-                      {item.computedState === "open" ? (
-                        <button
-                          onClick={() => navigate(`/survey/${item.id}`)}
-                          className="w-full flex items-center justify-center gap-2 bg-kaist-darkgreen/90 hover:bg-kaist-darkgreen text-white/95 font-semibold text-sm py-2.5 rounded-xl transition-all shadow-sm shadow-kaist-darkgreen/10 border-0 cursor-pointer"
-                        >
-                          <span>{lang === "ko" ? "참여하기" : "Participate"}</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      ) : item.computedState === "closed" && item.resultVisibility === "PUBLIC" ? (
-                        <button
-                          onClick={() => navigate(`/survey/${item.id}/results`)}
-                          className="w-full flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-kaist-darkgreen/80 font-semibold text-sm py-2.5 rounded-xl transition-all border border-kaist-darkgreen/20 cursor-pointer"
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                          <span>{lang === "ko" ? "결과 보기" : "View Results"}</span>
-                        </button>
-                      ) : (
-                        <button
-                          disabled
-                          className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-400 font-semibold text-sm py-2.5 rounded-xl border border-gray-200 cursor-not-allowed"
-                        >
-                          {item.computedState === "before_open" ? (
-                            <span>{lang === "ko" ? "개시 예정" : "Upcoming"}</span>
-                          ) : (
-                            <span>{lang === "ko" ? "마감됨" : "Closed"}</span>
+                  <div
+                    key={item.id}
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate(getItemHref(item))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        navigate(getItemHref(item));
+                      }
+                    }}
+                    className={`flex cursor-pointer flex-col justify-between space-y-4 border-gray-200 bg-white rounded-2xl border p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                      closed
+                        ? "border-slate-200 opacity-75 hover:opacity-95"
+                        : ""
+                    }`}
+                  >
+                    <div className="space-y-3.5">
+                      {/* Badge Row */}
+                      <div className="flex flex-wrap items-center justify-start gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {item.feePayersOnly && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              {lang === "ko"
+                                ? "Paid Members Only"
+                                : "Paid Members Only"}
+                            </span>
                           )}
-                        </button>
+                          {item.isKoreanOnly && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              {lang === "ko"
+                                ? "Korean Speakers Only"
+                                : "Korean Speakers Only"}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${statusInfo.color}`}
+                        >
+                          {statusInfo.label}
+                        </span>
+                      </div>
+
+                      {/* Title & Description */}
+                      <div className="space-y-2">
+                        <h3 className="text-[1.05rem] font-extrabold text-kaist-black line-clamp-2 leading-snug">
+                          {title}
+                        </h3>
+                        {desc && (
+                          <p className="text-sm text-kaist-grey/80 line-clamp-2 leading-relaxed font-normal">
+                            {desc}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Progress & Metadata */}
+                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                      {/* Response capacity bar if applicable */}
+                      {hasCapacity && (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-semibold text-kaist-grey/80">
+                            <span>
+                              {lang === "ko"
+                                ? "신청 현황"
+                                : "Registration Status"}
+                            </span>
+                            <span>
+                              {currentResponses} / {item.maxResponses} (
+                              {Math.round(fillPercentage)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="bg-kaist-darkgreen/80 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${fillPercentage}%` }}
+                            />
+                          </div>
+                        </div>
                       )}
+
+                      {/* Dates */}
+                      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-kaist-grey/75">
+                        <Clock className="w-3.5 h-3.5 shrink-0 text-kaist-greygreen/80" />
+                        <span className="truncate">{getPeriodText(item)}</span>
+                      </div>
+                      {/* Action buttons */}
+                      <div className="flex justify-between items-center pt-1 text-[12px] font-extrabold">
+                        <div>
+                          {item.kind === "EVENT" && item.surveyId && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/survey/${item.surveyId}`);
+                              }}
+                              className="text-kaist-darkgreen hover:opacity-80 border-0 bg-transparent cursor-pointer font-extrabold text-[12px] p-0"
+                            >
+                              {lang === "ko" ? "참여하기" : "Participate"}
+                            </button>
+                          )}
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-kaist-darkgreen">
+                          {getActionLabel(item)}
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Fragment>
               );
             })}
           </div>
