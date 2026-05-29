@@ -216,6 +216,9 @@ export const articles = pgTable("article", {
   postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  eventStartDate: timestamp("event_start_date", { withTimezone: true }),
+  eventEndDate: timestamp("event_end_date", { withTimezone: true }),
+  eventDescription: text("event_description"),
 }, (table) => [
   index("article_board_idx").on(table.boardId),
 ]);

@@ -46,6 +46,12 @@ export interface ArticleListItem {
   isAnonymous: boolean;
   commentCount: number;
   viewCount: number;
+  hasAttachment?: boolean;
+  eventStartDate?: string | null;
+  eventEndDate?: string | null;
+  eventDescription?: string | null;
+  surveyId?: string | null;
+  boardCode?: string;
 }
 
 export interface ArticleListResponse {
@@ -100,6 +106,9 @@ export interface ArticleDetailResponse {
   survey?: SurveySummary | null;
   prevArticle?: { articleId: string; titleKo: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
   nextArticle?: { articleId: string; titleKo: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
+  eventStartDate?: string | null;
+  eventEndDate?: string | null;
+  eventDescription?: string | null;
 }
 
 export interface ArticleAssetRequest {
@@ -118,6 +127,9 @@ export interface ArticleCreateRequest {
   pinOrder?: number | null;
   isAnonymous?: boolean;
   assets?: ArticleAssetRequest[];
+  eventStartDate?: string | null;
+  eventEndDate?: string | null;
+  eventDescription?: string | null;
 }
 
 export interface ArticleCreateResponse {
@@ -136,6 +148,9 @@ export interface ArticleUpdateRequest {
   pinOrder?: number | null;
   isAnonymous?: boolean;
   assets?: ArticleAssetRequest[];
+  eventStartDate?: string | null;
+  eventEndDate?: string | null;
+  eventDescription?: string | null;
 }
 
 export interface ArticleUpdateResponse {

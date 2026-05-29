@@ -1,1 +1,0 @@
-ALTER TABLE "survey" ADD COLUMN "show_on_calendar" boolean DEFAULT false NOT NULL;

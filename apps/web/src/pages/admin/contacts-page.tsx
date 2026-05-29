@@ -3,11 +3,21 @@ import { createApiClient } from "@soc/api-client";
 import type { ContactRecord, CreateContactRequest } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Plus, Edit2, Trash2, Save, X, Phone, Mail, User } from "lucide-react";
-import { useCurrentSession } from "@/hooks/use-current-session";
+import { AuthGuard } from "@/components/guards/auth-guard";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Permissions } from "@/lib/permissions";
 
 export function ContactsPage() {
+  return (
+    <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}>
+      <ContactsPageContent />
+    </AuthGuard>
+  );
+}
+
+function ContactsPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
-  const { data: session } = useCurrentSession();
+  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
 
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +108,14 @@ export function ContactsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("정말로 이 연락처를 삭제하시겠습니까?")) return;
+    const confirmed = await requestConfirm({
+      confirmLabel: "삭제",
+      description: "About 페이지의 구성원 연락처에서 즉시 제거됩니다.",
+      title: "이 연락처를 삭제하시겠습니까?",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
     try {
       await apiClient.deleteContact(id);
       loadContacts();
@@ -109,6 +126,7 @@ export function ContactsPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {ConfirmDialog}
       <div className="flex justify-between items-center border-b border-gray-100 pb-5">
         <div>
           <h1 className="text-2xl font-black text-kaist-black tracking-tight">집행위연락망 관리</h1>

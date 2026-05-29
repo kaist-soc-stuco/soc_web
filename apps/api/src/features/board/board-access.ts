@@ -39,4 +39,27 @@ export const assertBoardReadable = (
   }
 };
 
+export const canReadBoard = (
+  board: ReadScopeSource,
+  user: CurrentUserContext,
+): boolean => {
+  if (board.readScope === "PUBLIC") {
+    return true;
+  }
+
+  if (!user.authenticated) {
+    return false;
+  }
+
+  if (board.readScope === "LOGIN") {
+    return true;
+  }
+
+  return Boolean(
+    user.user &&
+      board.managePermissionBit > 0 &&
+      Permissions.has(user.user.permission, board.managePermissionBit),
+  );
+};
+
 export type { CurrentUserContext };

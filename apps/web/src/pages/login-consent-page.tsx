@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   clearStoredAuthState,
@@ -21,6 +22,7 @@ export function LoginConsentPage() {
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
+  const queryClient = useQueryClient();
 
   const pendingLoginToken = useMemo(() => {
     const queryToken = query.get("pendingLoginToken");
@@ -57,9 +59,8 @@ export function LoginConsentPage() {
         clearStoredAuthState();
       }
 
-      navigate("/login?status=success&reason=consent_processed", {
-        replace: true,
-      });
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+      navigate("/", { replace: true });
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -76,7 +77,7 @@ export function LoginConsentPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div className="space-y-3">
           <Link
-            to="/login"
+            to="/"
             className="text-sm font-semibold text-kaist-darkgreen hover:underline"
           >
             로그인 화면으로 돌아가기

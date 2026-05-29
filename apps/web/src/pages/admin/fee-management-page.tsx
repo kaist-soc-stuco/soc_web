@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import type { StudentFeeListResponse, FeeStatus } from '@soc/contracts';
 import { Button } from '@/components/ui/button';
+import { Pagination } from '@/components/ui/pagination';
 import { AuthGuard } from '@/components/guards/auth-guard';
 import { useCurrentSession } from '@/hooks/use-current-session';
 import { resolveApiBaseUrl } from '@/lib/api';
 import { Permissions } from '@/lib/permissions';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 export function FeeManagementPage() {
   const navigate = useNavigate();
@@ -90,44 +91,6 @@ export function FeeManagementPage() {
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-
-  const getPaginationItems = () => {
-    const items: (number | string)[] = [];
-
-    if (totalPages <= 7) {
-      for (let page = 1; page <= totalPages; page += 1) {
-        items.push(page);
-      }
-      return items;
-    }
-
-    if (currentPage <= 4) {
-      for (let page = 1; page <= 5; page += 1) {
-        items.push(page);
-      }
-      items.push('...');
-      items.push(totalPages);
-      return items;
-    }
-
-    if (currentPage >= totalPages - 3) {
-      items.push(1);
-      items.push('...');
-      for (let page = totalPages - 4; page <= totalPages; page += 1) {
-        items.push(page);
-      }
-      return items;
-    }
-
-    items.push(1);
-    items.push('...');
-    items.push(currentPage - 1);
-    items.push(currentPage);
-    items.push(currentPage + 1);
-    items.push('...');
-    items.push(totalPages);
-    return items;
-  };
 
   const getStatusBadgeStyle = (status: FeeStatus, disabled: boolean) => {
     const base = 'inline-flex rounded-full px-3 py-1 text-xs font-bold transition-all';
@@ -353,59 +316,11 @@ export function FeeManagementPage() {
 
           {totalCount > 0 && (
             <div className="border-t border-slate-100 bg-slate-50/10 px-6 py-4 flex items-center justify-center gap-2 select-none md:px-8">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${
-                      currentPage === 1
-                        ? 'cursor-not-allowed border-slate-100 bg-white text-slate-300'
-                        : 'cursor-pointer border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <ChevronLeft className="h-4 w-4 stroke-[2.5px]" />
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    {getPaginationItems().map((item, idx) => {
-                      if (item === '...') {
-                        return (
-                          <span key={`dots-${idx}`} className="flex h-9 w-9 select-none items-center justify-center px-1.5 text-xs text-slate-400">
-                            ...
-                          </span>
-                        );
-                      }
-
-                      const page = item as number;
-                      const isActive = currentPage === page;
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`flex h-9 w-9 items-center justify-center rounded-xl border-0 text-[13px] font-extrabold tracking-tight transition-all cursor-pointer ${
-                            isActive
-                              ? 'bg-kaist-darkgreen text-white shadow-sm'
-                              : 'bg-transparent text-slate-500 hover:text-slate-800'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${
-                      currentPage === totalPages
-                        ? 'cursor-not-allowed border-slate-100 bg-white text-slate-300'
-                        : 'cursor-pointer border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <ChevronRight className="h-4 w-4 stroke-[2.5px]" />
-                  </button>
-                </div>
+              <Pagination
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                totalPages={totalPages}
+              />
             </div>
           )}
         </section>

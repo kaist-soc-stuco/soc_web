@@ -7,10 +7,13 @@ services:
       - .env
     environment:
       POSTGRES_HOST: postgres
-      REDIS_HOST: redis
+      POSTGRES_PORT: 5432
       REDIS_URL: redis://redis:6379
+      ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
     ports:
       - '${API_PORT}:3000'
+    volumes:
+      - api_uploads:/app/apps/api/uploads
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -32,7 +35,7 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"
+      - '${POSTGRES_PORT}:5432'
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -57,8 +60,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+      POSTGRES_PORT: 5432
+      ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
+    volumes:
+      - api_uploads:/app/apps/api/uploads
     command: ['sh', '-c', 'pnpm db:migrate']
 
   redis:
@@ -82,5 +87,6 @@ services:
         condition: service_started
 
 volumes:
+  api_uploads:
   postgres_data:
   redis_data:

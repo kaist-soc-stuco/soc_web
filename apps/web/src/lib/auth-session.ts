@@ -25,6 +25,24 @@ export const getTemporarySessionId = (): string | undefined => {
   return readStoredAuthState()?.temporarySession?.sessionId;
 };
 
+export const getTemporaryAuthRequest = ():
+  | {
+      refreshToken?: string;
+      sessionId?: string;
+    }
+  | undefined => {
+  const temporarySession = readStoredAuthState()?.temporarySession;
+
+  if (!temporarySession?.refreshToken && !temporarySession?.sessionId) {
+    return undefined;
+  }
+
+  return {
+    refreshToken: temporarySession.refreshToken,
+    sessionId: temporarySession.sessionId,
+  };
+};
+
 /**
  * 세션 조회 실패 시에도 화면이 깨지지 않도록 기본 세션으로 복구합니다.
  */

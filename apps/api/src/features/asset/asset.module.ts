@@ -7,7 +7,7 @@ import { AssetService } from "./asset.service";
 import { AssetRepository } from "./repositories/asset.repository";
 import {
   AssetStorageProvider,
-  MemoryAssetStorageProvider,
+  LocalAssetStorageProvider,
 } from "./asset.storage";
 import { AuthModule } from "../auth/auth.module";
 
@@ -19,7 +19,7 @@ import { AuthModule } from "../auth/auth.module";
     AssetService,
     {
       provide: AssetStorageProvider,
-      useClass: MemoryAssetStorageProvider,
+      useClass: LocalAssetStorageProvider,
     },
   ],
 })

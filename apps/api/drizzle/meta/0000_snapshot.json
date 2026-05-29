@@ -1,5 +1,5 @@
 {
-  "id": "c862c154-0d38-4d10-884b-1b5f077fb175",
+  "id": "1ac2f59e-2830-4e57-8776-37d73791d135",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -179,6 +179,24 @@
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_start_date": {
+          "name": "event_start_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_end_date": {
+          "name": "event_end_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_description": {
+          "name": "event_description",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -958,23 +976,11 @@
           "primaryKey": true,
           "notNull": true
         },
-        "code": {
-          "name": "code",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
         "name_ko": {
           "name": "name_ko",
           "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
-        },
-        "name_en": {
-          "name": "name_en",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
         },
         "description": {
           "name": "description",
@@ -1008,11 +1014,11 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "role_group_code_unique": {
-          "name": "role_group_code_unique",
+        "role_group_name_ko_unique": {
+          "name": "role_group_name_ko_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "code"
+            "name_ko"
           ]
         }
       },
@@ -1339,29 +1345,11 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'draft'"
+          "default": "'submitted'"
         },
         "submitted_at": {
           "name": "submitted_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "review_admin_id": {
-          "name": "review_admin_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "review_reason": {
-          "name": "review_reason",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -1401,19 +1389,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
-          ],
-          "columnsTo": [
-            "user_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "survey_responses_review_admin_id_users_user_id_fk": {
-          "name": "survey_responses_review_admin_id_users_user_id_fk",
-          "tableFrom": "survey_responses",
-          "tableTo": "users",
-          "columnsFrom": [
-            "review_admin_id"
           ],
           "columnsTo": [
             "user_id"
@@ -1603,6 +1578,13 @@
         },
         "is_published": {
           "name": "is_published",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "show_on_calendar": {
+          "name": "show_on_calendar",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

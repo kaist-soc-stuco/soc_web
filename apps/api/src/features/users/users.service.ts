@@ -12,6 +12,16 @@ import { nowDate } from "@soc/shared";
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
 
+  private normalizeListOptions(options: { page: number; limit: number }) {
+    const page = Number.isFinite(options.page) ? Math.max(1, Math.floor(options.page)) : 1;
+    const limit = Number.isFinite(options.limit)
+      ? Math.min(100, Math.max(1, Math.floor(options.limit)))
+      : 20;
+    const offset = (page - 1) * limit;
+
+    return { limit, offset, page };
+  }
+
   /**
    * KAIST UID로 저장된 사용자를 조회합니다.
    */
@@ -123,20 +133,44 @@ export class UsersService {
   }
 
   async getMyArticles(userId: string, options: { page: number; limit: number }) {
-    const offset = Math.max(0, (options.page - 1) * options.limit);
-    const items = await this.usersRepository.getMyArticles(userId, options.limit, offset);
-    return { items };
+    const { limit, offset, page } = this.normalizeListOptions(options);
+    const [items, total] = await Promise.all([
+      this.usersRepository.getMyArticles(userId, limit, offset),
+      this.usersRepository.countMyArticles(userId),
+    ]);
+
+    return { items, limit, page, total };
   }
 
   async getMyComments(userId: string, options: { page: number; limit: number }) {
-    const offset = Math.max(0, (options.page - 1) * options.limit);
-    const items = await this.usersRepository.getMyComments(userId, options.limit, offset);
-    return { items };
+    const { limit, offset, page } = this.normalizeListOptions(options);
+    const [items, total] = await Promise.all([
+      this.usersRepository.getMyComments(userId, limit, offset),
+      this.usersRepository.countMyComments(userId),
+    ]);
+
+    return { items, limit, page, total };
   }
 
   async getMySurveyResponses(userId: string, options: { page: number; limit: number }) {
-    const offset = Math.max(0, (options.page - 1) * options.limit);
-    const items = await this.usersRepository.getMySurveyResponses(userId, options.limit, offset);
-    return { items };
+    const { limit, offset, page } = this.normalizeListOptions(options);
+    const [items, total] = await Promise.all([
+      this.usersRepository.getMySurveyResponses(userId, limit, offset),
+      this.usersRepository.countMySurveyResponses(userId),
+    ]);
+
+    return { items, limit, page, total };
+  }
+
+  async getMyActivities(userId: string, options: { page: number; limit: number }) {
+    const { limit, offset, page } = this.normalizeListOptions(options);
+    const [items, articleTotal, commentTotal, surveyTotal] = await Promise.all([
+      this.usersRepository.getMyActivities(userId, limit, offset),
+      this.usersRepository.countMyArticles(userId),
+      this.usersRepository.countMyComments(userId),
+      this.usersRepository.countMySurveyResponses(userId),
+    ]);
+
+    return { items, limit, page, total: articleTotal + commentTotal + surveyTotal };
   }
 }

@@ -1,81 +1,137 @@
 # SoC Web
 
-KAIST SoC 웹 모노레포입니다.
+KAIST 전산학부 집행위원회 사이트 모노레포입니다. 학생회 운영에 필요한 공지, 게시판, 설문조사, 권한 관리, 마이페이지 기능을 하나의 pnpm workspace에서 관리합니다.
 
-```
+## 구조
+
+```text
 apps/
-  api/   — NestJS backend (port 3000)
-  web/   — React + Vite frontend (port 5173)
+  api/   NestJS API 서버
+  web/   React + Vite 프론트엔드
 shared/
-  common/     — @soc/shared: 시간 유틸리티, 상수
-  contracts/  — @soc/contracts: HTTP 요청/응답 타입
-  api-client/ — @soc/api-client: 타입 안전 fetch 래퍼
-  config/     — 공유 TypeScript/ESLint 설정
+  common/      @soc/shared 공통 유틸리티와 상수
+  contracts/   @soc/contracts API 요청/응답 타입
+  api-client/  @soc/api-client 타입 안전 fetch 클라이언트
+  config/      공유 TypeScript/ESLint 설정
 infra/
-  docker/  — PostgreSQL 16, Redis 7, Nginx 설정
-  scripts/ — DB 마이그레이션/시드 스크립트
+  docker/   PostgreSQL, Redis, Nginx compose 설정
+  scripts/  DB 마이그레이션/시드 스크립트
+docs/       개발 규칙, UI/UX 규칙, 구조 개선 우선순위
 ```
 
-## Tech Stack
+## 기술 스택
 
-- Web: React 19 + Vite
+- Web: React 19, Vite, Tailwind CSS
 - API: NestJS
-- Infra: Postgres, Redis, Docker Compose
+- DB/Session: PostgreSQL 16, Redis 7
+- Monorepo: pnpm workspace
+- Infra: Docker Compose, Nginx reverse proxy
 
-## Requirements
+## 요구 사항
 
 - Node.js 20+
-- pnpm 10+
-- Docker
+- pnpm 11.x
+- Docker 및 Docker Compose
+- WSL 환경에서는 가능하면 WSL 내부 shell에서 pnpm 명령을 실행하세요. Windows와 WSL 경로가 섞이면 typecheck/build가 실패할 수 있습니다.
 
-## Setup
+## 환경 변수
 
-루트 `.env`를 사용합니다.
+루트의 `.env`를 사용합니다.
 
 ```bash
 cp .env.example .env
+```
+
+주요 값:
+
+- `API_PORT`, `WEB_PORT`, `NGINX_PORT`: 로컬 포트
+- `VITE_API_BASE_URL`: 프론트엔드 API base URL. nginx를 통해 접근하면 `/api` 사용
+- `AUTH_JWT_SECRET`: JWT 서명 secret. 운영에서는 반드시 교체
+- `AUTH_PENDING_LOGIN_ENCRYPTION_KEY`: SSO pending login 암호화 키. 32자 이상의 랜덤 문자열 권장
+- `REDIS_AUTH_TTL_SECONDS`: 임시 로그인 세션 TTL
+- `POSTGRES_*`: PostgreSQL 접속 정보
+- `REDIS_URL`: Redis 접속 URL
+- `ASSET_UPLOAD_DIR`: 게시글 이미지/첨부파일 저장 위치. 생략하면 로컬 개발 기본 경로 사용
+- `ASSET_ORPHAN_GRACE_HOURS`: 게시글에 연결되지 않은 업로드 파일을 정리하기 전까지 기다릴 시간. 기본값 24
+- `ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS`: 연결되지 않은 업로드 파일을 자동 점검하는 주기. 기본값 6
+- `SSO_LOGIN_URL`, `SSO_REDIRECT_URI`, `SSO_CLIENT_ID`, `SSO_AUTH_API_URL`, `SSO_CLIENT_SECRET`: KAIST SSO 연동 설정
+
+업로드 후 게시글에 연결되지 않은 파일은 관리자 권한으로 `POST /v1/assets/cleanup-orphans`를 호출해 정리할 수 있습니다.
+
+운영 배포 전에는 `.env.example`의 개발용 secret과 SSO 테스트 값을 실제 발급 값으로 교체해야 합니다.
+
+## 설치
+
+```bash
 pnpm install
 ```
 
-## Run
+## 로컬 개발
 
-### 전체 스택 (api, web, postgres, redis, nginx)
-
-```bash
-docker compose up -d --build
-```
-
-nginx는 기본적으로 `127.0.0.1:8080`에만 바인딩됩니다. 포트를 바꾸려면:
+DB와 Redis만 Docker로 띄우고 API/Web은 로컬 Node 프로세스로 실행합니다.
 
 ```bash
-NGINX_PORT=18080 docker compose up -d --build
-```
-
-### 로컬 개발 (DB + Redis만 Docker로 띄우고, api/web은 직접 실행)
-
-```bash
-docker compose -f infra/docker/compose.dev.yml up -d
+docker compose --env-file .env -f infra/docker/compose.dev.yml up -d
+pnpm db:migrate
 pnpm dev
 ```
 
 개별 실행:
 
 ```bash
-pnpm dev:api   # NestJS :3000
-pnpm dev:web   # Vite :5173
+pnpm dev:api
+pnpm dev:web
 ```
 
-## Check
+기본 주소:
 
 - Web: `http://localhost:5173`
 - API health: `http://localhost:3000/health`
 - Mock API: `http://localhost:3000/v1/mock/greeting`
 
-## Useful Commands
+## Docker 개발 스택
+
+API, Web, PostgreSQL, Redis, Nginx를 한 번에 실행합니다.
+
+```bash
+docker compose --env-file .env up -d --build
+```
+
+Nginx는 기본적으로 `127.0.0.1:8080`에 바인딩됩니다.
+
+```bash
+NGINX_PORT=18080 docker compose --env-file .env up -d --build
+```
+
+업로드 파일은 Docker volume `api_uploads`에 저장됩니다. PostgreSQL과 Redis도 각각 volume을 사용합니다.
+
+## 운영 compose
+
+운영용 이미지는 `infra/docker/compose.prod.yml`을 사용합니다.
+
+```bash
+docker compose --env-file .env -f infra/docker/compose.prod.yml config
+docker compose --env-file .env -f infra/docker/compose.prod.yml up -d --build
+```
+
+현재 운영 compose는 단일 서버 배포를 전제로 하며, 업로드 파일은 로컬 Docker volume에 저장합니다. 외부 오브젝트 스토리지나 CDN이 필요해지는 시점에 별도 설계를 추가하세요.
+
+## 자주 쓰는 명령
 
 ```bash
 pnpm typecheck
 pnpm build
 pnpm test
+pnpm lint
 pnpm db:migrate
+pnpm db:seed
 ```
+
+## 작업 전 확인 문서
+
+- `docs/DEVELOPMENT_GUIDE.md`: 코드 작성 규칙
+- `docs/UI_UX_GUIDE.md`: UI/UX 및 시각 스타일 규칙
+- `docs/ARCHITECTURE_REVIEW_AND_PRIORITIES.md`: 구조 리뷰와 개선 우선순위
+- `docs/CURRENT_ARCHITECTURE_REVIEW.md`: 현재 폴더 구조와 아키텍처 리뷰
+- `docs/SECURITY_PERMISSION_REVIEW.md`: 로그인/세션/권한/보안 점검
+- `docs/REMAINING_WORK.md`: 안정화 잔여 작업 목록

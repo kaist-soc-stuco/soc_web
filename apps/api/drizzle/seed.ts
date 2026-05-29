@@ -1,14 +1,48 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, eq, sql } from "drizzle-orm";
-import { articles, boards, permissions, surveys, users } from "../src/infrastructure/postgres/postgres.schema";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+import {
+  articleAssets,
+  articles,
+  assets,
+  boards,
+  comments,
+  permissions,
+  surveys,
+  users,
+} from "../src/infrastructure/postgres/postgres.schema";
 import { PERMISSION_REGISTRY } from "@soc/contracts";
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL || DATABASE_URL.trim().length === 0) {
-  throw new Error("DATABASE_URL is required for seeding");
-}
+
+const readRequiredEnv = (name: string): string => {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for seeding`);
+  }
+  return value;
+};
+
+const buildDatabaseUrl = (): string => {
+  const explicitUrl = process.env.DATABASE_URL?.trim();
+  if (explicitUrl) return explicitUrl;
+
+  const user = encodeURIComponent(readRequiredEnv("POSTGRES_USER"));
+  const password = encodeURIComponent(readRequiredEnv("POSTGRES_PASSWORD"));
+  const host = readRequiredEnv("POSTGRES_HOST");
+  const port = readRequiredEnv("POSTGRES_PORT");
+  const database = readRequiredEnv("POSTGRES_DB");
+
+  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
+};
+
+const DATABASE_URL = buildDatabaseUrl();
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
+const ASSET_UPLOAD_DIR =
+  process.env.ASSET_UPLOAD_DIR ??
+  path.resolve(process.cwd(), "uploads", "assets");
 type BoardSeed = {
   code: string;
   nameKo: string;
@@ -112,7 +146,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameKo: "연구실",
     description: "각 연구실의 소식과 공지사항",
     readScope: "PUBLIC",
-    writePermissionId: 4,
+    writePermissionId: 2,
     commentPermissionId: null,
     managePermissionId: null,
     allowComment: true,
@@ -126,7 +160,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameKo: "QnA",
     description: "궁금한 점을 자유롭게 질문하세요",
     readScope: "PUBLIC",
-    writePermissionId: 16,
+    writePermissionId: null,
     commentPermissionId: null,
     managePermissionId: null,
     allowComment: true,
@@ -153,16 +187,92 @@ async function seedPermissions() {
   console.log(`Upserted ${PERMISSION_SEEDS.length} permission(s)`);
 }
 async function seedBoards() {
-  const existing = await db.select({ code: boards.code }).from(boards);
-  const existingCodes = new Set(existing.map((row) => row.code));
-  const toInsert = BOARD_SEEDS.filter((boardSeed) => !existingCodes.has(boardSeed.code));
-  if (toInsert.length === 0) {
-    console.log("No new boards to insert");
-    return;
-  }
-  await db.insert(boards).values(toInsert).onConflictDoNothing();
-  console.log(`Inserted ${toInsert.length} board(s)`);
+  await db
+    .insert(boards)
+    .values(BOARD_SEEDS)
+    .onConflictDoUpdate({
+      target: boards.code,
+      set: {
+        allowComment: sql`excluded.allow_comment`,
+        allowLike: sql`excluded.allow_like`,
+        allowSecret: sql`excluded.allow_secret`,
+        commentPermissionId: sql`excluded.comment_permission_id`,
+        description: sql`excluded.description`,
+        isActive: sql`excluded.is_active`,
+        managePermissionId: sql`excluded.manage_permission_id`,
+        nameKo: sql`excluded.name_ko`,
+        readScope: sql`excluded.read_scope`,
+        sortOrder: sql`excluded.sort_order`,
+        writePermissionId: sql`excluded.write_permission_id`,
+      },
+    });
+  console.log(`Upserted ${BOARD_SEEDS.length} board(s)`);
 }
+
+const recruitmentPosterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fffdf7"/>
+      <stop offset="1" stop-color="#eef8ef"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00693e"/>
+      <stop offset="1" stop-color="#008a52"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" rx="12" fill="url(#bg)"/>
+  <text x="480" y="74" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="800" fill="#007044">2026 전산학부</text>
+  <text x="480" y="123" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="900" fill="#00633b">학생회 임원 모집 안내</text>
+  <text x="480" y="157" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#00633b">전산학부 학생회의 임원으로 활발한 참여를 기다립니다!</text>
+  <g transform="translate(62 207)">
+    <g>
+      <rect width="208" height="174" rx="10" fill="#fffdf9" stroke="#ccd9d1"/>
+      <circle cx="88" cy="57" r="19" fill="none" stroke="#00693e" stroke-width="6"/>
+      <circle cx="125" cy="57" r="19" fill="none" stroke="#00693e" stroke-width="6"/>
+      <path d="M43 112c13-29 44-37 68-25 12-13 38-13 51 0 25-12 56-4 68 25" fill="none" stroke="#00693e" stroke-width="6" stroke-linecap="round"/>
+      <text x="104" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="900" fill="#00693e">모집 대상</text>
+      <text x="104" y="146" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#193529">전산학부 재학생</text>
+    </g>
+    <g transform="translate(208 0)">
+      <rect width="208" height="174" rx="10" fill="#fffdf9" stroke="#ccd9d1"/>
+      <path d="M58 72h40l55-31v94l-55-31H58z" fill="none" stroke="#00693e" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M169 65l22-16M172 88h27M169 111l22 16" stroke="#00693e" stroke-width="6" stroke-linecap="round"/>
+      <text x="104" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="900" fill="#00693e">모집 부문</text>
+      <text x="104" y="146" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#193529">기획 · 사무국 · 재정</text>
+    </g>
+    <g transform="translate(416 0)">
+      <rect width="208" height="174" rx="10" fill="#fffdf9" stroke="#ccd9d1"/>
+      <rect x="62" y="42" width="84" height="79" rx="5" fill="none" stroke="#00693e" stroke-width="7"/>
+      <path d="M62 67h84M82 31v28M126 31v28" stroke="#00693e" stroke-width="7" stroke-linecap="round"/>
+      <text x="104" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="900" fill="#00693e">지원 기간</text>
+      <text x="104" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#193529">2026.05.20 ~ 06.03</text>
+    </g>
+    <g transform="translate(624 0)">
+      <rect width="208" height="174" rx="10" fill="#fffdf9" stroke="#ccd9d1"/>
+      <rect x="55" y="48" width="98" height="67" rx="4" fill="none" stroke="#00693e" stroke-width="7"/>
+      <path d="M57 53l47 39 47-39" fill="none" stroke="#00693e" stroke-width="7" stroke-linejoin="round"/>
+      <text x="104" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="900" fill="#00693e">지원 방법</text>
+      <text x="104" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#193529">이메일 제출</text>
+    </g>
+  </g>
+  <rect x="62" y="426" width="836" height="49" rx="7" fill="url(#green)"/>
+  <text x="480" y="458" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="900" fill="white">꿈을 실현할 수 있는 소중한 기회, 2026 전산학부와 함께 성장해요!</text>
+</svg>`;
+
+async function writeSeedAsset(filename: string, content: string | Buffer): Promise<{
+  storageKey: string;
+  sizeBytes: number;
+}> {
+  await mkdir(ASSET_UPLOAD_DIR, { recursive: true });
+  const filePath = path.join(ASSET_UPLOAD_DIR, filename);
+  const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+  await writeFile(filePath, buffer);
+  return {
+    storageKey: `/uploads/assets/${filename}`,
+    sizeBytes: buffer.byteLength,
+  };
+}
+
 async function seedMockData() {
   const [noticeBoard] = await db
     .select({ boardId: boards.boardId })
@@ -201,6 +311,17 @@ async function seedMockData() {
   await db.execute(sql`delete from article where author_user_id = ${seedAuthor.userId}::uuid`);
 
   // Seeding 5 notices
+  const detailedNoticeContent = [
+    "전산학부 학생회는 학부 여러분의 의견을 반영하고 보다 나은 학부 문화를 만들어가기 위해 열정과 책임감 있는 임원분들을 모집합니다.",
+    "",
+    "• 모집 대상 : 전산학부에 재학 중인 학생 (휴학생 활동 가능)",
+    "• 모집 부문 : 기획팀, 사무국, 재정(회계)팀, 홍보팀, 행사팀 등",
+    "• 주요 역할 : 학생 행사 기획 및 운영, 회계 관리, 조직 운영 지원, 회의, 복지, 학우 관리 등",
+    "• 지원 기간 : 2026.05.20 (수) ~ 2026.06.03 (수) 18:00",
+    "• 서류 심사 : 서류 심사 2026.06.06 (토) 예정 | 최종 발표 2026.06.08 (월)",
+    "• 지원 방법 : 지원서 작성 후 이메일 제출 (cs_suhak@kaist.ac.kr)",
+  ].join("\n");
+
   const noticeItems = [
     {
       titleKo: "전산학부 홈페이지 서버 점검 안내",
@@ -212,10 +333,11 @@ async function seedMockData() {
     },
     {
       titleKo: "2026 전산학부 집행위원회 임원 공개 모집",
-      contentKo: "2026학년도 집행위원회를 빛내줄 열정 가득한 임원을 모집합니다.",
+      contentKo: detailedNoticeContent,
       isPinned: false,
-      viewCount: 12,
-      postedAt: new Date("2026-05-20T00:00:00Z"),
+      viewCount: 16,
+      postedAt: new Date("2026-05-20T01:00:00Z"),
+      detailMock: true,
     },
     {
       titleKo: "2026 Apple Scholars in AIML Fellowship 추천 안내",
@@ -241,7 +363,7 @@ async function seedMockData() {
   ];
 
   for (const item of noticeItems) {
-    await db.insert(articles).values({
+    const [articleRow] = await db.insert(articles).values({
       boardId: noticeBoard.boardId,
       authorUserId: seedAuthor.userId,
       titleKo: item.titleKo,
@@ -252,9 +374,115 @@ async function seedMockData() {
       viewCount: item.viewCount,
       postedAt: item.postedAt,
       isAnonymous: false,
-    });
+    }).returning({ articleId: articles.articleId });
+
+    if (item.detailMock && articleRow) {
+      const poster = await writeSeedAsset(
+        "seed-student-council-recruitment-poster.svg",
+        recruitmentPosterSvg,
+      );
+      const applicationPdf = await writeSeedAsset(
+        "seed-student-council-application.pdf",
+        "Mock PDF attachment for the student council recruitment notice.\n",
+      );
+      const applicationXlsx = await writeSeedAsset(
+        "seed-student-council-application-form.xlsx",
+        "Mock spreadsheet attachment for the student council recruitment notice.\n",
+      );
+
+      const seededAssets = [
+        {
+          storageKey: poster.storageKey,
+          originalFilename: "학생회_임원모집_포스터.svg",
+          mimeType: "image/svg+xml",
+          sizeBytes: Math.max(poster.sizeBytes, 88000),
+          usageType: "THUMBNAIL",
+          sortOrder: 0,
+        },
+        {
+          storageKey: applicationPdf.storageKey,
+          originalFilename: "학생회_임원모집_지원서.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 556400,
+          usageType: "ATTACHMENT",
+          sortOrder: 1,
+        },
+        {
+          storageKey: applicationXlsx.storageKey,
+          originalFilename: "지원서_양식.xlsx",
+          mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          sizeBytes: 24800,
+          usageType: "ATTACHMENT",
+          sortOrder: 2,
+        },
+      ];
+
+      for (const asset of seededAssets) {
+        const [assetRow] = await db
+          .insert(assets)
+          .values({
+            storageKey: asset.storageKey,
+            originalFilename: asset.originalFilename,
+            mimeType: asset.mimeType,
+            sizeBytes: asset.sizeBytes,
+            uploadedBy: seedAuthor.userId,
+          })
+          .onConflictDoUpdate({
+            target: assets.storageKey,
+            set: {
+              originalFilename: sql`excluded.original_filename`,
+              mimeType: sql`excluded.mime_type`,
+              sizeBytes: sql`excluded.size_bytes`,
+              uploadedBy: sql`excluded.uploaded_by`,
+            },
+          })
+          .returning({ assetId: assets.assetId });
+
+        if (!assetRow) continue;
+        await db.insert(articleAssets).values({
+          articleId: articleRow.articleId,
+          assetId: assetRow.assetId,
+          usageType: asset.usageType,
+          sortOrder: asset.sortOrder,
+        });
+      }
+
+      await db.insert(surveys).values({
+        creatorId: seedAuthor.userId,
+        kind: "APPLICATION",
+        titleKo: "학생회 운영·행사 참여 의견 조사",
+        titleEn: "Student Council Participation Survey",
+        descriptionKo: "학생회 운영과 행사에 대한 여러분의 의견을 들려주세요. 더 나은 학부 문화를 함께 만들어갑니다.",
+        descriptionEn: "Share feedback on student council operations and events.",
+        status: "OPEN",
+        connectedArticleId: articleRow.articleId,
+        feeRequirementPolicy: "NONE",
+        resultVisibility: "PUBLIC",
+        isPublished: true,
+        showOnCalendar: true,
+        openAt: new Date("2026-05-20T01:00:00Z"),
+        closeAt: new Date("2026-06-03T09:00:00Z"),
+      });
+
+      await db.insert(comments).values([
+        {
+          articleId: articleRow.articleId,
+          authorUserId: seedAuthor.userId,
+          content: "이번 신입 학생 및 지원에 대해 더 자세한 안내가 있으면 좋겠습니다.",
+          createdAt: new Date("2026-05-20T01:15:00Z"),
+          updatedAt: new Date("2026-05-20T01:15:00Z"),
+        },
+        {
+          articleId: articleRow.articleId,
+          authorUserId: seedAuthor.userId,
+          content: "작년 활동이 정말 도움이 많이 되었어요. 이번에도 꼭 지원하고 싶어요.",
+          createdAt: new Date("2026-05-20T02:02:00Z"),
+          updatedAt: new Date("2026-05-20T02:02:00Z"),
+        },
+      ]);
+    }
   }
-  console.log("Seeded 5 mockup notice articles");
+  console.log("Seeded 5 mockup notice articles, including one detailed article with assets and survey");
 
   // Seeding 3 events
   const eventItems = [
@@ -262,6 +490,9 @@ async function seedMockData() {
       titleKo: "2026 집행위원회 리더십 선거",
       titleEn: "2026 Student Council Leadership Election",
       contentKo: "더 나은 학과를 만들어갈 집행위원회 리더를 선출하는 중요한 선거에 참여해주세요.",
+      eventDescription: "2026 집행위원회 리더십 선거 투표",
+      eventStartDate: new Date("2026-05-24T09:00:00Z"),
+      eventEndDate: new Date("2026-05-30T18:00:00Z"),
       isPinned: true,
       pinOrder: 0,
       postedAt: new Date("2026-05-24T00:00:00Z"),
@@ -276,6 +507,9 @@ async function seedMockData() {
       titleKo: "기말고사 간식이벤트",
       titleEn: "Final Exam Snack Event",
       contentKo: "시험기간에 에너지 충전하고 열공! 기말고사 응원 간식배부 이벤트입니다.",
+      eventDescription: "기말고사 기간 전산학부 간식 배부",
+      eventStartDate: new Date("2026-04-17T09:00:00Z"),
+      eventEndDate: new Date("2026-04-20T18:00:00Z"),
       isPinned: false,
       postedAt: new Date("2026-04-17T00:00:00Z"),
       survey: {
@@ -289,6 +523,9 @@ async function seedMockData() {
       titleKo: "MT 사전모임",
       titleEn: "MT Prep Meeting",
       contentKo: "전산학부 MT 출발 전 안전 수칙 안내 및 조편성을 위한 사전모임 신청입니다.",
+      eventDescription: "MT 안전 안내 및 조편성 사전모임",
+      eventStartDate: new Date("2026-05-23T14:00:00Z"),
+      eventEndDate: new Date("2026-05-23T16:00:00Z"),
       isPinned: false,
       postedAt: new Date("2026-05-23T00:00:00Z"),
       survey: {
@@ -311,6 +548,9 @@ async function seedMockData() {
       isPinned: event.isPinned,
       pinOrder: event.pinOrder,
       postedAt: event.postedAt,
+      eventStartDate: event.eventStartDate,
+      eventEndDate: event.eventEndDate,
+      eventDescription: event.eventDescription,
       isAnonymous: false,
     }).returning({ articleId: articles.articleId });
 
@@ -319,7 +559,7 @@ async function seedMockData() {
       kind: event.survey.kind,
       titleKo: event.titleKo,
       titleEn: event.titleEn,
-      descriptionKo: event.contentKo,
+      descriptionKo: event.eventDescription,
       status: event.survey.status,
       connectedArticleId: articleRow.articleId,
       feeRequirementPolicy: "NONE",
@@ -332,24 +572,9 @@ async function seedMockData() {
   }
   console.log("Seeded 3 mockup event articles and connected surveys");
 }
-async function seedDemoEventsIfExists() {
-  const sql = `DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'demo_events') THEN
-    INSERT INTO demo_events (event_name)
-    VALUES ('seeded-event')
-    ON CONFLICT DO NOTHING;
-  END IF;
-END $$;`;
-  await pool.query(sql);
-  console.log("demo_events seed attempted (if table existed)");
-}
 async function main() {
-  if (DATABASE_URL) {
-    console.log("Using DATABASE_URL:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
-  }
+  console.log("Using database:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
   try {
-    await seedDemoEventsIfExists();
     await seedPermissions();
     await seedBoards();
     await seedMockData();

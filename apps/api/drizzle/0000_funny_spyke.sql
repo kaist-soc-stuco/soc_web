@@ -22,7 +22,10 @@ CREATE TABLE "article" (
 	"view_count" integer DEFAULT 0 NOT NULL,
 	"posted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone
+	"deleted_at" timestamp with time zone,
+	"event_start_date" timestamp with time zone,
+	"event_end_date" timestamp with time zone,
+	"event_description" text
 );
 --> statement-breakpoint
 CREATE TABLE "asset" (
@@ -123,14 +126,12 @@ CREATE TABLE "role_group_permission" (
 --> statement-breakpoint
 CREATE TABLE "role_group" (
 	"role_group_id" serial PRIMARY KEY NOT NULL,
-	"code" varchar(50) NOT NULL,
 	"name_ko" varchar(100) NOT NULL,
-	"name_en" varchar(100),
 	"description" text,
 	"is_system" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "role_group_code_unique" UNIQUE("code")
+	CONSTRAINT "role_group_name_ko_unique" UNIQUE("name_ko")
 );
 --> statement-breakpoint
 CREATE TABLE "student_fee_status" (
@@ -175,11 +176,8 @@ CREATE TABLE "survey_responses" (
 	"survey_id" uuid NOT NULL,
 	"user_id" uuid,
 	"external_phone" text,
-	"status" text DEFAULT 'draft' NOT NULL,
+	"status" text DEFAULT 'submitted' NOT NULL,
 	"submitted_at" timestamp with time zone,
-	"reviewed_at" timestamp with time zone,
-	"review_admin_id" uuid,
-	"review_reason" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -211,6 +209,7 @@ CREATE TABLE "survey" (
 	"allow_multiple_responses" boolean DEFAULT false NOT NULL,
 	"is_korean_only" boolean DEFAULT false NOT NULL,
 	"is_published" boolean DEFAULT false NOT NULL,
+	"show_on_calendar" boolean DEFAULT false NOT NULL,
 	"result_visibility" varchar(20) NOT NULL,
 	"max_response_count" integer,
 	"open_at" timestamp with time zone,
@@ -273,7 +272,6 @@ ALTER TABLE "survey_answers" ADD CONSTRAINT "survey_answers_question_id_survey_q
 ALTER TABLE "survey_questions" ADD CONSTRAINT "survey_questions_section_id_survey_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."survey_sections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "survey_responses" ADD CONSTRAINT "survey_responses_survey_id_survey_survey_id_fk" FOREIGN KEY ("survey_id") REFERENCES "public"."survey"("survey_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "survey_responses" ADD CONSTRAINT "survey_responses_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "survey_responses" ADD CONSTRAINT "survey_responses_review_admin_id_users_user_id_fk" FOREIGN KEY ("review_admin_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "survey_sections" ADD CONSTRAINT "survey_sections_survey_id_survey_survey_id_fk" FOREIGN KEY ("survey_id") REFERENCES "public"."survey"("survey_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "survey" ADD CONSTRAINT "survey_creator_id_users_user_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "survey" ADD CONSTRAINT "survey_connected_article_id_article_article_id_fk" FOREIGN KEY ("connected_article_id") REFERENCES "public"."article"("article_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

@@ -1,10 +1,27 @@
 import { defineConfig } from "drizzle-kit";
 
-const databaseUrl = process.env.DATABASE_URL;
+const readRequiredEnv = (name: string): string => {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for Drizzle config`);
+  }
+  return value;
+};
 
-if (!databaseUrl || databaseUrl.trim().length === 0) {
-  throw new Error("DATABASE_URL is required for Drizzle config");
-}
+const buildDatabaseUrl = (): string => {
+  const explicitUrl = process.env.DATABASE_URL?.trim();
+  if (explicitUrl) return explicitUrl;
+
+  const user = encodeURIComponent(readRequiredEnv("POSTGRES_USER"));
+  const password = encodeURIComponent(readRequiredEnv("POSTGRES_PASSWORD"));
+  const host = readRequiredEnv("POSTGRES_HOST");
+  const port = readRequiredEnv("POSTGRES_PORT");
+  const database = readRequiredEnv("POSTGRES_DB");
+
+  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
+};
+
+const databaseUrl = buildDatabaseUrl();
 
 export default defineConfig({
   schema: "./src/infrastructure/postgres/postgres.schema.ts",

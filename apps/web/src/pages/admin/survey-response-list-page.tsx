@@ -4,12 +4,13 @@ import { createApiClient } from "@soc/api-client";
 import type { SurveyResponseRecord } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
+import { Pagination } from "@/components/ui/pagination";
+import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import { 
   ClipboardList, 
-  ChevronLeft, 
-  ChevronRight,
+  ChevronLeft,
   Loader2,
   Calendar,
   Users,
@@ -46,30 +47,6 @@ function format24hDateTime(dateIso: string | null) {
   const minute = String(d.getMinutes()).padStart(2, "0");
 
   return `${year}.${month}.${day} ${hour}:${minute}`;
-}
-
-// Single-line consolidated status badge for survey cards
-function renderSurveyStatusBadge(survey: any) {
-  if (!survey) return null;
-  if (!survey.isPublished && survey.status === "draft") {
-    return (
-      <span className="inline-flex items-center justify-center rounded-md bg-slate-50 px-2 py-0.5 text-[10.5px] font-extrabold text-slate-500 border border-slate-200 whitespace-nowrap">
-        임시저장
-      </span>
-    );
-  }
-  if (survey.closesAt && new Date(survey.closesAt) < new Date()) {
-    return (
-      <span className="inline-flex items-center justify-center rounded-md bg-rose-50 px-2 py-0.5 text-[10.5px] font-extrabold text-rose-700 border border-rose-200 whitespace-nowrap">
-        마감
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center justify-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10.5px] font-extrabold text-emerald-700 border border-emerald-200 whitespace-nowrap">
-      진행중
-    </span>
-  );
 }
 
 export function SurveyResponseListPage() {
@@ -225,40 +202,6 @@ export function SurveyResponseListPage() {
   }, [filteredResponses, totalPages, currentPage]);
 
   // Generate page items exactly as `< 1 2 3 ... 29 >`
-  const getPaginationItems = () => {
-    const items: (number | string)[] = [];
-    const total = totalPages || 1;
-    
-    if (total <= 7) {
-      for (let i = 1; i <= total; i++) {
-        items.push(i);
-      }
-    } else {
-      if (currentPage <= 4) {
-        for (let i = 1; i <= 5; i++) {
-          items.push(i);
-        }
-        items.push("...");
-        items.push(total);
-      } else if (currentPage >= total - 3) {
-        items.push(1);
-        items.push("...");
-        for (let i = total - 4; i <= total; i++) {
-          items.push(i);
-        }
-      } else {
-        items.push(1);
-        items.push("...");
-        items.push(currentPage - 1);
-        items.push(currentPage);
-        items.push(currentPage + 1);
-        items.push("...");
-        items.push(total);
-      }
-    }
-    return items;
-  };
-
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <div className="min-h-screen bg-slate-50/50 text-kaist-black">
@@ -324,7 +267,11 @@ export function SurveyResponseListPage() {
                       <h4 className="text-sm font-extrabold text-slate-800 truncate" title={survey.titleKo}>
                         {survey.titleKo}
                       </h4>
-                      {renderSurveyStatusBadge(survey)}
+                      <SurveyStatusBadge
+                        survey={survey}
+                        showDday={false}
+                        size="sm"
+                      />
                     </div>
                   </div>
                 </div>
@@ -577,59 +524,12 @@ export function SurveyResponseListPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                      currentPage === 1
-                        ? "bg-white border-slate-100 text-slate-300 cursor-not-allowed"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer shadow-sm animate-all"
-                    }`}
-                  >
-                    <ChevronLeft className="h-4 w-4 stroke-[2.5px]" />
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    {getPaginationItems().map((item, idx) => {
-                      if (item === "...") {
-                        return (
-                          <span key={`dots-${idx}`} className="text-slate-400 text-xs px-1.5 select-none w-9 h-9 flex items-center justify-center">
-                            ...
-                          </span>
-                        );
-                      }
-                      const page = item as number;
-                      const isActive = currentPage === page;
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-9 h-9 rounded-xl text-[13px] font-extrabold tracking-tight transition-all flex items-center justify-center cursor-pointer ${
-                            isActive
-                              ? "bg-kaist-darkgreen text-white shadow-sm border-0"
-                              : "text-slate-500 hover:text-slate-800 bg-transparent border-0"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                      currentPage === totalPages
-                        ? "bg-white border-slate-100 text-slate-300 cursor-not-allowed"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer shadow-sm animate-all"
-                    }`}
-                  >
-                    <ChevronRight className="h-4 w-4 stroke-[2.5px]" />
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                totalPages={totalPages}
+              />
+            </div>
             </div>
 
           </div>

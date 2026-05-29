@@ -204,9 +204,7 @@ export class SurveysService {
       throw new ForbiddenException("analytics_access_forbidden");
     }
 
-    const responses = await this.responsesRepo.findBySurveyId(surveyId);
-    const submittedResponses = responses.filter((r) => r.status !== "draft");
-    const totalResponses = submittedResponses.length;
+    const totalResponses = await this.responsesRepo.countSubmitted(surveyId);
 
     const sections = await this.sectionsRepo.findBySurveyId(surveyId);
     const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);

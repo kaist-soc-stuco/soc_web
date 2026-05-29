@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1779364506761,
-      "tag": "0000_needy_nightshade",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1779379047831,
-      "tag": "0001_sad_stature",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1779568380224,
-      "tag": "0002_damp_namora",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1779635974473,
-      "tag": "0003_remove_survey_review_fields",
+      "when": 1780060173964,
+      "tag": "0000_funny_spyke",
       "breakpoints": true
     }
   ]
