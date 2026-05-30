@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1780060173964,
-      "tag": "0000_funny_spyke",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1780138906434,
-      "tag": "0001_superb_magma",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1780146000000,
-      "tag": "0002_response_edit_policy",
+      "when": 1780167743469,
+      "tag": "0000_vengeful_tana_nile",
       "breakpoints": true
     }
   ]
