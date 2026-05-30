@@ -1,5 +1,5 @@
 {
-  "id": "1ac2f59e-2830-4e57-8776-37d73791d135",
+  "id": "4ea7e97e-d22d-4910-b0d5-3dee68bd7e6e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1334,12 +1334,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "external_phone": {
-          "name": "external_phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1535,13 +1529,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'DRAFT'"
-        },
         "connected_article_id": {
           "name": "connected_article_id",
           "type": "integer",
@@ -1555,15 +1542,15 @@
           "notNull": true,
           "default": "'NONE'"
         },
-        "allow_guest_response": {
-          "name": "allow_guest_response",
+        "allow_multiple_responses": {
+          "name": "allow_multiple_responses",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": false
         },
-        "allow_multiple_responses": {
-          "name": "allow_multiple_responses",
+        "allow_response_edit": {
+          "name": "allow_response_edit",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
