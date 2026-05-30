@@ -82,10 +82,9 @@ export const CreateSurveySchema = z.object({
   titleEn: z.string().max(255).optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
-  status: z.enum(["draft", "open", "closed"]).optional(),
   feeRequirementPolicy: z.string().max(20).optional(),
-  allowGuestResponse: z.boolean().optional(),
   allowMultipleResponses: z.boolean().optional(),
+  allowResponseEdit: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
   isPublished: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
@@ -108,13 +107,19 @@ export const CreateSectionSchema = z.object({
 
 export const UpdateSectionSchema = CreateSectionSchema.partial();
 
+const QuestionOptionSchema = z.object({
+  value: z.string().min(1),
+  labelKo: z.string().min(1),
+  labelEn: z.string().optional(),
+});
+
 export const CreateQuestionSchema = z.object({
   titleKo: z.string().min(1),
   titleEn: z.string().optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
   questionType: z.string().min(1),
-  options: z.any().optional(),
+  options: z.array(QuestionOptionSchema).optional(),
   answerRegex: z.string().optional(),
   isRequired: z.boolean().optional(),
   editDeadlineAt: z.string().optional(),
@@ -130,7 +135,6 @@ export const SubmitResponseSchema = z.object({
       content: z.record(z.string(), z.unknown()),
     }),
   ),
-  externalPhone: z.string().optional(),
 });
 
 // ─── Role Groups ─────────────────────────────────────────────────────────────

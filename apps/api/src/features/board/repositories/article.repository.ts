@@ -36,7 +36,19 @@ import {
   boards,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
-import { msToIso, nowDate } from "@soc/shared";
+import { isoToDate, msToIso, nowDate, nowMs } from "@soc/shared";
+
+const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_open" | "open" | "closed" => {
+  if (!survey.isPublished) return "closed";
+
+  const now = nowMs();
+  const openAt = survey.openAt?.valueOf();
+  const closeAt = survey.closeAt?.valueOf();
+
+  if (openAt && openAt > now) return "before_open";
+  if (closeAt && closeAt <= now) return "closed";
+  return "open";
+};
 
 @Injectable()
 export class ArticleRepository {
@@ -103,7 +115,10 @@ export class ArticleRepository {
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
-      .leftJoin(surveys, eq(surveys.connectedArticleId, articles.articleId))
+      .leftJoin(
+        surveys,
+        and(eq(surveys.connectedArticleId, articles.articleId), eq(surveys.isPublished, true)),
+      )
       .where(baseFilter)
       .orderBy(
         desc(articles.isPinned),
@@ -225,7 +240,10 @@ export class ArticleRepository {
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
       .leftJoin(boards, eq(articles.boardId, boards.boardId))
-      .leftJoin(surveys, eq(surveys.connectedArticleId, articles.articleId))
+      .leftJoin(
+        surveys,
+        and(eq(surveys.connectedArticleId, articles.articleId), eq(surveys.isPublished, true)),
+      )
       .where(baseFilter)
       .orderBy(
         params.sortBy === "views"
@@ -319,7 +337,10 @@ export class ArticleRepository {
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
       .leftJoin(boards, eq(articles.boardId, boards.boardId))
-      .leftJoin(surveys, eq(surveys.connectedArticleId, articles.articleId))
+      .leftJoin(
+        surveys,
+        and(eq(surveys.connectedArticleId, articles.articleId), eq(surveys.isPublished, true)),
+      )
       .where(baseFilter)
       .orderBy(desc(articles.postedAt))
       .limit(limit);
@@ -417,7 +438,7 @@ export class ArticleRepository {
     const surveyRow = await this.db
       .select()
       .from(surveys)
-      .where(eq(surveys.connectedArticleId, Number(articleId)))
+      .where(and(eq(surveys.connectedArticleId, Number(articleId)), eq(surveys.isPublished, true)))
       .limit(1);
 
     const prevRow = await this.db
@@ -504,18 +525,7 @@ export class ArticleRepository {
             titleEn: surveyRow[0].titleEn ?? undefined,
             descriptionKo: surveyRow[0].descriptionKo ?? undefined,
             descriptionEn: surveyRow[0].descriptionEn ?? undefined,
-            status: surveyRow[0].status,
-            computedState: (() => {
-              const now = Date.now();
-              const openAt = surveyRow[0].openAt?.getTime();
-              const closeAt = surveyRow[0].closeAt?.getTime();
-              const status = surveyRow[0].status.toLowerCase();
-              if (openAt && openAt > now) return "before_open";
-              if (closeAt && closeAt <= now) return "closed";
-              if (status === "open") return "open";
-              if (status === "scheduled" && openAt && openAt <= now) return "open";
-              return "closed";
-            })(),
+            computedState: getConnectedSurveyState(surveyRow[0]),
             feeRequirementPolicy: surveyRow[0].feeRequirementPolicy,
             openAt: surveyRow[0].openAt ? msToIso(surveyRow[0].openAt.valueOf()) : undefined,
             closeAt: surveyRow[0].closeAt ? msToIso(surveyRow[0].closeAt.valueOf()) : undefined,
@@ -572,8 +582,8 @@ export class ArticleRepository {
                   isAnonymous: input.payload.isAnonymous ?? false,
           postedAt: now,
           updatedAt: now,
-          eventStartDate: input.payload.eventStartDate ? new Date(input.payload.eventStartDate) : null,
-          eventEndDate: input.payload.eventEndDate ? new Date(input.payload.eventEndDate) : null,
+          eventStartDate: input.payload.eventStartDate ? isoToDate(input.payload.eventStartDate) : null,
+          eventEndDate: input.payload.eventEndDate ? isoToDate(input.payload.eventEndDate) : null,
           eventDescription: input.payload.eventDescription ?? null,
         })
         .returning({
@@ -683,11 +693,11 @@ export class ArticleRepository {
     }
 
     if (payload.eventStartDate !== undefined) {
-      updateSet.eventStartDate = payload.eventStartDate ? new Date(payload.eventStartDate) : null;
+      updateSet.eventStartDate = payload.eventStartDate ? isoToDate(payload.eventStartDate) : null;
     }
 
     if (payload.eventEndDate !== undefined) {
-      updateSet.eventEndDate = payload.eventEndDate ? new Date(payload.eventEndDate) : null;
+      updateSet.eventEndDate = payload.eventEndDate ? isoToDate(payload.eventEndDate) : null;
     }
 
     if (payload.eventDescription !== undefined) {

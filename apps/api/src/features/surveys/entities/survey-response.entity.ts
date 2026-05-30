@@ -5,7 +5,6 @@ export interface SurveyResponseRecord {
   id: string;
   surveyId: string;
   userId: string | null;
-  externalPhone: string | null;
   status: ResponseStatus;
   submittedAt: string | null;
   user: SurveyResponseUserRecord | null;

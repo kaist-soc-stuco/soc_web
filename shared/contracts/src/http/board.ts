@@ -78,7 +78,6 @@ export interface SurveySummary {
   titleEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  status: string;
   computedState: string;
   feeRequirementPolicy: string;
   openAt?: string;

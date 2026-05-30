@@ -17,6 +17,46 @@ export default defineConfig(({ mode }) => {
   return {
     envDir: workspaceRoot,
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+
+            if (
+              id.includes("/react/") ||
+              id.includes("/react-dom/") ||
+              id.includes("/react-router") ||
+              id.includes("/scheduler/")
+            ) {
+              return "vendor-react";
+            }
+
+            if (id.includes("/@tanstack/")) {
+              return "vendor-query";
+            }
+
+            if (
+              id.includes("/react-hook-form/") ||
+              id.includes("/@hookform/") ||
+              id.includes("/zod/")
+            ) {
+              return "vendor-forms";
+            }
+
+            if (id.includes("/lucide-react/")) {
+              return "vendor-icons";
+            }
+
+            if (id.includes("/dayjs/")) {
+              return "vendor-time";
+            }
+
+            return "vendor-misc";
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

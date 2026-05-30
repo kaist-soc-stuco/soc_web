@@ -1,5 +1,6 @@
 import type { ArticleListItem, BoardSummary } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
+import { isoToDate } from "@soc/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
@@ -36,7 +37,7 @@ const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date(value));
+  }).format(isoToDate(value));
 
 export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);

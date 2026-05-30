@@ -1,4 +1,43 @@
+/// <reference types="node" />
+
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { defineConfig } from "drizzle-kit";
+
+const findWorkspaceEnvFile = (): string | null => {
+  let currentDir = process.cwd();
+
+  while (true) {
+    const candidate = path.join(currentDir, ".env");
+    if (existsSync(candidate)) return candidate;
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) return null;
+    currentDir = parentDir;
+  }
+};
+
+const loadWorkspaceEnv = (): void => {
+  const envFile = findWorkspaceEnvFile();
+  if (!envFile) return;
+
+  const content = readFileSync(envFile, "utf8");
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex < 0) continue;
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    if (!key || process.env[key] !== undefined) continue;
+
+    const rawValue = trimmed.slice(separatorIndex + 1).trim();
+    process.env[key] = rawValue.replace(/^['"]|['"]$/g, "");
+  }
+};
+
+loadWorkspaceEnv();
 
 const readRequiredEnv = (name: string): string => {
   const value = process.env[name]?.trim();

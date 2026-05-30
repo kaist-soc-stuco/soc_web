@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "outDir": "dist/test-src",
+    "rootDir": "src",
+    "sourceMap": false
+  },
+  "include": [
+    "src/lib/events-surveys.ts",
+    "src/lib/survey-display.ts",
+    "src/lib/survey-results-display.ts"
+  ]
+}

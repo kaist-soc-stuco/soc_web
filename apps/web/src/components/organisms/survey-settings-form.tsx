@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useFormContext, Controller } from "react-hook-form";
 import { Check, Search, X } from "lucide-react";
+import type { ArticleListItem } from "@soc/contracts";
 import { SelectDropdown } from "../atoms/select-dropdown";
 
 export const SURVEY_KINDS = [
@@ -14,18 +15,37 @@ export const SURVEY_VISIBILITIES = [
   { value: "PRIVATE", label: "비공개 (결과 숨김)" },
 ];
 
+export interface SurveySettingsFormValues {
+  titleKo: string;
+  titleEn?: string;
+  descriptionKo?: string;
+  descriptionEn?: string;
+  kind: string;
+  resultVisibility: string;
+  feePayersOnly?: boolean;
+  isKoreanOnly?: boolean;
+  allowMultipleResponses?: boolean;
+  allowResponseEdit?: boolean;
+  isPublished?: boolean;
+  showOnCalendar?: boolean;
+  maxResponseCount?: string;
+  openAt: string;
+  closeAt: string;
+  connectedArticleId?: string;
+}
+
 interface SurveySettingsFormProps {
   saving: boolean;
   isEdit: boolean;
   isOngoing?: boolean;
   showArticleSearch: boolean;
-  articleSearchResults: any[];
+  articleSearchResults: ArticleListItem[];
   selectedArticleTitle: string | null;
   onToggleArticleSearch: () => void;
   onFetchArticles: () => Promise<void>;
   onSelectArticle: (articleId: string, title: string) => void;
   onConnectedArticleChange: () => void;
-  onSubmit: (values: any) => void;
+  onSubmit: (values: SurveySettingsFormValues) => void;
 }
 
 export function SurveySettingsForm({
@@ -49,11 +69,12 @@ export function SurveySettingsForm({
     setValue,
     control,
     formState: { errors },
-  } = useFormContext<any>();
+  } = useFormContext<SurveySettingsFormValues>();
 
   const feePayersOnly = Boolean(watch("feePayersOnly"));
-  const allowGuestResponse = Boolean(watch("allowGuestResponse"));
   const isKoreanOnly = Boolean(watch("isKoreanOnly"));
+  const allowMultipleResponses = Boolean(watch("allowMultipleResponses"));
+  const allowResponseEdit = Boolean(watch("allowResponseEdit"));
   const isPublished = Boolean(watch("isPublished"));
   const showOnCalendar = Boolean(watch("showOnCalendar"));
   const connectedArticleId = watch("connectedArticleId") ?? "";
@@ -68,10 +89,7 @@ export function SurveySettingsForm({
     "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-gray-300 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
 
   return (
-    <form
-      className="space-y-8"
-      onSubmit={handleSubmit(onSubmit)}
-    >
+    <form className="space-y-8" onSubmit={handleSubmit(onSubmit)}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
         {/* 좌측 메인 영역 */}
         <div className="lg:col-span-2 h-full space-y-6 bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 md:p-8 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
@@ -94,22 +112,30 @@ export function SurveySettingsForm({
                 onClick={() => setActiveTab("en")}
                 disabled={isKoreanOnly}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  isKoreanOnly ? "opacity-30 cursor-not-allowed text-kaist-grey/50" : "hover:bg-white/50 text-kaist-darkgreen"
+                  isKoreanOnly
+                    ? "opacity-30 cursor-not-allowed text-kaist-grey/50"
+                    : "hover:bg-white/50 text-kaist-darkgreen"
                 } ${
                   activeTab === "en"
                     ? "bg-white text-kaist-darkgreen shadow-md shadow-kaist-grey/10"
                     : "text-kaist-grey"
                 }`}
-                title={isKoreanOnly ? "한국어 사용자 전용 설문이므로 영문을 작성할 수 없습니다." : ""}
+                title={
+                  isKoreanOnly
+                    ? "한국어 사용자 전용 설문이므로 영문을 작성할 수 없습니다."
+                    : ""
+                }
               >
                 영문 (English)
               </button>
             </div>
 
             <div className="flex items-center gap-4 flex-wrap">
-              <label className={`flex items-center gap-3 group bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl ${
-                isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}>
+              <label
+                className={`flex items-center gap-3 group bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl ${
+                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
                 <div
                   className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                     isKoreanOnly
@@ -117,7 +143,9 @@ export function SurveySettingsForm({
                       : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
                   }`}
                 >
-                  {isKoreanOnly && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
+                  {isKoreanOnly && (
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                  )}
                 </div>
                 <input
                   type="checkbox"
@@ -131,7 +159,9 @@ export function SurveySettingsForm({
                     if (checked) setActiveTab("ko");
                   }}
                 />
-                <span className={`text-sm font-bold ${isKoreanOnly ? 'text-red-600' : 'text-kaist-black'}`}>
+                <span
+                  className={`text-sm font-bold ${isKoreanOnly ? "text-red-600" : "text-kaist-black"}`}
+                >
                   Korean Speakers Only
                 </span>
               </label>
@@ -140,7 +170,9 @@ export function SurveySettingsForm({
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-kaist-black mb-2">설문 제목 *</label>
+              <label className="block text-sm font-bold text-kaist-black mb-2">
+                설문 제목 *
+              </label>
               {activeTab === "ko" ? (
                 <input
                   key="titleKo"
@@ -157,15 +189,21 @@ export function SurveySettingsForm({
                 />
               )}
               {activeTab === "ko" && errors.titleKo && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">{errors.titleKo.message as string}</p>
+                <p className="mt-1 text-xs text-red-500 font-semibold">
+                  {errors.titleKo.message as string}
+                </p>
               )}
               {activeTab === "en" && errors.titleEn && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">{errors.titleEn.message as string}</p>
+                <p className="mt-1 text-xs text-red-500 font-semibold">
+                  {errors.titleEn.message as string}
+                </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-kaist-black mb-2">설명</label>
+              <label className="block text-sm font-bold text-kaist-black mb-2">
+                설명
+              </label>
               {activeTab === "ko" ? (
                 <textarea
                   key="descriptionKo"
@@ -188,7 +226,9 @@ export function SurveySettingsForm({
         {/* 우측 메타데이터 영역 */}
         <div className="lg:col-span-1 h-full space-y-6 bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 md:p-8 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
           <div className="flex items-center justify-between border-b border-kaist-grey/10 pb-4">
-            <span className="text-sm font-bold text-kaist-black">메타데이터 설정</span>
+            <span className="text-sm font-bold text-kaist-black">
+              메타데이터 설정
+            </span>
             <div className="flex items-center gap-2">
               {isPublished ? (
                 <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700 border border-emerald-200">
@@ -204,7 +244,9 @@ export function SurveySettingsForm({
 
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">유형 *</label>
+              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
+                유형 *
+              </label>
               <Controller
                 name="kind"
                 control={control}
@@ -220,7 +262,9 @@ export function SurveySettingsForm({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">결과 공개 범위 *</label>
+              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
+                결과 공개 범위 *
+              </label>
               <Controller
                 name="resultVisibility"
                 control={control}
@@ -239,9 +283,16 @@ export function SurveySettingsForm({
               <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
                 시작 시각 (Asia/Seoul) *
               </label>
-              <input type="datetime-local" className={inputCls} disabled={isOngoing} {...register("openAt")} />
+              <input
+                type="datetime-local"
+                className={inputCls}
+                disabled={isOngoing}
+                {...register("openAt")}
+              />
               {errors.openAt && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">{errors.openAt.message as string}</p>
+                <p className="mt-1 text-xs text-red-500 font-semibold">
+                  {errors.openAt.message as string}
+                </p>
               )}
             </div>
 
@@ -249,9 +300,15 @@ export function SurveySettingsForm({
               <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
                 마감 시각 (Asia/Seoul) *
               </label>
-              <input type="datetime-local" className={inputCls} {...register("closeAt")} />
+              <input
+                type="datetime-local"
+                className={inputCls}
+                {...register("closeAt")}
+              />
               {errors.closeAt && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">{errors.closeAt.message as string}</p>
+                <p className="mt-1 text-xs text-red-500 font-semibold">
+                  {errors.closeAt.message as string}
+                </p>
               )}
             </div>
 
@@ -276,9 +333,11 @@ export function SurveySettingsForm({
             <div className="pt-2 border-t border-kaist-grey/10" />
 
             <div className="flex flex-col gap-3 py-1">
-              <label className={`flex items-center gap-3 group ${
-                isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}>
+              <label
+                className={`flex items-center gap-3 group ${
+                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
                 <div
                   className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                     feePayersOnly
@@ -286,38 +345,22 @@ export function SurveySettingsForm({
                       : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
                   }`}
                 >
-                  {feePayersOnly && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
+                  {feePayersOnly && (
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                  )}
                 </div>
                 <input
                   type="checkbox"
                   className="hidden"
                   checked={feePayersOnly}
                   disabled={isOngoing}
-                  onChange={(e) => !isOngoing && setValue("feePayersOnly", e.target.checked)}
+                  onChange={(e) =>
+                    !isOngoing && setValue("feePayersOnly", e.target.checked)
+                  }
                 />
-                <span className="text-sm font-bold text-kaist-black">과비 납부자만 응답 가능</span>
-              </label>
-
-              <label className={`flex items-center gap-3 group ${
-                isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}>
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                    allowGuestResponse
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {allowGuestResponse && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
-                </div>
-                <input
-                  type="checkbox"
-                  className="hidden"
-                  checked={allowGuestResponse}
-                  disabled={isOngoing}
-                  onChange={(e) => !isOngoing && setValue("allowGuestResponse", e.target.checked)}
-                />
-                <span className="text-sm font-bold text-kaist-black">로그인 없이 응답 가능</span>
+                <span className="text-sm font-bold text-kaist-black">
+                  과비 납부자만 응답 가능
+                </span>
               </label>
 
               <label className="flex items-center gap-3 group cursor-pointer">
@@ -328,7 +371,9 @@ export function SurveySettingsForm({
                       : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
                   }`}
                 >
-                  {showOnCalendar && <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />}
+                  {showOnCalendar && (
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                  )}
                 </div>
                 <input
                   type="checkbox"
@@ -336,14 +381,91 @@ export function SurveySettingsForm({
                   checked={showOnCalendar}
                   onChange={(e) => setValue("showOnCalendar", e.target.checked)}
                 />
-                <span className="text-sm font-bold text-kaist-black">캘린더에 표시</span>
+                <span className="text-sm font-bold text-kaist-black">
+                  캘린더에 표시
+                </span>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 group ${
+                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
+                <div
+                  className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
+                    allowMultipleResponses
+                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
+                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
+                  }`}
+                >
+                  {allowMultipleResponses && (
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                  )}
+                </div>
+                <input
+                  type="checkbox"
+                  className="hidden"
+                  checked={allowMultipleResponses}
+                  disabled={isOngoing}
+                  onChange={(e) => {
+                    if (isOngoing) return;
+                    const checked = e.target.checked;
+                    setValue("allowMultipleResponses", checked);
+                    if (checked) setValue("allowResponseEdit", false);
+                  }}
+                />
+                <span className="text-sm font-bold text-kaist-black">
+                  복수 응답 허용
+                  <span className="mt-0.5 block text-[11px] font-semibold leading-relaxed text-kaist-grey">
+                    체크하지 않으면 사용자별 1회만 응답할 수 있습니다.
+                  </span>
+                </span>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 group ${
+                  isOngoing || allowMultipleResponses
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer"
+                }`}
+              >
+                <div
+                  className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
+                    allowResponseEdit
+                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
+                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
+                  }`}
+                >
+                  {allowResponseEdit && (
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                  )}
+                </div>
+                <input
+                  type="checkbox"
+                  className="hidden"
+                  checked={allowResponseEdit}
+                  disabled={isOngoing || allowMultipleResponses}
+                  onChange={(e) =>
+                    !isOngoing &&
+                    !allowMultipleResponses &&
+                    setValue("allowResponseEdit", e.target.checked)
+                  }
+                />
+                <span className="text-sm font-bold text-kaist-black">
+                  응답 제출 후 수정 허용
+                  <span className="mt-0.5 block text-[11px] font-semibold leading-relaxed text-kaist-grey">
+                    1회 응답 설문에서만 마감 전까지 본인 응답을 수정할 수 있습니다.
+                  </span>
+                </span>
               </label>
             </div>
 
             <div className="pt-2 border-t border-kaist-grey/10" />
 
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-kaist-grey uppercase tracking-wider">연결 게시글 (선택)</label>
+              <label className="block text-xs font-bold text-kaist-grey uppercase tracking-wider">
+                연결 게시글 (선택)
+              </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input
@@ -397,13 +519,17 @@ export function SurveySettingsForm({
                       <button
                         key={art.articleId}
                         type="button"
-                        onClick={() => onSelectArticle(String(art.articleId), art.titleKo)}
+                        onClick={() =>
+                          onSelectArticle(String(art.articleId), art.titleKo)
+                        }
                         className="w-full text-left px-3 py-2 text-xs hover:bg-kaist-lightgreen/10 border-b border-gray-100 last:border-0 transition-colors group flex items-center gap-2"
                       >
                         <span className="font-bold text-kaist-grey group-hover:text-kaist-darkgreen transition-colors shrink-0">
                           #{art.articleId}
                         </span>
-                        <span className="text-kaist-black font-semibold truncate">{art.titleKo}</span>
+                        <span className="text-kaist-black font-semibold truncate">
+                          {art.titleKo}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -436,7 +562,9 @@ export function SurveySettingsForm({
               </svg>
             </div>
             <div>
-              <h4 className="text-sm font-bold text-red-800 mb-1">입력 내용을 확인해주세요</h4>
+              <h4 className="text-sm font-bold text-red-800 mb-1">
+                입력 내용을 확인해주세요
+              </h4>
               <ul className="text-xs text-red-600 font-medium space-y-1">
                 {Object.entries(errors).map(([key, error]) => (
                   <li key={key}>• {error?.message as string}</li>

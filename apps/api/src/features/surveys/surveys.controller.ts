@@ -25,6 +25,10 @@ interface AuthedRequest extends Request {
   user: { id: string; permission: number };
 }
 
+interface OptionalAuthedRequest extends Request {
+  user?: { id: string; permission: number };
+}
+
 @Controller("surveys")
 export class SurveysController {
   constructor(private readonly surveysService: SurveysService) {}
@@ -42,13 +46,13 @@ export class SurveysController {
 
   @Get(":id")
   @UseGuards(OptionalAuthGuard)
-  findDetail(@Param("id", ParseUUIDPipe) id: string, @Req() req: any) {
-    return this.surveysService.findDetail(id, req.user?.id);
+  findDetail(@Param("id", ParseUUIDPipe) id: string, @Req() req: OptionalAuthedRequest) {
+    return this.surveysService.findDetail(id, req.user);
   }
 
   @Get(":id/analytics")
   @UseGuards(OptionalAuthGuard)
-  getAnalytics(@Param("id", ParseUUIDPipe) id: string, @Req() req: any) {
+  getAnalytics(@Param("id", ParseUUIDPipe) id: string, @Req() req: OptionalAuthedRequest) {
     return this.surveysService.getAnalytics(id, req.user);
   }
 

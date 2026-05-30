@@ -4,9 +4,11 @@ import type {
   CreateSurveyRequest,
   ResponseDetailResponse,
   SubmitResponseRequest,
+  SurveyAnalyticsResponse,
   SurveyDetailResponse,
   SurveyQuestionRecord,
   SurveyRecord,
+  SurveyResponseWithAnswers,
   SurveyResponseRecord,
   SurveySectionRecord,
   UpdateQuestionRequest,
@@ -38,6 +40,29 @@ export const createSurveyApi = ({
         headers: { "Content-Type": "application/json" },
         method: "POST",
       },
+    );
+  },
+
+  getMySurveyResponse: async (surveyId: string): Promise<ResponseDetailResponse> => {
+    return requestJson<ResponseDetailResponse>(
+      `${surveyBaseUrl}/${surveyId}/responses/mine`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateMySurveyResponse: async (
+    surveyId: string,
+    body: SubmitResponseRequest,
+  ): Promise<ResponseDetailResponse> => {
+    return requestJson<ResponseDetailResponse>(
+      `${surveyBaseUrl}/${surveyId}/responses/mine`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
     );
   },
 
@@ -203,24 +228,24 @@ export const createSurveyApi = ({
 
   listResponsesWithAnswers: async (
     surveyId: string,
-  ): Promise<Array<SurveyResponseRecord & { answers: any[] }>> => {
-    return requestJson<Array<SurveyResponseRecord & { answers: any[] }>>(
+  ): Promise<SurveyResponseWithAnswers[]> => {
+    return requestJson<SurveyResponseWithAnswers[]>(
       `${surveyBaseUrl}/${surveyId}/responses/with-answers`,
       { method: "GET" },
       { retryOnUnauthorized: true },
     );
   },
 
-  getSurveyAnalytics: async (surveyId: string): Promise<any> => {
-    return requestJson<any>(
+  getSurveyAnalytics: async (surveyId: string): Promise<SurveyAnalyticsResponse> => {
+    return requestJson<SurveyAnalyticsResponse>(
       `${surveyBaseUrl}/${surveyId}/analytics`,
       { method: "GET" },
       { retryOnUnauthorized: true },
     );
   },
 
-  getPublicSurveys: async (): Promise<any[]> => {
-    return requestJson<any[]>(
+  getPublicSurveys: async (): Promise<SurveyRecord[]> => {
+    return requestJson<SurveyRecord[]>(
       `${surveyBaseUrl}/list/public`,
       { method: "GET" },
     );

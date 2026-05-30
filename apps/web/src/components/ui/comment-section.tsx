@@ -1,4 +1,5 @@
 import type { CommentItem } from "@soc/contracts";
+import { isoToDate } from "@soc/shared";
 import { Loader2 } from "lucide-react";
 
 type CommentSectionProps = {
@@ -156,7 +157,7 @@ export function CommentSection({
 }
 
 function formatDateTime(isoString: string) {
-  const date = new Date(isoString);
+  const date = isoToDate(isoString);
   if (Number.isNaN(date.getTime())) return "";
 
   const yyyy = date.getFullYear();

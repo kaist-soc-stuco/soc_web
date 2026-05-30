@@ -2,7 +2,7 @@ import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
-import { msToIso, nowDate } from "@soc/shared";
+import { isoToMs, msToIso, nowDate } from "@soc/shared";
 import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 
 import {
@@ -24,7 +24,16 @@ import {
 } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
-import type { AdminUserRecord, StudentFeeStatusRecord, FeeStatus } from "@soc/contracts";
+import type {
+  AdminUserRecord,
+  ArticleStatus,
+  CommentStatus,
+  FeeStatus,
+  ResponseStatus,
+  StudentFeeListResponse,
+  StudentFeeStatusRecord,
+  VisibilityScope,
+} from "@soc/contracts";
 
 type UserUpsertInput = {
   academicStatus?: string | null;
@@ -352,7 +361,7 @@ export class UsersRepository {
     const now = nowDate();
     const rows = await this.db
       .select({
-        permissionBits: sql<number>`COALESCE(SUM(${permissions.bitValue}), 0)`,
+        permissionBits: sql<number>`COALESCE(SUM(DISTINCT ${permissions.bitValue}), 0)`,
       })
       .from(userRoleGroups)
       .innerJoin(
@@ -503,7 +512,7 @@ export class UsersRepository {
     status?: FeeStatus,
     page = 1,
     pageSize = 20,
-  ): Promise<{ students: any[]; total: number; page: number; pageSize: number }> {
+  ): Promise<StudentFeeListResponse> {
     const offset = (page - 1) * pageSize;
 
     const where = status
@@ -550,8 +559,8 @@ export class UsersRepository {
             : "UNPAID",
         userId: r.userId,
         nameKo: r.nameKo,
-        nameEn: r.nameEn ?? null,
-        stdNo: r.stdNo ?? null,
+        nameEn: r.nameEn ?? undefined,
+        stdNo: r.stdNo ?? undefined,
         email: r.email,
         paidAt: r.paidAt ? msToIso(r.paidAt.valueOf()) : null,
         verifiedAt: r.verifiedAt ? msToIso(r.verifiedAt.valueOf()) : null,
@@ -594,8 +603,8 @@ export class UsersRepository {
       boardNameKo: r.boardNameKo,
       boardCode: r.boardCode,
       titleKo: r.titleKo,
-      status: r.status as any,
-      visibilityScope: r.visibilityScope as any,
+      status: r.status as ArticleStatus,
+      visibilityScope: r.visibilityScope as VisibilityScope,
       postedAt: msToIso(r.postedAt.valueOf()),
       commentCount: Number(r.commentCount),
     }));
@@ -639,7 +648,7 @@ export class UsersRepository {
       boardCode: r.boardCode,
       articleTitleKo: r.articleTitleKo,
       content: r.content,
-      status: r.status as any,
+      status: r.status as CommentStatus,
       createdAt: msToIso(r.createdAt.valueOf()),
     }));
   }
@@ -673,7 +682,7 @@ export class UsersRepository {
       responseId: r.responseId,
       surveyId: r.surveyId,
       surveyTitleKo: r.surveyTitleKo,
-      status: r.status as any,
+      status: r.status as ResponseStatus,
       submittedAt: r.submittedAt ? msToIso(r.submittedAt.valueOf()) : null,
     }));
   }
@@ -756,7 +765,7 @@ export class UsersRepository {
       occurredAt:
         row.occurredAt instanceof Date
           ? msToIso(row.occurredAt.valueOf())
-          : msToIso(new Date(row.occurredAt).valueOf()),
+          : msToIso(isoToMs(String(row.occurredAt))),
       resourceId: row.resourceId,
       surveyId: row.surveyId,
       title: row.title,

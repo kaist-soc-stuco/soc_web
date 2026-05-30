@@ -5,6 +5,7 @@ import type {
   RoleGroupMemberRecord,
   RoleGroupRecord,
 } from "@soc/contracts";
+import { isoToDate } from "@soc/shared";
 import {
   Check,
   ChevronLeft,
@@ -36,7 +37,7 @@ const emptyRoleGroupForm = (): RoleGroupFormState => ({
 
 const formatShortDate = (value?: string | null) => {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = isoToDate(value);
   if (Number.isNaN(date.getTime())) return "-";
 
   const yyyy = date.getFullYear();

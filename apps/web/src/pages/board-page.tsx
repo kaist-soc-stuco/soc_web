@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { createApiClient } from "@soc/api-client";
 import type { CurrentUserResponse, ArticleListItem } from "@soc/contracts";
-import { hasPermission } from "@soc/shared";
+import { hasPermission, isoToDate, isoToMs, nowMs } from "@soc/shared";
 import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { Search, Filter, Paperclip } from "lucide-react";
@@ -18,8 +18,12 @@ import { useLanguage } from "@/hooks/use-language";
 import { PageHero } from "@/components/organisms/page-hero";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 
+type SearchCriteria = "title" | "author" | "title_content";
+type SortBy = "latest" | "views";
+type Period = "all" | "7days" | "30days";
+
 function formatDate(dateIso: string) {
-  const d = new Date(dateIso);
+  const d = isoToDate(dateIso);
   if (isNaN(d.getTime())) return "";
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -40,11 +44,9 @@ export function BoardPage() {
 
   // Advanced filter states
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-  const [searchCriteria, setSearchCriteria] = useState<
-    "title" | "author" | "title_content"
-  >("title");
-  const [sortBy, setSortBy] = useState<"latest" | "views">("latest");
-  const [period, setPeriod] = useState<"all" | "7days" | "30days">("all");
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>("title");
+  const [sortBy, setSortBy] = useState<SortBy>("latest");
+  const [period, setPeriod] = useState<Period>("all");
 
   // Page size option
   const [postsPerPage, setPostsPerPage] = useState(10);
@@ -129,19 +131,16 @@ export function BoardPage() {
 
         // 2. Date/Period Filter
         if (period !== "all") {
-          const now = new Date();
           const limitDays = period === "7days" ? 7 : 30;
-          const cutoff = new Date(
-            now.getTime() - limitDays * 24 * 60 * 60 * 1000,
-          );
-          items = items.filter((item) => new Date(item.postedAt) >= cutoff);
+          const cutoffMs = nowMs() - limitDays * 24 * 60 * 60 * 1000;
+          items = items.filter((item) => isoToMs(item.postedAt) >= cutoffMs);
         }
 
         // 3. Sorting Filter
         if (sortBy === "latest") {
           items.sort(
             (a, b) =>
-              new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime(),
+              isoToMs(b.postedAt) - isoToMs(a.postedAt),
           );
         } else if (sortBy === "views") {
           items.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
@@ -319,17 +318,17 @@ export function BoardPage() {
                         검색 기준
                       </span>
                       <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch">
-                        {[
+                        {([
                           { id: "title", label: "제목" },
                           { id: "author", label: "글쓴이" },
                           { id: "title_content", label: "제목+내용" },
-                        ].map((opt) => {
+                        ] as const).map((opt) => {
                           const active = searchCriteria === opt.id;
                           return (
                             <button
                               key={opt.id}
                               onClick={() => {
-                                setSearchCriteria(opt.id as any);
+                                setSearchCriteria(opt.id);
                                 setCurrentPage(1);
                               }}
                               className={`flex-1 py-1 px-1 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap ${
@@ -351,16 +350,16 @@ export function BoardPage() {
                         정렬 기준
                       </span>
                       <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch">
-                        {[
+                        {([
                           { id: "latest", label: "최신순" },
                           { id: "views", label: "조회수순" },
-                        ].map((opt) => {
+                        ] as const).map((opt) => {
                           const active = sortBy === opt.id;
                           return (
                             <button
                               key={opt.id}
                               onClick={() => {
-                                setSortBy(opt.id as any);
+                                setSortBy(opt.id);
                                 setCurrentPage(1);
                               }}
                               className={`flex-1 py-1 px-1 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap ${
@@ -382,17 +381,17 @@ export function BoardPage() {
                         조회 기간
                       </span>
                       <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch">
-                        {[
+                        {([
                           { id: "all", label: "전체" },
                           { id: "7days", label: "최근 7일" },
                           { id: "30days", label: "최근 30일" },
-                        ].map((opt) => {
+                        ] as const).map((opt) => {
                           const active = period === opt.id;
                           return (
                             <button
                               key={opt.id}
                               onClick={() => {
-                                setPeriod(opt.id as any);
+                                setPeriod(opt.id);
                                 setCurrentPage(1);
                               }}
                               className={`flex-1 py-1 px-1 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap ${
@@ -494,19 +493,11 @@ export function BoardPage() {
               {articles.length > 0 ? (
                 articles.map((post) => {
                   const isNew = (() => {
-                    const postDate = new Date(post.postedAt);
-                    const now = new Date();
-                    const fourDaysAgo = new Date();
-                    fourDaysAgo.setDate(now.getDate() - 4);
-                    return postDate >= fourDaysAgo;
+                    return isoToMs(post.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
                   })();
                   const hasAttachment = post.hasAttachment ?? false;
 
-                  const postCategory =
-                    post.boardCode ||
-                    (post as any).categoryCode ||
-                    category ||
-                    "공지";
+                  const postCategory = post.boardCode || category || "공지";
                   const postBoard = boardByCode.get(postCategory);
 
                   return (

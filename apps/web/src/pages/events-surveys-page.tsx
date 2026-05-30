@@ -1,11 +1,26 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
+import { isoToDate, localDate, nowDate } from "@soc/shared";
+import type { ArticleListItem } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { PageHero } from "@/components/organisms/page-hero";
+import {
+  buildCalendarEvents,
+  buildUnifiedItems,
+  filterItemsByTab,
+  getCardPeriodText,
+  isClosedItem,
+  isOpenItem,
+  sortVisibleItems,
+  stripCalendarPrefix,
+  type CalendarEvent,
+  type SurveyRecordWithState,
+  type UnifiedItem,
+} from "@/lib/events-surveys";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -16,97 +31,8 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
-
-interface SurveyRecordWithState {
-  id: string;
-  kind: string;
-  resultVisibility: string;
-  titleKo: string;
-  titleEn: string | null;
-  descriptionKo: string | null;
-  descriptionEn: string | null;
-  status: string;
-  computedState: string;
-  feePayersOnly: boolean;
-  allowAnonymous: boolean;
-  isKoreanOnly: boolean;
-  opensAt: string | null;
-  closesAt: string | null;
-  responseCount?: number;
-  maxResponses?: number | null;
-}
-
-interface UnifiedItem {
-  id: string;
-  kind: string; // "SURVEY" | "VOTE" | "EVENT"
-  titleKo: string;
-  titleEn: string | null;
-  descriptionKo: string | null;
-  descriptionEn: string | null;
-  computedState: string; // "before_open" | "open" | "closed"
-  opensAt: string | null;
-  closesAt: string | null;
-  surveyId?: string | null; // For EVENT tab to link connected survey
-  feePayersOnly?: boolean;
-  isKoreanOnly?: boolean;
-  resultVisibility?: string;
-  status?: string;
-  maxResponses?: number | null;
-  responseCount?: number;
-}
-
-const getEventArticleState = (ev: any) => {
-  if (!ev.eventStartDate || !ev.eventEndDate) return "closed";
-  const now = new Date().getTime();
-  const start = new Date(ev.eventStartDate).getTime();
-  const end = new Date(ev.eventEndDate).getTime();
-  if (now < start) return "before_open";
-  if (now > end) return "closed";
-  return "open";
-};
-
-const getItemStartTime = (item: UnifiedItem) => {
-  const raw = item.opensAt ?? item.closesAt;
-  if (!raw) return 0;
-  const time = new Date(raw).getTime();
-  return Number.isNaN(time) ? 0 : time;
-};
-
-const getItemDeadlineTime = (item: UnifiedItem) => {
-  const raw = item.closesAt ?? item.opensAt;
-  if (!raw) return Number.MAX_SAFE_INTEGER;
-  const time = new Date(raw).getTime();
-  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
-};
-
-const isClosedItem = (item: UnifiedItem) =>
-  item.computedState === "closed" || item.status === "closed";
-
-const isOpenItem = (item: UnifiedItem) =>
-  item.computedState === "open";
-
-const formatCompactDateTime = (value: string | null) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
-
-  return `${year}.${month}.${day} ${hour}:${minute}`;
-};
-
-const getPeriodText = (item: UnifiedItem) => {
-  const start = formatCompactDateTime(item.opensAt);
-  const end = formatCompactDateTime(item.closesAt);
-
-  if (start && end) return `${start} ~ ${end}`;
-  return start || end || "";
-};
 
 export function EventsSurveysPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -121,36 +47,40 @@ export function EventsSurveysPage() {
   const selectedParam = searchParams.get("selected");
 
   const [surveys, setSurveys] = useState<SurveyRecordWithState[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<ArticleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"latest" | "deadline">("latest");
   const [showOpenOnly, setShowOpenOnly] = useState(false);
 
   // Calendar navigation states
-  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [currentDate, setCurrentDate] = useState(() => nowDate());
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
   // Selection states for Calendar Tab
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     if (selectedParam) {
-      const parsed = new Date(selectedParam);
+      const parsed = isoToDate(selectedParam);
       if (!isNaN(parsed.getTime())) return parsed;
     }
-    return new Date();
+    return nowDate();
   });
-  const [selectedDayEvents, setSelectedDayEvents] = useState<any[]>([]);
+  const [selectedDayEvents, setSelectedDayEvents] = useState<CalendarEvent[]>(
+    [],
+  );
   const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
 
   const fetchItems = () => {
     setLoading(true);
     Promise.all([
       apiClient.getPublicSurveys(),
-      apiClient.getArticles("행사", { page: 1, limit: 100 }).catch(() => ({ items: [], total: 0 })),
+      apiClient
+        .getArticles("행사", { page: 1, limit: 100 })
+        .catch(() => ({ items: [], total: 0 })),
     ])
       .then(([surveysData, eventsData]) => {
-        setSurveys(surveysData as SurveyRecordWithState[]);
+        setSurveys(surveysData);
         setEvents(eventsData.items);
         setError(null);
       })
@@ -173,7 +103,7 @@ export function EventsSurveysPage() {
   // Sync selected query parameter from URL
   useEffect(() => {
     if (selectedParam) {
-      const parsed = new Date(selectedParam);
+      const parsed = isoToDate(selectedParam);
       if (!isNaN(parsed.getTime())) {
         setSelectedDate(parsed);
         setCurrentDate(parsed); // Automatically open the correct month
@@ -186,73 +116,16 @@ export function EventsSurveysPage() {
   };
 
   const unifiedItems = useMemo<UnifiedItem[]>(() => {
-    // 1. Map surveys
-    const mappedSurveys = surveys.map((s) => ({
-      id: s.id,
-      kind: s.kind,
-      titleKo: s.titleKo,
-      titleEn: s.titleEn,
-      descriptionKo: s.descriptionKo,
-      descriptionEn: s.descriptionEn,
-      computedState: s.computedState || s.status,
-      opensAt: s.opensAt,
-      closesAt: s.closesAt,
-      feePayersOnly: s.feePayersOnly,
-      isKoreanOnly: s.isKoreanOnly,
-      resultVisibility: s.resultVisibility,
-      status: s.status,
-      maxResponses: s.maxResponses,
-      responseCount: s.responseCount,
-    }));
-
-    // 2. Map events
-    const mappedEvents = events.map((e) => {
-      const state = getEventArticleState(e);
-      return {
-        id: e.articleId,
-        kind: "EVENT",
-        titleKo: e.titleKo,
-        titleEn: e.titleEn,
-        descriptionKo: e.eventDescription || e.contentKo || null,
-        descriptionEn: e.eventDescription || e.contentEn || null,
-        computedState: state,
-        opensAt: e.eventStartDate,
-        closesAt: e.eventEndDate,
-        surveyId: e.surveyId,
-        feePayersOnly: false,
-        isKoreanOnly: e.visibilityScope === "MEMBERS",
-        resultVisibility: "PRIVATE",
-        status: state === "closed" ? "closed" : "open",
-        maxResponses: null,
-        responseCount: 0,
-      };
-    });
-
-    return [...mappedSurveys, ...mappedEvents];
+    return buildUnifiedItems(surveys, events);
   }, [surveys, events]);
 
   // Filter items based on tab
   const filteredItems = useMemo(() => {
-    return unifiedItems.filter((item) => {
-      if (currentTab === "survey") {
-        return item.kind === "SURVEY" || item.kind === "VOTE";
-      }
-      return item.kind === "EVENT";
-    });
+    return filterItemsByTab(unifiedItems, currentTab);
   }, [unifiedItems, currentTab]);
 
   const visibleItems = useMemo(() => {
-    return filteredItems
-      .filter((item) => (showOpenOnly ? isOpenItem(item) : true))
-      .sort((a, b) => {
-        if (isClosedItem(a) !== isClosedItem(b)) {
-          return Number(isClosedItem(a)) - Number(isClosedItem(b));
-        }
-        if (sortBy === "deadline") {
-          return getItemDeadlineTime(a) - getItemDeadlineTime(b);
-        }
-        return getItemStartTime(b) - getItemStartTime(a);
-      });
+    return sortVisibleItems(filteredItems, sortBy, showOpenOnly);
   }, [filteredItems, showOpenOnly, sortBy]);
 
   const activeItems = useMemo(
@@ -266,47 +139,8 @@ export function EventsSurveysPage() {
   );
 
   // Dynamic calendar events parsed from items list
-  const calendarEvents = useMemo(() => {
-    const parsed: any[] = [];
-    unifiedItems.forEach((item) => {
-      const title =
-        lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
-      const description =
-        lang === "ko"
-          ? item.descriptionKo || ""
-          : item.descriptionEn || item.descriptionKo || "";
-
-      if (item.opensAt) {
-        parsed.push({
-          id: item.id,
-          kind: item.kind,
-          title: `${lang === "ko" ? "[시작]" : "[Start]"} ${title}`,
-          description,
-          dateType: "open",
-          rawDate: item.opensAt,
-          date: new Date(item.opensAt),
-          status: item.status || "open",
-          computedState: item.computedState,
-          surveyId: item.surveyId,
-        });
-      }
-
-      if (item.closesAt) {
-        parsed.push({
-          id: item.id,
-          kind: item.kind,
-          title: `${lang === "ko" ? "[마감]" : "[Deadline]"} ${title}`,
-          description,
-          dateType: "close",
-          rawDate: item.closesAt,
-          date: new Date(item.closesAt),
-          status: item.status || "closed",
-          computedState: item.computedState,
-          surveyId: item.surveyId,
-        });
-      }
-    });
-    return parsed;
+  const calendarEvents = useMemo<CalendarEvent[]>(() => {
+    return buildCalendarEvents(unifiedItems, lang);
   }, [unifiedItems, lang]);
 
   // Sync selected day details when calendarEvents load or selectedDate changes
@@ -337,10 +171,10 @@ export function EventsSurveysPage() {
     if (item.computedState === "open") {
       let dDayText = "";
       if (item.closesAt) {
-        const now = new Date();
-        const closeDate = new Date(item.closesAt);
-        const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const d2 = new Date(
+        const now = nowDate();
+        const closeDate = isoToDate(item.closesAt);
+        const d1 = localDate(now.getFullYear(), now.getMonth(), now.getDate());
+        const d2 = localDate(
           closeDate.getFullYear(),
           closeDate.getMonth(),
           closeDate.getDate(),
@@ -373,8 +207,8 @@ export function EventsSurveysPage() {
 
   // Calendar grid calculations
   const calendarGrid = useMemo(() => {
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+    const firstDayOfMonth = localDate(currentYear, currentMonth, 1);
+    const lastDayOfMonth = localDate(currentYear, currentMonth + 1, 0);
 
     const firstDayOfWeek = firstDayOfMonth.getDay();
     const daysInMonth = lastDayOfMonth.getDate();
@@ -382,12 +216,12 @@ export function EventsSurveysPage() {
     const grid = [];
 
     // Pad preceding month days
-    const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
+    const prevMonthLastDay = localDate(currentYear, currentMonth, 0).getDate();
     for (let i = firstDayOfWeek - 1; i >= 0; i--) {
       grid.push({
         day: prevMonthLastDay - i,
         isCurrentMonth: false,
-        date: new Date(currentYear, currentMonth - 1, prevMonthLastDay - i),
+        date: localDate(currentYear, currentMonth - 1, prevMonthLastDay - i),
       });
     }
 
@@ -396,7 +230,7 @@ export function EventsSurveysPage() {
       grid.push({
         day: i,
         isCurrentMonth: true,
-        date: new Date(currentYear, currentMonth, i),
+        date: localDate(currentYear, currentMonth, i),
       });
     }
 
@@ -407,7 +241,7 @@ export function EventsSurveysPage() {
       grid.push({
         day: i,
         isCurrentMonth: false,
-        date: new Date(currentYear, currentMonth + 1, i),
+        date: localDate(currentYear, currentMonth + 1, i),
       });
     }
 
@@ -462,11 +296,11 @@ export function EventsSurveysPage() {
   };
 
   const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+    setCurrentDate(localDate(currentYear, currentMonth - 1, 1));
   };
 
   const handleNextMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+    setCurrentDate(localDate(currentYear, currentMonth + 1, 1));
   };
 
   const weekHeaders =
@@ -490,16 +324,24 @@ export function EventsSurveysPage() {
   };
 
   const getActionLabel = (item: UnifiedItem) => {
-    if (item.kind === "EVENT") {
+    if (isOpenItem(item)) {
       return lang === "ko" ? "자세히 보기" : "View details";
     }
-    if (isClosedItem(item) && item.resultVisibility === "PUBLIC") {
+    if (item.resultVisibility === "PUBLIC") {
       return lang === "ko" ? "결과 보기" : "View results";
     }
-    if (isOpenItem(item)) {
-      return lang === "ko" ? "참여하기" : "Participate";
+    return "";
+  };
+
+  const getRestrictionMeta = (item: UnifiedItem) => {
+    const meta: string[] = [];
+    if (item.feePayersOnly) {
+      meta.push(lang === "ko" ? "과비 납부자" : "Paid members only");
     }
-    return lang === "ko" ? "자세히 보기" : "View details";
+    if (item.isKoreanOnly) {
+      meta.push(lang === "ko" ? "한국어 사용자" : "Korean speakers only");
+    }
+    return meta.join(" · ");
   };
 
   return (
@@ -576,7 +418,7 @@ export function EventsSurveysPage() {
                   className="h-3.5 w-3.5 rounded border-slate-300 text-kaist-darkgreen focus:ring-kaist-darkgreen/20"
                 />
                 <span>
-                  {lang === "ko" ? "진행 중인 행사만 보기" : "Ongoing only"}
+                  {lang === "ko" ? "진행 중인 항목만 보기" : "Ongoing only"}
                 </span>
               </label>
 
@@ -630,7 +472,7 @@ export function EventsSurveysPage() {
                   </button>
                   <button
                     onClick={() => {
-                      const today = new Date();
+                      const today = nowDate();
                       setCurrentDate(today);
                       setSelectedDate(today);
                     }}
@@ -671,7 +513,7 @@ export function EventsSurveysPage() {
                   const dayEvents = calendarEvents.filter((e) =>
                     isSameDay(e.date, cell.date),
                   );
-                  const isToday = isSameDay(new Date(), cell.date);
+                  const isToday = isSameDay(nowDate(), cell.date);
                   const isSelected =
                     selectedDate && isSameDay(selectedDate, cell.date);
 
@@ -718,11 +560,7 @@ export function EventsSurveysPage() {
                       <div className="w-full space-y-1 mt-2.5 overflow-hidden">
                         {dayEvents.slice(0, 2).map((event, eventIdx) => {
                           const isStart = event.dateType === "open";
-                          const shortTitle = event.title
-                            .replace(/^\[시작\]\s*/, "")
-                            .replace(/^\[마감\]\s*/, "")
-                            .replace(/^\[Start\]\s*/, "")
-                            .replace(/^\[Deadline\]\s*/, "");
+                          const shortTitle = stripCalendarPrefix(event.title);
 
                           return (
                             <div
@@ -760,7 +598,7 @@ export function EventsSurveysPage() {
                             <span>{dayEvents.length}개 일정</span>
                           </div>
                           <div className="flex flex-col gap-1.5 text-[9px] font-medium text-stone-200">
-                            {dayEvents.map((e: any, eIdx) => {
+                            {dayEvents.map((e, eIdx) => {
                               const isStart = e.dateType === "open";
                               const label =
                                 e.kind === "VOTE"
@@ -770,11 +608,7 @@ export function EventsSurveysPage() {
                                     : e.kind === "EVENT"
                                       ? "행사"
                                       : "설문";
-                              const titleText = e.title
-                                .replace(/^\[시작\]\s*/, "")
-                                .replace(/^\[마감\]\s*/, "")
-                                .replace(/^\[Start\]\s*/, "")
-                                .replace(/^\[Deadline\]\s*/, "");
+                              const titleText = stripCalendarPrefix(e.title);
 
                               return (
                                 <div
@@ -848,7 +682,7 @@ export function EventsSurveysPage() {
                       <div className="space-y-2.5 overflow-y-auto pr-1 flex-1 max-h-[300px] lg:max-h-[330px]">
                         {selectedDayEvents.map((event, idx) => {
                           const style = getEventStyles(event.kind);
-                          const eventDate = new Date(event.rawDate);
+                          const eventDate = isoToDate(event.rawDate);
                           const formattedTime = eventDate.toLocaleTimeString(
                             lang === "ko" ? "ko-KR" : "en-US",
                             {
@@ -927,22 +761,36 @@ export function EventsSurveysPage() {
                                 </div>
 
                                 <div className="flex gap-2">
-                                  {event.kind === "EVENT" && event.surveyId && (
-                                    <Link
-                                      to={`/survey/${event.surveyId}`}
-                                      className="inline-flex items-center gap-0.5 text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer mr-2 text-[10px]"
-                                    >
-                                      <span>{lang === "ko" ? "참여하기" : "Participate"}</span>
-                                    </Link>
-                                  )}
+                                  {event.kind === "EVENT" &&
+                                    event.surveyId &&
+                                    isStateOpen && (
+                                      <Link
+                                        to={`/survey/${event.surveyId}`}
+                                        className="inline-flex items-center rounded-md bg-kaist-lightgreen/20 px-1.5 py-0.5 text-[9px] font-extrabold text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer mr-2"
+                                      >
+                                        <span>
+                                          {lang === "ko"
+                                            ? "신청 가능"
+                                            : "Application open"}
+                                        </span>
+                                      </Link>
+                                    )}
                                   <Link
-                                    to={event.kind === "EVENT" ? `/board/행사/${event.id}` : `/survey/${event.id}`}
+                                    to={
+                                      event.kind === "EVENT"
+                                        ? `/board/행사/${event.id}`
+                                        : `/survey/${event.id}`
+                                    }
                                     className="inline-flex items-center gap-0.5 text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer text-[10px]"
                                   >
                                     <span>
                                       {event.kind === "EVENT"
-                                        ? lang === "ko" ? "자세히 보기" : "View"
-                                        : lang === "ko" ? "참여하기" : "View"}
+                                        ? lang === "ko"
+                                          ? "자세히 보기"
+                                          : "View"
+                                        : lang === "ko"
+                                          ? "보기"
+                                          : "View"}
                                     </span>
                                     <ArrowRight className="w-3 h-3" />
                                   </Link>
@@ -1008,28 +856,34 @@ export function EventsSurveysPage() {
               const startsActiveSection = index === 0 && !closed;
               const startsClosedSection =
                 closed && (index === 0 || !isClosedItem(previousItem));
+              const restrictionMeta = getRestrictionMeta(item);
+              const descriptionText =
+                desc ||
+                (lang === "ko"
+                  ? "등록된 상세 설명이 없습니다."
+                  : "No description provided.");
 
               return (
                 <Fragment key={item.id}>
                   {startsActiveSection ? (
-                    <div className="col-span-full flex items-center justify-between pt-1">
+                    <div className="col-span-full pt-1">
                       <h2 className="text-base font-extrabold text-slate-900">
-                        {lang === "ko" ? "진행 중" : "Ongoing"}
+                        {lang === "ko" ? "진행 중" : "Ongoing"}{" "}
+                        <span className="text-xs font-bold text-slate-400">
+                          ({activeItems.length})
+                        </span>
                       </h2>
-                      <span className="text-xs font-bold text-slate-400">
-                        {activeItems.length}
-                      </span>
                     </div>
                   ) : null}
 
                   {startsClosedSection ? (
-                    <div className="col-span-full flex items-center justify-between pt-3">
+                    <div className="col-span-full pt-3">
                       <h2 className="text-base font-extrabold text-slate-900">
-                        {lang === "ko" ? "마감됨" : "Closed"}
+                        {lang === "ko" ? "마감됨" : "Closed"}{" "}
+                        <span className="text-xs font-bold text-slate-400">
+                          ({closedItems.length})
+                        </span>
                       </h2>
-                      <span className="text-xs font-bold text-slate-400">
-                        {closedItems.length}
-                      </span>
                     </div>
                   ) : null}
 
@@ -1043,53 +897,44 @@ export function EventsSurveysPage() {
                         navigate(getItemHref(item));
                       }
                     }}
-                    className={`flex cursor-pointer flex-col justify-between space-y-4 border-gray-200 bg-white rounded-2xl border p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    className={`flex cursor-pointer flex-col justify-between space-y-3 border-gray-200 bg-white rounded-2xl border p-3.5 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
                       closed
                         ? "border-slate-200 opacity-75 hover:opacity-95"
                         : ""
                     }`}
                   >
-                    <div className="space-y-3.5">
+                    <div className="space-y-3">
                       {/* Badge Row */}
                       <div className="flex flex-wrap items-center justify-start gap-1.5">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {item.feePayersOnly && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              {lang === "ko"
-                                ? "Paid Members Only"
-                                : "Paid Members Only"}
-                            </span>
-                          )}
-                          {item.isKoreanOnly && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                              {lang === "ko"
-                                ? "Korean Speakers Only"
-                                : "Korean Speakers Only"}
-                            </span>
-                          )}
-                        </div>
                         <span
                           className={`inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${statusInfo.color}`}
                         >
                           {statusInfo.label}
                         </span>
+                        {item.kind === "EVENT" && item.surveyId && !closed && (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-kaist-lightgreen/20 text-kaist-darkgreen border border-kaist-darkgreen/10">
+                            {lang === "ko" ? "신청 가능" : "Application open"}
+                          </span>
+                        )}
                       </div>
 
                       {/* Title & Description */}
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <h3 className="text-[1.05rem] font-extrabold text-kaist-black line-clamp-2 leading-snug">
                           {title}
                         </h3>
-                        {desc && (
-                          <p className="text-sm text-kaist-grey/80 line-clamp-2 leading-relaxed font-normal">
-                            {desc}
-                          </p>
-                        )}
+                        <p
+                          className={`min-h-[2.25rem] text-[13px] line-clamp-2 leading-snug font-normal ${
+                            desc ? "text-kaist-grey/80" : "text-kaist-grey/40"
+                          }`}
+                        >
+                          {descriptionText}
+                        </p>
                       </div>
                     </div>
 
                     {/* Progress & Metadata */}
-                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                    <div className="space-y-3 pt-3 border-t border-gray-100">
                       {/* Response capacity bar if applicable */}
                       {hasCapacity && (
                         <div className="space-y-1.5">
@@ -1116,26 +961,29 @@ export function EventsSurveysPage() {
                       {/* Dates */}
                       <div className="flex items-center gap-1.5 text-[12px] font-semibold text-kaist-grey/75">
                         <Clock className="w-3.5 h-3.5 shrink-0 text-kaist-greygreen/80" />
-                        <span className="truncate">{getPeriodText(item)}</span>
+                        <span className="truncate">
+                          {getCardPeriodText(item)}
+                        </span>
+                      </div>
+                      <div
+                        className={`flex min-h-[0.875rem] items-center gap-1.5 text-[11px] font-bold ${
+                          restrictionMeta
+                            ? "text-kaist-grey/65"
+                            : "text-transparent"
+                        }`}
+                        aria-hidden={!restrictionMeta}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-kaist-greygreen/80" />
+                        <span className="truncate">
+                          {restrictionMeta || "-"}
+                        </span>
                       </div>
                       {/* Action buttons */}
-                      <div className="flex justify-between items-center pt-1 text-[12px] font-extrabold">
-                        <div>
-                          {item.kind === "EVENT" && item.surveyId && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/survey/${item.surveyId}`);
-                              }}
-                              className="text-kaist-darkgreen hover:opacity-80 border-0 bg-transparent cursor-pointer font-extrabold text-[12px] p-0"
-                            >
-                              {lang === "ko" ? "참여하기" : "Participate"}
-                            </button>
-                          )}
-                        </div>
+                      <div className="flex justify-end items-center pt-1 text-[12px] font-extrabold">
                         <span className="inline-flex items-center gap-1 text-kaist-darkgreen">
-                          {getActionLabel(item)}
+                          {getActionLabel(item) && (
+                            <span>{getActionLabel(item)}</span>
+                          )}
                           <ArrowRight className="h-3.5 w-3.5" />
                         </span>
                       </div>

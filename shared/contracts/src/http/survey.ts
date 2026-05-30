@@ -1,4 +1,3 @@
-export type SurveyStatus = 'draft' | 'scheduled' | 'open' | 'closed' | 'archived';
 export type ResponseStatus = 'submitted';
 export type QuestionType =
   | 'short_text'
@@ -26,13 +25,12 @@ export interface SurveyRecord {
   descriptionKo: string | null;
   descriptionEn: string | null;
   creatorId: string | null;
-  status: SurveyStatus;
   computedState: ComputedSurveyState;
   publishedAt: string | null;
   connectedPostId: string | null;
   feePayersOnly: boolean;
-  allowAnonymous: boolean;
   allowMultipleResponses: boolean;
+  allowResponseEdit: boolean;
   isKoreanOnly: boolean;
   isPublished: boolean;
   showOnCalendar: boolean;
@@ -77,7 +75,6 @@ export interface SurveyResponseRecord {
   id: string;
   surveyId: string;
   userId: string | null;
-  externalPhone: string | null;
   status: ResponseStatus;
   submittedAt: string | null;
   user: SurveyResponseUserRecord | null;
@@ -110,8 +107,8 @@ export interface CreateSurveyRequest {
   descriptionKo?: string;
   descriptionEn?: string;
   feeRequirementPolicy?: string;
-  allowGuestResponse?: boolean;
   allowMultipleResponses?: boolean;
+  allowResponseEdit?: boolean;
   isKoreanOnly?: boolean;
   isPublished?: boolean;
   showOnCalendar?: boolean;
@@ -128,10 +125,9 @@ export interface UpdateSurveyRequest {
   titleEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  status?: SurveyStatus;
   feeRequirementPolicy?: string;
-  allowGuestResponse?: boolean;
   allowMultipleResponses?: boolean;
+  allowResponseEdit?: boolean;
   isKoreanOnly?: boolean;
   isPublished?: boolean;
   showOnCalendar?: boolean;
@@ -190,7 +186,6 @@ export interface AnswerInput {
 }
 
 export interface SubmitResponseRequest {
-  externalPhone?: string;
   answers: AnswerInput[];
 }
 
@@ -198,9 +193,51 @@ export interface SubmitResponseRequest {
 
 export interface SurveyDetailResponse extends SurveyRecord {
   sections: Array<SurveySectionRecord & { questions: SurveyQuestionRecord[] }>;
+  currentResponse?: ResponseDetailResponse | null;
   hasSubmitted?: boolean;
+  isPreview?: boolean;
 }
 
 export interface ResponseDetailResponse extends SurveyResponseRecord {
   answers: SurveyAnswerRecord[];
+}
+
+export interface SurveyResponseWithAnswers extends SurveyResponseRecord {
+  answers: SurveyAnswerRecord[];
+}
+
+export interface SurveyChoiceAnalyticsItem {
+  value: string;
+  labelKo: string;
+  labelEn: string | null;
+  count: number;
+  percentage: number;
+}
+
+export interface SurveyQuestionAnalyticsItem {
+  questionId: string;
+  questionType: QuestionType;
+  titleKo: string;
+  titleEn: string | null;
+  totalAnswers: number;
+  choices?: SurveyChoiceAnalyticsItem[];
+  texts?: string[];
+}
+
+export interface SurveyAnalyticsResponse {
+  surveyId: string;
+  kind: string;
+  resultVisibility: string;
+  feePayersOnly: boolean;
+  allowMultipleResponses: boolean;
+  isKoreanOnly: boolean;
+  descriptionKo: string | null;
+  descriptionEn: string | null;
+  computedState: ComputedSurveyState;
+  opensAt: string | null;
+  closesAt: string | null;
+  titleKo: string;
+  titleEn: string | null;
+  totalResponses: number;
+  questions: SurveyQuestionAnalyticsItem[];
 }

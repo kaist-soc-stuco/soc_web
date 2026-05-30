@@ -3,7 +3,7 @@ import { createApiClient } from "@soc/api-client";
 import type { BulkEmailRecord, SendBulkEmailRequest } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Send, History, AlertTriangle, Users, Mail } from "lucide-react";
-import { formatKoreanDateTime } from "@soc/shared";
+import { formatKoreanDateTime, isoToMs } from "@soc/shared";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Permissions } from "@/lib/permissions";
@@ -39,7 +39,7 @@ function BulkEmailPageContent() {
       .then((res) => {
         // Sort history by sentAt descending
         const sorted = [...res.items].sort(
-          (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+          (a, b) => isoToMs(b.sentAt) - isoToMs(a.sentAt)
         );
         setHistory(sorted);
       })

@@ -26,12 +26,11 @@ export class SurveysRepository {
       descriptionKo: row.descriptionKo,
       descriptionEn: row.descriptionEn,
       creatorId: row.creatorId ? String(row.creatorId) : null,
-      status: row.status.toLowerCase() as SurveyRecord["status"],
       publishedAt: null,
       connectedPostId: row.connectedArticleId ? String(row.connectedArticleId) : null,
       feePayersOnly: row.feeRequirementPolicy === "PAID_ONLY",
-      allowAnonymous: row.allowGuestResponse,
       allowMultipleResponses: row.allowMultipleResponses,
+      allowResponseEdit: row.allowResponseEdit,
       isKoreanOnly: row.isKoreanOnly,
       isPublished: row.isPublished,
       showOnCalendar: row.showOnCalendar,
@@ -80,10 +79,9 @@ export class SurveysRepository {
         titleEn: dto.titleEn,
         descriptionKo: dto.descriptionKo ?? null,
         descriptionEn: dto.descriptionEn ?? null,
-        status: "DRAFT",
         feeRequirementPolicy: dto.feeRequirementPolicy ?? "NONE",
-        allowGuestResponse: dto.allowGuestResponse ?? false,
         allowMultipleResponses: dto.allowMultipleResponses ?? false,
+        allowResponseEdit: dto.allowResponseEdit ?? false,
         isKoreanOnly: dto.isKoreanOnly ?? false,
         isPublished: dto.isPublished ?? false,
         showOnCalendar: dto.showOnCalendar ?? false,
@@ -101,7 +99,6 @@ export class SurveysRepository {
   async update(
     id: string,
     dto: UpdateSurveyDto,
-    publishedAt?: string,
   ): Promise<SurveyRecord | null> {
     const set: Partial<typeof surveys.$inferInsert> & { updatedAt: Date } = {
       updatedAt: nowDate(),
@@ -112,12 +109,11 @@ export class SurveysRepository {
     if (dto.titleEn !== undefined) set.titleEn = dto.titleEn;
     if (dto.descriptionKo !== undefined) set.descriptionKo = dto.descriptionKo;
     if (dto.descriptionEn !== undefined) set.descriptionEn = dto.descriptionEn;
-    if (dto.status !== undefined) set.status = dto.status.toUpperCase();
     if (dto.feeRequirementPolicy !== undefined) {
       set.feeRequirementPolicy = dto.feeRequirementPolicy;
     }
-    if (dto.allowGuestResponse !== undefined) set.allowGuestResponse = dto.allowGuestResponse;
     if (dto.allowMultipleResponses !== undefined) set.allowMultipleResponses = dto.allowMultipleResponses;
+    if (dto.allowResponseEdit !== undefined) set.allowResponseEdit = dto.allowResponseEdit;
     if (dto.isKoreanOnly !== undefined) set.isKoreanOnly = dto.isKoreanOnly;
     if (dto.isPublished !== undefined) set.isPublished = dto.isPublished;
     if (dto.showOnCalendar !== undefined) set.showOnCalendar = dto.showOnCalendar;

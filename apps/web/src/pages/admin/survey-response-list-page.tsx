@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { SurveyResponseRecord } from "@soc/contracts";
+import type {
+  SurveyAnswerRecord,
+  SurveyDetailResponse,
+  SurveyQuestionRecord,
+  SurveyResponseRecord,
+} from "@soc/contracts";
+import { isoToDate, isoToMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { Pagination } from "@/components/ui/pagination";
@@ -21,15 +27,15 @@ import {
 } from "lucide-react";
 
 function formatResponseName(response: SurveyResponseRecord) {
-  return response.user?.nameKo ?? (response.externalPhone ? "외부 응답자" : "—");
+  return response.user?.nameKo ?? "—";
 }
 
 function formatResponseEmail(response: SurveyResponseRecord) {
-  return response.user?.email ?? response.externalPhone ?? "—";
+  return response.user?.email ?? "—";
 }
 
 function formatResponseDepartment(response: SurveyResponseRecord) {
-  if (!response.user) return response.externalPhone ?? "—";
+  if (!response.user) return "—";
   const parts = [response.user.departmentKo, response.user.stdNo].filter(Boolean);
   return parts.length > 0 ? parts.join(" / ") : "—";
 }
@@ -37,7 +43,7 @@ function formatResponseDepartment(response: SurveyResponseRecord) {
 // Convert timestamp to 24-hour single line format
 function format24hDateTime(dateIso: string | null) {
   if (!dateIso) return null;
-  const d = new Date(dateIso);
+  const d = isoToDate(dateIso);
   if (isNaN(d.getTime())) return null;
 
   const year = d.getFullYear();
@@ -49,17 +55,37 @@ function format24hDateTime(dateIso: string | null) {
   return `${year}.${month}.${day} ${hour}:${minute}`;
 }
 
+function stringifyAnswerContent(
+  answer: SurveyAnswerRecord | undefined,
+  question: SurveyQuestionRecord,
+) {
+  if (!answer?.content) return "";
+  const content = answer.content;
+
+  if (question.questionType === "multiple_choice") {
+    const values = content.values;
+    return Array.isArray(values) ? values.map(String).join(" | ") : "";
+  }
+
+  for (const key of ["text", "value", "date", "time", "datetime"]) {
+    const value = content[key];
+    if (value !== undefined && value !== null) return String(value);
+  }
+
+  return JSON.stringify(content);
+}
+
 export function SurveyResponseListPage() {
   const navigate = useNavigate();
   const { id: surveyId } = useParams<{ id: string }>();
-  const [survey, setSurvey] = useState<any>(null);
+  const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
   const [responses, setResponses] = useState<SurveyResponseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortOrder, setSortOrder] = useState("desc"); // desc: 최신순, asc: 오래된순
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -98,7 +124,7 @@ export function SurveyResponseListPage() {
       const allQuestions = detail.sections.flatMap((s) => s.questions);
       const data = await client.listResponsesWithAnswers(surveyId);
 
-      const csvCell = (val: any) => {
+      const csvCell = (val: unknown) => {
         if (val === null || val === undefined) return '""';
         const str = String(val);
         return `"${str.replace(/"/g, '""')}"`;
@@ -117,17 +143,7 @@ export function SurveyResponseListPage() {
       const rows = data.map((r, idx) => {
         const answerCols = allQuestions.map((q) => {
           const ans = r.answers.find((a) => a.questionId === q.id);
-          if (!ans || !ans.content) return "";
-          const content = ans.content as Record<string, any>;
-          if (q.questionType === "multiple_choice") {
-            return (content.values as string[])?.join(" | ") || "";
-          }
-          if ("text" in content) return String(content.text);
-          if ("value" in content) return String(content.value);
-          if ("date" in content) return String(content.date);
-          if ("time" in content) return String(content.time);
-          if ("datetime" in content) return String(content.datetime);
-          return JSON.stringify(content);
+          return stringifyAnswerContent(ans, q);
         });
 
         return [
@@ -177,8 +193,8 @@ export function SurveyResponseListPage() {
 
     // 2. Sorting (submittedAt time)
     result.sort((a, b) => {
-      const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-      const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+      const dateA = a.submittedAt ? isoToMs(a.submittedAt) : 0;
+      const dateB = b.submittedAt ? isoToMs(b.submittedAt) : 0;
       return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
     });
 
@@ -352,10 +368,10 @@ export function SurveyResponseListPage() {
                       <div className="flex flex-col gap-2">
                         <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">정렬 기준</span>
                         <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch select-none">
-                          {[
+                          {([
                             { value: "desc", label: "최신순" },
                             { value: "asc", label: "오래된순" }
-                          ].map((opt) => {
+                          ] as const).map((opt) => {
                             const isActive = sortOrder === opt.value;
                             return (
                               <button

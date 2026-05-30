@@ -12,7 +12,7 @@
     "db:seed": "ts-node-dev --transpile-only --no-notify ./drizzle/seed.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "echo 'no tests yet'"
+    "test": "pnpm --dir ../../shared/common build && pnpm build && node --conditions=production --test test/*.test.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.8",

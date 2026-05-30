@@ -10,13 +10,11 @@ import { surveyAnswers, surveyResponses, users } from "../../infrastructure/post
 
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
-import type { ResponseStatus } from "@soc/contracts";
 
 type SurveyResponseQueryRow = {
   id: string;
   surveyId: string;
   userId: string | null;
-  externalPhone: string | null;
   status: string;
   submittedAt: Date | null;
   createdAt: Date;
@@ -36,8 +34,7 @@ export class SurveyResponsesRepository {
       id: row.id,
       surveyId: row.surveyId,
       userId: row.userId,
-      externalPhone: row.externalPhone,
-      status: row.status as ResponseStatus,
+      status: "submitted",
       submittedAt: row.submittedAt ? msToIso(row.submittedAt.valueOf()) : null,
       user: row.userId
         ? {
@@ -56,7 +53,6 @@ export class SurveyResponsesRepository {
     id: surveyResponses.id,
     surveyId: surveyResponses.surveyId,
     userId: surveyResponses.userId,
-    externalPhone: surveyResponses.externalPhone,
     status: surveyResponses.status,
     submittedAt: surveyResponses.submittedAt,
     createdAt: surveyResponses.createdAt,
@@ -124,7 +120,6 @@ export class SurveyResponsesRepository {
   async insertResponse(input: {
     surveyId: string;
     userId?: string;
-    externalPhone?: string;
   }): Promise<SurveyResponseRecord> {
     const now = nowDate();
     const [row] = await this.db
@@ -132,7 +127,6 @@ export class SurveyResponsesRepository {
       .values({
         surveyId: input.surveyId,
         userId: input.userId,
-        externalPhone: input.externalPhone ?? null,
         status: "submitted",
         createdAt: now,
         submittedAt: now,
@@ -145,7 +139,6 @@ export class SurveyResponsesRepository {
       id: row.id,
       surveyId: row.surveyId,
       userId: row.userId,
-      externalPhone: row.externalPhone,
       status: row.status,
       submittedAt: row.submittedAt,
       createdAt: row.createdAt,
@@ -167,6 +160,126 @@ export class SurveyResponsesRepository {
       .values(answers.map((a) => ({ responseId, questionId: a.questionId, content: a.content })))
       .returning();
     return rows.map((r) => this.mapAnswer(r));
+  }
+
+  async insertSubmission(input: {
+    surveyId: string;
+    userId: string;
+    answers: Array<{ questionId: string; content: Record<string, unknown> }>;
+  }): Promise<{ response: SurveyResponseRecord; answers: SurveyAnswerRecord[] }> {
+    const now = nowDate();
+
+    const responseRow = await this.db.transaction(async (tx) => {
+      const [insertedResponse] = await tx
+        .insert(surveyResponses)
+        .values({
+          surveyId: input.surveyId,
+          userId: input.userId,
+          status: "submitted",
+          createdAt: now,
+          submittedAt: now,
+          updatedAt: now,
+        })
+        .returning();
+
+      if (input.answers.length > 0) {
+        await tx.insert(surveyAnswers).values(
+          input.answers.map((answer) => ({
+            responseId: insertedResponse.id,
+            questionId: answer.questionId,
+            content: answer.content,
+          })),
+        );
+      }
+
+      return insertedResponse;
+    });
+
+    const response = await this.findById(responseRow.id, responseRow.surveyId);
+    const answers = await this.findAnswersByResponseId(responseRow.id);
+
+    return {
+      response:
+        response ??
+        this.mapResponse({
+          id: responseRow.id,
+          surveyId: responseRow.surveyId,
+          userId: responseRow.userId,
+          status: responseRow.status,
+          submittedAt: responseRow.submittedAt,
+          createdAt: responseRow.createdAt,
+          updatedAt: responseRow.updatedAt,
+          userNameKo: null,
+          userEmail: null,
+          userDepartmentKo: null,
+          userStdNo: null,
+        }),
+      answers,
+    };
+  }
+
+  async updateSubmission(input: {
+    responseId: string;
+    surveyId: string;
+    answers: Array<{ questionId: string; content: Record<string, unknown> }>;
+  }): Promise<{ response: SurveyResponseRecord; answers: SurveyAnswerRecord[] }> {
+    const now = nowDate();
+
+    const responseRow = await this.db.transaction(async (tx) => {
+      const [updatedResponse] = await tx
+        .update(surveyResponses)
+        .set({
+          submittedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(surveyResponses.id, input.responseId),
+            eq(surveyResponses.surveyId, input.surveyId),
+          ),
+        )
+        .returning();
+
+      await tx
+        .delete(surveyAnswers)
+        .where(eq(surveyAnswers.responseId, input.responseId));
+
+      if (input.answers.length > 0) {
+        await tx.insert(surveyAnswers).values(
+          input.answers.map((answer) => ({
+            responseId: input.responseId,
+            questionId: answer.questionId,
+            content: answer.content,
+            submittedAt: now,
+            updatedAt: now,
+          })),
+        );
+      }
+
+      return updatedResponse;
+    });
+
+    const response = await this.findById(responseRow.id, responseRow.surveyId);
+    const answers = await this.findAnswersByResponseId(responseRow.id);
+
+    return {
+      response:
+        response ??
+        this.mapResponse({
+          id: responseRow.id,
+          surveyId: responseRow.surveyId,
+          userId: responseRow.userId,
+          status: responseRow.status,
+          submittedAt: responseRow.submittedAt,
+          createdAt: responseRow.createdAt,
+          updatedAt: responseRow.updatedAt,
+          userNameKo: null,
+          userEmail: null,
+          userDepartmentKo: null,
+          userStdNo: null,
+        }),
+      answers,
+    };
   }
 
   async findAnswersByResponseId(responseId: string): Promise<SurveyAnswerRecord[]> {

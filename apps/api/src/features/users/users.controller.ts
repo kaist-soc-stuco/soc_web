@@ -6,7 +6,7 @@ import { Permissions } from "@soc/contracts";
 import { AuthGuard, RequirePermissions } from "../../shared/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { UsersService } from "./users.service";
-import type { UpdateStudentFeeStatusRequest } from "@soc/contracts";
+import type { FeeStatus, UpdateStudentFeeStatusRequest } from "@soc/contracts";
 
 /**
  * 사용자 조회 관련 API 골격입니다.
@@ -109,8 +109,11 @@ export class UsersController {
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
   ) {
+    const feeStatus: FeeStatus | undefined =
+      status === "PAID" || status === "UNPAID" ? status : undefined;
+
     return this.usersService.listStudentsByFeeStatus(
-      (status as any) || undefined,
+      feeStatus,
       page ? Number(page) : 1,
       pageSize ? Number(pageSize) : 20,
     );
