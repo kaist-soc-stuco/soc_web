@@ -26,6 +26,8 @@ services:
       dockerfile: apps/web/Dockerfile
     env_file:
       - .env
+    environment:
+      DEV_API_PROXY_TARGET: http://api:3000
     ports:
       - '${WEB_PORT}:5173'
     depends_on:

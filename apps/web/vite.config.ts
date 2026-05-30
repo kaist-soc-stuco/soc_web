@@ -12,7 +12,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, workspaceRoot, "");
   const port = Number.parseInt(env.WEB_PORT ?? "5173", 10);
   const apiPort = Number.parseInt(env.API_PORT ?? "3000", 10);
-  const apiTarget = `http://localhost:${Number.isNaN(apiPort) ? 3000 : apiPort}`;
+  const apiTarget =
+    process.env.DEV_API_PROXY_TARGET?.trim() ||
+    env.DEV_API_PROXY_TARGET?.trim() ||
+    `http://localhost:${Number.isNaN(apiPort) ? 3000 : apiPort}`;
 
   return {
     envDir: workspaceRoot,
