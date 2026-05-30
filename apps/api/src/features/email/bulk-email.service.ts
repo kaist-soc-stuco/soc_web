@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { eq, and, or, isNull } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 import { users, studentFeeStatus } from "../../infrastructure/postgres/postgres.schema";
 import { BulkEmailRepository } from "./bulk-email.repository";
@@ -23,13 +24,13 @@ export class BulkEmailService {
     dto: SendBulkEmailRequest,
   ): Promise<SendBulkEmailResponse> {
     // 1. Resolve recipients
-    let queryWhere = eq(users.isActive, true);
+    let queryWhere: SQL | undefined = eq(users.isActive, true);
 
     if (dto.recipientType === "PAID_STUDENTS") {
       queryWhere = and(
         eq(users.isActive, true),
         eq(studentFeeStatus.status, "PAID"),
-      ) as any;
+      );
     } else if (dto.recipientType === "UNPAID_STUDENTS") {
       queryWhere = and(
         eq(users.isActive, true),
@@ -37,7 +38,7 @@ export class BulkEmailService {
           eq(studentFeeStatus.status, "UNPAID"),
           isNull(studentFeeStatus.status),
         ),
-      ) as any;
+      );
     }
 
     const recipients = await this.db

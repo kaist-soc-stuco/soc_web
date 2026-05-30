@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
+import { isoToDate, localDate, msToDate, nowDate } from "@soc/shared";
+import type { SurveyRecord } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -40,7 +42,7 @@ export function Calendar() {
   );
 
   // Navigation states
-  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [currentDate, setCurrentDate] = useState(() => nowDate());
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
@@ -54,7 +56,7 @@ export function Calendar() {
       .getPublicSurveys()
       .then((res) => {
         const parsed: CompactEvent[] = [];
-        res.forEach((survey: any) => {
+        res.forEach((survey: SurveyRecord) => {
           if (!survey.isPublished || !survey.showOnCalendar) return;
 
           const title =
@@ -66,7 +68,7 @@ export function Calendar() {
               kind: survey.kind,
               title: `${lang === "ko" ? "[시작]" : "[Start]"} ${title}`,
               cleanTitle: title,
-              date: new Date(survey.opensAt),
+              date: isoToDate(survey.opensAt),
               dateType: "open",
             });
           }
@@ -76,7 +78,7 @@ export function Calendar() {
               kind: survey.kind,
               title: `${lang === "ko" ? "[마감]" : "[Deadline]"} ${title}`,
               cleanTitle: title,
-              date: new Date(survey.closesAt),
+              date: isoToDate(survey.closesAt),
               dateType: "close",
             });
           }
@@ -93,8 +95,8 @@ export function Calendar() {
 
   // Generate compact calendar grid
   const days = useMemo(() => {
-    const firstDay = new Date(currentYear, currentMonth, 1);
-    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const firstDay = localDate(currentYear, currentMonth, 1);
+    const lastDay = localDate(currentYear, currentMonth + 1, 0);
 
     const firstDayOfWeek = firstDay.getDay();
     const daysCount = lastDay.getDate();
@@ -102,10 +104,10 @@ export function Calendar() {
     const grid = [];
 
     // Pad preceding days with actual dates of previous month
-    const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
+    const prevMonthLastDay = localDate(currentYear, currentMonth, 0).getDate();
     for (let i = firstDayOfWeek - 1; i >= 0; i--) {
       const d = prevMonthLastDay - i;
-      const cellDate = new Date(currentYear, currentMonth - 1, d);
+      const cellDate = localDate(currentYear, currentMonth - 1, d);
       grid.push({
         day: d,
         date: cellDate,
@@ -115,9 +117,9 @@ export function Calendar() {
     }
 
     // Add current month days
+    const todayDate = nowDate();
     for (let d = 1; d <= daysCount; d++) {
-      const cellDate = new Date(currentYear, currentMonth, d);
-      const todayDate = new Date();
+      const cellDate = localDate(currentYear, currentMonth, d);
       const isToday =
         todayDate.getFullYear() === currentYear &&
         todayDate.getMonth() === currentMonth &&
@@ -135,7 +137,7 @@ export function Calendar() {
     const totalCells = 42;
     const remaining = totalCells - grid.length;
     for (let i = 1; i <= remaining; i++) {
-      const cellDate = new Date(currentYear, currentMonth + 1, i);
+      const cellDate = localDate(currentYear, currentMonth + 1, i);
       grid.push({
         day: i,
         date: cellDate,
@@ -148,22 +150,22 @@ export function Calendar() {
   }, [currentYear, currentMonth]);
 
   const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+    setCurrentDate(localDate(currentYear, currentMonth - 1, 1));
   };
 
   const handleNextMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+    setCurrentDate(localDate(currentYear, currentMonth + 1, 1));
   };
 
   const weeklyEvents = useMemo(() => {
-    const today = new Date();
+    const today = nowDate();
     // Get Sunday of the current week
     const currentDay = today.getDay();
-    const sunday = new Date(today);
+    const sunday = msToDate(today.getTime());
     sunday.setDate(today.getDate() - currentDay);
     sunday.setHours(0, 0, 0, 0);
 
-    const saturday = new Date(sunday);
+    const saturday = msToDate(sunday.getTime());
     saturday.setDate(sunday.getDate() + 6);
     saturday.setHours(23, 59, 59, 999);
 

@@ -4,6 +4,7 @@ import type {
   CommentItem,
 } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
+import { isoToDate } from "@soc/shared";
 import {
   ChevronDown,
   ChevronUp,
@@ -36,7 +37,7 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 
 function formatDate(isoString: string) {
-  const date = new Date(isoString);
+  const date = isoToDate(isoString);
   if (Number.isNaN(date.getTime())) return "";
   const yyyy = date.getFullYear();
   const MM = String(date.getMonth() + 1).padStart(2, "0");
@@ -45,7 +46,7 @@ function formatDate(isoString: string) {
 }
 
 function formatDateSlash(isoString: string) {
-  const date = new Date(isoString);
+  const date = isoToDate(isoString);
   if (Number.isNaN(date.getTime())) return "";
   const yyyy = date.getFullYear();
   const MM = String(date.getMonth() + 1).padStart(2, "0");

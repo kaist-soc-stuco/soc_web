@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
+  ArticleListItem,
   SurveyDetailResponse,
   SurveySectionRecord,
   SurveyQuestionRecord,
@@ -9,19 +10,22 @@ import type {
 import { z } from "zod";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { htmlDatetimeLocalToIso, isoToHtmlDatetimeLocal } from "@soc/shared";
+import { htmlDatetimeLocalToIso, isoToDate, isoToHtmlDatetimeLocal } from "@soc/shared";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { Permissions } from "@/lib/permissions";
-import { SurveySettingsForm } from "@/components/organisms/survey-settings-form";
+import {
+  SurveySettingsForm,
+  type SurveySettingsFormValues,
+} from "@/components/organisms/survey-settings-form";
 import { QuestionEditorModal, QuestionFormState } from "@/components/organisms/question-editor-modal";
 import { GripVertical, Plus, Calendar as CalendarIcon } from "lucide-react";
 
 const formatCompactDateTime = (value: string | null) => {
   if (!value) return "";
-  const date = new Date(value);
+  const date = isoToDate(value);
   if (Number.isNaN(date.getTime())) return "";
 
   const year = date.getFullYear();
@@ -49,12 +53,12 @@ const SurveySettingsSchema = z.object({
   titleEn: z.string().max(255).optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
-  status: z.string().max(20).optional(),
   kind: z.string().min(1).max(20),
   resultVisibility: z.string().min(1).max(20),
   feePayersOnly: z.boolean().optional(),
-  allowGuestResponse: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
+  allowMultipleResponses: z.boolean().optional(),
+  allowResponseEdit: z.boolean().optional(),
   isPublished: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
   maxResponseCount: z
@@ -76,8 +80,6 @@ const SurveySettingsSchema = z.object({
   path: ["titleEn"],
 });
 
-type SurveySettingsFormValues = z.infer<typeof SurveySettingsSchema>;
-
 const emptyQuestion = (): QuestionFormState => ({
   titleKo: "",
   titleEn: "",
@@ -91,6 +93,9 @@ const emptyQuestion = (): QuestionFormState => ({
 });
 
 const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
+
+const getErrorMessage = (err: unknown, fallback: string) =>
+  err instanceof Error ? err.message : fallback;
 
 export function SurveyEditorPage() {
   const navigate = useNavigate();
@@ -106,12 +111,12 @@ export function SurveyEditorPage() {
       titleEn: "",
       descriptionKo: "",
       descriptionEn: "",
-      status: "draft",
       kind: "SURVEY",
       resultVisibility: "PUBLIC",
       feePayersOnly: false,
-      allowGuestResponse: false,
       isKoreanOnly: false,
+      allowMultipleResponses: false,
+      allowResponseEdit: false,
       isPublished: false,
       showOnCalendar: false,
       maxResponseCount: "",
@@ -125,7 +130,7 @@ export function SurveyEditorPage() {
   const isPublished = Boolean(form.watch("isPublished"));
   const isOngoing = isEdit && isPublished;
 
-  const [articleSearchResults, setArticleSearchResults] = useState<any[]>([]);
+  const [articleSearchResults, setArticleSearchResults] = useState<ArticleListItem[]>([]);
   const [showArticleSearch, setShowArticleSearch] = useState(false);
   const [selectedArticleTitle, setSelectedArticleTitle] = useState<string | null>(null);
   const [overwriteTarget, setOverwriteTarget] = useState<{
@@ -176,14 +181,14 @@ export function SurveyEditorPage() {
             titleEn: detail.titleEn ?? "",
             descriptionKo: detail.descriptionKo ?? "",
             descriptionEn: detail.descriptionEn ?? "",
-            status: detail.status,
             kind: detail.kind ?? "SURVEY",
             resultVisibility: detail.resultVisibility ?? "PUBLIC",
             feePayersOnly: detail.feePayersOnly,
-            allowGuestResponse: detail.allowAnonymous,
-            isKoreanOnly: (detail as any).isKoreanOnly ?? false,
+            isKoreanOnly: detail.isKoreanOnly ?? false,
+            allowMultipleResponses: detail.allowMultipleResponses ?? false,
+            allowResponseEdit: detail.allowResponseEdit ?? false,
             isPublished: detail.isPublished ?? false,
-            showOnCalendar: (detail as any).showOnCalendar ?? false,
+            showOnCalendar: detail.showOnCalendar ?? false,
             maxResponseCount:
               detail.maxResponses != null ? String(detail.maxResponses) : "",
             openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
@@ -199,7 +204,7 @@ export function SurveyEditorPage() {
               if (matched) setSelectedArticleTitle(matched.titleKo);
             });
           }
-        } catch (err) {
+        } catch (err: unknown) {
           console.error(err);
           setError("설문조사를 불러오지 못했습니다.");
         }
@@ -220,9 +225,11 @@ export function SurveyEditorPage() {
         titleEn: values.titleEn?.trim() || undefined,
         descriptionKo: values.descriptionKo?.trim() || undefined,
         descriptionEn: values.descriptionEn?.trim() || undefined,
-        status: "open" as any,
         feeRequirementPolicy: values.feePayersOnly ? "PAID_ONLY" : "NONE",
-        allowGuestResponse: values.allowGuestResponse,
+        allowMultipleResponses: values.allowMultipleResponses,
+        allowResponseEdit: values.allowMultipleResponses
+          ? false
+          : values.allowResponseEdit,
         isKoreanOnly: values.isKoreanOnly,
         isPublished: values.isPublished,
         showOnCalendar: values.showOnCalendar,
@@ -239,9 +246,9 @@ export function SurveyEditorPage() {
         await client.createSurvey(body);
         navigate("/admin/surveys");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || "저장 중 오류가 발생했습니다.");
+      setError(getErrorMessage(err, "저장 중 오류가 발생했습니다."));
     } finally {
       setSaving(false);
     }
@@ -264,9 +271,9 @@ export function SurveyEditorPage() {
       setSections(updated.sections);
       setNewSectionTitle("");
       setNewSectionTitleEn("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || "섹션 추가 실패");
+      setError(getErrorMessage(err, "섹션 추가 실패"));
     } finally {
       setAddingSection(false);
     }
@@ -287,9 +294,9 @@ export function SurveyEditorPage() {
       await client.deleteSection(loadedSurveyId, sectionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || "섹션 삭제 실패");
+      setError(getErrorMessage(err, "섹션 삭제 실패"));
     }
   };
 
@@ -347,9 +354,9 @@ export function SurveyEditorPage() {
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
       setEditingQuestion(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || "문항 저장 실패");
+      setError(getErrorMessage(err, "문항 저장 실패"));
     }
   };
 
@@ -368,9 +375,9 @@ export function SurveyEditorPage() {
       await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || "문항 삭제 실패");
+      setError(getErrorMessage(err, "문항 삭제 실패"));
     }
   };
 
@@ -397,9 +404,9 @@ export function SurveyEditorPage() {
           })
         )
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || "순서 변경 실패");
+      setError(getErrorMessage(err, "순서 변경 실패"));
       setSections(backup);
     }
   };

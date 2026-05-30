@@ -8,18 +8,19 @@ import { PendingLoginRepository } from "./pending-login.repository";
 import { AuthSessionRepository } from "./auth-session.repository";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
-import { AuthGuard } from "../../shared/guards";
+import { AuthGuard, PermissionBitsGuard } from "../../shared/guards";
 
 @Module({
   imports: [PostgresModule, RedisModule, forwardRef(() => UsersModule)],
   controllers: [AuthController],
   providers: [
     AuthGuard,
+    PermissionBitsGuard,
     AuthService,
     AuthSessionRepository,
     AuthSessionService,
     PendingLoginRepository,
   ],
-  exports: [AuthGuard, AuthSessionRepository, AuthSessionService, UsersModule],
+  exports: [AuthGuard, PermissionBitsGuard, AuthSessionRepository, AuthSessionService, UsersModule],
 })
 export class AuthModule {}

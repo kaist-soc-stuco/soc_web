@@ -6,6 +6,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { isoToDate, msToIso, nowMs } from "@soc/shared";
 
 import { AssetRepository } from "./repositories/asset.repository";
 import { AssetStorageProvider } from "./asset.storage";
@@ -99,7 +100,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       "ASSET_ORPHAN_GRACE_HOURS",
       24,
     );
-    const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000);
+    const cutoff = isoToDate(msToIso(nowMs() - olderThanHours * 60 * 60 * 1000));
     const candidates = await this.assetRepository.findUnlinkedAssetsBefore(
       cutoff,
       100,

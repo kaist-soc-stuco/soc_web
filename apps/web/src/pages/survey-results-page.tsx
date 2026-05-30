@@ -1,19 +1,398 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { createApiClient } from "@soc/api-client";
+import type { ReactNode } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ApiClientHttpError, createApiClient } from "@soc/api-client";
+import type {
+  QuestionType,
+  SurveyAnalyticsResponse,
+  SurveyChoiceAnalyticsItem,
+  SurveyQuestionAnalyticsItem,
+} from "@soc/contracts";
+import { isoToDate } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import {
+  getVisibleTextResponses,
+  sortChoiceResults,
+} from "@/lib/survey-results-display";
 import { useLanguage } from "@/hooks/use-language";
 import { Header } from "@/components/organisms/header";
-import { Footer } from "@/components/organisms/footer";
-import { BarChart3, ChevronLeft, Users, AlertCircle, Lock } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  ChevronLeft,
+  Clock,
+  ListChecks,
+  Lock,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
+
+const CHART_COLORS = [
+  "#34D399",
+  "#60A5FA",
+  "#FBBF24",
+  "#F472B6",
+  "#A78BFA",
+  "#FB7185",
+  "#38BDF8",
+  "#94A3B8",
+];
+
+function getLocalizedTitle(
+  lang: string,
+  ko: string,
+  en: string | null | undefined,
+) {
+  return lang === "ko" ? ko : en || ko;
+}
+
+function getQuestionTypeLabel(type: QuestionType, lang: string) {
+  const labels: Record<QuestionType, { ko: string; en: string }> = {
+    short_text: { ko: "단답형", en: "Short text" },
+    long_text: { ko: "서술형", en: "Long text" },
+    single_choice: { ko: "단일 선택", en: "Single choice" },
+    multiple_choice: { ko: "복수 선택", en: "Multiple choice" },
+    dropdown: { ko: "드롭다운", en: "Dropdown" },
+    date: { ko: "날짜", en: "Date" },
+    time: { ko: "시간", en: "Time" },
+    datetime: { ko: "날짜와 시간", en: "Date & time" },
+  };
+
+  return lang === "ko" ? labels[type].ko : labels[type].en;
+}
+
+function getSurveyKindLabel(kind: string, lang: string) {
+  if (kind === "VOTE") return lang === "ko" ? "투표" : "Vote";
+  if (kind === "APPLICATION") {
+    return lang === "ko" ? "신청서/행사 접수" : "Event application";
+  }
+  return lang === "ko" ? "일반 설문" : "Survey";
+}
+
+function getStateLabel(state: string, lang: string) {
+  if (state === "open") return lang === "ko" ? "진행 중" : "Open";
+  if (state === "before_open") return lang === "ko" ? "시작 전" : "Upcoming";
+  return lang === "ko" ? "마감" : "Closed";
+}
+
+function isChoiceQuestion(type: QuestionType) {
+  return (
+    type === "single_choice" ||
+    type === "multiple_choice" ||
+    type === "dropdown"
+  );
+}
+
+function isTemporalQuestion(type: QuestionType) {
+  return type === "date" || type === "time" || type === "datetime";
+}
+
+function formatTemporalAnswer(type: QuestionType, value: string) {
+  if (!value) return "";
+  if (type === "time") return value;
+
+  const parsed = isoToDate(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  const dateText = `${yyyy}.${mm}.${dd}`;
+  if (type !== "datetime") return dateText;
+
+  const hh = String(parsed.getHours()).padStart(2, "0");
+  const min = String(parsed.getMinutes()).padStart(2, "0");
+  return `${dateText} ${hh}:${min}`;
+}
+
+function formatSurveyDateTime(iso: string) {
+  const parsed = isoToDate(iso);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  const hh = String(parsed.getHours()).padStart(2, "0");
+  const min = String(parsed.getMinutes()).padStart(2, "0");
+
+  return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
+}
+
+function getScheduleLabel(analytics: SurveyAnalyticsResponse, lang: string) {
+  if (!analytics.opensAt && !analytics.closesAt) {
+    return lang === "ko" ? "상시 응답 가능" : "Always open";
+  }
+
+  const opensAt = analytics.opensAt
+    ? formatSurveyDateTime(analytics.opensAt)
+    : null;
+  const closesAt = analytics.closesAt
+    ? formatSurveyDateTime(analytics.closesAt)
+    : null;
+
+  if (opensAt && closesAt) {
+    return lang === "ko"
+      ? `${opensAt} ~ ${closesAt}`
+      : `${opensAt} - ${closesAt}`;
+  }
+  if (opensAt) return lang === "ko" ? `${opensAt}부터` : `From ${opensAt}`;
+  return lang === "ko" ? `${closesAt}까지` : `Until ${closesAt}`;
+}
+
+function getAudienceLabel(analytics: SurveyAnalyticsResponse, lang: string) {
+  if (analytics.feePayersOnly) {
+    return lang === "ko" ? "과비 납부자" : "Paid members";
+  }
+  if (analytics.isKoreanOnly) {
+    return lang === "ko" ? "한국어 사용자" : "Korean-language users";
+  }
+  return lang === "ko" ? "로그인 회원" : "Signed-in members";
+}
+
+function getResponsePolicyLabel(
+  analytics: SurveyAnalyticsResponse,
+  lang: string,
+) {
+  const countPolicy = analytics.allowMultipleResponses
+    ? lang === "ko"
+      ? "복수 응답 가능"
+      : "Multiple submissions allowed"
+    : lang === "ko"
+      ? "1회만 응답 가능"
+      : "One submission per user";
+  const resultPolicy =
+    analytics.resultVisibility === "PUBLIC"
+      ? lang === "ko"
+        ? "결과 공개"
+        : "Public results"
+      : lang === "ko"
+        ? "결과 비공개"
+        : "Private results";
+
+  return `${countPolicy} · ${resultPolicy}`;
+}
+
+function ResultShell({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ChoiceResult({
+  choices,
+  lang,
+}: {
+  choices: SurveyChoiceAnalyticsItem[];
+  lang: string;
+}) {
+  const sortedChoices = sortChoiceResults(choices);
+
+  return (
+    <div className="space-y-3">
+      {sortedChoices.map((choice, idx) => {
+        const label = getLocalizedTitle(lang, choice.labelKo, choice.labelEn);
+        const color = CHART_COLORS[idx % CHART_COLORS.length];
+
+        return (
+          <div key={choice.value} className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate text-sm font-medium text-slate-700">
+                {label}
+              </span>
+              <span className="shrink-0 text-xs font-bold text-slate-500">
+                {lang === "ko"
+                  ? `${choice.count}명 (${choice.percentage}%)`
+                  : `${choice.count} (${choice.percentage}%)`}
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${choice.percentage}%`,
+                  backgroundColor: color,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TextResult({
+  texts,
+  lang,
+  type,
+}: {
+  texts: string[] | undefined;
+  lang: string;
+  type: QuestionType;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!texts?.length) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+        {lang === "ko" ? "제출된 답변이 없습니다." : "No responses submitted."}
+      </div>
+    );
+  }
+
+  const isShortText = type === "short_text";
+  const { hiddenCount, visibleTexts } = getVisibleTextResponses(
+    texts,
+    type,
+    expanded,
+  );
+
+  return (
+    <div className={isShortText ? "space-y-1.5" : "space-y-2.5"}>
+      {visibleTexts.map((text, idx) => (
+        <div
+          key={`${idx}-${text}`}
+          className={`grid grid-cols-[2rem_minmax(0,1fr)] gap-2 ${
+            isShortText ? "items-center" : "items-start"
+          }`}
+        >
+          <span className="pt-0.5 text-right text-xs font-bold tabular-nums text-slate-400">
+            {idx + 1}.
+          </span>
+          <p
+            className={
+              isShortText
+                ? "min-w-0 truncate text-sm font-medium text-slate-700"
+                : "min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-slate-700"
+            }
+          >
+            {text || (
+              <span className="text-slate-400">
+                {lang === "ko" ? "빈 응답" : "Empty response"}
+              </span>
+            )}
+          </p>
+        </div>
+      ))}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-2 inline-flex rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-50 hover:text-kaist-darkgreen"
+        >
+          {lang === "ko"
+            ? `${hiddenCount}개 더 보기`
+            : `Show ${hiddenCount} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TemporalResult({
+  question,
+  lang,
+}: {
+  question: SurveyQuestionAnalyticsItem;
+  lang: string;
+}) {
+  const values = question.texts ?? [];
+  const Icon = question.questionType === "time" ? Clock : Calendar;
+
+  if (!values.length) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+        {lang === "ko"
+          ? "제출된 날짜/시간 응답이 없습니다."
+          : "No date or time responses submitted."}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {values.map((value, idx) => (
+        <div
+          key={`${idx}-${value}`}
+          className="flex items-center gap-2 text-sm font-medium text-slate-700"
+        >
+          <Icon className="h-4 w-4 text-kaist-darkgreen" />
+          {formatTemporalAnswer(question.questionType, value)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function QuestionResultCard({
+  idx,
+  lang,
+  question,
+}: {
+  idx: number;
+  lang: string;
+  question: SurveyQuestionAnalyticsItem;
+}) {
+  const title = getLocalizedTitle(lang, question.titleKo, question.titleEn);
+
+  return (
+    <ResultShell className="px-5 py-4">
+      <div className="mb-2 flex flex-col gap-2 border-b border-slate-100 pb-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-md bg-kaist-lightgreen/20 px-2 py-1 text-[11px] font-extrabold text-kaist-darkgreen">
+              {getQuestionTypeLabel(question.questionType, lang)}
+            </span>
+            <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-extrabold text-slate-500">
+              {lang === "ko"
+                ? `응답 ${question.totalAnswers}개`
+                : `${question.totalAnswers} answers`}
+            </span>
+          </div>
+          <h2 className="break-words text-base font-extrabold leading-snug text-slate-950 sm:text-lg">
+            <span className="mr-2 text-kaist-darkgreen">{idx + 1}.</span>
+            {title}
+          </h2>
+        </div>
+      </div>
+
+      {isChoiceQuestion(question.questionType) ? (
+        <ChoiceResult choices={question.choices ?? []} lang={lang} />
+      ) : isTemporalQuestion(question.questionType) ? (
+        <TemporalResult question={question} lang={lang} />
+      ) : (
+        <TextResult
+          texts={question.texts}
+          lang={lang}
+          type={question.questionType}
+        />
+      )}
+    </ResultShell>
+  );
+}
 
 export function SurveyResultsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { lang } = useLanguage();
-  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
 
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<SurveyAnalyticsResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,8 +403,8 @@ export function SurveyResultsPage() {
       .then((data) => {
         setAnalytics(data);
       })
-      .catch((err: any) => {
-        if (err.status === 403) {
+      .catch((err: unknown) => {
+        if (err instanceof ApiClientHttpError && err.status === 403) {
           setError("forbidden");
         } else {
           setError("failed");
@@ -39,238 +418,132 @@ export function SurveyResultsPage() {
   const renderContent = () => {
     if (loading) {
       return (
-        <div className="bg-white border border-gray-200 rounded-3xl p-12 text-center text-kaist-grey/60 font-medium shadow-xl">
+        <ResultShell className="p-10 text-center text-sm font-bold text-slate-400">
           {lang === "ko" ? "결과를 불러오는 중..." : "Loading results..."}
-        </div>
+        </ResultShell>
       );
     }
 
     if (error === "forbidden") {
       return (
-        <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-xl text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
-          <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 mb-6 border border-rose-100">
-            <Lock className="w-8 h-8" />
+        <ResultShell className="mx-auto my-10 flex max-w-md flex-col items-center p-8 text-center sm:p-10">
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-100 bg-rose-50 text-rose-500">
+            <Lock className="h-8 w-8" />
           </div>
-          <h2 className="text-2xl font-bold text-kaist-black mb-3">
+          <h2 className="mb-3 text-2xl font-black text-slate-950">
             {lang === "ko" ? "결과 비공개 설문" : "Private Survey Results"}
           </h2>
-          <p className="text-sm text-kaist-grey/80 leading-relaxed mb-6">
+          <p className="mb-6 text-sm font-medium leading-relaxed text-slate-500">
             {lang === "ko"
               ? "이 설문의 결과는 비공개로 설정되어 있습니다. 관리자 권한을 가진 사용자만 조회할 수 있습니다."
               : "This survey's results are private. Only administrators are allowed to view the analytics."}
           </p>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full py-3 bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 text-center text-sm cursor-pointer border-0"
+          <Link
+            to="/events-surveys?tab=survey"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-extrabold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
           >
-            {lang === "ko" ? "홈으로 돌아가기" : "Back to Home"}
-          </button>
-        </div>
+            {lang === "ko" ? "설문 목록으로" : "Survey list"}
+          </Link>
+        </ResultShell>
       );
     }
 
     if (error || !analytics) {
       return (
-        <div className="bg-white border border-gray-200 rounded-3xl p-12 text-center text-red-500 font-bold shadow-xl flex flex-col items-center gap-3">
-          <AlertCircle className="w-10 h-10" />
-          <span>{lang === "ko" ? "결과 데이터를 조회하지 못했습니다." : "Failed to load survey results."}</span>
-        </div>
+        <ResultShell className="flex flex-col items-center gap-3 p-10 text-center text-sm font-extrabold text-rose-500">
+          <AlertCircle className="h-10 w-10" />
+          <span>
+            {lang === "ko"
+              ? "결과 데이터를 조회하지 못했습니다."
+              : "Failed to load survey results."}
+          </span>
+        </ResultShell>
       );
     }
 
     return (
-      <div className="space-y-8">
-        {/* Survey Summary Header */}
-        <div className="bg-white border border-gray-200 rounded-3xl p-8 lg:p-12 shadow-xl">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="bg-kaist-lightgreen/20 text-kaist-darkgreen text-xs font-bold px-3 py-1.5 rounded-lg border border-kaist-darkgreen/15 flex items-center gap-1">
-              <BarChart3 className="w-3.5 h-3.5" />
-              {lang === "ko" ? "통계 및 결과" : "Results & Analytics"}
+      <div className="space-y-5">
+        <ResultShell className="p-6 sm:p-8">
+          <div className="mb-5 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-kaist-darkgreen/15 bg-kaist-lightgreen/20 px-3 py-1.5 text-xs font-extrabold text-kaist-darkgreen">
+              <ListChecks className="h-3.5 w-3.5 text-kaist-darkgreen" />
+              {getSurveyKindLabel(analytics.kind, lang)}
             </span>
-            <span className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700">
+              <Clock className="h-3.5 w-3.5 text-emerald-600" />
+              {getStateLabel(analytics.computedState, lang)}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700">
+              <Users className="h-3.5 w-3.5" />
               {lang === "ko"
-                ? `총 응답 수: ${analytics.totalResponses}개`
-                : `Total Responses: ${analytics.totalResponses}`}
+                ? `총 응답 ${analytics.totalResponses}개`
+                : `${analytics.totalResponses} total responses`}
             </span>
           </div>
 
-          <h1 className="text-3xl font-black text-kaist-black tracking-tight leading-tight">
-            {lang === "ko" ? analytics.titleKo : (analytics.titleEn || analytics.titleKo)}
+          <h1 className="text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
+            {getLocalizedTitle(lang, analytics.titleKo, analytics.titleEn)}
           </h1>
-          <p className="mt-4 text-sm text-kaist-grey leading-relaxed border-t border-gray-100 pt-4">
-            {lang === "ko"
-              ? "응답자들이 제출한 누적 통계 데이터입니다. 주관식 답변은 개별 텍스트로 표시됩니다."
-              : "This shows the accumulated statistical data of responses. Subjective questions are shown as text lists."}
-          </p>
-        </div>
+          {getLocalizedTitle(
+            lang,
+            analytics.descriptionKo ?? "",
+            analytics.descriptionEn,
+          ) && (
+            <p className="mt-3 text-sm font-medium leading-relaxed text-slate-600">
+              {getLocalizedTitle(
+                lang,
+                analytics.descriptionKo ?? "",
+                analytics.descriptionEn,
+              )}
+            </p>
+          )}
+          <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-bold text-slate-500">
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-kaist-darkgreen" />
+              {lang === "ko" ? "대상" : "Audience"}:{" "}
+              {getAudienceLabel(analytics, lang)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-kaist-darkgreen" />
+              {getResponsePolicyLabel(analytics, lang)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-kaist-darkgreen" />
+              {getScheduleLabel(analytics, lang)}
+            </span>
+          </div>
+        </ResultShell>
 
-        {/* Questions Analytics */}
-        <div className="space-y-6">
-          {analytics.questions.map((question: any, idx: number) => {
-            const isChoice = !!question.choices;
-            const title = lang === "ko" ? question.titleKo : (question.titleEn || question.titleKo);
-
-            // Precompute slices for the SVG donut chart if choice question
-            let slices: any[] = [];
-            if (isChoice) {
-              const COLORS = [
-                "#073B24", // Dark Green
-                "#10B981", // Emerald
-                "#3B82F6", // Blue
-                "#F59E0B", // Amber
-                "#EC4899", // Pink
-                "#8B5CF6", // Violet
-                "#EF4444", // Red
-                "#6B7280"  // Gray
-              ];
-              let tempAccum = 0;
-              slices = question.choices.map((choice: any, cIdx: number) => {
-                const percent = choice.percentage;
-                const dashOffset = 100 - tempAccum + 25; // 25 unit shift to rotate start to 12 o'clock
-                tempAccum += percent;
-                return {
-                  ...choice,
-                  color: COLORS[cIdx % COLORS.length],
-                  dashArray: `${percent} ${100 - percent}`,
-                  dashOffset,
-                  percent
-                };
-              });
-            }
-
-            return (
-              <div key={question.questionId} className="bg-white border border-gray-200 rounded-3xl p-6 lg:p-8 shadow-md space-y-6">
-                
-                {/* Question Header with visual hierarchy */}
-                <div className="border-b border-gray-100 pb-3.5 flex items-center justify-between gap-4">
-                  <h3 className="text-base sm:text-lg font-extrabold text-gray-900 flex items-start gap-2 min-w-0">
-                    <span className="text-kaist-darkgreen shrink-0 select-none">{idx + 1}.</span>
-                    <span className="leading-snug break-all">{title}</span>
-                  </h3>
-                  <span className="text-xs font-bold text-kaist-grey bg-kaist-lightgreen/10 px-2.5 py-1.5 rounded-lg shrink-0">
-                    {lang === "ko" ? `응답 ${question.totalAnswers}개` : `${question.totalAnswers} answers`}
-                  </span>
-                </div>
-
-                {isChoice ? (
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-8 pt-2">
-                    {/* SVG Donut Chart */}
-                    <div className="flex-shrink-0 flex items-center justify-center bg-gray-50/50 p-5 rounded-2xl border border-gray-100">
-                      <svg viewBox="0 0 42 42" className="w-48 h-48 flex-shrink-0">
-                        <circle
-                          cx="21"
-                          cy="21"
-                          r="15.91549430918954"
-                          fill="transparent"
-                          stroke="#f3f4f6"
-                          strokeWidth="5"
-                        />
-                        {slices.map((slice: any) => (
-                          <circle
-                            key={slice.value}
-                            cx="21"
-                            cy="21"
-                            r="15.91549430918954"
-                            fill="transparent"
-                            stroke={slice.color}
-                            strokeWidth="5"
-                            strokeDasharray={slice.dashArray}
-                            strokeDashoffset={slice.dashOffset}
-                            className="transition-all duration-500"
-                          />
-                        ))}
-                        <text x="21" y="20.5" textAnchor="middle" className="font-extrabold fill-gray-800 text-[4px]">
-                          {question.totalAnswers}
-                        </text>
-                        <text x="21" y="24.5" textAnchor="middle" className="font-bold fill-gray-400 text-[2.2px]">
-                          {lang === "ko" ? "응답 수" : "Answers"}
-                        </text>
-                      </svg>
-                    </div>
-
-                    {/* Donut Legend */}
-                    <div className="flex-1 w-full space-y-2.5">
-                      {slices.map((slice: any) => {
-                        const choiceLabel = lang === "ko" ? slice.labelKo : (slice.labelEn || slice.labelKo);
-                        return (
-                          <div key={slice.value} className="flex items-center justify-between text-xs sm:text-sm font-semibold text-gray-700 hover:bg-gray-50/50 px-3 py-2 rounded-xl transition-all">
-                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                              <span
-                                className="w-3 h-3 rounded-md flex-shrink-0 border border-black/5"
-                                style={{ backgroundColor: slice.color }}
-                              />
-                              <span className="truncate text-gray-800 leading-none">{choiceLabel}</span>
-                            </div>
-                            <span className="text-gray-500 font-bold flex-shrink-0 shrink-0">
-                              {slice.count}{lang === "ko" ? "명" : ""} ({slice.percent}%)
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  /* Open-ended text answers inside structured table */
-                  <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-xs">
-                    <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100">
-                          <th className="py-2.5 px-4 font-bold text-gray-500 w-12 text-center">#</th>
-                          <th className="py-2.5 px-4 font-bold text-gray-500">{lang === "ko" ? "답변 내용" : "Response Content"}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white font-medium text-gray-800">
-                        {question.texts && question.texts.length > 0 ? (
-                          question.texts.map((text: string, tIdx: number) => (
-                            <tr key={tIdx} className="hover:bg-gray-50/30 transition-colors">
-                              <td className="py-2.5 px-4 text-center font-bold text-gray-400">{tIdx + 1}</td>
-                              <td className="py-2.5 px-4 whitespace-pre-wrap break-all leading-relaxed">
-                                {text || (
-                                  <span className="text-gray-300 italic">
-                                    {lang === "ko" ? "(빈 응답)" : "(Empty response)"}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={2} className="py-8 px-4 text-center text-gray-400 font-bold italic">
-                              {lang === "ko" ? "제출된 답변이 없습니다." : "No responses submitted."}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {analytics.questions.map((question, idx) => (
+          <QuestionResultCard
+            key={question.questionId}
+            idx={idx}
+            lang={lang}
+            question={question}
+          />
+        ))}
       </div>
     );
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50/50">
+    <div className="flex min-h-screen flex-col bg-[#fafafa]">
       <Header showLogo />
-      <main className="flex-1 px-4 py-12 lg:px-0 bg-gradient-to-br from-kaist-lightgreen/5 via-white to-gray-50/50">
+      <main className="flex-1 px-4 py-10 lg:px-0">
         <div className="mx-auto max-w-4xl">
           <div className="mb-4">
             <button
+              type="button"
               onClick={() => navigate(-1)}
-              className="text-xs font-semibold text-kaist-grey hover:text-kaist-darkgreen transition-colors inline-flex items-center gap-1 bg-transparent border-0 cursor-pointer"
+              className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent text-xs font-extrabold text-slate-400 transition-colors hover:text-kaist-darkgreen"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              {lang === "ko" ? "이전 페이지로" : "Go Back"}
+              <ChevronLeft className="h-3.5 w-3.5" />
+              {lang === "ko" ? "이전 페이지로" : "Go back"}
             </button>
           </div>
           {renderContent()}
         </div>
       </main>
-      <Footer />
     </div>
   );
 }

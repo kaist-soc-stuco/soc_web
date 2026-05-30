@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type { SurveyRecord } from "@soc/contracts";
+import { isoToDate, nowMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -10,6 +11,12 @@ import { Pagination } from "@/components/ui/pagination";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
+import {
+  filterAndSortSurveys,
+  type SurveyPeriodFilter,
+  type SurveySortKey,
+  type SurveyStatusFilter,
+} from "@/lib/survey-display";
 import { 
   Copy, 
   Edit2, 
@@ -109,7 +116,7 @@ function CustomDropdown({
 // Convert timestamp to 24-hour format
 function format24hDateTime(dateIso: string | null) {
   if (!dateIso) return null;
-  const d = new Date(dateIso);
+  const d = isoToDate(dateIso);
   if (isNaN(d.getTime())) return null;
 
   const year = d.getFullYear();
@@ -127,11 +134,10 @@ function format24hDateTime(dateIso: string | null) {
 // Convert timestamp to Korean relative time
 function formatRelativeTime(dateIso: string | null) {
   if (!dateIso) return "—";
-  const d = new Date(dateIso);
+  const d = isoToDate(dateIso);
   if (isNaN(d.getTime())) return "—";
 
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
+  const diffMs = nowMs() - d.getTime();
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
   const diffHour = Math.floor(diffMin / 60);
@@ -177,10 +183,10 @@ export function SurveyListPage() {
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<SurveyStatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [periodFilter, setPeriodFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("updatedAt");
+  const [periodFilter, setPeriodFilter] = useState<SurveyPeriodFilter>("all");
+  const [sortBy, setSortBy] = useState<SurveySortKey>("updatedAt");
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [isPageSizeDropdownOpen, setIsPageSizeDropdownOpen] = useState(false);
@@ -307,71 +313,13 @@ export function SurveyListPage() {
 
   // Perform Dynamic Client-Side Filtering & Sorting
   const filteredSurveys = useMemo(() => {
-    let result = [...surveys];
-
-    // 1. Search Query (Title or Description)
-    if (searchQuery.trim().length > 0) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.titleKo.toLowerCase().includes(q) ||
-          (s.titleEn && s.titleEn.toLowerCase().includes(q)) ||
-          (s.descriptionKo && s.descriptionKo.toLowerCase().includes(q)) ||
-          (s.descriptionEn && s.descriptionEn.toLowerCase().includes(q))
-      );
-    }
-
-    // 2. Status Filter
-    if (statusFilter !== "all") {
-      result = result.filter((s) => {
-        if (statusFilter === "draft") return s.status === "draft";
-        if (statusFilter === "closed") {
-          return s.status === "closed" || (s.closesAt && new Date(s.closesAt) < new Date());
-        }
-        if (statusFilter === "open") {
-          const isBeforeOpen = s.opensAt && new Date(s.opensAt) > new Date();
-          const isClosed = s.closesAt && new Date(s.closesAt) < new Date();
-          return s.status !== "draft" && !isBeforeOpen && !isClosed;
-        }
-        return true;
-      });
-    }
-
-    // 3. Type Filter
-    if (typeFilter !== "all") {
-      result = result.filter((s) => s.kind === typeFilter);
-    }
-
-    // 4. Period Filter (Based on createdAt)
-    if (periodFilter !== "all") {
-      const now = new Date();
-      result = result.filter((s) => {
-        const dateToCheck = new Date(s.createdAt);
-        const diffMs = now.getTime() - dateToCheck.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        if (periodFilter === "7days") return diffDays <= 7;
-        if (periodFilter === "30days") return diffDays <= 30;
-        if (periodFilter === "1year") return diffDays <= 365;
-        return true;
-      });
-    }
-
-    // 5. Sorting
-    result.sort((a, b) => {
-      if (sortBy === "updatedAt") {
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      }
-      if (sortBy === "createdAt") {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-      if (sortBy === "responseCount") {
-        return (b.responseCount ?? 0) - (a.responseCount ?? 0);
-      }
-      return 0;
+    return filterAndSortSurveys(surveys, {
+      periodFilter,
+      searchQuery,
+      sortBy,
+      statusFilter,
+      typeFilter,
     });
-
-    return result;
   }, [surveys, searchQuery, statusFilter, typeFilter, periodFilter, sortBy]);
 
   // Total pages
@@ -444,7 +392,7 @@ export function SurveyListPage() {
                   { value: "closed", label: "마감" },
                   { value: "draft", label: "임시저장" }
                 ]}
-                onChange={setStatusFilter}
+                onChange={(value) => setStatusFilter(value as SurveyStatusFilter)}
                 className="md:col-span-2"
               />
 
@@ -472,7 +420,7 @@ export function SurveyListPage() {
                   { value: "30days", label: "최근 30일" },
                   { value: "1year", label: "최근 1년" }
                 ]}
-                onChange={setPeriodFilter}
+                onChange={(value) => setPeriodFilter(value as SurveyPeriodFilter)}
                 icon={<Calendar className="h-4 w-4 text-slate-400 shrink-0" />}
                 className="md:col-span-2"
               />
@@ -486,7 +434,7 @@ export function SurveyListPage() {
                   { value: "createdAt", label: "최근 생성일" },
                   { value: "responseCount", label: "응답자 수" }
                 ]}
-                onChange={setSortBy}
+                onChange={(value) => setSortBy(value as SurveySortKey)}
                 className="md:col-span-3"
               />
             </div>
@@ -608,7 +556,7 @@ export function SurveyListPage() {
 
                           {/* Response Count (center-aligned) */}
                           <td className="px-4 py-4 text-center text-[13.5px] font-extrabold text-slate-800">
-                            {s.status === "draft" ? "—" : `${s.responseCount ?? 0}명`}
+	                            {!s.isPublished ? "—" : `${s.responseCount ?? 0}명`}
                           </td>
 
                           {/* Duration Column (center-aligned, double line, tight spacing, dates and times treated with equal contrast, 24h format) */}

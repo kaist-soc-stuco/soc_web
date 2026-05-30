@@ -2,7 +2,12 @@ import { Injectable } from "@nestjs/common";
 
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
-import type { AdminUserRecord, StudentFeeStatusRecord, FeeStatus } from "@soc/contracts";
+import type {
+  AdminUserRecord,
+  FeeStatus,
+  StudentFeeListResponse,
+  StudentFeeStatusRecord,
+} from "@soc/contracts";
 import { nowDate } from "@soc/shared";
 
 /**
@@ -128,7 +133,7 @@ export class UsersService {
     status?: FeeStatus,
     page?: number,
     pageSize?: number,
-  ): Promise<{ students: any[]; total: number; page: number; pageSize: number }> {
+  ): Promise<StudentFeeListResponse> {
     return this.usersRepository.listStudentsByFeeStatus(status, page, pageSize);
   }
 

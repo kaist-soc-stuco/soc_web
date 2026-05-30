@@ -15,7 +15,7 @@ import {
   getBoardTitleFromMetadata,
   getBoardWritePermissionBitFromMetadata,
 } from "@/lib/board-metadata";
-import { hasPermission, htmlDatetimeLocalToIso } from "@soc/shared";
+import { hasPermission, htmlDatetimeLocalToIso, msToDate, nowMs } from "@soc/shared";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 
 type AttachedAsset = {
@@ -184,7 +184,7 @@ export function BoardWritePage() {
       eventStartDate,
       eventEndDate,
       eventDescription,
-      updatedAt: Date.now(),
+      updatedAt: nowMs(),
     };
     localStorage.setItem(key, JSON.stringify(data));
     if (!silent) {
@@ -238,7 +238,7 @@ export function BoardWritePage() {
     setHasDraft(false);
   };
 
-  // Auto save draft every 10 seconds if any content has been entered
+  // Auto save draft every 10 seconds after content has been entered.
   useEffect(() => {
     if (!titleKo && !contentKo && !titleEn && !contentEn && !eventStartDate && !eventEndDate && !eventDescription) return;
     const timer = setTimeout(() => {
@@ -340,8 +340,8 @@ export function BoardWritePage() {
             <div className="bg-emerald-50/50 border border-kaist-darkgreen/20 px-6 py-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
               <span className="font-semibold text-kaist-darkgreen text-xs">
                 {lang === "ko" 
-                  ? `이전에 작성 중이던 임시 저장글이 있습니다. (저장 시각: ${new Date(draftTime).toLocaleTimeString()})`
-                  : `You have a saved draft from a previous session. (Saved at: ${new Date(draftTime).toLocaleTimeString()})`}
+                  ? `이전에 작성 중이던 임시 저장글이 있습니다. (저장 시각: ${msToDate(draftTime).toLocaleTimeString()})`
+                  : `You have a saved draft from a previous session. (Saved at: ${msToDate(draftTime).toLocaleTimeString()})`}
               </span>
               <div className="flex gap-2 w-full sm:w-auto shrink-0 justify-end">
                 <button

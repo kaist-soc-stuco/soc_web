@@ -1,5 +1,5 @@
 import type { ArticleStatus, VisibilityScope, CommentStatus } from "./board.js";
-import type { SurveyStatus, ResponseStatus } from "./survey.js";
+import type { ResponseStatus } from "./survey.js";
 
 export interface MyPageListMeta {
   page: number;

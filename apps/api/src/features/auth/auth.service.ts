@@ -182,7 +182,6 @@ export class AuthService {
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
       if (process.env.NODE_ENV !== "production") {
         // Test-only: log full SSO userInfo payload for debugging.
-        // eslint-disable-next-line no-console
         console.log("SSO userInfo", userInfo);
       }
       const ssoSubject = this.readRequiredUserInfoString(

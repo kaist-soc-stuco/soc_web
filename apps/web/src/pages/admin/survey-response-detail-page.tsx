@@ -126,7 +126,7 @@ export function SurveyResponseDetailPage() {
                   <span className="hidden md:inline text-kaist-grey/30">|</span>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-kaist-grey text-xs uppercase tracking-wider">이메일</span>
-                    <span className="break-all">{response.user?.email ?? response.externalPhone ?? "—"}</span>
+                    <span className="break-all">{response.user?.email ?? "—"}</span>
                   </div>
                   <span className="hidden md:inline text-kaist-grey/30">|</span>
                   <div className="flex items-center gap-2">

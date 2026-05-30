@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
+import { isoToDate, isoToMs, nowMs } from "@soc/shared";
 import { Pin } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
@@ -73,7 +74,7 @@ function NoticeItem({
 }
 
 function formatDate(dateIso: string) {
-  const d = new Date(dateIso);
+  const d = isoToDate(dateIso);
   if (isNaN(d.getTime())) return "";
   const yy = String(d.getFullYear()).slice(-2);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -122,9 +123,7 @@ export function NoticeBoard() {
             if (a.isPinned !== b.isPinned) {
               return Number(b.isPinned) - Number(a.isPinned);
             }
-            return (
-              new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime()
-            );
+            return isoToMs(b.postedAt) - isoToMs(a.postedAt);
           })
           .map((item, idx) => ({
             id: item.articleId,
@@ -134,11 +133,7 @@ export function NoticeBoard() {
             isImportant: item.isPinned,
             isNew: (() => {
               if (activeCategory !== "공지") return false;
-              const postDate = new Date(item.postedAt);
-              const now = new Date();
-              const fourDaysAgo = new Date();
-              fourDaysAgo.setDate(now.getDate() - 4);
-              return postDate >= fourDaysAgo;
+              return isoToMs(item.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
             })(),
             count:
               activeCategory === "공지" ? [12, 8, 3, 5, 2][idx] : undefined,

@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -44,6 +45,25 @@ export class SurveyResponsesController {
   @RequirePermissions(Permissions.MANAGE_SURVEY)
   findAll(@Param("surveyId", ParseUUIDPipe) surveyId: string) {
     return this.responsesService.findAll(surveyId);
+  }
+
+  @Get("mine")
+  @UseGuards(OptionalAuthGuard)
+  findMine(
+    @Param("surveyId", ParseUUIDPipe) surveyId: string,
+    @Req() req: MaybeAuthedRequest,
+  ) {
+    return this.responsesService.findMine(surveyId, req.user);
+  }
+
+  @Patch("mine")
+  @UseGuards(OptionalAuthGuard)
+  updateMine(
+    @Param("surveyId", ParseUUIDPipe) surveyId: string,
+    @Body(new ZodValidationPipe(SubmitResponseSchema)) dto: SubmitResponseDto,
+    @Req() req: MaybeAuthedRequest,
+  ) {
+    return this.responsesService.updateMine(surveyId, dto, req.user);
   }
 
   @Get("with-answers")

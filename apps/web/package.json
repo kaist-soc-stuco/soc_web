@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "echo 'no tests yet'"
+    "test": "pnpm --dir ../../shared/common build && tsc -p tsconfig.test.json && node --conditions=production --test test/*.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
-import { isoToMs, isExpired, nowMs, nowIso } from "@soc/shared";
+import { isoToMs, nowMs } from "@soc/shared";
 import { Permissions } from "@soc/contracts";
 
 import { SurveysRepository } from "./surveys.repository";
@@ -12,7 +12,12 @@ import type { SurveySectionRecord } from "./entities/survey-section.entity";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateSurveyDto } from "./dto/create-survey.dto";
 import type { UpdateSurveyDto } from "./dto/update-survey.dto";
-import type { ComputedSurveyState, SurveyDetailResponse, SurveyStatus } from "@soc/contracts";
+import type { ComputedSurveyState, SurveyDetailResponse } from "@soc/contracts";
+
+interface SurveyCaller {
+  id: string;
+  permission: number;
+}
 
 @Injectable()
 export class SurveysService {
@@ -23,25 +28,31 @@ export class SurveysService {
     private readonly responsesRepo: SurveyResponsesRepository,
   ) {}
 
-  private computeStatusAndState(survey: {
+  private computeState(survey: {
     isPublished: boolean;
     opensAt: string | null;
     closesAt: string | null;
-  }): { status: SurveyStatus; computedState: ComputedSurveyState } {
+  }): ComputedSurveyState {
     if (!survey.isPublished) {
-      return { status: "draft", computedState: "closed" };
+      return "closed";
     }
 
     const now = nowMs();
 
     if (survey.opensAt && isoToMs(survey.opensAt) > now) {
-      return { status: "scheduled", computedState: "before_open" };
+      return "before_open";
     }
     if (survey.closesAt && isoToMs(survey.closesAt) <= now) {
-      return { status: "closed", computedState: "closed" };
+      return "closed";
     }
 
-    return { status: "open", computedState: "open" };
+    return "open";
+  }
+
+  private hasManageSurvey(caller?: { permission: number }): boolean {
+    return Boolean(
+      caller && Permissions.has(caller.permission, Permissions.MANAGE_SURVEY),
+    );
   }
 
   async findAll(): Promise<SurveyRecordWithState[]> {
@@ -56,8 +67,8 @@ export class SurveysService {
     const responseCountMap = new Map(responseCounts.map((item) => [item.surveyId, item.responseCount]));
 
     return surveys.map((s) => {
-      const { status, computedState } = this.computeStatusAndState(s);
-      return { ...s, status, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
+      const computedState = this.computeState(s);
+      return { ...s, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
     });
   }
 
@@ -73,20 +84,26 @@ export class SurveysService {
     const responseCountMap = new Map(responseCounts.map((item) => [item.surveyId, item.responseCount]));
 
     return surveys.map((s) => {
-      const { status, computedState } = this.computeStatusAndState(s);
-      return { ...s, status, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
+      const computedState = this.computeState(s);
+      return { ...s, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
     });
   }
 
   async findById(id: string): Promise<SurveyRecordWithState> {
     const survey = await this.surveysRepo.findById(id);
     if (!survey) throw new NotFoundException("survey_not_found");
-    const { status, computedState } = this.computeStatusAndState(survey);
-    return { ...survey, status, computedState };
+    const computedState = this.computeState(survey);
+    return { ...survey, computedState };
   }
 
-  async findDetail(id: string, callerId?: string): Promise<SurveyDetailResponse> {
+  async findDetail(id: string, caller?: SurveyCaller): Promise<SurveyDetailResponse> {
     const survey = await this.findById(id);
+    const isManagerPreview = !survey.isPublished && this.hasManageSurvey(caller);
+
+    if (!survey.isPublished && !isManagerPreview) {
+      throw new NotFoundException("survey_not_found");
+    }
+
     const sections = await this.sectionsRepo.findBySurveyId(id);
 
     const sectionsWithQuestions = await Promise.all(
@@ -96,32 +113,39 @@ export class SurveysService {
       }),
     );
 
-    const hasSubmitted = callerId
-      ? !!(await this.responsesRepo.findByUserAndSurvey(id, callerId))
-      : false;
+    const existingResponse = caller?.id
+      ? await this.responsesRepo.findByUserAndSurvey(id, caller.id)
+      : null;
+    const currentResponse = existingResponse
+      ? {
+          ...existingResponse,
+          answers: await this.responsesRepo.findAnswersByResponseId(existingResponse.id),
+        }
+      : null;
 
-    return { ...survey, sections: sectionsWithQuestions, hasSubmitted };
+    return {
+      ...survey,
+      sections: sectionsWithQuestions,
+      currentResponse,
+      hasSubmitted: Boolean(existingResponse),
+      isPreview: isManagerPreview,
+    };
   }
 
   async create(creatorId: string, dto: CreateSurveyDto): Promise<SurveyRecordWithState> {
     const survey = await this.surveysRepo.insert(creatorId, dto);
-    const { status, computedState } = this.computeStatusAndState(survey);
-    return { ...survey, status, computedState, responseCount: 0 };
+    const computedState = this.computeState(survey);
+    return { ...survey, computedState, responseCount: 0 };
   }
 
   async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecordWithState> {
     const current = await this.surveysRepo.findById(id);
     if (!current) throw new NotFoundException("survey_not_found");
 
-    let publishedAt: string | undefined;
-    if (dto.isPublished === true && !current.isPublished && !current.publishedAt) {
-      publishedAt = nowIso();
-    }
-
-    const survey = await this.surveysRepo.update(id, dto, publishedAt);
+    const survey = await this.surveysRepo.update(id, dto);
     if (!survey) throw new NotFoundException("survey_not_found");
-    const { status, computedState } = this.computeStatusAndState(survey);
-    return { ...survey, status, computedState, responseCount: current.responseCount ?? 0 };
+    const computedState = this.computeState(survey);
+    return { ...survey, computedState, responseCount: current.responseCount ?? 0 };
   }
 
   async delete(id: string): Promise<void> {
@@ -140,8 +164,8 @@ export class SurveysService {
       descriptionKo: original.descriptionKo ?? undefined,
       descriptionEn: original.descriptionEn ?? undefined,
       feeRequirementPolicy: original.feePayersOnly ? "PAID_ONLY" : "NONE",
-      allowGuestResponse: original.allowAnonymous,
       allowMultipleResponses: original.allowMultipleResponses,
+      allowResponseEdit: original.allowResponseEdit,
       isKoreanOnly: original.isKoreanOnly,
       isPublished: false,
       resultVisibility: original.resultVisibility,
@@ -176,8 +200,8 @@ export class SurveysService {
       }
     }
 
-    const { status, computedState } = this.computeStatusAndState(newSurvey);
-    return { ...newSurvey, status, computedState, responseCount: 0 };
+    const computedState = this.computeState(newSurvey);
+    return { ...newSurvey, computedState, responseCount: 0 };
   }
 
   async findSectionWithQuestions(
@@ -199,6 +223,10 @@ export class SurveysService {
 
     const hasAdminPermission =
       caller && Permissions.has(caller.permission, Permissions.MANAGE_SURVEY);
+
+    if (!survey.isPublished && !hasAdminPermission) {
+      throw new NotFoundException("survey_not_found");
+    }
 
     if (survey.resultVisibility !== "PUBLIC" && !hasAdminPermission) {
       throw new ForbiddenException("analytics_access_forbidden");
@@ -297,6 +325,16 @@ export class SurveysService {
 
     return {
       surveyId: survey.id,
+      kind: survey.kind,
+      resultVisibility: survey.resultVisibility,
+      feePayersOnly: survey.feePayersOnly,
+      allowMultipleResponses: survey.allowMultipleResponses,
+      isKoreanOnly: survey.isKoreanOnly,
+      descriptionKo: survey.descriptionKo,
+      descriptionEn: survey.descriptionEn,
+      computedState: survey.computedState,
+      opensAt: survey.opensAt,
+      closesAt: survey.closesAt,
       titleKo: survey.titleKo,
       titleEn: survey.titleEn,
       totalResponses,

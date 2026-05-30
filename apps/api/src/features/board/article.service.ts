@@ -16,6 +16,7 @@ import type {
   ArticleDeleteResponse,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
+import { isoToDate, msToIso, nowMs } from "@soc/shared";
 
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
@@ -99,9 +100,9 @@ export class ArticleService {
     const sortBy = params.sortBy ?? "latest";
     const cutoffDate =
       params.period === "7days"
-        ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        ? isoToDate(msToIso(nowMs() - 7 * 24 * 60 * 60 * 1000))
         : params.period === "30days"
-          ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          ? isoToDate(msToIso(nowMs() - 30 * 24 * 60 * 60 * 1000))
           : undefined;
 
     const result = await this.articleRepository.listByBoardIds(

@@ -6,6 +6,7 @@ import type {
   MySurveyResponseListResponse,
 } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
+import { isoToMs, nowMs } from "@soc/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardCheck,
@@ -27,6 +28,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { clearStoredAuthState } from "@/lib/auth-storage";
 import { getTemporaryAuthRequest } from "@/lib/auth-session";
+import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 type ActivityItem = {
@@ -37,12 +39,14 @@ type ActivityItem = {
   type: "survey" | "post" | "comment";
 };
 
+type ActivityTab = "all" | "survey" | "post" | "comment";
+
 const formatRelative = (value?: string | null) => {
   if (!value) return "-";
-  const time = new Date(value).getTime();
+  const time = isoToMs(value);
   if (Number.isNaN(time)) return "-";
 
-  const diffDays = Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor((nowMs() - time) / (1000 * 60 * 60 * 24));
   if (diffDays <= 0) {
     return "오늘";
   }
@@ -177,6 +181,7 @@ export function MyPage() {
   }, [lang, session, user]);
 
   const userInfo = user?.user;
+  const isAdmin = hasAdminPermission(userInfo?.permission);
 
   const articleItems = articles?.items ?? [];
   const commentItems = comments?.items ?? [];
@@ -402,7 +407,7 @@ export function MyPage() {
                       </h2>
 
                       {/* Admin status tag */}
-                      {userInfo && (userInfo as any).isAdmin && (
+                      {isAdmin && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#e6f4ea] text-kaist-darkgreen border border-emerald-100 select-none">
                           관리자
                         </span>
@@ -612,9 +617,7 @@ export function MyPage() {
                     <div className="grid grid-cols-[120px_1fr] py-4 text-[13px] items-center">
                       <span className="font-semibold text-slate-400">권한</span>
                       <span className="font-bold text-slate-800 text-[14px]">
-                        {userInfo && (userInfo as any).isAdmin
-                          ? "관리자"
-                          : "일반 사용자"}
+                        {isAdmin ? "관리자" : "일반 사용자"}
                       </span>
                     </div>
                   </div>
@@ -635,18 +638,18 @@ export function MyPage() {
                   <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col">
                     {/* Underlined filter navigation tabs */}
                     <div className="flex gap-6 border-b border-slate-100 pb-2 mb-4 overflow-x-auto items-stretch select-none">
-                      {[
+                      {([
                         { id: "all", label: "전체" },
                         { id: "survey", label: "설문" },
                         { id: "post", label: "작성한 글" },
                         { id: "comment", label: "작성한 댓글" },
-                      ].map((tab) => {
+                      ] as const satisfies ReadonlyArray<{ id: ActivityTab; label: string }>).map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (
                           <button
                             key={tab.id}
                             onClick={() => {
-                              setActiveTab(tab.id as any);
+                              setActiveTab(tab.id);
                               setCurrentPage(1);
                             }}
                             className={`relative flex items-center justify-center text-[13px] font-semibold pb-2 border-0 bg-transparent cursor-pointer transition-colors ${

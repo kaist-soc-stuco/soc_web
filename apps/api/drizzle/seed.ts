@@ -454,7 +454,6 @@ async function seedMockData() {
         titleEn: "Student Council Participation Survey",
         descriptionKo: "학생회 운영과 행사에 대한 여러분의 의견을 들려주세요. 더 나은 학부 문화를 함께 만들어갑니다.",
         descriptionEn: "Share feedback on student council operations and events.",
-        status: "OPEN",
         connectedArticleId: articleRow.articleId,
         feeRequirementPolicy: "NONE",
         resultVisibility: "PUBLIC",
@@ -498,7 +497,6 @@ async function seedMockData() {
       postedAt: new Date("2026-05-24T00:00:00Z"),
       survey: {
         kind: "VOTE",
-        status: "OPEN",
         openAt: new Date("2026-05-24T09:00:00Z"),
         closeAt: new Date("2026-05-30T18:00:00Z"),
       }
@@ -514,7 +512,6 @@ async function seedMockData() {
       postedAt: new Date("2026-04-17T00:00:00Z"),
       survey: {
         kind: "APPLICATION",
-        status: "CLOSED",
         openAt: new Date("2026-04-17T09:00:00Z"),
         closeAt: new Date("2026-04-20T18:00:00Z"),
       }
@@ -530,7 +527,6 @@ async function seedMockData() {
       postedAt: new Date("2026-05-23T00:00:00Z"),
       survey: {
         kind: "SURVEY",
-        status: "OPEN",
         openAt: new Date("2026-05-23T14:00:00Z"),
         closeAt: new Date("2026-05-23T16:00:00Z"),
       }
@@ -560,7 +556,6 @@ async function seedMockData() {
       titleKo: event.titleKo,
       titleEn: event.titleEn,
       descriptionKo: event.eventDescription,
-      status: event.survey.status,
       connectedArticleId: articleRow.articleId,
       feeRequirementPolicy: "NONE",
       resultVisibility: "PUBLIC",

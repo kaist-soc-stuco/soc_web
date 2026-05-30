@@ -159,6 +159,7 @@ export class CommentService {
     const comment = await this.commentRepository.findPermissionInfo(
       commentId,
       articleId,
+      board.boardId,
     );
 
     if (!comment || comment.status === COMMENT_STATUS.DELETED) {
@@ -192,6 +193,7 @@ export class CommentService {
     const comment = await this.commentRepository.findPermissionInfo(
       commentId,
       articleId,
+      board.boardId,
     );
 
     if (!comment || comment.status === COMMENT_STATUS.DELETED) {

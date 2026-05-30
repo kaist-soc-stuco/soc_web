@@ -14,6 +14,7 @@ import {
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
 import {
+  articles,
   comments,
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
@@ -80,6 +81,7 @@ export class CommentRepository {
   async findPermissionInfo(
     commentId: string,
     articleId: string,
+    boardId: number,
   ): Promise<{
     authorUserId: string;
     status: string;
@@ -90,10 +92,12 @@ export class CommentRepository {
         status: comments.status,
       })
       .from(comments)
+      .innerJoin(articles, eq(comments.articleId, articles.articleId))
       .where(
         and(
           eq(comments.commentId, Number(commentId)),
           eq(comments.articleId, Number(articleId)),
+          eq(articles.boardId, boardId),
         ),
       )
       .limit(1);

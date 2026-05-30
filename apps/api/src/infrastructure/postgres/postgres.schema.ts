@@ -50,8 +50,7 @@ export const surveys = pgTable("survey", {
   descriptionKo: text("description_ko"),
   descriptionEn: text("description_en"),
 
-  // 2. 상태 및 게시 설정
-  status: varchar("status", { length: 20 }).notNull().default("DRAFT"), // DRAFT, OPEN, CLOSED 등
+  // 2. 게시 설정
   connectedArticleId: integer("connected_article_id")
     .references(() => articles.articleId, { onDelete: "set null" }),
 
@@ -60,8 +59,8 @@ export const surveys = pgTable("survey", {
     .notNull()
     .default("NONE"), // NONE, PAID_ONLY 등 (feat/form의 feePayersOnly 대체)
 
-  allowGuestResponse: boolean("allow_guest_response").notNull().default(false),
   allowMultipleResponses: boolean("allow_multiple_responses").notNull().default(false),
+  allowResponseEdit: boolean("allow_response_edit").notNull().default(false),
   isKoreanOnly: boolean("is_korean_only").notNull().default(false),
   isPublished: boolean("is_published").notNull().default(false),
   showOnCalendar: boolean("show_on_calendar").notNull().default(false),
@@ -280,7 +279,6 @@ export const surveyResponses = pgTable("survey_responses", {
     .references(() => surveys.surveyId, { onDelete: "cascade" })
     .notNull(),
   userId: uuid("user_id").references(() => users.userId),
-  externalPhone: text("external_phone"),
   // 'draft' | 'submitted'
   status: text("status").notNull().default("submitted"),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),

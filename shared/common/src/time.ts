@@ -45,6 +45,10 @@ export function msToIso(ms: number): string {
   return dayjs.utc(ms).toISOString();
 }
 
+export function msToDate(ms: number): Date {
+  return new Date(ms);
+}
+
 export function isoToMs(iso: string): number {
   return dayjs.utc(iso).valueOf();
 }
@@ -125,7 +129,19 @@ export function nowDate(): Date {
 }
 
 export function isoToDate(iso: string): Date {
-  return new Date(isoToMs(iso));
+  return msToDate(isoToMs(iso));
+}
+
+export function localDate(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  millisecond = 0,
+): Date {
+  return new Date(year, monthIndex, day, hour, minute, second, millisecond);
 }
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────

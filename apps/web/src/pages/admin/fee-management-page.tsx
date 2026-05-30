@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import type { StudentFeeListResponse, FeeStatus } from '@soc/contracts';
+import { isoToDate } from '@soc/shared';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
 import { AuthGuard } from '@/components/guards/auth-guard';
@@ -280,7 +281,7 @@ export function FeeManagementPage() {
                         </button>
                       </td>
                       <td className="px-5 py-4 align-top text-slate-400">
-                        {student.paidAt ? new Date(student.paidAt).toLocaleDateString('ko-KR') : '-'}
+                        {student.paidAt ? isoToDate(student.paidAt).toLocaleDateString('ko-KR') : '-'}
                       </td>
                       <td className="px-5 py-4 align-top">
                         <input

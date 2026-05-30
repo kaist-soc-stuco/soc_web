@@ -3,7 +3,7 @@ import { eq, asc } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 import { executiveContacts } from "../../infrastructure/postgres/postgres.schema";
 import type { ContactRecord, CreateContactRequest, UpdateContactRequest } from "@soc/contracts";
-import { msToIso } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 @Injectable()
 export class ContactsRepository {
@@ -51,7 +51,7 @@ export class ContactsRepository {
         email: dto.email ?? null,
         phoneNumber: dto.phoneNumber ?? null,
         sortOrder: dto.sortOrder ?? 0,
-        updatedAt: new Date(),
+        updatedAt: nowDate(),
       })
       .returning();
     return this.map(row);
@@ -59,7 +59,7 @@ export class ContactsRepository {
 
   async update(id: string, dto: UpdateContactRequest): Promise<ContactRecord | null> {
     const set: Partial<typeof executiveContacts.$inferInsert> = {
-      updatedAt: new Date(),
+      updatedAt: nowDate(),
     };
 
     if (dto.nameKo !== undefined) set.nameKo = dto.nameKo;

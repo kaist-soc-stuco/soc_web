@@ -9,7 +9,6 @@ export class LoggingInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(() => {
         const duration = nowMs() - start;
-        // eslint-disable-next-line no-console
         console.log(`Request handled in ${duration}ms`);
       }),
     );
