@@ -98,14 +98,6 @@ export function App() {
             }
           />
           <Route path="/board/:category" element={<BoardPage />} />
-          <Route
-            path="/board/:category/write"
-            element={
-              <AuthGuard>
-                <BoardWritePage />
-              </AuthGuard>
-            }
-          />
           <Route path="/board/:category/:articleId" element={<BoardDetailPage />} />
           <Route
             path="/board/:category/:articleId/edit"
