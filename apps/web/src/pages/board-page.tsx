@@ -198,7 +198,7 @@ export function BoardPage() {
   const canWrite = category
     ? writableBoardCodes.includes(category)
     : writableBoardCodes.length > 0;
-  const writeHref = category ? `/board/${category}/write` : "/board/write";
+  const writeState = category ? { initialCategory: category } : undefined;
 
   const boardTitle = category
     ? getBoardTitleFromMetadata(currentBoard, category, lang)
@@ -575,7 +575,8 @@ export function BoardPage() {
               {canWrite && (
                 <div className="absolute right-6">
                   <Link
-                    to={writeHref}
+                    state={writeState}
+                    to="/board/write"
                     className="inline-flex items-center justify-center px-3.5 py-1.5 bg-kaist-darkgreen border border-transparent text-white rounded-lg text-[13px] font-bold tracking-tight hover:opacity-90 transition-all shadow-sm"
                   >
                     {lang === "ko" ? "글쓰기" : "Write"}

@@ -341,6 +341,9 @@ export function EventsSurveysPage() {
     if (item.isKoreanOnly) {
       meta.push(lang === "ko" ? "한국어 사용자" : "Korean speakers only");
     }
+    if (meta.length === 0) {
+      return lang === "ko" ? "누구나" : "Everyone";
+    }
     return meta.join(" · ");
   };
 

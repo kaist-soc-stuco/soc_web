@@ -13,7 +13,7 @@ services:
     ports:
       - '${API_PORT}:3000'
     volumes:
-      - api_uploads:/app/apps/api/uploads
+      - ./apps/api/uploads:/app/apps/api/uploads
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -65,7 +65,7 @@ services:
       POSTGRES_PORT: 5432
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
     volumes:
-      - api_uploads:/app/apps/api/uploads
+      - ./apps/api/uploads:/app/apps/api/uploads
     command: ['sh', '-c', 'pnpm db:migrate']
 
   redis:
@@ -89,6 +89,5 @@ services:
         condition: service_started
 
 volumes:
-  api_uploads:
   postgres_data:
   redis_data:
