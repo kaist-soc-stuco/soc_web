@@ -10,6 +10,7 @@ export interface ListQueryOptions {
   q?: string;
   searchBy?: "title" | "author" | "title_content";
   sortBy?: "latest" | "views";
+  sortDirection?: "asc" | "desc";
 }
 
 export class ApiClientHttpError extends Error {
@@ -22,6 +23,7 @@ export class ApiClientHttpError extends Error {
 export interface ApiClientContext {
   assetBaseUrl: string;
   authBaseUrl: string;
+  calendarBaseUrl: string;
   contactsBaseUrl: string;
   emailsBaseUrl: string;
   normalizedBaseUrl: string;
@@ -65,6 +67,10 @@ export const buildListQuery = (options?: ListQueryOptions): string => {
 
   if (options.sortBy !== undefined) {
     params.set("sortBy", options.sortBy);
+  }
+
+  if (options.sortDirection !== undefined) {
+    params.set("sortDirection", options.sortDirection);
   }
 
   if (options.period !== undefined) {
@@ -215,6 +221,7 @@ export const createApiClientContext = ({
   return {
     assetBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "assets"),
     authBaseUrl,
+    calendarBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "calendar"),
     contactsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "contacts"),
     emailsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "admin/emails"),
     normalizedBaseUrl,

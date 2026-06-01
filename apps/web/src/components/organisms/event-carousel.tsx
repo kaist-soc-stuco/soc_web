@@ -2,12 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
-import { isoToDate, isoToMs, nowMs } from "@soc/shared";
-import type { ArticleDetailResponse, ArticleListItem } from "@soc/contracts";
+import type { ArticleDetailResponse } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { resolveAssetUrl } from "@/lib/asset-url";
-
-type EventCardStatus = "ongoing" | "completed";
 
 interface EventCardItem {
   id: string;
@@ -15,10 +12,6 @@ interface EventCardItem {
   fallbackClassName: string;
   title: string;
   description?: string;
-  date: string;
-  status: EventCardStatus;
-  tags?: string[];
-  badge?: string;
 }
 
 interface FeaturedCardProps {
@@ -27,8 +20,6 @@ interface FeaturedCardProps {
   fallbackClassName: string;
   title: string;
   description?: string;
-  date: string;
-  tags: string[];
 }
 
 function FeaturedEventCard({
@@ -37,8 +28,6 @@ function FeaturedEventCard({
   fallbackClassName,
   title,
   description,
-  date,
-  tags,
 }: FeaturedCardProps) {
   const isMock = id.startsWith("mock-");
   const [imageFailed, setImageFailed] = useState(false);
@@ -49,7 +38,7 @@ function FeaturedEventCard({
   }, [imageUrl]);
 
   const cardContent = (
-    <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 select-none group flex flex-col justify-end">
+    <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-card hover:shadow-card-hover transition-all duration-300 select-none group flex flex-col justify-end">
       <div className={`absolute inset-0 ${fallbackClassName}`} />
       {showImage && (
         <img
@@ -57,54 +46,29 @@ function FeaturedEventCard({
           alt=""
           aria-hidden="true"
           onError={() => setImageFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-103"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
         />
       )}
       {/* Dark overlay for readability */}
       <div
         className={
           showImage
-            ? "absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/20"
-            : "absolute inset-0 bg-black/15"
+            ? "absolute inset-0 bg-gradient-to-t from-black/78 via-black/35 to-black/5 transition-opacity duration-300 group-hover:opacity-95"
+            : "absolute inset-0 bg-black/10 transition-opacity duration-300 group-hover:opacity-90"
         }
       />
 
       {/* Bottom Content Area */}
-      <div className="absolute bottom-0 left-0 right-0 p-5 z-10 flex flex-col">
-        {/* Pills & Date Row */}
-        <div className="flex items-center justify-between mb-2.5 shrink-0">
-          <div className="flex items-center gap-1.5">
-            {tags.map((tag, idx) => (
-              <span
-                key={idx}
-                className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full select-none ${
-                  tag === "진행중"
-                    ? "bg-[#0c3e19] text-[#5cdb7d]"
-                    : tag.startsWith("D-")
-                      ? "bg-[#74b816] text-white font-extrabold"
-                      : "bg-[#1098ad] text-white"
-                }`}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-          <span className="text-[10px] font-medium text-stone-300 tracking-tight select-none">
-            {date}
-          </span>
-        </div>
-
+      <div className="absolute bottom-0 left-0 right-0 p-4 z-10 flex flex-col">
         {/* Title */}
-        <h3 className="text-base lg:text-lg font-bold text-white leading-snug tracking-tight group-hover:text-[#5cdb7d] transition-colors line-clamp-1">
+        <h3 className="text-base font-bold text-white leading-snug tracking-tight group-hover:text-[#86efac] transition-colors line-clamp-1">
           {title}
         </h3>
 
         {/* Description */}
-        {description && (
-          <p className="mt-1.5 text-xs text-stone-300 line-clamp-2 leading-relaxed font-normal">
-            {description}
-          </p>
-        )}
+        <p className="mt-1.5 h-10 text-xs font-normal leading-relaxed text-stone-200/90 line-clamp-2">
+          {description ?? ""}
+        </p>
       </div>
     </div>
   );
@@ -124,22 +88,18 @@ interface StandardCardProps {
   id: string;
   imageUrl: string | null;
   fallbackClassName: string;
+  isPeek?: boolean;
   title: string;
   description?: string;
-  date: string;
-  status: EventCardStatus;
-  badge?: string;
 }
 
 function StandardEventCard({
   id,
   imageUrl,
   fallbackClassName,
+  isPeek = false,
   title,
   description,
-  date,
-  status,
-  badge,
 }: StandardCardProps) {
   const isMock = id.startsWith("mock-");
   const [imageFailed, setImageFailed] = useState(false);
@@ -150,7 +110,7 @@ function StandardEventCard({
   }, [imageUrl]);
 
   const cardContent = (
-    <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 select-none group flex flex-col justify-end">
+    <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-card hover:shadow-card-hover transition-all duration-300 select-none group flex flex-col justify-end">
       <div className={`absolute inset-0 ${fallbackClassName}`} />
       {showImage && (
         <img
@@ -158,49 +118,29 @@ function StandardEventCard({
           alt=""
           aria-hidden="true"
           onError={() => setImageFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-103"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
         />
       )}
       {/* Dark overlay for readability */}
       <div
         className={
           showImage
-            ? "absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/20"
-            : "absolute inset-0 bg-black/15"
+            ? "absolute inset-0 bg-gradient-to-t from-black/78 via-black/35 to-black/5 transition-opacity duration-300 group-hover:opacity-95"
+            : "absolute inset-0 bg-black/10 transition-opacity duration-300 group-hover:opacity-90"
         }
       />
 
-      {/* Bottom Content Area */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 z-10 flex flex-col">
-        {/* Title */}
-        <h3 className="text-[13.5px] font-bold text-white leading-snug tracking-tight group-hover:text-[#5cdb7d] transition-colors line-clamp-1">
-          {title}
-        </h3>
+      {!isPeek && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 z-10 flex flex-col">
+          <h3 className="text-base font-bold text-white leading-snug tracking-tight group-hover:text-[#86efac] transition-colors line-clamp-1">
+            {title}
+          </h3>
 
-        {/* Description */}
-        {description && (
-          <p className="mt-1 text-xs text-stone-300 line-clamp-1 leading-normal font-normal">
-            {description}
+          <p className="mt-1.5 h-10 text-xs font-normal leading-relaxed text-stone-200/90 line-clamp-2">
+            {description ?? ""}
           </p>
-        )}
-
-        {/* Status & Date Footer Row */}
-        <div className="mt-2.5 flex items-center justify-between border-t border-white/10 pt-2 shrink-0">
-          <div className="flex items-center gap-1.5 shrink-0">
-            {badge && (
-              <span className="bg-[#1c7ed6] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm select-none">
-                {badge}
-              </span>
-            )}
-            <div className="rounded-full bg-[#0c3e19] text-[#5cdb7d] px-2.5 py-0.5 text-[9.5px] font-bold tracking-tight select-none">
-              {status === "ongoing" ? "진행중" : "완료"}
-            </div>
-          </div>
-          <span className="text-[10px] font-semibold tracking-tight text-stone-400 select-none">
-            {date}
-          </span>
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -216,15 +156,6 @@ function StandardEventCard({
       {cardContent}
     </Link>
   );
-}
-
-function formatDate(dateIso: string) {
-  const d = isoToDate(dateIso);
-  if (isNaN(d.getTime())) return "";
-  const yy = String(d.getFullYear()).slice(-2);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yy}.${mm}.${dd}`;
 }
 
 const FALLBACK_CLASS_NAMES = [
@@ -248,10 +179,35 @@ function resolveEventImageUrl(detail: ArticleDetailResponse) {
   return imageAsset ? resolveAssetUrl(imageAsset.storageKey) : null;
 }
 
+function EventCarouselSkeleton() {
+  return (
+    <section className="h-full bg-transparent select-none">
+      <div className="w-full mb-4 flex items-center justify-between">
+        <h2 className="text-base lg:text-lg font-black text-kaist-black tracking-tight">
+          이번 주 주요 행사
+        </h2>
+        <div className="h-4 w-12 rounded bg-slate-100" />
+      </div>
+      <div className="overflow-hidden">
+        <div className="flex gap-6">
+          <div className="h-[290px] flex-[0_0_100%] rounded-2xl bg-slate-100 animate-pulse md:h-[330px] md:flex-[0_0_31%]" />
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="hidden h-[330px] flex-[0_0_31%] rounded-2xl bg-slate-100 animate-pulse md:block"
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function EventCarousel() {
   const [currentPage, setCurrentPage] = useState(0);
   const [events, setEvents] = useState<EventCardItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -261,20 +217,6 @@ export function EventCarousel() {
   useEffect(() => {
     let active = true;
     const loadEvents = async () => {
-      const resolveStatus = (
-        item: ArticleListItem,
-        detail?: ArticleDetailResponse,
-      ): EventCardStatus => {
-        if (detail?.survey) {
-          return detail.survey.computedState === "open"
-            ? "ongoing"
-            : "completed";
-        }
-        const isRecent =
-          isoToMs(item.postedAt) > nowMs() - 14 * 24 * 60 * 60 * 1000;
-        return isRecent ? "ongoing" : "completed";
-      };
-
       try {
         const res = await apiClient.getArticles("행사", { limit: 12 });
         const detailedEvents = await Promise.all(
@@ -289,20 +231,16 @@ export function EventCarousel() {
                   detail.eventDescription ??
                   item.eventDescription ??
                   item.titleKo,
-                date: formatDate(item.postedAt),
                 imageUrl: resolveEventImageUrl(detail),
                 fallbackClassName: resolveFallbackClassName(item.articleId),
-                status: resolveStatus(item, detail),
               };
             } catch {
               return {
                 id: item.articleId,
                 title: item.titleKo,
                 description: item.eventDescription ?? item.titleKo,
-                date: formatDate(item.postedAt),
                 imageUrl: null,
                 fallbackClassName: resolveFallbackClassName(item.articleId),
-                status: resolveStatus(item),
               };
             }
           }),
@@ -327,20 +265,38 @@ export function EventCarousel() {
   }, [apiClient]);
 
   const displayEvents = events;
+  const pageSize = isMobile ? 1 : 4;
 
-  // Chunk events into pages of 4 items (1 featured + 3 standard = 4 items)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const updateIsMobile = () => setIsMobile(mediaQuery.matches);
+
+    updateIsMobile();
+    mediaQuery.addEventListener("change", updateIsMobile);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateIsMobile);
+    };
+  }, []);
+
   const chunkedPages = useMemo(() => {
     const pages: EventCardItem[][] = [];
-    for (let i = 0; i < displayEvents.length; i += 4) {
-      const chunk = displayEvents.slice(i, i + 4);
+    for (let i = 0; i < displayEvents.length; i += pageSize) {
+      const chunk = displayEvents.slice(i, i + pageSize);
       if (chunk.length > 0) {
         pages.push(chunk);
       }
     }
     return pages;
-  }, [displayEvents]);
+  }, [displayEvents, pageSize]);
 
   const totalPages = chunkedPages.length;
+
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [displayEvents.length, pageSize]);
 
   const handlePrevPage = () => {
     setCurrentPage((prev) => (prev === 0 ? totalPages - 1 : prev - 1));
@@ -351,19 +307,28 @@ export function EventCarousel() {
   };
 
   if (loading && events.length === 0) {
-    return (
-      <section className="h-full bg-kaist-white overflow-hidden flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-kaist-darkgreen"></div>
-      </section>
-    );
+    return <EventCarouselSkeleton />;
   }
 
   if (events.length === 0) {
     return (
-      <section className="h-full bg-transparent flex flex-col items-center justify-center min-h-[150px] border border-dashed border-slate-200 rounded-3xl bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.025)]">
-        <p className="text-sm font-semibold text-slate-400">
-          진행 중인 행사가 없습니다.
-        </p>
+      <section className="h-full bg-transparent select-none">
+        <div className="w-full mb-4 flex items-center justify-between">
+          <h2 className="text-base lg:text-lg font-black text-kaist-black tracking-tight">
+            이번 주 주요 행사
+          </h2>
+          <Link
+            to="/events-surveys"
+            className="text-[10px] font-bold text-kaist-grey hover:text-brand-primary transition-colors cursor-pointer"
+          >
+            더보기
+          </Link>
+        </div>
+        <div className="h-[290px] md:h-[315px] rounded-2xl border border-dashed border-slate-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.025)] flex items-center justify-center">
+          <p className="text-sm font-semibold text-slate-400">
+            표시할 주요 행사가 없습니다.
+          </p>
+        </div>
       </section>
     );
   }
@@ -377,7 +342,7 @@ export function EventCarousel() {
         </h2>
         <Link
           to="/events-surveys"
-          className="text-[10px] font-bold text-kaist-grey hover:text-kaist-darkgreen transition-colors cursor-pointer flex items-center gap-0.5"
+          className="text-[10px] font-bold text-kaist-grey hover:text-brand-primary transition-colors cursor-pointer flex items-center gap-0.5"
         >
           <span>더보기</span>
           <svg
@@ -396,7 +361,7 @@ export function EventCarousel() {
         </Link>
       </div>
 
-      <div className="relative flex items-center justify-center">
+      <div className="group/carousel relative flex items-center justify-center">
         {/* Sliding Page Viewport */}
         <div className="w-full overflow-hidden">
           <div
@@ -409,68 +374,71 @@ export function EventCarousel() {
               const featuredItem = pageItems[0];
               const standardItems = pageItems.slice(1);
 
-              return (
-                <div
-                  key={pageIdx}
-                  className="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-5 gap-5"
-                >
-                  {/* Featured Card (spans 2 columns) */}
-                  <div className="md:col-span-2 h-[290px] md:h-[315px]">
-                    <FeaturedEventCard
-                      id={featuredItem.id}
-                      imageUrl={featuredItem.imageUrl}
-                      fallbackClassName={featuredItem.fallbackClassName}
-                      title={featuredItem.title}
-                      description={featuredItem.description}
-                      date={featuredItem.date}
-                      tags={
-                        featuredItem.tags || [
-                          "학부",
-                          featuredItem.status === "ongoing" ? "진행중" : "완료",
-                        ]
-                      }
-                    />
-                  </div>
-
-                  {/* Standard Cards (span 1 column each) */}
-                  {standardItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="md:col-span-1 h-[290px] md:h-[315px]"
-                    >
-                      <StandardEventCard
-                        id={item.id}
-                        imageUrl={item.imageUrl}
-                        fallbackClassName={item.fallbackClassName}
-                        title={item.title}
-                        description={item.description}
-                        date={item.date}
-                        status={item.status}
-                        badge={item.badge || "KAIST SoC"}
+              if (isMobile) {
+                return (
+                  <div key={pageIdx} className="w-full flex-shrink-0">
+                    <div className="h-[260px]">
+                      <FeaturedEventCard
+                        id={featuredItem.id}
+                        imageUrl={featuredItem.imageUrl}
+                        fallbackClassName={featuredItem.fallbackClassName}
+                        title={featuredItem.title}
+                        description={featuredItem.description}
                       />
                     </div>
-                  ))}
+                  </div>
+                );
+              }
 
-                  {/* Padding if less than 4 items */}
-                  {Array.from({ length: 4 - pageItems.length }).map(
-                    (_, padIdx) => (
-                      <div
-                        key={`pad-${padIdx}`}
-                        className="md:col-span-1 opacity-0 pointer-events-none"
+              return (
+                <div key={pageIdx} className="w-full flex-shrink-0 overflow-hidden">
+                  <div className="flex gap-6 pr-2">
+                    {/* Featured Card */}
+                    <div className="h-[310px] flex-[0_0_31%] md:h-[330px]">
+                      <FeaturedEventCard
+                        id={featuredItem.id}
+                        imageUrl={featuredItem.imageUrl}
+                        fallbackClassName={featuredItem.fallbackClassName}
+                        title={featuredItem.title}
+                        description={featuredItem.description}
                       />
-                    ),
-                  )}
+                    </div>
+
+                    {/* Standard Cards */}
+                    {standardItems.map((item, itemIndex) => (
+                      <div
+                        key={item.id}
+                        className="h-[310px] flex-[0_0_31%] md:h-[330px]"
+                      >
+                        <StandardEventCard
+                          id={item.id}
+                          imageUrl={item.imageUrl}
+                          fallbackClassName={item.fallbackClassName}
+                          isPeek={itemIndex === 2}
+                          title={item.title}
+                          description={item.description}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
 
+        {totalPages > 1 && currentPage < totalPages - 1 && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-[linear-gradient(to_left,#fafafa_0%,rgba(250,250,250,0.82)_34%,rgba(250,250,250,0.36)_68%,rgba(250,250,250,0)_100%)] opacity-80" />
+        )}
+        {totalPages > 1 && currentPage > 0 && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-[linear-gradient(to_right,#fafafa_0%,rgba(250,250,250,0.68)_42%,rgba(250,250,250,0.22)_74%,rgba(250,250,250,0)_100%)] opacity-70" />
+        )}
+
         {/* Floating Right Arrow Button */}
         {totalPages > 1 && (
           <button
             onClick={handleNextPage}
-            className="absolute right-4 z-20 w-8 h-8 rounded-full bg-white shadow-md border border-slate-100/50 flex items-center justify-center text-slate-800 hover:text-[#137333] transition-all hover:scale-105 cursor-pointer"
+            className="absolute right-3 z-20 w-8 h-8 rounded-full bg-white/95 shadow-card border border-card-border-subtle flex items-center justify-center text-slate-700 hover:text-brand-primary transition-all hover:scale-105 cursor-pointer opacity-0 group-hover/carousel:opacity-100"
             aria-label="Next page"
           >
             <ChevronRight className="h-4 w-4 stroke-[3px]" />
@@ -481,7 +449,7 @@ export function EventCarousel() {
         {totalPages > 1 && currentPage > 0 && (
           <button
             onClick={handlePrevPage}
-            className="absolute left-4 z-20 w-8 h-8 rounded-full bg-white shadow-md border border-slate-100/50 flex items-center justify-center text-slate-800 hover:text-[#137333] transition-all hover:scale-105 cursor-pointer"
+            className="absolute left-3 z-20 w-8 h-8 rounded-full bg-white/95 shadow-card border border-card-border-subtle flex items-center justify-center text-slate-700 hover:text-brand-primary transition-all hover:scale-105 cursor-pointer opacity-0 group-hover/carousel:opacity-100"
             aria-label="Previous page"
           >
             <ChevronLeft className="h-4 w-4 stroke-[3px]" />

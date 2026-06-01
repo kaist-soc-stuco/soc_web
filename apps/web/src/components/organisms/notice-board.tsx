@@ -29,18 +29,18 @@ function NoticeItem({
   return (
     <Link
       to={`/board/${isImportant ? "공지" : category}/${id}`}
-      className={`block px-4 transition-colors hover:bg-slate-50/80 ${
+      className={`block px-3 transition-colors hover:bg-slate-50/80 ${
         showGroupDivider ? "border-t border-slate-100" : ""
       }`}
     >
       <div className="flex items-center justify-between py-2.5 gap-4">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {isImportant ? (
-            <span className="inline-flex items-center bg-[#e6f4ea] text-[#137333] border border-[#137333]/10 rounded-full px-2 py-0.5 text-[10px] font-extrabold shrink-0 select-none">
+            <span className="inline-flex items-center bg-brand-primary-light text-brand-primary border border-brand-primary/10 rounded-full px-2 py-0.5 text-[10px] font-extrabold shrink-0 select-none">
               <span>공지</span>
             </span>
           ) : (
-            <span className="bg-[#e6f4ea] text-[#137333] rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 tracking-tight select-none">
+            <span className="bg-brand-primary-light text-brand-primary rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 tracking-tight select-none">
               {category}
             </span>
           )}
@@ -48,17 +48,17 @@ function NoticeItem({
             className={`text-[13.5px] tracking-tight truncate ${
               isImportant
                 ? "text-slate-800 font-semibold"
-                : "text-slate-600 font-normal hover:text-kaist-darkgreen"
+                : "text-slate-600 font-normal hover:text-brand-primary"
             }`}
           >
             {isImportant ? (
-              <Pin className="mr-1 inline h-3 w-3 align-[-1px] text-slate-400" />
+              <Pin className="mr-1 inline h-3 w-3 align-[-1px] fill-[#E11D48] text-[#E11D48]" />
             ) : null}
             {title}
           </span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="text-[11.5px] font-normal tracking-tight text-slate-400">
+          <span className="text-[11.5px] font-normal tracking-tight text-slate-500">
             {date}
           </span>
 
@@ -156,7 +156,7 @@ export function NoticeBoard() {
   }, [activeCategory, notices, apiClient]);
 
   return (
-    <section className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.025)] px-6 py-2 pt-2.5 pb-1.5 h-full flex flex-col select-none">
+    <section className="bg-white rounded-3xl border border-card-border-subtle shadow-card px-5 py-2 pt-2.5 pb-1.5 h-full flex flex-col select-none">
       <div className="mx-auto w-full flex-1 flex flex-col justify-between">
         <div>
           {/* Tabs */}
@@ -173,13 +173,13 @@ export function NoticeBoard() {
                     onClick={() => setActiveTab(index)}
                     className={`relative flex items-center justify-center h-full text-[14.5px] tracking-tight transition-colors border-0 bg-transparent cursor-pointer ${
                       activeTab === index
-                        ? "text-[#137333] font-semibold"
-                        : "text-slate-400 hover:text-[#137333] font-medium"
+                        ? "text-brand-primary font-semibold"
+                        : "text-slate-400 hover:text-brand-primary font-medium"
                     }`}
                   >
                     <span className="py-1.5">{tab.label}</span>
                     <span
-                      className={`absolute bottom-0 left-[-10px] right-[-10px] h-0.5 bg-[#137333] transition-transform duration-200 origin-center rounded-t-full ${
+                      className={`absolute bottom-0 left-[-10px] right-[-10px] h-0.5 bg-brand-primary transition-transform duration-200 origin-center rounded-t-full ${
                         activeTab === index
                           ? "scale-x-100"
                           : hoveredIndex === index
@@ -199,10 +199,10 @@ export function NoticeBoard() {
               onMouseEnter={() => setHoveredIndex(tabs.length)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              <div className="relative flex items-center justify-center h-full text-base tracking-tight text-slate-400 hover:text-[#137333] font-medium transition-colors cursor-pointer">
+              <div className="relative flex items-center justify-center h-full text-base tracking-tight text-slate-400 hover:text-brand-primary font-medium transition-colors cursor-pointer">
                 <span className="py-1.5">+</span>
                 <span
-                  className={`absolute bottom-0 left-0 right-0 h-0.5 bg-[#137333] transition-transform duration-200 origin-center rounded-t-full ${
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary transition-transform duration-200 origin-center rounded-t-full ${
                     hoveredIndex === tabs.length ? "scale-x-100" : "scale-x-0"
                   }`}
                 />
@@ -214,7 +214,7 @@ export function NoticeBoard() {
           <div className="overflow-y-auto min-h-[225px] pt-1">
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-kaist-darkgreen"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
               </div>
             ) : displayNotices.length > 0 ? (
               displayNotices.map((notice, index) => (

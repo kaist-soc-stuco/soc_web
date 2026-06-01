@@ -5,7 +5,7 @@ import type { CurrentUserResponse, ArticleListItem } from "@soc/contracts";
 import { hasPermission, isoToDate, isoToMs, nowMs } from "@soc/shared";
 import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
-import { Search, Filter, Paperclip } from "lucide-react";
+import { ArrowDown, Filter, Paperclip, Pin, Search } from "lucide-react";
 import { Pagination } from "@/components/ui/pagination";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
@@ -20,7 +20,22 @@ import { useBoardCatalog } from "@/hooks/use-board-catalog";
 
 type SearchCriteria = "title" | "author" | "title_content";
 type SortBy = "latest" | "views";
+type SortDirection = "asc" | "desc";
 type Period = "all" | "7days" | "30days";
+
+function comparePinnedArticles(a: ArticleListItem, b: ArticleListItem) {
+  if (a.isPinned !== b.isPinned) {
+    return Number(b.isPinned) - Number(a.isPinned);
+  }
+
+  if (a.isPinned && b.isPinned) {
+    const aOrder = a.pinOrder ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = b.pinOrder ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+  }
+
+  return 0;
+}
 
 function formatDate(dateIso: string) {
   const d = isoToDate(dateIso);
@@ -46,6 +61,7 @@ export function BoardPage() {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>("title");
   const [sortBy, setSortBy] = useState<SortBy>("latest");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [period, setPeriod] = useState<Period>("all");
 
   // Page size option
@@ -86,6 +102,18 @@ export function BoardPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleSortChange = (nextSortBy: SortBy) => {
+    if (sortBy === nextSortBy) {
+      setSortDirection((currentDirection) =>
+        currentDirection === "desc" ? "asc" : "desc",
+      );
+    } else {
+      setSortBy(nextSortBy);
+      setSortDirection("desc");
+    }
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -99,6 +127,7 @@ export function BoardPage() {
           q: searchQuery,
           searchBy: searchCriteria,
           sortBy,
+          sortDirection,
         });
 
     fetchPromise.then((data) => {
@@ -106,6 +135,11 @@ export function BoardPage() {
         let items = [...data.items];
 
         if (!category) {
+          items.sort((a, b) => {
+            const pinnedOrder = comparePinnedArticles(a, b);
+            if (pinnedOrder !== 0) return pinnedOrder;
+            return 0;
+          });
           setArticles(items);
           setTotalCount(data.total);
           return;
@@ -138,12 +172,19 @@ export function BoardPage() {
 
         // 3. Sorting Filter
         if (sortBy === "latest") {
-          items.sort(
-            (a, b) =>
-              isoToMs(b.postedAt) - isoToMs(a.postedAt),
-          );
+          items.sort((a, b) => {
+            const pinnedOrder = comparePinnedArticles(a, b);
+            if (pinnedOrder !== 0) return pinnedOrder;
+            const diff = isoToMs(b.postedAt) - isoToMs(a.postedAt);
+            return sortDirection === "desc" ? diff : -diff;
+          });
         } else if (sortBy === "views") {
-          items.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+          items.sort((a, b) => {
+            const pinnedOrder = comparePinnedArticles(a, b);
+            if (pinnedOrder !== 0) return pinnedOrder;
+            const diff = (b.viewCount || 0) - (a.viewCount || 0);
+            return sortDirection === "desc" ? diff : -diff;
+          });
         }
 
         // 4. Client-side Paginate
@@ -166,6 +207,7 @@ export function BoardPage() {
     searchQuery,
     searchCriteria,
     sortBy,
+    sortDirection,
     period,
     postsPerPage,
   ]);
@@ -175,6 +217,7 @@ export function BoardPage() {
     setSearchQuery("");
     setSearchCriteria("title");
     setSortBy("latest");
+    setSortDirection("desc");
     setPeriod("all");
   }, [category]);
 
@@ -222,7 +265,7 @@ export function BoardPage() {
 
         {/* Board Underlined Tabs Navigation & Search block (Spans full width, on same row) */}
         <div className="border-b border-slate-200 bg-white mb-6">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row md:items-stretch md:justify-between gap-4 select-none">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row md:items-stretch md:justify-between gap-2 md:gap-4 select-none">
             {/* Category tabs */}
             <div className="flex flex-wrap items-stretch gap-6 lg:gap-8">
               {/* "전체" Tab */}
@@ -230,13 +273,13 @@ export function BoardPage() {
                 <div
                   className={`relative flex items-center justify-center h-full text-[14px] lg:text-[14.5px] tracking-tight transition-all py-4 cursor-pointer ${
                     !category
-                      ? "text-kaist-darkgreen font-semibold"
-                      : "text-slate-400 hover:text-kaist-darkgreen font-medium"
+                      ? "text-brand-primary font-semibold"
+                      : "text-slate-400 hover:text-brand-primary font-medium"
                   }`}
                 >
                   <span>{lang === "ko" ? "전체" : "All"}</span>
                   <span
-                    className={`absolute bottom-0 left-0 right-0 h-[3px] bg-kaist-darkgreen transition-transform duration-200 origin-center ${
+                    className={`absolute bottom-0 left-0 right-0 h-[3px] bg-brand-primary transition-transform duration-200 origin-center ${
                       !category
                         ? "scale-x-100"
                         : "scale-x-0 group-hover:scale-x-100"
@@ -256,15 +299,15 @@ export function BoardPage() {
                     <div
                       className={`relative flex items-center justify-center h-full text-[14px] lg:text-[14.5px] tracking-tight transition-all py-4 cursor-pointer ${
                         isActive
-                          ? "text-kaist-darkgreen font-semibold"
-                          : "text-slate-400 hover:text-kaist-darkgreen font-medium"
+                          ? "text-brand-primary font-semibold"
+                          : "text-slate-400 hover:text-brand-primary font-medium"
                       }`}
                     >
                       <span>
                         {getBoardLabelFromMetadata(board, board.code, lang)}
                       </span>
                       <span
-                        className={`absolute bottom-0 left-0 right-0 h-[3px] bg-kaist-darkgreen transition-transform duration-200 origin-center ${
+                        className={`absolute bottom-0 left-0 right-0 h-[3px] bg-brand-primary transition-transform duration-200 origin-center ${
                           isActive
                             ? "scale-x-100"
                             : "scale-x-0 group-hover:scale-x-100"
@@ -277,8 +320,8 @@ export function BoardPage() {
             </div>
 
             {/* Search, Popover Filter & Write Block aligned on same row */}
-            <div className="flex items-center gap-2 py-2 md:py-0 shrink-0 self-center">
-              <div className="relative">
+            <div className="flex w-full items-center gap-2 pb-2 pt-0 md:w-auto md:shrink-0 md:self-center md:py-0">
+              <div className="relative min-w-0 flex-1 md:flex-none">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input
                   type="text"
@@ -292,7 +335,7 @@ export function BoardPage() {
                     setCurrentPage(1);
                     setSearchQuery(e.target.value);
                   }}
-                  className="pl-9 pr-3 py-1.5 w-64 rounded-lg border border-slate-200 bg-white text-[13px] font-medium tracking-tight text-slate-800 shadow-sm focus:outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10 transition-colors placeholder:text-slate-400"
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-[13px] font-medium tracking-tight text-slate-800 shadow-sm transition-colors placeholder:text-slate-400 focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/10 md:w-64"
                 />
               </div>
 
@@ -300,9 +343,9 @@ export function BoardPage() {
               <div className="relative">
                 <button
                   onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-[13px] font-semibold transition-colors shadow-sm cursor-pointer select-none ${
+                  className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-semibold shadow-sm transition-colors cursor-pointer select-none ${
                     isFilterDropdownOpen
-                      ? "border-kaist-darkgreen bg-[#e6f4ea]/40 text-kaist-darkgreen"
+                      ? "border-brand-primary bg-brand-primary-light text-brand-primary"
                       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
@@ -311,18 +354,20 @@ export function BoardPage() {
                 </button>
 
                 {isFilterDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-3.5 z-30 flex flex-col gap-3.5 animate-in fade-in slide-in-from-top-1 duration-200 select-none">
+                  <div className="absolute right-0 z-30 mt-2 flex w-72 animate-in select-none flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xl fade-in slide-in-from-top-1 duration-200">
                     {/* Criteria */}
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                         검색 기준
                       </span>
                       <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch">
-                        {([
-                          { id: "title", label: "제목" },
-                          { id: "author", label: "글쓴이" },
-                          { id: "title_content", label: "제목+내용" },
-                        ] as const).map((opt) => {
+                        {(
+                          [
+                            { id: "title", label: "제목" },
+                            { id: "author", label: "글쓴이" },
+                            { id: "title_content", label: "제목+내용" },
+                          ] as const
+                        ).map((opt) => {
                           const active = searchCriteria === opt.id;
                           return (
                             <button
@@ -333,38 +378,7 @@ export function BoardPage() {
                               }}
                               className={`flex-1 py-1 px-1 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap ${
                                 active
-                                  ? "bg-white text-kaist-darkgreen shadow-xs"
-                                  : "text-slate-500 hover:text-slate-800 bg-transparent"
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Sorting */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        정렬 기준
-                      </span>
-                      <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch">
-                        {([
-                          { id: "latest", label: "최신순" },
-                          { id: "views", label: "조회수순" },
-                        ] as const).map((opt) => {
-                          const active = sortBy === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              onClick={() => {
-                                setSortBy(opt.id);
-                                setCurrentPage(1);
-                              }}
-                              className={`flex-1 py-1 px-1 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap ${
-                                active
-                                  ? "bg-white text-kaist-darkgreen shadow-xs"
+                                  ? "bg-white text-brand-primary shadow-xs"
                                   : "text-slate-500 hover:text-slate-800 bg-transparent"
                               }`}
                             >
@@ -381,11 +395,13 @@ export function BoardPage() {
                         조회 기간
                       </span>
                       <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch">
-                        {([
-                          { id: "all", label: "전체" },
-                          { id: "7days", label: "최근 7일" },
-                          { id: "30days", label: "최근 30일" },
-                        ] as const).map((opt) => {
+                        {(
+                          [
+                            { id: "all", label: "전체" },
+                            { id: "7days", label: "최근 7일" },
+                            { id: "30days", label: "최근 30일" },
+                          ] as const
+                        ).map((opt) => {
                           const active = period === opt.id;
                           return (
                             <button
@@ -396,7 +412,7 @@ export function BoardPage() {
                               }}
                               className={`flex-1 py-1 px-1 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap ${
                                 active
-                                  ? "bg-white text-kaist-darkgreen shadow-xs"
+                                  ? "bg-white text-brand-primary shadow-xs"
                                   : "text-slate-500 hover:text-slate-800 bg-transparent"
                               }`}
                             >
@@ -415,20 +431,20 @@ export function BoardPage() {
 
         {/* Board Content Table */}
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="bg-white border border-slate-100 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.015)] overflow-hidden">
+          <div className="bg-white border border-card-border-subtle rounded-2xl shadow-card overflow-hidden">
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-2 bg-white">
               <div className="text-[14px] font-bold text-slate-800 tracking-tight">
                 {lang === "ko" ? (
                   <span>
                     총{" "}
-                    <strong className="font-black text-kaist-darkgreen">
+                    <strong className="font-black text-brand-primary">
                       {totalCount}
                     </strong>
                     건
                   </span>
                 ) : (
                   <span>
-                    <strong className="font-black text-kaist-darkgreen">
+                    <strong className="font-black text-brand-primary">
                       {totalCount}
                     </strong>{" "}
                     posts
@@ -444,7 +460,7 @@ export function BoardPage() {
                     setPostsPerPage(value);
                     setCurrentPage(1);
                   }}
-                  className="appearance-none bg-white border border-slate-200/80 rounded-xl px-4 py-1.5 pr-9 text-[13px] font-semibold text-slate-700 shadow-sm focus:outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10 cursor-pointer"
+                  className="appearance-none bg-white border border-slate-200/80 rounded-xl px-4 py-1.5 pr-9 text-[13px] font-semibold text-slate-700 shadow-sm focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 cursor-pointer"
                 >
                   <option value={10}>
                     {lang === "ko" ? "10건" : "10 per page"}
@@ -470,21 +486,59 @@ export function BoardPage() {
               </div>
             </div>
             {/* Table Header using CSS Grid with Fractional Middle Track to prevent Overflow */}
-            <div className="grid grid-cols-[12%_1fr_15%_12%_8%] gap-4 py-3.5 px-6 border-b border-slate-200 font-bold text-[13px] tracking-tight text-slate-500 bg-slate-50/50 items-center">
+            <div className="grid grid-cols-[3.75rem_minmax(0,1fr)_5.25rem] gap-3 border-b border-slate-200 bg-slate-50/50 px-4 py-3.5 text-[13px] font-bold tracking-tight text-slate-500 md:grid-cols-[8%_1fr_15%_12%_8%] md:gap-4 md:px-6">
               <div className="text-center shrink-0">
                 {lang === "ko" ? "말머리" : "Category"}
               </div>
-              <div className="text-left pl-6 shrink-0">
+              <div className="min-w-0 text-left md:pl-2">
                 {lang === "ko" ? "제목" : "Title"}
               </div>
-              <div className="text-center shrink-0">
+              <div className="hidden text-center shrink-0 md:block">
                 {lang === "ko" ? "글쓴이" : "Author"}
               </div>
-              <div className="text-center shrink-0">
-                {lang === "ko" ? "작성일" : "Date"}
+              <div className="flex justify-center shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSortChange("latest");
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors ${
+                    sortBy === "latest"
+                      ? "text-brand-primary"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <span>{lang === "ko" ? "작성일" : "Date"}</span>
+                  <ArrowDown
+                    className={`h-3 w-3 transition-transform ${
+                      sortBy === "latest" && sortDirection === "asc"
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  />
+                </button>
               </div>
-              <div className="text-center shrink-0">
-                {lang === "ko" ? "조회수" : "Views"}
+              <div className="hidden justify-end pr-4 shrink-0 md:flex">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSortChange("views");
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors ${
+                    sortBy === "views"
+                      ? "text-brand-primary"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <span>{lang === "ko" ? "조회수" : "Views"}</span>
+                  <ArrowDown
+                    className={`h-3 w-3 transition-transform ${
+                      sortBy === "views" && sortDirection === "asc"
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 
@@ -493,7 +547,10 @@ export function BoardPage() {
               {articles.length > 0 ? (
                 articles.map((post) => {
                   const isNew = (() => {
-                    return isoToMs(post.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
+                    return (
+                      isoToMs(post.postedAt) >=
+                      nowMs() - 4 * 24 * 60 * 60 * 1000
+                    );
                   })();
                   const hasAttachment = post.hasAttachment ?? false;
 
@@ -504,11 +561,11 @@ export function BoardPage() {
                     <Link
                       key={post.articleId}
                       to={`/board/${postCategory}/${post.articleId}`}
-                      className="grid grid-cols-[12%_1fr_15%_12%_8%] gap-4 py-4 px-6 items-center transition-colors group hover:bg-slate-50/50"
+                      className="group grid grid-cols-[3.75rem_minmax(0,1fr)_5.25rem] items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50/50 md:grid-cols-[8%_1fr_15%_12%_8%] md:gap-4 md:px-6"
                     >
                       {/* Badge / 말머리 */}
                       <div className="flex justify-center text-center shrink-0">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold tracking-tight bg-[#e6f4ea] text-[#137333] select-none shrink-0">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-[10.5px] font-bold tracking-tight bg-brand-primary-light text-brand-primary select-none shrink-0">
                           {getBoardLabelFromMetadata(
                             postBoard,
                             postCategory,
@@ -518,7 +575,10 @@ export function BoardPage() {
                       </div>
 
                       {/* Title / 제목 */}
-                      <div className="flex items-center gap-2 pl-6 text-left font-semibold text-[14px] tracking-tight text-slate-800 group-hover:text-kaist-darkgreen transition-colors truncate shrink-0">
+                      <div className="flex min-w-0 items-center gap-2 text-left text-[14px] font-semibold tracking-tight text-slate-800 transition-colors group-hover:text-brand-primary md:pl-2">
+                        {post.isPinned && (
+                          <Pin className="h-3.5 w-3.5 shrink-0 fill-[#E11D48] text-[#E11D48]" />
+                        )}
                         <span className="truncate">
                           {lang === "ko"
                             ? post.titleKo
@@ -535,7 +595,7 @@ export function BoardPage() {
                       </div>
 
                       {/* Author / 글쓴이 */}
-                      <div className="text-center text-[13px] font-medium tracking-tight text-slate-600 shrink-0">
+                      <div className="hidden text-center text-[13px] font-medium tracking-tight text-slate-600 shrink-0 md:block">
                         {post.isAnonymous
                           ? lang === "ko"
                             ? "익명"
@@ -549,8 +609,8 @@ export function BoardPage() {
                       </div>
 
                       {/* Views / 조회수 */}
-                      <div className="text-center text-[13px] font-semibold tracking-tight text-slate-500 shrink-0">
-                        {post.viewCount}
+                      <div className="hidden justify-end pr-4 text-[13px] font-medium tabular-nums tracking-tight text-slate-500 md:flex">
+                        <span className="w-12 text-right">{post.viewCount}</span>
                       </div>
                     </Link>
                   );
@@ -577,7 +637,7 @@ export function BoardPage() {
                   <Link
                     state={writeState}
                     to="/board/write"
-                    className="inline-flex items-center justify-center px-3.5 py-1.5 bg-kaist-darkgreen border border-transparent text-white rounded-lg text-[13px] font-bold tracking-tight hover:opacity-90 transition-all shadow-sm"
+                    className="inline-flex items-center justify-center px-3.5 py-1.5 bg-brand-primary border border-transparent text-white rounded-lg text-[13px] font-bold tracking-tight hover:opacity-90 transition-all shadow-sm"
                   >
                     {lang === "ko" ? "글쓰기" : "Write"}
                   </Link>

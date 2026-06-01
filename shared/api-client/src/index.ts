@@ -1,6 +1,7 @@
 import { createAdminApi } from "./admin";
 import { createAuthApi } from "./auth";
 import { createBoardApi } from "./board";
+import { createCalendarApi } from "./calendar";
 import {
   ApiClientHttpError,
   createApiClientContext,
@@ -18,6 +19,7 @@ export const createApiClient = (options: ApiClientOptions) => {
   return {
     ...createAuthApi(context),
     ...createBoardApi(context),
+    ...createCalendarApi(context),
     ...createAdminApi(context),
     ...createSurveyApi(context),
     ...createMiscApi(context),

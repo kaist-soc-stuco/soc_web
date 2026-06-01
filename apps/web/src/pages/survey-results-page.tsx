@@ -27,16 +27,7 @@ import {
   Users,
 } from "lucide-react";
 
-const CHART_COLORS = [
-  "#34D399",
-  "#60A5FA",
-  "#FBBF24",
-  "#F472B6",
-  "#A78BFA",
-  "#FB7185",
-  "#38BDF8",
-  "#94A3B8",
-];
+const CHART_COLORS = ["#047857", "#059669", "#10B981", "#34D399"];
 
 function getLocalizedTitle(
   lang: string,
@@ -181,7 +172,7 @@ function ResultShell({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)] ${className}`}
+      className={`rounded-2xl border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)] ${className}`}
     >
       {children}
     </div>
@@ -198,7 +189,7 @@ function ChoiceResult({
   const sortedChoices = sortChoiceResults(choices);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {sortedChoices.map((choice, idx) => {
         const label = getLocalizedTitle(lang, choice.labelKo, choice.labelEn);
         const color = CHART_COLORS[idx % CHART_COLORS.length];
@@ -215,7 +206,7 @@ function ChoiceResult({
                   : `${choice.count} (${choice.percentage}%)`}
               </span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -347,21 +338,23 @@ function QuestionResultCard({
 
   return (
     <ResultShell className="px-5 py-4">
-      <div className="mb-2 flex flex-col gap-2 border-b border-slate-100 pb-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-3.5 flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <span className="inline-flex rounded-md bg-kaist-lightgreen/20 px-2 py-1 text-[11px] font-extrabold text-kaist-darkgreen">
+            <span className="inline-flex rounded-md bg-kaist-lightgreen/20 px-1.5 py-0.5 text-[10px] font-bold text-kaist-darkgreen">
               {getQuestionTypeLabel(question.questionType, lang)}
             </span>
-            <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-extrabold text-slate-500">
+            <span className="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
               {lang === "ko"
                 ? `응답 ${question.totalAnswers}개`
                 : `${question.totalAnswers} answers`}
             </span>
           </div>
-          <h2 className="break-words text-base font-extrabold leading-snug text-slate-950 sm:text-lg">
-            <span className="mr-2 text-kaist-darkgreen">{idx + 1}.</span>
-            {title}
+          <h2 className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-extrabold leading-6 text-slate-950">
+            <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
+              {idx + 1}.
+            </span>
+            <span className="min-h-6 break-words leading-6">{title}</span>
           </h2>
         </div>
       </div>
@@ -530,7 +523,7 @@ export function SurveyResultsPage() {
     <div className="flex min-h-screen flex-col bg-[#fafafa]">
       <Header showLogo />
       <main className="flex-1 px-4 py-10 lg:px-0">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-[52rem]">
           <div className="mb-4">
             <button
               type="button"

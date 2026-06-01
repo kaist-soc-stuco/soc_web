@@ -80,6 +80,7 @@ export interface SurveySummary {
   descriptionEn?: string;
   computedState: string;
   feeRequirementPolicy: string;
+  isAlwaysOpen: boolean;
   openAt?: string;
   closeAt?: string;
 }

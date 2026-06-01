@@ -107,7 +107,7 @@ function QuestionInput({
         );
       }
       return (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           {question.options?.map((opt) => {
             const isSelected = value === opt.value;
             return (
@@ -150,7 +150,7 @@ function QuestionInput({
 
     case "multiple_choice":
       return (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           {question.options?.map((opt) => {
             const selected = (value as string[]).includes(opt.value);
             return (
@@ -516,7 +516,7 @@ function SuccessView({
   const canViewResults = resultVisibility === "PUBLIC";
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-[0_14px_45px_rgba(15,23,42,0.08)] text-center flex flex-col items-center max-w-lg mx-auto my-10 animate-in fade-in zoom-in-95 duration-300">
+    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-[0_14px_45px_rgba(15,23,42,0.08)] text-center flex w-full flex-col items-center mx-auto my-10 animate-in fade-in zoom-in-95 duration-300">
       <div className="w-14 h-14 rounded-2xl bg-kaist-lightgreen/20 flex items-center justify-center text-kaist-darkgreen mb-5 border border-kaist-lightgreen/30">
         <CheckCircle2 className="w-8 h-8" />
       </div>
@@ -562,7 +562,7 @@ function AlreadySubmittedView({
   const canViewResults = resultVisibility === "PUBLIC";
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-[0_14px_45px_rgba(15,23,42,0.08)] text-center flex flex-col items-center max-w-lg mx-auto my-10 animate-in fade-in zoom-in-95 duration-300">
+    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-[0_14px_45px_rgba(15,23,42,0.08)] text-center flex w-full flex-col items-center mx-auto my-10 animate-in fade-in zoom-in-95 duration-300">
       <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 mb-5 border border-blue-100">
         <CheckCircle2 className="w-8 h-8" />
       </div>
@@ -821,7 +821,7 @@ export function SurveyPage() {
                 (lang === "ko"
                   ? section.descriptionKo
                   : section.descriptionEn || section.descriptionKo)) && (
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                <div className="px-1 pb-1 pt-2">
                   {(lang === "ko"
                     ? section.titleKo
                     : section.titleEn || section.titleKo) && (
@@ -853,16 +853,16 @@ export function SurveyPage() {
                     className="group rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)] transition-all hover:border-kaist-darkgreen/20 hover:shadow-[0_16px_40px_rgba(15,23,42,0.07)]"
                   >
                     <div className="mb-3.5 border-b border-slate-100 pb-3">
-                      <label className="flex min-w-0 items-start gap-2 text-[15px] font-extrabold leading-snug text-slate-950">
-                        <span className="shrink-0 text-kaist-darkgreen">
+                      <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-extrabold leading-6 text-slate-950">
+                        <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
                           {questionIndex}.
                         </span>
-                        <span className="break-words">
+                        <span className="min-h-6 break-words leading-6">
                           {lang === "ko"
                             ? question.titleKo
                             : question.titleEn || question.titleKo}
                           {question.isRequired && (
-                            <span className="ml-1 align-super text-xs font-black text-rose-500">
+                            <span className="ml-1 inline-block translate-y-[-0.22em] text-xs font-black leading-none text-rose-500">
                               *
                             </span>
                           )}
@@ -959,7 +959,7 @@ export function SurveyPage() {
     <div className="flex min-h-screen flex-col bg-[#fafafa]">
       <Header showLogo />
       <main className="flex-1 px-4 py-10 lg:px-0">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-[52rem]">
           {survey && (
             <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.06)] animate-in fade-in slide-in-from-top-4 duration-300 sm:p-8">
               <div className="mb-5 flex flex-wrap items-center gap-2">

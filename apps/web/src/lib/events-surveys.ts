@@ -7,6 +7,9 @@ import { isoToDate, isoToMs, nowMs } from "@soc/shared";
 
 export type EventsSurveysTab = "event" | "survey" | "calendar";
 export type EventsSurveysSortKey = "latest" | "deadline";
+export type EventsSurveysStateFilter =
+  | "all"
+  | ComputedSurveyState;
 export type UnifiedItemKind = SurveyRecord["kind"] | "EVENT";
 
 export type SurveyRecordWithState = SurveyRecord & {
@@ -29,6 +32,7 @@ export interface UnifiedItem {
   resultVisibility?: string;
   maxResponses?: number | null;
   responseCount?: number;
+  isAlwaysOpen?: boolean;
 }
 
 export interface CalendarEvent {
@@ -54,7 +58,8 @@ export const getEventArticleState = (
   event: ArticleListItem,
   currentMs = nowMs(),
 ): ComputedSurveyState => {
-  if (!event.eventStartDate || !event.eventEndDate) return "closed";
+  if (!event.eventStartDate && !event.eventEndDate) return "open";
+  if (!event.eventStartDate || !event.eventEndDate) return "open";
 
   const start = isoToMs(event.eventStartDate);
   const end = isoToMs(event.eventEndDate);
@@ -117,7 +122,11 @@ export const getPeriodText = (item: UnifiedItem) => {
   return start || end || "";
 };
 
-export const getCardPeriodText = (item: UnifiedItem) => {
+export const getCardPeriodText = (item: UnifiedItem, lang: "ko" | string = "ko") => {
+  if (item.isAlwaysOpen || (!item.opensAt && !item.closesAt)) {
+    return lang === "ko" ? "상시" : "Always open";
+  }
+
   const start = formatCardDate(item.opensAt);
   const end = formatCardDate(item.closesAt);
 
@@ -130,7 +139,9 @@ export const buildUnifiedItems = (
   events: ArticleListItem[],
   currentMs = nowMs(),
 ): UnifiedItem[] => {
-  const mappedSurveys: UnifiedItem[] = surveys.map((survey) => ({
+  const mappedSurveys: UnifiedItem[] = surveys
+    .filter((survey) => !(survey.kind === "EVENT" && survey.connectedPostId))
+    .map((survey) => ({
     id: survey.id,
     kind: survey.kind,
     titleKo: survey.titleKo,
@@ -145,6 +156,7 @@ export const buildUnifiedItems = (
     resultVisibility: survey.resultVisibility,
     maxResponses: survey.maxResponses,
     responseCount: survey.responseCount,
+    isAlwaysOpen: survey.isAlwaysOpen,
   }));
 
   const mappedEvents: UnifiedItem[] = events.map((event) => ({
@@ -163,6 +175,7 @@ export const buildUnifiedItems = (
     resultVisibility: "PRIVATE",
     maxResponses: null,
     responseCount: 0,
+    isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
   }));
 
   return [...mappedSurveys, ...mappedEvents];
@@ -182,13 +195,22 @@ export const filterItemsByTab = (
 export const sortVisibleItems = (
   items: UnifiedItem[],
   sortBy: EventsSurveysSortKey,
-  showOpenOnly: boolean,
+  stateFilter: EventsSurveysStateFilter | boolean,
 ) =>
   [...items]
-    .filter((item) => (showOpenOnly ? isOpenItem(item) : true))
+    .filter((item) =>
+      typeof stateFilter === "boolean"
+        ? stateFilter
+          ? isOpenItem(item)
+          : true
+        : stateFilter === "all"
+          ? true
+          : item.computedState === stateFilter,
+    )
     .sort((a, b) => {
-      if (isClosedItem(a) !== isClosedItem(b)) {
-        return Number(isClosedItem(a)) - Number(isClosedItem(b));
+      const stateOrder = { before_open: 0, open: 1, closed: 2 };
+      if (a.computedState !== b.computedState) {
+        return stateOrder[a.computedState] - stateOrder[b.computedState];
       }
       if (sortBy === "deadline") {
         return getItemDeadlineTime(a) - getItemDeadlineTime(b);

@@ -61,23 +61,43 @@ const SurveySettingsSchema = z.object({
   allowResponseEdit: z.boolean().optional(),
   isPublished: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
+  isAlwaysOpen: z.boolean().optional(),
   maxResponseCount: z
     .string()
     .optional()
     .refine((value: string | undefined) => !value || /^[0-9]+$/.test(value), {
       message: "숫자만 입력하세요.",
     }),
-  openAt: z.string().min(1, "시작 시각을 입력해주세요."),
-  closeAt: z.string().min(1, "마감 시각을 입력해주세요."),
+  openAt: z.string(),
+  closeAt: z.string(),
   connectedArticleId: z.string().optional(),
-}).refine((data) => {
+}).superRefine((data, ctx) => {
   if (!data.isKoreanOnly) {
-    return !!data.titleEn?.trim();
+    if (!data.titleEn?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "영문 제목은 필수입니다 (Korean Speakers Only가 아닐 경우).",
+        path: ["titleEn"],
+      });
+    }
   }
-  return true;
-}, {
-  message: "영문 제목은 필수입니다 (Korean Speakers Only가 아닐 경우).",
-  path: ["titleEn"],
+
+  if (!data.isAlwaysOpen) {
+    if (!data.openAt?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "시작 시각을 입력해주세요.",
+        path: ["openAt"],
+      });
+    }
+    if (!data.closeAt?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "마감 시각을 입력해주세요.",
+        path: ["closeAt"],
+      });
+    }
+  }
 });
 
 const emptyQuestion = (): QuestionFormState => ({
@@ -119,6 +139,7 @@ export function SurveyEditorPage() {
       allowResponseEdit: false,
       isPublished: false,
       showOnCalendar: false,
+      isAlwaysOpen: false,
       maxResponseCount: "",
       openAt: "",
       closeAt: "",
@@ -189,6 +210,7 @@ export function SurveyEditorPage() {
             allowResponseEdit: detail.allowResponseEdit ?? false,
             isPublished: detail.isPublished ?? false,
             showOnCalendar: detail.showOnCalendar ?? false,
+            isAlwaysOpen: detail.isAlwaysOpen ?? false,
             maxResponseCount:
               detail.maxResponses != null ? String(detail.maxResponses) : "",
             openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
@@ -233,10 +255,19 @@ export function SurveyEditorPage() {
         isKoreanOnly: values.isKoreanOnly,
         isPublished: values.isPublished,
         showOnCalendar: values.showOnCalendar,
+        isAlwaysOpen: values.isAlwaysOpen,
         resultVisibility: values.resultVisibility,
         maxResponseCount,
-        openAt: values.openAt ? htmlDatetimeLocalToIso(values.openAt) : undefined,
-        closeAt: values.closeAt ? htmlDatetimeLocalToIso(values.closeAt) : undefined,
+        openAt: values.isAlwaysOpen
+          ? null
+          : values.openAt
+            ? htmlDatetimeLocalToIso(values.openAt)
+            : undefined,
+        closeAt: values.isAlwaysOpen
+          ? null
+          : values.closeAt
+            ? htmlDatetimeLocalToIso(values.closeAt)
+            : undefined,
         connectedArticleId: values.connectedArticleId?.trim() || undefined,
       };
       if (isEdit && loadedSurveyId) {
@@ -449,6 +480,7 @@ export function SurveyEditorPage() {
     setSelectedArticleTitle(title);
     
     if (yes) {
+      form.setValue("isAlwaysOpen", false);
       form.setValue("openAt", isoToHtmlDatetimeLocal(eventStartDate));
       form.setValue("closeAt", isoToHtmlDatetimeLocal(eventEndDate));
     }

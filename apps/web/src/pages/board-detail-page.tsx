@@ -285,6 +285,16 @@ export function BoardDetailPage() {
     lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
   const content =
     lang === "ko" ? article.contentKo : article.contentEn || article.contentKo;
+  const surveyTitle = article.survey
+    ? lang === "ko"
+      ? article.survey.titleKo
+      : article.survey.titleEn || article.survey.titleKo
+    : "";
+  const surveyDescription = article.survey
+    ? lang === "ko"
+      ? article.survey.descriptionKo
+      : article.survey.descriptionEn || article.survey.descriptionKo
+    : "";
 
   const boardTitle = getBoardTitleFromMetadata(
     board ?? catalogBoard,
@@ -462,25 +472,28 @@ export function BoardDetailPage() {
             />
 
             {article.survey && (
-              <section className="mt-6 rounded-xl border border-slate-200/80 bg-slate-50/40 p-4 shadow-none">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <ClipboardCheck className="h-6 w-6 text-kaist-darkgreen/80 shrink-0" />
-                    <div>
-                      <h2 className="text-[13.5px] font-bold text-slate-800 leading-none">
-                        설문조사 참여 안내
+              <section className="mt-6 rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.025)]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-kaist-darkgreen">
+                      <ClipboardCheck className="h-4.5 w-4.5" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-[14px] font-extrabold leading-snug tracking-tight text-slate-900">
+                        {surveyTitle}
                       </h2>
-                      <p className="mt-1.5 text-[11.5px] font-medium leading-relaxed text-slate-500">
-                        학생회 운영·행사에 대한 여러분의 소중한 의견을
-                        들려주세요. 더 나은 학부 문화를 함께 만들어갑니다.
-                      </p>
+                      {surveyDescription && (
+                        <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-relaxed text-slate-500">
+                          {surveyDescription}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Link
                     to={`/survey/${article.survey.surveyId}`}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3.5 py-1.5 text-[12px] font-bold text-white transition hover:opacity-90 shrink-0 shadow-sm"
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm transition hover:opacity-90"
                   >
-                    <span>설문조사 참여하기</span>
+                    <span>{lang === "ko" ? "설문조사 참여하기" : "Open survey"}</span>
                     <svg
                       className="w-2.5 h-2.5 text-white"
                       fill="none"

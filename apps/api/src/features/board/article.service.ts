@@ -34,6 +34,7 @@ interface ArticleQueryParams {
   period?: "all" | "7days" | "30days";
   searchBy?: "title" | "author" | "title_content";
   sortBy?: "latest" | "views";
+  sortDirection?: "asc" | "desc";
 }
 
 interface AuthenticatedUser {
@@ -98,6 +99,7 @@ export class ArticleService {
     const query = params.q?.trim();
     const searchBy = params.searchBy ?? "title";
     const sortBy = params.sortBy ?? "latest";
+    const sortDirection = params.sortDirection ?? "desc";
     const cutoffDate =
       params.period === "7days"
         ? isoToDate(msToIso(nowMs() - 7 * 24 * 60 * 60 * 1000))
@@ -114,6 +116,7 @@ export class ArticleService {
         query,
         searchBy,
         sortBy,
+        sortDirection,
       },
     );
 

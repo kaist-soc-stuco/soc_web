@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
 import { isoToDate, localDate, msToDate, nowDate } from "@soc/shared";
-import type { SurveyRecord } from "@soc/contracts";
+import type {
+  ArticleListItem,
+  KoreanHolidayRecord,
+  SurveyRecord,
+} from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -14,6 +18,35 @@ interface CompactEvent {
   cleanTitle: string;
   date: Date;
   dateType: "open" | "close";
+}
+
+interface CalendarPreviewEvent {
+  key: string;
+  cleanTitle: string;
+  timeText: string;
+  dateType: "open" | "close" | "range";
+  sortDate: Date;
+}
+
+function toDateKey(date: Date) {
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}`;
+}
+
+function isSameDate(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatTime(date: Date) {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${hh}:${min}`;
 }
 
 function formatDate(date: Date) {
@@ -33,6 +66,58 @@ function formatWeekDate(date: Date, lang: string) {
   return `${mm}.${dd} (${dayName}) ${hh}:${min}`;
 }
 
+function buildPreviewEvents(dayEvents: CompactEvent[]): CalendarPreviewEvent[] {
+  const sortedEvents = [...dayEvents].sort(
+    (a, b) => a.date.getTime() - b.date.getTime(),
+  );
+  const consumed = new Set<string>();
+  const previewEvents: CalendarPreviewEvent[] = [];
+
+  sortedEvents.forEach((event, index) => {
+    const eventKey = `${event.id}-${event.dateType}`;
+    if (consumed.has(eventKey)) return;
+
+    if (event.kind === "EVENT" && event.dateType === "open") {
+      const closeEvent = sortedEvents.find(
+        (candidate) =>
+          candidate.id === event.id &&
+          candidate.kind === event.kind &&
+          candidate.dateType === "close" &&
+          isSameDate(candidate.date, event.date),
+      );
+
+      if (closeEvent) {
+        consumed.add(eventKey);
+        consumed.add(`${closeEvent.id}-${closeEvent.dateType}`);
+        previewEvents.push({
+          key: `${event.id}-range`,
+          cleanTitle: event.cleanTitle,
+          timeText: `(${formatTime(event.date)} ~ ${formatTime(closeEvent.date)})`,
+          dateType: "range",
+          sortDate: event.date,
+        });
+        return;
+      }
+    }
+
+    consumed.add(eventKey);
+    previewEvents.push({
+      key: `${event.id}-${event.dateType}-${index}`,
+      cleanTitle: event.cleanTitle,
+      timeText:
+        event.dateType === "open"
+          ? `(${formatTime(event.date)}~)`
+          : `(~${formatTime(event.date)})`,
+      dateType: event.dateType,
+      sortDate: event.date,
+    });
+  });
+
+  return previewEvents.sort(
+    (a, b) => a.sortDate.getTime() - b.sortDate.getTime(),
+  );
+}
+
 export function Calendar() {
   const navigate = useNavigate();
   const { lang } = useLanguage();
@@ -48,15 +133,24 @@ export function Calendar() {
 
   // DB events
   const [events, setEvents] = useState<CompactEvent[]>([]);
+  const [holidays, setHolidays] = useState<KoreanHolidayRecord[]>([]);
+  const [hoveredDateKey, setHoveredDateKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const holidayCacheRef = useRef(new Map<string, KoreanHolidayRecord[]>());
 
   useEffect(() => {
+    let active = true;
     setLoading(true);
-    apiClient
-      .getPublicSurveys()
-      .then((res) => {
+    Promise.all([
+      apiClient.getPublicSurveys(),
+      apiClient
+        .getArticles("행사", { page: 1, limit: 100 })
+        .then((res) => res.items)
+        .catch(() => [] as ArticleListItem[]),
+    ])
+      .then(([surveys, eventArticles]) => {
         const parsed: CompactEvent[] = [];
-        res.forEach((survey: SurveyRecord) => {
+        surveys.forEach((survey: SurveyRecord) => {
           if (!survey.isPublished || !survey.showOnCalendar) return;
 
           const title =
@@ -83,15 +177,81 @@ export function Calendar() {
             });
           }
         });
-        setEvents(parsed);
+        eventArticles.forEach((article: ArticleListItem) => {
+          const title =
+            lang === "ko"
+              ? article.titleKo
+              : article.titleEn || article.titleKo;
+
+          if (article.eventStartDate) {
+            parsed.push({
+              id: article.articleId,
+              kind: "EVENT",
+              title: `${lang === "ko" ? "[시작]" : "[Start]"} ${title}`,
+              cleanTitle: title,
+              date: isoToDate(article.eventStartDate),
+              dateType: "open",
+            });
+          }
+
+          if (article.eventEndDate) {
+            parsed.push({
+              id: article.articleId,
+              kind: "EVENT",
+              title: `${lang === "ko" ? "[마감]" : "[Deadline]"} ${title}`,
+              cleanTitle: title,
+              date: isoToDate(article.eventEndDate),
+              dateType: "close",
+            });
+          }
+        });
+
+        if (active) {
+          setEvents(parsed);
+        }
       })
       .catch((err) => {
         console.error("Failed to load compact calendar events:", err);
       })
       .finally(() => {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       });
+    return () => {
+      active = false;
+    };
   }, [apiClient, lang]);
+
+  useEffect(() => {
+    let active = true;
+    const cacheKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+    const cached = holidayCacheRef.current.get(cacheKey);
+
+    if (cached) {
+      setHolidays(cached);
+      return;
+    }
+
+    apiClient
+      .getKoreanHolidays(currentYear, currentMonth + 1)
+      .then((holidayItems) => {
+        holidayCacheRef.current.set(cacheKey, holidayItems);
+        if (active) {
+          setHolidays(holidayItems);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load Korean holidays:", err);
+        if (active) {
+          setHolidays([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [apiClient, currentMonth, currentYear]);
 
   // Generate compact calendar grid
   const days = useMemo(() => {
@@ -176,32 +336,35 @@ export function Calendar() {
       })
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [events]);
-  const visibleWeeklyEvents = weeklyEvents.slice(0, 1);
+  const visibleWeeklyEvents = weeklyEvents.slice(0, 2);
   const hiddenWeeklyEventCount = Math.max(
     0,
     weeklyEvents.length - visibleWeeklyEvents.length,
   );
+  const holidayMap = useMemo(() => {
+    return new Map(holidays.map((holiday) => [holiday.locdate, holiday]));
+  }, [holidays]);
 
   return (
-    <section className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.025)] px-6 pt-4 pb-5 h-full flex flex-col justify-between select-none">
-      <div className="flex flex-col pb-2">
+    <section className="bg-white rounded-3xl border border-card-border-subtle shadow-card px-6 pt-4 pb-4 h-full flex flex-col justify-between select-none">
+      <div className="flex flex-col pb-1">
         {/* Header */}
-        <div className="mb-3.5 mt-1 flex-shrink-0 flex items-center justify-between">
+        <div className="mb-2.5 mt-1 flex-shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={handlePrevMonth}
-              className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors text-slate-600 cursor-pointer"
+              className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center hover:border-brand-primary-border hover:bg-brand-primary-light transition-colors text-slate-600 cursor-pointer"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
 
-            <h3 className="text-base font-bold tracking-tight text-[#137333]">
+            <h3 className="text-base font-bold tracking-tight text-brand-primary">
               {currentYear}년 {currentMonth + 1}월
             </h3>
 
             <button
               onClick={handleNextMonth}
-              className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors text-slate-600 cursor-pointer"
+              className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center hover:border-brand-primary-border hover:bg-brand-primary-light transition-colors text-slate-600 cursor-pointer"
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
@@ -209,7 +372,7 @@ export function Calendar() {
         </div>
 
         {/* Weekday Headers */}
-        <div className="mb-2 grid grid-cols-7 gap-x-1 flex-shrink-0 text-center">
+        <div className="mb-1.5 grid grid-cols-7 gap-x-1 flex-shrink-0 text-center">
           {["일", "월", "화", "수", "목", "금", "토"].map((day, index) => (
             <div key={index}>
               <span
@@ -229,12 +392,15 @@ export function Calendar() {
 
         {/* Calendar Grid */}
         {loading ? (
-          <div className="flex-1 flex items-center justify-center min-h-[190px]">
-            <div className="w-6 h-6 border-2 border-[#137333]/30 border-t-[#137333] rounded-full animate-spin"></div>
+          <div className="flex-1 flex items-center justify-center min-h-[176px]">
+            <div className="w-6 h-6 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin"></div>
           </div>
         ) : (
-          <div className="flex-1 grid grid-cols-7 gap-y-1 bg-white min-h-[190px] overflow-y-auto overflow-x-hidden">
+          <div className="flex-1 grid grid-cols-7 gap-y-0.5 bg-white min-h-[176px] overflow-visible">
             {days.map((item, index) => {
+              const cellDateKey = item.date
+                ? toDateKey(item.date)
+                : `empty-${index}`;
               const dayEvents = item.date
                 ? events.filter(
                     (e) =>
@@ -246,6 +412,11 @@ export function Calendar() {
 
               const isSunday = item.date?.getDay() === 0;
               const isSaturday = item.date?.getDay() === 6;
+              const holiday = item.date
+                ? holidayMap.get(toDateKey(item.date))
+                : undefined;
+              const isPublicHoliday = holiday?.isHoliday === true;
+              const previewEvents = buildPreviewEvents(dayEvents);
 
               return (
                 <button
@@ -257,19 +428,32 @@ export function Calendar() {
                       );
                     }
                   }}
-                  className={`relative flex flex-col items-center justify-start py-0.5 transition-all h-[37px] cursor-pointer bg-white rounded-lg group ${
+                  onMouseEnter={() => setHoveredDateKey(cellDateKey)}
+                  onMouseLeave={() =>
+                    setHoveredDateKey((current) =>
+                      current === cellDateKey ? null : current,
+                    )
+                  }
+                  onFocus={() => setHoveredDateKey(cellDateKey)}
+                  onBlur={() =>
+                    setHoveredDateKey((current) =>
+                      current === cellDateKey ? null : current,
+                    )
+                  }
+                  className={`relative flex h-[34px] cursor-pointer flex-col items-center justify-start rounded-lg bg-white py-0.5 transition-all hover:z-40 ${
                     item.today ? "" : "hover:bg-slate-50/80"
                   }`}
                 >
                   {item.today ? (
-                    <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                    <div className="w-4 h-4 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
                       {item.day}
                     </div>
                   ) : (
                     <span
+                      title={holiday?.dateName}
                       className={`text-[11.5px] font-semibold ${
                         item.isCurrentMonth
-                          ? isSunday
+                          ? isSunday || isPublicHoliday
                             ? "text-red-500"
                             : isSaturday
                               ? "text-blue-500"
@@ -284,64 +468,71 @@ export function Calendar() {
                   {/* Bullet/Badge Space */}
                   <div className="flex flex-col items-center justify-end flex-1 w-full pb-0.5">
                     {dayEvents.length > 0 ? (
-                      <span
-                        className="bg-emerald-50 text-emerald-700 border border-emerald-200/30 rounded-full px-1.5 py-0.2 text-[8px] font-extrabold tracking-tight select-none scale-90 truncate max-w-[56px] block text-center"
-                        title={dayEvents[0].title}
-                      >
-                        {dayEvents[0].cleanTitle}
-                      </span>
+                      <div className="flex h-2 items-center justify-center gap-1">
+                        {previewEvents.slice(0, 4).map((event) => (
+                          <span
+                            key={event.key}
+                            title={`${event.cleanTitle} ${event.timeText}`}
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              event.dateType === "close"
+                                ? "bg-red-500"
+                                : "bg-brand-primary"
+                            }`}
+                          />
+                        ))}
+                      </div>
                     ) : item.today ? (
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-900 shrink-0 mb-0.5" />
                     ) : (
-                      <div className="flex items-center justify-center gap-0.5 h-1.5 mb-0.5">
-                        {dayEvents.slice(0, 3).map((event, eventIdx) => {
-                          const isStart = event.dateType === "open";
-                          return (
-                            <span
-                              key={eventIdx}
-                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                isStart ? "bg-green-500" : "bg-red-500"
-                              }`}
-                              title={event.title}
-                            />
-                          );
-                        })}
-                      </div>
+                      <div className="h-2" />
                     )}
                   </div>
 
                   {/* Preview Tooltip on Hover */}
-                  {item.date && dayEvents.length > 0 && (
-                    <div
-                      className={`absolute bottom-full mb-2.5 w-48 bg-slate-900/95 text-white text-[10px] rounded-xl p-2.5 shadow-xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 z-30 select-none flex flex-col gap-1.5 border border-white/10 ${(() => {
-                        const column = index % 7;
-                        if (column <= 2) return "left-0 translate-x-0";
-                        if (column >= 4) return "right-0 translate-x-0";
-                        return "left-1/2 -translate-x-1/2";
-                      })()}`}
-                    >
-                      <div className="font-extrabold border-b border-white/15 pb-1 flex items-center justify-between text-[#5cdb7d]">
-                        <span>{formatDate(item.date)}</span>
-                        <span>{dayEvents.length}개 일정</span>
+                  {item.date &&
+                    dayEvents.length > 0 &&
+                    hoveredDateKey === cellDateKey && (
+                      <div
+                        className={`absolute bottom-full mb-2.5 w-48 bg-slate-900/95 text-white text-[10px] rounded-xl p-2.5 shadow-xl pointer-events-none z-50 select-none flex flex-col gap-1.5 border border-white/10 ${(() => {
+                          const column = index % 7;
+                          if (column <= 2) return "left-0 translate-x-0";
+                          if (column >= 4) return "right-0 translate-x-0";
+                          return "left-1/2 -translate-x-1/2";
+                        })()}`}
+                      >
+                        <div className="font-extrabold border-b border-white/15 pb-1 flex items-center justify-between text-brand-primary-light">
+                          <span>{formatDate(item.date)}</span>
+                          <span>{previewEvents.length}개 일정</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5 text-[9px] font-medium text-stone-200">
+                          {previewEvents.slice(0, 4).map((event) => (
+                            <div
+                              key={event.key}
+                              className="flex min-w-0 items-center gap-1.5"
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                  event.dateType === "close"
+                                    ? "bg-red-400"
+                                    : "bg-brand-primary-light"
+                                }`}
+                              />
+                              <span className="min-w-0 flex-1 truncate">
+                                {event.cleanTitle}
+                              </span>
+                              <span className="shrink-0 text-[8.5px] font-semibold text-stone-300">
+                                {event.timeText}
+                              </span>
+                            </div>
+                          ))}
+                          {previewEvents.length > 4 && (
+                            <div className="text-[8px] text-stone-400 pl-3">
+                              + {previewEvents.length - 4}개 더보기
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-1 text-[9px] font-medium text-stone-200">
-                        {dayEvents.slice(0, 3).map((e, idx) => (
-                          <div
-                            key={idx}
-                            className="truncate flex items-center gap-1.5"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#5cdb7d] shrink-0" />
-                            <span className="truncate">{e.title}</span>
-                          </div>
-                        ))}
-                        {dayEvents.length > 3 && (
-                          <div className="text-[8px] text-stone-400 pl-3">
-                            + {dayEvents.length - 3}개 더보기
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                    )}
                 </button>
               );
             })}
@@ -350,14 +541,14 @@ export function Calendar() {
       </div>
 
       {/* 이번 주 예정 일정 */}
-      <div className="mt-4 flex-shrink-0 flex flex-col gap-2">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+      <div className="mt-1.5 flex-shrink-0 flex flex-col gap-1">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-1">
           <h4 className="text-[13.5px] font-bold text-slate-800">
             이번 주 예정 일정
           </h4>
           <Link
             to="/events-surveys?tab=calendar"
-            className="text-[11px] font-medium text-slate-400 hover:text-[#137333] transition-colors cursor-pointer flex items-center gap-0.5"
+            className="text-[11px] font-medium text-slate-400 hover:text-brand-primary transition-colors cursor-pointer flex items-center gap-0.5"
           >
             <span>더보기</span>
             <svg
@@ -375,28 +566,20 @@ export function Calendar() {
             </svg>
           </Link>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
           {weeklyEvents.length > 0 ? (
-            visibleWeeklyEvents.map((event) => {
-              const isVote = event.kind === "VOTE";
-              const isApp = event.kind === "APPLICATION";
-              const kindLabel = isVote
+            visibleWeeklyEvents.map((event, index) => {
+              const isDeadline = event.dateType === "close";
+              const statusLabel = isDeadline
                 ? lang === "ko"
-                  ? "투표"
-                  : "Vote"
-                : isApp
-                  ? lang === "ko"
-                    ? "신청"
-                    : "Application"
-                  : lang === "ko"
-                    ? "설문"
-                    : "Survey";
-
-              const kindColor = isVote
-                ? "bg-purple-50 text-purple-700 border-purple-200"
-                : isApp
-                  ? "bg-[#e8f4fd] text-[#1971c2] border-[#d0ebff]"
-                  : "bg-teal-50 text-teal-700 border-teal-200";
+                  ? "마감"
+                  : "Deadline"
+                : lang === "ko"
+                  ? "시작"
+                  : "Start";
+              const showHiddenCount =
+                hiddenWeeklyEventCount > 0 &&
+                index === visibleWeeklyEvents.length - 1;
 
               return (
                 <div
@@ -406,21 +589,25 @@ export function Calendar() {
                       `/events-surveys?tab=calendar&selected=${event.date.toISOString()}`,
                     )
                   }
-                  className="flex items-center justify-between py-1 transition-colors hover:bg-slate-50 rounded-lg px-2 -mx-2 cursor-pointer"
+                  className="flex items-center justify-between py-0.5 transition-colors hover:bg-slate-50 rounded-lg px-2 -mx-2 cursor-pointer"
                 >
                   <div className="flex items-center gap-3 w-full min-w-0">
-                    <span className="text-[11.5px] font-normal text-slate-400 shrink-0">
+                    <span className="text-[11.5px] font-normal text-slate-500 shrink-0">
                       {formatWeekDate(event.date, lang)}
                     </span>
+                    <span className="text-[11.5px] font-semibold text-slate-700 truncate min-w-0 flex-1">
+                      {event.cleanTitle}
+                    </span>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold border shrink-0 select-none ${kindColor}`}
+                      className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${
+                        isDeadline
+                          ? "border-slate-200 bg-slate-50 text-slate-400"
+                          : "border-brand-primary-border bg-brand-primary-light text-brand-primary"
+                      }`}
                     >
-                      {kindLabel}
+                      {statusLabel}
                     </span>
-                    <span className="text-[12.5px] font-semibold text-slate-700 truncate min-w-0 flex-1">
-                      {event.title}
-                    </span>
-                    {hiddenWeeklyEventCount > 0 && (
+                    {showHiddenCount && (
                       <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-extrabold text-slate-500">
                         +{hiddenWeeklyEventCount}
                       </span>
@@ -430,7 +617,7 @@ export function Calendar() {
               );
             })
           ) : (
-            <p className="text-xs text-slate-400 text-center py-4">
+            <p className="text-xs text-slate-500 text-center py-4">
               {lang === "ko"
                 ? "이번 주 예정된 일정이 없습니다."
                 : "No scheduled events this week."}
