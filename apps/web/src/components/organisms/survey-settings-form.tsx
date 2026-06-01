@@ -8,6 +8,7 @@ export const SURVEY_KINDS = [
   { value: "SURVEY", label: "일반 설문" },
   { value: "VOTE", label: "투표" },
   { value: "APPLICATION", label: "신청서/행사 접수" },
+  { value: "EVENT", label: "행사" },
 ];
 
 export const SURVEY_VISIBILITIES = [
@@ -28,6 +29,7 @@ export interface SurveySettingsFormValues {
   allowResponseEdit?: boolean;
   isPublished?: boolean;
   showOnCalendar?: boolean;
+  isAlwaysOpen?: boolean;
   maxResponseCount?: string;
   openAt: string;
   closeAt: string;
@@ -77,6 +79,7 @@ export function SurveySettingsForm({
   const allowResponseEdit = Boolean(watch("allowResponseEdit"));
   const isPublished = Boolean(watch("isPublished"));
   const showOnCalendar = Boolean(watch("showOnCalendar"));
+  const isAlwaysOpen = Boolean(watch("isAlwaysOpen"));
   const connectedArticleId = watch("connectedArticleId") ?? "";
 
   useEffect(() => {
@@ -84,6 +87,12 @@ export function SurveySettingsForm({
       setActiveTab("ko");
     }
   }, [isKoreanOnly, activeTab]);
+
+  useEffect(() => {
+    if (!isAlwaysOpen) return;
+    setValue("openAt", "");
+    setValue("closeAt", "");
+  }, [isAlwaysOpen, setValue]);
 
   const inputCls =
     "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-gray-300 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
@@ -279,6 +288,39 @@ export function SurveySettingsForm({
               />
             </div>
 
+            <label
+              className={`flex items-start gap-3 group ${
+                isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              }`}
+            >
+              <div
+                className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
+                  isAlwaysOpen
+                    ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
+                    : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
+                }`}
+              >
+                {isAlwaysOpen && (
+                  <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                )}
+              </div>
+              <input
+                type="checkbox"
+                className="hidden"
+                checked={isAlwaysOpen}
+                disabled={isOngoing}
+                onChange={(e) =>
+                  !isOngoing && setValue("isAlwaysOpen", e.target.checked)
+                }
+              />
+              <span className="text-sm font-bold text-kaist-black">
+                상시 진행
+                <span className="mt-0.5 block text-[11px] font-semibold leading-relaxed text-kaist-grey">
+                  시작/마감 시각 없이 항상 참여 가능한 설문으로 게시합니다.
+                </span>
+              </span>
+            </label>
+
             <div>
               <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
                 시작 시각 (Asia/Seoul) *
@@ -286,7 +328,7 @@ export function SurveySettingsForm({
               <input
                 type="datetime-local"
                 className={inputCls}
-                disabled={isOngoing}
+                disabled={isOngoing || isAlwaysOpen}
                 {...register("openAt")}
               />
               {errors.openAt && (
@@ -303,6 +345,7 @@ export function SurveySettingsForm({
               <input
                 type="datetime-local"
                 className={inputCls}
+                disabled={isOngoing || isAlwaysOpen}
                 {...register("closeAt")}
               />
               {errors.closeAt && (

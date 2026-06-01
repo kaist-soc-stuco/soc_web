@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
-import type { ArticleListItem } from "@soc/contracts";
+import type { ArticleListItem, KoreanHolidayRecord } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 import { Header } from "@/components/organisms/header";
@@ -18,6 +18,7 @@ import {
   sortVisibleItems,
   stripCalendarPrefix,
   type CalendarEvent,
+  type EventsSurveysStateFilter,
   type SurveyRecordWithState,
   type UnifiedItem,
 } from "@/lib/events-surveys";
@@ -33,6 +34,13 @@ import {
   ChevronRight,
   ShieldCheck,
 } from "lucide-react";
+
+function toDateKey(date: Date) {
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}`;
+}
 
 export function EventsSurveysPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -51,7 +59,8 @@ export function EventsSurveysPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"latest" | "deadline">("latest");
-  const [showOpenOnly, setShowOpenOnly] = useState(false);
+  const [stateFilter, setStateFilter] =
+    useState<EventsSurveysStateFilter>("all");
 
   // Calendar navigation states
   const [currentDate, setCurrentDate] = useState(() => nowDate());
@@ -70,6 +79,8 @@ export function EventsSurveysPage() {
     [],
   );
   const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
+  const [holidays, setHolidays] = useState<KoreanHolidayRecord[]>([]);
+  const holidayCacheRef = useRef(new Map<string, KoreanHolidayRecord[]>());
 
   const fetchItems = () => {
     setLoading(true);
@@ -100,6 +111,35 @@ export function EventsSurveysPage() {
     fetchItems();
   }, [apiClient]);
 
+  useEffect(() => {
+    let active = true;
+    const cacheKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+    const cached = holidayCacheRef.current.get(cacheKey);
+
+    if (cached) {
+      setHolidays(cached);
+      return;
+    }
+
+    apiClient
+      .getKoreanHolidays(currentYear, currentMonth + 1)
+      .then((holidayItems) => {
+        holidayCacheRef.current.set(cacheKey, holidayItems);
+        if (active) {
+          setHolidays(holidayItems);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setHolidays([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [apiClient, currentMonth, currentYear]);
+
   // Sync selected query parameter from URL
   useEffect(() => {
     if (selectedParam) {
@@ -125,11 +165,16 @@ export function EventsSurveysPage() {
   }, [unifiedItems, currentTab]);
 
   const visibleItems = useMemo(() => {
-    return sortVisibleItems(filteredItems, sortBy, showOpenOnly);
-  }, [filteredItems, showOpenOnly, sortBy]);
+    return sortVisibleItems(filteredItems, sortBy, stateFilter);
+  }, [filteredItems, stateFilter, sortBy]);
+
+  const beforeOpenItems = useMemo(
+    () => visibleItems.filter((item) => item.computedState === "before_open"),
+    [visibleItems],
+  );
 
   const activeItems = useMemo(
-    () => visibleItems.filter((item) => !isClosedItem(item)),
+    () => visibleItems.filter((item) => item.computedState === "open"),
     [visibleItems],
   );
 
@@ -196,7 +241,7 @@ export function EventsSurveysPage() {
           : lang === "ko"
             ? "진행중"
             : "Ongoing",
-        color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        color: "bg-brand-primary-light text-brand-primary border-brand-primary-border",
       };
     }
     return {
@@ -248,6 +293,10 @@ export function EventsSurveysPage() {
     return grid;
   }, [currentYear, currentMonth]);
 
+  const holidayMap = useMemo(() => {
+    return new Map(holidays.map((holiday) => [holiday.locdate, holiday]));
+  }, [holidays]);
+
   const isSameDay = (d1: Date, d2: Date) => {
     return (
       d1.getFullYear() === d2.getFullYear() &&
@@ -268,8 +317,8 @@ export function EventsSurveysPage() {
         };
       case "EVENT":
         return {
-          bg: "bg-emerald-100 border-emerald-300 font-extrabold text-emerald-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
-          bullet: "bg-emerald-600",
+          bg: "bg-brand-primary-light border-brand-primary-border font-extrabold text-brand-primary",
+          bullet: "bg-brand-primary",
           label: lang === "ko" ? "행사" : "Event",
           icon: CalendarIcon,
         };
@@ -324,8 +373,11 @@ export function EventsSurveysPage() {
   };
 
   const getActionLabel = (item: UnifiedItem) => {
-    if (isOpenItem(item)) {
+    if (item.kind === "EVENT") {
       return lang === "ko" ? "자세히 보기" : "View details";
+    }
+    if (isOpenItem(item) || item.computedState === "before_open") {
+      return lang === "ko" ? "참여하기" : "Participate";
     }
     if (item.resultVisibility === "PUBLIC") {
       return lang === "ko" ? "결과 보기" : "View results";
@@ -347,6 +399,36 @@ export function EventsSurveysPage() {
     return meta.join(" · ");
   };
 
+  const stateFilters: Array<{
+    value: EventsSurveysStateFilter;
+    labelKo: string;
+    labelEn: string;
+  }> = [
+    { value: "all", labelKo: "전체", labelEn: "All" },
+    { value: "before_open", labelKo: "시작 전", labelEn: "Upcoming" },
+    { value: "open", labelKo: "진행 중", labelEn: "Ongoing" },
+    { value: "closed", labelKo: "마감", labelEn: "Closed" },
+  ];
+
+  const getSectionInfo = (state: UnifiedItem["computedState"]) => {
+    if (state === "before_open") {
+      return {
+        label: lang === "ko" ? "시작 전" : "Upcoming",
+        count: beforeOpenItems.length,
+      };
+    }
+    if (state === "open") {
+      return {
+        label: lang === "ko" ? "진행 중" : "Ongoing",
+        count: activeItems.length,
+      };
+    }
+    return {
+      label: lang === "ko" ? "마감" : "Closed",
+      count: closedItems.length,
+    };
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50/40">
       <Header showLogo />
@@ -361,7 +443,7 @@ export function EventsSurveysPage() {
       />
 
       {/* Underlined Tab-style Navigation matching the rest of the application */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs select-none">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-card select-none">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex gap-8 overflow-x-auto items-stretch">
             {tabs.map((tab) => {
@@ -372,13 +454,13 @@ export function EventsSurveysPage() {
                   onClick={() => handleTabChange(tab.id)}
                   className={`relative flex items-center justify-center text-[14px] lg:text-[14.5px] font-bold tracking-tight transition-all py-4 border-0 bg-transparent shrink-0 cursor-pointer ${
                     isActive
-                      ? "text-kaist-darkgreen"
-                      : "text-slate-400 hover:text-kaist-darkgreen"
+                      ? "text-brand-primary"
+                      : "text-slate-400 hover:text-brand-primary"
                   }`}
                 >
                   <span>{lang === "ko" ? tab.labelKo : tab.labelEn}</span>
                   <span
-                    className={`absolute bottom-0 left-0 right-0 h-[3px] bg-kaist-darkgreen transition-transform duration-200 origin-center ${
+                    className={`absolute bottom-0 left-0 right-0 h-[3px] bg-brand-primary transition-transform duration-200 origin-center ${
                       isActive ? "scale-x-100" : "scale-x-0"
                     }`}
                   />
@@ -393,18 +475,37 @@ export function EventsSurveysPage() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 md:px-8">
         {currentTab !== "calendar" && !loading && !error ? (
           <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.015)] md:flex-row md:items-center md:justify-between">
-            <div className="text-[13px] font-bold text-slate-600">
+            <div className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 p-1 shadow-inner shadow-slate-100/60">
+              {stateFilters.map((filter) => {
+                const active = stateFilter === filter.value;
+                return (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setStateFilter(filter.value)}
+                    className={`rounded-full border px-3.5 py-1.5 text-[12px] font-extrabold transition-all cursor-pointer ${
+                      active
+                        ? "border-brand-primary/20 bg-brand-primary text-white shadow-sm"
+                        : "border-transparent bg-transparent text-slate-500 hover:bg-white hover:text-brand-primary"
+                    }`}
+                  >
+                    {lang === "ko" ? filter.labelKo : filter.labelEn}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="hidden">
               {lang === "ko" ? (
                 <span>
                   전체{" "}
-                  <strong className="text-kaist-darkgreen">
+                  <strong className="text-brand-primary">
                     {visibleItems.length}
                   </strong>
                   개
                 </span>
               ) : (
                 <span>
-                  <strong className="text-kaist-darkgreen">
+                  <strong className="text-brand-primary">
                     {visibleItems.length}
                   </strong>{" "}
                   items
@@ -413,12 +514,14 @@ export function EventsSurveysPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <label className="flex cursor-pointer items-center gap-2 text-[12px] font-bold text-slate-600">
+              <label className="hidden">
                 <input
                   type="checkbox"
-                  checked={showOpenOnly}
-                  onChange={(event) => setShowOpenOnly(event.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-kaist-darkgreen focus:ring-kaist-darkgreen/20"
+                  checked={stateFilter === "open"}
+                  onChange={(event) =>
+                    setStateFilter(event.target.checked ? "open" : "all")
+                  }
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary/20"
                 />
                 <span>
                   {lang === "ko" ? "진행 중인 항목만 보기" : "Ongoing only"}
@@ -430,7 +533,7 @@ export function EventsSurveysPage() {
                 onChange={(event) =>
                   setSortBy(event.target.value as "latest" | "deadline")
                 }
-                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
+                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
               >
                 <option value="latest">
                   {lang === "ko" ? "최신순" : "Newest"}
@@ -445,7 +548,7 @@ export function EventsSurveysPage() {
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="w-8 h-8 border-3 border-kaist-darkgreen border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-3 border-brand-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-xs font-semibold text-slate-400">
               {lang === "ko" ? "불러오는 중..." : "Loading..."}
             </p>
@@ -462,7 +565,7 @@ export function EventsSurveysPage() {
             <div className="lg:col-span-3 bg-white rounded-3xl border border-kaist-grey/15 p-6 shadow-sm flex flex-col">
               {/* Calendar Grid Controller Header */}
               <div className="flex items-center justify-between pb-4 border-b border-kaist-grey/10 mb-5 select-none">
-                <h3 className="text-lg md:text-xl font-extrabold tracking-tight text-kaist-darkgreen-main whitespace-nowrap">
+                <h3 className="text-lg md:text-xl font-extrabold tracking-tight text-brand-primary whitespace-nowrap">
                   {currentYear}년 {currentMonth + 1}월
                 </h3>
 
@@ -519,6 +622,8 @@ export function EventsSurveysPage() {
                   const isToday = isSameDay(nowDate(), cell.date);
                   const isSelected =
                     selectedDate && isSameDay(selectedDate, cell.date);
+                  const holiday = holidayMap.get(toDateKey(cell.date));
+                  const isPublicHoliday = holiday?.isHoliday === true;
 
                   return (
                     <button
@@ -527,26 +632,27 @@ export function EventsSurveysPage() {
                       className={`min-h-[75px] p-2 rounded-xl text-left border flex flex-col justify-between items-start transition-all cursor-pointer relative group ${
                         cell.isCurrentMonth
                           ? isSelected
-                            ? "bg-[#e6f4ea]/30 border-kaist-darkgreen/30"
+                            ? "bg-brand-primary-light border-brand-primary-border"
                             : "bg-white hover:bg-slate-50/50 border-kaist-grey/10"
                           : isSelected
-                            ? "bg-[#e6f4ea]/20 border-kaist-darkgreen/20 text-kaist-grey/40"
+                            ? "bg-brand-primary-light/70 border-brand-primary-border text-kaist-grey/40"
                             : "bg-slate-50/40 border-transparent text-kaist-grey/40"
                       }`}
                     >
                       {/* Day Label */}
                       <div className="flex items-center justify-between w-full select-none">
                         {isToday ? (
-                          <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                          <div className="w-4 h-4 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
                             {cell.day}
                           </div>
                         ) : (
                           <span
+                            title={holiday?.dateName}
                             className={`text-xs leading-none ${
                               isSelected
-                                ? "text-kaist-darkgreen font-extrabold"
+                                ? "text-brand-primary font-extrabold"
                                 : cell.isCurrentMonth
-                                  ? cell.date.getDay() === 0
+                                  ? cell.date.getDay() === 0 || isPublicHoliday
                                     ? "text-red-500"
                                     : cell.date.getDay() === 6
                                       ? "text-blue-500"
@@ -555,6 +661,18 @@ export function EventsSurveysPage() {
                             } ${cell.isCurrentMonth && !isSelected ? "font-bold" : ""}`}
                           >
                             {cell.day}
+                          </span>
+                        )}
+                        {holiday && cell.isCurrentMonth && (
+                          <span
+                            className={`truncate text-[9px] font-extrabold ${
+                              holiday.isHoliday
+                                ? "text-red-400"
+                                : "text-slate-400"
+                            }`}
+                            title={holiday.dateName}
+                          >
+                            {holiday.dateName}
                           </span>
                         )}
                       </div>
@@ -568,11 +686,11 @@ export function EventsSurveysPage() {
                           return (
                             <div
                               key={eventIdx}
-                              className="w-full text-[9.5px] font-bold truncate leading-relaxed flex items-center gap-1.5 text-slate-600 hover:text-kaist-darkgreen"
+                              className="w-full text-[9.5px] font-bold truncate leading-relaxed flex items-center gap-1.5 text-slate-600 hover:text-brand-primary"
                               title={event.title}
                             >
                               <span
-                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-green-500" : "bg-red-500"}`}
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-brand-primary" : "bg-red-500"}`}
                               />
                               <span className="truncate">{shortTitle}</span>
                             </div>
@@ -588,7 +706,7 @@ export function EventsSurveysPage() {
                       {/* Preview Hover Tooltip for complete schedule details */}
                       {cell.isCurrentMonth && dayEvents.length > 0 && (
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-slate-900/95 text-white text-[10px] rounded-xl p-3 shadow-xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 z-30 select-none flex flex-col gap-2 border border-white/10">
-                          <div className="font-extrabold border-b border-white/15 pb-1 flex items-center justify-between text-[#5cdb7d]">
+                        <div className="font-extrabold border-b border-white/15 pb-1 flex items-center justify-between text-brand-primary-light">
                             <span>
                               {cell.date.toLocaleDateString(
                                 lang === "ko" ? "ko-KR" : "en-US",
@@ -620,7 +738,7 @@ export function EventsSurveysPage() {
                                 >
                                   <div className="truncate flex items-center gap-1.5">
                                     <span
-                                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-green-500" : "bg-red-500"}`}
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-brand-primary-light" : "bg-red-500"}`}
                                     />
                                     <span className="truncate">
                                       {titleText}
@@ -642,10 +760,10 @@ export function EventsSurveysPage() {
             </div>
 
             {/* 2. Compact Selected Day Details Panel (Expanded height to 500px, reduced cards padding and sizes) */}
-            <div className="lg:col-span-1 bg-white rounded-3xl border border-kaist-grey/15 p-4.5 shadow-sm min-h-[380px] lg:h-[500px] sticky top-24 self-start flex flex-col justify-between">
+            <div className="lg:col-span-1 bg-white rounded-3xl border border-card-border-subtle p-4.5 shadow-card min-h-[380px] lg:h-[500px] sticky top-24 self-start flex flex-col justify-between">
               <div className="flex flex-col min-h-0 flex-1">
                 <h3 className="text-base font-extrabold text-kaist-black border-b border-kaist-grey/10 pb-2.5 mb-3.5 flex items-center gap-2 select-none shrink-0">
-                  <CalendarIcon className="w-4 h-4 text-kaist-darkgreen" />
+                  <CalendarIcon className="w-4 h-4 text-brand-primary" />
                   <span>
                     {lang === "ko" ? "일정 상세조회" : "Day Schedule Details"}
                   </span>
@@ -654,18 +772,23 @@ export function EventsSurveysPage() {
                 {selectedDateStr ? (
                   <div className="flex flex-col min-h-0 flex-1 space-y-4">
                     {/* Rich Date & Total Event Count wrapper card */}
-                    <div className="bg-[#e6f4ea]/30 border border-kaist-darkgreen/10 rounded-2xl p-3 flex flex-col items-center gap-1 text-center shadow-xs select-none shrink-0">
-                      <span className="text-[12.5px] font-black text-kaist-darkgreen">
+                    <div className="bg-brand-primary-light border border-brand-primary/10 rounded-2xl p-3 flex flex-col items-center gap-1 text-center shadow-card select-none shrink-0">
+                      <span className="text-[12.5px] font-black text-brand-primary">
                         {selectedDateStr}
                       </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-kaist-darkgreen text-white shadow-xs mt-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-brand-primary text-white shadow-card mt-1">
                         <CalendarIcon className="w-3 h-3" />
                         <span>
                           {lang === "ko"
                             ? `총 ${selectedDayEvents.length}개 일정`
                             : `${selectedDayEvents.length} Events`}
                         </span>
-                      </span>
+                        </span>
+                      {selectedDate && holidayMap.get(toDateKey(selectedDate)) && (
+                        <span className="mt-1 inline-flex items-center rounded-full border border-red-100 bg-red-50 px-2.5 py-0.5 text-[10.5px] font-extrabold text-red-500">
+                          {holidayMap.get(toDateKey(selectedDate))?.dateName}
+                        </span>
+                      )}
                     </div>
 
                     {selectedDayEvents.length === 0 ? (
@@ -705,7 +828,7 @@ export function EventsSurveysPage() {
                           return (
                             <div
                               key={idx}
-                              className="bg-white border border-slate-100 rounded-xl p-3.5 space-y-2 shadow-xs hover:shadow-sm transition-shadow relative overflow-hidden shrink-0"
+                              className="bg-white border border-card-border-subtle rounded-xl p-3.5 space-y-2 shadow-card hover:shadow-card-hover transition-shadow relative overflow-hidden shrink-0"
                             >
                               {/* Top border strip for event type branding */}
                               <div
@@ -722,7 +845,7 @@ export function EventsSurveysPage() {
                                 <span
                                   className={`text-[9px] font-black px-2 py-0.2 rounded-full ${
                                     isStateOpen
-                                      ? "bg-[#e6f4ea] text-[#137333]"
+                                      ? "bg-brand-primary-light text-brand-primary"
                                       : "bg-slate-100 text-slate-500"
                                   }`}
                                 >
@@ -769,7 +892,7 @@ export function EventsSurveysPage() {
                                     isStateOpen && (
                                       <Link
                                         to={`/survey/${event.surveyId}`}
-                                        className="inline-flex items-center rounded-md bg-kaist-lightgreen/20 px-1.5 py-0.5 text-[9px] font-extrabold text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer mr-2"
+                                        className="inline-flex items-center rounded-md bg-brand-primary-light px-1.5 py-0.5 text-[9px] font-extrabold text-brand-primary hover:opacity-85 transition-all cursor-pointer mr-2"
                                       >
                                         <span>
                                           {lang === "ko"
@@ -784,7 +907,7 @@ export function EventsSurveysPage() {
                                         ? `/board/행사/${event.id}`
                                         : `/survey/${event.id}`
                                     }
-                                    className="inline-flex items-center gap-0.5 text-kaist-darkgreen hover:opacity-85 transition-all cursor-pointer text-[10px]"
+                                    className="inline-flex items-center gap-0.5 text-brand-primary hover:opacity-85 transition-all cursor-pointer text-[10px]"
                                   >
                                     <span>
                                       {event.kind === "EVENT"
@@ -856,9 +979,10 @@ export function EventsSurveysPage() {
                 : 0;
               const closed = isClosedItem(item);
               const previousItem = visibleItems[index - 1];
-              const startsActiveSection = index === 0 && !closed;
-              const startsClosedSection =
-                closed && (index === 0 || !isClosedItem(previousItem));
+              const startsStateSection =
+                index === 0 ||
+                previousItem?.computedState !== item.computedState;
+              const sectionInfo = getSectionInfo(item.computedState);
               const restrictionMeta = getRestrictionMeta(item);
               const descriptionText =
                 desc ||
@@ -868,28 +992,16 @@ export function EventsSurveysPage() {
 
               return (
                 <Fragment key={item.id}>
-                  {startsActiveSection ? (
+                  {startsStateSection ? (
                     <div className="col-span-full pt-1">
                       <h2 className="text-base font-extrabold text-slate-900">
-                        {lang === "ko" ? "진행 중" : "Ongoing"}{" "}
+                        {sectionInfo.label}{" "}
                         <span className="text-xs font-bold text-slate-400">
-                          ({activeItems.length})
+                          ({sectionInfo.count})
                         </span>
                       </h2>
                     </div>
                   ) : null}
-
-                  {startsClosedSection ? (
-                    <div className="col-span-full pt-3">
-                      <h2 className="text-base font-extrabold text-slate-900">
-                        {lang === "ko" ? "마감됨" : "Closed"}{" "}
-                        <span className="text-xs font-bold text-slate-400">
-                          ({closedItems.length})
-                        </span>
-                      </h2>
-                    </div>
-                  ) : null}
-
                   <div
                     key={item.id}
                     role="link"
@@ -900,10 +1012,10 @@ export function EventsSurveysPage() {
                         navigate(getItemHref(item));
                       }
                     }}
-                    className={`flex cursor-pointer flex-col justify-between space-y-3 border-gray-200 bg-white rounded-2xl border p-3.5 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    className={`group flex cursor-pointer flex-col justify-between space-y-3 rounded-2xl border bg-white p-3.5 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand-primary-border hover:shadow-card-hover ${
                       closed
                         ? "border-slate-200 opacity-75 hover:opacity-95"
-                        : ""
+                        : "border-gray-200"
                     }`}
                   >
                     <div className="space-y-3">
@@ -915,7 +1027,7 @@ export function EventsSurveysPage() {
                           {statusInfo.label}
                         </span>
                         {item.kind === "EVENT" && item.surveyId && !closed && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-kaist-lightgreen/20 text-kaist-darkgreen border border-kaist-darkgreen/10">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-brand-primary-light text-brand-primary border border-brand-primary/10">
                             {lang === "ko" ? "신청 가능" : "Application open"}
                           </span>
                         )}
@@ -928,7 +1040,7 @@ export function EventsSurveysPage() {
                         </h3>
                         <p
                           className={`min-h-[2.25rem] text-[13px] line-clamp-2 leading-snug font-normal ${
-                            desc ? "text-kaist-grey/80" : "text-kaist-grey/40"
+                            desc ? "text-kaist-grey/90" : "text-kaist-grey/55"
                           }`}
                         >
                           {descriptionText}
@@ -941,7 +1053,7 @@ export function EventsSurveysPage() {
                       {/* Response capacity bar if applicable */}
                       {hasCapacity && (
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs font-semibold text-kaist-grey/80">
+                          <div className="flex justify-between text-xs font-semibold text-kaist-grey/90">
                             <span>
                               {lang === "ko"
                                 ? "신청 현황"
@@ -954,7 +1066,7 @@ export function EventsSurveysPage() {
                           </div>
                           <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                             <div
-                              className="bg-kaist-darkgreen/80 h-full rounded-full transition-all duration-300"
+                              className="bg-brand-primary/80 h-full rounded-full transition-all duration-300"
                               style={{ width: `${fillPercentage}%` }}
                             />
                           </div>
@@ -962,16 +1074,16 @@ export function EventsSurveysPage() {
                       )}
 
                       {/* Dates */}
-                      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-kaist-grey/75">
+                      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-kaist-grey/85">
                         <Clock className="w-3.5 h-3.5 shrink-0 text-kaist-greygreen/80" />
                         <span className="truncate">
-                          {getCardPeriodText(item)}
+                          {getCardPeriodText(item, lang)}
                         </span>
                       </div>
                       <div
                         className={`flex min-h-[0.875rem] items-center gap-1.5 text-[11px] font-bold ${
                           restrictionMeta
-                            ? "text-kaist-grey/65"
+                            ? "text-kaist-grey/75"
                             : "text-transparent"
                         }`}
                         aria-hidden={!restrictionMeta}
@@ -983,11 +1095,13 @@ export function EventsSurveysPage() {
                       </div>
                       {/* Action buttons */}
                       <div className="flex justify-end items-center pt-1 text-[12px] font-extrabold">
-                        <span className="inline-flex items-center gap-1 text-kaist-darkgreen">
+                        <span className="inline-flex items-center gap-1 text-brand-primary">
                           {getActionLabel(item) && (
-                            <span>{getActionLabel(item)}</span>
+                            <span className="cta-underline">
+                              {getActionLabel(item)}
+                            </span>
                           )}
-                          <ArrowRight className="h-3.5 w-3.5" />
+                          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
                         </span>
                       </div>
                     </div>

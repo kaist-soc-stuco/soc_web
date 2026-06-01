@@ -40,6 +40,7 @@ import { isoToDate, msToIso, nowDate, nowMs } from "@soc/shared";
 
 const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_open" | "open" | "closed" => {
   if (!survey.isPublished) return "closed";
+  if (survey.isAlwaysOpen) return "open";
 
   const now = nowMs();
   const openAt = survey.openAt?.valueOf();
@@ -167,6 +168,7 @@ export class ArticleRepository {
       query?: string;
       searchBy: "title" | "author" | "title_content";
       sortBy: "latest" | "views";
+      sortDirection: "asc" | "desc";
     },
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     if (boardIds.length === 0) {
@@ -202,6 +204,15 @@ export class ArticleRepository {
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
       .where(baseFilter);
+
+    const primarySort =
+      params.sortBy === "views"
+        ? params.sortDirection === "asc"
+          ? asc(articles.viewCount)
+          : desc(articles.viewCount)
+        : params.sortDirection === "asc"
+          ? asc(articles.postedAt)
+          : desc(articles.postedAt);
 
     const rows = await this.db
       .select({
@@ -246,9 +257,9 @@ export class ArticleRepository {
       )
       .where(baseFilter)
       .orderBy(
-        params.sortBy === "views"
-          ? desc(articles.viewCount)
-          : desc(articles.postedAt),
+        desc(articles.isPinned),
+        asc(sql`coalesce(${articles.pinOrder}, 2147483647)`),
+        primarySort,
         desc(articles.postedAt),
       )
       .limit(params.limit)
@@ -527,6 +538,7 @@ export class ArticleRepository {
             descriptionEn: surveyRow[0].descriptionEn ?? undefined,
             computedState: getConnectedSurveyState(surveyRow[0]),
             feeRequirementPolicy: surveyRow[0].feeRequirementPolicy,
+            isAlwaysOpen: surveyRow[0].isAlwaysOpen,
             openAt: surveyRow[0].openAt ? msToIso(surveyRow[0].openAt.valueOf()) : undefined,
             closeAt: surveyRow[0].closeAt ? msToIso(surveyRow[0].closeAt.valueOf()) : undefined,
           }

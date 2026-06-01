@@ -66,6 +66,7 @@ export const surveys = pgTable("survey", {
   showOnCalendar: boolean("show_on_calendar").notNull().default(false),
   resultVisibility: varchar("result_visibility", { length: 20 }).notNull(), // PUBLIC, PRIVATE 등
   maxResponseCount: integer("max_response_count"), // 정원 제한
+  isAlwaysOpen: boolean("is_always_open").notNull().default(false),
   openAt: timestamp("open_at", { withTimezone: true }),
   closeAt: timestamp("close_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -16,6 +16,7 @@ import { BoardModule } from "./features/board/board.module";
 import { AssetModule } from "./features/asset/asset.module";
 import { ContactsModule } from "./features/contacts/contacts.module";
 import { BulkEmailModule } from "./features/email/bulk-email.module";
+import { CalendarModule } from "./features/calendar/calendar.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { BulkEmailModule } from "./features/email/bulk-email.module";
     SurveysModule,
     ContactsModule,
     BulkEmailModule,
+    CalendarModule,
     RoleGroupsModule,
     HealthModule,
     MockModule,

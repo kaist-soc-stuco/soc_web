@@ -18,6 +18,7 @@ export interface SurveyRecord {
   isPublished: boolean;
   showOnCalendar: boolean;
   maxResponses: number | null;
+  isAlwaysOpen: boolean;
   opensAt: string | null;
   closesAt: string | null;
   createdAt: string;

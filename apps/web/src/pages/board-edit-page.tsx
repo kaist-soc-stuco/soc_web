@@ -14,8 +14,10 @@ import {
   X,
 } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
+import type { SurveyRecord } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { htmlDatetimeLocalToIso, isoToHtmlDatetimeLocal } from "@soc/shared";
 
 type AttachedAsset = {
@@ -44,6 +46,7 @@ export function BoardEditPage() {
   }>();
   const navigate = useNavigate();
   const { lang } = useLanguage();
+  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -66,6 +69,9 @@ export function BoardEditPage() {
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
   const [eventDescription, setEventDescription] = useState("");
+  const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
+  const [selectedSurveyId, setSelectedSurveyId] = useState("");
+  const [initialSurveyId, setInitialSurveyId] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +99,8 @@ export function BoardEditPage() {
           res.eventEndDate ? isoToHtmlDatetimeLocal(res.eventEndDate) : "",
         );
         setEventDescription(res.eventDescription || "");
+        setSelectedSurveyId(res.survey?.surveyId ?? "");
+        setInitialSurveyId(res.survey?.surveyId ?? "");
         setAssets(
           res.assets.map((asset) => ({
             assetId: asset.assetId,
@@ -116,6 +124,13 @@ export function BoardEditPage() {
         setLoading(false);
       });
   }, [category, articleId, apiClient, lang]);
+
+  useEffect(() => {
+    apiClient
+      .listSurveys()
+      .then(setSurveys)
+      .catch(() => setSurveys([]));
+  }, [apiClient]);
 
   const handleUploadFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -213,6 +228,39 @@ export function BoardEditPage() {
         eventDescription:
           category === "행사" ? eventDescription.trim() : undefined,
       });
+      if (selectedSurveyId) {
+        let overwriteSchedule = false;
+        if (category === "행사" && eventStartDate && eventEndDate) {
+          overwriteSchedule = await requestConfirm({
+            confirmLabel: lang === "ko" ? "덮어쓰기" : "Overwrite",
+            description:
+              lang === "ko"
+                ? "선택한 설문조사의 시작/마감 시각을 행사 일정과 동일하게 맞출까요?"
+                : "Use this event schedule as the linked survey schedule?",
+            title:
+              lang === "ko"
+                ? "설문 일정도 행사 일정으로 덮어쓸까요?"
+                : "Overwrite survey schedule?",
+          });
+        }
+
+        await apiClient.updateSurvey(selectedSurveyId, {
+          connectedArticleId: articleId,
+          kind: category === "행사" ? "EVENT" : undefined,
+          isAlwaysOpen: overwriteSchedule ? false : undefined,
+          openAt: overwriteSchedule
+            ? htmlDatetimeLocalToIso(eventStartDate)
+            : undefined,
+          closeAt: overwriteSchedule
+            ? htmlDatetimeLocalToIso(eventEndDate)
+            : undefined,
+        });
+      }
+      if (initialSurveyId && initialSurveyId !== selectedSurveyId) {
+        await apiClient.updateSurvey(initialSurveyId, {
+          connectedArticleId: null,
+        });
+      }
       alert(
         lang === "ko"
           ? "게시글이 수정되었습니다."
@@ -233,6 +281,7 @@ export function BoardEditPage() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col text-slate-950">
+      {ConfirmDialog}
       <Header showLogo />
 
       <PageHero
@@ -563,6 +612,33 @@ export function BoardEditPage() {
                       </div>
                     </div>
                   )}
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3 select-none">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        {lang === "ko" ? "설문조사 연동" : "Linked Survey"}
+                      </h3>
+                      <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                        {lang === "ko"
+                          ? "저장 후 선택한 설문조사가 이 게시글에 연결됩니다."
+                          : "After saving, the selected survey will be linked to this post."}
+                      </p>
+                    </div>
+                    <select
+                      value={selectedSurveyId}
+                      onChange={(event) => setSelectedSurveyId(event.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all"
+                    >
+                      <option value="">
+                        {lang === "ko" ? "연동하지 않음" : "No linked survey"}
+                      </option>
+                      {surveys.map((survey) => (
+                        <option key={survey.id} value={survey.id}>
+                          {survey.titleKo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   {assets.length > 0 && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">

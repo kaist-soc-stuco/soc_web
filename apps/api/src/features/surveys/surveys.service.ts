@@ -30,11 +30,16 @@ export class SurveysService {
 
   private computeState(survey: {
     isPublished: boolean;
+    isAlwaysOpen?: boolean;
     opensAt: string | null;
     closesAt: string | null;
   }): ComputedSurveyState {
     if (!survey.isPublished) {
       return "closed";
+    }
+
+    if (survey.isAlwaysOpen) {
+      return "open";
     }
 
     const now = nowMs();
@@ -173,6 +178,7 @@ export class SurveysService {
       openAt: original.opensAt ?? undefined,
       closeAt: original.closesAt ?? undefined,
       connectedArticleId: original.connectedPostId ?? undefined,
+      isAlwaysOpen: original.isAlwaysOpen,
     });
 
     for (const section of original.sections) {
@@ -333,6 +339,7 @@ export class SurveysService {
       descriptionKo: survey.descriptionKo,
       descriptionEn: survey.descriptionEn,
       computedState: survey.computedState,
+      isAlwaysOpen: survey.isAlwaysOpen,
       opensAt: survey.opensAt,
       closesAt: survey.closesAt,
       titleKo: survey.titleKo,

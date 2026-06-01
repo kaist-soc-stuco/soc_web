@@ -88,11 +88,12 @@ export const CreateSurveySchema = z.object({
   isKoreanOnly: z.boolean().optional(),
   isPublished: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
+  isAlwaysOpen: z.boolean().optional(),
   resultVisibility: z.string().min(1).max(20),
   maxResponseCount: z.number().int().positive().nullable().optional(),
-  openAt: z.string().optional(),
-  closeAt: z.string().optional(),
-  connectedArticleId: z.string().optional(),
+  openAt: z.string().nullable().optional(),
+  closeAt: z.string().nullable().optional(),
+  connectedArticleId: z.string().nullable().optional(),
 });
 
 export const UpdateSurveySchema = CreateSurveySchema.partial();

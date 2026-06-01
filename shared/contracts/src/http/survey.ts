@@ -35,6 +35,7 @@ export interface SurveyRecord {
   isPublished: boolean;
   showOnCalendar: boolean;
   maxResponses: number | null;
+  isAlwaysOpen: boolean;
   opensAt: string | null;
   closesAt: string | null;
   createdAt: string;
@@ -114,9 +115,10 @@ export interface CreateSurveyRequest {
   showOnCalendar?: boolean;
   resultVisibility: string;
   maxResponseCount?: number;
-  openAt?: string;
-  closeAt?: string;
-  connectedArticleId?: string;
+  isAlwaysOpen?: boolean;
+  openAt?: string | null;
+  closeAt?: string | null;
+  connectedArticleId?: string | null;
 }
 
 export interface UpdateSurveyRequest {
@@ -133,9 +135,10 @@ export interface UpdateSurveyRequest {
   showOnCalendar?: boolean;
   resultVisibility?: string;
   maxResponseCount?: number;
-  openAt?: string;
-  closeAt?: string;
-  connectedArticleId?: string;
+  isAlwaysOpen?: boolean;
+  openAt?: string | null;
+  closeAt?: string | null;
+  connectedArticleId?: string | null;
 }
 
 export interface CreateSectionRequest {
@@ -234,6 +237,7 @@ export interface SurveyAnalyticsResponse {
   descriptionKo: string | null;
   descriptionEn: string | null;
   computedState: ComputedSurveyState;
+  isAlwaysOpen: boolean;
   opensAt: string | null;
   closesAt: string | null;
   titleKo: string;

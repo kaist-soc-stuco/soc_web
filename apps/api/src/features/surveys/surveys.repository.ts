@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -35,6 +35,7 @@ export class SurveysRepository {
       isPublished: row.isPublished,
       showOnCalendar: row.showOnCalendar,
       maxResponses: row.maxResponseCount,
+      isAlwaysOpen: row.isAlwaysOpen,
       opensAt: row.openAt ? msToIso(row.openAt.valueOf()) : null,
       closesAt: row.closeAt ? msToIso(row.closeAt.valueOf()) : null,
       createdAt: msToIso(row.createdAt.valueOf()),
@@ -87,8 +88,9 @@ export class SurveysRepository {
         showOnCalendar: dto.showOnCalendar ?? false,
         resultVisibility: dto.resultVisibility,
         maxResponseCount: dto.maxResponseCount ?? null,
-        openAt: dto.openAt ? isoToDate(dto.openAt) : null,
-        closeAt: dto.closeAt ? isoToDate(dto.closeAt) : null,
+        isAlwaysOpen: dto.isAlwaysOpen ?? false,
+        openAt: dto.isAlwaysOpen ? null : dto.openAt ? isoToDate(dto.openAt) : null,
+        closeAt: dto.isAlwaysOpen ? null : dto.closeAt ? isoToDate(dto.closeAt) : null,
         connectedArticleId: dto.connectedArticleId ? Number(dto.connectedArticleId) : null,
         updatedAt: nowDate(),
       })
@@ -119,8 +121,17 @@ export class SurveysRepository {
     if (dto.showOnCalendar !== undefined) set.showOnCalendar = dto.showOnCalendar;
     if (dto.resultVisibility !== undefined) set.resultVisibility = dto.resultVisibility;
     if (dto.maxResponseCount !== undefined) set.maxResponseCount = dto.maxResponseCount;
-    if (dto.openAt !== undefined) set.openAt = dto.openAt ? isoToDate(dto.openAt) : null;
-    if (dto.closeAt !== undefined) set.closeAt = dto.closeAt ? isoToDate(dto.closeAt) : null;
+    if (dto.isAlwaysOpen !== undefined) {
+      set.isAlwaysOpen = dto.isAlwaysOpen;
+      if (dto.isAlwaysOpen) {
+        set.openAt = null;
+        set.closeAt = null;
+      }
+    }
+    if (!dto.isAlwaysOpen) {
+      if (dto.openAt !== undefined) set.openAt = dto.openAt ? isoToDate(dto.openAt) : null;
+      if (dto.closeAt !== undefined) set.closeAt = dto.closeAt ? isoToDate(dto.closeAt) : null;
+    }
     if (dto.connectedArticleId !== undefined) {
       set.connectedArticleId = dto.connectedArticleId ? Number(dto.connectedArticleId) : null;
     }
@@ -152,7 +163,9 @@ export class SurveysRepository {
         responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`
       })
       .from(surveys)
-      .where(eq(surveys.isPublished, true));
+      .where(
+        and(eq(surveys.isPublished, true), isNull(surveys.connectedArticleId)),
+      );
     return rows.map((r) => ({
       ...this.map(r.survey),
       responseCount: r.responseCount,

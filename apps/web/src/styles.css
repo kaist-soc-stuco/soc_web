@@ -33,6 +33,14 @@
   --kaist-black: oklch(0.26 0.03 240);
   --kaist-grey: oklch(0.65 0.03 240);
   --kaist-brown: oklch(0.6173 0.12863 18.31);
+
+  /* App interaction tokens */
+  --app-primary: var(--kaist-darkgreen);
+  --app-primary-light: oklch(0.955 0.035 157.503);
+  --app-primary-border: oklch(0.86 0.055 157.503);
+  --app-card-border: oklch(0.90 0.012 230);
+  --app-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.035), 0 8px 24px rgba(16, 24, 40, 0.045);
+  --app-shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.05), 0 12px 28px rgba(16, 24, 40, 0.07);
 }
 
 @theme inline {
@@ -70,6 +78,12 @@
   --color-kaist-black: var(--kaist-black);
   --color-kaist-grey: var(--kaist-grey);
   --color-kaist-brown: var(--kaist-brown);
+  --color-brand-primary: var(--app-primary);
+  --color-brand-primary-light: var(--app-primary-light);
+  --color-brand-primary-border: var(--app-primary-border);
+  --color-card-border-subtle: var(--app-card-border);
+  --shadow-card: var(--app-shadow-card);
+  --shadow-card-hover: var(--app-shadow-card-hover);
 }
 
 @layer base {
@@ -82,5 +96,29 @@
     margin: 0;
     min-height: 100vh;
     font-family: 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Roboto Slab', sans-serif;
+  }
+}
+
+@layer components {
+  .cta-underline {
+    position: relative;
+  }
+
+  .cta-underline::after {
+    position: absolute;
+    left: 0;
+    bottom: -0.16rem;
+    width: 100%;
+    height: 1px;
+    content: "";
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 180ms ease;
+  }
+
+  .group:hover .cta-underline::after,
+  .cta-underline:hover::after {
+    transform: scaleX(1);
   }
 }

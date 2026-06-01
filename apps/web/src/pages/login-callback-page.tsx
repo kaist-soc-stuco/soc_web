@@ -50,6 +50,15 @@ export function LoginCallbackPage() {
   const consumedResultTokenRef = useRef<Set<string>>(new Set());
   const [status, setStatus] = useState<LoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingConsentToken, setPendingConsentToken] = useState<string | null>(
+    null,
+  );
+  const [consentSubmitting, setConsentSubmitting] = useState<
+    null | "persisted" | "temporary"
+  >(null);
+  const [consentErrorMessage, setConsentErrorMessage] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -88,7 +97,8 @@ export function LoginCallbackPage() {
 
     if (loginStatus === "consent-required" && pendingLoginToken) {
       writeStoredAuthState({ pendingLoginToken });
-      navigate("/login/consent", { replace: true });
+      setPendingConsentToken(pendingLoginToken);
+      setStatus("processing");
       return;
     }
 
@@ -141,6 +151,44 @@ export function LoginCallbackPage() {
     void startLogin();
   }, [apiClient, location.search, navigate, queryClient]);
 
+  const submitConsentDecision = async (consent: boolean) => {
+    if (!pendingConsentToken) {
+      setConsentErrorMessage(
+        "로그인 동의 토큰이 없습니다. 로그인을 다시 시도해주세요.",
+      );
+      return;
+    }
+
+    setConsentSubmitting(consent ? "persisted" : "temporary");
+    setConsentErrorMessage(null);
+
+    try {
+      const payload = await apiClient.submitConsentDecision({
+        consent,
+        pendingLoginToken: pendingConsentToken,
+      });
+
+      if (payload.storageMode === "temporary") {
+        writeStoredAuthState({
+          temporarySession: payload.temporarySession,
+        });
+      } else {
+        clearStoredAuthState();
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+      navigate("/", { replace: true });
+    } catch (error) {
+      setConsentErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "동의 처리 중 오류가 발생했습니다.",
+      );
+    } finally {
+      setConsentSubmitting(null);
+    }
+  };
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-white px-6 text-kaist-black">
       <section className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
@@ -162,6 +210,55 @@ export function LoginCallbackPage() {
           </button>
         ) : null}
       </section>
+
+      {pendingConsentToken ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+          <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-kaist-greygreen">
+              Privacy Consent
+            </p>
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-kaist-black">
+              개인정보 제공 동의
+            </h1>
+            <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-600">
+              <p>SSO 로그인으로 받은 이름, 이메일, 학번 정보를 서비스 이용에 사용합니다.</p>
+              <p>
+                동의하면 다음 로그인부터 필요한 기능을 바로 사용할 수 있습니다. 동의하지
+                않아도 이번 세션에서는 임시 로그인으로 계속 이용할 수 있습니다.
+              </p>
+            </div>
+
+            {consentErrorMessage ? (
+              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                {consentErrorMessage}
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={consentSubmitting !== null}
+                onClick={() => void submitConsentDecision(false)}
+                className="rounded-xl border border-kaist-darkgreen/30 bg-white px-5 py-2.5 text-sm font-extrabold text-kaist-darkgreen disabled:opacity-50"
+              >
+                {consentSubmitting === "temporary"
+                  ? "처리 중..."
+                  : "저장하지 않고 계속"}
+              </button>
+              <button
+                type="button"
+                disabled={consentSubmitting !== null}
+                onClick={() => void submitConsentDecision(true)}
+                className="rounded-xl bg-kaist-darkgreen px-5 py-2.5 text-sm font-extrabold text-white shadow-sm disabled:opacity-50"
+              >
+                {consentSubmitting === "persisted"
+                  ? "처리 중..."
+                  : "동의하고 저장"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

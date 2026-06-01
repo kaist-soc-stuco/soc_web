@@ -12,9 +12,6 @@ const BoardPage = lazy(() =>
 const LoginCallbackPage = lazy(() =>
   import('@/pages/login-callback-page').then((module) => ({ default: module.LoginCallbackPage })),
 );
-const LoginConsentPage = lazy(() =>
-  import('@/pages/login-consent-page').then((module) => ({ default: module.LoginConsentPage })),
-);
 const SurveyPage = lazy(() =>
   import('@/pages/survey-page').then((module) => ({ default: module.SurveyPage })),
 );
@@ -110,7 +107,6 @@ export function App() {
           <Route path="/survey/:id" element={<SurveyPage />} />
           <Route path="/survey/:id/results" element={<SurveyResultsPage />} />
           <Route path="/login" element={<LoginCallbackPage />} />
-          <Route path="/login/consent" element={<LoginConsentPage />} />
           <Route path="/mypage" element={<MyPage />} />
 
           {/* Admin Routes with nested Outlet */}

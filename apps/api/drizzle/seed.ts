@@ -295,7 +295,7 @@ type QuestionSeed = {
 };
 
 type SurveySeed = {
-  kind: "APPLICATION" | "SURVEY" | "VOTE";
+  kind: "APPLICATION" | "EVENT" | "SURVEY" | "VOTE";
   titleKo: string;
   titleEn: string;
   descriptionKo: string;
@@ -819,7 +819,7 @@ async function seedMockData() {
         accentDark: "#005f3a",
       }),
       survey: {
-        kind: "APPLICATION",
+        kind: "EVENT",
         titleKo: "전산인의 밤 참가 신청",
         titleEn: "SoC Night Registration",
         descriptionKo: "참석 인원과 식사 준비를 위해 사전 신청을 받습니다. 신청 후 일정이 바뀌면 마감 전까지 응답을 수정할 수 있습니다.",
@@ -907,7 +907,7 @@ async function seedMockData() {
         accentDark: "#115e59",
       }),
       survey: {
-        kind: "APPLICATION",
+        kind: "EVENT",
         titleKo: "기말고사 간식 배부 신청",
         titleEn: "Final Exam Snack Pickup Registration",
         descriptionKo: "간식 수량과 수령 시간을 조정하기 위한 신청 설문입니다. 신청은 1인 1회만 가능하며, 마감 전까지 응답을 수정할 수 있습니다.",
@@ -993,7 +993,7 @@ async function seedMockData() {
         accentDark: "#1d4ed8",
       }),
       survey: {
-        kind: "SURVEY",
+        kind: "EVENT",
         titleKo: "알고리즘 스터디 매칭 설문",
         titleEn: "Algorithm Study Matching Survey",
         descriptionKo: "스터디 그룹 편성을 위해 관심 난이도, 사용 언어, 가능 시간대를 조사합니다. 학생회비 납부자는 우선 배정됩니다.",
@@ -1045,6 +1045,94 @@ async function seedMockData() {
       } satisfies SurveySeed,
     },
     {
+      titleKo: "2026 여름 개발 워크숍 참가 신청",
+      titleEn: "Summer 2026 Development Workshop Registration",
+      contentKo: [
+        "여름방학을 앞두고 웹 서비스 기획부터 배포까지 짧게 경험해 보는 개발 워크숍을 진행합니다.",
+        "",
+        "참가자는 소규모 팀으로 나뉘어 문제 정의, 화면 설계, API 연동, 배포 점검까지 하루 동안 압축적으로 실습합니다. 개발 경험이 많지 않아도 참여할 수 있도록 공통 템플릿과 멘토링을 제공합니다.",
+        "",
+        "• 일시: 2026.06.18 14:00 ~ 18:00",
+        "• 장소: N1 102호 전산 실습실",
+        "• 대상: 웹 개발에 관심 있는 전산학부 구성원",
+        "• 준비물: 개인 노트북",
+        "• 신청: 연결된 설문에서 관심 트랙과 개발 경험을 입력해 주세요.",
+      ].join("\n"),
+      contentEn: [
+        "This workshop offers a hands-on path from product planning to deployment before summer break.",
+        "",
+        "Participants will work in small teams with templates and mentoring support.",
+      ].join("\n"),
+      eventDescription: "기획, 구현, 배포를 하루 동안 실습하는 전산학부 여름 개발 워크숍",
+      eventStartDate: new Date("2026-06-18T14:00:00+09:00"),
+      eventEndDate: new Date("2026-06-18T18:00:00+09:00"),
+      isPinned: false,
+      viewCount: 142,
+      postedAt: new Date("2026-05-31T11:00:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "SUMMER WORKSHOP",
+        title: "개발 워크숍",
+        subtitle: "기획부터 배포까지",
+        dateLine: "06.18 THU 14:00 · N1 102호",
+        accent: "#0891b2",
+        accentDark: "#0e7490",
+      }),
+      survey: {
+        kind: "EVENT",
+        titleKo: "여름 개발 워크숍 참가 신청",
+        titleEn: "Summer Development Workshop Registration",
+        descriptionKo: "워크숍 팀 구성과 멘토 배정을 위해 관심 트랙과 개발 경험을 확인합니다. 신청 후 마감 전까지 응답을 수정할 수 있습니다.",
+        descriptionEn: "This form collects preferred tracks and development experience for team and mentor matching.",
+        feeRequirementPolicy: "NONE",
+        allowMultipleResponses: false,
+        allowResponseEdit: true,
+        resultVisibility: "PRIVATE",
+        maxResponseCount: 40,
+        openAt: new Date("2026-05-31T11:00:00+09:00"),
+        closeAt: new Date("2026-06-15T23:59:00+09:00"),
+        sections: [
+          {
+            titleKo: "참가 정보",
+            titleEn: "Participation details",
+            sortOrder: 0,
+            questions: [
+              {
+                titleKo: "가장 관심 있는 워크숍 트랙을 선택해 주세요.",
+                titleEn: "Choose your preferred workshop track.",
+                questionType: "single_choice",
+                options: [
+                  { value: "frontend", labelKo: "프론트엔드 UI 구현", labelEn: "Frontend UI" },
+                  { value: "backend", labelKo: "백엔드 API 설계", labelEn: "Backend API" },
+                  { value: "deploy", labelKo: "배포와 운영 점검", labelEn: "Deployment and operations" },
+                ],
+                sortOrder: 0,
+              },
+              {
+                titleKo: "사용해 본 기술을 모두 선택해 주세요.",
+                titleEn: "Select all technologies you have used.",
+                questionType: "multiple_choice",
+                options: [
+                  { value: "react", labelKo: "React", labelEn: "React" },
+                  { value: "node", labelKo: "Node.js", labelEn: "Node.js" },
+                  { value: "db", labelKo: "데이터베이스", labelEn: "Database" },
+                  { value: "deploy", labelKo: "배포 경험", labelEn: "Deployment" },
+                  { value: "none", labelKo: "아직 없습니다", labelEn: "None yet" },
+                ],
+                sortOrder: 1,
+              },
+              {
+                titleKo: "워크숍에서 만들어 보고 싶은 서비스를 자유롭게 적어주세요.",
+                titleEn: "What kind of service would you like to build?",
+                questionType: "long_text",
+                isRequired: false,
+                sortOrder: 2,
+              },
+            ],
+          },
+        ],
+      } satisfies SurveySeed,
+    },
+    {
       titleKo: "2026 가을 MT 사전 수요조사",
       titleEn: "Fall 2026 MT Demand Survey",
       contentKo: [
@@ -1077,7 +1165,7 @@ async function seedMockData() {
         accentDark: "#5b21b6",
       }),
       survey: {
-        kind: "SURVEY",
+        kind: "EVENT",
         titleKo: "가을 MT 사전 수요조사",
         titleEn: "Fall MT Preliminary Demand Survey",
         descriptionKo: "참여 의향과 선호 일정을 확인하기 위한 사전 조사입니다. 실제 참가 신청은 추후 별도 공지됩니다.",
@@ -1164,7 +1252,7 @@ async function seedMockData() {
 
     await createSurveyWithQuestions(event.survey, seedAuthor.userId, articleRow.articleId);
   }
-  console.log("Seeded 4 event articles with linked surveys and posters");
+  console.log("Seeded 5 event articles with linked surveys and posters");
 }
 async function main() {
   console.log("Using database:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));

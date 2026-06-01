@@ -25,6 +25,7 @@ export class ArticleSearchController {
     @Query("q") q?: string,
     @Query("searchBy") searchBy?: "title" | "author" | "title_content",
     @Query("sortBy") sortBy?: "latest" | "views",
+    @Query("sortDirection") sortDirection?: "asc" | "desc",
     @Query("period") period?: "all" | "7days" | "30days",
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListResponse> {
@@ -39,6 +40,7 @@ export class ArticleSearchController {
         q,
         searchBy,
         sortBy,
+        sortDirection,
       },
       currentUser,
     );
