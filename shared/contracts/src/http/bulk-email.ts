@@ -1,3 +1,6 @@
+import type { z } from "zod";
+import type { SendBulkEmailSchema } from "../schemas.js";
+
 export interface BulkEmailRecord {
   id: string;
   subject: string;
@@ -9,11 +12,7 @@ export interface BulkEmailRecord {
   sentAt: string;
 }
 
-export interface SendBulkEmailRequest {
-  subject: string;
-  content: string;
-  recipientType: "ALL" | "PAID_STUDENTS" | "UNPAID_STUDENTS";
-}
+export type SendBulkEmailRequest = z.infer<typeof SendBulkEmailSchema>;
 
 export interface SendBulkEmailResponse {
   success: boolean;

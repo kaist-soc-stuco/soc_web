@@ -1,11 +1,8 @@
 import { Module } from "@nestjs/common";
 
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
-import { RedisModule } from "../../infrastructure/redis/redis.module";
-import { AuthSessionRepository } from "../auth/auth-session.repository";
-import { UsersRepository } from "../users/repositories/users.repository";
-import { UsersService } from "../users/users.service";
-import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "../../shared/guards";
+import { AuthModule } from "../auth/auth.module";
+import { UsersModule } from "../users/users.module";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -23,7 +20,7 @@ import { SurveyQuestionsController } from "./survey-questions.controller";
 import { SurveyResponsesController } from "./survey-responses.controller";
 
 @Module({
-  imports: [PostgresModule, RedisModule],
+  imports: [PostgresModule, AuthModule, UsersModule],
   controllers: [
     SurveysController,
     SurveySectionsController,
@@ -31,13 +28,6 @@ import { SurveyResponsesController } from "./survey-responses.controller";
     SurveyResponsesController,
   ],
   providers: [
-    // Infrastructure
-    AuthSessionRepository,
-    UsersRepository,
-    UsersService,
-    AuthGuard,
-    OptionalAuthGuard,
-    PermissionBitsGuard,
     // Survey repositories
     SurveysRepository,
     SurveySectionsRepository,

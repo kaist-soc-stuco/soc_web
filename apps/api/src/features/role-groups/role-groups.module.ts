@@ -1,27 +1,17 @@
 import { Module } from "@nestjs/common";
 
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
-import { RedisModule } from "../../infrastructure/redis/redis.module";
-import { AuthSessionRepository } from "../auth/auth-session.repository";
-import { UsersRepository } from "../users/repositories/users.repository";
-import { UsersService } from "../users/users.service";
-import { AuthGuard, PermissionBitsGuard } from "../../shared/guards";
+import { AuditLogModule } from "../audit/audit-log.module";
+import { AuthModule } from "../auth/auth.module";
+import { UsersModule } from "../users/users.module";
 
 import { RoleGroupsController } from "./role-groups.controller";
 import { RoleGroupsRepository } from "./role-groups.repository";
 import { RoleGroupsService } from "./role-groups.service";
 
 @Module({
-  imports: [PostgresModule, RedisModule],
+  imports: [PostgresModule, AuthModule, UsersModule, AuditLogModule],
   controllers: [RoleGroupsController],
-  providers: [
-    AuthSessionRepository,
-    UsersRepository,
-    UsersService,
-    AuthGuard,
-    PermissionBitsGuard,
-    RoleGroupsRepository,
-    RoleGroupsService,
-  ],
+  providers: [RoleGroupsRepository, RoleGroupsService],
 })
 export class RoleGroupsModule {}

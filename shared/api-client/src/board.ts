@@ -17,9 +17,13 @@ import type {
   CommentUpdateResponse,
 } from "@soc/contracts";
 
-import { buildListQuery, type ApiClientContext, type ListQueryOptions } from "./core";
+import {
+  buildListQuery,
+  type ApiClientContext,
+  type ListQueryOptions,
+} from "./core.js";
 
-interface AssetUploadResponse {
+export interface AssetUploadResponse {
   assetId: string;
   originalFilename: string;
   mimeType: string;

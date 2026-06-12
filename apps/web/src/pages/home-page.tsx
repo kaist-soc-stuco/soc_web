@@ -8,29 +8,29 @@ import { Footer } from '@/components/organisms/footer';
 export function HomePage() {
   return (
     <div 
-      className="bg-[#fafafa] h-screen overflow-hidden flex flex-col select-none" 
+      className="min-h-screen bg-[#fafafa] flex flex-col select-none lg:h-screen lg:overflow-hidden"
     >
       <div className="flex flex-1 min-h-0">
-        {/* Left Hero Image - 1/3 width, fills height */}
-        <aside className="hidden lg:block lg:w-1/3 h-full border-r border-kaist-grey/15 shrink-0">
+        {/* Left Hero Image */}
+        <aside className="hidden lg:block lg:w-[30%] h-full border-r border-kaist-grey/15 shrink-0">
           <Hero />
         </aside>
 
-        {/* Right Side - Main Content (2/3) */}
-        <div className="w-full lg:w-2/3 h-full flex flex-col min-h-0">
+        {/* Right Side - Main Content */}
+        <div className="w-full min-h-screen flex flex-col bg-[linear-gradient(180deg,#ffffff_0%,#f8faf9_100%)] lg:w-[70%] lg:h-full lg:min-h-0">
           <Header />
-          <main className="flex-1 min-h-0 flex flex-col py-4 px-6 lg:px-8 gap-5 justify-between">
+          <main className="flex-1 flex flex-col gap-5 overflow-y-auto px-6 py-5 lg:min-h-0 lg:overflow-hidden lg:px-8">
             {/* Event Carousel */}
-            <div className="shrink-0">
+            <div className="min-h-[350px] shrink-0 md:min-h-[400px]">
               <EventCarousel />
             </div>
             
             {/* Notice & Calendar Side by Side with elegant margin and generous gaps */}
-            <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-8 pb-2">
-              <div className="flex-[1.6] h-full min-h-0">
+            <div className="flex flex-col gap-7 pb-2 lg:flex-1 lg:min-h-0 lg:flex-row">
+              <div className="lg:flex-[1.6] lg:h-full lg:min-h-0">
                 <NoticeBoard />
               </div>
-              <div className="flex-1 h-full min-h-0">
+              <div className="lg:flex-1 lg:h-full lg:min-h-0">
                 <Calendar />
               </div>
             </div>

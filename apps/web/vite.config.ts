@@ -63,6 +63,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
+        "@soc/contracts": path.resolve(
+          workspaceRoot,
+          "shared/contracts/src/index.ts",
+        ),
+        "@soc/shared": path.resolve(workspaceRoot, "shared/common/src/index.ts"),
         "zod": path.resolve(__dirname, "node_modules/zod"),
       },
     },

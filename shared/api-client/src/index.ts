@@ -1,17 +1,17 @@
-import { createAdminApi } from "./admin";
-import { createAuthApi } from "./auth";
-import { createBoardApi } from "./board";
-import { createCalendarApi } from "./calendar";
+import { createAdminApi } from "./admin.js";
+import { createAuthApi } from "./auth.js";
+import { createBoardApi } from "./board.js";
+import { createCalendarApi } from "./calendar.js";
 import {
   ApiClientHttpError,
   createApiClientContext,
   type ApiClientOptions,
-} from "./core";
-import { createMiscApi } from "./misc";
-import { createSurveyApi } from "./survey";
+} from "./core.js";
+import { createMiscApi } from "./misc.js";
+import { createSurveyApi } from "./survey.js";
 
 export { ApiClientHttpError };
-export type { ApiClientOptions, ListQueryOptions } from "./core";
+export type { ApiClientOptions, ListQueryOptions } from "./core.js";
 
 export const createApiClient = (options: ApiClientOptions) => {
   const context = createApiClientContext(options);

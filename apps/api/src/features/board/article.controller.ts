@@ -24,7 +24,7 @@ import type {
 import { ArticleCreateSchema, ArticleUpdateSchema } from "@soc/contracts";
 import { Request, Response } from "express";
 
-import { AuthGuard } from "../../shared/guards";
+import { AuthGuard } from "../auth/guards";
 import { Cookies } from "../../shared/decorators/cookies.decorator";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { AUTH_ACCESS_COOKIE_NAME } from "../auth/auth.tokens";

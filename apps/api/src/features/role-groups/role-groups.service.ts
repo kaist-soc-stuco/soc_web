@@ -9,14 +9,21 @@ import type {
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
 
+import { AuditLogService } from "../audit/audit-log.service";
 import { UsersService } from "../users/users.service";
 import { RoleGroupsRepository } from "./role-groups.repository";
+
+interface AuditMetadata {
+  actorUserId?: string | null;
+  ipAddress?: string | null;
+}
 
 @Injectable()
 export class RoleGroupsService {
   constructor(
     private readonly roleGroupsRepository: RoleGroupsRepository,
     private readonly usersService: UsersService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listPermissions(): Promise<PermissionRecord[]> {
@@ -27,12 +34,24 @@ export class RoleGroupsService {
     return this.roleGroupsRepository.listRoleGroups();
   }
 
-  async createRoleGroup(input: CreateRoleGroupRequest): Promise<RoleGroupRecord> {
+  async createRoleGroup(
+    input: CreateRoleGroupRequest,
+    audit?: AuditMetadata,
+  ): Promise<RoleGroupRecord> {
     const created = await this.roleGroupsRepository.createRoleGroup(input);
 
     if (!created) {
       throw new NotFoundException("role_group_create_failed");
     }
+
+    await this.auditLogService.record({
+      action: "role_group.create",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { created, input },
+      targetId: created.roleGroupId,
+      targetType: "role_group",
+    });
 
     return created;
   }
@@ -40,7 +59,14 @@ export class RoleGroupsService {
   async updateRoleGroup(
     roleGroupId: number,
     input: UpdateRoleGroupRequest,
+    audit?: AuditMetadata,
   ): Promise<RoleGroupRecord> {
+    const existing = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
+
+    if (!existing) {
+      throw new NotFoundException("role_group_not_found");
+    }
+
     const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(
       (member) => member.userId,
     );
@@ -52,10 +78,19 @@ export class RoleGroupsService {
 
     await this.usersService.invalidatePermissionCaches(memberIds);
 
+    await this.auditLogService.record({
+      action: "role_group.update",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { after: updated, before: existing, input },
+      targetId: roleGroupId,
+      targetType: "role_group",
+    });
+
     return updated;
   }
 
-  async deleteRoleGroup(roleGroupId: number): Promise<void> {
+  async deleteRoleGroup(roleGroupId: number, audit?: AuditMetadata): Promise<void> {
     const existing = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
 
     if (!existing) {
@@ -72,6 +107,14 @@ export class RoleGroupsService {
 
     await this.roleGroupsRepository.deleteRoleGroup(roleGroupId);
     await this.usersService.invalidatePermissionCaches(memberIds);
+    await this.auditLogService.record({
+      action: "role_group.delete",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { deleted: existing, memberIds },
+      targetId: roleGroupId,
+      targetType: "role_group",
+    });
   }
 
   async listRoleGroupMembers(roleGroupId: number): Promise<RoleGroupMemberRecord[]> {
@@ -87,7 +130,7 @@ export class RoleGroupsService {
   async addUserToRoleGroup(
     roleGroupId: number,
     input: AssignRoleGroupMemberRequest,
-    grantedByUserId?: string,
+    audit?: AuditMetadata,
   ): Promise<RoleGroupMemberRecord> {
     const roleGroup = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
     if (!roleGroup) {
@@ -100,7 +143,7 @@ export class RoleGroupsService {
     }
 
     const added = await this.roleGroupsRepository.addUserToRoleGroup(roleGroupId, {
-      grantedBy: grantedByUserId ?? null,
+      grantedBy: audit?.actorUserId ?? null,
       userId: input.userId,
     });
 
@@ -109,11 +152,23 @@ export class RoleGroupsService {
     }
 
     await this.usersService.invalidatePermissionCache(added.userId);
+    await this.auditLogService.record({
+      action: "role_group_member.add",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { added, input, roleGroup },
+      targetId: `${roleGroupId}:${added.userId}`,
+      targetType: "role_group_member",
+    });
 
     return added;
   }
 
-  async removeUserFromRoleGroup(roleGroupId: number, userId: string): Promise<void> {
+  async removeUserFromRoleGroup(
+    roleGroupId: number,
+    userId: string,
+    audit?: AuditMetadata,
+  ): Promise<void> {
     const roleGroup = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
     if (!roleGroup) {
       throw new NotFoundException("role_group_not_found");
@@ -121,5 +176,13 @@ export class RoleGroupsService {
 
     await this.roleGroupsRepository.removeUserFromRoleGroup(roleGroupId, userId);
     await this.usersService.invalidatePermissionCache(userId);
+    await this.auditLogService.record({
+      action: "role_group_member.remove",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { roleGroup, userId },
+      targetId: `${roleGroupId}:${userId}`,
+      targetType: "role_group_member",
+    });
   }
 }

@@ -5,6 +5,7 @@ const {
   buildCalendarEvents,
   buildUnifiedItems,
   filterItemsByTab,
+  getCardPeriodText,
   getEventArticleState,
   sortVisibleItems,
   stripCalendarPrefix,
@@ -93,6 +94,49 @@ test("builds unified survey and event items", () => {
     ],
   );
   assert.equal(items[1].surveyId, "survey-child");
+});
+
+test("keeps event-connected surveys out of the pure survey tab", () => {
+  const items = buildUnifiedItems(
+    [
+      survey({
+        id: "event-child",
+        kind: "EVENT",
+        connectedPostId: "article-1",
+      }),
+      survey({ id: "pure-survey", kind: "SURVEY" }),
+    ],
+    [article({ articleId: "article-1", surveyId: "event-child" })],
+    NOW,
+  );
+
+  assert.deepEqual(
+    filterItemsByTab(items, "survey").map((item) => item.id),
+    ["pure-survey"],
+  );
+  assert.deepEqual(
+    filterItemsByTab(items, "event").map((item) => item.id),
+    ["article-1"],
+  );
+});
+
+test("renders always-open survey cards as ongoing without dates", () => {
+  const [item] = buildUnifiedItems(
+    [
+      survey({
+        id: "always-open",
+        isAlwaysOpen: true,
+        opensAt: null,
+        closesAt: null,
+      }),
+    ],
+    [],
+    NOW,
+  );
+
+  assert.equal(item.computedState, "open");
+  assert.equal(getCardPeriodText(item, "ko"), "상시");
+  assert.equal(getCardPeriodText(item, "en"), "Always open");
 });
 
 test("filters by tab and sorts open items before closed items", () => {

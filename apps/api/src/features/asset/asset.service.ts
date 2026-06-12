@@ -32,6 +32,18 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
+    const enabled = this.configService.get<boolean>(
+      "ASSET_ORPHAN_CLEANUP_ENABLED",
+      false,
+    );
+
+    if (!enabled) {
+      this.logger.log(
+        "Asset orphan cleanup scheduler is disabled. Use POST /assets/cleanup-orphans or enable ASSET_ORPHAN_CLEANUP_ENABLED on a single runner.",
+      );
+      return;
+    }
+
     const intervalHours = this.configService.get<number>(
       "ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS",
       6,

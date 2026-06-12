@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
+import { AuditLogService } from "../audit/audit-log.service";
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
 import type {
@@ -10,12 +11,20 @@ import type {
 } from "@soc/contracts";
 import { nowDate } from "@soc/shared";
 
+interface AuditMetadata {
+  actorUserId?: string | null;
+  ipAddress?: string | null;
+}
+
 /**
  * PostgreSQL user 저장/조회 로직을 담당합니다.
  */
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   private normalizeListOptions(options: { page: number; limit: number }) {
     const page = Number.isFinite(options.page) ? Math.max(1, Math.floor(options.page)) : 1;
@@ -121,8 +130,20 @@ export class UsersService {
       note?: string | null;
       verifiedBy?: string;
     },
+    audit?: AuditMetadata,
   ): Promise<StudentFeeStatusRecord> {
-    return this.usersRepository.updateStudentFeeStatus(userId, input);
+    const record = await this.usersRepository.updateStudentFeeStatus(userId, input);
+
+    await this.auditLogService.record({
+      action: "student_fee_status.update",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { input, record },
+      targetId: userId,
+      targetType: "student_fee_status",
+    });
+
+    return record;
   }
 
   async ensureStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord> {

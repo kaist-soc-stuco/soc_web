@@ -1,3 +1,12 @@
+import type { z } from "zod";
+import type {
+  ArticleAssetRequestSchema,
+  ArticleCreateSchema,
+  ArticleUpdateSchema,
+  CommentCreateSchema,
+  CommentUpdateSchema,
+} from "../schemas.js";
+
 export type BoardReadScope = "PUBLIC" | "LOGIN" | "STAFF_ONLY";
 
 export interface BoardSummary {
@@ -111,26 +120,9 @@ export interface ArticleDetailResponse {
   eventDescription?: string | null;
 }
 
-export interface ArticleAssetRequest {
-  assetId: string;
-  usageType: "IMAGE" | "ATTACHMENT" | "THUMBNAIL";
-  sortOrder: number;
-}
+export type ArticleAssetRequest = z.infer<typeof ArticleAssetRequestSchema>;
 
-export interface ArticleCreateRequest {
-  titleKo: string;
-  titleEn?: string;
-  contentKo: string;
-  contentEn?: string;
-  visibilityScope: VisibilityScope;
-  isPinned?: boolean;
-  pinOrder?: number | null;
-  isAnonymous?: boolean;
-  assets?: ArticleAssetRequest[];
-  eventStartDate?: string | null;
-  eventEndDate?: string | null;
-  eventDescription?: string | null;
-}
+export type ArticleCreateRequest = z.infer<typeof ArticleCreateSchema>;
 
 export interface ArticleCreateResponse {
   articleId: string;
@@ -138,20 +130,7 @@ export interface ArticleCreateResponse {
   postedAt: string;
 }
 
-export interface ArticleUpdateRequest {
-  titleKo?: string;
-  titleEn?: string;
-  contentKo?: string;
-  contentEn?: string;
-  visibilityScope?: VisibilityScope;
-  isPinned?: boolean;
-  pinOrder?: number | null;
-  isAnonymous?: boolean;
-  assets?: ArticleAssetRequest[];
-  eventStartDate?: string | null;
-  eventEndDate?: string | null;
-  eventDescription?: string | null;
-}
+export type ArticleUpdateRequest = z.infer<typeof ArticleUpdateSchema>;
 
 export interface ArticleUpdateResponse {
   articleId: string;
@@ -184,19 +163,14 @@ export interface CommentListResponse {
   items: CommentItem[];
 }
 
-export interface CommentCreateRequest {
-  parentCommentId?: string | null;
-  content: string;
-}
+export type CommentCreateRequest = z.infer<typeof CommentCreateSchema>;
 
 export interface CommentCreateResponse {
   commentId: string;
   createdAt: string;
 }
 
-export interface CommentUpdateRequest {
-  content: string;
-}
+export type CommentUpdateRequest = z.infer<typeof CommentUpdateSchema>;
 
 export interface CommentUpdateResponse {
   commentId: string;

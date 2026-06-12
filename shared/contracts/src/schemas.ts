@@ -25,9 +25,9 @@ export const SsoCallbackBodySchema = z.object({
 
 // ─── Board / Article ─────────────────────────────────────────────────────────
 
-const VisibilityScopeSchema = z.enum(["PUBLIC", "MEMBERS", "STAFF_ONLY"]);
+export const VisibilityScopeSchema = z.enum(["PUBLIC", "MEMBERS", "STAFF_ONLY"]);
 
-const ArticleAssetRequestSchema = z.object({
+export const ArticleAssetRequestSchema = z.object({
   assetId: z.string().min(1),
   usageType: z.enum(["IMAGE", "ATTACHMENT", "THUMBNAIL"]),
   sortOrder: z.number().int().min(0),
@@ -108,7 +108,18 @@ export const CreateSectionSchema = z.object({
 
 export const UpdateSectionSchema = CreateSectionSchema.partial();
 
-const QuestionOptionSchema = z.object({
+export const QuestionTypeSchema = z.enum([
+  "short_text",
+  "long_text",
+  "single_choice",
+  "multiple_choice",
+  "dropdown",
+  "date",
+  "time",
+  "datetime",
+]);
+
+export const QuestionOptionSchema = z.object({
   value: z.string().min(1),
   labelKo: z.string().min(1),
   labelEn: z.string().optional(),
@@ -119,7 +130,7 @@ export const CreateQuestionSchema = z.object({
   titleEn: z.string().optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
-  questionType: z.string().min(1),
+  questionType: QuestionTypeSchema,
   options: z.array(QuestionOptionSchema).optional(),
   answerRegex: z.string().optional(),
   isRequired: z.boolean().optional(),

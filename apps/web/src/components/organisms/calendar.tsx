@@ -14,8 +14,8 @@ import { useLanguage } from "@/hooks/use-language";
 interface CompactEvent {
   id: string;
   kind: string;
-  title: string;
-  cleanTitle: string;
+  cleanTitleKo: string;
+  cleanTitleEn?: string | null;
   date: Date;
   dateType: "open" | "close";
 }
@@ -55,6 +55,18 @@ function formatDate(date: Date) {
   return `${mm}.${dd}`;
 }
 
+function formatMonthTitle(year: number, monthIndex: number, lang: string) {
+  if (lang === "ko") return `${year}년 ${monthIndex + 1}월`;
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    year: "numeric",
+  }).format(dateFromParts(year, monthIndex));
+}
+
+function dateFromParts(year: number, monthIndex: number) {
+  return new Date(year, monthIndex, 1);
+}
+
 function formatWeekDate(date: Date, lang: string) {
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
@@ -66,7 +78,16 @@ function formatWeekDate(date: Date, lang: string) {
   return `${mm}.${dd} (${dayName}) ${hh}:${min}`;
 }
 
-function buildPreviewEvents(dayEvents: CompactEvent[]): CalendarPreviewEvent[] {
+function getCompactEventTitle(event: CompactEvent, lang: string) {
+  return lang === "ko"
+    ? event.cleanTitleKo
+    : event.cleanTitleEn || event.cleanTitleKo;
+}
+
+function buildPreviewEvents(
+  dayEvents: CompactEvent[],
+  lang: string,
+): CalendarPreviewEvent[] {
   const sortedEvents = [...dayEvents].sort(
     (a, b) => a.date.getTime() - b.date.getTime(),
   );
@@ -91,7 +112,7 @@ function buildPreviewEvents(dayEvents: CompactEvent[]): CalendarPreviewEvent[] {
         consumed.add(`${closeEvent.id}-${closeEvent.dateType}`);
         previewEvents.push({
           key: `${event.id}-range`,
-          cleanTitle: event.cleanTitle,
+          cleanTitle: getCompactEventTitle(event, lang),
           timeText: `(${formatTime(event.date)} ~ ${formatTime(closeEvent.date)})`,
           dateType: "range",
           sortDate: event.date,
@@ -103,7 +124,7 @@ function buildPreviewEvents(dayEvents: CompactEvent[]): CalendarPreviewEvent[] {
     consumed.add(eventKey);
     previewEvents.push({
       key: `${event.id}-${event.dateType}-${index}`,
-      cleanTitle: event.cleanTitle,
+      cleanTitle: getCompactEventTitle(event, lang),
       timeText:
         event.dateType === "open"
           ? `(${formatTime(event.date)}~)`
@@ -153,15 +174,12 @@ export function Calendar() {
         surveys.forEach((survey: SurveyRecord) => {
           if (!survey.isPublished || !survey.showOnCalendar) return;
 
-          const title =
-            lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo;
-
           if (survey.opensAt) {
             parsed.push({
               id: survey.id,
               kind: survey.kind,
-              title: `${lang === "ko" ? "[시작]" : "[Start]"} ${title}`,
-              cleanTitle: title,
+              cleanTitleKo: survey.titleKo,
+              cleanTitleEn: survey.titleEn || survey.titleKo,
               date: isoToDate(survey.opensAt),
               dateType: "open",
             });
@@ -170,25 +188,20 @@ export function Calendar() {
             parsed.push({
               id: survey.id,
               kind: survey.kind,
-              title: `${lang === "ko" ? "[마감]" : "[Deadline]"} ${title}`,
-              cleanTitle: title,
+              cleanTitleKo: survey.titleKo,
+              cleanTitleEn: survey.titleEn || survey.titleKo,
               date: isoToDate(survey.closesAt),
               dateType: "close",
             });
           }
         });
         eventArticles.forEach((article: ArticleListItem) => {
-          const title =
-            lang === "ko"
-              ? article.titleKo
-              : article.titleEn || article.titleKo;
-
           if (article.eventStartDate) {
             parsed.push({
               id: article.articleId,
               kind: "EVENT",
-              title: `${lang === "ko" ? "[시작]" : "[Start]"} ${title}`,
-              cleanTitle: title,
+              cleanTitleKo: article.titleKo,
+              cleanTitleEn: article.titleEn || article.titleKo,
               date: isoToDate(article.eventStartDate),
               dateType: "open",
             });
@@ -198,8 +211,8 @@ export function Calendar() {
             parsed.push({
               id: article.articleId,
               kind: "EVENT",
-              title: `${lang === "ko" ? "[마감]" : "[Deadline]"} ${title}`,
-              cleanTitle: title,
+              cleanTitleKo: article.titleKo,
+              cleanTitleEn: article.titleEn || article.titleKo,
               date: isoToDate(article.eventEndDate),
               dateType: "close",
             });
@@ -221,7 +234,7 @@ export function Calendar() {
     return () => {
       active = false;
     };
-  }, [apiClient, lang]);
+  }, [apiClient]);
 
   useEffect(() => {
     let active = true;
@@ -346,11 +359,11 @@ export function Calendar() {
   }, [holidays]);
 
   return (
-    <section className="bg-white rounded-3xl border border-card-border-subtle shadow-card px-6 pt-4 pb-4 h-full flex flex-col justify-between select-none">
+    <section className="home-bento-card px-6 pt-4 pb-4 h-full flex flex-col justify-between select-none">
       <div className="flex flex-col pb-1">
         {/* Header */}
         <div className="mb-2.5 mt-1 flex-shrink-0 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="grid w-[14rem] grid-cols-[1.75rem_1fr_1.75rem] items-center gap-2">
             <button
               onClick={handlePrevMonth}
               className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center hover:border-brand-primary-border hover:bg-brand-primary-light transition-colors text-slate-600 cursor-pointer"
@@ -358,8 +371,8 @@ export function Calendar() {
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
 
-            <h3 className="text-base font-bold tracking-tight text-brand-primary">
-              {currentYear}년 {currentMonth + 1}월
+            <h3 className="text-center text-[15px] font-extrabold text-brand-primary">
+              {formatMonthTitle(currentYear, currentMonth, lang)}
             </h3>
 
             <button
@@ -373,7 +386,10 @@ export function Calendar() {
 
         {/* Weekday Headers */}
         <div className="mb-1.5 grid grid-cols-7 gap-x-1 flex-shrink-0 text-center">
-          {["일", "월", "화", "수", "목", "금", "토"].map((day, index) => (
+          {(lang === "ko"
+            ? ["일", "월", "화", "수", "목", "금", "토"]
+            : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+          ).map((day, index) => (
             <div key={index}>
               <span
                 className={`text-[11.5px] font-semibold tracking-tight ${
@@ -416,7 +432,7 @@ export function Calendar() {
                 ? holidayMap.get(toDateKey(item.date))
                 : undefined;
               const isPublicHoliday = holiday?.isHoliday === true;
-              const previewEvents = buildPreviewEvents(dayEvents);
+              const previewEvents = buildPreviewEvents(dayEvents, lang);
 
               return (
                 <button
@@ -445,7 +461,7 @@ export function Calendar() {
                   }`}
                 >
                   {item.today ? (
-                    <div className="w-4 h-4 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                    <div className="w-4.5 h-4.5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
                       {item.day}
                     </div>
                   ) : (
@@ -493,18 +509,24 @@ export function Calendar() {
                     dayEvents.length > 0 &&
                     hoveredDateKey === cellDateKey && (
                       <div
-                        className={`absolute bottom-full mb-2.5 w-48 bg-slate-900/95 text-white text-[10px] rounded-xl p-2.5 shadow-xl pointer-events-none z-50 select-none flex flex-col gap-1.5 border border-white/10 ${(() => {
+                        className={`absolute bottom-full mb-2.5 w-56 rounded-2xl border border-card-border-subtle bg-white p-3 text-[10px] text-slate-800 shadow-[0_18px_45px_rgba(15,23,42,0.16)] pointer-events-none z-50 select-none flex flex-col gap-2 ${(() => {
                           const column = index % 7;
                           if (column <= 2) return "left-0 translate-x-0";
                           if (column >= 4) return "right-0 translate-x-0";
                           return "left-1/2 -translate-x-1/2";
                         })()}`}
                       >
-                        <div className="font-extrabold border-b border-white/15 pb-1 flex items-center justify-between text-brand-primary-light">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 font-extrabold text-brand-primary">
                           <span>{formatDate(item.date)}</span>
-                          <span>{previewEvents.length}개 일정</span>
+                          <span>
+                            {lang === "ko"
+                              ? `${previewEvents.length}개 일정`
+                              : `${previewEvents.length} event${
+                                  previewEvents.length === 1 ? "" : "s"
+                                }`}
+                          </span>
                         </div>
-                        <div className="flex flex-col gap-1.5 text-[9px] font-medium text-stone-200">
+                        <div className="flex flex-col gap-1.5 text-[10px] font-semibold text-slate-700">
                           {previewEvents.slice(0, 4).map((event) => (
                             <div
                               key={event.key}
@@ -513,21 +535,23 @@ export function Calendar() {
                               <span
                                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                                   event.dateType === "close"
-                                    ? "bg-red-400"
-                                    : "bg-brand-primary-light"
+                                    ? "bg-red-500"
+                                    : "bg-brand-primary"
                                 }`}
                               />
                               <span className="min-w-0 flex-1 truncate">
                                 {event.cleanTitle}
                               </span>
-                              <span className="shrink-0 text-[8.5px] font-semibold text-stone-300">
+                              <span className="shrink-0 text-[9px] font-bold text-slate-500">
                                 {event.timeText}
                               </span>
                             </div>
                           ))}
                           {previewEvents.length > 4 && (
-                            <div className="text-[8px] text-stone-400 pl-3">
-                              + {previewEvents.length - 4}개 더보기
+                            <div className="pl-3 text-[9px] font-semibold text-slate-400">
+                              {lang === "ko"
+                                ? `+ ${previewEvents.length - 4}개 더보기`
+                                : `+ ${previewEvents.length - 4} more`}
                             </div>
                           )}
                         </div>
@@ -543,16 +567,15 @@ export function Calendar() {
       {/* 이번 주 예정 일정 */}
       <div className="mt-1.5 flex-shrink-0 flex flex-col gap-1">
         <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-          <h4 className="text-[13.5px] font-bold text-slate-800">
-            이번 주 예정 일정
+          <h4 className="home-card-title text-slate-800">
+            {lang === "ko" ? "이번 주 예정 일정" : "This Week"}
           </h4>
           <Link
             to="/events-surveys?tab=calendar"
-            className="text-[11px] font-medium text-slate-400 hover:text-brand-primary transition-colors cursor-pointer flex items-center gap-0.5"
+            className="home-more-link"
           >
-            <span>더보기</span>
+            <span>{lang === "ko" ? "더보기" : "More"}</span>
             <svg
-              className="w-3 h-3 text-slate-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -570,6 +593,7 @@ export function Calendar() {
           {weeklyEvents.length > 0 ? (
             visibleWeeklyEvents.map((event, index) => {
               const isDeadline = event.dateType === "close";
+              const cleanTitle = getCompactEventTitle(event, lang);
               const statusLabel = isDeadline
                 ? lang === "ko"
                   ? "마감"
@@ -592,11 +616,11 @@ export function Calendar() {
                   className="flex items-center justify-between py-0.5 transition-colors hover:bg-slate-50 rounded-lg px-2 -mx-2 cursor-pointer"
                 >
                   <div className="flex items-center gap-3 w-full min-w-0">
-                    <span className="text-[11.5px] font-normal text-slate-500 shrink-0">
+                    <span className="home-meta-text shrink-0 text-slate-500">
                       {formatWeekDate(event.date, lang)}
                     </span>
-                    <span className="text-[11.5px] font-semibold text-slate-700 truncate min-w-0 flex-1">
-                      {event.cleanTitle}
+                    <span className="home-meta-text min-w-0 flex-1 truncate text-slate-700">
+                      {cleanTitle}
                     </span>
                     <span
                       className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${

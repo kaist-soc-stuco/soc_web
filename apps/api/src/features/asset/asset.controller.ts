@@ -16,7 +16,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { Permissions } from "@soc/contracts";
 import { Request } from "express";
 
-import { AuthGuard, RequirePermissions } from "../../shared/guards";
+import { AuthGuard, RequirePermissions } from "../auth/guards";
 import { AssetService } from "./asset.service";
 
 interface AuthenticatedRequest extends Request {

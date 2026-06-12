@@ -29,7 +29,7 @@ docs/       개발 규칙, UI/UX 규칙, 구조 개선 우선순위
 
 ## 요구 사항
 
-- Node.js 20+
+- Node.js 22.13+
 - pnpm 11.x
 - Docker 및 Docker Compose
 - WSL 환경에서는 가능하면 WSL 내부 shell에서 pnpm 명령을 실행하세요. Windows와 WSL 경로가 섞이면 typecheck/build가 실패할 수 있습니다.
@@ -53,10 +53,11 @@ cp .env.example .env
 - `REDIS_URL`: Redis 접속 URL
 - `ASSET_UPLOAD_DIR`: 게시글 이미지/첨부파일 저장 위치. 생략하면 로컬 개발 기본 경로 사용
 - `ASSET_ORPHAN_GRACE_HOURS`: 게시글에 연결되지 않은 업로드 파일을 정리하기 전까지 기다릴 시간. 기본값 24
+- `ASSET_ORPHAN_CLEANUP_ENABLED`: 미연결 업로드 파일 자동 정리 스케줄러 실행 여부. 기본값 false
 - `ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS`: 연결되지 않은 업로드 파일을 자동 점검하는 주기. 기본값 6
 - `SSO_LOGIN_URL`, `SSO_REDIRECT_URI`, `SSO_CLIENT_ID`, `SSO_AUTH_API_URL`, `SSO_CLIENT_SECRET`: KAIST SSO 연동 설정
 
-업로드 후 게시글에 연결되지 않은 파일은 관리자 권한으로 `POST /v1/assets/cleanup-orphans`를 호출해 정리할 수 있습니다.
+업로드 후 게시글에 연결되지 않은 파일은 관리자 권한으로 `POST /v1/assets/cleanup-orphans`를 호출해 정리할 수 있습니다. 자동 정리는 `ASSET_ORPHAN_CLEANUP_ENABLED=true`인 API 프로세스에서만 실행하세요.
 
 운영 배포 전에는 `.env.example`의 개발용 secret과 SSO 테스트 값을 실제 발급 값으로 교체해야 합니다.
 
@@ -71,7 +72,7 @@ pnpm install
 DB와 Redis만 Docker로 띄우고 API/Web은 로컬 Node 프로세스로 실행합니다.
 
 ```bash
-docker compose --env-file .env -f infra/docker/compose.dev.yml up -d
+docker compose --env-file .env up -d
 pnpm db:migrate
 pnpm dev
 ```
@@ -94,13 +95,13 @@ pnpm dev:web
 API, Web, PostgreSQL, Redis, Nginx를 한 번에 실행합니다.
 
 ```bash
-docker compose --env-file .env up -d --build
+docker compose --env-file .env -f infra/docker/compose.local.yml up -d --build
 ```
 
 Nginx는 기본적으로 `127.0.0.1:8080`에 바인딩됩니다.
 
 ```bash
-NGINX_PORT=18080 docker compose --env-file .env up -d --build
+NGINX_PORT=18080 docker compose --env-file .env -f infra/docker/compose.local.yml up -d --build
 ```
 
 업로드 파일은 Docker volume `api_uploads`에 저장됩니다. PostgreSQL과 Redis도 각각 volume을 사용합니다.
@@ -114,7 +115,7 @@ docker compose --env-file .env -f infra/docker/compose.prod.yml config
 docker compose --env-file .env -f infra/docker/compose.prod.yml up -d --build
 ```
 
-현재 운영 compose는 단일 서버 배포를 전제로 하며, 업로드 파일은 로컬 Docker volume에 저장합니다. 외부 오브젝트 스토리지나 CDN이 필요해지는 시점에 별도 설계를 추가하세요.
+현재 운영 compose는 단일 서버 배포를 전제로 하며, 업로드 파일은 로컬 Docker volume에 저장합니다. 자동 업로드 정리는 단일 API 인스턴스에서만 `ASSET_ORPHAN_CLEANUP_ENABLED=true`로 켜세요. API replica, 외부 오브젝트 스토리지, CDN이 필요해지는 시점에는 별도 worker 또는 distributed lock 설계를 먼저 추가하세요.
 
 ## 자주 쓰는 명령
 

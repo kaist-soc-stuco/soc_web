@@ -1,8 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
-import { eq, and, or, isNull } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
-import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
-import { users, studentFeeStatus } from "../../infrastructure/postgres/postgres.schema";
+import { Injectable, Logger } from "@nestjs/common";
 import { BulkEmailRepository } from "./bulk-email.repository";
 import type { BulkEmailRecord, SendBulkEmailRequest, SendBulkEmailResponse } from "@soc/contracts";
 
@@ -11,7 +7,6 @@ export class BulkEmailService {
   private readonly logger = new Logger(BulkEmailService.name);
 
   constructor(
-    @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
     private readonly bulkEmailRepo: BulkEmailRepository,
   ) {}
 
@@ -23,36 +18,8 @@ export class BulkEmailService {
     senderId: string,
     dto: SendBulkEmailRequest,
   ): Promise<SendBulkEmailResponse> {
-    // 1. Resolve recipients
-    let queryWhere: SQL | undefined = eq(users.isActive, true);
+    const emails = await this.bulkEmailRepo.findRecipientEmails(dto.recipientType);
 
-    if (dto.recipientType === "PAID_STUDENTS") {
-      queryWhere = and(
-        eq(users.isActive, true),
-        eq(studentFeeStatus.status, "PAID"),
-      );
-    } else if (dto.recipientType === "UNPAID_STUDENTS") {
-      queryWhere = and(
-        eq(users.isActive, true),
-        or(
-          eq(studentFeeStatus.status, "UNPAID"),
-          isNull(studentFeeStatus.status),
-        ),
-      );
-    }
-
-    const recipients = await this.db
-      .select({
-        email: users.email,
-        nameKo: users.nameKo,
-      })
-      .from(users)
-      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
-      .where(queryWhere);
-
-    const emails = recipients.map((r) => r.email).filter(Boolean);
-
-    // 2. Perform Mock Dispatch
     this.logger.log(`========================================`);
     this.logger.log(`[BULK EMAIL DISPATCH]`);
     this.logger.log(`Subject: ${dto.subject}`);

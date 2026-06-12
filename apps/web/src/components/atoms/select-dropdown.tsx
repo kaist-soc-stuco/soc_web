@@ -7,21 +7,31 @@ interface DropdownOption {
 }
 
 interface SelectDropdownProps {
+  id?: string;
   value: string;
   options: DropdownOption[];
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  buttonClassName?: string;
   disabled?: boolean;
+  emptyLabel?: string;
+  menuClassName?: string;
+  optionClassName?: string;
 }
 
 export function SelectDropdown({
+  id,
   value,
   options,
   onChange,
   placeholder,
   className,
+  buttonClassName,
   disabled = false,
+  emptyLabel = "선택지가 없습니다.",
+  menuClassName,
+  optionClassName,
 }: SelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,14 +51,16 @@ export function SelectDropdown({
   return (
     <div ref={containerRef} className={`relative ${className || ""}`}>
       <button
+        id={id}
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all flex items-center justify-between font-medium ${
+        aria-expanded={isOpen}
+        className={`w-full rounded-xl border border-gray-200 px-4 py-2.5 text-left text-sm font-medium transition-all flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen ${
           disabled
             ? "bg-gray-50 text-gray-400 opacity-50 cursor-not-allowed border-gray-200"
             : "bg-white text-gray-700 hover:border-gray-300"
-        }`}
+        } ${buttonClassName || ""}`}
       >
         <span className={selectedOption ? "text-kaist-black" : "text-kaist-grey/50"}>
           {selectedOption ? selectedOption.label : placeholder || "선택하세요"}
@@ -61,14 +73,21 @@ export function SelectDropdown({
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute z-50 mt-2 w-full border border-gray-200 rounded-xl bg-white shadow-lg py-1 animate-in fade-in duration-100 max-h-60 overflow-y-auto">
+        <div
+          role="listbox"
+          className={`absolute z-50 mt-2 w-full border border-gray-200 rounded-xl bg-white shadow-lg py-1 animate-in fade-in duration-100 max-h-60 overflow-y-auto ${menuClassName || ""}`}
+        >
           {options.length === 0 ? (
-            <div className="px-4 py-2.5 text-xs text-kaist-grey/50">선택지가 없습니다.</div>
+            <div className="px-4 py-2.5 text-xs text-kaist-grey/50">
+              {emptyLabel}
+            </div>
           ) : (
             options.map((option) => (
               <button
                 key={option.value}
                 type="button"
+                role="option"
+                aria-selected={option.value === value}
                 onClick={() => {
                   onChange(option.value);
                   setIsOpen(false);
@@ -77,7 +96,7 @@ export function SelectDropdown({
                   option.value === value
                     ? "text-kaist-darkgreen bg-kaist-lightgreen/20 font-bold"
                     : "text-kaist-black font-medium"
-                }`}
+                } ${optionClassName || ""}`}
               >
                 <span>{option.label}</span>
                 {option.value === value && <Check className="w-3.5 h-3.5 text-kaist-darkgreen" />}

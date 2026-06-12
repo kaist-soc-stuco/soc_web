@@ -12,6 +12,9 @@ export const BOARD_CODES = [
 
 export type BoardCode = (typeof BOARD_CODES)[number];
 
+// 서버 카탈로그를 못 받은 상태에서는 fallback으로 글쓰기 권한을 열지 않는다.
+const FALLBACK_WRITE_PERMISSION_BIT = Number.MAX_SAFE_INTEGER;
+
 export interface BoardFallbackMetadata {
   descriptionEn: string;
   descriptionKo: string;
@@ -25,70 +28,72 @@ export type BoardMetadata = Pick<
   "code" | "nameKo" | "nameEn" | "description" | "writePermissionBit"
 >;
 
-const BOARD_FALLBACK_METADATA: Record<BoardCode, BoardFallbackMetadata> = {
+const BOARD_FALLBACK_METADATA: Record<
+  BoardCode,
+  Omit<BoardFallbackMetadata, "writePermissionBit">
+> = {
   공지: {
     descriptionKo: "전산학부의 다양한 소식을 확인하세요.",
-    descriptionEn: "Get updates on various news from KAIST School of Computing.",
+    descriptionEn: "Get updates from the School of Computing.",
     labelEn: "Notice",
-    titleKo: "공지사항",
-    writePermissionBit: 1,
+    titleKo: "공지",
   },
   행사: {
     descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요.",
     descriptionEn: "Discover events organized by the School of Computing.",
-    labelEn: "Event",
-    titleKo: "행사 게시판",
-    writePermissionBit: 1,
+    labelEn: "Events",
+    titleKo: "행사",
   },
   HoC: {
     descriptionKo: "Hall of Code 프로젝트 및 활동 내역을 확인하세요.",
     descriptionEn: "Hall of Code projects and activity logs.",
     labelEn: "HoC",
-    titleKo: "HoC 게시판",
-    writePermissionBit: 2,
+    titleKo: "HoC",
   },
   홍보글: {
     descriptionKo: "집행위원회 및 학회 홍보 게시물을 확인하세요.",
     descriptionEn: "Promotional posts from the Student Council and societies.",
-    labelEn: "Promo",
-    titleKo: "홍보글 게시판",
-    writePermissionBit: 2,
+    labelEn: "Promotions",
+    titleKo: "홍보글",
   },
   건의사항: {
     descriptionKo: "학생들의 의견과 건의사항을 공유하는 공간입니다.",
-    descriptionEn: "Share opinions and suggestions with us.",
+    descriptionEn: "Share opinions and suggestions with the council.",
     labelEn: "Suggestions",
-    titleKo: "건의사항 게시판",
-    writePermissionBit: 0,
+    titleKo: "건의사항",
   },
   연구실: {
     descriptionKo: "각 연구실의 소식과 공지사항을 확인하세요.",
     descriptionEn: "News and announcements from research labs.",
     labelEn: "Labs",
-    titleKo: "연구실 게시판",
-    writePermissionBit: 2,
+    titleKo: "연구실",
   },
   QnA: {
     descriptionKo: "궁금한 점을 자유롭게 질문하세요.",
     descriptionEn: "Ask questions and get answers freely.",
-    labelEn: "QnA",
-    titleKo: "QnA 게시판",
-    writePermissionBit: 0,
+    labelEn: "Q&A",
+    titleKo: "QnA",
   },
 };
 
 export const getBoardFallbackMetadata = (
   code: string,
 ): BoardFallbackMetadata => {
-  return (
-    BOARD_FALLBACK_METADATA[code as BoardCode] ?? {
-      descriptionKo: `${code} 게시판입니다.`,
-      descriptionEn: `${code} board.`,
-      labelEn: code,
-      titleKo: `${code} 게시판`,
-      writePermissionBit: 0,
-    }
-  );
+  const metadata = BOARD_FALLBACK_METADATA[code as BoardCode];
+  if (metadata) {
+    return {
+      ...metadata,
+      writePermissionBit: FALLBACK_WRITE_PERMISSION_BIT,
+    };
+  }
+
+  return {
+    descriptionKo: `${code} 게시판입니다.`,
+    descriptionEn: `${code} board.`,
+    labelEn: code,
+    titleKo: code,
+    writePermissionBit: FALLBACK_WRITE_PERMISSION_BIT,
+  };
 };
 
 export const getBoardLabel = (code: string, lang: string): string => {
@@ -98,7 +103,7 @@ export const getBoardLabel = (code: string, lang: string): string => {
 
 export const getBoardTitle = (code: string, lang: string): string => {
   const metadata = getBoardFallbackMetadata(code);
-  return lang === "ko" ? metadata.titleKo : `${metadata.labelEn} Board`;
+  return lang === "ko" ? metadata.titleKo : metadata.labelEn;
 };
 
 export const getBoardDescription = (code: string, lang: string): string => {
@@ -147,10 +152,10 @@ export const getBoardTitleFromMetadata = (
   }
 
   if (lang === "ko") {
-    return code === "공지" ? "공지사항" : board.nameKo || fallback.titleKo;
+    return board.nameKo || code;
   }
 
-  return `${board.nameEn || fallback.labelEn || board.nameKo || code} Board`;
+  return board.nameEn || fallback.labelEn || board.nameKo || code;
 };
 
 export const getBoardDescriptionFromMetadata = (

@@ -4,12 +4,16 @@ import { Permissions } from "@soc/contracts";
 import type { AssignRoleGroupMemberRequest } from "@soc/contracts";
 import { Request } from "express";
 
-import { RequirePermissions } from "../../shared/guards";
+import { RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { CreateRoleGroupDto } from "./dto/create-role-group.dto";
 import { UpdateRoleGroupDto } from "./dto/update-role-group.dto";
 import { RoleGroupsService } from "./role-groups.service";
+
+type AuthenticatedRequest = Request & {
+  user?: { id: string };
+};
 
 @Controller("role-groups")
 @RequirePermissions(Permissions.ADMIN)
@@ -27,16 +31,26 @@ export class RoleGroupsController {
   }
 
   @Post()
-  create(@Body(new ZodValidationPipe(CreateRoleGroupSchema)) dto: CreateRoleGroupDto) {
-    return this.roleGroupsService.createRoleGroup(dto);
+  create(
+    @Body(new ZodValidationPipe(CreateRoleGroupSchema)) dto: CreateRoleGroupDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.roleGroupsService.createRoleGroup(dto, {
+      actorUserId: request.user?.id,
+      ipAddress: request.ip,
+    });
   }
 
   @Patch(":roleGroupId")
   update(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Body(new ZodValidationPipe(UpdateRoleGroupSchema)) dto: UpdateRoleGroupDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.roleGroupsService.updateRoleGroup(roleGroupId, dto);
+    return this.roleGroupsService.updateRoleGroup(roleGroupId, dto, {
+      actorUserId: request.user?.id,
+      ipAddress: request.ip,
+    });
   }
 
   @Get(":roleGroupId/users")
@@ -49,25 +63,34 @@ export class RoleGroupsController {
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Body(new ZodValidationPipe(AssignRoleGroupMemberSchema))
     dto: AssignRoleGroupMemberRequest,
-    @Req() request: Request & { user?: { id: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.roleGroupsService.addUserToRoleGroup(
-      roleGroupId,
-      dto,
-      request.user?.id,
-    );
+    return this.roleGroupsService.addUserToRoleGroup(roleGroupId, dto, {
+      actorUserId: request.user?.id,
+      ipAddress: request.ip,
+    });
   }
 
   @Delete(":roleGroupId/users/:userId")
   removeMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Param("userId") userId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.roleGroupsService.removeUserFromRoleGroup(roleGroupId, userId);
+    return this.roleGroupsService.removeUserFromRoleGroup(roleGroupId, userId, {
+      actorUserId: request.user?.id,
+      ipAddress: request.ip,
+    });
   }
 
   @Delete(":roleGroupId")
-  delete(@Param("roleGroupId", ParseIntPipe) roleGroupId: number) {
-    return this.roleGroupsService.deleteRoleGroup(roleGroupId);
+  delete(
+    @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.roleGroupsService.deleteRoleGroup(roleGroupId, {
+      actorUserId: request.user?.id,
+      ipAddress: request.ip,
+    });
   }
 }

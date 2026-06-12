@@ -9,7 +9,7 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
     "db:push": "drizzle-kit push --config drizzle.config.ts",
-    "db:seed": "ts-node-dev --transpile-only --no-notify ./drizzle/seed.ts",
+    "db:seed": "ts-node --transpile-only ./drizzle/seed.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "pnpm --dir ../../shared/common build && pnpm build && node --conditions=production --test test/*.test.js"
@@ -40,6 +40,7 @@
     "@types/node": "^24.5.2",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "0.31.5",
+    "ts-node": "10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.2"
   }

@@ -8,24 +8,24 @@ import type {
   RefreshResponse,
 } from "@soc/contracts";
 
-import type { ApiClientContext } from "./core";
+import type { ApiClientContext } from "./core.js";
 
-interface LoginResultResponse {
+export interface LoginResultResponse {
   storageMode: "persisted" | "temporary";
   userId?: string;
 }
 
-interface MockLoginResponse {
+export interface MockLoginResponse {
   storageMode: "persisted";
   userId: string;
 }
 
-interface AccessCheckResponse {
+export interface AccessCheckResponse {
   mode: "persisted" | "temporary";
   ok: boolean;
 }
 
-interface TemporaryAuthRequest {
+export interface TemporaryAuthRequest {
   refreshToken?: string;
   sessionId?: string;
 }

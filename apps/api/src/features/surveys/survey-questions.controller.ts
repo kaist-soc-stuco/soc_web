@@ -10,7 +10,7 @@ import {
 import { CreateQuestionSchema, UpdateQuestionSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
-import { RequirePermissions } from "../../shared/guards";
+import { RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveyQuestionsService } from "./survey-questions.service";

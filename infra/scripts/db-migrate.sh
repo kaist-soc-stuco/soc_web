@@ -15,8 +15,7 @@ fi
 docker compose -f "$COMPOSE_FILE" up -d postgres
 
 cd "$ROOT_DIR"
-pnpm --filter @soc/api db:generate
 pnpm --filter @soc/api db:migrate
 
-echo "Drizzle generate/migrate completed"
+echo "Drizzle migrations applied"
 exit 0

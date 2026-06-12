@@ -48,6 +48,7 @@ const ASSET_UPLOAD_DIR =
 type BoardSeed = {
   code: string;
   nameKo: string;
+  nameEn: string;
   description: string;
   readScope: string;
   writePermissionId: number | null;
@@ -76,6 +77,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "공지",
     nameKo: "공지",
+    nameEn: "Notice",
     description: "집행위원회 및 학교의 중요한 공지사항을 확인하세요",
     readScope: "PUBLIC",
     writePermissionId: 1,
@@ -90,6 +92,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "행사",
     nameKo: "행사",
+    nameEn: "Events",
     description: "전산학부의 다양한 행사 정보를 확인하세요",
     readScope: "PUBLIC",
     writePermissionId: 1,
@@ -104,6 +107,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "HoC",
     nameKo: "HoC",
+    nameEn: "HoC",
     description: "Hall of Code 프로젝트 및 활동 내역",
     readScope: "PUBLIC",
     writePermissionId: 2,
@@ -118,6 +122,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "홍보글",
     nameKo: "홍보글",
+    nameEn: "Promotions",
     description: "집행위원회 및 학회의 홍보 게시물",
     readScope: "PUBLIC",
     writePermissionId: 2,
@@ -132,6 +137,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "건의사항",
     nameKo: "건의사항",
+    nameEn: "Suggestions",
     description: "학생들의 의견과 건의사항을 나눠주세요",
     readScope: "PUBLIC",
     writePermissionId: null,
@@ -146,6 +152,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "연구실",
     nameKo: "연구실",
+    nameEn: "Labs",
     description: "각 연구실의 소식과 공지사항",
     readScope: "PUBLIC",
     writePermissionId: 2,
@@ -160,6 +167,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "QnA",
     nameKo: "QnA",
+    nameEn: "Q&A",
     description: "궁금한 점을 자유롭게 질문하세요",
     readScope: "PUBLIC",
     writePermissionId: null,
@@ -202,6 +210,7 @@ async function seedBoards() {
         description: sql`excluded.description`,
         isActive: sql`excluded.is_active`,
         managePermissionId: sql`excluded.manage_permission_id`,
+        nameEn: sql`excluded.name_en`,
         nameKo: sql`excluded.name_ko`,
         readScope: sql`excluded.read_scope`,
         sortOrder: sql`excluded.sort_order`,
@@ -336,17 +345,14 @@ function makeSeedPosterSvg(input: {
   accentDark: string;
 }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
-  <rect width="960" height="540" rx="24" fill="#f8fafc"/>
-  <rect x="48" y="48" width="864" height="444" rx="22" fill="white" stroke="#dbe3ea" stroke-width="2"/>
-  <rect x="48" y="48" width="864" height="138" rx="22" fill="${input.accent}"/>
-  <circle cx="780" cy="112" r="112" fill="${input.accentDark}" opacity="0.18"/>
-  <circle cx="842" cy="74" r="56" fill="#ffffff" opacity="0.18"/>
-  <text x="96" y="100" font-family="Arial, sans-serif" font-size="24" font-weight="800" fill="#ffffff" opacity="0.92">${input.eyebrow}</text>
-  <text x="96" y="154" font-family="Arial, sans-serif" font-size="44" font-weight="900" fill="#ffffff">${input.title}</text>
-  <text x="96" y="260" font-family="Arial, sans-serif" font-size="30" font-weight="900" fill="${input.accentDark}">${input.subtitle}</text>
-  <rect x="96" y="306" width="768" height="2" fill="#e2e8f0"/>
-  <text x="96" y="366" font-family="Arial, sans-serif" font-size="26" font-weight="800" fill="#1e293b">${input.dateLine}</text>
-  <text x="96" y="430" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#64748b">KAIST School of Computing Student Council</text>
+  <title>${input.title}</title>
+  <rect width="960" height="540" rx="24" fill="${input.accent}"/>
+  <rect x="0" y="0" width="960" height="540" fill="${input.accentDark}" opacity="0.12"/>
+  <circle cx="806" cy="126" r="128" fill="#ffffff" opacity="0.14"/>
+  <circle cx="892" cy="72" r="56" fill="#ffffff" opacity="0.18"/>
+  <path d="M0 366 C180 318 302 394 462 346 C626 297 723 297 960 342 L960 540 L0 540 Z" fill="#ffffff" opacity="0.11"/>
+  <rect x="64" y="64" width="128" height="8" rx="4" fill="#ffffff" opacity="0.36"/>
+  <rect x="64" y="88" width="72" height="8" rx="4" fill="#ffffff" opacity="0.24"/>
 </svg>`;
 }
 

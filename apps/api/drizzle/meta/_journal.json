@@ -15,6 +15,13 @@
       "when": 1780299048926,
       "tag": "0001_melted_runaways",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781249548007,
+      "tag": "0002_numerous_sphinx",
+      "breakpoints": true
     }
   ]
 }

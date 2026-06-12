@@ -6,6 +6,9 @@
  * - contract를 바꿀 때는 api-client와 프런트 사용처를 같이 업데이트하세요.
  */
 
+import type { z } from "zod";
+import type { ConsentDecisionSchema } from "../schemas.js";
+
 export type AuthStorageMode = "temporary" | "persisted";
 
 export interface LoginStartResponse {
@@ -47,10 +50,7 @@ export interface CurrentUserResponse {
   };
 }
 
-export interface ConsentDecisionRequest {
-  consent: boolean;
-  pendingLoginToken: string;
-}
+export type ConsentDecisionRequest = z.infer<typeof ConsentDecisionSchema>;
 
 export interface TemporarySessionPayload {
   accessToken?: string;
