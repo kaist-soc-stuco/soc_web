@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Req } from "@nestjs/common";
 import { SendBulkEmailSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
-import { RequirePermissions } from "../../shared/guards";
+import { RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { BulkEmailService } from "./bulk-email.service";
 import type { Request } from "express";

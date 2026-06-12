@@ -57,6 +57,9 @@ const EventsSurveysPage = lazy(() =>
 const PrivacyPage = lazy(() =>
   import('@/pages/privacy-page').then((module) => ({ default: module.PrivacyPage })),
 );
+const SearchPage = lazy(() =>
+  import('@/pages/search-page').then((module) => ({ default: module.SearchPage })),
+);
 const ContactsPage = lazy(() =>
   import('@/pages/admin/contacts-page').then((module) => ({ default: module.ContactsPage })),
 );
@@ -84,6 +87,7 @@ export function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/events-surveys" element={<EventsSurveysPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/calendar" element={<Navigate to="/events-surveys?tab=calendar" replace />} />
           <Route path="/board" element={<BoardPage />} />
           <Route

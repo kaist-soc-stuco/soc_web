@@ -60,6 +60,28 @@ const asOptionalPositiveInt = (
   return asPositiveInt(value, name);
 };
 
+const asOptionalBoolean = (
+  value: unknown,
+  name: string,
+  fallback: boolean,
+): boolean => {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+
+  throw new Error(`Invalid boolean value for ${name}: ${String(value)}`);
+};
+
 export const validateEnv = (config: Record<string, unknown>): Record<string, unknown> => {
   const postgresHost = asString(config.POSTGRES_HOST, 'POSTGRES_HOST');
   const postgresPort = asPort(config.POSTGRES_PORT, 'POSTGRES_PORT');
@@ -94,6 +116,11 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       config.ASSET_ORPHAN_GRACE_HOURS,
       'ASSET_ORPHAN_GRACE_HOURS',
       24,
+    ),
+    ASSET_ORPHAN_CLEANUP_ENABLED: asOptionalBoolean(
+      config.ASSET_ORPHAN_CLEANUP_ENABLED,
+      'ASSET_ORPHAN_CLEANUP_ENABLED',
+      false,
     ),
     ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS: asOptionalPositiveInt(
       config.ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS,

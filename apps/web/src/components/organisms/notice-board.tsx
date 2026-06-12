@@ -2,12 +2,15 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { isoToDate, isoToMs, nowMs } from "@soc/shared";
-import { Pin } from "lucide-react";
+import { ChevronRight, Pin } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { useLanguage } from "@/hooks/use-language";
 
 interface NoticeItemProps {
   id: string;
   category: string;
+  categoryLabel: string;
+  lang: string;
   title: string;
   date: string;
   isImportant?: boolean;
@@ -19,16 +22,17 @@ interface NoticeItemProps {
 function NoticeItem({
   id,
   category,
+  categoryLabel,
+  lang,
   title,
   date,
   isImportant,
   isNew,
-  count,
   showGroupDivider,
 }: NoticeItemProps) {
   return (
     <Link
-      to={`/board/${isImportant ? "공지" : category}/${id}`}
+      to={`/board/${category}/${id}`}
       className={`block px-3 transition-colors hover:bg-slate-50/80 ${
         showGroupDivider ? "border-t border-slate-100" : ""
       }`}
@@ -36,16 +40,16 @@ function NoticeItem({
       <div className="flex items-center justify-between py-2.5 gap-4">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {isImportant ? (
-            <span className="inline-flex items-center bg-brand-primary-light text-brand-primary border border-brand-primary/10 rounded-full px-2 py-0.5 text-[10px] font-extrabold shrink-0 select-none">
-              <span>공지</span>
+            <span className="inline-flex items-center bg-brand-primary-light text-brand-primary border border-brand-primary/10 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 select-none">
+              <span>{categoryLabel}</span>
             </span>
           ) : (
             <span className="bg-brand-primary-light text-brand-primary rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 tracking-tight select-none">
-              {category}
+              {categoryLabel}
             </span>
           )}
           <span
-            className={`text-[13.5px] tracking-tight truncate ${
+            className={`text-[13px] truncate ${
               isImportant
                 ? "text-slate-800 font-semibold"
                 : "text-slate-600 font-normal hover:text-brand-primary"
@@ -58,7 +62,7 @@ function NoticeItem({
           </span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="text-[11.5px] font-normal tracking-tight text-slate-500">
+          <span className="home-meta-text text-slate-500">
             {date}
           </span>
 
@@ -83,31 +87,39 @@ function formatDate(dateIso: string) {
 }
 
 export function NoticeBoard() {
+  const { lang } = useLanguage();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [notices, setNotices] = useState<Record<string, NoticeItemProps[]>>({});
   const [loading, setLoading] = useState(false);
 
   const tabs = [
-    { label: "공지" },
-    { label: "행사" },
-    { label: "HoC" },
-    { label: "홍보글" },
-    { label: "건의사항" },
-    { label: "연구실" },
-    { label: "QnA" },
+    { code: "all", labelKo: "전체", labelEn: "All" },
+    { code: "공지", labelKo: "공지", labelEn: "Notice" },
+    { code: "행사", labelKo: "행사", labelEn: "Events" },
+    { code: "HoC", labelKo: "HoC", labelEn: "HoC" },
+    { code: "홍보글", labelKo: "홍보글", labelEn: "Promotions" },
+    { code: "건의사항", labelKo: "건의사항", labelEn: "Suggestions" },
+    { code: "연구실", labelKo: "연구실", labelEn: "Labs" },
+    { code: "QnA", labelKo: "QnA", labelEn: "Q&A" },
   ];
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  const activeCategory = tabs[activeTab].label;
+  const activeCategory = tabs[activeTab].code;
+  const activeNoticeKey = `${activeCategory}:${lang}`;
+  const getCategoryLabel = (code: string) => {
+    const tab = tabs.find((item) => item.code === code);
+    if (!tab) return code;
+    return lang === "ko" ? tab.labelKo : tab.labelEn;
+  };
 
-  const currentNotices = notices[activeCategory] || [];
+  const currentNotices = notices[activeNoticeKey] || [];
 
   const displayNotices = useMemo(() => {
-    return currentNotices.slice(0, 5);
+    return currentNotices;
   }, [currentNotices]);
 
   useEffect(() => {
@@ -115,7 +127,10 @@ export function NoticeBoard() {
     const fetchNotices = async () => {
       setLoading(true);
       try {
-        const res = await apiClient.getArticles(activeCategory, { limit: 5 });
+        const res =
+          activeCategory === "all"
+            ? await apiClient.getAllArticles({ limit: 12, page: 1 })
+            : await apiClient.getArticles(activeCategory, { limit: 12 });
         // Filter out items with blank/empty titles
         const items = res.items
           .filter((item) => item.titleKo && item.titleKo.trim() !== "")
@@ -127,19 +142,32 @@ export function NoticeBoard() {
           })
           .map((item, idx) => ({
             id: item.articleId,
-            category: activeCategory,
-            title: item.titleKo,
+            category:
+              activeCategory === "all"
+                ? item.boardCode || "공지"
+                : activeCategory,
+            categoryLabel: getCategoryLabel(
+              activeCategory === "all"
+                ? item.boardCode || "공지"
+                : activeCategory,
+            ),
+            lang,
+            title: lang === "ko" ? item.titleKo : item.titleEn || item.titleKo,
             date: formatDate(item.postedAt),
             isImportant: item.isPinned,
             isNew: (() => {
-              if (activeCategory !== "공지") return false;
+              if (activeCategory !== "공지" && activeCategory !== "all") {
+                return false;
+              }
               return isoToMs(item.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
             })(),
             count:
-              activeCategory === "공지" ? [12, 8, 3, 5, 2][idx] : undefined,
-          }));
+              activeCategory === "공지"
+                ? [12, 8, 3, 5, 2, 1, 4, 6, 3, 2, 1, 1][idx]
+                : undefined,
+        }));
         if (active) {
-          setNotices((prev) => ({ ...prev, [activeCategory]: items }));
+          setNotices((prev) => ({ ...prev, [activeNoticeKey]: items }));
         }
       } catch (err) {
         console.error(err);
@@ -150,90 +178,90 @@ export function NoticeBoard() {
       }
     };
 
-    if (!notices[activeCategory]) {
+    if (!notices[activeNoticeKey]) {
       void fetchNotices();
     }
-  }, [activeCategory, notices, apiClient]);
+  }, [
+    activeCategory,
+    activeNoticeKey,
+    lang,
+    notices,
+    apiClient,
+  ]);
 
   return (
-    <section className="bg-white rounded-3xl border border-card-border-subtle shadow-card px-5 py-2 pt-2.5 pb-1.5 h-full flex flex-col select-none">
-      <div className="mx-auto w-full flex-1 flex flex-col justify-between">
-        <div>
-          {/* Tabs */}
-          <div className="flex items-stretch justify-between gap-4 border-b border-slate-100 mb-1.5 shrink-0">
-            <div className="flex flex-wrap items-stretch gap-6">
-              {tabs.map((tab, index) => (
-                <div
-                  key={index}
-                  className="relative group"
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                >
-                  <button
-                    onClick={() => setActiveTab(index)}
-                    className={`relative flex items-center justify-center h-full text-[14.5px] tracking-tight transition-colors border-0 bg-transparent cursor-pointer ${
-                      activeTab === index
-                        ? "text-brand-primary font-semibold"
-                        : "text-slate-400 hover:text-brand-primary font-medium"
-                    }`}
-                  >
-                    <span className="py-1.5">{tab.label}</span>
-                    <span
-                      className={`absolute bottom-0 left-[-10px] right-[-10px] h-0.5 bg-brand-primary transition-transform duration-200 origin-center rounded-t-full ${
-                        activeTab === index
-                          ? "scale-x-100"
-                          : hoveredIndex === index
-                            ? "scale-x-100"
-                            : "scale-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Plus Button */}
-            <Link
-              to={`/board/${tabs[activeTab].label}`}
-              className="relative group"
-              onMouseEnter={() => setHoveredIndex(tabs.length)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              <div className="relative flex items-center justify-center h-full text-base tracking-tight text-slate-400 hover:text-brand-primary font-medium transition-colors cursor-pointer">
-                <span className="py-1.5">+</span>
-                <span
-                  className={`absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary transition-transform duration-200 origin-center rounded-t-full ${
-                    hoveredIndex === tabs.length ? "scale-x-100" : "scale-x-0"
+    <section className="home-bento-card flex h-full flex-col overflow-hidden px-5 py-2 pt-2.5 pb-1.5 select-none">
+      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col">
+        {/* Tabs */}
+        <div className="mb-1.5 flex shrink-0 items-stretch justify-between gap-4 border-b border-slate-100">
+          <div className="flex min-w-0 flex-1 flex-nowrap items-stretch gap-4 overflow-x-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {tabs.map((tab, index) => (
+              <div
+                key={index}
+                className="relative group"
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                <button
+                  onClick={() => setActiveTab(index)}
+                  className={`relative flex h-full items-center justify-center whitespace-nowrap border-0 bg-transparent text-[13px] font-semibold transition-colors cursor-pointer ${
+                    activeTab === index
+                      ? "text-brand-primary"
+                      : "text-slate-400 hover:text-brand-primary"
                   }`}
-                />
+                >
+                  <span className="py-1.5">
+                    {lang === "ko" ? tab.labelKo : tab.labelEn}
+                  </span>
+                  <span
+                    className={`absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary transition-transform duration-200 origin-center rounded-t-full ${
+                      activeTab === index
+                        ? "scale-x-100"
+                        : hoveredIndex === index
+                          ? "scale-x-100"
+                          : "scale-x-0"
+                    }`}
+                  />
+                </button>
               </div>
-            </Link>
+            ))}
           </div>
 
-          {/* Notice List */}
-          <div className="overflow-y-auto min-h-[225px] pt-1">
-            {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
-              </div>
-            ) : displayNotices.length > 0 ? (
-              displayNotices.map((notice, index) => (
-                <NoticeItem
-                  key={notice.id}
-                  {...notice}
-                  showGroupDivider={
-                    index > 0 &&
-                    !notice.isImportant &&
-                    Boolean(displayNotices[index - 1]?.isImportant)
-                  }
-                />
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-sm font-semibold">
-                게시글이 없습니다.
-              </div>
-            )}
-          </div>
+          <Link
+            to={activeCategory === "all" ? "/board" : `/board/${activeCategory}`}
+            className="home-more-link shrink-0"
+            onMouseEnter={() => setHoveredIndex(tabs.length)}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            <span>{lang === "ko" ? "더보기" : "More"}</span>
+            <ChevronRight className="h-3 w-3" />
+          </Link>
+        </div>
+
+        {/* Notice List */}
+        <div className="min-h-0 flex-1 overflow-y-auto pt-1 pb-1">
+          {loading ? (
+            <div className="flex h-full min-h-[180px] items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
+            </div>
+          ) : displayNotices.length > 0 ? (
+            displayNotices.map((notice, index) => (
+              <NoticeItem
+                key={notice.id}
+                {...notice}
+                lang={lang}
+                showGroupDivider={
+                  index > 0 &&
+                  !notice.isImportant &&
+                  Boolean(displayNotices[index - 1]?.isImportant)
+                }
+              />
+            ))
+          ) : (
+            <div className="flex h-full min-h-[180px] flex-col items-center justify-center text-slate-400 text-sm font-semibold">
+              {lang === "ko" ? "게시글이 없습니다." : "No posts available."}
+            </div>
+          )}
         </div>
       </div>
     </section>

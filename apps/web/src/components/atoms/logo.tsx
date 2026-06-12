@@ -2,7 +2,10 @@ import { Link } from 'react-router-dom';
 
 export function Logo() {
   return (
-    <Link to="/" className="flex items-center gap-2 md:gap-4 hover:opacity-90 transition-opacity">
+    <Link
+      to="/"
+      className="flex items-center gap-2 transition-opacity hover:opacity-90 md:gap-4"
+    >
       <img 
         src="/kaist_logo.png" 
         alt="KAIST Logo" 

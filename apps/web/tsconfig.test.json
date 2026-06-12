@@ -10,6 +10,7 @@
     "sourceMap": false
   },
   "include": [
+    "src/lib/board-metadata.ts",
     "src/lib/events-surveys.ts",
     "src/lib/survey-display.ts",
     "src/lib/survey-results-display.ts"

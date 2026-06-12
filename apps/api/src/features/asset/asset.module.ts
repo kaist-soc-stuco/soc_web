@@ -10,9 +10,10 @@ import {
   LocalAssetStorageProvider,
 } from "./asset.storage";
 import { AuthModule } from "../auth/auth.module";
+import { UsersModule } from "../users/users.module";
 
 @Module({
-  imports: [AuthModule, PostgresModule, RedisModule],
+  imports: [AuthModule, UsersModule, PostgresModule, RedisModule],
   controllers: [AssetController],
   providers: [
     AssetRepository,

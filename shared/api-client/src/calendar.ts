@@ -1,6 +1,6 @@
 import type { KoreanHolidayRecord } from "@soc/contracts";
 
-import type { ApiClientContext } from "./core";
+import type { ApiClientContext } from "./core.js";
 
 export const createCalendarApi = ({
   calendarBaseUrl,
@@ -21,4 +21,3 @@ export const createCalendarApi = ({
     );
   },
 });
-

@@ -4,10 +4,11 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
 import { AuthModule } from './features/auth/auth.module';
+import { AuthDevModule } from "./features/auth/auth-dev.module";
 import { HealthModule } from './features/health/health.module';
 import { MockModule } from './features/mock/mock.module';
 import { SurveysModule } from './features/surveys/surveys.module';
-import { UsersModule } from './features/users/users.module';
+import { UsersHttpModule } from './features/users/users-http.module';
 import { RoleGroupsModule } from "./features/role-groups/role-groups.module";
 import { PostgresModule } from './infrastructure/postgres/postgres.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
@@ -17,6 +18,9 @@ import { AssetModule } from "./features/asset/asset.module";
 import { ContactsModule } from "./features/contacts/contacts.module";
 import { BulkEmailModule } from "./features/email/bulk-email.module";
 import { CalendarModule } from "./features/calendar/calendar.module";
+
+const devOnlyModules =
+  process.env.NODE_ENV === "production" ? [] : [AuthDevModule, MockModule];
 
 @Module({
   imports: [
@@ -35,14 +39,14 @@ import { CalendarModule } from "./features/calendar/calendar.module";
     AuthModule,
     AssetModule,
     BoardModule,
-    UsersModule,
+    UsersHttpModule,
     SurveysModule,
     ContactsModule,
     BulkEmailModule,
     CalendarModule,
     RoleGroupsModule,
     HealthModule,
-    MockModule,
+    ...devOnlyModules,
   ],
 })
 export class AppModule {}

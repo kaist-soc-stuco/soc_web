@@ -13,7 +13,7 @@ const REQUIRED_PERMISSION_KEY = "requiredPermission";
 
 /**
  * @deprecated RequirePermissions 데코레이터를 사용하세요.
- * @see {import("../decorators/require-permissions.decorator").RequirePermissions}
+ * @see {import("../../features/auth/guards").RequirePermissions}
  */
 export const RequirePermission = (permission: number) =>
   SetMetadata(REQUIRED_PERMISSION_KEY, permission);

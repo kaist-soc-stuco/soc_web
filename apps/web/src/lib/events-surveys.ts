@@ -33,6 +33,7 @@ export interface UnifiedItem {
   maxResponses?: number | null;
   responseCount?: number;
   isAlwaysOpen?: boolean;
+  imageUrl?: string | null;
 }
 
 export interface CalendarEvent {
@@ -136,7 +137,7 @@ export const getCardPeriodText = (item: UnifiedItem, lang: "ko" | string = "ko")
 
 export const buildUnifiedItems = (
   surveys: SurveyRecordWithState[],
-  events: ArticleListItem[],
+  events: Array<ArticleListItem & { imageUrl?: string | null }>,
   currentMs = nowMs(),
 ): UnifiedItem[] => {
   const mappedSurveys: UnifiedItem[] = surveys
@@ -176,6 +177,7 @@ export const buildUnifiedItems = (
     maxResponses: null,
     responseCount: 0,
     isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
+    imageUrl: event.imageUrl ?? null,
   }));
 
   return [...mappedSurveys, ...mappedEvents];

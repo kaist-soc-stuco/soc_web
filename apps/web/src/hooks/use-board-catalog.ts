@@ -9,25 +9,31 @@ interface BoardCatalogApiClient {
   getBoards: () => Promise<{ items: BoardMetadata[] }>;
 }
 
+type BoardCatalogSource = "fallback" | "loading" | "server";
+
 export function useBoardCatalog(apiClient: BoardCatalogApiClient) {
   const fallbackBoards = useMemo(() => getFallbackBoards(), []);
-  const [boards, setBoards] = useState<BoardMetadata[]>(fallbackBoards);
+  const [boards, setBoards] = useState<BoardMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [source, setSource] = useState<BoardCatalogSource>("loading");
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
+    setSource("loading");
 
     apiClient
       .getBoards()
       .then((response) => {
-        if (!cancelled && response.items.length > 0) {
+        if (!cancelled) {
           setBoards(response.items);
+          setSource("server");
         }
       })
       .catch(() => {
         if (!cancelled) {
           setBoards(fallbackBoards);
+          setSource("fallback");
         }
       })
       .finally(() => {
@@ -50,5 +56,6 @@ export function useBoardCatalog(apiClient: BoardCatalogApiClient) {
     boards,
     boardByCode,
     isLoading,
+    source,
   };
 }

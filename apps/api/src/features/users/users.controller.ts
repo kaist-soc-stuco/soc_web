@@ -3,7 +3,7 @@ import { Request } from "express";
 import { UpdateStudentFeeStatusSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
-import { AuthGuard, RequirePermissions } from "../../shared/guards";
+import { AuthGuard, RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { UsersService } from "./users.service";
 import type { FeeStatus, UpdateStudentFeeStatusRequest } from "@soc/contracts";
@@ -135,7 +135,18 @@ export class UsersController {
   async updateStudentFeeStatus(
     @Param("userId") userId: string,
     @Body(new ZodValidationPipe(UpdateStudentFeeStatusSchema)) body: UpdateStudentFeeStatusRequest,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.usersService.updateStudentFeeStatus(userId, body);
+    return this.usersService.updateStudentFeeStatus(
+      userId,
+      {
+        ...body,
+        verifiedBy: req.user?.id,
+      },
+      {
+        actorUserId: req.user?.id,
+        ipAddress: req.ip,
+      },
+    );
   }
 }

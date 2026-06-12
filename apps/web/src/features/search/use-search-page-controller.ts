@@ -1,0 +1,132 @@
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { createApiClient } from "@soc/api-client";
+import type { ArticleListItem, BoardSummary, SurveyRecord } from "@soc/contracts";
+
+import { useLanguage } from "@/hooks/use-language";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+
+import { ABOUT_ITEMS, includesQuery } from "./search-utils";
+
+export function useSearchPageController() {
+  const { lang } = useLanguage();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get("q")?.trim() ?? "";
+  const [inputValue, setInputValue] = useState(query);
+  const [articles, setArticles] = useState<ArticleListItem[]>([]);
+  const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
+
+  useEffect(() => {
+    setInputValue(query);
+  }, [query]);
+
+  useEffect(() => {
+    if (!query) {
+      setArticles([]);
+      setSurveys([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    Promise.all([
+      apiClient.searchArticles(query, 24),
+      apiClient.getPublicSurveys(),
+      apiClient.getBoards().catch(() => ({ items: [] as BoardSummary[] })),
+    ])
+      .then(([articleItems, surveyItems, boardResponse]) => {
+        if (cancelled) return;
+        setArticles(articleItems);
+        setSurveys(
+          surveyItems.filter((survey) =>
+            includesQuery(
+              [
+                survey.titleKo,
+                survey.titleEn,
+                survey.descriptionKo,
+                survey.descriptionEn,
+                survey.kind,
+              ],
+              query,
+            ),
+          ),
+        );
+        setBoards(boardResponse.items);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setArticles([]);
+          setSurveys([]);
+          setError(
+            lang === "ko"
+              ? "검색 결과를 불러오지 못했습니다."
+              : "Failed to load search results.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, lang, query]);
+
+  const boardById = useMemo(
+    () => new Map(boards.map((board) => [board.boardId, board])),
+    [boards],
+  );
+
+  const aboutResults = useMemo(() => {
+    if (!query) return ABOUT_ITEMS;
+    return ABOUT_ITEMS.filter((item) =>
+      includesQuery(
+        [
+          item.titleKo,
+          item.titleEn,
+          item.descriptionKo,
+          item.descriptionEn,
+          ...item.keywords,
+        ],
+        query,
+      ),
+    );
+  }, [query]);
+
+  const totalCount = articles.length + surveys.length + aboutResults.length;
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextQuery = inputValue.trim();
+    navigate(nextQuery ? `/search?q=${encodeURIComponent(nextQuery)}` : "/search");
+  };
+
+  return {
+    aboutResults,
+    articles,
+    boardById,
+    error,
+    handleSubmit,
+    inputValue,
+    lang,
+    loading,
+    query,
+    setInputValue,
+    surveys,
+    totalCount,
+  };
+}

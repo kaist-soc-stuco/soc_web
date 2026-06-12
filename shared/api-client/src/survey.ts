@@ -16,7 +16,7 @@ import type {
   UpdateSurveyRequest,
 } from "@soc/contracts";
 
-import type { ApiClientContext } from "./core";
+import type { ApiClientContext } from "./core.js";
 
 export const createSurveyApi = ({
   requestJson,

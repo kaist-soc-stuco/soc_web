@@ -1,6 +1,6 @@
 import type { GreetingResponse, HealthResponse } from "@soc/contracts";
 
-import type { ApiClientContext } from "./core";
+import type { ApiClientContext } from "./core.js";
 
 export const createMiscApi = ({
   normalizedBaseUrl,

@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { CreateContactSchema, UpdateContactSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
-import { RequirePermissions } from "../../shared/guards";
+import { RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { ContactsService } from "./contacts.service";
 import type { ContactListResponse, ContactRecord, CreateContactRequest, UpdateContactRequest } from "@soc/contracts";

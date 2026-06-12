@@ -1,13 +1,45 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
-import { bulkEmails, users } from "../../infrastructure/postgres/postgres.schema";
-import type { BulkEmailRecord } from "@soc/contracts";
+import { bulkEmails, studentFeeStatus, users } from "../../infrastructure/postgres/postgres.schema";
+import type { BulkEmailRecord, SendBulkEmailRequest } from "@soc/contracts";
 import { msToIso } from "@soc/shared";
 
 @Injectable()
 export class BulkEmailRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
+
+  async findRecipientEmails(
+    recipientType: SendBulkEmailRequest["recipientType"],
+  ): Promise<string[]> {
+    let queryWhere: SQL | undefined = eq(users.isActive, true);
+
+    if (recipientType === "PAID_STUDENTS") {
+      queryWhere = and(
+        eq(users.isActive, true),
+        eq(studentFeeStatus.status, "PAID"),
+      );
+    } else if (recipientType === "UNPAID_STUDENTS") {
+      queryWhere = and(
+        eq(users.isActive, true),
+        or(
+          eq(studentFeeStatus.status, "UNPAID"),
+          isNull(studentFeeStatus.status),
+        ),
+      );
+    }
+
+    const recipients = await this.db
+      .select({
+        email: users.email,
+      })
+      .from(users)
+      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
+      .where(queryWhere);
+
+    return recipients.map((recipient) => recipient.email).filter(Boolean);
+  }
 
   async findAll(): Promise<BulkEmailRecord[]> {
     const rows = await this.db

@@ -19,7 +19,9 @@ COPY shared/contracts shared/contracts
 COPY shared/common shared/common
 COPY shared/config shared/config
 
+RUN pnpm --filter @soc/shared build
 RUN pnpm --filter @soc/contracts build
+RUN pnpm --filter @soc/api-client build
 
 WORKDIR /app/apps/web
 

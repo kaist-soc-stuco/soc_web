@@ -13,7 +13,7 @@ import {
 import { CreateSurveySchema, UpdateSurveySchema } from "@soc/contracts";
 import { Request } from "express";
 
-import { RequirePermissions, OptionalAuthGuard } from "../../shared/guards";
+import { RequirePermissions, OptionalAuthGuard } from "../auth/guards";
 import { Permissions } from "@soc/contracts";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 

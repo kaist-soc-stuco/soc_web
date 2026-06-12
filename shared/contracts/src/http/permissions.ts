@@ -1,3 +1,10 @@
+import type { z } from "zod";
+import type {
+  AssignRoleGroupMemberSchema,
+  CreateRoleGroupSchema,
+  UpdateRoleGroupSchema,
+} from "../schemas.js";
+
 export interface PermissionRecord {
   permissionId: number;
   code: string;
@@ -61,18 +68,10 @@ export interface RoleGroupRecord {
   permissionMask: number;
 }
 
-export interface CreateRoleGroupRequest {
-  nameKo: string;
-  description?: string;
-  permissionIds: number[];
-}
+export type CreateRoleGroupRequest = z.infer<typeof CreateRoleGroupSchema>;
 
-export interface UpdateRoleGroupRequest {
-  nameKo: string;
-  description?: string;
-  permissionIds: number[];
-}
+export type UpdateRoleGroupRequest = z.infer<typeof UpdateRoleGroupSchema>;
 
-export interface AssignRoleGroupMemberRequest {
-  userId: string;
-}
+export type AssignRoleGroupMemberRequest = z.infer<
+  typeof AssignRoleGroupMemberSchema
+>;

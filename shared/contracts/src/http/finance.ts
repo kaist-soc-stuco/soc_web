@@ -2,6 +2,9 @@
  * Finance / Fee Management HTTP Contracts
  */
 
+import type { z } from "zod";
+import type { UpdateStudentFeeStatusSchema } from "../schemas.js";
+
 export type FeeStatus = "PAID" | "UNPAID";
 
 export interface StudentFeeStatusRecord {
@@ -15,11 +18,9 @@ export interface StudentFeeStatusRecord {
   updatedAt: string;
 }
 
-export interface UpdateStudentFeeStatusRequest {
-  status: FeeStatus;
-  coverageSemesters?: number;
-  note?: string | null;
-}
+export type UpdateStudentFeeStatusRequest = z.infer<
+  typeof UpdateStudentFeeStatusSchema
+>;
 
 export interface StudentFeeListResponse {
   students: Array<{

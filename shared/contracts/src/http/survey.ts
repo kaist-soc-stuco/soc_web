@@ -1,20 +1,21 @@
+import type { z } from "zod";
+import type {
+  CreateQuestionSchema,
+  CreateSectionSchema,
+  CreateSurveySchema,
+  QuestionOptionSchema,
+  QuestionTypeSchema,
+  SubmitResponseSchema,
+  UpdateQuestionSchema,
+  UpdateSectionSchema,
+  UpdateSurveySchema,
+} from "../schemas.js";
+
 export type ResponseStatus = 'submitted';
-export type QuestionType =
-  | 'short_text'
-  | 'long_text'
-  | 'single_choice'
-  | 'multiple_choice'
-  | 'dropdown'
-  | 'date'
-  | 'time'
-  | 'datetime';
+export type QuestionType = z.infer<typeof QuestionTypeSchema>;
 export type ComputedSurveyState = 'before_open' | 'open' | 'closed';
 
-export interface QuestionOption {
-  value: string;
-  labelKo: string;
-  labelEn?: string;
-}
+export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
 
 export interface SurveyRecord {
   id: string;
@@ -101,96 +102,21 @@ export interface SurveyAnswerRecord {
 
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
-export interface CreateSurveyRequest {
-  kind: string;
-  titleKo: string;
-  titleEn?: string;
-  descriptionKo?: string;
-  descriptionEn?: string;
-  feeRequirementPolicy?: string;
-  allowMultipleResponses?: boolean;
-  allowResponseEdit?: boolean;
-  isKoreanOnly?: boolean;
-  isPublished?: boolean;
-  showOnCalendar?: boolean;
-  resultVisibility: string;
-  maxResponseCount?: number;
-  isAlwaysOpen?: boolean;
-  openAt?: string | null;
-  closeAt?: string | null;
-  connectedArticleId?: string | null;
-}
+export type CreateSurveyRequest = z.infer<typeof CreateSurveySchema>;
 
-export interface UpdateSurveyRequest {
-  kind?: string;
-  titleKo?: string;
-  titleEn?: string;
-  descriptionKo?: string;
-  descriptionEn?: string;
-  feeRequirementPolicy?: string;
-  allowMultipleResponses?: boolean;
-  allowResponseEdit?: boolean;
-  isKoreanOnly?: boolean;
-  isPublished?: boolean;
-  showOnCalendar?: boolean;
-  resultVisibility?: string;
-  maxResponseCount?: number;
-  isAlwaysOpen?: boolean;
-  openAt?: string | null;
-  closeAt?: string | null;
-  connectedArticleId?: string | null;
-}
+export type UpdateSurveyRequest = z.infer<typeof UpdateSurveySchema>;
 
-export interface CreateSectionRequest {
-  titleKo: string;
-  titleEn?: string;
-  descriptionKo?: string;
-  descriptionEn?: string;
-  sortOrder?: number;
-}
+export type CreateSectionRequest = z.infer<typeof CreateSectionSchema>;
 
-export interface UpdateSectionRequest {
-  titleKo?: string;
-  titleEn?: string;
-  descriptionKo?: string;
-  descriptionEn?: string;
-  sortOrder?: number;
-}
+export type UpdateSectionRequest = z.infer<typeof UpdateSectionSchema>;
 
-export interface CreateQuestionRequest {
-  titleKo: string;
-  titleEn?: string;
-  descriptionKo?: string;
-  descriptionEn?: string;
-  questionType: QuestionType;
-  options?: QuestionOption[];
-  answerRegex?: string;
-  isRequired?: boolean;
-  editDeadlineAt?: string;
-  sortOrder?: number;
-}
+export type CreateQuestionRequest = z.infer<typeof CreateQuestionSchema>;
 
-export interface UpdateQuestionRequest {
-  titleKo?: string;
-  titleEn?: string;
-  descriptionKo?: string;
-  descriptionEn?: string;
-  questionType?: QuestionType;
-  options?: QuestionOption[];
-  answerRegex?: string;
-  isRequired?: boolean;
-  editDeadlineAt?: string;
-  sortOrder?: number;
-}
+export type UpdateQuestionRequest = z.infer<typeof UpdateQuestionSchema>;
 
-export interface AnswerInput {
-  questionId: string;
-  content: Record<string, unknown>;
-}
+export type SubmitResponseRequest = z.infer<typeof SubmitResponseSchema>;
 
-export interface SubmitResponseRequest {
-  answers: AnswerInput[];
-}
+export type AnswerInput = SubmitResponseRequest["answers"][number];
 
 // ─── Response DTOs ────────────────────────────────────────────────────────────
 

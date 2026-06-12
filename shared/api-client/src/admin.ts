@@ -22,7 +22,11 @@ import type {
   UpdateStudentFeeStatusRequest,
 } from "@soc/contracts";
 
-import { buildListQuery, type ApiClientContext, type ListQueryOptions } from "./core";
+import {
+  buildListQuery,
+  type ApiClientContext,
+  type ListQueryOptions,
+} from "./core.js";
 
 export const createAdminApi = ({
   contactsBaseUrl,
