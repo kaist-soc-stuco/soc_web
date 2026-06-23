@@ -6,6 +6,7 @@ import { Send, History, AlertTriangle, Users, Mail } from "lucide-react";
 import { formatKoreanDateTime, isoToMs } from "@soc/shared";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Permissions } from "@/lib/permissions";
 
 export function BulkEmailPage() {
@@ -112,6 +113,27 @@ function BulkEmailPageContent() {
     }
   };
 
+  const historySkeleton = (
+    <div className="space-y-4" aria-busy="true">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/30 p-4"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <Skeleton className="h-5 w-16 rounded-md" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+          <Skeleton className="h-4 w-full" />
+          <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
       {ConfirmDialog}
@@ -210,7 +232,7 @@ function BulkEmailPageContent() {
               </h2>
 
               {historyLoading ? (
-                <div className="py-8 text-center text-sm font-semibold text-slate-400">불러오는 중...</div>
+                historySkeleton
               ) : history.length === 0 ? (
                 <div className="py-8 text-center text-sm font-semibold text-slate-400">이전 발송 이력이 없습니다.</div>
               ) : (

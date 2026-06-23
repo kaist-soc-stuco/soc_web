@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { PageHero } from "@/components/organisms/page-hero";
@@ -11,18 +13,20 @@ import {
   BoardWriteEditorFields,
   BoardWriteEventFields,
   BoardWriteHeaderControls,
-  BoardWritePostOptions,
-  BoardWriteSurveyLink,
-  BoardWriteToolbar,
+  BoardWriteSettings,
+  BoardWriteFooter,
 } from "@/features/board-write/board-write-form-sections";
 import { useBoardWritePageController } from "@/features/board-write/use-board-write-page-controller";
 
 export function BoardWritePage() {
+  const navigate = useNavigate();
   const {
     ConfirmDialog,
     activeTab,
     assets,
+    allowComment,
     boardByCode,
+    canConfigurePostSettings,
     canWriteSelected,
     contentEn,
     contentKo,
@@ -39,6 +43,7 @@ export function BoardWritePage() {
     handleUploadFiles,
     hasDraft,
     isAnonymous,
+    isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
     isSubmitting,
@@ -48,12 +53,14 @@ export function BoardWritePage() {
     selectedSurveyId,
     setActiveTab,
     setAssets,
+    setAllowComment,
     setContentEn,
     setContentKo,
     setEventDescription,
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
+    setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
     setSelectedSurveyId,
@@ -103,7 +110,17 @@ export function BoardWritePage() {
             />
           )}
 
-          <div className="rounded-xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)] overflow-hidden">
+          {/* Hidden file input for editor uploads */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(event) => void handleUploadFiles(event.target.files)}
+          />
+
+          {/* Unified Editor Card Container */}
+          <div className="rounded-xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
             <BoardWriteHeaderControls
               activeTab={activeTab}
               boardByCode={boardByCode}
@@ -119,17 +136,6 @@ export function BoardWritePage() {
               writableBoardCodes={writableBoardCodes}
             />
 
-            <BoardWriteToolbar
-              canWriteSelected={canWriteSelected}
-              fileInputRef={fileInputRef}
-              isSubmitting={isSubmitting}
-              lang={lang}
-              onSaveDraft={() => handleSaveDraft(false)}
-              onSubmit={handleSubmit}
-              onUploadFiles={(files) => void handleUploadFiles(files)}
-              uploading={uploading}
-            />
-
             <div className="p-6 md:p-8 space-y-6 min-h-[450px]">
               <BoardWriteEditorFields
                 activeTab={activeTab}
@@ -142,6 +148,8 @@ export function BoardWritePage() {
                 onTitleKoChange={setTitleKo}
                 titleEn={titleEn}
                 titleKo={titleKo}
+                fileInputRef={fileInputRef}
+                uploading={uploading}
               />
 
               {selectedCategory === "행사" && (
@@ -149,19 +157,20 @@ export function BoardWritePage() {
                   eventDescription={eventDescription}
                   eventEndDate={eventEndDate}
                   eventStartDate={eventStartDate}
+                  isEventAlwaysOpen={isEventAlwaysOpen}
                   lang={lang}
+                  onEventAlwaysOpenChange={(checked) => {
+                    setIsEventAlwaysOpen(checked);
+                    if (checked) {
+                      setEventStartDate("");
+                      setEventEndDate("");
+                    }
+                  }}
                   onEventDescriptionChange={setEventDescription}
                   onEventEndDateChange={setEventEndDate}
                   onEventStartDateChange={setEventStartDate}
                 />
               )}
-
-              <BoardWriteSurveyLink
-                lang={lang}
-                onSelectedSurveyIdChange={setSelectedSurveyId}
-                selectedSurveyId={selectedSurveyId}
-                surveys={surveys}
-              />
 
               <BoardWriteAttachmentList
                 assets={assets}
@@ -176,12 +185,27 @@ export function BoardWritePage() {
             </div>
           </div>
 
-          <BoardWritePostOptions
+          <BoardWriteSettings
+            allowComment={allowComment}
+            canConfigurePostSettings={canConfigurePostSettings}
+            lang={lang}
+            onAllowCommentChange={setAllowComment}
+            onSelectedSurveyIdChange={setSelectedSurveyId}
+            selectedSurveyId={selectedSurveyId}
+            surveys={surveys}
             isAnonymous={isAnonymous}
             isPinned={isPinned}
-            lang={lang}
             onAnonymousChange={setIsAnonymous}
             onPinnedChange={setIsPinned}
+          />
+
+          <BoardWriteFooter
+            lang={lang}
+            isSubmitting={isSubmitting}
+            canWriteSelected={canWriteSelected}
+            onCancel={() => navigate(-1)}
+            onSaveDraft={() => handleSaveDraft(false)}
+            onSubmit={handleSubmit}
           />
         </div>
       </main>

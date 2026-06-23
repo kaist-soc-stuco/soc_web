@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import { isoToDate, localDate, msToDate, nowDate } from "@soc/shared";
 import type {
-  ArticleListItem,
   KoreanHolidayRecord,
-  SurveyRecord,
+  PublicCalendarEventItem,
 } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
@@ -64,7 +64,20 @@ function formatMonthTitle(year: number, monthIndex: number, lang: string) {
 }
 
 function dateFromParts(year: number, monthIndex: number) {
-  return new Date(year, monthIndex, 1);
+  return localDate(year, monthIndex, 1);
+}
+
+function getCalendarGridRange(year: number, monthIndex: number) {
+  const firstDay = localDate(year, monthIndex, 1);
+  const start = msToDate(firstDay.getTime());
+  start.setDate(firstDay.getDate() - firstDay.getDay());
+  start.setHours(0, 0, 0, 0);
+
+  const end = msToDate(start.getTime());
+  end.setDate(start.getDate() + 41);
+  end.setHours(23, 59, 59, 999);
+
+  return { from: start, to: end };
 }
 
 function formatWeekDate(date: Date, lang: string) {
@@ -139,6 +152,58 @@ function buildPreviewEvents(
   );
 }
 
+function CalendarGridSkeleton() {
+  return (
+    <div
+      className="grid min-h-[176px] flex-1 grid-cols-7 gap-y-0.5 bg-white overflow-hidden"
+      aria-busy="true"
+    >
+      {Array.from({ length: 42 }).map((_, index) => (
+        <div
+          key={index}
+          className="flex h-[34px] flex-col items-center justify-start rounded-lg py-0.5"
+        >
+          <div
+            className={`home-loading-surface rounded-full ${
+              index % 11 === 0 ? "h-4.5 w-4.5" : "mt-0.5 h-3 w-3"
+            }`}
+          />
+          <div className="flex flex-1 items-end justify-center pb-1">
+            {index % 5 === 0 ? (
+              <div className="flex h-2 items-center gap-1">
+                <span className="home-loading-surface h-1.5 w-1.5 rounded-full" />
+                <span className="home-loading-surface h-1.5 w-1.5 rounded-full" />
+              </div>
+            ) : (
+              <div className="h-2" />
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WeeklyEventsSkeleton() {
+  return (
+    <div className="flex flex-col gap-0.5" aria-busy="true">
+      {Array.from({ length: 2 }).map((_, index) => (
+        <div key={index} className="flex items-center justify-between px-2 py-0.5 -mx-2">
+          <div className="flex w-full min-w-0 items-center gap-3">
+            <div className="home-loading-surface h-3 w-20 shrink-0 rounded" />
+            <div
+              className={`home-loading-surface h-3 min-w-0 flex-1 rounded ${
+                index === 0 ? "max-w-28" : "max-w-36"
+              }`}
+            />
+            <div className="home-loading-surface h-5 w-9 shrink-0 rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Calendar() {
   const navigate = useNavigate();
   const { lang } = useLanguage();
@@ -153,118 +218,43 @@ export function Calendar() {
   const currentMonth = currentDate.getMonth();
 
   // DB events
-  const [events, setEvents] = useState<CompactEvent[]>([]);
-  const [holidays, setHolidays] = useState<KoreanHolidayRecord[]>([]);
   const [hoveredDateKey, setHoveredDateKey] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const holidayCacheRef = useRef(new Map<string, KoreanHolidayRecord[]>());
+  const calendarGridRange = useMemo(
+    () => getCalendarGridRange(currentYear, currentMonth),
+    [currentMonth, currentYear],
+  );
+  const calendarRangeFrom = calendarGridRange.from.toISOString();
+  const calendarRangeTo = calendarGridRange.to.toISOString();
 
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    Promise.all([
-      apiClient.getPublicSurveys(),
-      apiClient
-        .getArticles("행사", { page: 1, limit: 100 })
-        .then((res) => res.items)
-        .catch(() => [] as ArticleListItem[]),
-    ])
-      .then(([surveys, eventArticles]) => {
-        const parsed: CompactEvent[] = [];
-        surveys.forEach((survey: SurveyRecord) => {
-          if (!survey.isPublished || !survey.showOnCalendar) return;
-
-          if (survey.opensAt) {
-            parsed.push({
-              id: survey.id,
-              kind: survey.kind,
-              cleanTitleKo: survey.titleKo,
-              cleanTitleEn: survey.titleEn || survey.titleKo,
-              date: isoToDate(survey.opensAt),
-              dateType: "open",
-            });
-          }
-          if (survey.closesAt) {
-            parsed.push({
-              id: survey.id,
-              kind: survey.kind,
-              cleanTitleKo: survey.titleKo,
-              cleanTitleEn: survey.titleEn || survey.titleKo,
-              date: isoToDate(survey.closesAt),
-              dateType: "close",
-            });
-          }
-        });
-        eventArticles.forEach((article: ArticleListItem) => {
-          if (article.eventStartDate) {
-            parsed.push({
-              id: article.articleId,
-              kind: "EVENT",
-              cleanTitleKo: article.titleKo,
-              cleanTitleEn: article.titleEn || article.titleKo,
-              date: isoToDate(article.eventStartDate),
-              dateType: "open",
-            });
-          }
-
-          if (article.eventEndDate) {
-            parsed.push({
-              id: article.articleId,
-              kind: "EVENT",
-              cleanTitleKo: article.titleKo,
-              cleanTitleEn: article.titleEn || article.titleKo,
-              date: isoToDate(article.eventEndDate),
-              dateType: "close",
-            });
-          }
-        });
-
-        if (active) {
-          setEvents(parsed);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load compact calendar events:", err);
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [apiClient]);
-
-  useEffect(() => {
-    let active = true;
-    const cacheKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
-    const cached = holidayCacheRef.current.get(cacheKey);
-
-    if (cached) {
-      setHolidays(cached);
-      return;
-    }
-
-    apiClient
-      .getKoreanHolidays(currentYear, currentMonth + 1)
-      .then((holidayItems) => {
-        holidayCacheRef.current.set(cacheKey, holidayItems);
-        if (active) {
-          setHolidays(holidayItems);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load Korean holidays:", err);
-        if (active) {
-          setHolidays([]);
-        }
+  const calendarEventsQuery = useQuery({
+    queryKey: ["calendar", "events", calendarRangeFrom, calendarRangeTo],
+    queryFn: async () => {
+      const response = await apiClient.getPublicCalendarEvents({
+        from: calendarRangeFrom,
+        to: calendarRangeTo,
       });
 
-    return () => {
-      active = false;
-    };
-  }, [apiClient, currentMonth, currentYear]);
+      return response.items.map((event: PublicCalendarEventItem) => ({
+        id: event.id,
+        kind: event.kind,
+        cleanTitleKo: event.titleKo,
+        cleanTitleEn: event.titleEn || event.titleKo,
+        date: isoToDate(event.date),
+        dateType: event.dateType,
+      }));
+    },
+    staleTime: 60 * 1000,
+  });
+
+  const holidaysQuery = useQuery<KoreanHolidayRecord[]>({
+    queryKey: ["calendar", "holidays", currentYear, currentMonth + 1],
+    queryFn: () => apiClient.getKoreanHolidays(currentYear, currentMonth + 1),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+
+  const events = calendarEventsQuery.data ?? [];
+  const holidays = holidaysQuery.data ?? [];
+  const loading = calendarEventsQuery.isPending;
 
   // Generate compact calendar grid
   const days = useMemo(() => {
@@ -359,7 +349,7 @@ export function Calendar() {
   }, [holidays]);
 
   return (
-    <section className="home-bento-card px-6 pt-4 pb-4 h-full flex flex-col justify-between select-none">
+    <section className="home-bento-card min-w-0 px-6 pt-4 pb-4 h-full flex flex-col justify-between select-none">
       <div className="flex flex-col pb-1">
         {/* Header */}
         <div className="mb-2.5 mt-1 flex-shrink-0 flex items-center justify-between">
@@ -408,9 +398,7 @@ export function Calendar() {
 
         {/* Calendar Grid */}
         {loading ? (
-          <div className="flex-1 flex items-center justify-center min-h-[176px]">
-            <div className="w-6 h-6 border-2 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin"></div>
-          </div>
+          <CalendarGridSkeleton />
         ) : (
           <div className="flex-1 grid grid-cols-7 gap-y-0.5 bg-white min-h-[176px] overflow-visible">
             {days.map((item, index) => {
@@ -526,7 +514,7 @@ export function Calendar() {
                                 }`}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-1.5 text-[10px] font-semibold text-slate-700">
+                        <div className="flex flex-col gap-1.5 text-left text-[10px] font-semibold text-slate-700">
                           {previewEvents.slice(0, 4).map((event) => (
                             <div
                               key={event.key}
@@ -539,7 +527,7 @@ export function Calendar() {
                                     : "bg-brand-primary"
                                 }`}
                               />
-                              <span className="min-w-0 flex-1 truncate">
+                              <span className="min-w-0 flex-1 truncate text-left">
                                 {event.cleanTitle}
                               </span>
                               <span className="shrink-0 text-[9px] font-bold text-slate-500">
@@ -568,13 +556,23 @@ export function Calendar() {
       <div className="mt-1.5 flex-shrink-0 flex flex-col gap-1">
         <div className="flex items-center justify-between border-b border-slate-100 pb-1">
           <h4 className="home-card-title text-slate-800">
-            {lang === "ko" ? "이번 주 예정 일정" : "This Week"}
+            {lang === "ko"
+              ? `이번 주 예정 일정 (${weeklyEvents.length})`
+              : `This Week (${weeklyEvents.length})`}
           </h4>
           <Link
             to="/events-surveys?tab=calendar"
             className="home-more-link"
           >
-            <span>{lang === "ko" ? "더보기" : "More"}</span>
+            <span>
+              {hiddenWeeklyEventCount > 0
+                ? lang === "ko"
+                  ? `더보기(+${hiddenWeeklyEventCount})`
+                  : `More(+${hiddenWeeklyEventCount})`
+                : lang === "ko"
+                  ? "더보기"
+                  : "More"}
+            </span>
             <svg
               fill="none"
               stroke="currentColor"
@@ -590,8 +588,10 @@ export function Calendar() {
           </Link>
         </div>
         <div className="flex flex-col gap-0.5">
-          {weeklyEvents.length > 0 ? (
-            visibleWeeklyEvents.map((event, index) => {
+          {loading ? (
+            <WeeklyEventsSkeleton />
+          ) : weeklyEvents.length > 0 ? (
+            visibleWeeklyEvents.map((event) => {
               const isDeadline = event.dateType === "close";
               const cleanTitle = getCompactEventTitle(event, lang);
               const statusLabel = isDeadline
@@ -601,10 +601,6 @@ export function Calendar() {
                 : lang === "ko"
                   ? "시작"
                   : "Start";
-              const showHiddenCount =
-                hiddenWeeklyEventCount > 0 &&
-                index === visibleWeeklyEvents.length - 1;
-
               return (
                 <div
                   key={`${event.id}-${event.dateType}`}
@@ -631,11 +627,6 @@ export function Calendar() {
                     >
                       {statusLabel}
                     </span>
-                    {showHiddenCount && (
-                      <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-extrabold text-slate-500">
-                        +{hiddenWeeklyEventCount}
-                      </span>
-                    )}
                   </div>
                 </div>
               );

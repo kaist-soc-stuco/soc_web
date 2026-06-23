@@ -35,7 +35,7 @@ function formatMonthTitle(year: number, monthIndex: number, lang: Language) {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
-  }).format(new Date(year, monthIndex, 1));
+  }).format(localDate(year, monthIndex, 1));
 }
 
 export function EventsSurveysCalendar({

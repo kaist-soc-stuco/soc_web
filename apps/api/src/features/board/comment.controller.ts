@@ -52,7 +52,7 @@ export class CommentController {
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<CommentListResponse> {
     const currentUser =
-      await this.authSessionService.getCurrentUser(accessToken);
+      await this.authSessionService.getOptionalCurrentUser(accessToken);
     return this.commentService.getComments(
       code,
       articleId,

@@ -1,28 +1,33 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import type { StudentFeeListResponse, FeeStatus } from '@soc/contracts';
-import { isoToDate } from '@soc/shared';
-import { Button } from '@/components/ui/button';
+import { isoToDate, nowIso } from '@soc/shared';
 import { Pagination } from '@/components/ui/pagination';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { AuthGuard } from '@/components/guards/auth-guard';
 import { useCurrentSession } from '@/hooks/use-current-session';
 import { resolveApiBaseUrl } from '@/lib/api';
 import { Permissions } from '@/lib/permissions';
-import { ChevronDown } from 'lucide-react';
+import { ArrowDown, ChevronDown } from 'lucide-react';
+
+type FeeSortBy = 'name' | 'studentId' | 'status' | 'paidAt';
+type SortDirection = 'asc' | 'desc';
+type StudentFeeRow = StudentFeeListResponse['students'][number];
 
 export function FeeManagementPage() {
-  const navigate = useNavigate();
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const [feeData, setFeeData] = useState<StudentFeeListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<FeeStatus | undefined>(undefined);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isPageSizeDropdownOpen, setIsPageSizeDropdownOpen] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState<FeeSortBy>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const students = feeData?.students ?? [];
   const totalCount = feeData?.total ?? 0;
@@ -37,7 +42,15 @@ export function FeeManagementPage() {
       return;
     }
     loadData();
-  }, [selectedStatus, currentPage, pageSize, session, sessionLoading]);
+  }, [
+    selectedStatus,
+    currentPage,
+    pageSize,
+    session,
+    sessionLoading,
+    sortBy,
+    sortDirection,
+  ]);
 
   const loadData = async () => {
     try {
@@ -47,6 +60,8 @@ export function FeeManagementPage() {
         selectedStatus,
         currentPage,
         pageSize,
+        sortBy,
+        sortDirection,
       );
       setFeeData(data);
       setNoteDrafts(
@@ -59,16 +74,79 @@ export function FeeManagementPage() {
     }
   };
 
+  const updateStudentRow = (userId: string, patch: Partial<StudentFeeRow>) => {
+    setFeeData((current) => {
+      if (!current) return current;
+
+      const nextStudents = current.students
+        .map((student) =>
+          student.userId === userId ? { ...student, ...patch } : student,
+        )
+        .filter((student) => !selectedStatus || student.status === selectedStatus);
+      const removedByFilter =
+        current.students.length > nextStudents.length &&
+        current.students.some((student) => student.userId === userId);
+
+      return {
+        ...current,
+        students: nextStudents,
+        total: removedByFilter ? Math.max(0, current.total - 1) : current.total,
+      };
+    });
+  };
+
   const saveStudentFeeStatus = async (userId: string, status: FeeStatus, note: string) => {
+    const previousStudent = feeData?.students.find((student) => student.userId === userId);
+    const previousNoteDraft = noteDrafts[userId];
+    const optimisticPaidAt = status === 'PAID' ? nowIso() : null;
+
     try {
       setSavingUserId(userId);
-      await apiClient.updateStudentFeeStatus(userId, {
+      setOperationError(null);
+      updateStudentRow(userId, {
+        note: note.trim() ? note : null,
+        paidAt: optimisticPaidAt,
+        status,
+      });
+
+      const record = await apiClient.updateStudentFeeStatus(userId, {
         status,
         note: note.trim() ? note : null,
       });
-      loadData();
+      setNoteDrafts((prev) => ({
+        ...prev,
+        [userId]: record.note ?? '',
+      }));
+      updateStudentRow(userId, {
+        note: record.note,
+        paidAt: record.paidAt,
+        status: record.status,
+        verifiedAt: record.verifiedAt,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '업데이트 실패');
+      if (previousStudent) {
+        setFeeData((current) => {
+          if (!current) return current;
+          const hasPreviousRow = current.students.some(
+            (student) => student.userId === userId,
+          );
+
+          return {
+            ...current,
+            students: hasPreviousRow
+              ? current.students.map((student) =>
+                  student.userId === userId ? previousStudent : student,
+                )
+              : [previousStudent, ...current.students],
+            total: hasPreviousRow ? current.total : current.total + 1,
+          };
+        });
+      }
+      setNoteDrafts((prev) => ({
+        ...prev,
+        [userId]: previousNoteDraft ?? previousStudent?.note ?? '',
+      }));
+      setOperationError(err instanceof Error ? err.message : '업데이트 실패');
     } finally {
       setSavingUserId(null);
     }
@@ -92,6 +170,7 @@ export function FeeManagementPage() {
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const isInitialLoading = loading && feeData === null;
 
   const getStatusBadgeStyle = (status: FeeStatus, disabled: boolean) => {
     const base = 'inline-flex rounded-full px-3 py-1 text-xs font-bold transition-all';
@@ -106,53 +185,27 @@ export function FeeManagementPage() {
 
   const getStatusLabel = (status: FeeStatus) => (status === 'PAID' ? '납부 완료' : '미납부');
 
+  const handleSortChange = (nextSortBy: FeeSortBy) => {
+    if (sortBy === nextSortBy) {
+      setSortDirection((currentDirection) =>
+        currentDirection === 'asc' ? 'desc' : 'asc',
+      );
+    } else {
+      setSortBy(nextSortBy);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
 
-  if (loading) {
-    return (
-        <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
-          <main className="mx-auto flex w-full max-w-7xl items-center justify-center px-4 py-20 md:px-8">
-            <div className="rounded-2xl border border-slate-100 bg-white px-8 py-10 text-center shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-slate-400">
-                Fee Console
-              </p>
-              <p className="mt-3 text-lg font-black text-slate-800">과비 데이터를 불러오는 중입니다.</p>
-              <p className="mt-2 text-sm font-semibold text-slate-400">잠시만 기다려 주세요.</p>
-            </div>
-          </main>
-        </div>
-    );
-  }
-
-  if (error) {
-    return (
-        <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
-          <main className="mx-auto flex w-full max-w-4xl px-4 py-10 md:px-8">
-            <div className="w-full rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.28em] text-slate-400">
-                Fee Console
-              </p>
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-                {error}
-              </div>
-              <div className="mt-6">
-                <Button onClick={() => navigate('/')} variant="outline" className="rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900">
-                  홈으로 돌아가기
-                </Button>
-              </div>
-            </div>
-          </main>
-        </div>
-    );
-  }
-
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_FINANCE}>
-      <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
+      <div className="min-h-screen bg-slate-50/50 pb-20 text-slate-950">
         <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
           
           {/* Compact Header */}
@@ -163,17 +216,27 @@ export function FeeManagementPage() {
                 학생별 과비 납부 상태를 한 화면에서 확인하고 바로 수정합니다.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700">전체 {totalCount}명</span>
-              <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700">납부 완료 {paidCount}명</span>
-              <span className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-rose-700">미납부 {unpaidCount}명</span>
+            <div className="flex items-center gap-2 text-xs font-bold">
+              {isInitialLoading ? (
+                <>
+                  <Skeleton className="h-7 w-20 rounded-lg" />
+                  <Skeleton className="h-7 w-28 rounded-lg" />
+                  <Skeleton className="h-7 w-24 rounded-lg" />
+                </>
+              ) : (
+                <>
+                  <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700">전체 {totalCount}명</span>
+                  <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700">납부 완료 {paidCount}명</span>
+                  <span className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-rose-700">미납부 {unpaidCount}명</span>
+                </>
+              )}
             </div>
           </div>
 
           {/* Filters and Controls */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
             <div className="flex items-center gap-2">
-              <span className="mr-2 text-sm font-bold text-slate-400">필터:</span>
+              <span className="mr-2 text-xs font-black text-slate-400">필터:</span>
               {([
                 { key: undefined, label: '전체' },
                 { key: 'UNPAID', label: '미납부' },
@@ -198,6 +261,18 @@ export function FeeManagementPage() {
             </div>
 
           </div>
+
+          {operationError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {operationError}
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {error}
+            </div>
+          )}
 
         <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
           <div className="border-b border-slate-100 px-6 py-4 md:px-8 bg-white">
@@ -247,17 +322,47 @@ export function FeeManagementPage() {
             </div>
           </div>
 
-          {students.length > 0 ? (
+          {loading ? (
+            <TableSkeleton columns={6} rows={8} />
+          ) : students.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-slate-50/50 text-slate-500">
+                <thead className="bg-slate-50/50 text-xs font-black text-slate-500">
                   <tr>
-                    <th className="px-5 py-4 text-left text-[13px] font-extrabold uppercase tracking-[0.14em]">이름</th>
-                    <th className="px-5 py-4 text-left text-[13px] font-extrabold uppercase tracking-[0.14em]">학번</th>
-                    <th className="px-5 py-4 text-left text-[13px] font-extrabold uppercase tracking-[0.14em]">이메일</th>
-                    <th className="px-5 py-4 text-left text-[13px] font-extrabold uppercase tracking-[0.14em]">상태</th>
-                    <th className="px-5 py-4 text-left text-[13px] font-extrabold uppercase tracking-[0.14em]">납부일</th>
-                    <th className="px-5 py-4 text-left text-[13px] font-extrabold uppercase tracking-[0.14em]">비고</th>
+                    <th className="px-5 py-4 text-left">
+                      <SortableHeader
+                        active={sortBy === 'name'}
+                        ascending={sortBy === 'name' && sortDirection === 'asc'}
+                        label="이름"
+                        onClick={() => handleSortChange('name')}
+                      />
+                    </th>
+                    <th className="px-5 py-4 text-left">
+                      <SortableHeader
+                        active={sortBy === 'studentId'}
+                        ascending={sortBy === 'studentId' && sortDirection === 'asc'}
+                        label="학번"
+                        onClick={() => handleSortChange('studentId')}
+                      />
+                    </th>
+                    <th className="px-5 py-4 text-left">이메일</th>
+                    <th className="px-5 py-4 text-left">
+                      <SortableHeader
+                        active={sortBy === 'status'}
+                        ascending={sortBy === 'status' && sortDirection === 'asc'}
+                        label="상태"
+                        onClick={() => handleSortChange('status')}
+                      />
+                    </th>
+                    <th className="px-5 py-4 text-left">
+                      <SortableHeader
+                        active={sortBy === 'paidAt'}
+                        ascending={sortBy === 'paidAt' && sortDirection === 'asc'}
+                        label="납부일"
+                        onClick={() => handleSortChange('paidAt')}
+                      />
+                    </th>
+                    <th className="px-5 py-4 text-left">비고</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold">
@@ -315,7 +420,7 @@ export function FeeManagementPage() {
             </div>
           )}
 
-          {totalCount > 0 && (
+          {!loading && totalCount > 0 && (
             <div className="border-t border-slate-100 bg-slate-50/10 px-6 py-4 flex items-center justify-center gap-2 select-none md:px-8">
               <Pagination
                 currentPage={currentPage}
@@ -328,5 +433,34 @@ export function FeeManagementPage() {
         </main>
       </div>
     </AuthGuard>
+  );
+}
+
+function SortableHeader({
+  active,
+  ascending,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  ascending: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors ${
+        active ? 'text-kaist-darkgreen' : 'text-slate-500 hover:text-slate-700'
+      }`}
+    >
+      <span>{label}</span>
+      <ArrowDown
+        className={`h-3 w-3 transition-transform ${
+          ascending ? 'rotate-180' : ''
+        }`}
+      />
+    </button>
   );
 }

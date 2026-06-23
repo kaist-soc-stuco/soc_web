@@ -4,6 +4,12 @@ import { AuditLogService } from "../audit/audit-log.service";
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
 import type {
+  AdminUserSortBy,
+  SortDirection,
+  StudentFeeSortBy,
+} from "./repositories/users.repository";
+import type {
+  AdminUserListResponse,
   AdminUserRecord,
   FeeStatus,
   StudentFeeListResponse,
@@ -93,6 +99,17 @@ export class UsersService {
     return this.usersRepository.searchUsers(input.query, input.limit ?? 20);
   }
 
+  async listAdminUsers(input: {
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    sortBy?: AdminUserSortBy;
+    sortDirection?: SortDirection;
+    status?: "active" | "inactive";
+  }): Promise<AdminUserListResponse> {
+    return this.usersRepository.listAdminUsers(input);
+  }
+
   /**
    * 현재 사용자가 개인정보를 영구 저장한 상태인지 확인합니다.
    */
@@ -154,8 +171,16 @@ export class UsersService {
     status?: FeeStatus,
     page?: number,
     pageSize?: number,
+    sortBy?: StudentFeeSortBy,
+    sortDirection?: SortDirection,
   ): Promise<StudentFeeListResponse> {
-    return this.usersRepository.listStudentsByFeeStatus(status, page, pageSize);
+    return this.usersRepository.listStudentsByFeeStatus(
+      status,
+      page,
+      pageSize,
+      sortBy,
+      sortDirection,
+    );
   }
 
   async getMyArticles(userId: string, options: { page: number; limit: number }) {

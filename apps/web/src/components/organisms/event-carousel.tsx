@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
-import type { ArticleDetailResponse } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { useLanguage } from "@/hooks/use-language";
@@ -72,7 +71,7 @@ function FeaturedEventCard({
       {/* Bottom Content Area */}
       <div className="absolute bottom-0 left-0 right-0 z-10 flex flex-col p-4">
         {/* Title */}
-        <h3 className="home-card-title line-clamp-1 text-white transition-colors group-hover:text-[#69db7c]">
+        <h3 className="home-card-title line-clamp-1 text-white transition-colors group-hover:text-white/88">
           {title}
         </h3>
 
@@ -143,7 +142,7 @@ function StandardEventCard({
 
       {!isPeek && (
         <div className="absolute bottom-0 left-0 right-0 z-10 flex flex-col p-4">
-          <h3 className="home-card-title line-clamp-1 text-white transition-colors group-hover:text-[#69db7c]">
+          <h3 className="home-card-title line-clamp-1 text-white transition-colors group-hover:text-white/88">
             {title}
           </h3>
 
@@ -181,22 +180,6 @@ function resolveFallbackClassName(id: string) {
   return FALLBACK_CLASS_NAMES[hash % FALLBACK_CLASS_NAMES.length];
 }
 
-function resolveEventImageUrl(detail: ArticleDetailResponse) {
-  const imageAsset = detail.assets?.find(
-    (asset) =>
-      asset.usageType === "THUMBNAIL" || asset.usageType === "IMAGE",
-  );
-
-  return imageAsset ? resolveAssetUrl(imageAsset.storageKey) : null;
-}
-
-function stripPlainText(value?: string | null) {
-  return (value ?? "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
   return {
     id: record.id,
@@ -215,26 +198,38 @@ function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
 }
 
 function EventCarouselSkeleton({ lang }: { lang: string }) {
+  const cards = Array.from({ length: 3 });
+
   return (
-    <section className="min-h-[350px] bg-transparent select-none md:min-h-[400px]">
+    <section className="min-w-0 max-w-full min-h-[350px] bg-transparent select-none md:min-h-[400px]">
       <div className="w-full mb-4 flex items-center justify-between">
         <h2 className="home-section-title">
           {lang === "ko" ? "이번 주 주요 행사" : "Featured Events"}
         </h2>
-        <div className="h-4 w-12 rounded bg-slate-100" />
+        <div className="home-loading-surface h-4 w-14 rounded-full" />
       </div>
-      <div className="overflow-hidden">
+      <div className="max-w-full overflow-hidden">
         <div className="flex gap-6">
-          <div className="home-loading-surface h-[290px] flex-[0_0_100%] rounded-2xl md:h-[330px] md:flex-1" />
-          {Array.from({ length: 2 }).map((_, index) => (
+          {cards.map((_, index) => (
             <div
               key={index}
-              className="home-loading-surface hidden h-[330px] flex-1 rounded-2xl md:block"
-            />
+              className={`home-loading-surface relative h-[290px] overflow-hidden rounded-[1.35rem] md:h-[330px] md:flex-1 ${
+                index === 0 ? "flex-[0_0_100%]" : "hidden md:block"
+              }`}
+            >
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/20 to-transparent p-4">
+                <div className="h-4 w-2/3 rounded bg-white/55" />
+                <div className="mt-3 h-3 w-full rounded bg-white/35" />
+                <div className="mt-2 h-3 w-4/5 rounded bg-white/30" />
+              </div>
+            </div>
           ))}
         </div>
       </div>
-      <div className="mt-5 flex h-1.5 items-center justify-center" />
+      <div className="mt-5 flex h-1.5 items-center justify-center gap-2">
+        <div className="home-loading-surface h-1.5 w-4 rounded-full" />
+        <div className="home-loading-surface h-1.5 w-1.5 rounded-full" />
+      </div>
     </section>
   );
 }
@@ -258,42 +253,19 @@ export function EventCarousel() {
     const loadEvents = async () => {
       try {
         const res = await apiClient.getArticles("행사", { limit: 12 });
-        const detailedEvents = await Promise.all(
-          res.items.map(async (item) => {
-            try {
-              const detail = await apiClient.getArticle("행사", item.articleId);
-
-              return {
-                id: item.articleId,
-                titleKo: item.titleKo,
-                titleEn: item.titleEn,
-                descriptionKo:
-                  detail.eventDescription ?? item.eventDescription ?? item.titleKo,
-                descriptionEn:
-                  stripPlainText(detail.contentEn) ||
-                  item.titleEn ||
-                  detail.eventDescription ||
-                  item.eventDescription ||
-                  item.titleKo,
-                imageUrl: resolveEventImageUrl(detail),
-                fallbackClassName: resolveFallbackClassName(item.articleId),
-              };
-            } catch {
-              return {
-                id: item.articleId,
-                titleKo: item.titleKo,
-                titleEn: item.titleEn,
-                descriptionKo: item.eventDescription ?? item.titleKo,
-                descriptionEn:
-                  item.titleEn || item.eventDescription || item.titleKo,
-                imageUrl: null,
-                fallbackClassName: resolveFallbackClassName(item.articleId),
-              };
-            }
-          }),
-        );
+        const eventCards = res.items.map((item) => ({
+          id: item.articleId,
+          titleKo: item.titleKo,
+          titleEn: item.titleEn,
+          descriptionKo: item.eventDescription ?? item.titleKo,
+          descriptionEn: item.titleEn || item.eventDescription || item.titleKo,
+          imageUrl: item.thumbnailStorageKey
+            ? resolveAssetUrl(item.thumbnailStorageKey)
+            : null,
+          fallbackClassName: resolveFallbackClassName(item.articleId),
+        }));
         if (active) {
-          setEvents(detailedEvents);
+          setEvents(eventCards);
           setLoading(false);
         }
       } catch (err) {
@@ -316,13 +288,13 @@ export function EventCarousel() {
     [events, lang],
   );
   const pageSize = isMobile ? 1 : 3;
-  const pageGap = isMobile ? 0 : 24;
+  const pageGap = isMobile ? 0 : 36;
   const peekWidth = isMobile ? 0 : 112;
   const measuredPageWidth =
     viewportWidth > 0 ? Math.max(0, viewportWidth - peekWidth) : 0;
   const pageWidth = isMobile ? viewportWidth : measuredPageWidth;
   const slideDistance =
-    pageWidth > 0 ? currentPage * (pageWidth + pageGap) : 0;
+    !isMobile && pageWidth > 0 ? currentPage * (pageWidth + pageGap) : 0;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -389,7 +361,7 @@ export function EventCarousel() {
 
   if (events.length === 0) {
     return (
-      <section className="min-h-[350px] bg-transparent select-none md:min-h-[400px]">
+      <section className="min-w-0 max-w-full min-h-[350px] bg-transparent select-none md:min-h-[400px]">
         <div className="w-full mb-4 flex items-center justify-between">
           <h2 className="home-section-title">
             {lang === "ko" ? "이번 주 주요 행사" : "Featured Events"}
@@ -426,7 +398,7 @@ export function EventCarousel() {
   }
 
   return (
-    <section className="min-h-[350px] bg-transparent select-none md:min-h-[400px]">
+    <section className="min-w-0 max-w-full min-h-[350px] bg-transparent select-none md:min-h-[400px]">
       {/* Title Bar */}
       <div className="w-full mb-4 flex items-center justify-between">
         <h2 className="home-section-title flex items-center gap-1.5">
@@ -456,9 +428,11 @@ export function EventCarousel() {
         {/* Sliding Page Viewport */}
         <div ref={viewportRef} className="w-full overflow-hidden">
           <div
-            className="flex transition-transform duration-500 ease-in-out"
+            className="flex transform-gpu transition-transform duration-500 ease-in-out"
             style={{
-              transform: `translateX(-${slideDistance}px)`,
+              transform: isMobile
+                ? `translateX(-${currentPage * 100}%)`
+                : `translateX(-${slideDistance}px)`,
             }}
           >
             {chunkedPages.map((pageItems, pageIdx) => {
@@ -470,9 +444,6 @@ export function EventCarousel() {
                   <div
                     key={pageIdx}
                     className="w-full flex-shrink-0"
-                    style={{
-                      width: pageWidth > 0 ? `${pageWidth}px` : "100%",
-                    }}
                   >
                     <div className="h-[260px]">
                       <FeaturedEventCard

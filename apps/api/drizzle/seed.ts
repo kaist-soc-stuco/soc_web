@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -11,9 +11,12 @@ import {
   boards,
   comments,
   permissions,
+  roleGroupPermissions,
+  roleGroups,
   surveyQuestions,
   surveySections,
   surveys,
+  userRoleGroups,
   users,
 } from "../src/infrastructure/postgres/postgres.schema";
 import { PERMISSION_REGISTRY } from "@soc/contracts";
@@ -218,6 +221,112 @@ async function seedBoards() {
       },
     });
   console.log(`Upserted ${BOARD_SEEDS.length} board(s)`);
+}
+
+async function seedDevAdminRole() {
+  const now = new Date();
+  const permissionRows = await db
+    .select({ permissionId: permissions.permissionId })
+    .from(permissions)
+    .where(eq(permissions.isActive, true));
+
+  if (permissionRows.length === 0) {
+    throw new Error("No active permissions found for dev admin seed");
+  }
+
+  const [devAdmin] = await db
+    .insert(users)
+    .values({
+      academicStatus: "재학",
+      departmentEn: "School of Computing",
+      departmentKo: "전산학부",
+      email: "dev-admin@kaist.ac.kr",
+      identityCode: "S",
+      isActive: true,
+      kaistUid: "DEV0001",
+      lastLoginAt: now,
+      nameEn: "Development Admin",
+      nameKo: "관리자",
+      privacyConsentAt: now,
+      stdNo: "20260001",
+    })
+    .onConflictDoUpdate({
+      target: users.kaistUid,
+      set: {
+        academicStatus: sql`excluded.academic_status`,
+        departmentEn: sql`excluded.dept_en`,
+        departmentKo: sql`excluded.dept_ko`,
+        email: sql`excluded.email`,
+        identityCode: sql`excluded.identity_code`,
+        isActive: sql`excluded.is_active`,
+        lastLoginAt: sql`excluded.last_login_at`,
+        nameEn: sql`excluded.name_en`,
+        nameKo: sql`excluded.name_ko`,
+        privacyConsentAt: sql`excluded.privacy_consent_at`,
+        stdNo: sql`excluded.std_no`,
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning({ userId: users.userId });
+
+  if (!devAdmin) {
+    throw new Error("Failed to upsert dev admin user");
+  }
+
+  const [devRoleGroup] = await db
+    .insert(roleGroups)
+    .values({
+      description: "개발 환경용 전체 권한 테스트 그룹",
+      isSystem: true,
+      nameKo: "개발 관리자",
+    })
+    .onConflictDoUpdate({
+      target: roleGroups.nameKo,
+      set: {
+        description: "개발 환경용 전체 권한 테스트 그룹",
+        isSystem: true,
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning({ roleGroupId: roleGroups.roleGroupId });
+
+  if (!devRoleGroup) {
+    throw new Error("Failed to upsert dev admin role group");
+  }
+
+  await db
+    .delete(roleGroupPermissions)
+    .where(eq(roleGroupPermissions.roleGroupId, devRoleGroup.roleGroupId));
+
+  await db.insert(roleGroupPermissions).values(
+    permissionRows.map((permission) => ({
+      permissionId: permission.permissionId,
+      roleGroupId: devRoleGroup.roleGroupId,
+    })),
+  );
+
+  await db
+    .delete(userRoleGroups)
+    .where(
+      and(
+        eq(userRoleGroups.userId, devAdmin.userId),
+        eq(userRoleGroups.roleGroupId, devRoleGroup.roleGroupId),
+      ),
+    );
+
+  await db.insert(userRoleGroups).values({
+    grantedAt: now,
+    grantedBy: devAdmin.userId,
+    isActive: true,
+    roleGroupId: devRoleGroup.roleGroupId,
+    userId: devAdmin.userId,
+    validFrom: now,
+    validTo: null,
+  });
+
+  console.log(
+    `Seeded dev admin role with ${permissionRows.length} active permission(s)`,
+  );
 }
 
 const recruitmentPosterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
@@ -1265,6 +1374,7 @@ async function main() {
   try {
     await seedPermissions();
     await seedBoards();
+    await seedDevAdminRole();
     await seedMockData();
     console.log("Seed finished");
   } catch (err) {

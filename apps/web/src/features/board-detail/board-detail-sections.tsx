@@ -118,12 +118,12 @@ export function BoardDetailArticleCard({
   title,
 }: ArticleCardProps) {
   return (
-    <article className="w-full rounded-xl border border-slate-200 bg-white px-6 md:px-[52px] py-6 md:py-[32px] shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+    <article className="w-full rounded-xl border border-card-border-subtle bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]">
       <header>
-        <span className="inline-flex rounded-md bg-[#e6f4ea] px-2 py-1 text-xs font-bold text-[#137333]">
+        <span className="inline-flex rounded-md bg-brand-primary-light px-2 py-1 text-xs font-bold text-brand-primary">
           {category}
         </span>
-        <h1 className="mt-3 text-[1.18rem] font-bold leading-snug tracking-tight text-slate-950 md:text-[1.45rem]">
+        <h1 className="mt-3 text-[1.18rem] font-extrabold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
           {title}
         </h1>
         <div className="mt-3 flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -168,14 +168,15 @@ export function BoardDetailArticleCard({
             <img
               src={resolveAssetUrl(posterAsset.storageKey)}
               alt={posterAsset.originalFilename}
-              className="w-full object-cover max-h-[640px]"
+              className="mx-auto max-h-[520px] w-full object-contain"
             />
           </figure>
         )}
 
-        <div className="whitespace-pre-line text-[0.94rem] font-medium leading-7 text-slate-800 [overflow-wrap:anywhere]">
-          {content}
-        </div>
+        <div
+          className="rich-content text-[0.94rem] font-medium leading-7 text-app-text-body [overflow-wrap:anywhere]"
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
       </div>
 
       <AttachmentList
@@ -184,18 +185,18 @@ export function BoardDetailArticleCard({
       />
 
       {article.survey && (
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.025)]">
+        <section className="mt-6 rounded-xl border border-brand-primary-border bg-brand-primary-light/55 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.025)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-kaist-darkgreen">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white text-brand-primary shadow-sm">
                 <ClipboardCheck className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-[14px] font-extrabold leading-snug tracking-tight text-slate-900">
+                <h2 className="truncate text-[14px] font-extrabold leading-snug tracking-tight text-app-text-strong">
                   {surveyTitle}
                 </h2>
                 {surveyDescription && (
-                  <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-relaxed text-slate-500">
+                  <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-relaxed text-app-text-muted">
                     {surveyDescription}
                   </p>
                 )}
@@ -203,7 +204,7 @@ export function BoardDetailArticleCard({
             </div>
             <Link
               to={`/survey/${article.survey.surveyId}`}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm transition hover:opacity-90"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#053b23]"
             >
               <span>{lang === "ko" ? "설문조사 참여하기" : "Open survey"}</span>
               <svg

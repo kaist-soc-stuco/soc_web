@@ -51,6 +51,7 @@ export function EventsSurveysPage() {
 
       <PageHero
         title={lang === "ko" ? "행사 / 설문·투표" : "Events / Surveys & Votes"}
+        variant="large"
         description={
           lang === "ko"
             ? "집행위원회가 진행하는 행사와 설문·투표를 한 곳에서 확인하고 참여하세요."
@@ -68,7 +69,7 @@ export function EventsSurveysPage() {
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`relative flex items-center justify-center text-[14px] lg:text-[14.5px] font-bold tracking-tight transition-all py-4 border-0 bg-transparent shrink-0 cursor-pointer ${
+                  className={`group relative flex items-center justify-center text-[14px] lg:text-[14.5px] font-bold tracking-tight transition-all py-4 border-0 bg-transparent shrink-0 cursor-pointer ${
                     isActive
                       ? "text-brand-primary"
                       : "text-slate-400 hover:text-brand-primary"
@@ -77,7 +78,7 @@ export function EventsSurveysPage() {
                   <span>{lang === "ko" ? tab.labelKo : tab.labelEn}</span>
                   <span
                     className={`absolute bottom-0 left-0 right-0 h-[3px] bg-brand-primary transition-transform duration-200 origin-center ${
-                      isActive ? "scale-x-100" : "scale-x-0"
+                      isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
                     }`}
                   />
                 </button>

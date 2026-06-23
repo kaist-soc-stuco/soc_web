@@ -67,6 +67,7 @@ export function useBoardDetailPageController() {
 
   const canCreateComment = useMemo(() => {
     if (!board?.allowComment) return false;
+    if (!article?.allowComment) return false;
     if (!session?.canUsePersistentFeatures) return false;
 
     const permission = session.permission ?? 0;
@@ -74,7 +75,7 @@ export function useBoardDetailPageController() {
       board.commentPermissionBit <= 0 ||
       Permissions.has(permission, board.commentPermissionBit)
     );
-  }, [board, session]);
+  }, [article, board, session]);
 
   const posterAsset = useMemo(
     () =>

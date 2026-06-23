@@ -5,12 +5,11 @@ import { Footer } from "@/components/organisms/footer";
 import { PageHero } from "@/components/organisms/page-hero";
 import {
   BoardEditHeaderControls,
-  BoardEditToolbar,
   BoardWriteAttachmentList,
   BoardWriteEditorFields,
   BoardWriteEventFields,
-  BoardWritePostOptions,
-  BoardWriteSurveyLink,
+  BoardWriteSettings,
+  BoardWriteFooter,
 } from "@/features/board-write/board-write-form-sections";
 import { useBoardEditPageController } from "@/features/board-write/use-board-edit-page-controller";
 
@@ -20,7 +19,9 @@ export function BoardEditPage() {
     activeTab,
     articleId,
     assets,
+    allowComment,
     backToArticle,
+    canConfigurePostSettings,
     category,
     contentEn,
     contentKo,
@@ -32,12 +33,14 @@ export function BoardEditPage() {
     handleSubmit,
     handleUploadFiles,
     isAnonymous,
+    isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
     isSubmitting,
     lang,
     loading,
     selectedSurveyId,
+    setAllowComment,
     setActiveTab,
     setAssets,
     setContentEn,
@@ -46,6 +49,7 @@ export function BoardEditPage() {
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
+    setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
     setSelectedSurveyId,
@@ -108,7 +112,17 @@ export function BoardEditPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)] overflow-hidden">
+              {/* Hidden file input for editor uploads */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => void handleUploadFiles(event.target.files)}
+              />
+
+              {/* Unified Editor Card Container */}
+              <div className="rounded-xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
                 <BoardEditHeaderControls
                   activeTab={activeTab}
                   category={category}
@@ -119,16 +133,6 @@ export function BoardEditPage() {
                     setIsKoreanOnly(checked);
                     if (checked) setActiveTab("ko");
                   }}
-                />
-
-                <BoardEditToolbar
-                  fileInputRef={fileInputRef}
-                  isSubmitting={isSubmitting}
-                  lang={lang}
-                  onCancel={backToArticle}
-                  onSubmit={handleSubmit}
-                  onUploadFiles={(files) => void handleUploadFiles(files)}
-                  uploading={uploading}
                 />
 
                 <div className="p-6 md:p-8 space-y-6 min-h-[450px]">
@@ -143,6 +147,8 @@ export function BoardEditPage() {
                     onTitleKoChange={setTitleKo}
                     titleEn={titleEn}
                     titleKo={titleKo}
+                    fileInputRef={fileInputRef}
+                    uploading={uploading}
                   />
 
                   {category === "행사" && (
@@ -150,19 +156,20 @@ export function BoardEditPage() {
                       eventDescription={eventDescription}
                       eventEndDate={eventEndDate}
                       eventStartDate={eventStartDate}
+                      isEventAlwaysOpen={isEventAlwaysOpen}
                       lang={lang}
+                      onEventAlwaysOpenChange={(checked) => {
+                        setIsEventAlwaysOpen(checked);
+                        if (checked) {
+                          setEventStartDate("");
+                          setEventEndDate("");
+                        }
+                      }}
                       onEventDescriptionChange={setEventDescription}
                       onEventEndDateChange={setEventEndDate}
                       onEventStartDateChange={setEventStartDate}
                     />
                   )}
-
-                  <BoardWriteSurveyLink
-                    lang={lang}
-                    onSelectedSurveyIdChange={setSelectedSurveyId}
-                    selectedSurveyId={selectedSurveyId}
-                    surveys={surveys}
-                  />
 
                   <BoardWriteAttachmentList
                     assets={assets}
@@ -177,16 +184,33 @@ export function BoardEditPage() {
                 </div>
               </div>
 
-              <BoardWritePostOptions
+              <BoardWriteSettings
+                allowComment={allowComment}
+                canConfigurePostSettings={canConfigurePostSettings}
+                lang={lang}
+                onAllowCommentChange={setAllowComment}
+                onSelectedSurveyIdChange={setSelectedSurveyId}
+                selectedSurveyId={selectedSurveyId}
+                surveys={surveys}
+                isAnonymous={isAnonymous}
+                isPinned={isPinned}
+                onAnonymousChange={setIsAnonymous}
+                onPinnedChange={setIsPinned}
                 anonymousLabel={
                   lang === "ko" ? "익명으로 수정" : "Edit Anonymously"
                 }
-                isAnonymous={isAnonymous}
-                isPinned={isPinned}
+                pinnedLabel={
+                  lang === "ko" ? "게시글 상단 고정" : "Pin to Top"
+                }
+              />
+
+              <BoardWriteFooter
                 lang={lang}
-                onAnonymousChange={setIsAnonymous}
-                onPinnedChange={setIsPinned}
-                pinnedLabel={lang === "ko" ? "게시글 상단 고정" : "Pin to Top"}
+                isSubmitting={isSubmitting}
+                onCancel={backToArticle}
+                onSubmit={handleSubmit}
+                submitLabel={lang === "ko" ? "수정 완료" : "Save Changes"}
+                submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}
               />
             </>
           )}

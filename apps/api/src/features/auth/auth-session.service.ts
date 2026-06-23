@@ -420,49 +420,70 @@ export class AuthSessionService {
    * access token 기반으로 현재 사용자를 조회합니다.
    */
   async getCurrentUser(accessToken?: string): Promise<CurrentUserSummary> {
+    const claims = this.validateAccessToken(accessToken);
+
+    if (claims.mode === "temporary") {
+      return {
+        authenticated: true,
+        storageMode: "temporary",
+      };
+    }
+
+    const user = await this.usersService.findById(claims.userId);
+
+    if (!user) {
+      return {
+        authenticated: false,
+        storageMode: null,
+      };
+    }
+
+    return {
+      authenticated: true,
+      storageMode: "persisted",
+      user: {
+        id: user.userId,
+        name: user.nameKo,
+        permission:
+          await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
+        email: user.email,
+        nameKo: user.nameKo,
+        nameEn: user.nameEn,
+        userMobile: null,
+        studentNumber: user.stdNo,
+        departmentKo: user.departmentKo,
+        departmentEn: user.departmentEn,
+        academicStatus: user.academicStatus,
+        identityCode: user.identityCode,
+      },
+    };
+  }
+
+  /**
+   * 공개 API에서 선택적으로 현재 사용자를 조회합니다.
+   * 토큰이 없거나 유효하지 않으면 익명 사용자로 처리합니다.
+   */
+  async getOptionalCurrentUser(
+    accessToken?: string,
+  ): Promise<CurrentUserSummary> {
+    if (!accessToken) {
+      return {
+        authenticated: false,
+        storageMode: null,
+      };
+    }
+
     try {
-      const claims = this.validateAccessToken(accessToken);
-
-      if (claims.mode === "temporary") {
-        return {
-          authenticated: true,
-          storageMode: "temporary",
-        };
-      }
-
-      const user = await this.usersService.findById(claims.userId);
-
-      if (!user) {
+      return await this.getCurrentUser(accessToken);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
         return {
           authenticated: false,
           storageMode: null,
         };
       }
 
-      return {
-        authenticated: true,
-        storageMode: "persisted",
-        user: {
-          id: user.userId,
-          name: user.nameKo,
-          permission:
-            await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
-          email: user.email,
-          nameKo: user.nameKo,
-          nameEn: user.nameEn,
-          userMobile: null,
-          studentNumber: user.stdNo,
-          departmentKo: user.departmentKo,
-          departmentEn: user.departmentEn,
-          academicStatus: user.academicStatus,
-          identityCode: user.identityCode,
-        },
-      };
-    } catch {
-      return {
-        authenticated: false,
-        storageMode: null,
-      };
+      throw error;
     }
   }
 

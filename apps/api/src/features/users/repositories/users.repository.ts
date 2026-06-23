@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
 import { isoToMs, msToIso, nowDate } from "@soc/shared";
-import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -25,6 +25,7 @@ import {
 
 import type { UserRecord } from "../entities/user";
 import type {
+  AdminUserListResponse,
   AdminUserRecord,
   ArticleStatus,
   CommentStatus,
@@ -61,6 +62,15 @@ type UserProfileUpdateInput = {
   stdNo?: string | null;
   lastLoginAt?: Date;
 };
+
+export type StudentFeeSortBy = "name" | "studentId" | "status" | "paidAt";
+export type SortDirection = "asc" | "desc";
+export type AdminUserSortBy =
+  | "name"
+  | "studentId"
+  | "status"
+  | "lastLoginAt"
+  | "createdAt";
 
 /**
  * PostgreSQL users 테이블 접근 로직입니다.
@@ -120,6 +130,27 @@ export class UsersRepository {
       isActive: row.isActive,
       lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
       updatedAt: msToIso(row.updatedAt.valueOf()),
+    };
+  }
+
+  private mapRowToAdminUserRecord(
+    row: typeof users.$inferSelect,
+  ): AdminUserRecord {
+    return {
+      academicStatus: row.academicStatus ?? null,
+      createdAt: msToIso(row.createdAt.valueOf()),
+      departmentEn: row.departmentEn ?? null,
+      departmentKo: row.departmentKo ?? null,
+      email: row.email,
+      identityCode: row.identityCode ?? null,
+      isActive: row.isActive,
+      kaistUid: row.kaistUid,
+      lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
+      nameEn: row.nameEn ?? null,
+      nameKo: row.nameKo,
+      stdNo: row.stdNo ?? null,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+      userId: row.userId,
     };
   }
 
@@ -320,6 +351,7 @@ export class UsersRepository {
           ilike(users.nameKo, `%${normalizedQuery}%`),
           ilike(users.nameEn, `%${normalizedQuery}%`),
           ilike(users.stdNo, `%${normalizedQuery}%`),
+          ilike(users.email, `%${normalizedQuery}%`),
         )
       : undefined;
 
@@ -330,22 +362,71 @@ export class UsersRepository {
       .orderBy(desc(users.updatedAt))
       .limit(Math.min(Math.max(limit, 1), 50));
 
-    return rows.map((row) => ({
-      createdAt: msToIso(row.createdAt.valueOf()),
-      userId: row.userId,
-      kaistUid: row.kaistUid,
-      nameEn: row.nameEn ?? null,
-      nameKo: row.nameKo,
-      stdNo: row.stdNo ?? null,
-      email: row.email,
-      departmentEn: row.departmentEn ?? null,
-      departmentKo: row.departmentKo ?? null,
-      academicStatus: row.academicStatus ?? null,
-      identityCode: row.identityCode ?? null,
-      isActive: row.isActive,
-      lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
-      updatedAt: msToIso(row.updatedAt.valueOf()),
-    }));
+    return rows.map((row) => this.mapRowToAdminUserRecord(row));
+  }
+
+  async listAdminUsers(input: {
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    sortBy?: AdminUserSortBy;
+    sortDirection?: SortDirection;
+    status?: "active" | "inactive";
+  }): Promise<AdminUserListResponse> {
+    const page = Math.max(input.page ?? 1, 1);
+    const pageSize = Math.min(Math.max(input.pageSize ?? 20, 1), 100);
+    const offset = (page - 1) * pageSize;
+    const normalizedQuery = input.query?.trim() ?? "";
+    const conditions = [
+      normalizedQuery
+        ? or(
+            ilike(users.nameKo, `%${normalizedQuery}%`),
+            ilike(users.nameEn, `%${normalizedQuery}%`),
+            ilike(users.stdNo, `%${normalizedQuery}%`),
+            ilike(users.email, `%${normalizedQuery}%`),
+            ilike(users.departmentKo, `%${normalizedQuery}%`),
+          )
+        : undefined,
+      input.status === "active"
+        ? eq(users.isActive, true)
+        : input.status === "inactive"
+          ? eq(users.isActive, false)
+          : undefined,
+    ].filter(Boolean);
+    const whereClause =
+      conditions.length === 0 ? undefined : and(...conditions);
+    const direction = input.sortDirection === "desc" ? desc : asc;
+    const sortBy = input.sortBy ?? "name";
+    const primarySort =
+      sortBy === "studentId"
+        ? direction(users.stdNo)
+        : sortBy === "status"
+          ? direction(users.isActive)
+          : sortBy === "lastLoginAt"
+            ? direction(users.lastLoginAt)
+            : sortBy === "createdAt"
+              ? direction(users.createdAt)
+              : direction(users.nameKo);
+
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(whereClause)
+      .orderBy(primarySort, asc(users.nameKo), asc(users.stdNo))
+      .limit(pageSize)
+      .offset(offset);
+
+    const countResult = await this.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(users)
+      .where(whereClause);
+
+    return {
+      items: rows.map((row) => this.mapRowToAdminUserRecord(row)),
+      page,
+      pageSize,
+      total: Number(countResult[0]?.count ?? 0),
+    };
   }
 
   async resolvePermissionBitmaskByUserId(userId: string): Promise<number> {
@@ -512,6 +593,8 @@ export class UsersRepository {
     status?: FeeStatus,
     page = 1,
     pageSize = 20,
+    sortBy: StudentFeeSortBy = "name",
+    sortDirection: SortDirection = "asc",
   ): Promise<StudentFeeListResponse> {
     const offset = (page - 1) * pageSize;
 
@@ -523,6 +606,15 @@ export class UsersRepository {
           )
         : eq(studentFeeStatus.status, status)
       : undefined;
+    const direction = sortDirection === "desc" ? desc : asc;
+    const primarySort =
+      sortBy === "studentId"
+        ? direction(users.stdNo)
+        : sortBy === "status"
+          ? direction(sql<string>`COALESCE(${studentFeeStatus.status}, 'UNPAID')`)
+          : sortBy === "paidAt"
+            ? direction(studentFeeStatus.paidAt)
+            : direction(users.nameKo);
 
     const rows = await this.db
       .select({
@@ -539,7 +631,7 @@ export class UsersRepository {
       .from(users)
       .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
       .where(where)
-      .orderBy(desc(studentFeeStatus.updatedAt))
+      .orderBy(primarySort, asc(users.nameKo), asc(users.stdNo))
       .limit(pageSize)
       .offset(offset);
 

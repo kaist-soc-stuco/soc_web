@@ -30,17 +30,23 @@
   --kaist-lightgreen: oklch(0.7173 0.12863 157.503);
   --kaist-lightgreen2: oklch(0.8173 0.12863 157.503);
   --kaist-greygreen: oklch(0.6435 0.0089 157.503);
+  --kaist-blue: oklch(0.48 0.155 255);
   --kaist-black: oklch(0.26 0.03 240);
   --kaist-grey: oklch(0.65 0.03 240);
   --kaist-brown: oklch(0.6173 0.12863 18.31);
 
   /* App interaction tokens */
   --app-primary: var(--kaist-darkgreen);
+  --app-accent-secondary: var(--kaist-blue);
   --app-primary-light: oklch(0.955 0.035 157.503);
   --app-primary-border: oklch(0.86 0.055 157.503);
+  --app-text-strong: oklch(0.22 0.034 240);
+  --app-text-body: oklch(0.37 0.032 240);
+  --app-text-muted: oklch(0.56 0.028 240);
   --app-card-border: oklch(0.90 0.012 230);
   --app-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.035), 0 8px 24px rgba(16, 24, 40, 0.045);
   --app-shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.05), 0 12px 28px rgba(16, 24, 40, 0.07);
+  --app-shadow-elevated: 0 18px 48px rgba(15, 23, 42, 0.08);
 }
 
 @theme inline {
@@ -75,15 +81,21 @@
   --color-kaist-lightgreen2: var(--kaist-lightgreen2);
   --color-kaist-lightgreen: var(--kaist-lightgreen);
   --color-kaist-greygreen: var(--kaist-greygreen);
+  --color-kaist-blue: var(--kaist-blue);
   --color-kaist-black: var(--kaist-black);
   --color-kaist-grey: var(--kaist-grey);
   --color-kaist-brown: var(--kaist-brown);
   --color-brand-primary: var(--app-primary);
+  --color-brand-secondary: var(--app-accent-secondary);
   --color-brand-primary-light: var(--app-primary-light);
   --color-brand-primary-border: var(--app-primary-border);
+  --color-app-text-strong: var(--app-text-strong);
+  --color-app-text-body: var(--app-text-body);
+  --color-app-text-muted: var(--app-text-muted);
   --color-card-border-subtle: var(--app-card-border);
   --shadow-card: var(--app-shadow-card);
   --shadow-card-hover: var(--app-shadow-card-hover);
+  --shadow-elevated: var(--app-shadow-elevated);
 }
 
 @layer base {
@@ -122,6 +134,50 @@
     transform: scaleX(1);
   }
 
+  .page-hero-surface {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--kaist-darkgreen) 0%, #002613 100%);
+  }
+
+  .page-hero-surface::before {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    content: "";
+    background: radial-gradient(
+      circle at 20% 20%,
+      rgba(113, 185, 141, 0.16),
+      transparent 42%
+    );
+  }
+
+  .page-hero-large {
+    padding-block: 2.25rem;
+  }
+
+  .page-hero-medium {
+    padding-block: 1.65rem;
+  }
+
+  .page-hero-compact {
+    padding-block: 1.15rem;
+  }
+
+  @media (min-width: 768px) {
+    .page-hero-large {
+      padding-block: 2.75rem;
+    }
+
+    .page-hero-medium {
+      padding-block: 2rem;
+    }
+
+    .page-hero-compact {
+      padding-block: 1.35rem;
+    }
+  }
+
   .home-bento-card {
     border: 1px solid var(--app-card-border);
     border-radius: 1.5rem;
@@ -137,6 +193,18 @@
     border-color: var(--app-primary-border);
     box-shadow: var(--app-shadow-card-hover);
     transform: translateY(-1px);
+  }
+
+  .home-mobile-section {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  @media (max-width: 767px) {
+    .home-mobile-section {
+      width: calc(100vw - 3rem);
+      max-width: calc(100vw - 3rem);
+    }
   }
 
   /* Home scale: section 16-17/800, card title 15/700, body 12.5/500, meta 11.5/500. */
@@ -226,4 +294,144 @@
   100% {
     background-position: -70% 0, 0 0;
   }
+}
+
+/* Tiptap & Rich Content Styling */
+.rich-content,
+.tiptap {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.rich-content p,
+.tiptap p {
+  margin-bottom: 1.25rem;
+  line-height: 1.48;
+}
+
+.rich-content p:last-child,
+.tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-content h1,
+.tiptap h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--kaist-black);
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  line-height: 1.3;
+}
+
+.rich-content h2,
+.tiptap h2 {
+  font-size: 1.4rem;
+  font-weight: 750;
+  color: var(--kaist-black);
+  margin-top: 1.75rem;
+  margin-bottom: 0.85rem;
+  line-height: 1.35;
+}
+
+.rich-content h3,
+.tiptap h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--kaist-black);
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.rich-content ul,
+.tiptap ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.rich-content ol,
+.tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.rich-content li,
+.tiptap li {
+  margin-bottom: 0.35rem;
+  line-height: 1.6;
+}
+
+.rich-content li > p,
+.tiptap li > p {
+  margin-bottom: 0;
+}
+
+.rich-content blockquote,
+.tiptap blockquote {
+  border-left: 4px solid var(--kaist-darkgreen);
+  background-color: oklch(0.98 0.005 220); /* slate-50/100 matching background */
+  padding: 0.85rem 1.25rem;
+  margin: 1.5rem 0;
+  color: oklch(0.45 0.03 240); /* slate-500/600 equivalent */
+  font-style: italic;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.rich-content pre,
+.tiptap pre {
+  background-color: oklch(0.25 0.02 240); /* slate-800 equivalent */
+  color: oklch(0.95 0.01 240); /* slate-100 equivalent */
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+
+.rich-content pre code,
+.tiptap pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.rich-content code,
+.tiptap code {
+  background-color: oklch(0.95 0.01 240); /* slate-100 equivalent */
+  color: oklch(0.55 0.15 10); /* reddish / rose tone */
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85em;
+}
+
+.rich-content a,
+.tiptap a {
+  color: var(--kaist-darkgreen);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.rich-content a:hover,
+.tiptap a:hover {
+  opacity: 0.85;
+}
+
+/* Editor Placeholder styling */
+.tiptap p.is-editor-empty:first-child::before {
+  color: oklch(0.65 0.03 240); /* slate-400 */
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap-container {
+  outline: none;
 }

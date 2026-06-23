@@ -1,6 +1,8 @@
 import type {
   AdminUserRecord,
+  AdminUserListResponse,
   AssignRoleGroupMemberRequest,
+  AuditLogListResponse,
   BulkEmailListResponse,
   ContactListResponse,
   ContactRecord,
@@ -29,6 +31,7 @@ import {
 } from "./core.js";
 
 export const createAdminApi = ({
+  auditLogsBaseUrl,
   contactsBaseUrl,
   emailsBaseUrl,
   requestJson,
@@ -194,6 +197,80 @@ export const createAdminApi = ({
     );
   },
 
+  listAdminUsers: async (options?: {
+    page?: number;
+    pageSize?: number;
+    q?: string;
+    sortBy?: "name" | "studentId" | "status" | "lastLoginAt" | "createdAt";
+    sortDirection?: "asc" | "desc";
+    status?: "active" | "inactive";
+  }): Promise<AdminUserListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.q?.trim()) {
+      params.set("q", options.q.trim());
+    }
+    if (options?.page !== undefined) {
+      params.set("page", String(options.page));
+    }
+    if (options?.pageSize !== undefined) {
+      params.set("pageSize", String(options.pageSize));
+    }
+    if (options?.sortBy !== undefined) {
+      params.set("sortBy", options.sortBy);
+    }
+    if (options?.sortDirection !== undefined) {
+      params.set("sortDirection", options.sortDirection);
+    }
+    if (options?.status !== undefined) {
+      params.set("status", options.status);
+    }
+
+    return requestJson<AdminUserListResponse>(
+      `${usersBaseUrl}/admin/list${params.toString() ? `?${params.toString()}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  listAuditLogs: async (options?: {
+    action?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+    sortBy?: "createdAt" | "actor" | "action";
+    sortDirection?: "asc" | "desc";
+    targetType?: string;
+  }): Promise<AuditLogListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.action?.trim()) {
+      params.set("action", options.action.trim());
+    }
+    if (options?.q?.trim()) {
+      params.set("q", options.q.trim());
+    }
+    if (options?.targetType?.trim()) {
+      params.set("targetType", options.targetType.trim());
+    }
+    if (options?.page !== undefined) {
+      params.set("page", String(options.page));
+    }
+    if (options?.pageSize !== undefined) {
+      params.set("pageSize", String(options.pageSize));
+    }
+    if (options?.sortBy !== undefined) {
+      params.set("sortBy", options.sortBy);
+    }
+    if (options?.sortDirection !== undefined) {
+      params.set("sortDirection", options.sortDirection);
+    }
+
+    return requestJson<AuditLogListResponse>(
+      `${auditLogsBaseUrl}${params.toString() ? `?${params.toString()}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   getStudentFeeStatus: async (
     userId: string,
   ): Promise<StudentFeeStatusRecord> => {
@@ -225,6 +302,8 @@ export const createAdminApi = ({
     status?: string,
     page = 1,
     pageSize = 20,
+    sortBy: "name" | "studentId" | "status" | "paidAt" = "name",
+    sortDirection: "asc" | "desc" = "asc",
   ): Promise<StudentFeeListResponse> => {
     const params = new URLSearchParams();
     if (status) {
@@ -232,6 +311,8 @@ export const createAdminApi = ({
     }
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
+    params.set("sortBy", sortBy);
+    params.set("sortDirection", sortDirection);
 
     return requestJson<StudentFeeListResponse>(
       `${usersBaseUrl}/fee-status/list?${params.toString()}`,

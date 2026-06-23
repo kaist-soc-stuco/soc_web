@@ -7,10 +7,10 @@ import type {
 } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
 import {
+  ArrowDown,
   Check,
   ChevronLeft,
   ChevronRight,
-  ChevronRightIcon,
   Pencil,
   Plus,
   Search,
@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/data-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { hasAdminPermission, Permissions } from "@/lib/permissions";
@@ -29,6 +30,9 @@ type RoleGroupFormState = {
   description: string;
   nameKo: string;
 };
+
+type MemberSortBy = "name" | "studentId" | "grantedAt";
+type SortDirection = "asc" | "desc";
 
 const emptyRoleGroupForm = (): RoleGroupFormState => ({
   description: "",
@@ -49,6 +53,12 @@ const formatShortDate = (value?: string | null) => {
 const displayStudentId = (user: Pick<AdminUserRecord, "stdNo" | "kaistUid">) =>
   user.stdNo ?? user.kaistUid;
 
+const compareText = (left?: string | null, right?: string | null) =>
+  (left ?? "").localeCompare(right ?? "", "ko-KR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+
 const operationErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof ApiClientHttpError) {
     if (error.status === 401) {
@@ -67,39 +77,39 @@ const permissionDisplay: Record<
   { description: string; label: string }
 > = {
   WRITE_NOTICE: {
-    description: "공지사항·행사 게시글 작성",
-    label: "공지사항 관리",
+    description: "공지, 행사 게시판에 공식 게시글을 작성할 수 있습니다.",
+    label: "공지/행사 작성",
   },
   WRITE_GENERAL: {
-    description: "일반 게시판 글 작성",
+    description: "HoC, 홍보글, 연구실 게시판에 글을 작성할 수 있습니다.",
     label: "일반 게시판 작성",
   },
   WRITE_REPLY: {
-    description: "건의사항·QnA 공식 답변",
+    description: "건의사항, QnA 게시판에 공식 답변을 작성하고 상태를 변경할 수 있습니다.",
     label: "공식 답변 관리",
   },
   MANAGE_SURVEY: {
-    description: "설문 생성·응답 확인",
+    description: "행사, 설문·투표, 신청폼을 만들고 응답/결과를 확인할 수 있습니다.",
     label: "설문조사 관리",
   },
   MANAGE_FINANCE: {
-    description: "학생회비 납부 상태 관리",
+    description: "학생회비 납부 상태를 확인·수정하고 독촉 메일을 발송할 수 있습니다.",
     label: "학생회비 관리",
   },
   MANAGE_CONTENT: {
-    description: "사이트 운영 콘텐츠 관리",
+    description: "홈 화면, 배너, 소개/로드맵, 캘린더 콘텐츠를 수정할 수 있습니다.",
     label: "사이트 콘텐츠 관리",
   },
   MANAGE_TOOL: {
-    description: "내부 운영 도구 관리",
+    description: "POM 채점기, 챗봇 등 운영 도구 데이터와 설정을 관리할 수 있습니다.",
     label: "운영 도구 관리",
   },
   MODERATOR: {
-    description: "게시글·댓글 숨김 및 삭제",
+    description: "전체 게시판의 게시글·댓글을 숨김/삭제하고 사용자 제재를 처리할 수 있습니다.",
     label: "게시글/댓글 관리",
   },
   ADMIN: {
-    description: "역할·권한·관리 기능",
+    description: "운영 역할을 만들고 권한을 부여하며 구성원을 관리할 수 있습니다.",
     label: "권한 관리",
   },
 };
@@ -150,6 +160,9 @@ export function PermissionPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [roleGroupError, setRoleGroupError] = useState<string | null>(null);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [memberSortBy, setMemberSortBy] = useState<MemberSortBy>("name");
+  const [memberSortDirection, setMemberSortDirection] =
+    useState<SortDirection>("asc");
   const [roleGroupSaveStatus, setRoleGroupSaveStatus] = useState<
     "saved" | null
   >(null);
@@ -169,6 +182,40 @@ export function PermissionPage() {
         selectedRoleGroup.permissionIds,
       )
     : false;
+  const sortedRoleGroupMembers = useMemo(() => {
+    const direction = memberSortDirection === "asc" ? 1 : -1;
+
+    return [...roleGroupMembers].sort((left, right) => {
+      if (memberSortBy === "studentId") {
+        return (
+          compareText(displayStudentId(left), displayStudentId(right)) *
+          direction
+        );
+      }
+
+      if (memberSortBy === "grantedAt") {
+        const leftTime = left.grantedAt ? isoToDate(left.grantedAt).getTime() : 0;
+        const rightTime = right.grantedAt
+          ? isoToDate(right.grantedAt).getTime()
+          : 0;
+        return (leftTime - rightTime) * direction;
+      }
+
+      return compareText(left.nameKo, right.nameKo) * direction;
+    });
+  }, [memberSortBy, memberSortDirection, roleGroupMembers]);
+
+  const handleMemberSortChange = (nextSortBy: MemberSortBy) => {
+    if (memberSortBy === nextSortBy) {
+      setMemberSortDirection((currentDirection) =>
+        currentDirection === "asc" ? "desc" : "asc",
+      );
+      return;
+    }
+
+    setMemberSortBy(nextSortBy);
+    setMemberSortDirection("asc");
+  };
 
   const openRoleGroupEditor = (roleGroup: RoleGroupRecord) => {
     setSelectedRoleGroupId(roleGroup.roleGroupId);
@@ -477,7 +524,7 @@ export function PermissionPage() {
               관리자 권한이 있는 계정에서만 역할과 구성원을 관리할 수 있습니다.
             </div>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-[0.72fr_2fr]">
+            <div className="flex flex-col gap-4">
               <section className="rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
                 <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                   <div>
@@ -499,16 +546,22 @@ export function PermissionPage() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-[1fr_auto] border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 text-xs font-black text-slate-500">
-                  <span>역할</span>
-                  <span>구성원</span>
-                </div>
-
-                <div className="p-2.5">
+                <div className="p-4">
                   {roleGroupLoading ? (
-                    <p className="p-4 text-sm font-bold text-slate-400">
-                      역할을 불러오는 중입니다.
-                    </p>
+                    <div className="flex flex-wrap gap-2" aria-busy="true">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="flex min-h-[3rem] min-w-44 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2"
+                        >
+                          <span className="min-w-0 flex-1 space-y-2">
+                            <Skeleton className="h-3.5 w-24" />
+                            <Skeleton className="h-3 w-32" />
+                          </span>
+                          <Skeleton className="h-5 w-8 rounded-full" />
+                        </div>
+                      ))}
+                    </div>
                   ) : roleGroups.length === 0 ? (
                     <div className="space-y-3">
                       <EmptyState
@@ -525,7 +578,7 @@ export function PermissionPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="grid gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {roleGroups.map((roleGroup) => {
                         const selected =
                           roleGroup.roleGroupId === selectedRoleGroupId;
@@ -537,30 +590,29 @@ export function PermissionPage() {
                             onClick={() =>
                               void handleSelectRoleGroup(roleGroup)
                             }
-	                            className={`grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-	                              selected
-	                                ? "border-emerald-200 bg-emerald-50/60 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]"
-	                                : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"
-	                            }`}
+                            className={`inline-flex min-h-[3rem] max-w-full items-center gap-3 rounded-full border px-4 py-2 text-left transition ${
+                              selected
+                                ? "border-kaist-darkgreen bg-kaist-darkgreen text-white shadow-sm"
+                                : "border-slate-200 bg-white text-slate-700 hover:border-kaist-darkgreen/30 hover:bg-emerald-50/45"
+                            }`}
                           >
-                            <span>
+                            <span className="min-w-0">
                               <span
-                                className={`block text-[13px] font-extrabold ${selected ? "text-kaist-darkgreen" : "text-slate-900"}`}
+                                className={`block truncate text-[13px] font-extrabold ${selected ? "text-white" : "text-slate-900"}`}
                               >
                                 {roleGroup.nameKo}
                               </span>
-                              <span className="mt-0.5 line-clamp-1 block text-[11px] font-semibold text-slate-500">
+                              <span
+                                className={`mt-0.5 block max-w-[16rem] truncate text-[11px] font-semibold ${selected ? "text-white/75" : "text-slate-500"}`}
+                              >
                                 {roleGroup.description ?? "설명 없음"}
                               </span>
                             </span>
                             <span
-                              className={`rounded-md px-2 py-0.5 text-[11px] font-black ${selected ? "bg-white text-kaist-darkgreen" : "bg-slate-100 text-slate-600"}`}
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-black ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-600"}`}
                             >
                               {roleGroup.userCount}명
                             </span>
-                            <ChevronRightIcon
-                              className={`h-3.5 w-3.5 ${selected ? "text-kaist-darkgreen" : "text-slate-400"}`}
-                            />
                           </button>
                         );
                       })}
@@ -574,18 +626,14 @@ export function PermissionPage() {
                 </div>
               </section>
 
-              <div className="flex flex-col gap-4">
-                {selectedRoleGroup ? (
+              {selectedRoleGroup ? (
                   <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-base font-extrabold tracking-tight text-slate-800">
-                          역할 정보
-                        </h2>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-black text-slate-900">
-                            {selectedRoleGroup.nameKo}
-                          </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-base font-extrabold tracking-tight text-slate-800">
+                            역할 정보
+                          </h2>
                           {selectedRoleGroup.isSystem && (
                             <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-black text-slate-500">
                               시스템 역할
@@ -681,11 +729,11 @@ export function PermissionPage() {
                               onClick={() =>
                                 togglePermissionId(permission.permissionId)
                               }
-	                              className={`flex min-h-[3.25rem] items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-	                                selected
-	                                  ? "border-emerald-200 bg-emerald-50/40 text-kaist-darkgreen"
-	                                  : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-	                              }`}
+                              className={`flex min-h-[3.75rem] items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
+                                selected
+                                  ? "border-emerald-200 bg-emerald-50/40 text-kaist-darkgreen"
+                                  : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                              }`}
                             >
                               <span
                                 className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
@@ -695,14 +743,17 @@ export function PermissionPage() {
                                 }`}
                               >
                                 {selected && (
-	                                  <Check className="h-2.5 w-2.5" strokeWidth={4} />
+                                  <Check
+                                    className="h-2.5 w-2.5"
+                                    strokeWidth={4}
+                                  />
                                 )}
                               </span>
                               <span className="min-w-0">
                                 <span className="block text-[11.5px] font-extrabold">
                                   {permissionInfo.label}
                                 </span>
-                                <span className="mt-0.5 line-clamp-1 block text-[10.5px] font-semibold leading-4 text-slate-500">
+                                <span className="mt-0.5 line-clamp-2 block text-[10.5px] font-semibold leading-4 text-slate-500">
                                   {permissionInfo.description}
                                 </span>
                               </span>
@@ -721,7 +772,7 @@ export function PermissionPage() {
                 ) : (
                   <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
                     <EmptyState
-                      message="왼쪽에서 역할을 추가하거나 선택해 주세요."
+                      message="상단에서 역할을 추가하거나 선택해 주세요."
                       minHeightClassName="min-h-24"
                     />
                   </section>
@@ -744,7 +795,7 @@ export function PermissionPage() {
                         className="h-9 shrink-0 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 outline-none"
                         defaultValue="10"
                       >
-                        <option value="10">10명 씩 보기</option>
+                        <option value="10">10명</option>
                       </select>
                       <div className="flex h-9 min-w-[18rem] flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3">
                         <Search className="h-3.5 w-3.5 text-slate-400" />
@@ -830,23 +881,58 @@ export function PermissionPage() {
                     <table className="w-full min-w-[44rem] text-left text-sm">
                       <thead className="bg-slate-50 text-xs font-black text-slate-500">
                         <tr>
-                          <th className="px-4 py-3">이름</th>
-                          <th className="px-4 py-3">학번</th>
+                          <th className="px-4 py-3">
+                            <SortableHeader
+                              active={memberSortBy === "name"}
+                              ascending={
+                                memberSortBy === "name" &&
+                                memberSortDirection === "asc"
+                              }
+                              label="이름"
+                              onClick={() => handleMemberSortChange("name")}
+                            />
+                          </th>
+                          <th className="px-4 py-3">
+                            <SortableHeader
+                              active={memberSortBy === "studentId"}
+                              ascending={
+                                memberSortBy === "studentId" &&
+                                memberSortDirection === "asc"
+                              }
+                              label="학번"
+                              onClick={() =>
+                                handleMemberSortChange("studentId")
+                              }
+                            />
+                          </th>
                           <th className="px-4 py-3">이메일</th>
-                          <th className="px-4 py-3">추가일</th>
+                          <th className="px-4 py-3">
+                            <SortableHeader
+                              active={memberSortBy === "grantedAt"}
+                              ascending={
+                                memberSortBy === "grantedAt" &&
+                                memberSortDirection === "asc"
+                              }
+                              label="추가일"
+                              onClick={() =>
+                                handleMemberSortChange("grantedAt")
+                              }
+                            />
+                          </th>
                           <th className="px-4 py-3 text-center">작업</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
                         {memberLoading ? (
-                          <tr>
-                            <td
-                              colSpan={5}
-                              className="px-4 py-8 text-center text-sm font-bold text-slate-400"
-                            >
-                              구성원을 불러오는 중입니다.
-                            </td>
-                          </tr>
+                          Array.from({ length: 5 }).map((_, index) => (
+                            <tr key={index}>
+                              {Array.from({ length: 5 }).map((__, columnIndex) => (
+                                <td key={columnIndex} className="px-4 py-3">
+                                  <Skeleton className="h-4 w-full max-w-28" />
+                                </td>
+                              ))}
+                            </tr>
+                          ))
                         ) : roleGroupMembers.length === 0 ? (
                           <tr>
                             <td
@@ -857,7 +943,7 @@ export function PermissionPage() {
                             </td>
                           </tr>
                         ) : (
-                          roleGroupMembers.map((member) => (
+                          sortedRoleGroupMembers.map((member) => (
                             <tr
                               key={member.userRoleGroupId}
                               className="text-sm text-slate-700"
@@ -908,11 +994,39 @@ export function PermissionPage() {
                     </div>
                   </div>
                 </section>
-              </div>
             </div>
           )}
         </main>
       </div>
     </AuthGuard>
+  );
+}
+
+function SortableHeader({
+  active,
+  ascending,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  ascending: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors ${
+        active ? "text-kaist-darkgreen" : "text-slate-500 hover:text-slate-700"
+      }`}
+    >
+      <span>{label}</span>
+      <ArrowDown
+        className={`h-3 w-3 transition-transform ${
+          ascending ? "rotate-180" : ""
+        }`}
+      />
+    </button>
   );
 }

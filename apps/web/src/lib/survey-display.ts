@@ -18,12 +18,14 @@ export interface SurveyStatusInfo {
 export type SurveyStatusFilter = "all" | "draft" | "open" | "closed";
 export type SurveyTypeFilter = "all" | string;
 export type SurveyPeriodFilter = "all" | "7days" | "30days" | "1year";
-export type SurveySortKey = "updatedAt" | "createdAt" | "responseCount";
+export type SurveySortKey = "updatedAt" | "opensAt" | "responseCount";
+export type SurveySortDirection = "asc" | "desc";
 
 export interface SurveyListFilterOptions {
   periodFilter: SurveyPeriodFilter;
   searchQuery: string;
   sortBy: SurveySortKey;
+  sortDirection?: SurveySortDirection;
   statusFilter: SurveyStatusFilter;
   typeFilter: SurveyTypeFilter;
 }
@@ -130,16 +132,23 @@ export function filterAndSortSurveys(
   }
 
   result.sort((a, b) => {
+    const direction = options.sortDirection === "asc" ? -1 : 1;
+    let comparison = 0;
+    const getSortableMs = (value: string | null | undefined) => {
+      if (!value) return 0;
+      const ms = isoToMs(value);
+      return Number.isNaN(ms) ? 0 : ms;
+    };
+
     if (options.sortBy === "updatedAt") {
-      return isoToMs(b.updatedAt) - isoToMs(a.updatedAt);
+      comparison = getSortableMs(b.updatedAt) - getSortableMs(a.updatedAt);
+    } else if (options.sortBy === "opensAt") {
+      comparison = getSortableMs(b.opensAt) - getSortableMs(a.opensAt);
+    } else if (options.sortBy === "responseCount") {
+      comparison = (b.responseCount ?? 0) - (a.responseCount ?? 0);
     }
-    if (options.sortBy === "createdAt") {
-      return isoToMs(b.createdAt) - isoToMs(a.createdAt);
-    }
-    if (options.sortBy === "responseCount") {
-      return (b.responseCount ?? 0) - (a.responseCount ?? 0);
-    }
-    return 0;
+
+    return comparison * direction;
   });
 
   return result;

@@ -48,29 +48,28 @@ function NoticeItem({
               {categoryLabel}
             </span>
           )}
-          <span
+          <div
             className={`text-[13px] truncate ${
               isImportant
                 ? "text-slate-800 font-semibold"
                 : "text-slate-600 font-normal hover:text-brand-primary"
-            }`}
+            } flex min-w-0 items-center gap-1.5`}
           >
             {isImportant ? (
               <Pin className="mr-1 inline h-3 w-3 align-[-1px] fill-[#E11D48] text-[#E11D48]" />
             ) : null}
-            {title}
-          </span>
+            <span className="min-w-0 truncate">{title}</span>
+            {isNew && (
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#f03e3e] text-[9px] font-black text-white select-none">
+                N
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className="home-meta-text text-slate-500">
             {date}
           </span>
-
-          {isNew && (
-            <span className="w-4 h-4 bg-[#f03e3e] text-white rounded-full flex items-center justify-center text-[9px] font-black shrink-0">
-              N
-            </span>
-          )}
         </div>
       </div>
     </Link>
@@ -84,6 +83,30 @@ function formatDate(dateIso: string) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yy}.${mm}.${dd}`;
+}
+
+function NoticeBoardSkeleton() {
+  return (
+    <div className="divide-y divide-slate-100" aria-busy="true">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div key={index} className="flex items-center justify-between gap-4 px-3 py-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="home-loading-surface h-5 w-12 shrink-0 rounded-full" />
+            <div
+              className={`home-loading-surface h-3.5 min-w-0 rounded ${
+                index % 3 === 0
+                  ? "w-4/5"
+                  : index % 3 === 1
+                    ? "w-3/5"
+                    : "w-2/3"
+              }`}
+            />
+          </div>
+          <div className="home-loading-surface h-3 w-12 shrink-0 rounded" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function NoticeBoard() {
@@ -190,7 +213,7 @@ export function NoticeBoard() {
   ]);
 
   return (
-    <section className="home-bento-card flex h-full flex-col overflow-hidden px-5 py-2 pt-2.5 pb-1.5 select-none">
+    <section className="home-bento-card flex h-full min-w-0 flex-col overflow-hidden px-5 py-2 pt-2.5 pb-1.5 select-none">
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col">
         {/* Tabs */}
         <div className="mb-1.5 flex shrink-0 items-stretch justify-between gap-4 border-b border-slate-100">
@@ -241,9 +264,7 @@ export function NoticeBoard() {
         {/* Notice List */}
         <div className="min-h-0 flex-1 overflow-y-auto pt-1 pb-1">
           {loading ? (
-            <div className="flex h-full min-h-[180px] items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
-            </div>
+            <NoticeBoardSkeleton />
           ) : displayNotices.length > 0 ? (
             displayNotices.map((notice, index) => (
               <NoticeItem

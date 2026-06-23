@@ -29,6 +29,7 @@ export function SearchPage() {
       <Header showLogo />
       <PageHero
         title={lang === "ko" ? "통합검색" : "Search"}
+        variant="medium"
         description={
           lang === "ko"
             ? "게시글, 설문조사, 소개 페이지를 한 번에 검색합니다."

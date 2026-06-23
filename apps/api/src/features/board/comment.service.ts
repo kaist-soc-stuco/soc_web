@@ -18,7 +18,7 @@ import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import { CommentRepository } from "./repositories/comment.repository";
 import { assertBoardReadable, type CurrentUserContext } from "./board-access";
-import { COMMENT_STATUS } from "./board.constants";
+import { ARTICLE_STATUS, COMMENT_STATUS } from "./board.constants";
 
 interface CommentQueryParams {
   page?: number;
@@ -102,13 +102,17 @@ export class CommentService {
       throw new ForbiddenException("comment_not_allowed");
     }
 
-    const articleReadable = await this.articleRepository.isReadableArticle(
+    const article = await this.articleRepository.findCommentPermissionInfo(
       board.boardId,
       articleId,
     );
 
-    if (!articleReadable) {
+    if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
       throw new NotFoundException("article_not_found");
+    }
+
+    if (!article.allowComment) {
+      throw new ForbiddenException("comment_not_allowed");
     }
 
     if (

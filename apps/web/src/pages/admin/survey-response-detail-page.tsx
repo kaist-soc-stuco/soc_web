@@ -9,7 +9,8 @@ import { formatKoreanDateTime } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { Permissions } from "@/lib/permissions";
-import { ChevronLeft, User, Calendar, ClipboardCheck, Loader2 } from "lucide-react";
+import { ChevronLeft, User, ClipboardCheck } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function renderAnswerContent(content: Record<string, unknown>): string {
   if ("text" in content) return String(content.text);
@@ -99,9 +100,33 @@ export function SurveyResponseDetailPage() {
           </div>
 
           {loading && (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 bg-white rounded-2xl border border-gray-200 shadow-xs">
-              <Loader2 className="w-10 h-10 text-kaist-darkgreen animate-spin" />
-              <p className="text-sm font-semibold text-kaist-grey">데이터를 불러오는 중입니다...</p>
+            <div className="space-y-6" aria-busy="true">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs">
+                <div className="border-b border-gray-100 pb-3">
+                  <Skeleton className="h-5 w-44" />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Skeleton className="h-3 w-14" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs">
+                <div className="border-b border-gray-100 pb-3">
+                  <Skeleton className="h-5 w-36" />
+                </div>
+                <div className="mt-6 space-y-6">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="space-y-3 border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                      <Skeleton className="h-5 w-2/3" />
+                      <Skeleton className="h-16 w-full rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

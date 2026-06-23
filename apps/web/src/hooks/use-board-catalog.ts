@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   getFallbackBoards,
@@ -11,41 +12,36 @@ interface BoardCatalogApiClient {
 
 type BoardCatalogSource = "fallback" | "loading" | "server";
 
+const SERVER_CACHE_MS = 5 * 60 * 1000;
+const FALLBACK_CACHE_MS = 30 * 1000;
+
 export function useBoardCatalog(apiClient: BoardCatalogApiClient) {
   const fallbackBoards = useMemo(() => getFallbackBoards(), []);
-  const [boards, setBoards] = useState<BoardMetadata[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [source, setSource] = useState<BoardCatalogSource>("loading");
+  const catalogQuery = useQuery({
+    queryKey: ["board-catalog"],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.getBoards();
+        return {
+          boards: response.items,
+          source: "server" as const,
+        };
+      } catch {
+        return {
+          boards: fallbackBoards,
+          source: "fallback" as const,
+        };
+      }
+    },
+    staleTime: (query) =>
+      query.state.data?.source === "fallback"
+        ? FALLBACK_CACHE_MS
+        : SERVER_CACHE_MS,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setSource("loading");
-
-    apiClient
-      .getBoards()
-      .then((response) => {
-        if (!cancelled) {
-          setBoards(response.items);
-          setSource("server");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBoards(fallbackBoards);
-          setSource("fallback");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient, fallbackBoards]);
+  const boards = catalogQuery.data?.boards ?? [];
+  const source: BoardCatalogSource =
+    catalogQuery.data?.source ?? (catalogQuery.isPending ? "loading" : "fallback");
 
   const boardByCode = useMemo(
     () => new Map(boards.map((board) => [board.code, board])),
@@ -55,7 +51,7 @@ export function useBoardCatalog(apiClient: BoardCatalogApiClient) {
   return {
     boards,
     boardByCode,
-    isLoading,
+    isLoading: catalogQuery.isPending,
     source,
   };
 }

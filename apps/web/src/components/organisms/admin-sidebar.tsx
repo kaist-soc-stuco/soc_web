@@ -3,7 +3,9 @@ import {
   ClipboardList,
   ContactRound,
   Mail,
+  ScrollText,
   ShieldCheck,
+  Users,
   WalletCards,
 } from "lucide-react";
 
@@ -12,6 +14,8 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 
 const ADMIN_MENU = [
   { label: "설문조사 관리", to: "/admin/surveys", bit: Permissions.MANAGE_SURVEY, icon: ClipboardList },
+  { label: "유저 관리", to: "/admin/users", bit: Permissions.ADMIN, icon: Users },
+  { label: "운영 로그", to: "/admin/audit-logs", bit: Permissions.ADMIN, icon: ScrollText },
   { label: "집행위연락망 관리", to: "/admin/contacts", bit: Permissions.MANAGE_CONTENT, icon: ContactRound },
   { label: "이메일 일괄발송", to: "/admin/emails", bit: Permissions.ADMIN, icon: Mail },
   { label: "권한 관리", to: "/admin/permissions", bit: Permissions.ADMIN, icon: ShieldCheck },

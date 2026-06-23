@@ -17,20 +17,20 @@ export function HomePage() {
         </aside>
 
         {/* Right Side - Main Content */}
-        <div className="w-full min-h-screen flex flex-col bg-[linear-gradient(180deg,#ffffff_0%,#f8faf9_100%)] lg:w-[70%] lg:h-full lg:min-h-0">
+        <div className="w-full min-w-0 min-h-screen flex flex-col overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8faf9_100%)] lg:w-[70%] lg:h-full lg:min-h-0">
           <Header />
-          <main className="flex-1 flex flex-col gap-5 overflow-y-auto px-6 py-5 lg:min-h-0 lg:overflow-hidden lg:px-8">
+          <main className="flex-1 min-w-0 flex flex-col gap-5 overflow-x-hidden overflow-y-auto px-6 py-5 lg:min-h-0 lg:overflow-hidden lg:px-8">
             {/* Event Carousel */}
-            <div className="min-h-[350px] shrink-0 md:min-h-[400px]">
+            <div className="home-mobile-section min-w-0 min-h-[350px] shrink-0 overflow-hidden md:min-h-[400px]">
               <EventCarousel />
             </div>
             
             {/* Notice & Calendar Side by Side with elegant margin and generous gaps */}
-            <div className="flex flex-col gap-7 pb-2 lg:flex-1 lg:min-h-0 lg:flex-row">
-              <div className="lg:flex-[1.6] lg:h-full lg:min-h-0">
+            <div className="flex min-w-0 flex-col gap-7 pb-2 lg:flex-1 lg:min-h-0 lg:flex-row">
+              <div className="home-mobile-section min-w-0 lg:flex-[1.6] lg:h-full lg:min-h-0">
                 <NoticeBoard />
               </div>
-              <div className="lg:flex-1 lg:h-full lg:min-h-0">
+              <div className="home-mobile-section min-w-0 lg:flex-1 lg:h-full lg:min-h-0">
                 <Calendar />
               </div>
             </div>

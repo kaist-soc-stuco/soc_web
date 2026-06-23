@@ -1,4 +1,7 @@
-import type { KoreanHolidayRecord } from "@soc/contracts";
+import type {
+  KoreanHolidayRecord,
+  PublicCalendarEventsResponse,
+} from "@soc/contracts";
 
 import type { ApiClientContext } from "./core.js";
 
@@ -6,6 +9,21 @@ export const createCalendarApi = ({
   calendarBaseUrl,
   requestJson,
 }: ApiClientContext) => ({
+  getPublicCalendarEvents: async (params: {
+    from: string;
+    to: string;
+  }): Promise<PublicCalendarEventsResponse> => {
+    const query = new URLSearchParams({
+      from: params.from,
+      to: params.to,
+    });
+
+    return requestJson<PublicCalendarEventsResponse>(
+      `${calendarBaseUrl}/events?${query.toString()}`,
+      { method: "GET" },
+    );
+  },
+
   getKoreanHolidays: async (
     year: number,
     month: number,

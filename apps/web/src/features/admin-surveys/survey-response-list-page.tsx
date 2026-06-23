@@ -11,6 +11,7 @@ import { isoToDate, isoToMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { Pagination } from "@/components/ui/pagination";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
@@ -404,9 +405,8 @@ export function SurveyResponseListPage() {
           <div className="rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-col overflow-hidden">
             
             {loading && (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 select-none bg-white">
-                <Loader2 className="w-8 h-8 text-kaist-darkgreen animate-spin" />
-                <p className="text-xs font-bold text-slate-400">응답 목록을 불러오는 중입니다...</p>
+              <div className="bg-white">
+                <TableSkeleton columns={6} rows={8} />
               </div>
             )}
             

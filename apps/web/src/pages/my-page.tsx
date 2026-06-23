@@ -20,12 +20,12 @@ export function MyPage() {
     displayName,
     filteredActivities,
     handleLogout,
+    initialLoading,
     isAdmin,
+    isContentRefreshing,
     loadError,
-    loading,
     menuItems,
     session,
-    sessionLoading,
     setActiveMenu,
     setActiveTab,
     setCurrentPage,
@@ -48,7 +48,7 @@ export function MyPage() {
         />
 
         <section className="flex-1 min-w-0">
-          {sessionLoading || loading ? (
+          {initialLoading ? (
             <MyPageLoadingState />
           ) : !canUseMyPage ? (
             <MyPageUnavailableState authenticated={session?.authenticated} />
@@ -89,6 +89,7 @@ export function MyPage() {
                     setActiveTab(tab);
                     setCurrentPage(1);
                   }}
+                  loading={isContentRefreshing}
                   totalPages={totalPages}
                 />
               )}

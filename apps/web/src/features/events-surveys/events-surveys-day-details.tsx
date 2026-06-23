@@ -143,7 +143,7 @@ export function EventsSurveysDayDetails({
                       </div>
 
                       <div className="flex gap-2">
-                        {event.kind === "EVENT" &&
+                        {event.sourceType === "ARTICLE" &&
                           event.surveyId &&
                           isStateOpen && (
                             <Link
@@ -159,14 +159,14 @@ export function EventsSurveysDayDetails({
                           )}
                         <Link
                           to={
-                            event.kind === "EVENT"
-                              ? `/board/행사/${event.id}`
-                              : `/survey/${event.id}`
+                            event.sourceType === "ARTICLE"
+                              ? `/board/행사/${event.articleId ?? event.id}`
+                              : `/survey/${event.surveyId ?? event.id}`
                           }
                           className="inline-flex items-center gap-0.5 text-brand-primary hover:opacity-85 transition-all cursor-pointer text-[10px]"
                         >
                           <span>
-                            {event.kind === "EVENT"
+                            {event.sourceType === "ARTICLE"
                               ? lang === "ko"
                                 ? "자세히 보기"
                                 : "View"
