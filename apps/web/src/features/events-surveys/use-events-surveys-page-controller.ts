@@ -1,20 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
-import type { ArticleListItem, KoreanHolidayRecord } from "@soc/contracts";
-import { isoToDate, nowDate } from "@soc/shared";
+import type { KoreanHolidayRecord } from "@soc/contracts";
+import { isoToDate, localDate, nowDate } from "@soc/shared";
 
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import {
-  buildCalendarEvents,
+  buildCalendarEventsFromPublicItems,
   buildUnifiedItems,
   filterItemsByTab,
   sortVisibleItems,
+  type CalendarEvent,
   type EventsSurveysSortKey,
   type EventsSurveysStateFilter,
-  type SurveyRecordWithState,
   type UnifiedItem,
 } from "@/lib/events-surveys";
+import { buildCalendarGrid } from "./events-surveys-calendar-utils";
 
 export function useEventsSurveysPageController({
   currentTab,
@@ -29,12 +31,6 @@ export function useEventsSurveysPageController({
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  const [surveys, setSurveys] = useState<SurveyRecordWithState[]>([]);
-  const [events, setEvents] = useState<
-    Array<ArticleListItem & { imageUrl?: string | null }>
-  >([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<EventsSurveysSortKey>("latest");
   const [stateFilter, setStateFilter] =
     useState<EventsSurveysStateFilter>("all");
@@ -46,86 +42,83 @@ export function useEventsSurveysPageController({
     }
     return nowDate();
   });
-  const [holidays, setHolidays] = useState<KoreanHolidayRecord[]>([]);
-  const holidayCacheRef = useRef(new Map<string, KoreanHolidayRecord[]>());
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
+  const calendarRange = useMemo(() => {
+    const grid = buildCalendarGrid(currentYear, currentMonth);
+    const firstDate = grid[0]?.date ?? localDate(currentYear, currentMonth, 1);
+    const lastDate =
+      grid[grid.length - 1]?.date ?? localDate(currentYear, currentMonth + 1, 0);
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      apiClient.getPublicSurveys(),
-      apiClient
-        .getArticles("행사", { page: 1, limit: 100 })
-        .catch(() => ({ items: [], total: 0 })),
-    ])
-      .then(async ([surveysData, eventsData]) => {
-        const eventsWithImages = await Promise.all(
-          eventsData.items.map(async (event) => {
-            try {
-              const detail = await apiClient.getArticle("행사", event.articleId);
-              const posterAsset = detail.assets?.find(
-                (asset) =>
-                  asset.usageType === "THUMBNAIL" ||
-                  asset.usageType === "IMAGE",
-              );
-              return {
-                ...event,
-                imageUrl: posterAsset
-                  ? resolveAssetUrl(posterAsset.storageKey)
-                  : null,
-              };
-            } catch {
-              return { ...event, imageUrl: null };
-            }
-          }),
-        );
-
-        setSurveys(surveysData);
-        setEvents(eventsWithImages);
-        setError(null);
-      })
-      .catch(() => {
-        setError(
-          lang === "ko"
-            ? "목록을 불러오는 중 오류가 발생했습니다."
-            : "Failed to load events and surveys.",
-        );
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [apiClient]);
-
-  useEffect(() => {
-    let active = true;
-    const cacheKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
-    const cached = holidayCacheRef.current.get(cacheKey);
-
-    if (cached) {
-      setHolidays(cached);
-      return;
-    }
-
-    apiClient
-      .getKoreanHolidays(currentYear, currentMonth + 1)
-      .then((holidayItems) => {
-        holidayCacheRef.current.set(cacheKey, holidayItems);
-        if (active) {
-          setHolidays(holidayItems);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setHolidays([]);
-        }
-      });
-
-    return () => {
-      active = false;
+    return {
+      from: localDate(
+        firstDate.getFullYear(),
+        firstDate.getMonth(),
+        firstDate.getDate(),
+      ),
+      to: localDate(
+        lastDate.getFullYear(),
+        lastDate.getMonth(),
+        lastDate.getDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
     };
-  }, [apiClient, currentMonth, currentYear]);
+  }, [currentMonth, currentYear]);
+  const calendarRangeFrom = calendarRange.from.toISOString();
+  const calendarRangeTo = calendarRange.to.toISOString();
+
+  const listQuery = useQuery({
+    queryKey: ["events-surveys", "list"],
+    queryFn: async () => {
+      const [surveysData, eventsData] = await Promise.all([
+        apiClient.getPublicSurveys(),
+        apiClient
+          .getArticles("행사", { page: 1, limit: 100 })
+          .catch(() => ({ items: [], total: 0 })),
+      ]);
+
+      const eventsWithImages = eventsData.items.map((event) => ({
+        ...event,
+        imageUrl: event.thumbnailStorageKey
+          ? resolveAssetUrl(event.thumbnailStorageKey)
+          : null,
+      }));
+
+      return {
+        surveys: surveysData,
+        events: eventsWithImages,
+      };
+    },
+    enabled: currentTab !== "calendar",
+    staleTime: 60 * 1000,
+  });
+
+  const calendarEventsQuery = useQuery({
+    queryKey: [
+      "events-surveys",
+      "calendar-events",
+      calendarRangeFrom,
+      calendarRangeTo,
+    ],
+    queryFn: () =>
+      apiClient.getPublicCalendarEvents({
+        from: calendarRangeFrom,
+        to: calendarRangeTo,
+      }),
+    enabled: currentTab === "calendar",
+    staleTime: 60 * 1000,
+  });
+
+  const holidaysQuery = useQuery<KoreanHolidayRecord[]>({
+    queryKey: ["calendar", "holidays", currentYear, currentMonth + 1],
+    queryFn: () => apiClient.getKoreanHolidays(currentYear, currentMonth + 1),
+    enabled: currentTab === "calendar",
+    staleTime: 24 * 60 * 60 * 1000,
+  });
 
   useEffect(() => {
     if (selectedParam) {
@@ -137,9 +130,22 @@ export function useEventsSurveysPageController({
     }
   }, [selectedParam]);
 
-  const unifiedItems = useMemo<UnifiedItem[]>(() => {
-    return buildUnifiedItems(surveys, events);
-  }, [surveys, events]);
+  const surveys = listQuery.data?.surveys ?? [];
+  const events = listQuery.data?.events ?? [];
+  const holidays = holidaysQuery.data ?? [];
+  const calendarEvents = useMemo<CalendarEvent[]>(
+    () =>
+      buildCalendarEventsFromPublicItems(
+        calendarEventsQuery.data?.items ?? [],
+        lang,
+      ),
+    [calendarEventsQuery.data?.items, lang],
+  );
+
+  const unifiedItems = useMemo<UnifiedItem[]>(
+    () => buildUnifiedItems(surveys, events),
+    [surveys, events],
+  );
 
   const filteredItems = useMemo(() => {
     return filterItemsByTab(unifiedItems, currentTab);
@@ -149,16 +155,26 @@ export function useEventsSurveysPageController({
     return sortVisibleItems(filteredItems, sortBy, stateFilter);
   }, [filteredItems, stateFilter, sortBy]);
 
-  const calendarEvents = useMemo(() => {
-    return buildCalendarEvents(unifiedItems, lang);
-  }, [unifiedItems, lang]);
-
   return {
     calendarEvents,
     currentDate,
-    error,
+    error:
+      currentTab === "calendar"
+        ? calendarEventsQuery.isError
+          ? lang === "ko"
+            ? "일정을 불러오는 중 오류가 발생했습니다."
+            : "Failed to load calendar events."
+          : null
+        : listQuery.isError
+          ? lang === "ko"
+            ? "목록을 불러오는 중 오류가 발생했습니다."
+            : "Failed to load events and surveys."
+          : null,
     holidays,
-    loading,
+    loading:
+      currentTab === "calendar"
+        ? calendarEventsQuery.isPending
+        : listQuery.isPending,
     selectedDate,
     setCurrentDate,
     setSelectedDate,

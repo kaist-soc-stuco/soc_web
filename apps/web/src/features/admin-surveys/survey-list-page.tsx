@@ -8,16 +8,19 @@ import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Pagination } from "@/components/ui/pagination";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import {
   filterAndSortSurveys,
   type SurveyPeriodFilter,
+  type SurveySortDirection,
   type SurveySortKey,
   type SurveyStatusFilter,
 } from "@/lib/survey-display";
 import { 
+  ArrowDown,
   Copy, 
   Edit2, 
   BarChart3, 
@@ -187,6 +190,8 @@ export function SurveyListPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState<SurveyPeriodFilter>("all");
   const [sortBy, setSortBy] = useState<SurveySortKey>("updatedAt");
+  const [sortDirection, setSortDirection] =
+    useState<SurveySortDirection>("desc");
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [isPageSizeDropdownOpen, setIsPageSizeDropdownOpen] = useState(false);
@@ -307,7 +312,22 @@ export function SurveyListPage() {
     setTypeFilter("all");
     setPeriodFilter("all");
     setSortBy("updatedAt");
+    setSortDirection("desc");
     setPageSize(10);
+    setCurrentPage(1);
+  };
+
+  const handleSortChange = (nextSortBy: SurveySortKey) => {
+    if (sortBy === nextSortBy) {
+      setSortDirection((currentDirection) =>
+        currentDirection === "desc" ? "asc" : "desc",
+      );
+      setCurrentPage(1);
+      return;
+    }
+
+    setSortBy(nextSortBy);
+    setSortDirection("desc");
     setCurrentPage(1);
   };
 
@@ -317,10 +337,19 @@ export function SurveyListPage() {
       periodFilter,
       searchQuery,
       sortBy,
+      sortDirection,
       statusFilter,
       typeFilter,
     });
-  }, [surveys, searchQuery, statusFilter, typeFilter, periodFilter, sortBy]);
+  }, [
+    surveys,
+    searchQuery,
+    statusFilter,
+    typeFilter,
+    periodFilter,
+    sortBy,
+    sortDirection,
+  ]);
 
   // Total pages
   const totalPages = Math.max(1, Math.ceil(filteredSurveys.length / pageSize));
@@ -365,7 +394,7 @@ export function SurveyListPage() {
           <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] select-none">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               {/* Search */}
-              <div className="md:col-span-3 flex flex-col gap-2.5">
+              <div className="md:col-span-4 flex flex-col gap-2.5">
                 <span className="text-xs font-bold text-slate-400 tracking-tight">검색</span>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -422,20 +451,7 @@ export function SurveyListPage() {
                 ]}
                 onChange={(value) => setPeriodFilter(value as SurveyPeriodFilter)}
                 icon={<Calendar className="h-4 w-4 text-slate-400 shrink-0" />}
-                className="md:col-span-2"
-              />
-
-              {/* Sort */}
-              <CustomDropdown
-                label="정렬"
-                value={sortBy}
-                options={[
-                  { value: "updatedAt", label: "최근 수정일" },
-                  { value: "createdAt", label: "최근 생성일" },
-                  { value: "responseCount", label: "응답자 수" }
-                ]}
-                onChange={(value) => setSortBy(value as SurveySortKey)}
-                className="md:col-span-3"
+                className="md:col-span-4"
               />
             </div>
           </div>
@@ -488,9 +504,8 @@ export function SurveyListPage() {
             </div>
 
             {loading && (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 select-none">
-                <Loader2 className="w-8 h-8 text-kaist-darkgreen animate-spin" />
-                <p className="text-xs font-bold text-slate-400">설문 목록을 불러오는 중입니다...</p>
+              <div className="bg-white">
+                <TableSkeleton columns={6} rows={8} />
               </div>
             )}
             
@@ -518,9 +533,39 @@ export function SurveyListPage() {
                         {/* All other columns are center-aligned with increased header text size */}
                         <th className="px-4 py-4 text-center w-28">상태</th>
                         <th className="px-4 py-4 text-center w-24">유형</th>
-                        <th className="px-4 py-4 text-center w-24">응답자 수</th>
-                        <th className="px-4 py-4 text-center w-52">기간</th>
-                        <th className="px-4 py-4 text-center w-36">최근 수정</th>
+                        <th className="px-4 py-4 text-center w-24">
+                          <SortableHeader
+                            active={sortBy === "responseCount"}
+                            ascending={
+                              sortBy === "responseCount" &&
+                              sortDirection === "asc"
+                            }
+                            label="응답자 수"
+                            onClick={() => handleSortChange("responseCount")}
+                          />
+                        </th>
+                        <th className="px-4 py-4 text-center w-52">
+                          <SortableHeader
+                            active={sortBy === "opensAt"}
+                            ascending={
+                              sortBy === "opensAt" &&
+                              sortDirection === "asc"
+                            }
+                            label="기간"
+                            onClick={() => handleSortChange("opensAt")}
+                          />
+                        </th>
+                        <th className="px-4 py-4 text-center w-36">
+                          <SortableHeader
+                            active={sortBy === "updatedAt"}
+                            ascending={
+                              sortBy === "updatedAt" &&
+                              sortDirection === "asc"
+                            }
+                            label="최근 수정"
+                            onClick={() => handleSortChange("updatedAt")}
+                          />
+                        </th>
                         <th className="px-4 py-4 text-center w-32">작업</th>
                       </tr>
                     </thead>
@@ -717,5 +762,34 @@ export function SurveyListPage() {
         </main>
       </div>
     </AuthGuard>
+  );
+}
+
+function SortableHeader({
+  active,
+  ascending,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  ascending: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center justify-center gap-1 rounded-md px-1.5 py-0.5 transition-colors ${
+        active ? "text-kaist-darkgreen" : "text-slate-500 hover:text-slate-700"
+      }`}
+    >
+      <span>{label}</span>
+      <ArrowDown
+        className={`h-3 w-3 transition-transform ${
+          ascending ? "rotate-180" : ""
+        }`}
+      />
+    </button>
   );
 }

@@ -44,7 +44,11 @@ export function BoardPage() {
       <Header showLogo={true} />
 
       <main className="flex-1 w-full mx-auto pb-16">
-        <PageHero title={boardTitle} description={boardDescription} />
+        <PageHero
+          title={boardTitle}
+          description={boardDescription}
+          variant="medium"
+        />
 
         <BoardNavigationBar
           boards={boards}

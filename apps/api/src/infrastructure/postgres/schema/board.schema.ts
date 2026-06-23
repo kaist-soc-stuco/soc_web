@@ -50,6 +50,7 @@ export const articles = pgTable("article", {
   isPinned: boolean("is_pinned").notNull().default(false),
   pinOrder: integer("pin_order"),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
+  allowComment: boolean("allow_comment").notNull().default(true),
   viewCount: integer("view_count").notNull().default(0),
   postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

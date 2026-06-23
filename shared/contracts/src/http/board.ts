@@ -53,9 +53,11 @@ export interface ArticleListItem {
   updatedAt: string;
   author: ArticleAuthorSummary;
   isAnonymous: boolean;
+  allowComment?: boolean;
   commentCount: number;
   viewCount: number;
   hasAttachment?: boolean;
+  thumbnailStorageKey?: string | null;
   eventStartDate?: string | null;
   eventEndDate?: string | null;
   eventDescription?: string | null;
@@ -109,6 +111,7 @@ export interface ArticleDetailResponse {
   updatedAt: string;
   author: ArticleAuthorSummary;
   isAnonymous: boolean;
+  allowComment: boolean;
   assets: ArticleAssetItem[];
   commentCount: number;
   viewCount: number;

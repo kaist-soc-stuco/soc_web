@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { ArticleListItem, CurrentUserResponse } from "@soc/contracts";
+import type { ArticleListItem } from "@soc/contracts";
 import { hasPermission, isoToMs, nowMs } from "@soc/shared";
 
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
@@ -12,6 +13,7 @@ import {
   getBoardTitleFromMetadata,
   getBoardWritePermissionBitFromMetadata,
 } from "@/lib/board-metadata";
+import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 export type BoardSearchCriteria = "title" | "author" | "title_content";
 export type BoardSortBy = "latest" | "views";
@@ -36,13 +38,11 @@ export function useBoardPageController() {
   const { category } = useParams<{ category?: string }>();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(
-    null,
-  );
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [isArticleLoading, setIsArticleLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const { lang } = useLanguage();
+  const { data: session } = useCurrentSession();
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [searchCriteria, setSearchCriteria] =
     useState<BoardSearchCriteria>("title");
@@ -62,23 +62,6 @@ export function useBoardPageController() {
     source: boardCatalogSource,
   } = useBoardCatalog(apiClient);
   const currentBoard = category ? boardByCode.get(category) : undefined;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void apiClient
-      .getCurrentUser()
-      .then((response) => {
-        if (!cancelled) setCurrentUser(response);
-      })
-      .catch(() => {
-        if (!cancelled) setCurrentUser(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient]);
 
   const totalPages = Math.ceil(totalCount / postsPerPage);
 
@@ -209,9 +192,10 @@ export function useBoardPageController() {
     setPeriod("all");
   }, [category]);
 
-  const userPermission = currentUser?.user?.permission ?? 0;
+  const canUseWriteFeatures = hasPersistedProfile(session ?? null);
+  const userPermission = session?.permission ?? 0;
   const writableBoardCodes = useMemo(() => {
-    if (!currentUser?.authenticated) return [];
+    if (!canUseWriteFeatures) return [];
     if (boardCatalogSource !== "server") return [];
 
     return boards
@@ -226,7 +210,7 @@ export function useBoardPageController() {
         );
       })
       .map((board) => board.code);
-  }, [boardCatalogSource, boards, currentUser?.authenticated, userPermission]);
+  }, [boardCatalogSource, boards, canUseWriteFeatures, userPermission]);
   const canWrite = category
     ? writableBoardCodes.includes(category)
     : writableBoardCodes.length > 0;

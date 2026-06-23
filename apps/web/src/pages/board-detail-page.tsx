@@ -74,7 +74,11 @@ export function BoardDetailPage() {
       <Header showLogo />
 
       <main className="flex-1 w-full mx-auto pb-16">
-        <PageHero title={boardTitle} description={boardDescription} />
+        <PageHero
+          title={boardTitle}
+          description={boardDescription}
+          variant="compact"
+        />
         <BoardDetailTabs boards={boards} category={category} lang={lang} />
 
         <div className="mx-auto max-w-[1040px] px-6 lg:px-8 pt-1 pb-16 flex flex-col gap-3 w-full">

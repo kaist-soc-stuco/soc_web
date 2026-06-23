@@ -1,6 +1,21 @@
-import { Injectable, Logger } from "@nestjs/common";
-import type { KoreanHolidayRecord } from "@soc/contracts";
-import { nowMs } from "@soc/shared";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import { and, eq, gte, lte, or } from "drizzle-orm";
+import type {
+  KoreanHolidayRecord,
+  PublicCalendarEventItem,
+  PublicCalendarEventsResponse,
+} from "@soc/contracts";
+import { msToIso, nowMs } from "@soc/shared";
+
+import {
+  DRIZZLE_DB,
+  PostgresDatabase,
+} from "../../infrastructure/postgres/postgres.provider";
+import {
+  articles,
+  boards,
+  surveys,
+} from "../../infrastructure/postgres/postgres.schema";
 
 const HOLIDAY_API_KEY =
   "20cf41ac7ae1a30ef4bf27e3ad0141f41ec3e815aea7c45c0972fbf90a1070bb";
@@ -22,6 +37,24 @@ interface HolidayCacheEntry {
 export class CalendarService {
   private readonly logger = new Logger(CalendarService.name);
   private readonly cache = new Map<string, HolidayCacheEntry>();
+
+  constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
+
+  async listPublicCalendarEvents(
+    from: Date,
+    to: Date,
+  ): Promise<PublicCalendarEventsResponse> {
+    const [surveyEvents, articleEvents] = await Promise.all([
+      this.listSurveyCalendarEvents(from, to),
+      this.listArticleCalendarEvents(from, to),
+    ]);
+
+    return {
+      items: [...surveyEvents, ...articleEvents].sort(
+        (a, b) => a.date.localeCompare(b.date) || a.titleKo.localeCompare(b.titleKo),
+      ),
+    };
+  }
 
   async listKoreanHolidays(
     year: number,
@@ -111,5 +144,137 @@ export class CalendarService {
   private readXmlTag(block: string, tag: string): string {
     const match = block.match(new RegExp(`<${tag}>(.*?)<\\/${tag}>`));
     return match?.[1] ?? "";
+  }
+
+  private async listSurveyCalendarEvents(
+    from: Date,
+    to: Date,
+  ): Promise<PublicCalendarEventItem[]> {
+    const rows = await this.db
+      .select({
+        id: surveys.surveyId,
+        kind: surveys.kind,
+        titleKo: surveys.titleKo,
+        titleEn: surveys.titleEn,
+        opensAt: surveys.openAt,
+        closesAt: surveys.closeAt,
+      })
+      .from(surveys)
+      .where(
+        and(
+          eq(surveys.isPublished, true),
+          eq(surveys.showOnCalendar, true),
+          or(
+            and(gte(surveys.openAt, from), lte(surveys.openAt, to)),
+            and(gte(surveys.closeAt, from), lte(surveys.closeAt, to)),
+          ),
+        ),
+      );
+
+    return rows.flatMap((row) => {
+      const items: PublicCalendarEventItem[] = [];
+
+      if (this.isWithinRange(row.opensAt, from, to)) {
+        items.push({
+          id: row.id,
+          sourceType: "SURVEY",
+          surveyId: row.id,
+          kind: row.kind,
+          titleKo: row.titleKo,
+          titleEn: row.titleEn,
+          date: msToIso(row.opensAt.valueOf()),
+          dateType: "open",
+        });
+      }
+
+      if (this.isWithinRange(row.closesAt, from, to)) {
+        items.push({
+          id: row.id,
+          sourceType: "SURVEY",
+          surveyId: row.id,
+          kind: row.kind,
+          titleKo: row.titleKo,
+          titleEn: row.titleEn,
+          date: msToIso(row.closesAt.valueOf()),
+          dateType: "close",
+        });
+      }
+
+      return items;
+    });
+  }
+
+  private async listArticleCalendarEvents(
+    from: Date,
+    to: Date,
+  ): Promise<PublicCalendarEventItem[]> {
+    const rows = await this.db
+      .select({
+        id: articles.articleId,
+        surveyId: surveys.surveyId,
+        titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
+        startsAt: articles.eventStartDate,
+        endsAt: articles.eventEndDate,
+      })
+      .from(articles)
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .leftJoin(
+        surveys,
+        and(
+          eq(surveys.connectedArticleId, articles.articleId),
+          eq(surveys.isPublished, true),
+        ),
+      )
+      .where(
+        and(
+          eq(boards.code, "행사"),
+          eq(articles.status, "PUBLISHED"),
+          or(
+            and(gte(articles.eventStartDate, from), lte(articles.eventStartDate, to)),
+            and(gte(articles.eventEndDate, from), lte(articles.eventEndDate, to)),
+          ),
+        ),
+      );
+
+    return rows.flatMap((row) => {
+      const items: PublicCalendarEventItem[] = [];
+
+      if (this.isWithinRange(row.startsAt, from, to)) {
+        items.push({
+          id: String(row.id),
+          sourceType: "ARTICLE",
+          articleId: String(row.id),
+          surveyId: row.surveyId,
+          kind: "EVENT",
+          titleKo: row.titleKo,
+          titleEn: row.titleEn,
+          date: msToIso(row.startsAt.valueOf()),
+          dateType: "open",
+        });
+      }
+
+      if (this.isWithinRange(row.endsAt, from, to)) {
+        items.push({
+          id: String(row.id),
+          sourceType: "ARTICLE",
+          articleId: String(row.id),
+          surveyId: row.surveyId,
+          kind: "EVENT",
+          titleKo: row.titleKo,
+          titleEn: row.titleEn,
+          date: msToIso(row.endsAt.valueOf()),
+          dateType: "close",
+        });
+      }
+
+      return items;
+    });
+  }
+
+  private isWithinRange(date: Date | null, from: Date, to: Date): date is Date {
+    if (!date) return false;
+    const time = date.valueOf();
+    return time >= from.valueOf() && time <= to.valueOf();
   }
 }

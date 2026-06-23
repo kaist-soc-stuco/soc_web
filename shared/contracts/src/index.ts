@@ -4,6 +4,7 @@ export * from "./http/auth.js";
 export * from "./http/survey.js";
 export * from "./http/board.js";
 export * from "./http/permissions.js";
+export * from "./http/audit.js";
 export * from "./http/finance.js";
 export * from "./http/users.js";
 export * from "./http/contact.js";

@@ -84,6 +84,8 @@ export function useMyPageController() {
       setComments(null);
       setSurveyResponses(null);
       setActivities(null);
+      setLoading(false);
+      setLoadError(null);
       return;
     }
 
@@ -169,6 +171,17 @@ export function useMyPageController() {
   }, [lang, session, user]);
 
   const userInfo = user?.user;
+  const hasLoadedMyPageData =
+    user !== null ||
+    articles !== null ||
+    comments !== null ||
+    surveyResponses !== null ||
+    activities !== null ||
+    loadError !== null;
+  const initialLoading =
+    sessionLoading || (canUseMyPage && loading && !hasLoadedMyPageData);
+  const isContentRefreshing =
+    canUseMyPage && loading && hasLoadedMyPageData;
   const isAdmin = hasAdminPermission(userInfo?.permission);
   const articleItems = articles?.items ?? [];
   const commentItems = comments?.items ?? [];
@@ -311,7 +324,9 @@ export function useMyPageController() {
     displayName,
     filteredActivities,
     handleLogout,
+    initialLoading,
     isAdmin,
+    isContentRefreshing,
     loadError,
     loading,
     menuItems,

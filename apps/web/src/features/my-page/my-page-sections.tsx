@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/data-state";
 import { Pagination } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import type {
   ActivityItem,
@@ -89,9 +90,51 @@ export function MyPageSidebar({
 
 export function MyPageLoadingState() {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-xs font-bold text-slate-400 shadow-sm flex flex-col items-center justify-center gap-3">
-      <div className="w-6 h-6 border-2 border-kaist-darkgreen/30 border-t-kaist-darkgreen rounded-full animate-spin" />
-      <span>마이페이지 정보를 불러오는 중입니다...</span>
+    <div className="flex flex-col gap-5" aria-busy="true">
+      <div className="mb-1">
+        <Skeleton className="h-6 w-20" />
+      </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-36" />
+          <Skeleton className="h-5 w-14 rounded-full" />
+        </div>
+        <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-3">
+              <Skeleton className="h-3 w-14" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_5px_15px_rgba(0,0,0,0.015)]"
+          >
+            <Skeleton className="h-9 w-9 rounded-lg" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-5 w-10" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+        <div className="mb-4 border-b border-slate-100 pb-3.5">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <Skeleton className="mt-2 h-3 w-full max-w-md" />
+        </div>
+        <ActivityRowsSkeleton />
+      </section>
     </div>
   );
 }
@@ -160,6 +203,24 @@ function ActivityRows({ items }: { items: ActivityItem[] }) {
           </Link>
         );
       })}
+    </div>
+  );
+}
+
+function ActivityRowsSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="divide-y divide-slate-100" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div
+          key={index}
+          className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-3 py-3.5"
+        >
+          <Skeleton className="h-5 w-10 rounded" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-3 w-14" />
+          <Skeleton className="h-3.5 w-3.5 rounded" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -358,6 +419,7 @@ interface ActivityPanelProps {
   activeTab: ActivityTab;
   activities: ActivityItem[];
   currentPage: number;
+  loading: boolean;
   onPageChange: (page: number) => void;
   onTabChange: (tab: ActivityTab) => void;
   totalPages: number;
@@ -367,6 +429,7 @@ export function MyPageActivityPanel({
   activeTab,
   activities,
   currentPage,
+  loading,
   onPageChange,
   onTabChange,
   totalPages,
@@ -415,7 +478,9 @@ export function MyPageActivityPanel({
           })}
         </div>
 
-        {activities.length === 0 ? (
+        {loading ? (
+          <ActivityRowsSkeleton />
+        ) : activities.length === 0 ? (
           <EmptyState
             message="내역이 없습니다."
             minHeightClassName="min-h-[200px]"
@@ -426,7 +491,7 @@ export function MyPageActivityPanel({
           </div>
         )}
 
-        {totalPages > 1 && (
+        {!loading && totalPages > 1 && (
           <div className="border-t border-slate-100 pt-4 mt-4 flex justify-center select-none">
             <Pagination
               currentPage={currentPage}

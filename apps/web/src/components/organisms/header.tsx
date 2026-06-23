@@ -256,13 +256,13 @@ export function Header({ showLogo = false }: HeaderProps) {
           </nav>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4 pr-6 relative">
+        <div className="flex items-center gap-1.5 pr-3 md:gap-4 md:pr-6 relative">
           <div ref={searchRef} className="relative">
             <button
               type="button"
               aria-label={lang === "ko" ? "통합검색" : "Search"}
               aria-expanded={searchOpen}
-              className="text-kaist-black hover:text-kaist-darkgreen transition-colors p-2 rounded-lg hover:bg-gray-50"
+              className="text-kaist-black hover:text-kaist-darkgreen transition-colors p-1.5 rounded-lg hover:bg-gray-50 md:p-2"
               onClick={() => {
                 setSearchOpen((value) => !value);
                 setDropdownOpen(false);
@@ -273,10 +273,7 @@ export function Header({ showLogo = false }: HeaderProps) {
 
             {searchOpen && (
               <div className="absolute right-0 top-full mt-2 w-[min(22rem,calc(100vw-2rem))] animate-in fade-in slide-in-from-top-1 duration-200 rounded-lg border border-kaist-grey/25 bg-white shadow-xl z-50 overflow-hidden">
-                <form
-                  className="p-3"
-                  onSubmit={handleSearchSubmit}
-                >
+                <form className="p-3" onSubmit={handleSearchSubmit}>
                   <div className="flex items-center gap-2 rounded-md border border-kaist-grey/25 px-3 py-2 focus-within:border-kaist-darkgreen-main">
                     <Search className="w-4 h-4 text-kaist-greygreen shrink-0" />
                     <input
@@ -285,8 +282,8 @@ export function Header({ showLogo = false }: HeaderProps) {
                       className="w-full min-w-0 bg-transparent text-sm font-semibold text-kaist-black outline-none placeholder:text-kaist-grey"
                       placeholder={
                         lang === "ko"
-                          ? "게시판, 설문, 소개 검색"
-                          : "Search board, surveys, about"
+                          ? "검색어를 입력하세요.."
+                          : "Enter search keyword..."
                       }
                       autoFocus
                     />
@@ -297,11 +294,6 @@ export function Header({ showLogo = false }: HeaderProps) {
                       {lang === "ko" ? "검색" : "Search"}
                     </button>
                   </div>
-                  <p className="mt-2 px-1 text-[11px] font-semibold text-kaist-grey">
-                    {lang === "ko"
-                      ? "검색 결과 페이지에서 게시글, 설문, 소개를 함께 확인합니다."
-                      : "Results include board posts, surveys, and about pages."}
-                  </p>
                 </form>
               </div>
             )}
@@ -310,7 +302,7 @@ export function Header({ showLogo = false }: HeaderProps) {
           <button
             type="button"
             aria-label={lang === "ko" ? "알림" : "Notifications"}
-            className="text-kaist-black transition-colors p-2 rounded-lg"
+            className="text-kaist-black transition-colors p-1.5 rounded-lg md:p-2"
             title={lang === "ko" ? "알림" : "Notifications"}
           >
             <Bell className="h-4 w-4 md:h-5 md:w-5" />
@@ -319,7 +311,7 @@ export function Header({ showLogo = false }: HeaderProps) {
           <button
             type="button"
             onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-            className="flex items-center gap-1 text-xs font-bold text-kaist-black hover:text-kaist-darkgreen transition-all bg-gray-100 hover:bg-gray-200/80 px-2.5 py-1.5 rounded-lg border border-kaist-grey/15 cursor-pointer shrink-0"
+            className="hidden min-[420px]:flex items-center gap-1 text-xs font-bold text-kaist-black hover:text-kaist-darkgreen transition-all bg-gray-100 hover:bg-gray-200/80 px-2.5 py-1.5 rounded-lg border border-kaist-grey/15 cursor-pointer shrink-0"
             title={lang === "ko" ? "Switch to English" : "한국어로 변경"}
           >
             <Globe className="w-3.5 h-3.5 text-kaist-greygreen" />
@@ -411,7 +403,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                 type="button"
                 onClick={() => void handleStartLogin()}
                 disabled={loginStarting}
-                className="group relative flex cursor-pointer items-center border-0 bg-transparent text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 lg:text-base"
+                className="group relative hidden cursor-pointer items-center whitespace-nowrap border-0 bg-transparent text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 sm:flex lg:text-base"
               >
                 <span className="py-2">
                   {loginStarting
@@ -429,7 +421,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                   type="button"
                   onClick={() => void handleMockLogin()}
                   disabled={mockLoginStarting}
-                  className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-extrabold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-70"
+                  className="hidden rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-extrabold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-70 lg:inline-flex"
                 >
                   {mockLoginStarting
                     ? "Mock..."

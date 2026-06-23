@@ -154,7 +154,7 @@ export function EventsSurveysCalendarGrid({
                         : `${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}`}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1.5 text-[9px] font-semibold text-slate-700">
+                  <div className="flex flex-col gap-1.5 text-left text-[9px] font-semibold text-slate-700">
                     {dayEvents.map((event, eventIdx) => {
                       const isStart = event.dateType === "open";
                       const titleText = stripCalendarPrefix(event.title);
@@ -162,13 +162,13 @@ export function EventsSurveysCalendarGrid({
                       return (
                         <div
                           key={eventIdx}
-                          className="flex items-center justify-between gap-2"
+                          className="flex items-center justify-between gap-2 text-left"
                         >
-                          <div className="truncate flex items-center gap-1.5">
+                          <div className="truncate flex items-center gap-1.5 text-left">
                             <span
                               className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-brand-primary" : "bg-red-500"}`}
                             />
-                            <span className="truncate">{titleText}</span>
+                            <span className="truncate text-left">{titleText}</span>
                           </div>
                           <span className="shrink-0 select-none rounded-sm bg-brand-primary-light px-1 text-[8px] font-extrabold uppercase text-brand-primary">
                             {getCompactKindLabel(event.kind, lang)}

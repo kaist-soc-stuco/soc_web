@@ -51,6 +51,18 @@ const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_o
   return "open";
 };
 
+const articleThumbnailStorageKey = sql<string | null>`(
+  select ${assets.storageKey}
+  from ${articleAssets}
+  inner join ${assets} on ${assets.assetId} = ${articleAssets.assetId}
+  where ${articleAssets.articleId} = ${articles.articleId}
+    and ${articleAssets.usageType} in ('THUMBNAIL', 'IMAGE')
+  order by
+    case when ${articleAssets.usageType} = 'THUMBNAIL' then 0 else 1 end,
+    ${articleAssets.sortOrder} asc
+  limit 1
+)`;
+
 @Injectable()
 export class ArticleRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
@@ -92,6 +104,7 @@ export class ArticleRepository {
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
         isAnonymous: articles.isAnonymous,
+        allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
         authorId: users.userId,
@@ -109,6 +122,7 @@ export class ArticleRepository {
           where ${articleAssets.articleId} = ${articles.articleId}
             and ${articleAssets.usageType} = 'ATTACHMENT'
         )`,
+        thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
         eventDescription: articles.eventDescription,
@@ -142,6 +156,7 @@ export class ArticleRepository {
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
         isAnonymous: row.isAnonymous,
+        allowComment: row.allowComment,
         postedAt: msToIso(row.postedAt.valueOf()),
         updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
@@ -151,6 +166,7 @@ export class ArticleRepository {
         commentCount: Number(row.commentCount ?? 0),
         viewCount: row.viewCount,
         hasAttachment: Boolean(row.hasAttachment),
+        thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
         eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
         eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
         eventDescription: row.eventDescription ?? undefined,
@@ -226,6 +242,7 @@ export class ArticleRepository {
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
         isAnonymous: articles.isAnonymous,
+        allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
         authorId: users.userId,
@@ -243,6 +260,7 @@ export class ArticleRepository {
           where ${articleAssets.articleId} = ${articles.articleId}
             and ${articleAssets.usageType} = 'ATTACHMENT'
         )`,
+        thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
         eventDescription: articles.eventDescription,
@@ -279,6 +297,7 @@ export class ArticleRepository {
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
         isAnonymous: row.isAnonymous,
+        allowComment: row.allowComment,
         postedAt: msToIso(row.postedAt.valueOf()),
         updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
@@ -288,6 +307,7 @@ export class ArticleRepository {
         commentCount: Number(row.commentCount ?? 0),
         viewCount: row.viewCount,
         hasAttachment: Boolean(row.hasAttachment),
+        thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
         eventStartDate: row.eventStartDate
           ? msToIso(row.eventStartDate.valueOf())
           : undefined,
@@ -329,6 +349,7 @@ export class ArticleRepository {
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
         isAnonymous: articles.isAnonymous,
+        allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
         authorId: users.userId,
@@ -340,6 +361,7 @@ export class ArticleRepository {
           where ${articleAssets.articleId} = ${articles.articleId}
             and ${articleAssets.usageType} = 'ATTACHMENT'
         )`,
+        thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
         eventDescription: articles.eventDescription,
@@ -368,6 +390,7 @@ export class ArticleRepository {
       isPinned: row.isPinned,
       pinOrder: row.pinOrder ?? null,
       isAnonymous: row.isAnonymous,
+      allowComment: row.allowComment,
       postedAt: msToIso(row.postedAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
       author: {
@@ -377,6 +400,7 @@ export class ArticleRepository {
       commentCount: 0, // Not needed for search
       viewCount: row.viewCount,
       hasAttachment: Boolean(row.hasAttachment),
+      thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
       eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
       eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
       eventDescription: row.eventDescription ?? undefined,
@@ -401,6 +425,7 @@ export class ArticleRepository {
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
         isAnonymous: articles.isAnonymous,
+        allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
         authorId: users.userId,
@@ -507,6 +532,7 @@ export class ArticleRepository {
       isPinned: row[0].isPinned,
       pinOrder: row[0].pinOrder ?? null,
       isAnonymous: row[0].isAnonymous,
+      allowComment: row[0].allowComment,
       postedAt: msToIso(row[0].postedAt.valueOf()),
       updatedAt: msToIso(row[0].updatedAt.valueOf()),
       author: {
@@ -591,7 +617,8 @@ export class ArticleRepository {
           visibilityScope: input.payload.visibilityScope,
           isPinned: input.payload.isPinned ?? false,
           pinOrder: input.payload.pinOrder ?? null,
-                  isAnonymous: input.payload.isAnonymous ?? false,
+          isAnonymous: input.payload.isAnonymous ?? false,
+          allowComment: input.payload.allowComment ?? true,
           postedAt: now,
           updatedAt: now,
           eventStartDate: input.payload.eventStartDate ? isoToDate(input.payload.eventStartDate) : null,
@@ -649,6 +676,32 @@ export class ArticleRepository {
     };
   }
 
+  async findCommentPermissionInfo(
+    boardId: number,
+    articleId: string,
+  ): Promise<{
+    allowComment: boolean;
+    status: string;
+  } | null> {
+    const row = await this.db
+      .select({
+        allowComment: articles.allowComment,
+        status: articles.status,
+      })
+      .from(articles)
+      .where(
+        and(eq(articles.boardId, boardId), eq(articles.articleId, Number(articleId))),
+      )
+      .limit(1);
+
+    if (!row[0]) return null;
+
+    return {
+      allowComment: row[0].allowComment,
+      status: row[0].status,
+    };
+  }
+
   async updateArticle(
     boardId: number,
     articleId: string,
@@ -664,6 +717,7 @@ export class ArticleRepository {
       isPinned?: boolean;
       pinOrder?: number | null;
       isAnonymous?: boolean;
+      allowComment?: boolean;
       updatedAt: Date;
       eventStartDate?: Date | null;
       eventEndDate?: Date | null;
@@ -702,6 +756,10 @@ export class ArticleRepository {
 
     if (payload.isAnonymous !== undefined) {
       updateSet.isAnonymous = payload.isAnonymous;
+    }
+
+    if (payload.allowComment !== undefined) {
+      updateSet.allowComment = payload.allowComment;
     }
 
     if (payload.eventStartDate !== undefined) {

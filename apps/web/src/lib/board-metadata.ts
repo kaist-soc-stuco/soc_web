@@ -25,7 +25,12 @@ export interface BoardFallbackMetadata {
 
 export type BoardMetadata = Pick<
   BoardSummary,
-  "code" | "nameKo" | "nameEn" | "description" | "writePermissionBit"
+  | "allowComment"
+  | "code"
+  | "description"
+  | "nameEn"
+  | "nameKo"
+  | "writePermissionBit"
 >;
 
 const BOARD_FALLBACK_METADATA: Record<
@@ -122,6 +127,7 @@ export const getFallbackBoards = (): BoardMetadata[] =>
       nameKo: code,
       nameEn: metadata.labelEn,
       description: metadata.descriptionKo,
+      allowComment: true,
       writePermissionBit: metadata.writePermissionBit,
     };
   });

@@ -30,7 +30,7 @@ export class ArticleSearchController {
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListResponse> {
     const currentUser =
-      await this.authSessionService.getCurrentUser(accessToken);
+      await this.authSessionService.getOptionalCurrentUser(accessToken);
 
     return this.articleService.getAllArticles(
       {

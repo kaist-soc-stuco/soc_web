@@ -54,7 +54,7 @@ export class ArticleController {
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListResponse> {
     const currentUser =
-      await this.authSessionService.getCurrentUser(accessToken);
+      await this.authSessionService.getOptionalCurrentUser(accessToken);
     return this.articleService.getArticles(
       code,
       {
@@ -73,7 +73,7 @@ export class ArticleController {
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken: string | undefined,
   ): Promise<ArticleDetailResponse> {
     const currentUser =
-      await this.authSessionService.getCurrentUser(accessToken);
+      await this.authSessionService.getOptionalCurrentUser(accessToken);
 
     const incrementView = true;
 

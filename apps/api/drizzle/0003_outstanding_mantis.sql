@@ -1,0 +1,1 @@
+ALTER TABLE "article" ADD COLUMN "allow_comment" boolean DEFAULT true NOT NULL;

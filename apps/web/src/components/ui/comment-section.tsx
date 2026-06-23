@@ -88,7 +88,7 @@ export function CommentSection({
         )}
         {!canCreateComment && isAuthenticated && (
           <p className="mt-2 text-xs font-semibold text-rose-600">
-            이 게시판에는 댓글 작성 권한이 없습니다.
+            이 게시글에는 댓글을 작성할 수 없습니다.
           </p>
         )}
         {commentError && (

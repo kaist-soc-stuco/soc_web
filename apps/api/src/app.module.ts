@@ -18,6 +18,7 @@ import { AssetModule } from "./features/asset/asset.module";
 import { ContactsModule } from "./features/contacts/contacts.module";
 import { BulkEmailModule } from "./features/email/bulk-email.module";
 import { CalendarModule } from "./features/calendar/calendar.module";
+import { AuditLogHttpModule } from "./features/audit/audit-log-http.module";
 
 const devOnlyModules =
   process.env.NODE_ENV === "production" ? [] : [AuthDevModule, MockModule];
@@ -44,6 +45,7 @@ const devOnlyModules =
     ContactsModule,
     BulkEmailModule,
     CalendarModule,
+    AuditLogHttpModule,
     RoleGroupsModule,
     HealthModule,
     ...devOnlyModules,

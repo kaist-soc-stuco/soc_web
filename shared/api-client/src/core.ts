@@ -21,6 +21,7 @@ export class ApiClientHttpError extends Error {
 }
 
 export interface ApiClientContext {
+  auditLogsBaseUrl: string;
   assetBaseUrl: string;
   authBaseUrl: string;
   calendarBaseUrl: string;
@@ -219,6 +220,7 @@ export const createApiClientContext = ({
   };
 
   return {
+    auditLogsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "audit-logs"),
     assetBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "assets"),
     authBaseUrl,
     calendarBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "calendar"),

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { AuditLogListResponse } from "@soc/contracts";
 
 import {
   AuditLogRepository,
@@ -21,5 +22,17 @@ export class AuditLogService {
         }`,
       );
     }
+  }
+
+  async list(input: {
+    action?: string;
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    sortBy?: "createdAt" | "actor" | "action";
+    sortDirection?: "asc" | "desc";
+    targetType?: string;
+  }): Promise<AuditLogListResponse> {
+    return this.auditLogRepository.list(input);
   }
 }

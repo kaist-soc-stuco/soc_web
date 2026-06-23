@@ -32,6 +32,13 @@ export interface AdminUserRecord {
   updatedAt: string;
 }
 
+export interface AdminUserListResponse {
+  items: AdminUserRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 export interface RoleGroupMemberRecord {
   userRoleGroupId: number;
   roleGroupId: number;

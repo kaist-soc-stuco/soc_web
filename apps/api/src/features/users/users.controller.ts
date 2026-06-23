@@ -90,6 +90,37 @@ export class UsersController {
     };
   }
 
+  @Get("admin/list")
+  @RequirePermissions(Permissions.ADMIN)
+  async listAdminUsers(
+    @Query("q") query?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDirection") sortDirection?: string,
+    @Query("status") status?: string,
+  ) {
+    const adminUserSortBy =
+      sortBy === "studentId" ||
+      sortBy === "status" ||
+      sortBy === "lastLoginAt" ||
+      sortBy === "createdAt" ||
+      sortBy === "name"
+        ? sortBy
+        : "name";
+    const adminUserStatus =
+      status === "active" || status === "inactive" ? status : undefined;
+
+    return this.usersService.listAdminUsers({
+      page: page ? Number(page) : 1,
+      pageSize: pageSize ? Number(pageSize) : 20,
+      query,
+      sortBy: adminUserSortBy,
+      sortDirection: sortDirection === "desc" ? "desc" : "asc",
+      status: adminUserStatus,
+    });
+  }
+
   @Get()
   @RequirePermissions(Permissions.ADMIN)
   async searchUsers(
@@ -108,14 +139,26 @@ export class UsersController {
     @Query("status") status?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDirection") sortDirection?: string,
   ) {
     const feeStatus: FeeStatus | undefined =
       status === "PAID" || status === "UNPAID" ? status : undefined;
+    const feeSortBy =
+      sortBy === "studentId" ||
+      sortBy === "status" ||
+      sortBy === "paidAt" ||
+      sortBy === "name"
+        ? sortBy
+        : "name";
+    const feeSortDirection = sortDirection === "desc" ? "desc" : "asc";
 
     return this.usersService.listStudentsByFeeStatus(
       feeStatus,
       page ? Number(page) : 1,
       pageSize ? Number(pageSize) : 20,
+      feeSortBy,
+      feeSortDirection,
     );
   }
 

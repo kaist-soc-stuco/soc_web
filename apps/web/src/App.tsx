@@ -33,6 +33,12 @@ const SurveyResponseDetailPage = lazy(() =>
 const PermissionPage = lazy(() =>
   import('@/pages/admin/permission-page').then((module) => ({ default: module.PermissionPage })),
 );
+const UserManagementPage = lazy(() =>
+  import('@/pages/admin/user-management-page').then((module) => ({ default: module.UserManagementPage })),
+);
+const AuditLogPage = lazy(() =>
+  import('@/pages/admin/audit-log-page').then((module) => ({ default: module.AuditLogPage })),
+);
 const FeeManagementPage = lazy(() =>
   import('@/pages/admin/fee-management-page').then((module) => ({ default: module.FeeManagementPage })),
 );
@@ -117,6 +123,8 @@ export function App() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminIndexPage />} />
             <Route path="surveys" element={<SurveyListPage />} />
+            <Route path="users" element={<UserManagementPage />} />
+            <Route path="audit-logs" element={<AuditLogPage />} />
             <Route path="permissions" element={<PermissionPage />} />
             <Route path="finance" element={<FeeManagementPage />} />
             <Route path="surveys/new" element={<SurveyEditorPage />} />

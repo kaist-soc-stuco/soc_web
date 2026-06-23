@@ -1,6 +1,7 @@
 import type {
   ArticleListItem,
   ComputedSurveyState,
+  PublicCalendarEventItem,
   SurveyRecord,
 } from "@soc/contracts";
 import { isoToDate, isoToMs, nowMs } from "@soc/shared";
@@ -38,6 +39,7 @@ export interface UnifiedItem {
 
 export interface CalendarEvent {
   id: string;
+  sourceType?: PublicCalendarEventItem["sourceType"];
   kind: UnifiedItemKind;
   title: string;
   description: string;
@@ -45,6 +47,7 @@ export interface CalendarEvent {
   rawDate: string;
   date: Date;
   computedState: ComputedSurveyState;
+  articleId?: string | null;
   surveyId?: string | null;
 }
 
@@ -236,6 +239,7 @@ export const buildCalendarEvents = (
     if (item.opensAt) {
       parsed.push({
         id: item.id,
+        sourceType: item.kind === "EVENT" ? "ARTICLE" : "SURVEY",
         kind: item.kind,
         title: `${lang === "ko" ? "[시작]" : "[Start]"} ${title}`,
         description,
@@ -243,6 +247,7 @@ export const buildCalendarEvents = (
         rawDate: item.opensAt,
         date: isoToDate(item.opensAt),
         computedState: item.computedState,
+        articleId: item.kind === "EVENT" ? item.id : null,
         surveyId: item.surveyId,
       });
     }
@@ -250,6 +255,7 @@ export const buildCalendarEvents = (
     if (item.closesAt) {
       parsed.push({
         id: item.id,
+        sourceType: item.kind === "EVENT" ? "ARTICLE" : "SURVEY",
         kind: item.kind,
         title: `${lang === "ko" ? "[마감]" : "[Deadline]"} ${title}`,
         description,
@@ -257,6 +263,7 @@ export const buildCalendarEvents = (
         rawDate: item.closesAt,
         date: isoToDate(item.closesAt),
         computedState: item.computedState,
+        articleId: item.kind === "EVENT" ? item.id : null,
         surveyId: item.surveyId,
       });
     }
@@ -264,3 +271,43 @@ export const buildCalendarEvents = (
 
   return parsed;
 };
+
+export const buildCalendarEventsFromPublicItems = (
+  items: PublicCalendarEventItem[],
+  lang: "ko" | string,
+  currentMs = nowMs(),
+): CalendarEvent[] =>
+  items.map((item) => {
+    const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
+    const prefix =
+      item.dateType === "open"
+        ? lang === "ko"
+          ? "[시작]"
+          : "[Start]"
+        : lang === "ko"
+          ? "[마감]"
+          : "[Deadline]";
+    const time = isoToMs(item.date);
+    const computedState: ComputedSurveyState =
+      item.dateType === "open"
+        ? currentMs < time
+          ? "before_open"
+          : "open"
+        : currentMs > time
+          ? "closed"
+          : "open";
+
+    return {
+      id: item.id,
+      sourceType: item.sourceType,
+      articleId: item.articleId,
+      surveyId: item.surveyId,
+      kind: item.kind as UnifiedItemKind,
+      title: `${prefix} ${title}`,
+      description: "",
+      dateType: item.dateType,
+      rawDate: item.date,
+      date: isoToDate(item.date),
+      computedState,
+    };
+  });

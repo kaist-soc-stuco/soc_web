@@ -337,8 +337,8 @@ export function BoardArticleTable({
                         {lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}
                       </span>
                       {isNew && (
-                        <span className="bg-[#ffe3e3] text-[#e03131] text-[9px] font-black px-1.5 py-0.2 rounded-sm select-none scale-90 tracking-tighter shrink-0">
-                          NEW
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#f03e3e] text-[9px] font-black text-white select-none">
+                          N
                         </span>
                       )}
                       {(post.hasAttachment ?? false) && (
@@ -361,13 +361,13 @@ export function BoardArticleTable({
                   </Link>
                 );
               })
-            ) : (
+            ) : !isLoading ? (
               <div className="py-20 text-center text-slate-400">
                 <p className="text-base font-semibold">
                   {lang === "ko" ? "게시글이 없습니다" : "No posts available"}
                 </p>
               </div>
-            )}
+            ) : null}
           </div>
 
           {isLoading && (
