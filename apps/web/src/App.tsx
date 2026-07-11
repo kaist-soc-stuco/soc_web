@@ -1,6 +1,20 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
+import { AdminPage } from '@/pages/admin-page';
+import { AdminPaymentsPage } from '@/pages/admin-payments-page';
+import { AdminSurveysPage } from '@/pages/admin-surveys-page';
+import { AdminSurveyEditPage } from '@/pages/admin-survey-edit-page';
+import { AdminContactsPage } from '@/pages/admin-contacts-page';
+import { AdminEmailsPage } from '@/pages/admin-emails-page';
+import { AboutPage } from '@/pages/about-page';
 import { HomePage } from '@/pages/home-page';
 import { BoardPage } from '@/pages/board-page';
+import { BoardPostPage } from '@/pages/board-post-page';
+import { BoardWritePage } from '@/pages/board-write-page';
+import { CalendarPage } from '@/pages/calendar-page';
+import { EventsPage } from '@/pages/events-page';
+import { EventSurveyPage } from '@/pages/event-survey-page';
+import { RoadmapPage } from '@/pages/roadmap-page';
 import { TreeLogin } from '@/pages/login-page';
 import { LoginConsentPage } from '@/pages/login-consent-page';
 
@@ -9,7 +23,23 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/events" element={<EventsPage />} />
+        <Route path="/events/:eventId/survey" element={<EventSurveyPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/about/roadmap" element={<RoadmapPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/board/:category" element={<BoardPage />} />
+        <Route path="/board/:category/write" element={<BoardWritePage />} />
+        <Route path="/board/:category/:id" element={<BoardPostPage />} />
+        <Route path="/admin" element={<AdminPage />}>
+          <Route index element={<Navigate to="payments" replace />} />
+          <Route path="payments" element={<AdminPaymentsPage />} />
+          <Route path="surveys" element={<AdminSurveysPage />} />
+          <Route path="surveys/:surveyId/edit" element={<AdminSurveyEditPage />} />
+          <Route path="emails" element={<AdminEmailsPage />} />
+          <Route path="contacts" element={<AdminContactsPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<TreeLogin />} />
         <Route path="/login/consent" element={<LoginConsentPage />} />
       </Routes>

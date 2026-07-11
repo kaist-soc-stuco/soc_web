@@ -1,7 +1,19 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { nowMs, msToTimeObj, timeObjToMs, addMs, subtractMs } from '@soc/shared';
 
+interface CalendarProps {
+  clickable?: boolean;
+}
+
+export function Calendar({ clickable = false }: CalendarProps) {
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(today);
+  const navigate = useNavigate();
+  
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
 export function Calendar() {
   const todayMs = nowMs();
   const todayTime = msToTimeObj(todayMs);
@@ -71,14 +83,20 @@ export function Calendar() {
   const days = generateCalendarDays();
 
   return (
-    <section className="h-full bg-kaist-white flex flex-col">
+    <section
+      className={`h-full bg-kaist-white flex flex-col ${clickable ? 'cursor-pointer' : ''}`}
+      onClick={clickable ? () => navigate('/calendar') : undefined}
+    >
       <div className="flex-1 flex flex-col overflow-hidden border-b border-kaist-grey/30">
         {/* Header */}
         <div className="mb-2 mt-1 flex-shrink-0 relative flex items-center justify-center">
           <div className="flex items-center gap-4">
+            {/* Left Arrow */}
             <button
               onClick={handlePrevMonth}
               disabled={!canGoPrev}
+              type="button"
+              aria-label="이전 달"
               className={`text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
                 !canGoPrev ? 'opacity-0 pointer-events-none' : ''
               }`}
@@ -90,9 +108,12 @@ export function Calendar() {
               {currentYear}년 {currentMonth}월
             </h3>
 
+            {/* Right Arrow */}
             <button
               onClick={handleNextMonth}
               disabled={!canGoNext}
+              type="button"
+              aria-label="다음 달"
               className={`text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
                 !canGoNext ? 'opacity-0 pointer-events-none' : ''
               }`}
@@ -101,9 +122,15 @@ export function Calendar() {
             </button>
           </div>
 
+          {/* Plus Button (absolute right) */}
+          <Link
+            to="/calendar"
+            onClick={(event) => event.stopPropagation()}
+            className="absolute right-0 text-base md:text-lg font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors"
+          >
           <button className="absolute right-0 text-base md:text-lg font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors">
             +
-          </button>
+          </Link>
         </div>
 
         {/* Divider */}

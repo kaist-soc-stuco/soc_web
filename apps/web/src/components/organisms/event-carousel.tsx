@@ -1,16 +1,19 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { mockEvents } from '@/lib/mock-data';
 
 interface EventCardProps {
+  id: number;
   image: string;
   title: string;
   date: string;
   status: 'ongoing' | 'completed';
 }
 
-function EventCard({ image, title, date, status }: EventCardProps) {
+function EventCard({ id, image, title, date, status }: EventCardProps) {
   return (
-    <div className="w-[calc(25%-1.75rem)] flex-shrink-0">
+    <Link to={`/events/${id}/survey`} className="w-[calc(25%-1.75rem)] flex-shrink-0">
       {/* Image */}
       <div 
         className="aspect-[3/4] w-full rounded-[1px] bg-cover bg-center"
@@ -36,28 +39,14 @@ function EventCard({ image, title, date, status }: EventCardProps) {
       <h3 className="mt-2 text-base font-extrabold tracking-tight text-kaist-black line-clamp-2">
         {title}
       </h3>
-    </div>
+    </Link>
   );
 }
 
 export function EventCarousel() {
   const [currentPage, setCurrentPage] = useState(0);
   
-  // TODO: MySQL에서 이벤트 데이터 가져오기
-  const events = [
-    { image: '/temp.png', title: '전산학부 간식이벤트 1', date: '26.04.17', status: 'completed' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 2', date: '26.04.17', status: 'ongoing' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 3', date: '26.04.17', status: 'completed' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 4', date: '26.04.17', status: 'completed' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 5', date: '26.04.17', status: 'ongoing' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 6', date: '26.04.17', status: 'completed' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 7', date: '26.04.17', status: 'completed' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 8', date: '26.04.17', status: 'ongoing' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 9', date: '26.04.17', status: 'completed' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 10', date: '26.04.17', status: 'completed' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 11', date: '26.04.17', status: 'ongoing' as const },
-    { image: '/temp.png', title: '전산학부 간식이벤트 12', date: '26.04.17', status: 'completed' as const },
-  ];
+  const events = [...mockEvents, ...mockEvents.map((event) => ({ ...event, id: event.id + 100 }))];
 
   const itemsPerPage = 4;
   const totalPages = Math.ceil(events.length / itemsPerPage);

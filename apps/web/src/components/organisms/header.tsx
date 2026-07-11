@@ -24,18 +24,34 @@ export function Header({ showLogo = false }: HeaderProps) {
     {
       label: '게시판',
       href: '/board/공지',
-      dropdown: ['공지', '행사', 'HoC', '홍보글', '건의사항', '연구실', 'QnA'],
-      isBoard: true,
+      dropdown: [
+        { label: '공지', to: '/board/공지' },
+        { label: '행사', to: '/board/행사' },
+        { label: 'HoC', to: '/board/HoC' },
+        { label: '홍보글', to: '/board/홍보글' },
+        { label: '건의사항', to: '/board/건의사항' },
+        { label: '연구실', to: '/board/연구실' },
+        { label: 'QnA', to: '/board/QnA' },
+      ],
     },
     {
       label: '행사 / 설문조사',
-      href: '#events',
-      dropdown: ['진행중인 행사', '완료된 행사', '설문조사'],
+      href: '/events',
+      dropdown: [
+        { label: '진행중인 행사', to: '/events' },
+        { label: '완료된 행사', to: '/events' },
+        { label: '설문조사', to: '/events' },
+      ],
     },
     {
       label: 'About',
-      href: '#about',
-      dropdown: ['소개', '연혁', '조직도', '구성원'],
+      href: '/about',
+      dropdown: [
+        { label: '소개', to: '/about' },
+        { label: 'FAQ', to: '/board/QnA' },
+        { label: '로드맵', to: '/about/roadmap' },
+        { label: '일정', to: '/calendar' },
+      ],
     },
   ];
 
@@ -91,10 +107,11 @@ export function Header({ showLogo = false }: HeaderProps) {
             </svg>
           </button>
           <Link
+            to="/admin"
             to="/login"
             className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
           >
-            <span className="py-2">로그인</span>
+            <span className="py-2">마이페이지</span>
             <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
           </Link>
         </div>
@@ -122,7 +139,7 @@ export function Header({ showLogo = false }: HeaderProps) {
               <ul className="space-y-1">
                 {item.dropdown.map((subItem, subIndex) => (
                   <li 
-                    key={subIndex}
+                    key={subItem.label}
                     className={`transition-all duration-200 pb-1 mx-2 ${
                       hoveredIndex !== null 
                         ? 'opacity-100 translate-x-0' 
@@ -135,16 +152,16 @@ export function Header({ showLogo = false }: HeaderProps) {
                     style={{
                       transitionDelay: hoveredIndex !== null ? `${(index * 80) + (subIndex * 40) + 80}ms` : '0ms',
                     }}
-                  >
-                    <Link
-                      to={item.isBoard ? `/board/${subItem}` : `${item.href}/${subItem}`}
+                    >
+                      <Link
+                      to={subItem.to}
                       className={`block text-sm font-semibold tracking-tight text-center py-2 transition-all ${
                         hoveredIndex === index
                           ? 'text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1'
                           : 'text-kaist-grey'
                       }`}
                     >
-                      {subItem}
+                      {subItem.label}
                     </Link>
                   </li>
                 ))}

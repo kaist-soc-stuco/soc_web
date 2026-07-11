@@ -3,7 +3,6 @@ import { Hero } from '@/components/organisms/hero';
 import { EventCarousel } from '@/components/organisms/event-carousel';
 import { NoticeBoard } from '@/components/organisms/notice-board';
 import { Calendar } from '@/components/organisms/calendar';
-import { Footer } from '@/components/organisms/footer';
 
 export function HomePage() {
   return (
@@ -31,7 +30,7 @@ export function HomePage() {
                 <NoticeBoard />
               </div>
               <div className="flex-1">
-                <Calendar />
+                <Calendar clickable />
               </div>
             </div>
           </main>
