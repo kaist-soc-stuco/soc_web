@@ -71,7 +71,7 @@ export function Header({ showLogo = false }: HeaderProps) {
           )}
           
           {/* Navigation */}
-          <nav ref={navRef} className={`hidden md:flex items-stretch ${showLogo ? '' : 'pl-4'}`}>
+          <nav ref={navRef} className={`hidden md:flex items-stretch ${showLogo ? 'pl-4' : 'pl-4'}`}>
             {navItems.map((item, index) => (
               <div
                 key={index}
