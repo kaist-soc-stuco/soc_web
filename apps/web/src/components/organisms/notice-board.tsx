@@ -9,7 +9,7 @@ interface NoticeItemProps {
 
 function NoticeItem({ category, title, date }: NoticeItemProps) {
   return (
-    <div className="flex items-center justify-between py-[14px] gap-2">
+    <Link to={`/board/${category}/1`} className="flex items-center justify-between gap-2 py-[14px] transition hover:bg-kaist-grey/5">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <span className="inline-flex items-center rounded-full bg-kaist-darkgreen px-2 py-0.5 text-xs font-semibold tracking-tight text-kaist-white flex-shrink-0">
           {category}
@@ -21,7 +21,7 @@ function NoticeItem({ category, title, date }: NoticeItemProps) {
       <span className="text-xs font-semibold tracking-tight text-kaist-grey flex-shrink-0">
         {date}
       </span>
-    </div>
+    </Link>
   );
 }
 
