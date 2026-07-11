@@ -15,6 +15,8 @@ import { CalendarPage } from '@/pages/calendar-page';
 import { EventsPage } from '@/pages/events-page';
 import { EventSurveyPage } from '@/pages/event-survey-page';
 import { RoadmapPage } from '@/pages/roadmap-page';
+import { TreeLogin } from '@/pages/login-page';
+import { LoginConsentPage } from '@/pages/login-consent-page';
 
 export function App() {
   return (
@@ -38,6 +40,8 @@ export function App() {
           <Route path="contacts" element={<AdminContactsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/login" element={<TreeLogin />} />
+        <Route path="/login/consent" element={<LoginConsentPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -1,125 +1,71 @@
-# SoC Web Monorepo Starter
+# SoC Web
 
-React(Web) + NestJS(API) + Postgres/Redis 기반 `pnpm` 워크스페이스입니다.  
-이 레포를 기준으로 기능 개발을 시작할 수 있도록 기본 구조와 실행 절차를 정리했습니다.
+KAIST SoC 웹 모노레포입니다.
 
-## Tech Stack
+- Web: React + Vite
+- API: NestJS
+- Infra: Postgres, Redis, Docker Compose
 
-- Web: React 19, Vite 7, Tailwind CSS v4, shadcn/ui
-- API: NestJS 11, `pg`, `ioredis`
-- Shared Packages: `@soc/contracts`, `@soc/shared`, `@soc/api-client`
-- Infra: Docker Compose (Postgres, Redis, Nginx)
-
-## Workspace 구조
-
-```text
-.
-├─ apps
-│  ├─ api
-│  └─ web
-│     └─ src/components
-│        ├─ ui          # shadcn/ui primitives
-│        ├─ atoms
-│        ├─ molecules
-│        └─ organisms
-├─ packages
-│  ├─ api-client
-│  ├─ contracts
-│  ├─ shared
-│  └─ config
-├─ infra
-│  ├─ docker
-│  └─ scripts
-├─ .env.example
-└─ pnpm-workspace.yaml
-```
-
-## 사전 요구사항
+## Requirements
 
 - Node.js 20+
 - pnpm 10+
-- Docker + Docker Compose
+- Docker
 
-## 빠른 시작
+## Setup
 
-1. 환경 변수 파일 생성
+루트 `.env`를 사용합니다.
 
 ```bash
 cp .env.example .env
+pnpm install
+docker compose up -d --build
 ```
 
-2. 의존성 설치
+루트 `compose.yml`은 전체 스택(api, web, postgres, redis, nginx)을 띄웁니다.
+nginx는 기본적으로 `127.0.0.1:8080`에만 바인딩되므로, Caddy가 80/443을 사용해도 충돌하지 않습니다.
+필요하면 `NGINX_PORT`로 바꿀 수 있습니다.
 
 ```bash
-pnpm install
+NGINX_PORT=18080 docker compose up -d --build
 ```
 
-3. 개발용 인프라 실행
+DB/Redis만 필요하면 아래 개발용 compose를 사용합니다.
 
 ```bash
 docker compose -f infra/docker/compose.dev.yml up -d
 ```
 
-4. 백엔드 실행 (터미널 1)
+## Run
+
+API:
 
 ```bash
 pnpm dev:api
 ```
 
-5. 프론트 실행 (터미널 2)
+Web:
 
 ```bash
 pnpm dev:web
 ```
 
-## 기본 검증 포인트
+둘 다 같이 실행:
+
+```bash
+pnpm dev
+```
+
+## Check
 
 - Web: `http://localhost:5173`
-- Health API: `GET http://localhost:3000/health`
-- Mock API: `GET http://localhost:3000/v1/mock/greeting`
+- API health: `http://localhost:3000/health`
+- Mock API: `http://localhost:3000/v1/mock/greeting`
 
-## 자주 쓰는 명령어
-
-- 전체 동시 실행: `pnpm dev`
-- API만 실행: `pnpm dev:api`
-- Web만 실행: `pnpm dev:web`
-- 전체 타입체크: `pnpm typecheck`
-- 전체 빌드: `pnpm build`
-- 전체 테스트(현재 placeholder): `pnpm test`
-
-## Web 컴포넌트 규칙 (shadcn + Atomic)
-
-- `apps/web/src/components/ui`: shadcn 기반 재사용 primitive
-- `apps/web/src/components/atoms`: 최소 단위 표현 컴포넌트
-- `apps/web/src/components/molecules`: atom 조합
-- `apps/web/src/components/organisms`: 화면 섹션 단위 조합
-- `apps/web/src/lib/utils.ts`: `cn()` 등 공용 UI 유틸
-
-새 shadcn 컴포넌트 추가 예시:
+## Useful Commands
 
 ```bash
-cd apps/web
-pnpm dlx shadcn@latest add button
+pnpm typecheck
+pnpm build
+pnpm test
 ```
-
-## 환경 변수
-
-루트 `.env`를 사용합니다. 기본값은 `.env.example`을 참고하세요.
-
-주요 항목:
-
-- `API_PORT`, `WEB_PORT`, `API_BASE_URL`
-- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
-- `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`
-
-## DB 관련 스크립트
-
-```bash
-./infra/scripts/db-migrate.sh
-./infra/scripts/db-seed.sh
-```
-
-## 참고
-
-- `pnpm test`는 현재 각 패키지에서 placeholder 스크립트입니다.
-- 운영/배포용 compose는 `infra/docker/compose.prod.yml`를 사용합니다.

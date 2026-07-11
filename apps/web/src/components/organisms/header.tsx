@@ -108,6 +108,7 @@ export function Header({ showLogo = false }: HeaderProps) {
           </button>
           <Link
             to="/admin"
+            to="/login"
             className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
           >
             <span className="py-2">마이페이지</span>

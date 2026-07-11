@@ -2,11 +2,13 @@
   "name": "soc-web-monorepo",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@10.29.3",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "pnpm -r --parallel --filter @soc/api --filter @soc/web dev",
     "dev:api": "pnpm --filter @soc/api dev",
     "dev:web": "pnpm --filter @soc/web dev",
+    "db:migrate": "bash infra/scripts/db-migrate.sh",
+    "db:seed": "bash infra/scripts/db-seed.sh",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"
