@@ -8,13 +8,7 @@ interface CalendarProps {
 }
 
 export function Calendar({ clickable = false }: CalendarProps) {
-  const today = new Date();
-  const [currentDate, setCurrentDate] = useState(today);
   const navigate = useNavigate();
-  
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
-export function Calendar() {
   const todayMs = nowMs();
   const todayTime = msToTimeObj(todayMs);
 
@@ -127,8 +121,8 @@ export function Calendar() {
             to="/calendar"
             onClick={(event) => event.stopPropagation()}
             className="absolute right-0 text-base md:text-lg font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors"
+            aria-label="캘린더로 이동"
           >
-          <button className="absolute right-0 text-base md:text-lg font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors">
             +
           </Link>
         </div>

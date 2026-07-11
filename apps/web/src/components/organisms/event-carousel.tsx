@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { mockEvents } from '@/lib/mock-data';
 
 interface EventCardProps {
@@ -9,36 +9,40 @@ interface EventCardProps {
   title: string;
   date: string;
   status: 'ongoing' | 'completed';
+  summary: string;
 }
 
-function EventCard({ id, image, title, date, status }: EventCardProps) {
+function EventCard({ id, image, title, date, status, summary }: EventCardProps) {
   return (
-    <Link to={`/events/${id}/survey`} className="w-[calc(25%-1.75rem)] flex-shrink-0">
-      {/* Image */}
-      <div 
-        className="aspect-[3/4] w-full rounded-[1px] bg-cover bg-center"
-        style={{ backgroundImage: `url(${image})` }}
-      />
-      {/* Status & Date */}
-      <div className="mt-3 flex items-center justify-between">
-        <div 
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-tight text-kaist-white ${
-            status === 'ongoing' 
-              ? 'bg-kaist-lightgreen2' 
-              : 'bg-kaist-darkgreen'
-          }`}
-        >
+    <Link
+      to={`/events/${id}/survey`}
+      className="group flex h-[292px] w-[min(78vw,270px)] flex-shrink-0 flex-col overflow-hidden rounded-md bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md sm:w-[240px] lg:h-[min(33.25dvh,359px)] lg:w-[clamp(210px,21.4%,270px)]"
+    >
+      <div className="relative h-[60.2%] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
+        <div
+          className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+          style={{ backgroundImage: `url(${image})` }}
+        />
+        <span className="absolute left-4 top-4 rounded-full bg-kaist-darkgreen px-3 py-1 text-[10px] font-semibold tracking-tight text-kaist-white lg:text-xs">
           {status === 'ongoing' ? '진행중' : '완료'}
-        </div>
-        <span className="text-xs font-semibold tracking-tight text-kaist-grey">
-          {date}
         </span>
+        <div className="absolute bottom-4 left-4 rounded-full bg-[#5b93c4] px-2 py-0.5 text-[10px] font-semibold tracking-tight text-kaist-white">
+          이벤트
+        </div>
       </div>
-      
-      {/* Title */}
-      <h3 className="mt-2 text-base font-extrabold tracking-tight text-kaist-black line-clamp-2">
-        {title}
-      </h3>
+
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
+        <h3 className="truncate text-lg font-extrabold tracking-tight text-kaist-black lg:text-2xl">
+          {title}
+        </h3>
+        <p className="mt-2 line-clamp-2 text-xs font-semibold leading-normal tracking-tight text-kaist-grey">
+          {summary}
+        </p>
+        <div className="mt-auto flex items-center gap-2 text-[10px] font-semibold tracking-tight text-kaist-greygreen lg:text-xs">
+          <CalendarDays className="h-3.5 w-3.5" />
+          {date}
+        </div>
+      </div>
     </Link>
   );
 }
@@ -60,24 +64,24 @@ export function EventCarousel() {
   };
 
   return (
-    <section className="h-full bg-kaist-white overflow-hidden">
-      <div className="h-full w-full px-4 md:px-4 pt-8 flex flex-col">        
+    <section className="h-full overflow-hidden bg-kaist-white">
+      <div className="flex h-full w-full flex-col px-6 pt-8 md:px-8 lg:px-[5.4%] lg:pt-[3.2dvh]">
         {/* Event Cards with Navigation Arrows */}
-        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden">
           {/* Left Arrow - positioned at image vertical center */}
           <button
             onClick={handlePrevPage}
-            className={`absolute left-0 z-10 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
+            className={`absolute left-0 z-10 text-kaist-white drop-shadow-md transition-colors hover:text-kaist-lightgreen2 lg:text-kaist-darkgreen ${
               currentPage === 0 ? 'opacity-0 pointer-events-none' : ''
             }`}
-            style={{ top: 'calc(37.5% - 1rem)' }} // 이미지 aspect-[3/4]의 중앙 (전체 카드 높이의 약 37.5%)
+            style={{ top: 'calc(50% - 1rem)' }}
             aria-label="Previous page"
           >
             <ChevronLeft className="h-6 w-6 md:h-8 md:w-8" />
           </button>
 
           {/* Event Cards Container with Slide Animation */}
-          <div className="w-full overflow-hidden">
+          <div className="w-full overflow-hidden py-1">
             <div 
               className="flex transition-transform duration-500 ease-in-out"
               style={{
@@ -85,7 +89,7 @@ export function EventCarousel() {
               }}
             >
               {Array.from({ length: totalPages }).map((_, pageIndex) => (
-                <div key={pageIndex} className="w-full flex-shrink-0 flex justify-center gap-3">
+                <div key={pageIndex} className="flex w-full flex-shrink-0 justify-center gap-4 lg:gap-[2.06%]">
                   {events.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage).map((event, index) => (
                     <EventCard key={`${pageIndex}-${index}`} {...event} />
                   ))}
@@ -97,10 +101,10 @@ export function EventCarousel() {
           {/* Right Arrow - positioned at image vertical center */}
           <button
             onClick={handleNextPage}
-            className={`absolute right-0 z-10 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
+            className={`absolute right-0 z-10 text-kaist-white drop-shadow-md transition-colors hover:text-kaist-lightgreen2 lg:text-kaist-darkgreen ${
               currentPage === totalPages - 1 ? 'opacity-0 pointer-events-none' : ''
             }`}
-            style={{ top: 'calc(37.5% - 1rem)' }}
+            style={{ top: 'calc(50% - 1rem)' }}
             aria-label="Next page"
           >
             <ChevronRight className="h-6 w-6 md:h-8 md:w-8" />
@@ -108,15 +112,15 @@ export function EventCarousel() {
         </div>
 
         {/* Carousel Dots */}
-        <div className="flex-shrink-0 mt-6 mb-2 flex items-center justify-center gap-2 md:gap-4">
+        <div className="mb-5 mt-5 flex flex-shrink-0 items-center justify-center gap-3 md:gap-4 lg:mb-[2.9dvh] lg:mt-[3.7dvh]">
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i}
               onClick={() => setCurrentPage(i)}
               className={`rounded-full transition-all ${
                 i === currentPage 
-                  ? 'h-4 w-4 md:h-4 md:w-4 bg-kaist-darkgreen' 
-                  : 'h-3 w-3 md:h-3 md:w-3 bg-kaist-lightgreen hover:bg-kaist-lightgreen2'
+                  ? 'h-4 w-4 bg-kaist-darkgreen md:h-5 md:w-5' 
+                  : 'h-3.5 w-3.5 bg-kaist-greygreen hover:bg-kaist-lightgreen2'
               }`}
               aria-label={`Go to page ${i + 1}`}
             />
