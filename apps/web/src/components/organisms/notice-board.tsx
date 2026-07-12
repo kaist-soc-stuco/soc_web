@@ -9,16 +9,16 @@ interface NoticeItemProps {
 
 function NoticeItem({ category, title, date }: NoticeItemProps) {
   return (
-    <Link to={`/board/${category}/1`} className="flex items-center justify-between gap-3 py-2 transition hover:bg-kaist-grey/5 lg:py-[7px]">
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <span className="inline-flex flex-shrink-0 items-center rounded-full bg-kaist-darkgreen px-2 py-0.5 text-xs font-semibold tracking-tight text-kaist-white">
+    <Link to={`/board/${category}/1`} className="flex h-full min-h-0 items-center justify-between gap-3 py-1 transition hover:bg-kaist-grey/5">
+      <div className="flex items-center gap-4 flex-1 min-w-0">
+        <span className="inline-flex flex-shrink-0 items-center rounded-full bg-kaist-darkgreen px-3 py-1 text-xs font-semibold tracking-tight text-kaist-white">
           {category}
         </span>
-        <span className="truncate text-sm font-semibold tracking-tight text-kaist-black lg:text-lg">
+        <span className="truncate text-sm font-semibold tracking-tight text-kaist-black lg:text-base">
           {title}
         </span>
       </div>
-      <span className="flex-shrink-0 text-xs font-semibold tracking-tight text-kaist-grey lg:text-lg">
+      <span className="flex-shrink-0 text-xs font-semibold tracking-tight text-kaist-grey lg:text-md">
         {date}
       </span>
     </Link>
@@ -60,12 +60,13 @@ export function NoticeBoard() {
   };
 
   const currentNotices = noticesByTab[activeTab] || [];
+  const visibleNotices = currentNotices.slice(0, 8);
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-kaist-white">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col px-0 md:px-4">
+    <section className="flex h-full min-h-0 flex-col bg-kaist-white lg:pr-12">
+      <div className="flex h-full min-h-0 w-full flex-col">
         {/* Tabs */}
-        <div className="flex flex-shrink-0 items-stretch justify-between gap-4 border-b-2 border-kaist-grey/30">
+        <div className="flex flex-shrink-0 items-stretch justify-between pl-1 gap-4 border-b-2 border-kaist-grey/30">
           <div className="flex flex-wrap items-stretch gap-4 lg:gap-6">
             {tabs.map((tab, index) => (
               <div
@@ -76,7 +77,7 @@ export function NoticeBoard() {
               >
                 <button
                   onClick={() => setActiveTab(index)}
-                  className={`relative flex items-center justify-center h-full text-base font-extrabold tracking-tight transition-colors ${
+                  className={`relative flex items-center justify-center h-full text-xl font-extrabold tracking-tight transition-colors ${
                     activeTab === index 
                       ? 'text-kaist-darkgreen' 
                       : 'text-kaist-greygreen hover:text-kaist-darkgreen'
@@ -112,8 +113,11 @@ export function NoticeBoard() {
         </div>
 
         {/* Notice List */}
-        <div className="min-h-0 flex-1 divide-y divide-kaist-grey/20 overflow-y-auto border-b border-kaist-grey/20">
-          {currentNotices.map((notice, index) => (
+        <div
+          className="grid min-h-0 flex-1 divide-y divide-kaist-grey/20 overflow-hidden border-b border-kaist-grey/20"
+          style={{ gridTemplateRows: `repeat(${visibleNotices.length}, minmax(0, 1fr))` }}
+        >
+          {visibleNotices.map((notice, index) => (
             <NoticeItem key={`${activeTab}-${index}`} {...notice} />
           ))}
         </div>

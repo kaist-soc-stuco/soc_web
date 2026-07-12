@@ -35,7 +35,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       ],
     },
     {
-      label: '행사 / 설문조사',
+      label: '행사 & 설문조사',
       href: '/events',
       dropdown: [
         { label: '진행중인 행사', to: '/events' },
@@ -44,7 +44,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       ],
     },
     {
-      label: 'About',
+      label: '소개',
       href: '/about',
       dropdown: [
         { label: '소개', to: '/about' },
