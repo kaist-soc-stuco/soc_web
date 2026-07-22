@@ -49,6 +49,7 @@ export function getPaginationItems(
 interface PaginationProps {
   className?: string;
   currentPage: number;
+  lang?: string;
   onPageChange: (page: number) => void;
   size?: "sm" | "md";
   totalPages: number;
@@ -57,6 +58,7 @@ interface PaginationProps {
 export function Pagination({
   className,
   currentPage,
+  lang = "ko",
   onPageChange,
   size = "md",
   totalPages,
@@ -69,7 +71,7 @@ export function Pagination({
     <div className={cn("flex items-center gap-2", className)}>
       <button
         type="button"
-        aria-label="이전 페이지"
+        aria-label={lang === "ko" ? "이전 페이지" : "Previous page"}
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
         className={cn(
@@ -121,7 +123,7 @@ export function Pagination({
 
       <button
         type="button"
-        aria-label="다음 페이지"
+        aria-label={lang === "ko" ? "다음 페이지" : "Next page"}
         onClick={() => onPageChange(Math.min(total, currentPage + 1))}
         disabled={currentPage === total}
         className={cn(

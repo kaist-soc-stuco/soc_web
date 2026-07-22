@@ -1,13 +1,13 @@
 # PassNi SSO Login Guide
 
-이 문서는 `[etc]/SSO-Login-Guide` 아래 제공된 PDF/JSP 샘플을 기준으로, 현재 SoC Web 프로젝트에 필요한 로그인 연동 방식을 정리한 문서입니다.
+이 문서는 `[etc]/SSO-Login-Guide` 아래 제공된 PDF 가이드를 기준으로, 현재 SOC Web 프로젝트에 필요한 로그인 연동 방식을 정리한 문서입니다.
 
 ## Source
 
 - `PassNi_단일인증 적용 설명서.pdf`
 - `00.DOC/PassNi_단일인증_API 가이드_v2.0.pdf`
-- `01.Sample/singleMain.jsp`
-- `01.Sample/singleAuth.jsp`
+
+Upstream의 `01.Sample` JSP 예제는 credential 형태의 고정값과 TLS 인증서 검증 우회 코드를 포함한 callback 및 그 callback을 호출하는 companion 예제이므로 저장소에서 제거했다. callback 구현은 샘플 JSP를 복사하지 않고 현재 API의 인증 모듈과 환경변수 설정을 기준으로 유지한다.
 
 ## Login Flow
 
@@ -74,12 +74,15 @@
 
 현재 프로젝트에서는 헤더 로그인 버튼이 곧바로 API의 SSO 시작 endpoint를 호출하고, `/login` 페이지는 callback 결과 확인 화면 역할을 담당한다.
 
-- 브라우저에서 할 일
+브라우저에서 할 일:
+
 - `VITE_API_BASE_URL` 기준으로 API start endpoint를 `fetch`
 - 반환된 JSON 또는 HTML form payload를 정규화한 뒤 hidden `POST` form 생성 및 SSO authorize submit
-  - `status`, `reason`, `errorCode` 등 결과 쿼리 표시
-- 서버에서 할 일
-  - start/init endpoint 수신
+- `status`, `reason`, `errorCode` 등 결과 쿼리 표시
+
+서버에서 할 일:
+
+- start/init endpoint 수신
   - `state`, `nonce` 생성 및 Redis 저장
   - `POST /api/auth/login` callback 수신
   - `state` 검증
@@ -91,6 +94,8 @@
 ## Important Constraint
 
 `client_secret`은 브라우저에 노출되면 안 된다. 따라서 사용자 정보 조회 API 호출은 프런트엔드가 아니라 서버에서 처리해야 한다.
+
+고정 credential을 소스나 샘플에 넣지 않고 `SSO_CLIENT_SECRET` 환경변수로만 주입한다. 표준 TLS 인증서와 hostname 검증을 비활성화해서는 안 된다.
 
 또한 가이드 기준 callback 응답은 `POST`이므로, `redirect_uri`는 정적 SPA 라우트보다는 **서버 엔드포인트**로 두는 편이 안전하다.
 

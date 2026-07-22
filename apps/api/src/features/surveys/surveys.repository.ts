@@ -5,12 +5,18 @@ import { isoToDate, msToIso, nowDate } from "@soc/shared";
 import {
   DRIZZLE_DB,
   PostgresDatabase,
+  PostgresTransaction,
 } from "../../infrastructure/postgres/postgres.provider";
 import { surveys, surveyResponses } from "../../infrastructure/postgres/postgres.schema";
 
 import type { SurveyRecord } from "./entities/survey.entity";
 import type { CreateSurveyDto } from "./dto/create-survey.dto";
 import type { UpdateSurveyDto } from "./dto/update-survey.dto";
+
+interface SurveyVersionLineage {
+  previousVersionId: string;
+  versionNumber: number;
+}
 
 @Injectable()
 export class SurveysRepository {
@@ -33,6 +39,11 @@ export class SurveysRepository {
       allowResponseEdit: row.allowResponseEdit,
       isKoreanOnly: row.isKoreanOnly,
       isPublished: row.isPublished,
+      lifecycleStatus: row.lifecycleStatus as SurveyRecord["lifecycleStatus"],
+      archivedAt: row.archivedAt ? msToIso(row.archivedAt.valueOf()) : null,
+      previousVersionId: row.previousVersionId,
+      versionNumber: row.versionNumber,
+      derivedVersionCount: 0,
       showOnCalendar: row.showOnCalendar,
       maxResponses: row.maxResponseCount,
       isAlwaysOpen: row.isAlwaysOpen,
@@ -47,31 +58,48 @@ export class SurveysRepository {
     const rows = await this.db
       .select({
         survey: surveys,
-        responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`
+        responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`,
+        derivedVersionCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM "survey" AS child WHERE child."previous_version_id" = ${surveys.surveyId}), 0)`,
       })
       .from(surveys);
     return rows.map((r) => ({
       ...this.map(r.survey),
       responseCount: r.responseCount,
+      derivedVersionCount: r.derivedVersionCount,
     }));
   }
 
-  async findById(id: string): Promise<SurveyRecord | null> {
-    const row = await this.db.query.surveys.findFirst({
+  async findById(
+    id: string,
+    tx?: PostgresTransaction,
+  ): Promise<SurveyRecord | null> {
+    const db = tx ?? this.db;
+    const row = await db.query.surveys.findFirst({
       where: eq(surveys.surveyId, id),
     });
     if (!row) return null;
     const mapped = this.map(row);
-    const countResult = await this.db
+    const countResult = await db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(surveyResponses)
       .where(and(eq(surveyResponses.surveyId, id), sql`${surveyResponses.status} != 'draft'`));
     mapped.responseCount = countResult[0]?.count ?? 0;
+    const derivedVersionResult = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(surveys)
+      .where(eq(surveys.previousVersionId, id));
+    mapped.derivedVersionCount = derivedVersionResult[0]?.count ?? 0;
     return mapped;
   }
 
-  async insert(creatorId: string, dto: CreateSurveyDto): Promise<SurveyRecord> {
-    const [row] = await this.db
+  async insert(
+    creatorId: string,
+    dto: CreateSurveyDto,
+    tx?: PostgresTransaction,
+    lineage?: SurveyVersionLineage,
+  ): Promise<SurveyRecord> {
+    const db = tx ?? this.db;
+    const [row] = await db
       .insert(surveys)
       .values({
         creatorId: creatorId,
@@ -85,8 +113,12 @@ export class SurveysRepository {
         allowResponseEdit: dto.allowResponseEdit ?? false,
         isKoreanOnly: dto.isKoreanOnly ?? false,
         isPublished: dto.isPublished ?? false,
+        lifecycleStatus: dto.isPublished ? "PUBLISHED" : "DRAFT",
+        archivedAt: null,
+        previousVersionId: lineage?.previousVersionId ?? null,
+        versionNumber: lineage?.versionNumber ?? 1,
         showOnCalendar: dto.showOnCalendar ?? false,
-        resultVisibility: dto.resultVisibility,
+        resultVisibility: dto.resultVisibility ?? "PRIVATE",
         maxResponseCount: dto.maxResponseCount ?? null,
         isAlwaysOpen: dto.isAlwaysOpen ?? false,
         openAt: dto.isAlwaysOpen ? null : dto.openAt ? isoToDate(dto.openAt) : null,
@@ -101,6 +133,7 @@ export class SurveysRepository {
   async update(
     id: string,
     dto: UpdateSurveyDto,
+    tx?: PostgresTransaction,
   ): Promise<SurveyRecord | null> {
     const set: Partial<typeof surveys.$inferInsert> & { updatedAt: Date } = {
       updatedAt: nowDate(),
@@ -117,7 +150,11 @@ export class SurveysRepository {
     if (dto.allowMultipleResponses !== undefined) set.allowMultipleResponses = dto.allowMultipleResponses;
     if (dto.allowResponseEdit !== undefined) set.allowResponseEdit = dto.allowResponseEdit;
     if (dto.isKoreanOnly !== undefined) set.isKoreanOnly = dto.isKoreanOnly;
-    if (dto.isPublished !== undefined) set.isPublished = dto.isPublished;
+    if (dto.isPublished !== undefined) {
+      set.isPublished = dto.isPublished;
+      set.lifecycleStatus = dto.isPublished ? "PUBLISHED" : "DRAFT";
+      set.archivedAt = null;
+    }
     if (dto.showOnCalendar !== undefined) set.showOnCalendar = dto.showOnCalendar;
     if (dto.resultVisibility !== undefined) set.resultVisibility = dto.resultVisibility;
     if (dto.maxResponseCount !== undefined) set.maxResponseCount = dto.maxResponseCount;
@@ -136,7 +173,8 @@ export class SurveysRepository {
       set.connectedArticleId = dto.connectedArticleId ? Number(dto.connectedArticleId) : null;
     }
 
-    const [row] = await this.db
+    const db = tx ?? this.db;
+    const [row] = await db
       .update(surveys)
       .set(set)
       .where(eq(surveys.surveyId, id))
@@ -144,8 +182,29 @@ export class SurveysRepository {
     return row ? this.map(row) : null;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.db.delete(surveys).where(eq(surveys.surveyId, id));
+  async archive(
+    id: string,
+    tx?: PostgresTransaction,
+  ): Promise<SurveyRecord | null> {
+    const db = tx ?? this.db;
+    const archivedAt = nowDate();
+    const [row] = await db
+      .update(surveys)
+      .set({
+        archivedAt,
+        isPublished: false,
+        lifecycleStatus: "ARCHIVED",
+        showOnCalendar: false,
+        updatedAt: archivedAt,
+      })
+      .where(eq(surveys.surveyId, id))
+      .returning();
+    return row ? this.map(row) : null;
+  }
+
+  async delete(id: string, tx?: PostgresTransaction): Promise<void> {
+    const db = tx ?? this.db;
+    await db.delete(surveys).where(eq(surveys.surveyId, id));
   }
 
   async countPublished(surveyId: string): Promise<number> {
@@ -160,15 +219,20 @@ export class SurveysRepository {
     const rows = await this.db
       .select({
         survey: surveys,
-        responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`
+        responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`,
+        derivedVersionCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM "survey" AS child WHERE child."previous_version_id" = ${surveys.surveyId}), 0)`,
       })
       .from(surveys)
       .where(
-        and(eq(surveys.isPublished, true), isNull(surveys.connectedArticleId)),
+        and(
+          eq(surveys.lifecycleStatus, "PUBLISHED"),
+          isNull(surveys.connectedArticleId),
+        ),
       );
     return rows.map((r) => ({
       ...this.map(r.survey),
       responseCount: r.responseCount,
+      derivedVersionCount: r.derivedVersionCount,
     }));
   }
 }

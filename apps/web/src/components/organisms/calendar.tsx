@@ -10,6 +10,7 @@ import type {
 } from "@soc/contracts";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
+import { getKoreanHolidayName } from "@/lib/korean-holidays";
 
 interface CompactEvent {
   id: string;
@@ -454,7 +455,11 @@ export function Calendar() {
                     </div>
                   ) : (
                     <span
-                      title={holiday?.dateName}
+                      title={
+                        holiday
+                          ? getKoreanHolidayName(holiday.dateName, lang)
+                          : undefined
+                      }
                       className={`text-[11.5px] font-semibold ${
                         item.isCurrentMonth
                           ? isSunday || isPublicHoliday

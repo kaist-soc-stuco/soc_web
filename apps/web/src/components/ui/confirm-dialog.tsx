@@ -2,6 +2,8 @@ import { AlertTriangle, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { useLanguage } from "@/hooks/use-language";
+
 type ConfirmTone = "default" | "danger";
 
 type ConfirmOptions = {
@@ -15,15 +17,8 @@ type ConfirmOptions = {
 type ConfirmState = Required<Pick<ConfirmOptions, "cancelLabel" | "confirmLabel" | "title" | "tone">> &
   Pick<ConfirmOptions, "description">;
 
-const defaultState: ConfirmState = {
-  cancelLabel: "취소",
-  confirmLabel: "확인",
-  description: undefined,
-  title: "",
-  tone: "default",
-};
-
 export function useConfirmDialog() {
+  const { lang } = useLanguage();
   const [state, setState] = useState<ConfirmState | null>(null);
   const resolverRef = useRef<((confirmed: boolean) => void) | null>(null);
 
@@ -37,14 +32,19 @@ export function useConfirmDialog() {
     resolverRef.current?.(false);
 
     setState({
-      ...defaultState,
-      ...options,
+      cancelLabel:
+        options.cancelLabel ?? (lang === "ko" ? "취소" : "Cancel"),
+      confirmLabel:
+        options.confirmLabel ?? (lang === "ko" ? "확인" : "Confirm"),
+      description: options.description,
+      title: options.title,
+      tone: options.tone ?? "default",
     });
 
     return new Promise<boolean>((resolve) => {
       resolverRef.current = resolve;
     });
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (!state) return;
@@ -76,7 +76,7 @@ export function useConfirmDialog() {
         >
           <button
             type="button"
-            aria-label="닫기"
+            aria-label={lang === "ko" ? "닫기" : "Close"}
             className="absolute inset-0 cursor-default"
             onClick={() => close(false)}
           />
@@ -103,7 +103,7 @@ export function useConfirmDialog() {
               </div>
               <button
                 type="button"
-                aria-label="닫기"
+                aria-label={lang === "ko" ? "닫기" : "Close"}
                 onClick={() => close(false)}
                 className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >

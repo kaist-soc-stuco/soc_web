@@ -24,8 +24,15 @@ import { clearStoredAuthState } from "@/lib/auth-storage";
 import { getTemporaryAuthRequest } from "@/lib/auth-session";
 import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
+import {
+  getMyActivityDisplay,
+  getMyArticleTitle,
+  getMyCommentDisplay,
+  getMySurveyTitle,
+} from "@/lib/my-page-localization";
 
 export type ActivityItem = {
+  context?: string;
   date: string;
   href: string;
   label: string;
@@ -149,7 +156,9 @@ export function useMyPageController() {
           total: 0,
         });
         setLoadError(
-          "마이페이지 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          lang === "ko"
+            ? "마이페이지 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+            : "Failed to load your account information. Please try again shortly.",
         );
       })
       .finally(() => {
@@ -159,7 +168,7 @@ export function useMyPageController() {
     return () => {
       cancelled = true;
     };
-  }, [activeMenu, activeTab, apiClient, canUseMyPage, currentPage]);
+  }, [activeMenu, activeTab, apiClient, canUseMyPage, currentPage, lang]);
 
   const displayName = useMemo(() => {
     if (!user?.user) {
@@ -194,16 +203,23 @@ export function useMyPageController() {
       survey: lang === "ko" ? "설문" : "Survey",
     };
 
-    return (activities?.items ?? []).map((item) => ({
-      date: item.occurredAt,
-      href:
-        item.type === "survey"
-          ? `/survey/${item.surveyId}`
-          : `/board/${item.boardCode}/${item.articleId}`,
-      label: labelMap[item.type],
-      title: item.title,
-      type: item.type,
-    }));
+    return (activities?.items ?? []).map((item) => {
+      const display = getMyActivityDisplay(lang, item);
+
+      return {
+        context: display.context
+          ? `${lang === "ko" ? "게시글" : "Post"}: ${display.context}`
+          : undefined,
+        date: item.occurredAt,
+        href:
+          item.type === "survey"
+            ? `/survey/${item.surveyId}`
+            : `/board/${item.boardCode}/${item.articleId}`,
+        label: labelMap[item.type],
+        title: display.title,
+        type: item.type,
+      };
+    });
   }, [activities, lang]);
 
   const surveyActivities = useMemo<ActivityItem[]>(
@@ -212,7 +228,7 @@ export function useMyPageController() {
         date: item.submittedAt ?? "",
         href: `/survey/${item.surveyId}`,
         label: lang === "ko" ? "설문" : "Survey",
-        title: item.surveyTitleKo,
+        title: getMySurveyTitle(lang, item),
         type: "survey" as const,
       })),
     [surveyItems, lang],
@@ -224,7 +240,7 @@ export function useMyPageController() {
         date: item.postedAt,
         href: `/board/${item.boardCode}/${item.articleId}`,
         label: lang === "ko" ? "글" : "Post",
-        title: item.titleKo,
+        title: getMyArticleTitle(lang, item),
         type: "post" as const,
       })),
     [articleItems, lang],
@@ -232,13 +248,20 @@ export function useMyPageController() {
 
   const commentActivities = useMemo<ActivityItem[]>(
     () =>
-      commentItems.map((item) => ({
-        date: item.createdAt,
-        href: `/board/${item.boardCode}/${item.articleId}`,
-        label: lang === "ko" ? "댓글" : "Comment",
-        title: item.content,
-        type: "comment" as const,
-      })),
+      commentItems.map((item) => {
+        const display = getMyCommentDisplay(lang, item);
+
+        return {
+          context: display.context
+            ? `${lang === "ko" ? "게시글" : "Post"}: ${display.context}`
+            : undefined,
+          date: item.createdAt,
+          href: `/board/${item.boardCode}/${item.articleId}`,
+          label: lang === "ko" ? "댓글" : "Comment",
+          title: display.title,
+          type: "comment" as const,
+        };
+      }),
     [commentItems, lang],
   );
 
@@ -271,25 +294,25 @@ export function useMyPageController() {
 
   const stats: MyPageStat[] = [
     {
-      label: "설문 참여",
+      label: lang === "ko" ? "설문 참여" : "Survey responses",
       value: surveyTotal,
       icon: ClipboardCheck,
       color: "text-emerald-600 bg-emerald-50 border-emerald-100/50",
     },
     {
-      label: "최근 활동",
+      label: lang === "ko" ? "최근 활동" : "Recent activity",
       value: activityTotal,
       icon: Clock3,
       color: "text-blue-600 bg-blue-50 border-blue-100/50",
     },
     {
-      label: "작성한 글",
+      label: lang === "ko" ? "작성한 글" : "Posts",
       value: articleTotal,
       icon: FileText,
       color: "text-indigo-600 bg-indigo-50 border-indigo-100/50",
     },
     {
-      label: "작성한 댓글",
+      label: lang === "ko" ? "작성한 댓글" : "Comments",
       value: commentTotal,
       icon: MessageCircle,
       color: "text-slate-600 bg-slate-50 border-slate-200/50",
@@ -297,9 +320,9 @@ export function useMyPageController() {
   ];
 
   const menuItems = [
-    { id: "overview", label: "개요", icon: User },
-    { id: "profile", label: "내 정보", icon: FileText },
-    { id: "activity", label: "활동 내역", icon: Clock3 },
+    { id: "overview", label: lang === "ko" ? "개요" : "Overview", icon: User },
+    { id: "profile", label: lang === "ko" ? "내 정보" : "Profile", icon: FileText },
+    { id: "activity", label: lang === "ko" ? "활동 내역" : "Activity", icon: Clock3 },
   ] as const;
 
   const handleLogout = async () => {
@@ -327,6 +350,7 @@ export function useMyPageController() {
     initialLoading,
     isAdmin,
     isContentRefreshing,
+    lang,
     loadError,
     loading,
     menuItems,

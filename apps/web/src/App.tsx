@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AdminLayout } from '@/components/organisms/admin-layout';
 import { AuthGuard } from '@/components/guards/auth-guard';
+import { useLanguage } from '@/hooks/use-language';
 
 const HomePage = lazy(() =>
   import('@/pages/home-page').then((module) => ({ default: module.HomePage })),
@@ -57,6 +58,9 @@ const MyPage = lazy(() =>
 const AboutPage = lazy(() =>
   import('@/pages/about-page').then((module) => ({ default: module.AboutPage })),
 );
+const RoadmapPage = lazy(() =>
+  import('@/pages/roadmap-page').then((module) => ({ default: module.RoadmapPage })),
+);
 const EventsSurveysPage = lazy(() =>
   import('@/pages/events-surveys-page').then((module) => ({ default: module.EventsSurveysPage })),
 );
@@ -69,17 +73,25 @@ const SearchPage = lazy(() =>
 const ContactsPage = lazy(() =>
   import('@/pages/admin/contacts-page').then((module) => ({ default: module.ContactsPage })),
 );
+const SiteContentPage = lazy(() =>
+  import('@/pages/admin/site-content-page').then((module) => ({ default: module.SiteContentPage })),
+);
 const BulkEmailPage = lazy(() =>
   import('@/pages/admin/bulk-email-page').then((module) => ({ default: module.BulkEmailPage })),
 );
 const AdminIndexPage = lazy(() =>
   import('@/pages/admin/admin-index-page').then((module) => ({ default: module.AdminIndexPage })),
 );
+const NotFoundPage = lazy(() =>
+  import('@/pages/not-found-page').then((module) => ({ default: module.NotFoundPage })),
+);
 
 function RouteFallback() {
+  const { lang } = useLanguage();
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-bold text-slate-400">
-      불러오는 중...
+      {lang === 'ko' ? '불러오는 중...' : 'Loading...'}
     </div>
   );
 }
@@ -91,6 +103,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/about/roadmap" element={<RoadmapPage />} />
           <Route path="/events-surveys" element={<EventsSurveysPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/search" element={<SearchPage />} />
@@ -131,9 +144,11 @@ export function App() {
             <Route path="surveys/:id/edit" element={<SurveyEditorPage />} />
             <Route path="surveys/:id/responses" element={<SurveyResponseListPage />} />
             <Route path="surveys/:id/responses/:responseId" element={<SurveyResponseDetailPage />} />
+            <Route path="content" element={<SiteContentPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="emails" element={<BulkEmailPage />} />
           </Route>
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

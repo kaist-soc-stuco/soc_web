@@ -2,6 +2,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
@@ -10,6 +11,11 @@ import { isoToDate, msToIso, nowMs } from "@soc/shared";
 
 import { AssetRepository } from "./repositories/asset.repository";
 import { AssetStorageProvider } from "./asset.storage";
+import { toAssetReference } from "./asset-reference";
+import { BoardRepository } from "../board/repositories/board.repository";
+import { ArticleRepository } from "../board/repositories/article.repository";
+import { canReadBoard, type CurrentUserContext } from "../board/board-access";
+import { getReadableArticleScopes } from "../board/article-access";
 
 type UploadedAssetFile = {
   buffer: Buffer;
@@ -29,6 +35,8 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     @Inject(AssetStorageProvider)
     private readonly storage: AssetStorageProvider,
+    private readonly boardRepository: BoardRepository,
+    private readonly articleRepository: ArticleRepository,
   ) {}
 
   onModuleInit() {
@@ -98,7 +106,77 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       originalFilename: input.file.originalname,
       mimeType: input.file.mimetype,
       sizeBytes: input.file.size,
-      storageKey,
+      storageKey: toAssetReference(asset.assetId),
+    };
+  }
+
+  async getFile(
+    assetId: string,
+    currentUser: CurrentUserContext,
+  ): Promise<{
+    buffer: Buffer;
+    inline: boolean;
+    mimeType: string;
+    originalFilename: string;
+    sizeBytes: number;
+  }> {
+    const asset = await this.assetRepository.findAssetWithLinks(assetId);
+    if (!asset) {
+      throw new NotFoundException("asset_not_found");
+    }
+
+    let readableUsageTypes: string[] = [];
+
+    if (asset.links.length === 0) {
+      if (!currentUser.user || currentUser.user.id !== asset.uploadedBy) {
+        throw new NotFoundException("asset_not_found");
+      }
+    } else {
+      const readableScopes = getReadableArticleScopes(currentUser);
+
+      for (const link of asset.links) {
+        const board = await this.boardRepository.findByCode(link.boardCode);
+        if (!board || !board.isActive || !canReadBoard(board, currentUser)) {
+          continue;
+        }
+
+        const articleReadable = await this.articleRepository.isReadableArticle(
+          board.boardId,
+          link.articleId,
+          readableScopes,
+        );
+
+        if (articleReadable) {
+          readableUsageTypes.push(link.usageType);
+        }
+      }
+
+      if (readableUsageTypes.length === 0) {
+        throw new NotFoundException("asset_not_found");
+      }
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await this.storage.read(asset.storageKey);
+    } catch {
+      throw new NotFoundException("asset_not_found");
+    }
+
+    const isImage = asset.mimeType.startsWith("image/");
+    const inline =
+      isImage &&
+      (asset.links.length === 0 ||
+        readableUsageTypes.some(
+          (usageType) => usageType === "IMAGE" || usageType === "THUMBNAIL",
+        ));
+
+    return {
+      buffer,
+      inline,
+      mimeType: asset.mimeType,
+      originalFilename: asset.originalFilename,
+      sizeBytes: asset.sizeBytes,
     };
   }
 

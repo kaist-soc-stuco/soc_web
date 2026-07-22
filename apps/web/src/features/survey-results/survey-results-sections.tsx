@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type {
   QuestionType,
@@ -15,12 +15,10 @@ import {
   Lock,
   ShieldCheck,
   Users,
+  Languages,
 } from "lucide-react";
 
-import {
-  getVisibleTextResponses,
-  sortChoiceResults,
-} from "@/lib/survey-results-display";
+import { sortChoiceResults } from "@/lib/survey-results-display";
 
 import type { SurveyResultsError } from "./use-survey-results-page-controller";
 
@@ -71,28 +69,6 @@ function isChoiceQuestion(type: QuestionType) {
   );
 }
 
-function isTemporalQuestion(type: QuestionType) {
-  return type === "date" || type === "time" || type === "datetime";
-}
-
-function formatTemporalAnswer(type: QuestionType, value: string) {
-  if (!value) return "";
-  if (type === "time") return value;
-
-  const parsed = isoToDate(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-
-  const yyyy = parsed.getFullYear();
-  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
-  const dd = String(parsed.getDate()).padStart(2, "0");
-  const dateText = `${yyyy}.${mm}.${dd}`;
-  if (type !== "datetime") return dateText;
-
-  const hh = String(parsed.getHours()).padStart(2, "0");
-  const min = String(parsed.getMinutes()).padStart(2, "0");
-  return `${dateText} ${hh}:${min}`;
-}
-
 function formatSurveyDateTime(iso: string) {
   const parsed = isoToDate(iso);
   if (Number.isNaN(parsed.getTime())) return "";
@@ -130,9 +106,6 @@ function getScheduleLabel(analytics: SurveyAnalyticsResponse, lang: string) {
 function getAudienceLabel(analytics: SurveyAnalyticsResponse, lang: string) {
   if (analytics.feePayersOnly) {
     return lang === "ko" ? "과비 납부자" : "Paid members";
-  }
-  if (analytics.isKoreanOnly) {
-    return lang === "ko" ? "한국어 사용자" : "Korean-language users";
   }
   return lang === "ko" ? "로그인 회원" : "Signed-in members";
 }
@@ -219,105 +192,29 @@ function ChoiceResult({
   );
 }
 
-function TextResult({
-  texts,
-  lang,
-  type,
-}: {
-  texts: string[] | undefined;
-  lang: string;
-  type: QuestionType;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!texts?.length) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
-        {lang === "ko" ? "제출된 답변이 없습니다." : "No responses submitted."}
-      </div>
-    );
-  }
-
-  const isShortText = type === "short_text";
-  const { hiddenCount, visibleTexts } = getVisibleTextResponses(
-    texts,
-    type,
-    expanded,
-  );
-
-  return (
-    <div className={isShortText ? "space-y-1.5" : "space-y-2.5"}>
-      {visibleTexts.map((text, idx) => (
-        <div
-          key={`${idx}-${text}`}
-          className={`grid grid-cols-[2rem_minmax(0,1fr)] gap-2 ${
-            isShortText ? "items-center" : "items-start"
-          }`}
-        >
-          <span className="pt-0.5 text-right text-xs font-bold tabular-nums text-slate-400">
-            {idx + 1}.
-          </span>
-          <p
-            className={
-              isShortText
-                ? "min-w-0 truncate text-sm font-medium text-slate-700"
-                : "min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-slate-700"
-            }
-          >
-            {text || (
-              <span className="text-slate-400">
-                {lang === "ko" ? "빈 응답" : "Empty response"}
-              </span>
-            )}
-          </p>
-        </div>
-      ))}
-      {hiddenCount > 0 && (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="mt-2 inline-flex rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-50 hover:text-kaist-darkgreen"
-        >
-          {lang === "ko"
-            ? `${hiddenCount}개 더 보기`
-            : `Show ${hiddenCount} more`}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function TemporalResult({
+function PrivateRawAnswerResult({
   question,
   lang,
 }: {
   question: SurveyQuestionAnalyticsItem;
   lang: string;
 }) {
-  const values = question.texts ?? [];
-  const Icon = question.questionType === "time" ? Clock : Calendar;
-
-  if (!values.length) {
+  if (question.totalAnswers === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
-        {lang === "ko"
-          ? "제출된 날짜/시간 응답이 없습니다."
-          : "No date or time responses submitted."}
+        {lang === "ko" ? "제출된 응답이 없습니다." : "No responses submitted."}
       </div>
     );
   }
 
   return (
-    <div className="space-y-1.5">
-      {values.map((value, idx) => (
-        <div
-          key={`${idx}-${value}`}
-          className="flex items-center gap-2 text-sm font-medium text-slate-700"
-        >
-          <Icon className="h-4 w-4 text-kaist-darkgreen" />
-          {formatTemporalAnswer(question.questionType, value)}
-        </div>
-      ))}
+    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-kaist-darkgreen" />
+      <p className="font-medium leading-relaxed">
+        {lang === "ko"
+          ? "개인정보 보호를 위해 이 문항의 개별 응답은 공개 결과에 표시하지 않습니다."
+          : "Individual answers to this question are hidden from public results for privacy."}
+      </p>
     </div>
   );
 }
@@ -358,14 +255,8 @@ function QuestionResultCard({
 
       {isChoiceQuestion(question.questionType) ? (
         <ChoiceResult choices={question.choices ?? []} lang={lang} />
-      ) : isTemporalQuestion(question.questionType) ? (
-        <TemporalResult question={question} lang={lang} />
       ) : (
-        <TextResult
-          texts={question.texts}
-          lang={lang}
-          type={question.questionType}
-        />
+        <PrivateRawAnswerResult question={question} lang={lang} />
       )}
     </ResultShell>
   );
@@ -477,6 +368,14 @@ export function SurveyResultsContent({
             <Calendar className="h-3.5 w-3.5 text-kaist-darkgreen" />
             {getScheduleLabel(analytics, lang)}
           </span>
+          {analytics.isKoreanOnly && (
+            <span className="inline-flex items-center gap-1.5">
+              <Languages className="h-3.5 w-3.5 text-kaist-darkgreen" />
+              {lang === "ko"
+                ? "한국어 콘텐츠만 제공"
+                : "Content available in Korean only"}
+            </span>
+          )}
         </div>
       </ResultShell>
 

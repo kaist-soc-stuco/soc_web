@@ -25,5 +25,6 @@ import { UsersModule } from "../users/users.module";
     ArticleService,
     CommentService,
   ],
+  exports: [ArticleRepository, BoardRepository],
 })
 export class BoardModule {}

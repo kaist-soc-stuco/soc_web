@@ -5,3 +5,4 @@ export * from "./schema/survey.schema";
 export * from "./schema/audit.schema";
 export * from "./schema/contact.schema";
 export * from "./schema/email.schema";
+export * from "./schema/site-content.schema";

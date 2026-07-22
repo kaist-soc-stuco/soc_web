@@ -22,7 +22,8 @@ test("fallback board metadata does not grant write access", () => {
 test("server board metadata takes precedence over fallback labels and descriptions", () => {
   const board = {
     code: "공지",
-    description: "서버에서 온 게시판 설명",
+    descriptionKo: "서버에서 온 게시판 설명",
+    descriptionEn: "Description from server",
     nameEn: "Server Notice",
     nameKo: "서버 공지",
     writePermissionBit: 4,
@@ -35,7 +36,7 @@ test("server board metadata takes precedence over fallback labels and descriptio
   );
   assert.equal(
     getBoardDescriptionFromMetadata(board, "공지", "en"),
-    "서버에서 온 게시판 설명",
+    "Description from server",
   );
   assert.equal(getBoardWritePermissionBitFromMetadata(board, "공지"), 4);
 });

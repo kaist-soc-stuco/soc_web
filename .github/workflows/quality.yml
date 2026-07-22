@@ -1,0 +1,77 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: soc_web_test
+          POSTGRES_PASSWORD: soc_test
+          POSTGRES_USER: soc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U soc_test -d soc_web_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      CI: "true"
+      DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
+      FEE_CONCURRENCY_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
+      NODE_ENV: test
+      POSTGRES_DB: soc_web_test
+      POSTGRES_HOST: localhost
+      POSTGRES_PASSWORD: soc_test
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: soc_test
+      SURVEY_CONCURRENCY_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          cache: pnpm
+          node-version: 24.14.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply database migrations
+        run: pnpm --filter @soc/api db:migrate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test with PostgreSQL concurrency coverage
+        run: pnpm test
+
+      - name: Build production bundles
+        run: pnpm build

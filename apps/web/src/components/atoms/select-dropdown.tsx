@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
+import { useLanguage } from "@/hooks/use-language";
+
 interface DropdownOption {
   value: string;
   label: string;
@@ -29,10 +31,11 @@ export function SelectDropdown({
   className,
   buttonClassName,
   disabled = false,
-  emptyLabel = "선택지가 없습니다.",
+  emptyLabel,
   menuClassName,
   optionClassName,
 }: SelectDropdownProps) {
+  const { lang } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +66,9 @@ export function SelectDropdown({
         } ${buttonClassName || ""}`}
       >
         <span className={selectedOption ? "text-kaist-black" : "text-kaist-grey/50"}>
-          {selectedOption ? selectedOption.label : placeholder || "선택하세요"}
+          {selectedOption
+            ? selectedOption.label
+            : placeholder || (lang === "ko" ? "선택하세요" : "Select")}
         </span>
         <ChevronDown
           className={`w-4 h-4 text-kaist-grey/60 transition-transform duration-200 ${
@@ -79,7 +84,8 @@ export function SelectDropdown({
         >
           {options.length === 0 ? (
             <div className="px-4 py-2.5 text-xs text-kaist-grey/50">
-              {emptyLabel}
+              {emptyLabel ??
+                (lang === "ko" ? "선택지가 없습니다." : "No options.")}
             </div>
           ) : (
             options.map((option) => (

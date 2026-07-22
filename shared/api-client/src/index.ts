@@ -9,6 +9,7 @@ import {
 } from "./core.js";
 import { createMiscApi } from "./misc.js";
 import { createSurveyApi } from "./survey.js";
+import { createSiteContentApi } from "./site-content.js";
 
 export { ApiClientHttpError };
 export type { ApiClientOptions, ListQueryOptions } from "./core.js";
@@ -22,6 +23,7 @@ export const createApiClient = (options: ApiClientOptions) => {
     ...createCalendarApi(context),
     ...createAdminApi(context),
     ...createSurveyApi(context),
+    ...createSiteContentApi(context),
     ...createMiscApi(context),
   };
 };

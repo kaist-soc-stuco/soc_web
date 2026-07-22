@@ -14,6 +14,7 @@ import type {
 export type ResponseStatus = 'submitted';
 export type QuestionType = z.infer<typeof QuestionTypeSchema>;
 export type ComputedSurveyState = 'before_open' | 'open' | 'closed';
+export type SurveyLifecycleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
 export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
 
@@ -34,6 +35,11 @@ export interface SurveyRecord {
   allowResponseEdit: boolean;
   isKoreanOnly: boolean;
   isPublished: boolean;
+  lifecycleStatus: SurveyLifecycleStatus;
+  archivedAt: string | null;
+  previousVersionId: string | null;
+  versionNumber: number;
+  derivedVersionCount: number;
   showOnCalendar: boolean;
   maxResponses: number | null;
   isAlwaysOpen: boolean;
@@ -150,7 +156,7 @@ export interface SurveyQuestionAnalyticsItem {
   titleEn: string | null;
   totalAnswers: number;
   choices?: SurveyChoiceAnalyticsItem[];
-  texts?: string[];
+  rawAnswersHidden: boolean;
 }
 
 export interface SurveyAnalyticsResponse {

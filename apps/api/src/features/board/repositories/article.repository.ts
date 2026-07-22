@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import {
   and,
   asc,
@@ -20,6 +20,7 @@ import type {
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   ArticleDeleteResponse,
+  VisibilityScope,
 } from "@soc/contracts";
 
 import {
@@ -37,6 +38,8 @@ import {
 } from "../../../infrastructure/postgres/postgres.schema";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
 import { isoToDate, msToIso, nowDate, nowMs } from "@soc/shared";
+import { toAssetReference } from "../../asset/asset-reference";
+import { areArticleAssetsAttachable } from "../article-asset-access";
 
 const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_open" | "open" | "closed" => {
   if (!survey.isPublished) return "closed";
@@ -52,7 +55,7 @@ const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_o
 };
 
 const articleThumbnailStorageKey = sql<string | null>`(
-  select ${assets.storageKey}
+  select concat('asset:', ${assets.assetId}::text)
   from ${articleAssets}
   inner join ${assets} on ${assets.assetId} = ${articleAssets.assetId}
   where ${articleAssets.articleId} = ${articles.articleId}
@@ -71,6 +74,7 @@ export class ArticleRepository {
     boardId: number,
     page: number,
     limit: number,
+    visibilityScopes: VisibilityScope[],
     query?: string,
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     const offset = (page - 1) * limit;
@@ -85,6 +89,7 @@ export class ArticleRepository {
     const baseFilter = and(
       eq(articles.boardId, boardId),
       eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+      inArray(articles.visibilityScope, visibilityScopes),
       searchFilter,
     );
 
@@ -125,7 +130,8 @@ export class ArticleRepository {
         thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
-        eventDescription: articles.eventDescription,
+        eventDescriptionKo: articles.eventDescriptionKo,
+        eventDescriptionEn: articles.eventDescriptionEn,
         surveyId: surveys.surveyId,
       })
       .from(articles)
@@ -169,7 +175,8 @@ export class ArticleRepository {
         thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
         eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
         eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
-        eventDescription: row.eventDescription ?? undefined,
+        eventDescriptionKo: row.eventDescriptionKo ?? undefined,
+        eventDescriptionEn: row.eventDescriptionEn ?? undefined,
         surveyId: row.surveyId ?? undefined,
       })),
     };
@@ -185,6 +192,7 @@ export class ArticleRepository {
       searchBy: "title" | "author" | "title_content";
       sortBy: "latest" | "views";
       sortDirection: "asc" | "desc";
+      visibilityScopes: VisibilityScope[];
     },
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     if (boardIds.length === 0) {
@@ -199,10 +207,17 @@ export class ArticleRepository {
             ilike(users.nameKo, `%${normalizedQuery}%`),
             ilike(users.nameEn, `%${normalizedQuery}%`),
           )
-        : or(
-            ilike(articles.titleKo, `%${normalizedQuery}%`),
-            ilike(articles.titleEn, `%${normalizedQuery}%`),
-          )
+        : params.searchBy === "title_content"
+          ? or(
+              ilike(articles.titleKo, `%${normalizedQuery}%`),
+              ilike(articles.titleEn, `%${normalizedQuery}%`),
+              ilike(articles.contentKo, `%${normalizedQuery}%`),
+              ilike(articles.contentEn, `%${normalizedQuery}%`),
+            )
+          : or(
+              ilike(articles.titleKo, `%${normalizedQuery}%`),
+              ilike(articles.titleEn, `%${normalizedQuery}%`),
+            )
       : undefined;
     const cutoffFilter = params.cutoffDate
       ? gte(articles.postedAt, params.cutoffDate)
@@ -211,6 +226,7 @@ export class ArticleRepository {
     const baseFilter = and(
       inArray(articles.boardId, boardIds),
       eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+      inArray(articles.visibilityScope, params.visibilityScopes),
       searchFilter,
       cutoffFilter,
     );
@@ -263,7 +279,8 @@ export class ArticleRepository {
         thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
-        eventDescription: articles.eventDescription,
+        eventDescriptionKo: articles.eventDescriptionKo,
+        eventDescriptionEn: articles.eventDescriptionEn,
         surveyId: surveys.surveyId,
       })
       .from(articles)
@@ -314,7 +331,8 @@ export class ArticleRepository {
         eventEndDate: row.eventEndDate
           ? msToIso(row.eventEndDate.valueOf())
           : undefined,
-        eventDescription: row.eventDescription ?? undefined,
+        eventDescriptionKo: row.eventDescriptionKo ?? undefined,
+        eventDescriptionEn: row.eventDescriptionEn ?? undefined,
         surveyId: row.surveyId ?? undefined,
       })),
     };
@@ -323,7 +341,13 @@ export class ArticleRepository {
   async findAllArticles(
     limit: number,
     query?: string,
+    boardIds: number[] = [],
+    visibilityScopes: VisibilityScope[] = ["PUBLIC"],
   ): Promise<ArticleListItem[]> {
+    if (boardIds.length === 0) {
+      return [];
+    }
+
     const normalizedQuery = query?.trim();
     const searchFilter = normalizedQuery
       ? or(
@@ -333,7 +357,9 @@ export class ArticleRepository {
       : undefined;
 
     const baseFilter = and(
+      inArray(articles.boardId, boardIds),
       eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+      inArray(articles.visibilityScope, visibilityScopes),
       searchFilter,
     );
 
@@ -364,7 +390,8 @@ export class ArticleRepository {
         thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
-        eventDescription: articles.eventDescription,
+        eventDescriptionKo: articles.eventDescriptionKo,
+        eventDescriptionEn: articles.eventDescriptionEn,
         surveyId: surveys.surveyId,
       })
       .from(articles)
@@ -403,7 +430,8 @@ export class ArticleRepository {
       thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
       eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
       eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
-      eventDescription: row.eventDescription ?? undefined,
+      eventDescriptionKo: row.eventDescriptionKo ?? undefined,
+      eventDescriptionEn: row.eventDescriptionEn ?? undefined,
       surveyId: row.surveyId ?? undefined,
     }));
   }
@@ -411,6 +439,7 @@ export class ArticleRepository {
   async findDetailById(
     boardId: number,
     articleId: string,
+    visibilityScopes: VisibilityScope[],
   ): Promise<ArticleDetailResponse | null> {
     const row = await this.db
       .select({
@@ -439,7 +468,8 @@ export class ArticleRepository {
         )`,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
-        eventDescription: articles.eventDescription,
+        eventDescriptionKo: articles.eventDescriptionKo,
+        eventDescriptionEn: articles.eventDescriptionEn,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -448,6 +478,7 @@ export class ArticleRepository {
           eq(articles.boardId, boardId),
           eq(articles.articleId, Number(articleId)),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          inArray(articles.visibilityScope, visibilityScopes),
         ),
       )
       .limit(1);
@@ -481,6 +512,7 @@ export class ArticleRepository {
       .select({
         articleId: articles.articleId,
         titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
         postedAt: articles.postedAt,
         authorId: users.userId,
         authorName: users.nameKo,
@@ -492,6 +524,7 @@ export class ArticleRepository {
         and(
           eq(articles.boardId, boardId),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          inArray(articles.visibilityScope, visibilityScopes),
           lt(articles.postedAt, row[0].postedAt)
         )
       )
@@ -502,6 +535,7 @@ export class ArticleRepository {
       .select({
         articleId: articles.articleId,
         titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
         postedAt: articles.postedAt,
         authorId: users.userId,
         authorName: users.nameKo,
@@ -513,6 +547,7 @@ export class ArticleRepository {
         and(
           eq(articles.boardId, boardId),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          inArray(articles.visibilityScope, visibilityScopes),
           gt(articles.postedAt, row[0].postedAt)
         )
       )
@@ -547,13 +582,14 @@ export class ArticleRepository {
         originalFilename: assetRow.originalFilename,
         mimeType: assetRow.mimeType,
         sizeBytes: assetRow.sizeBytes,
-        storageKey: assetRow.storageKey,
+        storageKey: toAssetReference(assetRow.assetId),
       })),
       commentCount: Number(row[0].commentCount ?? 0),
       viewCount: row[0].viewCount,
       eventStartDate: row[0].eventStartDate ? msToIso(row[0].eventStartDate.valueOf()) : undefined,
       eventEndDate: row[0].eventEndDate ? msToIso(row[0].eventEndDate.valueOf()) : undefined,
-      eventDescription: row[0].eventDescription ?? undefined,
+      eventDescriptionKo: row[0].eventDescriptionKo ?? undefined,
+      eventDescriptionEn: row[0].eventDescriptionEn ?? undefined,
       survey: surveyRow[0]
         ? {
             surveyId: surveyRow[0].surveyId,
@@ -573,6 +609,7 @@ export class ArticleRepository {
         ? {
             articleId: String(prevRow[0].articleId),
             titleKo: prevRow[0].titleKo,
+            titleEn: prevRow[0].titleEn ?? undefined,
             postedAt: msToIso(prevRow[0].postedAt.valueOf()),
             isAnonymous: prevRow[0].isAnonymous,
             author: {
@@ -585,6 +622,7 @@ export class ArticleRepository {
         ? {
             articleId: String(nextRow[0].articleId),
             titleKo: nextRow[0].titleKo,
+            titleEn: nextRow[0].titleEn ?? undefined,
             postedAt: msToIso(nextRow[0].postedAt.valueOf()),
             isAnonymous: nextRow[0].isAnonymous,
             author: {
@@ -604,6 +642,39 @@ export class ArticleRepository {
     const now = nowDate();
 
     return this.db.transaction(async (tx) => {
+      if (input.payload.assets && input.payload.assets.length > 0) {
+        const requestedAssetIds = input.payload.assets.map((asset) =>
+          Number(asset.assetId),
+        );
+        const assetRows = await tx
+          .select({
+            assetId: assets.assetId,
+            uploadedBy: assets.uploadedBy,
+          })
+          .from(assets)
+          .where(inArray(assets.assetId, requestedAssetIds))
+          .for("update");
+        const existingLinks = await tx
+          .select({ assetId: articleAssets.assetId })
+          .from(articleAssets)
+          .where(inArray(articleAssets.assetId, requestedAssetIds));
+
+        if (!areArticleAssetsAttachable({
+          actingUserId: input.authorUserId,
+          requestedAssetIds,
+          assets: assetRows.map((asset) => ({
+            assetId: asset.assetId,
+            uploadedBy: String(asset.uploadedBy),
+          })),
+          links: existingLinks.map((link) => ({
+            articleId: -1,
+            assetId: link.assetId,
+          })),
+        })) {
+          throw new BadRequestException("article_asset_not_attachable");
+        }
+      }
+
       const [created] = await tx
         .insert(articles)
         .values({
@@ -623,7 +694,8 @@ export class ArticleRepository {
           updatedAt: now,
           eventStartDate: input.payload.eventStartDate ? isoToDate(input.payload.eventStartDate) : null,
           eventEndDate: input.payload.eventEndDate ? isoToDate(input.payload.eventEndDate) : null,
-          eventDescription: input.payload.eventDescription ?? null,
+          eventDescriptionKo: input.payload.eventDescriptionKo ?? null,
+          eventDescriptionEn: input.payload.eventDescriptionEn ?? null,
         })
         .returning({
           articleId: articles.articleId,
@@ -679,6 +751,7 @@ export class ArticleRepository {
   async findCommentPermissionInfo(
     boardId: number,
     articleId: string,
+    visibilityScopes: VisibilityScope[],
   ): Promise<{
     allowComment: boolean;
     status: string;
@@ -690,7 +763,11 @@ export class ArticleRepository {
       })
       .from(articles)
       .where(
-        and(eq(articles.boardId, boardId), eq(articles.articleId, Number(articleId))),
+        and(
+          eq(articles.boardId, boardId),
+          eq(articles.articleId, Number(articleId)),
+          inArray(articles.visibilityScope, visibilityScopes),
+        ),
       )
       .limit(1);
 
@@ -706,6 +783,7 @@ export class ArticleRepository {
     boardId: number,
     articleId: string,
     payload: ArticleUpdateRequest,
+    actingUserId: string,
   ): Promise<ArticleUpdateResponse> {
     const now = nowDate();
     const updateSet: {
@@ -721,7 +799,8 @@ export class ArticleRepository {
       updatedAt: Date;
       eventStartDate?: Date | null;
       eventEndDate?: Date | null;
-      eventDescription?: string | null;
+      eventDescriptionKo?: string | null;
+      eventDescriptionEn?: string | null;
     } = {
       updatedAt: now,
     };
@@ -770,11 +849,48 @@ export class ArticleRepository {
       updateSet.eventEndDate = payload.eventEndDate ? isoToDate(payload.eventEndDate) : null;
     }
 
-    if (payload.eventDescription !== undefined) {
-      updateSet.eventDescription = payload.eventDescription ?? null;
+    if (payload.eventDescriptionKo !== undefined) {
+      updateSet.eventDescriptionKo = payload.eventDescriptionKo ?? null;
+    }
+
+    if (payload.eventDescriptionEn !== undefined) {
+      updateSet.eventDescriptionEn = payload.eventDescriptionEn ?? null;
     }
 
     return this.db.transaction(async (tx) => {
+      if (payload.assets && payload.assets.length > 0) {
+        const requestedAssetIds = payload.assets.map((asset) =>
+          Number(asset.assetId),
+        );
+        const assetRows = await tx
+          .select({
+            assetId: assets.assetId,
+            uploadedBy: assets.uploadedBy,
+          })
+          .from(assets)
+          .where(inArray(assets.assetId, requestedAssetIds))
+          .for("update");
+        const existingLinks = await tx
+          .select({
+            articleId: articleAssets.articleId,
+            assetId: articleAssets.assetId,
+          })
+          .from(articleAssets)
+          .where(inArray(articleAssets.assetId, requestedAssetIds));
+        if (!areArticleAssetsAttachable({
+          actingUserId,
+          currentArticleId: Number(articleId),
+          requestedAssetIds,
+          assets: assetRows.map((asset) => ({
+            assetId: asset.assetId,
+            uploadedBy: String(asset.uploadedBy),
+          })),
+          links: existingLinks,
+        })) {
+          throw new BadRequestException("article_asset_not_attachable");
+        }
+      }
+
       await tx
         .update(articles)
         .set(updateSet)
@@ -833,6 +949,7 @@ export class ArticleRepository {
   async isReadableArticle(
     boardId: number,
     articleId: string,
+    visibilityScopes: VisibilityScope[],
   ): Promise<boolean> {
     const row = await this.db
       .select({ articleId: articles.articleId })
@@ -842,6 +959,7 @@ export class ArticleRepository {
           eq(articles.boardId, boardId),
           eq(articles.articleId, Number(articleId)),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          inArray(articles.visibilityScope, visibilityScopes),
         ),
       )
       .limit(1);

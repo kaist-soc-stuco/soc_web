@@ -45,9 +45,9 @@ export class ContactsRepository {
       .insert(executiveContacts)
       .values({
         nameKo: dto.nameKo,
-        nameEn: dto.nameEn ?? null,
+        nameEn: dto.nameEn,
         roleKo: dto.roleKo,
-        roleEn: dto.roleEn ?? null,
+        roleEn: dto.roleEn,
         email: dto.email ?? null,
         phoneNumber: dto.phoneNumber ?? null,
         sortOrder: dto.sortOrder ?? 0,

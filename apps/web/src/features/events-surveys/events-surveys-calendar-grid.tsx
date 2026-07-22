@@ -2,6 +2,7 @@ import type { KoreanHolidayRecord } from "@soc/contracts";
 import { nowDate } from "@soc/shared";
 
 import type { Language } from "@/hooks/use-language";
+import { getKoreanHolidayName } from "@/lib/korean-holidays";
 import {
   stripCalendarPrefix,
   type CalendarEvent,
@@ -83,7 +84,11 @@ export function EventsSurveysCalendarGrid({
                   </div>
                 ) : (
                   <span
-                    title={holiday?.dateName}
+                    title={
+                      holiday
+                        ? getKoreanHolidayName(holiday.dateName, lang)
+                        : undefined
+                    }
                     className={`text-xs leading-none ${
                       isSelected
                         ? "text-brand-primary font-extrabold"
@@ -104,9 +109,9 @@ export function EventsSurveysCalendarGrid({
                     className={`truncate text-[9px] font-extrabold ${
                       holiday.isHoliday ? "text-red-400" : "text-slate-400"
                     }`}
-                    title={holiday.dateName}
+                    title={getKoreanHolidayName(holiday.dateName, lang)}
                   >
-                    {holiday.dateName}
+                    {getKoreanHolidayName(holiday.dateName, lang)}
                   </span>
                 )}
               </div>

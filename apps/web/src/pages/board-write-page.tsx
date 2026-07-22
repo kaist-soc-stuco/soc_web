@@ -31,7 +31,8 @@ export function BoardWritePage() {
     contentEn,
     contentKo,
     draftTime,
-    eventDescription,
+    eventDescriptionKo,
+    eventDescriptionEn,
     eventEndDate,
     eventStartDate,
     fileInputRef,
@@ -56,7 +57,8 @@ export function BoardWritePage() {
     setAllowComment,
     setContentEn,
     setContentKo,
-    setEventDescription,
+    setEventDescriptionKo,
+    setEventDescriptionEn,
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
@@ -154,7 +156,9 @@ export function BoardWritePage() {
 
               {selectedCategory === "행사" && (
                 <BoardWriteEventFields
-                  eventDescription={eventDescription}
+                  activeTab={activeTab}
+                  eventDescriptionKo={eventDescriptionKo}
+                  eventDescriptionEn={eventDescriptionEn}
                   eventEndDate={eventEndDate}
                   eventStartDate={eventStartDate}
                   isEventAlwaysOpen={isEventAlwaysOpen}
@@ -166,7 +170,8 @@ export function BoardWritePage() {
                       setEventEndDate("");
                     }
                   }}
-                  onEventDescriptionChange={setEventDescription}
+                  onEventDescriptionKoChange={setEventDescriptionKo}
+                  onEventDescriptionEnChange={setEventDescriptionEn}
                   onEventEndDateChange={setEventEndDate}
                   onEventStartDateChange={setEventStartDate}
                 />

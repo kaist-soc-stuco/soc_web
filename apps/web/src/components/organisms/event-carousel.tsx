@@ -257,8 +257,12 @@ export function EventCarousel() {
           id: item.articleId,
           titleKo: item.titleKo,
           titleEn: item.titleEn,
-          descriptionKo: item.eventDescription ?? item.titleKo,
-          descriptionEn: item.titleEn || item.eventDescription || item.titleKo,
+          descriptionKo: item.eventDescriptionKo ?? item.titleKo,
+          descriptionEn:
+            item.eventDescriptionEn ||
+            item.titleEn ||
+            item.eventDescriptionKo ||
+            item.titleKo,
           imageUrl: item.thumbnailStorageKey
             ? resolveAssetUrl(item.thumbnailStorageKey)
             : null,

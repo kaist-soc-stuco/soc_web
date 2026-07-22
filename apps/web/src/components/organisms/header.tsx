@@ -1,13 +1,14 @@
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Bell,
   ChevronDown,
   Globe,
   LayoutDashboard,
   LogOut,
+  Menu,
   Search,
   User,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -38,6 +39,7 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginStarting, setLoginStarting] = useState(false);
   const [mockLoginStarting, setMockLoginStarting] = useState(false);
   const { lang, setLanguage } = useLanguage();
@@ -52,7 +54,10 @@ export function Header({ showLogo = false }: HeaderProps) {
     session?.authenticated && session.userId
       ? {
           id: session.userId,
-          name: session.nameEn ?? session.userName ?? session.nameKo ?? "User",
+          name:
+            lang === "ko"
+              ? session.nameKo ?? session.userName ?? session.nameEn ?? "사용자"
+              : session.nameEn ?? session.userName ?? session.nameKo ?? "User",
           permission: session.permission ?? 0,
         }
       : null;
@@ -69,6 +74,7 @@ export function Header({ showLogo = false }: HeaderProps) {
   const closePopovers = () => {
     setSearchOpen(false);
     setDropdownOpen(false);
+    setMobileMenuOpen(false);
   };
 
   const handleSearchSubmit = (event?: FormEvent<HTMLFormElement>) => {
@@ -136,6 +142,13 @@ export function Header({ showLogo = false }: HeaderProps) {
     }
   };
 
+  const handleLogout = async () => {
+    await apiClient.logout(getTemporaryAuthRequest());
+    clearStoredAuthState();
+    await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+    window.location.assign("/");
+  };
+
   const updateNavLeft = () => {
     if (navRef.current) setNavLeft(navRef.current.offsetLeft);
   };
@@ -191,7 +204,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       : [
           {
             label: "Board",
-            href: "/board/공지",
+            href: "/board",
             dropdown: boardNavItems.map((board) => board.code),
             dropdownLabels: boardNavItems.map((board) =>
               getBoardLabelFromMetadata(board, board.code, lang),
@@ -266,6 +279,7 @@ export function Header({ showLogo = false }: HeaderProps) {
               onClick={() => {
                 setSearchOpen((value) => !value);
                 setDropdownOpen(false);
+                setMobileMenuOpen(false);
               }}
             >
               <Search className="h-4 w-4 md:h-5 md:w-5" />
@@ -301,17 +315,8 @@ export function Header({ showLogo = false }: HeaderProps) {
 
           <button
             type="button"
-            aria-label={lang === "ko" ? "알림" : "Notifications"}
-            className="text-kaist-black transition-colors p-1.5 rounded-lg md:p-2"
-            title={lang === "ko" ? "알림" : "Notifications"}
-          >
-            <Bell className="h-4 w-4 md:h-5 md:w-5" />
-          </button>
-
-          <button
-            type="button"
             onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-            className="hidden min-[420px]:flex items-center gap-1 text-xs font-bold text-kaist-black hover:text-kaist-darkgreen transition-all bg-gray-100 hover:bg-gray-200/80 px-2.5 py-1.5 rounded-lg border border-kaist-grey/15 cursor-pointer shrink-0"
+            className="hidden items-center gap-1 rounded-lg border border-kaist-grey/15 bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-kaist-black transition-all hover:bg-gray-200/80 hover:text-kaist-darkgreen md:flex"
             title={lang === "ko" ? "Switch to English" : "한국어로 변경"}
           >
             <Globe className="w-3.5 h-3.5 text-kaist-greygreen" />
@@ -382,12 +387,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                       type="button"
                       className="flex w-full items-center gap-2 px-4 py-2.5 hover:bg-red-50 text-left text-sm font-semibold text-red-600"
                       onClick={async () => {
-                        await apiClient.logout(getTemporaryAuthRequest());
-                        clearStoredAuthState();
-                        await queryClient.invalidateQueries({
-                          queryKey: ["auth", "session"],
-                        });
-                        window.location.assign("/");
+                        await handleLogout();
                       }}
                     >
                       <LogOut className="w-4 h-4" />
@@ -403,7 +403,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                 type="button"
                 onClick={() => void handleStartLogin()}
                 disabled={loginStarting}
-                className="group relative hidden cursor-pointer items-center whitespace-nowrap border-0 bg-transparent text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 sm:flex lg:text-base"
+                className="group relative hidden cursor-pointer items-center whitespace-nowrap border-0 bg-transparent text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base"
               >
                 <span className="py-2">
                   {loginStarting
@@ -432,8 +432,130 @@ export function Header({ showLogo = false }: HeaderProps) {
               ) : null}
             </>
           )}
+
+          <button
+            type="button"
+            aria-controls="mobile-primary-navigation"
+            aria-expanded={mobileMenuOpen}
+            aria-label={
+              mobileMenuOpen
+                ? lang === "ko"
+                  ? "메뉴 닫기"
+                  : "Close menu"
+                : lang === "ko"
+                  ? "메뉴 열기"
+                  : "Open menu"
+            }
+            onClick={() => {
+              setMobileMenuOpen((value) => !value);
+              setSearchOpen(false);
+              setDropdownOpen(false);
+            }}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-kaist-black transition-colors hover:bg-slate-100 hover:text-kaist-darkgreen md:hidden"
+          >
+            {mobileMenuOpen ? (
+              <X aria-hidden="true" className="h-5 w-5" />
+            ) : (
+              <Menu aria-hidden="true" className="h-5 w-5" />
+            )}
+          </button>
         </div>
       </div>
+
+      {mobileMenuOpen && (
+        <div
+          id="mobile-primary-navigation"
+          className="absolute left-0 right-0 top-full z-50 border-t border-slate-100 bg-white px-4 pb-5 pt-4 shadow-xl md:hidden"
+        >
+          <nav aria-label={lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}>
+            <div className="grid grid-cols-3 gap-2">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={closePopovers}
+                  className="flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-2 text-center text-xs font-black text-slate-800 transition-colors hover:border-kaist-darkgreen/20 hover:bg-kaist-lightgreen/10 hover:text-kaist-darkgreen"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
+
+          <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4">
+            <button
+              type="button"
+              onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-black text-slate-700"
+            >
+              <Globe aria-hidden="true" className="h-4 w-4 text-kaist-greygreen" />
+              {lang === "ko" ? "English" : "한국어"}
+            </button>
+
+            {user ? (
+              <div
+                className={`grid items-center gap-2 ${
+                  canUseAdminDashboard
+                    ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem]"
+                    : "grid-cols-[minmax(0,1fr)_2.75rem]"
+                }`}
+              >
+                <Link
+                  to="/mypage"
+                  onClick={closePopovers}
+                  className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-slate-200 px-2 text-center text-xs font-black text-slate-700"
+                >
+                  {lang === "ko" ? "마이페이지" : "My Page"}
+                </Link>
+                {canUseAdminDashboard && (
+                  <Link
+                    to="/admin"
+                    onClick={closePopovers}
+                    className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-kaist-darkgreen px-2 text-center text-xs font-black text-white"
+                  >
+                    {lang === "ko" ? "관리자" : "Admin"}
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 text-red-600"
+                  aria-label={lang === "ko" ? "로그아웃" : "Logout"}
+                >
+                  <LogOut aria-hidden="true" className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleStartLogin()}
+                  disabled={loginStarting}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-kaist-darkgreen px-4 text-xs font-black text-white disabled:opacity-60"
+                >
+                  {loginStarting
+                    ? lang === "ko"
+                      ? "로그인 중"
+                      : "Signing in"
+                    : lang === "ko"
+                      ? "로그인"
+                      : "Login"}
+                </button>
+                {import.meta.env.DEV && (
+                  <button
+                    type="button"
+                    onClick={() => void handleMockLogin()}
+                    disabled={mockLoginStarting}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-black text-emerald-700 disabled:opacity-60"
+                  >
+                    {mockLoginStarting ? "Mock..." : "Mock"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div
         className={`absolute left-0 w-full bg-white shadow-[0_15px_30px_rgba(0,0,0,0.06)] border-t border-slate-50 overflow-hidden transition-all duration-300 ease-out ${

@@ -5,7 +5,6 @@ import {
   AlreadySubmittedView,
   BeforeOpenView,
   ClosedView,
-  KoreanOnlyWarningView,
   LoginRequiredView,
   SuccessView,
 } from "@/features/survey/survey-state-views";
@@ -84,16 +83,6 @@ export function SurveyPage() {
           surveyId={id!}
         />
       );
-    }
-
-    if (
-      !isPreview &&
-      survey.isKoreanOnly &&
-      session?.nameKo &&
-      session?.nameEn &&
-      session.nameKo === session.nameEn
-    ) {
-      return <KoreanOnlyWarningView lang={lang} />;
     }
 
     const isEditingExistingResponse =

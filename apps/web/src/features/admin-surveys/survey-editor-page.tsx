@@ -54,7 +54,7 @@ const SurveySettingsSchema = z.object({
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
   kind: z.string().min(1).max(20),
-  resultVisibility: z.string().min(1).max(20),
+  resultVisibility: z.enum(["PRIVATE", "PUBLIC"]),
   feePayersOnly: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
   allowMultipleResponses: z.boolean().optional(),
@@ -132,7 +132,7 @@ export function SurveyEditorPage() {
       descriptionKo: "",
       descriptionEn: "",
       kind: "SURVEY",
-      resultVisibility: "PUBLIC",
+      resultVisibility: "PRIVATE",
       feePayersOnly: false,
       isKoreanOnly: false,
       allowMultipleResponses: false,
@@ -149,7 +149,15 @@ export function SurveyEditorPage() {
 
   const isKoreanOnly = Boolean(form.watch("isKoreanOnly"));
   const isPublished = Boolean(form.watch("isPublished"));
-  const isOngoing = isEdit && isPublished;
+  const [loadedLifecycleStatus, setLoadedLifecycleStatus] = useState<
+    SurveyDetailResponse["lifecycleStatus"] | null
+  >(null);
+  const [loadedVersionNumber, setLoadedVersionNumber] = useState(1);
+  const [loadedPreviousVersionId, setLoadedPreviousVersionId] = useState<
+    string | null
+  >(null);
+  const isArchived = loadedLifecycleStatus === "ARCHIVED";
+  const isOngoing = isEdit && (isPublished || isArchived);
 
   const [articleSearchResults, setArticleSearchResults] = useState<ArticleListItem[]>([]);
   const [showArticleSearch, setShowArticleSearch] = useState(false);
@@ -203,7 +211,8 @@ export function SurveyEditorPage() {
             descriptionKo: detail.descriptionKo ?? "",
             descriptionEn: detail.descriptionEn ?? "",
             kind: detail.kind ?? "SURVEY",
-            resultVisibility: detail.resultVisibility ?? "PUBLIC",
+            resultVisibility:
+              detail.resultVisibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
             feePayersOnly: detail.feePayersOnly,
             isKoreanOnly: detail.isKoreanOnly ?? false,
             allowMultipleResponses: detail.allowMultipleResponses ?? false,
@@ -219,6 +228,9 @@ export function SurveyEditorPage() {
           });
           setSections(detail.sections);
           setLoadedSurveyId(surveyId);
+          setLoadedLifecycleStatus(detail.lifecycleStatus);
+          setLoadedVersionNumber(detail.versionNumber);
+          setLoadedPreviousVersionId(detail.previousVersionId);
 
           if (detail.connectedPostId) {
             client.searchArticles(detail.connectedPostId, 1).then(results => {
@@ -235,6 +247,10 @@ export function SurveyEditorPage() {
   }, [isEdit, surveyId, navigate, form, session, sessionLoading]);
 
   const handleSaveSettings = async (values: SurveySettingsFormValues) => {
+    if (isArchived) {
+      setError("보관된 설문은 수정하거나 다시 게시할 수 없습니다.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -518,6 +534,14 @@ export function SurveyEditorPage() {
             </div>
           </div>
 
+          {isArchived && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 text-sm font-semibold text-violet-800">
+              이 설문은 보관되어 읽기 전용입니다. 새 변경본이 필요하면 목록에서
+              복제하세요. {loadedPreviousVersionId ? "파생 단계" : "원본"} v
+              {loadedVersionNumber}
+            </div>
+          )}
+
           {/* Tab Navigation */}
           <div className="flex bg-gray-100/80 p-1.5 rounded-2xl w-full max-w-xs border border-kaist-darkgreen/10 shadow-inner">
             <button
@@ -554,6 +578,7 @@ export function SurveyEditorPage() {
                 saving={saving}
                 isEdit={isEdit}
                 isOngoing={isOngoing}
+                isArchived={isArchived}
                 showArticleSearch={showArticleSearch}
                 articleSearchResults={articleSearchResults}
                 selectedArticleTitle={selectedArticleTitle}

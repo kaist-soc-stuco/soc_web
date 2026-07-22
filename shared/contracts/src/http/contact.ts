@@ -4,9 +4,9 @@ import type { CreateContactSchema, UpdateContactSchema } from "../schemas.js";
 export interface ContactRecord {
   id: string;
   nameKo: string;
-  nameEn: string | null;
+  nameEn: string;
   roleKo: string;
-  roleEn: string | null;
+  roleEn: string;
   email: string | null;
   phoneNumber: string | null;
   sortOrder: number;

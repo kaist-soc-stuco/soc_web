@@ -184,7 +184,9 @@ export class UsersController {
       userId,
       {
         ...body,
-        verifiedBy: req.user?.id,
+        ...(body.status !== undefined && req.user?.id
+          ? { verifiedBy: req.user.id }
+          : {}),
       },
       {
         actorUserId: req.user?.id,

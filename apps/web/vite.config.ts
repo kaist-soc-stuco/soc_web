@@ -27,10 +27,11 @@ export default defineConfig(({ mode }) => {
             if (!id.includes("node_modules")) return undefined;
 
             if (
-              id.includes("/react/") ||
-              id.includes("/react-dom/") ||
-              id.includes("/react-router") ||
-              id.includes("/scheduler/")
+              id.includes("/node_modules/react/") ||
+              id.includes("/node_modules/react-dom/") ||
+              id.includes("/node_modules/react-router/") ||
+              id.includes("/node_modules/react-router-dom/") ||
+              id.includes("/node_modules/scheduler/")
             ) {
               return "vendor-react";
             }
@@ -81,10 +82,6 @@ export default defineConfig(({ mode }) => {
           rewrite: (requestPath) => requestPath.replace(/^\/api/, "/v1"),
         },
         "/health": {
-          target: apiTarget,
-          changeOrigin: true,
-        },
-        "/uploads/assets": {
           target: apiTarget,
           changeOrigin: true,
         },

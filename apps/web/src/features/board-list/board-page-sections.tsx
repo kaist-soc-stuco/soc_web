@@ -383,6 +383,7 @@ export function BoardArticleTable({
         <div className="border-t border-slate-200 bg-slate-50/20 px-6 py-4 relative flex items-center justify-center select-none">
           <Pagination
             currentPage={currentPage}
+            lang={lang}
             onPageChange={onPageChange}
             size="sm"
             totalPages={totalPages}

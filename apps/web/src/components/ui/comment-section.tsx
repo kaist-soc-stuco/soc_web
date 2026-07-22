@@ -12,6 +12,7 @@ type CommentSectionProps = {
   commentsLoading: boolean;
   currentUserId: string | null;
   isAuthenticated: boolean;
+  lang: string;
   onCommentTextChange: (value: string) => void;
   onCreateComment: () => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
@@ -27,6 +28,7 @@ export function CommentSection({
   commentError,
   commentSubmitting,
   isAuthenticated,
+  lang,
   onCommentTextChange,
   onCreateComment,
   onDeleteComment,
@@ -35,7 +37,7 @@ export function CommentSection({
     <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-6 py-6 shadow-[0_8px_28px_rgba(15,23,42,0.04)] md:px-[40px] md:py-[24px]">
       <div className="flex items-center justify-between pb-3">
         <h2 className="text-sm font-bold text-slate-800">
-          댓글 {comments.length}
+          {lang === "ko" ? `댓글 ${comments.length}` : `${comments.length} comments`}
         </h2>
         {commentsLoading && (
           <Loader2 className="h-4 w-4 animate-spin text-kaist-darkgreen" />
@@ -49,7 +51,9 @@ export function CommentSection({
               rows={1}
               value={commentText}
               onChange={(event) => onCommentTextChange(event.target.value)}
-              placeholder="댓글을 입력해주세요."
+              placeholder={
+                lang === "ko" ? "댓글을 입력해 주세요." : "Write a comment..."
+              }
               className="min-h-[40px] flex-1 resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium leading-normal text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
               onKeyDown={(event) => {
                 if (
@@ -75,20 +79,24 @@ export function CommentSection({
               {commentSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "등록"
+                lang === "ko" ? "등록" : "Post"
               )}
             </button>
           </div>
         ) : (
           <div className="rounded-lg bg-slate-50 px-3 py-2.5">
             <p className="text-sm font-bold text-slate-500">
-              댓글 작성은 로그인이 필요합니다.
+              {lang === "ko"
+                ? "댓글 작성은 로그인이 필요합니다."
+                : "Sign in to write a comment."}
             </p>
           </div>
         )}
         {!canCreateComment && isAuthenticated && (
           <p className="mt-2 text-xs font-semibold text-rose-600">
-            이 게시글에는 댓글을 작성할 수 없습니다.
+            {lang === "ko"
+              ? "이 게시글에는 댓글을 작성할 수 없습니다."
+              : "Comments are not available on this post."}
           </p>
         )}
         {commentError && (
@@ -101,13 +109,13 @@ export function CommentSection({
       <div className="order-2 mt-2 divide-y divide-slate-100">
         {comments.length === 0 && !commentsLoading ? (
           <div className="py-4 text-sm font-medium text-slate-400">
-            아직 등록된 댓글이 없습니다.
+            {lang === "ko" ? "아직 등록된 댓글이 없습니다." : "No comments yet."}
           </div>
         ) : (
           comments.map((comment) => {
             const canDelete =
               canManageComments || currentUserId === comment.author.userId;
-            const authorInitial = (comment.author.name || "익명")
+            const authorInitial = (comment.author.name || (lang === "ko" ? "익명" : "Anonymous"))
               .trim()
               .charAt(0)
               .toUpperCase();
@@ -137,9 +145,9 @@ export function CommentSection({
                         type="button"
                         onClick={() => void onDeleteComment(comment.commentId)}
                         className="shrink-0 text-xs font-bold text-slate-400 transition hover:text-rose-600"
-                        title="댓글 삭제"
+                        title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
                       >
-                        삭제
+                        {lang === "ko" ? "삭제" : "Delete"}
                       </button>
                     )}
                   </div>

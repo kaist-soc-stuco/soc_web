@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createApiClient } from '@soc/api-client';
-import type { StudentFeeListResponse, FeeStatus } from '@soc/contracts';
+import type {
+  FeeStatus,
+  StudentFeeListResponse,
+  UpdateStudentFeeStatusRequest,
+} from '@soc/contracts';
 import { isoToDate, nowIso } from '@soc/shared';
 import { Pagination } from '@/components/ui/pagination';
 import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
@@ -95,24 +99,31 @@ export function FeeManagementPage() {
     });
   };
 
-  const saveStudentFeeStatus = async (userId: string, status: FeeStatus, note: string) => {
+  const saveStudentFeeStatus = async (
+    userId: string,
+    input: UpdateStudentFeeStatusRequest,
+  ) => {
     const previousStudent = feeData?.students.find((student) => student.userId === userId);
     const previousNoteDraft = noteDrafts[userId];
-    const optimisticPaidAt = status === 'PAID' ? nowIso() : null;
+    const nextStatus = input.status ?? previousStudent?.status ?? 'UNPAID';
+    const nextNote = input.note !== undefined ? input.note : previousStudent?.note ?? null;
+    const statusChanged = input.status !== undefined && input.status !== previousStudent?.status;
+    const optimisticPaidAt = statusChanged
+      ? nextStatus === 'PAID'
+        ? nowIso()
+        : null
+      : previousStudent?.paidAt ?? null;
 
     try {
       setSavingUserId(userId);
       setOperationError(null);
       updateStudentRow(userId, {
-        note: note.trim() ? note : null,
+        note: nextNote,
         paidAt: optimisticPaidAt,
-        status,
+        status: nextStatus,
       });
 
-      const record = await apiClient.updateStudentFeeStatus(userId, {
-        status,
-        note: note.trim() ? note : null,
-      });
+      const record = await apiClient.updateStudentFeeStatus(userId, input);
       setNoteDrafts((prev) => ({
         ...prev,
         [userId]: record.note ?? '',
@@ -153,7 +164,11 @@ export function FeeManagementPage() {
   };
 
   const handleStatusChange = (userId: string, status: FeeStatus) => {
-    void saveStudentFeeStatus(userId, status, noteDrafts[userId] ?? '');
+    const note = noteDrafts[userId] ?? '';
+    void saveStudentFeeStatus(userId, {
+      status,
+      note: note.trim() ? note : null,
+    });
   };
 
   const handleStatusToggle = (userId: string, currentStatus: FeeStatus) => {
@@ -161,12 +176,12 @@ export function FeeManagementPage() {
     handleStatusChange(userId, nextStatus);
   };
 
-  const handleNoteBlur = (userId: string, status: FeeStatus, note: string) => {
+  const handleNoteBlur = (userId: string, note: string) => {
     const currentNote = feeData?.students.find((student) => student.userId === userId)?.note ?? '';
     if (currentNote === note) {
       return;
     }
-    void saveStudentFeeStatus(userId, status, note);
+    void saveStudentFeeStatus(userId, { note: note.trim() ? note : null });
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -398,7 +413,7 @@ export function FeeManagementPage() {
                               [student.userId]: e.target.value,
                             }))
                           }
-                          onBlur={(e) => handleNoteBlur(student.userId, student.status, e.target.value)}
+                          onBlur={(e) => handleNoteBlur(student.userId, e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.currentTarget.blur();

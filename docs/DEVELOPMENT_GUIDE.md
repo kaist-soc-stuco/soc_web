@@ -1,4 +1,4 @@
-# SoC Web Development Guide
+# SOC Web Development Guide
 
 이 문서는 전산학부 집행위원회 사이트에 기능을 추가할 때 우선 따를 개발 규칙이다. 현재 코드베이스의 구조와 관성을 존중하되, 작은 학생회 사이트 규모에서 유지보수성을 높이는 방향을 기준으로 한다.
 

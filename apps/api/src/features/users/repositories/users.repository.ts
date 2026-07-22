@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
 import { isoToMs, msToIso, nowDate } from "@soc/shared";
-import { and, asc, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -30,6 +30,10 @@ import type {
   ArticleStatus,
   CommentStatus,
   FeeStatus,
+  MyActivityItem,
+  MyArticleItem,
+  MyCommentItem,
+  MySurveyResponseItem,
   ResponseStatus,
   StudentFeeListResponse,
   StudentFeeStatusRecord,
@@ -496,45 +500,67 @@ export class UsersRepository {
   async updateStudentFeeStatus(
     userId: string,
     input: {
-      status: FeeStatus;
+      status?: FeeStatus;
       coverageSemesters?: number;
       note?: string | null;
       verifiedBy?: string;
     },
   ): Promise<StudentFeeStatusRecord> {
-    const now = nowDate();
-    await this.db.transaction(async (tx) => {
+    const row = await this.db.transaction(async (tx) => {
+      const lockUserIds = input.verifiedBy && input.verifiedBy !== userId
+        ? [userId, input.verifiedBy].sort()
+        : [userId];
+      const lockedUsers = await tx
+        .select({ userId: users.userId })
+        .from(users)
+        .where(inArray(users.userId, lockUserIds))
+        .orderBy(asc(users.userId))
+        .for("update")
+        .limit(lockUserIds.length);
+
+      if (!lockedUsers.some((lockedUser) => lockedUser.userId === userId)) {
+        throw new InternalServerErrorException("Can't load data");
+      }
+
+      const now = nowDate();
       const existing = await tx
         .select()
         .from(studentFeeStatus)
         .where(eq(studentFeeStatus.userId, userId))
+        .for("update")
         .limit(1);
 
       const current = existing[0];
+      const currentStatus: FeeStatus = current?.status === "PAID" ? "PAID" : "UNPAID";
+      const nextStatus = input.status ?? currentStatus;
+      const statusChanged = input.status !== undefined && input.status !== currentStatus;
+      const verifierChanged = statusChanged && input.verifiedBy !== undefined;
       const nextRecord = {
         coverageSemesters: input.coverageSemesters ?? current?.coverageSemesters ?? 4,
         note: input.note !== undefined ? input.note : current?.note ?? null,
-        paidAt:
-          input.status === "PAID"
+        paidAt: statusChanged
+          ? nextStatus === "PAID"
             ? now
-            : input.status === "UNPAID"
-              ? null
-              : current?.paidAt ?? null,
-        status: input.status,
+            : null
+          : current?.paidAt ?? null,
+        status: nextStatus,
         updatedAt: now,
-        verifiedAt:
-          input.verifiedBy !== undefined ? now : current?.verifiedAt ?? null,
-        verifiedBy:
-          input.verifiedBy !== undefined ? input.verifiedBy : current?.verifiedBy ?? null,
+        verifiedAt: verifierChanged ? now : current?.verifiedAt ?? null,
+        verifiedBy: verifierChanged ? input.verifiedBy : current?.verifiedBy ?? null,
       };
 
       if (current) {
-        await tx
+        const updated = await tx
           .update(studentFeeStatus)
           .set(nextRecord)
-          .where(eq(studentFeeStatus.userId, userId));
-      } else {
-        await tx.insert(studentFeeStatus).values({
+          .where(eq(studentFeeStatus.userId, userId))
+          .returning();
+        return updated[0];
+      }
+
+      const inserted = await tx
+        .insert(studentFeeStatus)
+        .values({
           coverageSemesters: nextRecord.coverageSemesters,
           note: nextRecord.note,
           paidAt: nextRecord.paidAt,
@@ -543,39 +569,59 @@ export class UsersRepository {
           userId,
           verifiedAt: nextRecord.verifiedAt,
           verifiedBy: nextRecord.verifiedBy,
-        });
-      }
+        })
+        .returning();
+      return inserted[0];
     });
 
-    const record = await this.getStudentFeeStatus(userId);
-    if (!record) {
+    if (!row) {
       throw new InternalServerErrorException("Can't load data");
     }
-    return record;
-    // return this.getStudentFeeStatus(userId) as Promise<StudentFeeStatusRecord>;
+
+    return {
+      userId: row.userId,
+      status: row.status === "PAID" ? "PAID" : "UNPAID",
+      coverageSemesters: row.coverageSemesters,
+      paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
+      verifiedBy: row.verifiedBy,
+      verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
+      note: row.note,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+    };
   }
 
   async ensureStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord> {
-    const now = nowDate();
-    
-    // ON CONFLICT (userId) DO UPDATE SET userId = EXCLUDED.userId
-    // 무의미한 업데이트(자기 자신의 ID로 덮어쓰기)를 발생시켜 
-    // 기존 로우가 있든 새로 삽입되든 항상 RETURNING을 발동시킵니다.
-    const rows = await this.db
-      .insert(studentFeeStatus)
-      .values({
-        userId,
-        status: "UNPAID",
-        coverageSemesters: 4,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: studentFeeStatus.userId,
-        set: { userId: sql`EXCLUDED.user_id` } 
-      })
-      .returning();
+    const row = await this.db.transaction(async (tx) => {
+      const lockedUser = await tx
+        .select({ userId: users.userId })
+        .from(users)
+        .where(eq(users.userId, userId))
+        .for("update")
+        .limit(1);
 
-    const row = rows[0];
+      if (!lockedUser.length) {
+        throw new InternalServerErrorException("Can't load data");
+      }
+
+      const rows = await tx
+        .insert(studentFeeStatus)
+        .values({
+          userId,
+          status: "UNPAID",
+          coverageSemesters: 4,
+          updatedAt: nowDate(),
+        })
+        .onConflictDoUpdate({
+          target: studentFeeStatus.userId,
+          set: { userId: sql`EXCLUDED.user_id` },
+        })
+        .returning();
+      return rows[0];
+    });
+
+    if (!row) {
+      throw new InternalServerErrorException("Can't load data");
+    }
 
     return {
       userId: row.userId,
@@ -664,16 +710,22 @@ export class UsersRepository {
     };
   }
 
-  async getMyArticles(userId: string, limit: number, offset: number) {
+  async getMyArticles(
+    userId: string,
+    limit: number,
+    offset: number,
+  ): Promise<MyArticleItem[]> {
     const rows = await this.db
       .select({
         articleId: articles.articleId,
         boardId: articles.boardId,
         titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
         status: articles.status,
         visibilityScope: articles.visibilityScope,
         postedAt: articles.postedAt,
         boardNameKo: boards.nameKo,
+        boardNameEn: boards.nameEn,
         boardCode: boards.code,
         commentCount: sql<number>`(
           select count(*)
@@ -693,8 +745,10 @@ export class UsersRepository {
       articleId: String(r.articleId),
       boardId: r.boardId,
       boardNameKo: r.boardNameKo,
+      boardNameEn: r.boardNameEn,
       boardCode: r.boardCode,
       titleKo: r.titleKo,
+      titleEn: r.titleEn,
       status: r.status as ArticleStatus,
       visibilityScope: r.visibilityScope as VisibilityScope,
       postedAt: msToIso(r.postedAt.valueOf()),
@@ -711,7 +765,11 @@ export class UsersRepository {
     return Number(rows[0]?.count ?? 0);
   }
 
-  async getMyComments(userId: string, limit: number, offset: number) {
+  async getMyComments(
+    userId: string,
+    limit: number,
+    offset: number,
+  ): Promise<MyCommentItem[]> {
     const rows = await this.db
       .select({
         commentId: comments.commentId,
@@ -720,8 +778,10 @@ export class UsersRepository {
         createdAt: comments.createdAt,
         articleId: articles.articleId,
         articleTitleKo: articles.titleKo,
+        articleTitleEn: articles.titleEn,
         boardId: boards.boardId,
         boardNameKo: boards.nameKo,
+        boardNameEn: boards.nameEn,
         boardCode: boards.code,
       })
       .from(comments)
@@ -737,8 +797,10 @@ export class UsersRepository {
       articleId: String(r.articleId),
       boardId: r.boardId,
       boardNameKo: r.boardNameKo,
+      boardNameEn: r.boardNameEn,
       boardCode: r.boardCode,
       articleTitleKo: r.articleTitleKo,
+      articleTitleEn: r.articleTitleEn,
       content: r.content,
       status: r.status as CommentStatus,
       createdAt: msToIso(r.createdAt.valueOf()),
@@ -754,12 +816,17 @@ export class UsersRepository {
     return Number(rows[0]?.count ?? 0);
   }
 
-  async getMySurveyResponses(userId: string, limit: number, offset: number) {
+  async getMySurveyResponses(
+    userId: string,
+    limit: number,
+    offset: number,
+  ): Promise<MySurveyResponseItem[]> {
     const rows = await this.db
       .select({
         responseId: surveyResponses.id,
         surveyId: surveys.surveyId,
         surveyTitleKo: surveys.titleKo,
+        surveyTitleEn: surveys.titleEn,
         status: surveyResponses.status,
         submittedAt: surveyResponses.submittedAt,
       })
@@ -774,6 +841,7 @@ export class UsersRepository {
       responseId: r.responseId,
       surveyId: r.surveyId,
       surveyTitleKo: r.surveyTitleKo,
+      surveyTitleEn: r.surveyTitleEn,
       status: r.status as ResponseStatus,
       submittedAt: r.submittedAt ? msToIso(r.submittedAt.valueOf()) : null,
     }));
@@ -788,11 +856,17 @@ export class UsersRepository {
     return Number(rows[0]?.count ?? 0);
   }
 
-  async getMyActivities(userId: string, limit: number, offset: number) {
+  async getMyActivities(
+    userId: string,
+    limit: number,
+    offset: number,
+  ): Promise<MyActivityItem[]> {
     type MyActivityRow = {
       activityType: "survey" | "post" | "comment";
       resourceId: string;
-      title: string;
+      titleKo: string;
+      titleEn: string | null;
+      commentContent: string | null;
       occurredAt: Date | string;
       articleId: string | null;
       boardCode: string | null;
@@ -804,7 +878,9 @@ export class UsersRepository {
         SELECT
           'post' AS "activityType",
           ${articles.articleId}::text AS "resourceId",
-          ${articles.titleKo} AS "title",
+          ${articles.titleKo} AS "titleKo",
+          ${articles.titleEn} AS "titleEn",
+          NULL::text AS "commentContent",
           ${articles.postedAt} AS "occurredAt",
           ${articles.articleId}::text AS "articleId",
           ${boards.code} AS "boardCode",
@@ -819,7 +895,9 @@ export class UsersRepository {
         SELECT
           'comment' AS "activityType",
           ${comments.commentId}::text AS "resourceId",
-          ${comments.content} AS "title",
+          ${articles.titleKo} AS "titleKo",
+          ${articles.titleEn} AS "titleEn",
+          ${comments.content} AS "commentContent",
           ${comments.createdAt} AS "occurredAt",
           ${articles.articleId}::text AS "articleId",
           ${boards.code} AS "boardCode",
@@ -835,7 +913,9 @@ export class UsersRepository {
         SELECT
           'survey' AS "activityType",
           ${surveyResponses.id}::text AS "resourceId",
-          ${surveys.titleKo} AS "title",
+          ${surveys.titleKo} AS "titleKo",
+          ${surveys.titleEn} AS "titleEn",
+          NULL::text AS "commentContent",
           COALESCE(${surveyResponses.submittedAt}, ${surveyResponses.createdAt}) AS "occurredAt",
           NULL::text AS "articleId",
           NULL::text AS "boardCode",
@@ -854,13 +934,15 @@ export class UsersRepository {
     return result.rows.map((row) => ({
       articleId: row.articleId,
       boardCode: row.boardCode,
+      commentContent: row.commentContent,
       occurredAt:
         row.occurredAt instanceof Date
           ? msToIso(row.occurredAt.valueOf())
           : msToIso(isoToMs(String(row.occurredAt))),
       resourceId: row.resourceId,
       surveyId: row.surveyId,
-      title: row.title,
+      titleKo: row.titleKo,
+      titleEn: row.titleEn,
       type: row.activityType,
     }));
   }

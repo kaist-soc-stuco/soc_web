@@ -7,36 +7,22 @@ import {
 
 import { SurveyResponsesRepository } from "./survey-responses.repository";
 import { SurveysRepository } from "./surveys.repository";
-import { SurveySectionsRepository } from "./survey-sections.repository";
-import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { UsersService } from "../users/users.service";
 
 
 import type { ResponseDetailResponse } from "@soc/contracts";
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
-import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import { isoToMs, nowMs } from "@soc/shared";
-import { validateSurveyAnswers } from "./survey-answer-validation";
 
 @Injectable()
 export class SurveyResponsesService {
   constructor(
     private readonly responsesRepo: SurveyResponsesRepository,
     private readonly surveysRepo: SurveysRepository,
-    private readonly sectionsRepo: SurveySectionsRepository,
-    private readonly questionsRepo: SurveyQuestionsRepository,
     private readonly usersService: UsersService,
   ) {}
-
-  private async getAllQuestionsForSurvey(surveyId: string): Promise<SurveyQuestionRecord[]> {
-    const sections = await this.sectionsRepo.findBySurveyId(surveyId);
-    const questionArrays = await Promise.all(
-      sections.map((s) => this.questionsRepo.findBySectionId(s.id)),
-    );
-    return questionArrays.flat();
-  }
 
   async submit(
     surveyId: string,
@@ -58,13 +44,6 @@ export class SurveyResponsesService {
       throw new ForbiddenException("login_required");
     }
 
-    if (!survey.allowMultipleResponses) {
-      const existing = await this.responsesRepo.findByUserAndSurvey(surveyId, caller.id);
-      if (existing) {
-        throw new ConflictException("already_submitted");
-      }
-    }
-
     if (survey.feePayersOnly) {
       const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
       if (!feeStatus || feeStatus.status !== "PAID") {
@@ -72,21 +51,35 @@ export class SurveyResponsesService {
       }
     }
 
-    if (survey.maxResponses !== null) {
-      const count = await this.responsesRepo.countSubmitted(surveyId);
-      if (count >= survey.maxResponses) throw new ConflictException("survey_capacity_full");
-    }
-
-    const questions = await this.getAllQuestionsForSurvey(surveyId);
-    validateSurveyAnswers(questions, dto.answers, now);
-
-    const { response, answers } = await this.responsesRepo.insertSubmission({
+    const submission = await this.responsesRepo.insertSubmission({
       surveyId,
       userId: caller.id,
       answers: dto.answers,
     });
 
-    return { ...response, answers };
+    if (submission.status === "survey_not_found") {
+      throw new NotFoundException("survey_not_found");
+    }
+    if (submission.status === "survey_not_published") {
+      throw new NotFoundException("survey_not_found");
+    }
+    if (submission.status === "survey_not_open_yet") {
+      throw new ConflictException("survey_not_open_yet");
+    }
+    if (submission.status === "survey_closed") {
+      throw new ConflictException("survey_closed");
+    }
+    if (submission.status === "fee_payer_only") {
+      throw new ForbiddenException("fee_payer_only");
+    }
+    if (submission.status === "already_submitted") {
+      throw new ConflictException("already_submitted");
+    }
+    if (submission.status === "capacity_full") {
+      throw new ConflictException("survey_capacity_full");
+    }
+
+    return { ...submission.response, answers: submission.answers };
   }
 
   async findMine(
@@ -142,16 +135,38 @@ export class SurveyResponsesService {
     const existing = await this.responsesRepo.findByUserAndSurvey(surveyId, caller.id);
     if (!existing) throw new NotFoundException("response_not_found");
 
-    const questions = await this.getAllQuestionsForSurvey(surveyId);
-    validateSurveyAnswers(questions, dto.answers, now);
-
-    const { response, answers } = await this.responsesRepo.updateSubmission({
+    const update = await this.responsesRepo.updateSubmission({
       responseId: existing.id,
       surveyId,
+      userId: caller.id,
       answers: dto.answers,
     });
 
-    return { ...response, answers };
+    if (update.status === "updated") {
+      return { ...update.response, answers: update.answers };
+    }
+    if (
+      update.status === "survey_not_found" ||
+      update.status === "survey_not_published"
+    ) {
+      throw new NotFoundException("survey_not_found");
+    }
+    if (update.status === "survey_not_open_yet") {
+      throw new ConflictException("survey_not_open_yet");
+    }
+    if (update.status === "survey_closed") {
+      throw new ConflictException("survey_closed");
+    }
+    if (update.status === "fee_payer_only") {
+      throw new ForbiddenException("fee_payer_only");
+    }
+    if (update.status === "response_edit_not_allowed") {
+      throw new ConflictException("response_edit_not_allowed");
+    }
+    if (update.status === "multiple_response_edit_not_supported") {
+      throw new ConflictException("multiple_response_edit_not_supported");
+    }
+    throw new NotFoundException("response_not_found");
   }
 
   async findAll(surveyId: string): Promise<SurveyResponseRecord[]> {

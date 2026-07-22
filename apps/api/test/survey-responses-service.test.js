@@ -33,44 +33,26 @@ function survey(overrides = {}) {
   };
 }
 
-function question(overrides = {}) {
-  return {
-    id: "question-1",
-    sectionId: "section-1",
-    titleKo: "질문",
-    titleEn: null,
-    descriptionKo: null,
-    descriptionEn: null,
-    questionType: "short_text",
-    options: null,
-    answerRegex: null,
-    isRequired: true,
-    editDeadlineAt: null,
-    sortOrder: 1,
-    createdAt: NOWISH_ISO,
-    updatedAt: NOWISH_ISO,
-    ...overrides,
-  };
-}
-
 function createService({
-  countSubmitted = 0,
   existingResponse = null,
   feeStatus = { status: "PAID" },
-  questions = [question()],
+  insertSubmissionStatus = "created",
   surveyRecord = survey(),
 } = {}) {
   const insertSubmissionCalls = [];
   const updateSubmissionCalls = [];
 
   const responsesRepo = {
-    countSubmitted: async () => countSubmitted,
     findBySurveyId: async () => [],
     findByUserAndSurvey: async () => existingResponse,
     findAnswersByResponseId: async () => [],
     insertSubmission: async (input) => {
       insertSubmissionCalls.push(input);
+      if (insertSubmissionStatus !== "created") {
+        return { status: insertSubmissionStatus };
+      }
       return {
+        status: "created",
         response: {
           id: "response-1",
           surveyId: input.surveyId,
@@ -94,6 +76,7 @@ function createService({
     updateSubmission: async (input) => {
       updateSubmissionCalls.push(input);
       return {
+        status: "updated",
         response: {
           id: input.responseId,
           surveyId: input.surveyId,
@@ -119,8 +102,6 @@ function createService({
   const service = new SurveyResponsesService(
     responsesRepo,
     { findById: async () => surveyRecord },
-    { findBySurveyId: async () => [{ id: "section-1" }] },
-    { findBySectionId: async () => questions },
     { getStudentFeeStatus: async () => feeStatus },
   );
 
@@ -185,9 +166,9 @@ test("requires a logged-in caller", async () => {
   assert.equal(insertSubmissionCalls.length, 0);
 });
 
-test("rejects duplicate submissions when multiple responses are disabled", async () => {
+test("maps the transactional duplicate outcome to a conflict", async () => {
   const { insertSubmissionCalls, service } = createService({
-    existingResponse: { id: "existing-response" },
+    insertSubmissionStatus: "already_submitted",
   });
 
   await expectHttpError(
@@ -195,7 +176,7 @@ test("rejects duplicate submissions when multiple responses are disabled", async
     ConflictException,
     "already_submitted",
   );
-  assert.equal(insertSubmissionCalls.length, 0);
+  assert.equal(insertSubmissionCalls.length, 1);
 });
 
 test("requires backend-confirmed fee payment for fee-payer-only surveys", async () => {
@@ -214,7 +195,7 @@ test("requires backend-confirmed fee payment for fee-payer-only surveys", async 
 
 test("rejects submissions once capacity is full", async () => {
   const { insertSubmissionCalls, service } = createService({
-    countSubmitted: 10,
+    insertSubmissionStatus: "capacity_full",
     surveyRecord: survey({ maxResponses: 10 }),
   });
 
@@ -223,7 +204,7 @@ test("rejects submissions once capacity is full", async () => {
     ConflictException,
     "survey_capacity_full",
   );
-  assert.equal(insertSubmissionCalls.length, 0);
+  assert.equal(insertSubmissionCalls.length, 1);
 });
 
 test("stores valid submissions with the authenticated user id", async () => {
@@ -268,6 +249,7 @@ test("updates the caller's existing response when editing is allowed", async () 
   assert.deepEqual(updateSubmissionCalls[0], {
     responseId: "existing-response",
     surveyId: "survey-1",
+    userId: "user-1",
     answers: validDto.answers,
   });
   assert.equal(result.id, "existing-response");

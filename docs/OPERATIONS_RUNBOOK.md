@@ -11,11 +11,9 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build
-pnpm db:seed
 ```
 
-`pnpm db:seed`는 `infra/scripts/db-seed.sh`를 통해 Postgres 컨테이너를 올리고, migration을 적용한 뒤 seed를 실행합니다.
-seed는 개발/스테이징 초기 데이터를 다시 맞추는 용도이며, 운영 DB에 적용하기 전에는 대상 DB와 `.env`를 반드시 확인합니다.
+`pnpm db:seed`는 배포 전 검증 명령이 아닙니다. `SEED_MODE=demo`는 개발용 샘플 데이터를 정리하고 다시 만들기 때문에 production에서 실행이 차단됩니다. 운영에서 권한·게시판 기준 데이터만 맞춰야 할 때에만 `SEED_MODE=reference pnpm db:seed`를 명시적으로 사용합니다.
 
 ## DB Migration And Seed
 
@@ -23,7 +21,7 @@ seed는 개발/스테이징 초기 데이터를 다시 맞추는 용도이며, �
 
 ```bash
 pnpm db:migrate
-pnpm db:seed
+SEED_MODE=demo pnpm db:seed
 ```
 
 API 워크스페이스 단독 확인:
@@ -32,7 +30,7 @@ API 워크스페이스 단독 확인:
 set -a && source .env && set +a
 pnpm --filter @soc/api db:generate
 pnpm --filter @soc/api db:migrate
-pnpm --filter @soc/api db:seed
+SEED_MODE=demo pnpm --filter @soc/api db:seed
 ```
 
 정상 로그 기준:

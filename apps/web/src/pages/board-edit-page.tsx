@@ -12,6 +12,7 @@ import {
   BoardWriteFooter,
 } from "@/features/board-write/board-write-form-sections";
 import { useBoardEditPageController } from "@/features/board-write/use-board-edit-page-controller";
+import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 
 export function BoardEditPage() {
   const {
@@ -26,7 +27,8 @@ export function BoardEditPage() {
     contentEn,
     contentKo,
     error,
-    eventDescription,
+    eventDescriptionKo,
+    eventDescriptionEn,
     eventEndDate,
     eventStartDate,
     fileInputRef,
@@ -45,7 +47,8 @@ export function BoardEditPage() {
     setAssets,
     setContentEn,
     setContentKo,
-    setEventDescription,
+    setEventDescriptionKo,
+    setEventDescriptionEn,
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
@@ -60,6 +63,7 @@ export function BoardEditPage() {
     titleKo,
     uploading,
   } = useBoardEditPageController();
+  const categoryLabel = getBoardLabelFromMetadata(undefined, category, lang);
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col text-slate-950">
@@ -69,8 +73,8 @@ export function BoardEditPage() {
       <PageHero
         title={
           lang === "ko"
-            ? `${category} - 글 수정하기`
-            : `${category} - Edit Post`
+            ? `${categoryLabel} - 글 수정하기`
+            : `${categoryLabel} - Edit Post`
         }
         description={
           lang === "ko"
@@ -153,7 +157,9 @@ export function BoardEditPage() {
 
                   {category === "행사" && (
                     <BoardWriteEventFields
-                      eventDescription={eventDescription}
+                      activeTab={activeTab}
+                      eventDescriptionKo={eventDescriptionKo}
+                      eventDescriptionEn={eventDescriptionEn}
                       eventEndDate={eventEndDate}
                       eventStartDate={eventStartDate}
                       isEventAlwaysOpen={isEventAlwaysOpen}
@@ -165,7 +171,8 @@ export function BoardEditPage() {
                           setEventEndDate("");
                         }
                       }}
-                      onEventDescriptionChange={setEventDescription}
+                      onEventDescriptionKoChange={setEventDescriptionKo}
+                      onEventDescriptionEnChange={setEventDescriptionEn}
                       onEventEndDateChange={setEventEndDate}
                       onEventStartDateChange={setEventStartDate}
                     />

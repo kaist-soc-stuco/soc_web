@@ -97,12 +97,15 @@ const getRestrictionMeta = (item: UnifiedItem, lang: string) => {
   const meta: string[] = [];
   if (item.feePayersOnly) {
     meta.push(lang === "ko" ? "과비 납부자" : "Paid members only");
+  } else if (item.kind !== "EVENT" || item.visibilityScope === "MEMBERS") {
+    meta.push(lang === "ko" ? "로그인 회원" : "Signed-in members");
+  } else if (item.visibilityScope === "STAFF_ONLY") {
+    meta.push(lang === "ko" ? "운영진 전용" : "Staff only");
+  } else {
+    meta.push(lang === "ko" ? "누구나" : "Everyone");
   }
   if (item.isKoreanOnly) {
-    meta.push(lang === "ko" ? "한국어 사용자" : "Korean speakers only");
-  }
-  if (meta.length === 0) {
-    return lang === "ko" ? "누구나" : "Everyone";
+    meta.push(lang === "ko" ? "한국어 콘텐츠" : "Korean content only");
   }
   return meta.join(" · ");
 };

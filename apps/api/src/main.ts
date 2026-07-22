@@ -4,8 +4,6 @@ import { RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
-import express from 'express';
-import path from 'node:path';
 
 import { AppModule } from './app.module';
 
@@ -26,19 +24,6 @@ async function bootstrap(): Promise<void> {
   });
 
   app.use(cookieParser());
-
-  const assetUploadDir =
-    configService.get<string>('ASSET_UPLOAD_DIR') ??
-    path.resolve(process.cwd(), 'uploads', 'assets');
-  app.use(
-    '/uploads/assets',
-    express.static(assetUploadDir, {
-      setHeaders: (res) => {
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-      },
-    }),
-  );
 
   // app.useGlobalPipes(
   //   new ZodValidationPipe()

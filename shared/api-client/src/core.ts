@@ -39,6 +39,7 @@ export interface ApiClientContext {
     options?: { retryOnUnauthorized?: boolean },
   ) => Promise<void>;
   roleGroupsBaseUrl: string;
+  siteContentBaseUrl: string;
   surveyBaseUrl: string;
   usersBaseUrl: string;
 }
@@ -230,6 +231,7 @@ export const createApiClientContext = ({
     requestJson,
     requestVoid,
     roleGroupsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "role-groups"),
+    siteContentBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "site-content"),
     surveyBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "surveys"),
     usersBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "users"),
   };

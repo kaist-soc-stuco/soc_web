@@ -7,7 +7,9 @@ import {
 } from "../../../infrastructure/postgres/postgres.provider";
 import {
   articleAssets,
+  articles,
   assets,
+  boards,
 } from "../../../infrastructure/postgres/postgres.schema";
 
 @Injectable()
@@ -34,6 +36,62 @@ export class AssetRepository {
       .returning({ assetId: assets.assetId });
 
     return { assetId: String(created.assetId) };
+  }
+
+  async findAssetWithLinks(assetId: string): Promise<{
+    assetId: string;
+    storageKey: string;
+    originalFilename: string;
+    mimeType: string;
+    sizeBytes: number;
+    uploadedBy: string;
+    links: Array<{
+      articleId: string;
+      boardCode: string;
+      usageType: string;
+    }>;
+  } | null> {
+    const [asset] = await this.db
+      .select({
+        assetId: assets.assetId,
+        storageKey: assets.storageKey,
+        originalFilename: assets.originalFilename,
+        mimeType: assets.mimeType,
+        sizeBytes: assets.sizeBytes,
+        uploadedBy: assets.uploadedBy,
+      })
+      .from(assets)
+      .where(eq(assets.assetId, Number(assetId)))
+      .limit(1);
+
+    if (!asset) {
+      return null;
+    }
+
+    const links = await this.db
+      .select({
+        articleId: articleAssets.articleId,
+        boardCode: boards.code,
+        usageType: articleAssets.usageType,
+      })
+      .from(articleAssets)
+      .innerJoin(articles, eq(articleAssets.articleId, articles.articleId))
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .where(eq(articleAssets.assetId, Number(assetId)));
+
+    return {
+      assetId: String(asset.assetId),
+      storageKey: asset.storageKey,
+      originalFilename: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: asset.sizeBytes,
+      uploadedBy: String(asset.uploadedBy),
+      links: links.map((link) => ({
+        articleId: String(link.articleId),
+        boardCode: link.boardCode,
+        usageType: link.usageType,
+      })),
+    };
   }
 
   async findUnlinkedAssetsBefore(

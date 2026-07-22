@@ -52,7 +52,8 @@ type BoardSeed = {
   code: string;
   nameKo: string;
   nameEn: string;
-  description: string;
+  descriptionKo: string;
+  descriptionEn: string;
   readScope: string;
   writePermissionId: number | null;
   commentPermissionId: number | null;
@@ -81,7 +82,8 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "공지",
     nameKo: "공지",
     nameEn: "Notice",
-    description: "집행위원회 및 학교의 중요한 공지사항을 확인하세요",
+    descriptionKo: "집행위원회 및 학교의 중요한 공지사항을 확인하세요",
+    descriptionEn: "Read important announcements from SOC and the school.",
     readScope: "PUBLIC",
     writePermissionId: 1,
     commentPermissionId: null,
@@ -96,7 +98,8 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "행사",
     nameKo: "행사",
     nameEn: "Events",
-    description: "전산학부의 다양한 행사 정보를 확인하세요",
+    descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요",
+    descriptionEn: "Discover events for School of Computing students.",
     readScope: "PUBLIC",
     writePermissionId: 1,
     commentPermissionId: null,
@@ -111,7 +114,8 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "HoC",
     nameKo: "HoC",
     nameEn: "HoC",
-    description: "Hall of Code 프로젝트 및 활동 내역",
+    descriptionKo: "Hall of Code 프로젝트 및 활동 내역",
+    descriptionEn: "Browse Hall of Code projects and activity updates.",
     readScope: "PUBLIC",
     writePermissionId: 2,
     commentPermissionId: null,
@@ -126,7 +130,8 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "홍보글",
     nameKo: "홍보글",
     nameEn: "Promotions",
-    description: "집행위원회 및 학회의 홍보 게시물",
+    descriptionKo: "집행위원회 및 학회의 홍보 게시물",
+    descriptionEn: "Find promotions from SOC and student organizations.",
     readScope: "PUBLIC",
     writePermissionId: 2,
     commentPermissionId: null,
@@ -141,7 +146,8 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "건의사항",
     nameKo: "건의사항",
     nameEn: "Suggestions",
-    description: "학생들의 의견과 건의사항을 나눠주세요",
+    descriptionKo: "학생들의 의견과 건의사항을 나눠주세요",
+    descriptionEn: "Share feedback and suggestions with SOC.",
     readScope: "PUBLIC",
     writePermissionId: null,
     commentPermissionId: null,
@@ -156,7 +162,8 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "연구실",
     nameKo: "연구실",
     nameEn: "Labs",
-    description: "각 연구실의 소식과 공지사항",
+    descriptionKo: "각 연구실의 소식과 공지사항",
+    descriptionEn: "Read news and announcements from research labs.",
     readScope: "PUBLIC",
     writePermissionId: 2,
     commentPermissionId: null,
@@ -171,7 +178,8 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "QnA",
     nameKo: "QnA",
     nameEn: "Q&A",
-    description: "궁금한 점을 자유롭게 질문하세요",
+    descriptionKo: "궁금한 점을 자유롭게 질문하세요",
+    descriptionEn: "Ask questions and share answers with the community.",
     readScope: "PUBLIC",
     writePermissionId: null,
     commentPermissionId: null,
@@ -210,7 +218,8 @@ async function seedBoards() {
         allowLike: sql`excluded.allow_like`,
         allowSecret: sql`excluded.allow_secret`,
         commentPermissionId: sql`excluded.comment_permission_id`,
-        description: sql`excluded.description`,
+        descriptionKo: sql`excluded.description_ko`,
+        descriptionEn: sql`excluded.description_en`,
         isActive: sql`excluded.is_active`,
         managePermissionId: sql`excluded.manage_permission_id`,
         nameEn: sql`excluded.name_en`,
@@ -510,7 +519,7 @@ async function upsertSeedAuthor() {
     values (
       'seed-council-author',
       '전산학부 학생회',
-      'SoC Student Council',
+      'SOC Student Council',
       'student-council@kaist.ac.kr',
       '전산학부',
       'School of Computing',
@@ -596,6 +605,7 @@ async function createSurveyWithQuestions(
       resultVisibility: seed.resultVisibility,
       maxResponseCount: seed.maxResponseCount,
       isPublished: true,
+      lifecycleStatus: "PUBLISHED",
       showOnCalendar: true,
       openAt: seed.openAt,
       closeAt: seed.closeAt,
@@ -712,14 +722,14 @@ async function seedMockData() {
     },
     {
       titleKo: "2026 전산학부 집행위원회 임원 공개 모집",
-      titleEn: "2026 SoC Executive Committee Recruitment",
+      titleEn: "2026 SOC Executive Committee Recruitment",
       contentKo: detailedNoticeContent,
       contentEn: [
         "The School of Computing Student Council is recruiting executive committee members for 2026.",
         "",
         "We welcome students who want to plan events, improve student welfare, and build better communication channels within the department.",
         "",
-        "• Eligibility: SoC undergraduate and graduate students",
+        "• Eligibility: School of Computing undergraduate and graduate students",
         "• Teams: Planning, Administration, Finance, PR, Events",
         "• Application period: 2026.05.20 ~ 2026.06.03 18:00",
         "• How to apply: Submit the application form by email",
@@ -732,7 +742,7 @@ async function seedMockData() {
     },
     {
       titleKo: "전산학부 라운지 이용 및 물품 대여 안내",
-      titleEn: "SoC Lounge and Welfare Item Rental Guide",
+      titleEn: "SOC Lounge and Welfare Item Rental Guide",
       contentKo: [
         "전산학부 라운지와 학생회 보유 물품 대여 절차를 안내드립니다.",
         "",
@@ -744,7 +754,7 @@ async function seedMockData() {
         "• 유의사항: 파손 또는 분실 시 동일 물품 기준으로 보상 요청이 있을 수 있습니다.",
       ].join("\n"),
       contentEn: [
-        "This notice explains how to use the SoC lounge and borrow welfare items managed by the student council.",
+        "This notice explains how to use the SOC lounge and borrow welfare items managed by the student council.",
         "",
         "Please keep the lounge clean and return borrowed items on time.",
       ].join("\n"),
@@ -901,7 +911,7 @@ async function seedMockData() {
   const eventItems = [
     {
       titleKo: "전산인의 밤: 봄학기 네트워킹 데이",
-      titleEn: "SoC Night: Spring Networking Day",
+      titleEn: "SOC Night: Spring Networking Day",
       contentKo: [
         "전산학부 구성원이 한자리에 모여 프로젝트 경험, 연구실 생활, 진로 고민을 나누는 네트워킹 행사를 진행합니다.",
         "",
@@ -914,11 +924,12 @@ async function seedMockData() {
         "• 신청: 연결된 설문에서 참석 여부와 관심 세션을 선택해 주세요.",
       ].join("\n"),
       contentEn: [
-        "SoC Night is a networking event for students to share project experiences, research interests, and career questions.",
+        "SOC Night is a networking event for students to share project experiences, research interests, and career questions.",
         "",
         "Dinner, small-group networking, and an alumni panel talk will be provided.",
       ].join("\n"),
-      eventDescription: "저녁 식사와 선배 패널 토크가 함께 진행되는 전산학부 네트워킹 행사",
+      eventDescriptionKo: "저녁 식사와 선배 패널 토크가 함께 진행되는 전산학부 네트워킹 행사",
+      eventDescriptionEn: "A School of Computing networking event featuring dinner and an alumni panel talk.",
       eventStartDate: new Date("2026-06-05T18:30:00+09:00"),
       eventEndDate: new Date("2026-06-05T21:00:00+09:00"),
       isPinned: true,
@@ -936,7 +947,7 @@ async function seedMockData() {
       survey: {
         kind: "EVENT",
         titleKo: "전산인의 밤 참가 신청",
-        titleEn: "SoC Night Registration",
+        titleEn: "SOC Night Registration",
         descriptionKo: "참석 인원과 식사 준비를 위해 사전 신청을 받습니다. 신청 후 일정이 바뀌면 마감 전까지 응답을 수정할 수 있습니다.",
         descriptionEn: "Please register in advance so we can prepare seats and dinner. Responses can be edited until the deadline.",
         feeRequirementPolicy: "NONE",
@@ -1007,7 +1018,8 @@ async function seedMockData() {
         "",
         "Please register for a pickup slot in advance. Duplicate pickup is not allowed.",
       ].join("\n"),
-      eventDescription: "기말고사 기간 전산학부 학생을 위한 사전 신청제 간식 배부",
+      eventDescriptionKo: "기말고사 기간 전산학부 학생을 위한 사전 신청제 간식 배부",
+      eventDescriptionEn: "Pre-registration snack distribution for School of Computing students during finals.",
       eventStartDate: new Date("2026-06-12T17:00:00+09:00"),
       eventEndDate: new Date("2026-06-12T19:00:00+09:00"),
       isPinned: false,
@@ -1077,7 +1089,7 @@ async function seedMockData() {
     },
     {
       titleKo: "전산학부 알고리즘 스터디 매칭",
-      titleEn: "SoC Algorithm Study Matching",
+      titleEn: "SOC Algorithm Study Matching",
       contentKo: [
         "방학 동안 알고리즘 문제풀이를 함께 진행할 스터디 그룹을 매칭합니다.",
         "",
@@ -1093,7 +1105,8 @@ async function seedMockData() {
         "",
         "Groups will be formed based on preferred difficulty, programming language, and available time slots.",
       ].join("\n"),
-      eventDescription: "난이도와 가능 시간대를 기준으로 여름방학 알고리즘 스터디 그룹 매칭",
+      eventDescriptionKo: "난이도와 가능 시간대를 기준으로 여름방학 알고리즘 스터디 그룹 매칭",
+      eventDescriptionEn: "Summer algorithm study-group matching based on skill level and availability.",
       eventStartDate: new Date("2026-06-24T19:00:00+09:00"),
       eventEndDate: new Date("2026-08-21T22:00:00+09:00"),
       isPinned: false,
@@ -1178,7 +1191,8 @@ async function seedMockData() {
         "",
         "Participants will work in small teams with templates and mentoring support.",
       ].join("\n"),
-      eventDescription: "기획, 구현, 배포를 하루 동안 실습하는 전산학부 여름 개발 워크숍",
+      eventDescriptionKo: "기획, 구현, 배포를 하루 동안 실습하는 전산학부 여름 개발 워크숍",
+      eventDescriptionEn: "A one-day summer workshop covering product planning, implementation, and deployment.",
       eventStartDate: new Date("2026-06-18T14:00:00+09:00"),
       eventEndDate: new Date("2026-06-18T18:00:00+09:00"),
       isPinned: false,
@@ -1265,7 +1279,8 @@ async function seedMockData() {
         "",
         "This is not the final registration form. The result will be used to estimate budget, venue size, and transportation.",
       ].join("\n"),
-      eventDescription: "가을학기 MT 규모와 일정 확정을 위한 사전 수요조사",
+      eventDescriptionKo: "가을학기 MT 규모와 일정 확정을 위한 사전 수요조사",
+      eventDescriptionEn: "A preliminary survey to plan the schedule and capacity for the fall retreat.",
       eventStartDate: new Date("2026-09-18T10:00:00+09:00"),
       eventEndDate: new Date("2026-09-19T15:00:00+09:00"),
       isPinned: false,
@@ -1349,7 +1364,8 @@ async function seedMockData() {
       postedAt: event.postedAt,
       eventStartDate: event.eventStartDate,
       eventEndDate: event.eventEndDate,
-      eventDescription: event.eventDescription,
+      eventDescriptionKo: event.eventDescriptionKo,
+      eventDescriptionEn: event.eventDescriptionEn,
       isAnonymous: false,
     }).returning({ articleId: articles.articleId });
 
@@ -1370,12 +1386,24 @@ async function seedMockData() {
   console.log("Seeded 5 event articles with linked surveys and posters");
 }
 async function main() {
+  const seedMode = process.env.SEED_MODE ??
+    (process.env.NODE_ENV === "production" ? "reference" : "demo");
+  if (seedMode !== "reference" && seedMode !== "demo") {
+    throw new Error("SEED_MODE must be either 'reference' or 'demo'");
+  }
+  if (process.env.NODE_ENV === "production" && seedMode === "demo") {
+    throw new Error("demo_seed_is_forbidden_in_production");
+  }
+
   console.log("Using database:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
+  console.log("Seed mode:", seedMode);
   try {
     await seedPermissions();
     await seedBoards();
-    await seedDevAdminRole();
-    await seedMockData();
+    if (seedMode === "demo") {
+      await seedDevAdminRole();
+      await seedMockData();
+    }
     console.log("Seed finished");
   } catch (err) {
     console.error("Seed failed:", err);

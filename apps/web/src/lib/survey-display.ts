@@ -1,12 +1,18 @@
 import type { SurveyRecord } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
 
-export type SurveyStatusTone = "draft" | "closed" | "beforeOpen" | "open";
+export type SurveyStatusTone =
+  | "archived"
+  | "draft"
+  | "closed"
+  | "beforeOpen"
+  | "open";
 
 export interface SurveyStatusLike {
   closesAt?: string | null;
   computedState?: "before_open" | "open" | "closed" | string | null;
   isPublished?: boolean | null;
+  lifecycleStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED" | string | null;
   opensAt?: string | null;
 }
 
@@ -15,7 +21,12 @@ export interface SurveyStatusInfo {
   tone: SurveyStatusTone;
 }
 
-export type SurveyStatusFilter = "all" | "draft" | "open" | "closed";
+export type SurveyStatusFilter =
+  | "all"
+  | "archived"
+  | "draft"
+  | "open"
+  | "closed";
 export type SurveyTypeFilter = "all" | string;
 export type SurveyPeriodFilter = "all" | "7days" | "30days" | "1year";
 export type SurveySortKey = "updatedAt" | "opensAt" | "responseCount";
@@ -48,6 +59,10 @@ export function getSurveyStatusInfo(
   showDday = true,
   currentMs = nowMs(),
 ): SurveyStatusInfo {
+  if (survey.lifecycleStatus === "ARCHIVED") {
+    return { label: "보관됨", tone: "archived" };
+  }
+
   if (!survey.isPublished) {
     return { label: "임시저장", tone: "draft" };
   }
@@ -104,7 +119,12 @@ export function filterAndSortSurveys(
 
   if (options.statusFilter !== "all") {
     result = result.filter((survey) => {
-      if (options.statusFilter === "draft") return !survey.isPublished;
+      if (options.statusFilter === "archived") {
+        return survey.lifecycleStatus === "ARCHIVED";
+      }
+      if (options.statusFilter === "draft") {
+        return survey.lifecycleStatus !== "ARCHIVED" && !survey.isPublished;
+      }
       if (options.statusFilter === "closed") {
         return survey.isPublished && survey.computedState === "closed";
       }

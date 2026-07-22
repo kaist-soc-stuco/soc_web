@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useLanguage } from "@/hooks/use-language";
+import { useLocalizedSiteContent } from "@/features/site-content/site-content";
 
 export function Hero() {
   const navigate = useNavigate();
-  const { lang } = useLanguage();
   const [imageLoaded, setImageLoaded] = useState(false);
+  const title = useLocalizedSiteContent("home.hero.title");
+  const description = useLocalizedSiteContent("home.hero.description");
+  const ctaLabel = useLocalizedSiteContent("home.hero.cta");
 
   return (
     <section className="hero-image-placeholder relative h-full w-full overflow-hidden select-none">
@@ -31,11 +33,14 @@ export function Hero() {
             className="h-5 w-auto brightness-0 invert opacity-95"
           />
           <div className="h-4 w-px bg-white/30" />
-          <img
-            src="/logo.png"
-            alt="TREE Logo"
-            className="h-6 w-auto bg-transparent brightness-0 invert opacity-95"
-          />
+          <span className="flex flex-col leading-none text-white" aria-label="SOC Student Council">
+            <span className="font-outfit text-xl font-black tracking-[-0.04em]">
+              SOC
+            </span>
+            <span className="mt-0.5 text-[7px] font-black uppercase tracking-[0.18em] text-white/70">
+              Student Council
+            </span>
+          </span>
         </div>
       </div>
 
@@ -48,28 +53,16 @@ export function Hero() {
 
           {/* Title */}
           <h1
-            className="text-4xl lg:text-[46px] font-extrabold leading-[1.15] text-white"
+            className="whitespace-pre-line text-4xl font-extrabold leading-[1.15] text-white lg:text-[46px]"
             style={{ fontFamily: "'Roboto Slab', serif" }}
           >
-            KAIST
-            <br />
-            School of Computing
+            {title}
           </h1>
         </div>
 
         {/* Subtitle - Left aligned with the Accent Bar */}
         <p className="mt-2 whitespace-pre-line text-[14px] font-medium leading-[1.65] text-white/86 lg:text-[15px]">
-          {lang === "ko" ? (
-            <>
-              학생들의 목소리를 대변하고,
-              <br />더 나은 학업 및 문화 환경을 만들어갑니다.
-            </>
-          ) : (
-            <>
-              Representing student voices
-              <br />and building a better academic community.
-            </>
-          )}
+          {description}
         </p>
 
         {/* Button - Left aligned with the Accent Bar */}
@@ -82,7 +75,7 @@ export function Hero() {
             <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[8px] text-[#2b8a3e] shrink-0 select-none shadow-2xs">
               ▶
             </span>
-            <span>{lang === "ko" ? "집행위원회 소개 보기" : "Meet the Council"}</span>
+            <span>{ctaLabel}</span>
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { and, eq, gte, lte, or } from "drizzle-orm";
 import type {
   KoreanHolidayRecord,
@@ -17,8 +18,6 @@ import {
   surveys,
 } from "../../infrastructure/postgres/postgres.schema";
 
-const HOLIDAY_API_KEY =
-  "20cf41ac7ae1a30ef4bf27e3ad0141f41ec3e815aea7c45c0972fbf90a1070bb";
 const HOLIDAY_API_URL =
   "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo";
 
@@ -38,7 +37,10 @@ export class CalendarService {
   private readonly logger = new Logger(CalendarService.name);
   private readonly cache = new Map<string, HolidayCacheEntry>();
 
-  constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
+    private readonly configService: ConfigService,
+  ) {}
 
   async listPublicCalendarEvents(
     from: Date,
@@ -68,8 +70,18 @@ export class CalendarService {
       return cached.items;
     }
 
+    const holidayApiKey = this.configService
+      .get<string>("KOREAN_HOLIDAY_API_KEY")
+      ?.trim();
+    if (!holidayApiKey) {
+      this.logger.warn(
+        "Korean holiday lookup is disabled because KOREAN_HOLIDAY_API_KEY is not configured.",
+      );
+      return [];
+    }
+
     const params = new URLSearchParams({
-      ServiceKey: HOLIDAY_API_KEY,
+      ServiceKey: holidayApiKey,
       pageNo: "1",
       numOfRows: "100",
       solYear: String(year),
@@ -229,7 +241,10 @@ export class CalendarService {
       .where(
         and(
           eq(boards.code, "행사"),
+          eq(boards.isActive, true),
+          eq(boards.readScope, "PUBLIC"),
           eq(articles.status, "PUBLISHED"),
+          eq(articles.visibilityScope, "PUBLIC"),
           or(
             and(gte(articles.eventStartDate, from), lte(articles.eventStartDate, to)),
             and(gte(articles.eventEndDate, from), lte(articles.eventEndDate, to)),

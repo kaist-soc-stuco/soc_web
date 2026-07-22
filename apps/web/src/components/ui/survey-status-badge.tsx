@@ -13,6 +13,7 @@ interface SurveyStatusBadgeProps {
 }
 
 const toneClassNames: Record<SurveyStatusTone, string> = {
+  archived: "border-violet-200 bg-violet-50 text-violet-700",
   beforeOpen: "border-amber-200 bg-amber-50 text-amber-700",
   closed: "border-rose-200 bg-rose-50 text-rose-700",
   draft: "border-slate-200 bg-slate-50 text-slate-600",

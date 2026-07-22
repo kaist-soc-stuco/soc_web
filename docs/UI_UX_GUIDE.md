@@ -1,10 +1,10 @@
-# SoC Web UI/UX Guide
+# SOC Web UI/UX Guide
 
 이 문서는 메인 페이지, 공지사항 페이지, 설문조사 관리 페이지를 기준으로 정리한 UI/UX 작업 기준이다.
 
 ## Current Visual Direction
 
-- 전체 톤은 KAIST SoC/TREE 계열의 녹색을 중심으로 한 깨끗한 admin/productive UI이다.
+- 공식 대외 브랜드는 `SOC`로 통일한다. 녹색 계열은 브랜드 색으로 사용하되 상태 색상과 혼용하지 않는다.
 - 배경은 `#fafafa`, `slate-50`, 흰색 카드, 얕은 border와 매우 약한 shadow를 주로 사용한다.
 - 주요 CTA와 active state는 `kaist-darkgreen` 또는 `#137333` 계열을 쓴다.
 - 정보 밀도는 높은 편이다. 학생회 운영 도구와 공지/설문 관리에는 이 방향이 적합하다.

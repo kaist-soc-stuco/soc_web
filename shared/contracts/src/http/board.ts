@@ -14,7 +14,8 @@ export interface BoardSummary {
   code: string;
   nameKo: string;
   nameEn?: string;
-  description?: string;
+  descriptionKo?: string;
+  descriptionEn?: string;
   readScope: BoardReadScope;
   /** 글쓰기에 필요한 permission bit 값. 0이면 제한 없음. */
   writePermissionBit: number;
@@ -60,7 +61,8 @@ export interface ArticleListItem {
   thumbnailStorageKey?: string | null;
   eventStartDate?: string | null;
   eventEndDate?: string | null;
-  eventDescription?: string | null;
+  eventDescriptionKo?: string | null;
+  eventDescriptionEn?: string | null;
   surveyId?: string | null;
   boardCode?: string;
 }
@@ -116,11 +118,12 @@ export interface ArticleDetailResponse {
   commentCount: number;
   viewCount: number;
   survey?: SurveySummary | null;
-  prevArticle?: { articleId: string; titleKo: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
-  nextArticle?: { articleId: string; titleKo: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
+  prevArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
+  nextArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
   eventStartDate?: string | null;
   eventEndDate?: string | null;
-  eventDescription?: string | null;
+  eventDescriptionKo?: string | null;
+  eventDescriptionEn?: string | null;
 }
 
 export type ArticleAssetRequest = z.infer<typeof ArticleAssetRequestSchema>;

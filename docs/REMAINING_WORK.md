@@ -1,5 +1,7 @@
 # Remaining Work
 
+> **2026-07-15 감사 주의:** 이 문서는 이전 안정화 pass의 작업 기록입니다. 일부 “Done” 및 범위 제외 항목이 현재 코드와 맞지 않습니다. 최신 우선순위와 완료 기준은 `docs/PROJECT_AUDIT_2026-07-15.md`, `docs/DESIGN_AUDIT_2026-07-15.md`, `docs/GATE0_IMPLEMENTATION_2026-07-15.md`를 기준으로 하며, 이 문서는 후속 작업에서 항목별로 다시 대조해야 합니다.
+
 This document tracks the remaining work for making the student council site deployable while preserving the current UI direction.
 
 ## Done In Current Stabilization Pass
@@ -11,6 +13,9 @@ This document tracks the remaining work for making the student council site depl
 - Connected board comments to create, update, and delete API client calls.
 - Added local server-folder asset upload for board images and attachments.
 - Added a conservative upload size and MIME allowlist policy.
+- Added a real Nest HTTP multipart boundary contract: exactly 20 MiB is accepted and larger files are rejected with 413 before storage.
+- Added explicit survey `DRAFT`/`PUBLISHED`/`ARCHIVED` lifecycle, terminal archive behavior, and branch-aware copy ancestry.
+- Added a SHA-pinned GitHub Actions quality workflow with fresh migrations and always-on real-DB fee/survey coverage.
 - Added session refresh retry coverage to key authenticated API client calls.
 - Aligned Docker compose upload volume, internal database port, and nginx upload proxy settings.
 - Added production Dockerfiles for API and Web without replacing the local development Dockerfiles.

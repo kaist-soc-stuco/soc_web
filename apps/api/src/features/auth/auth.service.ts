@@ -180,10 +180,6 @@ export class AuthService {
       await this.deletePendingState(stateKey);
 
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
-      if (process.env.NODE_ENV !== "production") {
-        // Test-only: log full SSO userInfo payload for debugging.
-        console.log("SSO userInfo", userInfo);
-      }
       const ssoSubject = this.readRequiredUserInfoString(
         userInfo,
         "user_id",

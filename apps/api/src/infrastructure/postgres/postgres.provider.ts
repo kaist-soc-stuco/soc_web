@@ -6,6 +6,9 @@ import { Pool } from 'pg';
 import * as schema from './postgres.schema';
 
 export type PostgresDatabase = NodePgDatabase<typeof schema>;
+export type PostgresTransaction = Parameters<
+  Parameters<PostgresDatabase["transaction"]>[0]
+>[0];
 
 export const DRIZZLE_DB = Symbol('DRIZZLE_DB');
 export const POSTGRES_POOL = Symbol('POSTGRES_POOL');

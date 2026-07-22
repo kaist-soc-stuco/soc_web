@@ -160,8 +160,8 @@ export function BoardWriteHeaderControls({
             title={
               isKoreanOnly
                 ? lang === "ko"
-                  ? "한국어 사용자 전용 게시글이므로 영문을 작성할 수 없습니다."
-                  : "This is restricted to Korean speakers only."
+                  ? "한국어 콘텐츠만 작성하도록 설정되어 영문 입력이 비활성화되었습니다."
+                  : "English input is disabled while Korean-only content is selected."
                 : ""
             }
           >
@@ -192,7 +192,7 @@ export function BoardWriteHeaderControls({
               isKoreanOnly ? "text-red-600" : "text-slate-600"
             }`}
           >
-            Korean Speakers Only
+            {lang === "ko" ? "한국어 콘텐츠만" : "Korean content only"}
           </span>
         </label>
       </div>
@@ -319,7 +319,12 @@ export function BoardEditHeaderControls({
             value={category}
             onChange={() => undefined}
             disabled
-            options={[{ value: category, label: category }]}
+            options={[
+              {
+                value: category,
+                label: getBoardLabelFromMetadata(undefined, category, lang),
+              },
+            ]}
             className="w-36"
             buttonClassName="h-8 rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold shadow-xs"
           />
@@ -351,8 +356,8 @@ export function BoardEditHeaderControls({
             title={
               isKoreanOnly
                 ? lang === "ko"
-                  ? "한국어 사용자 전용 게시글이므로 영문을 작성할 수 없습니다."
-                  : "This is restricted to Korean speakers only."
+                  ? "한국어 콘텐츠만 작성하도록 설정되어 영문 입력이 비활성화되었습니다."
+                  : "English input is disabled while Korean-only content is selected."
                 : ""
             }
           >
@@ -383,7 +388,7 @@ export function BoardEditHeaderControls({
               isKoreanOnly ? "text-red-600" : "text-slate-600"
             }`}
           >
-            Korean Speakers Only
+            {lang === "ko" ? "한국어 콘텐츠만" : "Korean content only"}
           </span>
         </label>
       </div>
@@ -554,25 +559,31 @@ export function BoardWriteEditorFields({
 }
 
 interface EventFieldsProps {
-  eventDescription: string;
+  activeTab: "ko" | "en";
+  eventDescriptionKo: string;
+  eventDescriptionEn: string;
   eventEndDate: string;
   eventStartDate: string;
   isEventAlwaysOpen: boolean;
   lang: string;
-  onEventDescriptionChange: (value: string) => void;
+  onEventDescriptionKoChange: (value: string) => void;
+  onEventDescriptionEnChange: (value: string) => void;
   onEventEndDateChange: (value: string) => void;
   onEventStartDateChange: (value: string) => void;
   onEventAlwaysOpenChange: (checked: boolean) => void;
 }
 
 export function BoardWriteEventFields({
-  eventDescription,
+  activeTab,
+  eventDescriptionKo,
+  eventDescriptionEn,
   eventEndDate,
   eventStartDate,
   isEventAlwaysOpen,
   lang,
   onEventAlwaysOpenChange,
-  onEventDescriptionChange,
+  onEventDescriptionKoChange,
+  onEventDescriptionEnChange,
   onEventEndDateChange,
   onEventStartDateChange,
 }: EventFieldsProps) {
@@ -642,18 +653,22 @@ export function BoardWriteEventFields({
       )}
       <div>
         <label className="block text-xs font-bold text-slate-500 mb-1">
-          {lang === "ko" ? "카드 노출용 간단한 설명 *" : "Card Description *"}
+          {activeTab === "ko" ? "카드 노출용 간단한 설명 *" : "Card Description *"}
         </label>
         <input
           type="text"
           placeholder={
-            lang === "ko"
+            activeTab === "ko"
               ? "피드에 표시될 짧은 행사 정보입니다"
               : "Short description for card display"
           }
           className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all"
-          value={eventDescription}
-          onChange={(event) => onEventDescriptionChange(event.target.value)}
+          value={activeTab === "ko" ? eventDescriptionKo : eventDescriptionEn}
+          onChange={(event) =>
+            activeTab === "ko"
+              ? onEventDescriptionKoChange(event.target.value)
+              : onEventDescriptionEnChange(event.target.value)
+          }
         />
       </div>
     </div>

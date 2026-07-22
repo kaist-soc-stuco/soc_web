@@ -50,7 +50,10 @@ export class ArticleSearchController {
   async searchArticles(
     @Query("q") q?: string,
     @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
+    @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListItem[]> {
-    return this.articleService.searchArticles(q, limit);
+    const currentUser =
+      await this.authSessionService.getOptionalCurrentUser(accessToken);
+    return this.articleService.searchArticles(q, limit ?? 20, currentUser);
   }
 }

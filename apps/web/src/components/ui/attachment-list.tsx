@@ -6,20 +6,25 @@ import { resolveAssetUrl } from "@/lib/asset-url";
 type AttachmentListProps = {
   assets: ArticleAssetItem[];
   className?: string;
+  lang?: string;
   title?: string;
 };
 
 export function AttachmentList({
   assets,
   className,
-  title = `첨부파일 (${assets.length})`,
+  lang = "ko",
+  title,
 }: AttachmentListProps) {
   if (assets.length === 0) return null;
 
   return (
     <section className={className}>
       <h2 className="mb-3 text-[13px] font-semibold text-slate-500">
-        {title}
+        {title ??
+          (lang === "ko"
+            ? `첨부파일 (${assets.length})`
+            : `Attachments (${assets.length})`)}
       </h2>
 
       <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -57,7 +62,7 @@ export function AttachmentList({
                       target="_blank"
                       rel="noreferrer"
                       className="text-slate-400 transition-colors hover:text-slate-650"
-                      title="다운로드"
+                      title={lang === "ko" ? "다운로드" : "Download"}
                     >
                       <Download className="inline-block h-4 w-4" />
                     </a>

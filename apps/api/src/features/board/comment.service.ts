@@ -17,6 +17,7 @@ import { Permissions } from "@soc/contracts";
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import { CommentRepository } from "./repositories/comment.repository";
+import { getReadableArticleScopes } from "./article-access";
 import { assertBoardReadable, type CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "./board.constants";
 
@@ -58,6 +59,7 @@ export class CommentService {
     const articleReadable = await this.articleRepository.isReadableArticle(
       board.boardId,
       articleId,
+      getReadableArticleScopes(currentUser),
     );
 
     if (!articleReadable) {
@@ -105,6 +107,7 @@ export class CommentService {
     const article = await this.articleRepository.findCommentPermissionInfo(
       board.boardId,
       articleId,
+      getReadableArticleScopes({ authenticated: true, user }),
     );
 
     if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
@@ -160,6 +163,16 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
+    const articleReadable = await this.articleRepository.isReadableArticle(
+      board.boardId,
+      articleId,
+      getReadableArticleScopes({ authenticated: true, user }),
+    );
+
+    if (!articleReadable) {
+      throw new NotFoundException("article_not_found");
+    }
+
     const comment = await this.commentRepository.findPermissionInfo(
       commentId,
       articleId,
@@ -192,6 +205,16 @@ export class CommentService {
 
     if (!board || !board.isActive) {
       throw new NotFoundException("board_not_found");
+    }
+
+    const articleReadable = await this.articleRepository.isReadableArticle(
+      board.boardId,
+      articleId,
+      getReadableArticleScopes({ authenticated: true, user }),
+    );
+
+    if (!articleReadable) {
+      throw new NotFoundException("article_not_found");
     }
 
     const comment = await this.commentRepository.findPermissionInfo(
