@@ -36,11 +36,10 @@ export function Header({ showLogo = false }: HeaderProps) {
     },
     {
       label: '행사 & 설문조사',
-      href: '/events',
+      href: '/events?type=survey',
       dropdown: [
-        { label: '진행중인 행사', to: '/events' },
-        { label: '완료된 행사', to: '/events' },
-        { label: '설문조사', to: '/events' },
+        { label: '설문조사', to: '/events?type=survey' },
+        { label: '행사', to: '/events?type=event' },
       ],
     },
     {

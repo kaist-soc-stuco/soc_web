@@ -121,7 +121,7 @@ export function Hero() {
       <div className="absolute inset-0 z-10 flex items-center px-8 md:px-12 lg:px-[15.6%]">
         <div className="flex max-w-7xl items-start gap-6 lg:gap-8">
           {/* Green Accent Bar */}
-          <div className="mt-5 h-11 w-3 bg-kaist-lightgreen2 lg:mt-10 lg:h-[54px] lg:w-[11px]" />
+          <div className="mt-5 h-11 w-3 bg-kaist-lightgreen2 lg:mt-11 lg:h-[54px] lg:w-[11px]" />
           
           {/* Title */}
           <h1 

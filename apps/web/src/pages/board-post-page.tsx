@@ -46,6 +46,7 @@ const mockPost = {
 
 export function BoardPostPage() {
   const { category = '공지', id } = useParams<{ category: string; id: string }>();
+  const pageContainerClass = 'mx-auto w-full px-[12vw]';
   const post = {
     ...mockPost,
     id: Number(id ?? mockPost.id),
@@ -55,35 +56,35 @@ export function BoardPostPage() {
 
 
   return (
-    <div className="min-h-screen flex flex-col bg-kaist-white">
+    <div className="min-h-screen flex flex-col bg-[#F7FCFC]">
       <Header showLogo={true} />
 
       <main className="flex-1 w-full mx-auto">
         {/* Banner */}
-        <div className="bg-gradient-to-r from-kaist-darkgreen to-kaist-lightgreen2 py-12 px-8">
-          <div className="max-w-7xl mx-auto">
-            <h1 className="text-4xl font-extrabold tracking-tight text-kaist-white mb-2">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+          <div className={pageContainerClass}>
+            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">
               {category} 게시판
             </h1>
-            <p className="text-base font-medium tracking-tight text-kaist-white/90">
+            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">
               {boardInfo[category]?.description || ''}
             </p>
           </div>
         </div>
 
         {/* Post Content */}
-        <div className="max-w-7xl mx-auto pb-16">
+        <div className={`${pageContainerClass} pb-16 py-2`}>
 
           {/* Post Meta */}
-          <div className="pt-8 pb-4 flex items-start justify-between gap-8">
-            <div>
-              <span className="inline-block mb-3 px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-semibold tracking-tight w-fit">
+          <div className="flex flex-col gap-5 border-b-3 border-kaist-darkgreen-main py-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+            <div className="min-w-0">
+              <span className="mb-3 inline-block w-fit rounded-full bg-kaist-darkgreen px-3 py-1 text-xs font-semibold tracking-tight text-kaist-white lg:text-sm">
                 {post.category}
               </span>
-              <h2 className="text-xl font-extrabold tracking-tight text-kaist-black mb-2">
+              <h2 className="mb-2 text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[32px]">
                 {post.title}
               </h2>
-              <div className="flex items-center pt-2 gap-2 text-sm font-medium tracking-tight text-kaist-grey">
+              <div className="flex flex-wrap items-center gap-2 pt-2 text-sm font-medium tracking-tight text-kaist-grey lg:text-base">
                 <span className="font-semibold text-kaist-black">{post.author}</span>
                 <span className="text-kaist-grey">|</span>
                 <span>{post.date}</span>
@@ -91,10 +92,10 @@ export function BoardPostPage() {
                 <span>조회 {post.views}</span>
               </div>
             </div>
-            <div className="flex shrink-0 gap-3">
+            <div className="flex shrink-0 flex-wrap gap-3">
               <Link
                 to={`/board/${category}`}
-                className="flex items-center gap-2 border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition-colors hover:bg-kaist-darkgreen hover:text-kaist-white"
+                className="flex items-center gap-2 rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition-colors hover:bg-kaist-darkgreen hover:text-kaist-white"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -103,36 +104,31 @@ export function BoardPostPage() {
               </Link>
               <Link
                 to={`/board/${category}/write`}
-                className="flex items-center gap-2 border border-kaist-darkgreen bg-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-white transition-colors hover:bg-kaist-darkgreen-main"
+                className="flex items-center gap-2 rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition-colors hover:bg-kaist-darkgreen-main"
               >
                 글쓰기
               </Link>
             </div>
           </div>
 
-          <div className="border-t-2 border-kaist-darkgreen" />
-
           {/* Post Body */}
-          <div className="py-8">
-            {/* Poster + Title/Summary */}
-            <div className="flex gap-8 mb-8">
+          <div className="py-8 lg:py-10">
+            <div className="flow-root">
               <div
-                className="aspect-[3/4] w-48 rounded-[1px] bg-cover bg-center shrink-0"
+                className="mb-6 aspect-[3/4] w-full max-w-[min(100%,340px)] rounded-[5px] bg-cover bg-center md:float-left md:mb-6 md:mr-[clamp(2rem,3vw,3rem)] md:w-[clamp(240px,24vw,340px)]"
                 style={{ backgroundImage: `url(${post.image})` }}
               />
-              <div className="flex flex-col justify-center">
-                <h3 className="text-2xl font-extrabold tracking-tight text-kaist-black mb-3">
-                  {post.title}
-                </h3>
-                <p className="text-base font-medium tracking-tight text-kaist-grey leading-relaxed">
-                  {post.summary}
-                </p>
-              </div>
-            </div>
 
-            {/* Detailed Content */}
-            <div className="text-sm font-medium tracking-tight text-kaist-black leading-relaxed whitespace-pre-line">
-              {post.content}
+              <h3 className="mb-3 text-xl font-extrabold tracking-tight text-kaist-black lg:text-2xl">
+                {post.title}
+              </h3>
+              <p className="mb-6 text-sm font-medium leading-relaxed tracking-tight text-kaist-grey lg:text-base">
+                {post.summary}
+              </p>
+
+              <div className="whitespace-pre-line text-sm font-medium leading-7 tracking-tight text-kaist-black lg:text-base lg:leading-8">
+                {post.content}
+              </div>
             </div>
           </div>
 
@@ -140,14 +136,14 @@ export function BoardPostPage() {
           <div>
             <Link
               to={`/board/${category}/${mockPrevPost.id}`}
-              className="flex items-center gap-4 py-3 border-t border-b border-kaist-grey/30 hover:bg-kaist-grey/5 transition-colors group"
+              className="group flex items-center gap-4 border-t border-b border-kaist-grey/30 py-4 transition-colors hover:bg-kaist-grey/5"
             >
               <ChevronUp className="h-4 w-4 shrink-0 text-kaist-darkgreen-main" />
-              <span className="text-xs font-semibold text-kaist-grey w-10 shrink-0">이전글</span>
-              <span className="flex-1 text-sm font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
+              <span className="w-10 shrink-0 text-xs font-semibold text-kaist-grey">이전글</span>
+              <span className="flex-1 truncate text-sm font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen lg:text-base">
                 {mockPrevPost.title}
               </span>
-              <div className="flex items-center gap-3 text-xs font-medium text-kaist-grey shrink-0">
+              <div className="hidden shrink-0 items-center gap-3 text-xs font-medium text-kaist-grey md:flex">
                 <span>{mockPrevPost.author}</span>
                 <span className="text-kaist-darkgreen-main">|</span>
                 <span>{mockPrevPost.date}</span>
@@ -157,14 +153,14 @@ export function BoardPostPage() {
             </Link>
             <Link
               to={`/board/${category}/${mockNextPost.id}`}
-              className="flex items-center gap-4 py-3 border-b border-kaist-grey/30 hover:bg-kaist-grey/5 transition-colors group"
+              className="group flex items-center gap-4 border-b border-kaist-grey/30 py-4 transition-colors hover:bg-kaist-grey/5"
             >
               <ChevronDown className="h-4 w-4 shrink-0 text-kaist-darkgreen-main" />
-              <span className="text-xs font-semibold text-kaist-grey w-10 shrink-0">다음글</span>
-              <span className="flex-1 text-sm font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
+              <span className="w-10 shrink-0 text-xs font-semibold text-kaist-grey">다음글</span>
+              <span className="flex-1 truncate text-sm font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen lg:text-base">
                 {mockNextPost.title}
               </span>
-              <div className="flex items-center gap-3 text-xs font-medium text-kaist-grey shrink-0">
+              <div className="hidden shrink-0 items-center gap-3 text-xs font-medium text-kaist-grey md:flex">
                 <span>{mockNextPost.author}</span>
                 <span className="text-kaist-darkgreen-main">|</span>
                 <span>{mockNextPost.date}</span>

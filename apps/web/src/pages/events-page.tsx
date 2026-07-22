@@ -1,92 +1,199 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { mockEvents } from '@/lib/mock-data';
-import { CalendarDays, ChevronsLeft, ChevronsRight, Search } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+
+const eventTabs = ['설문조사', '행사'] as const;
+
+type EventTab = (typeof eventTabs)[number];
 
 export function EventsPage() {
-  const cardEvents = Array.from({ length: 10 }, (_, index) => ({
-    ...mockEvents[index % mockEvents.length],
-    id: index + 1,
-  }));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageContainerClass = 'mx-auto w-full px-[12vw]';
+  const activeTab: EventTab = searchParams.get('type') === 'event' ? '행사' : '설문조사';
+
+  const cardEvents = useMemo(
+    () =>
+      Array.from({ length: 18 }, (_, index) => ({
+        ...mockEvents[index % mockEvents.length],
+        id: index + 1,
+      })),
+    [],
+  );
+
+  const filteredEvents = cardEvents.filter((event) => event.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const cardsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / cardsPerPage));
+  const currentEvents = filteredEvents.slice((currentPage - 1) * cardsPerPage, currentPage * cardsPerPage);
+
+  const handleTabChange = (tab: EventTab) => {
+    setSearchParams({ type: tab === '행사' ? 'event' : 'survey' });
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const startPage = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const endPage = Math.min(totalPages, startPage + 4);
+
+    for (let i = startPage; i <= endPage; i += 1) {
+      pages.push(i);
+    }
+
+    return pages;
+  };
 
   return (
     <SiteLayout>
-      <div className="relative h-[145px] overflow-hidden bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)]">
+      <div className="relative overflow-hidden bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
         <img
           src="/kaist_logo.png"
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute right-[clamp(2rem,12vw,13rem)] top-[-30px] hidden w-[380px] rotate-[-13deg] opacity-80 md:block"
         />
-        <div className="mx-auto flex h-full max-w-[1646px] flex-col justify-center px-6 xl:px-0">
+        <div className={pageContainerClass}>
           <h1 className="text-[36px] font-extrabold tracking-tight text-white">설문조사</h1>
-          <p className="mt-2 text-[24px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 소식을 알려 드립니다</p>
+          <p className="mt-2 text-[24px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 행사를 확인하고 설문에 참여하세요</p>
         </div>
       </div>
 
-      <section className="mx-auto max-w-[1646px] px-6 pb-16 pt-[37px] xl:px-0">
-        <div className="mb-[43px] flex h-[35px] items-start justify-end">
-          <div className="flex w-[254px] items-center justify-between border-b border-kaist-darkgreen/50 pb-[11px] text-[20px] font-semibold tracking-tight text-[#9AA69F]">
+      <div className="border-b border-kaist-grey/30 bg-[#F7FCFC]">
+        <div className={`${pageContainerClass} flex flex-wrap items-end justify-between gap-8`}>
+          <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-12 xl:gap-16">
+            {eventTabs.map((tab, index) => (
+              <button
+                key={tab}
+                type="button"
+                className="group relative"
+                onClick={() => handleTabChange(tab)}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                <span
+                  className={`relative flex h-full items-center justify-center text-lg font-extrabold tracking-tight transition-colors lg:text-2xl ${
+                    activeTab === tab ? 'text-kaist-darkgreen' : 'text-kaist-greygreen hover:text-kaist-darkgreen'
+                  }`}
+                >
+                  <span className="py-5">{tab}</span>
+                  <span
+                    className={`absolute bottom-0 left-0 right-0 h-1.5 origin-center bg-kaist-darkgreen transition-transform duration-200 ${
+                      activeTab === tab ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'
+                    }`}
+                  />
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-4 flex items-center gap-2 border-b border-kaist-darkgreen/40">
             <span>제목</span>
-            <div className="flex items-center gap-8">
-              <span className="text-[12px] leading-none text-kaist-darkgreen">⌄</span>
-              <Search className="h-[21px] w-[21px] text-kaist-darkgreen" />
-            </div>
+            <span className="mb-2 text-lg text-kaist-darkgreen">⌄</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              className="w-20 bg-transparent text-sm focus:outline-none"
+              aria-label="행사 제목 검색"
+            />
+            <Search className="h-4 w-4 text-kaist-darkgreen" />
           </div>
         </div>
+      </div>
 
-        <div className="grid justify-center gap-y-[51px] sm:grid-cols-[repeat(2,270px)] sm:justify-between lg:grid-cols-[repeat(3,270px)] xl:grid-cols-[repeat(5,270px)]">
-          {cardEvents.map((event) => (
+      <section className={`${pageContainerClass} bg-[#F7FCFC] pb-16 pt-10`}>
+        <div className="grid grid-cols-[repeat(auto-fit,270px)] justify-center gap-x-6 gap-y-[51px] min-[1900px]:justify-between">
+          {currentEvents.map((event) => (
             <Link
               key={event.id}
               to={`/events/${event.id}/survey`}
-              className="group relative h-[359px] w-[270px] overflow-hidden rounded-[15px] bg-[#F7FCFC] shadow-[-1px_0px_4px_rgba(0,0,0,0.25),1px_2px_4px_rgba(0,0,0,0.25)] transition hover:-translate-y-1"
+              className="group flex h-[359px] w-[270px] min-w-0 flex-col overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div
-                className="absolute left-0 top-0 h-[216px] w-[270px] rounded-[2px] bg-cover bg-center"
-                style={{ backgroundImage: `url(/event-snack-card.png), url(${event.image})` }}
-              >
-                <div className="absolute left-[17px] top-[16px] rounded-full bg-[#006B4A] px-[11px] py-[2px] text-[12px] font-semibold leading-[18px] tracking-tight text-white">
-                  진행중
-                </div>
-                <div className="absolute bottom-[10px] left-[17px] rounded-none bg-[#5B93C4] px-[11px] py-[2px] text-[10px] font-semibold leading-[15px] tracking-[0.2em] text-white">
-                  KAIST SoC
-                </div>
-                <div className="absolute bottom-[10px] right-[17px] rounded-[4px] bg-white/90 px-[8px] py-[3px] text-[10px] font-extrabold leading-none text-kaist-black">
-                  11/11 (화)
-                </div>
+              <div className="relative h-[60.2%] min-h-[168px] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+                  style={{ backgroundImage: `url(${event.image})` }}
+                />
+                <span className="absolute left-4 top-4 rounded-full bg-kaist-darkgreen px-3 py-1 text-[10px] font-semibold tracking-tight text-kaist-white lg:text-xs">
+                  {event.status === 'ongoing' ? '진행중' : '완료'}
+                </span>
               </div>
-              <div className="absolute left-[17px] top-[226px]">
-                <p className="text-[10px] font-semibold leading-[15px] tracking-tight text-[#5B93C4]">이벤트</p>
-                <h2 className="text-[24px] font-extrabold leading-[36px] tracking-tight text-kaist-black">전산학부 간식이벤트</h2>
-                <p className="mt-[10px] text-[12px] font-semibold leading-[18px] tracking-tight text-[#98A0AC]">
-                  중간고사 기간! SoC 구성원 여러분들을 위해
-                  <br />
-                  “상무초밥”을 제공해 드립니다. 5/23 9:00 오픈!
+
+              <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
+                <span className="mb-1 text-[10px] font-bold tracking-tight text-[#5b93c4] lg:text-xs">이벤트</span>
+                <h2 className="line-clamp-2 text-lg font-extrabold tracking-tight text-kaist-black lg:text-2xl">
+                  {event.title}
+                </h2>
+                <p className="mt-2 line-clamp-2 text-xs font-semibold leading-normal tracking-tight text-kaist-grey">
+                  {event.summary}
                 </p>
+                <div className="mt-auto flex items-center gap-2 text-[10px] font-semibold tracking-tight text-kaist-greygreen lg:text-xs">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  {event.date}
+                </div>
               </div>
-              <p className="absolute bottom-[13px] left-[38px] text-[8px] font-semibold leading-3 tracking-tight text-[#9AA69F]">26.05.23 09:00 구글폼 오픈</p>
-              <CalendarDays className="absolute bottom-[14px] left-[19px] h-[9px] w-[9px] text-kaist-black" strokeWidth={2} />
             </Link>
           ))}
         </div>
 
-        <div className="mt-[51px] flex items-center justify-center gap-[25px] text-[18px] font-semibold leading-[27px] tracking-tight text-kaist-black">
-          <button type="button" className="grid h-[17px] w-[17px] place-items-center text-kaist-darkgreen" aria-label="이전 페이지">
-            <ChevronsLeft className="h-[15px] w-[15px]" strokeWidth={3} />
+        {currentEvents.length === 0 ? (
+          <div className="py-20 text-center text-kaist-grey">
+            <p className="text-base font-semibold">행사가 없습니다</p>
+          </div>
+        ) : null}
+
+        <div className="mt-16 flex items-center justify-center gap-2 text-[18px] font-semibold tracking-tight text-kaist-black">
+          <button
+            type="button"
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className={`p-1 transition-colors ${
+              currentPage === 1 ? 'cursor-not-allowed text-kaist-grey/30' : 'text-kaist-darkgreen hover:bg-kaist-grey/10'
+            }`}
+            aria-label="이전 페이지"
+          >
+            <ChevronLeft className="h-5 w-5" />
           </button>
-          {Array.from({ length: 10 }, (_, index) => (
+
+          {getPageNumbers().map((page) => (
             <button
-              key={index + 1}
+              key={page}
               type="button"
-              className={index === 0 ? 'grid size-[33px] place-items-center rounded-[5px] bg-[#1AA172] text-white' : 'min-w-[11px]'}
+              onClick={() => handlePageChange(page)}
+              className={`h-[33px] min-w-[33px] rounded-[5px] px-3 transition-colors ${
+                currentPage === page ? 'bg-kaist-darkgreen-main text-kaist-white' : 'text-kaist-black hover:bg-kaist-grey/10'
+              }`}
             >
-              {index + 1}
+              {page}
             </button>
           ))}
-          <button type="button" className="grid h-[17px] w-[17px] place-items-center text-kaist-darkgreen" aria-label="다음 페이지">
-            <ChevronsRight className="h-[15px] w-[15px]" strokeWidth={3} />
+
+          <button
+            type="button"
+            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className={`p-2 transition-colors ${
+              currentPage === totalPages ? 'cursor-not-allowed text-kaist-grey/30' : 'text-kaist-darkgreen hover:bg-kaist-grey/10'
+            }`}
+            aria-label="다음 페이지"
+          >
+            <ChevronRight className="h-5 w-5" />
           </button>
         </div>
       </section>
