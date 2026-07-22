@@ -19,7 +19,7 @@ export function AboutPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50/50">
       <Header showLogo />
-      <AboutHero lang={lang} />
+      <AboutHero />
       <AboutTabs
         currentTab={currentTab}
         lang={lang}

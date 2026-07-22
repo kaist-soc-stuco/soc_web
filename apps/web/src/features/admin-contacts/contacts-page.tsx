@@ -62,9 +62,9 @@ function ContactsPageContent() {
     setIsEditing(contact.id);
     setFormData({
       nameKo: contact.nameKo,
-      nameEn: contact.nameEn || "",
+      nameEn: contact.nameEn,
       roleKo: contact.roleKo,
-      roleEn: contact.roleEn || "",
+      roleEn: contact.roleEn,
       email: contact.email || "",
       phoneNumber: contact.phoneNumber || "",
       sortOrder: contact.sortOrder,
@@ -90,16 +90,30 @@ function ContactsPageContent() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nameKo || !formData.roleKo) {
-      alert("이름(한글)과 역할(한글)은 필수 입력 사항입니다.");
+    const hasAllLocalizedFields = [
+      formData.nameKo,
+      formData.nameEn,
+      formData.roleKo,
+      formData.roleEn,
+    ].every((value) => value.trim().length > 0);
+    if (!hasAllLocalizedFields) {
+      alert("한글·영문 이름과 역할/직책을 모두 입력해 주세요.");
       return;
     }
 
+    const payload: CreateContactRequest = {
+      ...formData,
+      nameKo: formData.nameKo.trim(),
+      nameEn: formData.nameEn.trim(),
+      roleKo: formData.roleKo.trim(),
+      roleEn: formData.roleEn.trim(),
+    };
+
     try {
       if (isEditing === "new") {
-        await apiClient.createContact(formData);
+        await apiClient.createContact(payload);
       } else if (isEditing) {
-        await apiClient.updateContact(isEditing, formData);
+        await apiClient.updateContact(isEditing, payload);
       }
       setIsEditing(null);
       loadContacts();
@@ -178,10 +192,11 @@ function ContactsPageContent() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">이름 (영문)</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1.5">이름 (영문) *</label>
               <input
                 type="text"
-                value={formData.nameEn || ""}
+                required
+                value={formData.nameEn}
                 onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
                 className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
                 placeholder="Gildong Hong"
@@ -199,10 +214,11 @@ function ContactsPageContent() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">역할 / 직책 (영문)</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1.5">역할 / 직책 (영문) *</label>
               <input
                 type="text"
-                value={formData.roleEn || ""}
+                required
+                value={formData.roleEn}
                 onChange={(e) => setFormData({ ...formData, roleEn: e.target.value })}
                 className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
                 placeholder="President, Head of Planning etc."
@@ -289,13 +305,13 @@ function ContactsPageContent() {
                         </div>
                         <div className="min-w-0">
                           <div className="font-extrabold text-slate-800 truncate max-w-[150px]" title={contact.nameKo}>{contact.nameKo}</div>
-                          {contact.nameEn && <div className="mt-0.5 truncate max-w-[150px] text-xs font-semibold text-slate-400" title={contact.nameEn}>{contact.nameEn}</div>}
+                          <div className="mt-0.5 truncate max-w-[150px] text-xs font-semibold text-slate-400" title={contact.nameEn}>{contact.nameEn}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-slate-700 truncate max-w-[180px]" title={contact.roleKo}>{contact.roleKo}</div>
-                      {contact.roleEn && <div className="mt-0.5 truncate max-w-[180px] text-xs font-semibold text-slate-400" title={contact.roleEn}>{contact.roleEn}</div>}
+                      <div className="mt-0.5 truncate max-w-[180px] text-xs font-semibold text-slate-400" title={contact.roleEn}>{contact.roleEn}</div>
                     </td>
                     <td className="px-6 py-4 space-y-1 min-w-0">
                       {contact.email && (

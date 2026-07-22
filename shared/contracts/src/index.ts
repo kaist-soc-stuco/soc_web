@@ -10,6 +10,7 @@ export * from "./http/users.js";
 export * from "./http/contact.js";
 export * from "./http/bulk-email.js";
 export * from "./http/calendar.js";
+export * from "./http/site-content.js";
 export * from "./errors/app-error.js";
 export * from "./permissions-registry.js";
 export * from "./schemas.js";

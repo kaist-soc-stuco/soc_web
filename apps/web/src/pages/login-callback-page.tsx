@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { clearStoredAuthState, writeStoredAuthState } from "@/lib/auth-storage";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { useLanguage } from "@/hooks/use-language";
 
 const LAST_CONSUMED_RESULT_TOKEN_KEY = "soc.auth.last-consumed-result-token";
 
@@ -40,6 +41,7 @@ const submitAuthorizeForm = (payload: {
 };
 
 export function LoginCallbackPage() {
+  const { lang } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -81,16 +83,21 @@ export function LoginCallbackPage() {
           !payload.redirectUri ||
           !payload.state
         ) {
-          throw new Error("SSO 로그인 정보를 불러오지 못했습니다.");
+          throw new Error(
+            lang === "ko"
+              ? "SSO 로그인 정보를 불러오지 못했습니다."
+              : "Failed to load SSO login information.",
+          );
         }
 
         submitAuthorizeForm(payload);
       } catch (error) {
+        console.error(error);
         setStatus("failed");
         setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "로그인을 시작하지 못했습니다.",
+          lang === "ko"
+            ? "로그인을 시작하지 못했습니다."
+            : "Failed to start sign-in.",
         );
       }
     };
@@ -123,13 +130,14 @@ export function LoginCallbackPage() {
           navigate("/", { replace: true });
         })
         .catch((error) => {
+          console.error(error);
           consumedResultTokenRef.current.delete(resultToken);
           window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
           setStatus("failed");
           setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "로그인 결과를 처리하지 못했습니다.",
+            lang === "ko"
+              ? "로그인 결과를 처리하지 못했습니다."
+              : "Failed to process the sign-in result.",
           );
         });
       return;
@@ -144,17 +152,23 @@ export function LoginCallbackPage() {
 
     if (loginStatus === "error") {
       setStatus("failed");
-      setErrorMessage("로그인 중 오류가 발생했습니다.");
+      setErrorMessage(
+        lang === "ko"
+          ? "로그인 중 오류가 발생했습니다."
+          : "An error occurred while signing in.",
+      );
       return;
     }
 
     void startLogin();
-  }, [apiClient, location.search, navigate, queryClient]);
+  }, [apiClient, lang, location.search, navigate, queryClient]);
 
   const submitConsentDecision = async (consent: boolean) => {
     if (!pendingConsentToken) {
       setConsentErrorMessage(
-        "로그인 동의 토큰이 없습니다. 로그인을 다시 시도해주세요.",
+        lang === "ko"
+          ? "로그인 동의 토큰이 없습니다. 로그인을 다시 시도해 주세요."
+          : "The login consent token is missing. Please sign in again.",
       );
       return;
     }
@@ -179,10 +193,11 @@ export function LoginCallbackPage() {
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
       navigate("/", { replace: true });
     } catch (error) {
+      console.error(error);
       setConsentErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "동의 처리 중 오류가 발생했습니다.",
+        lang === "ko"
+          ? "동의 처리 중 오류가 발생했습니다."
+          : "An error occurred while saving your consent choice.",
       );
     } finally {
       setConsentSubmitting(null);
@@ -193,12 +208,23 @@ export function LoginCallbackPage() {
     <main className="flex min-h-screen items-center justify-center bg-white px-6 text-kaist-black">
       <section className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
         <p className="text-sm font-extrabold text-kaist-darkgreen">
-          {status === "failed" ? "로그인 실패" : "로그인 처리 중"}
+          {status === "failed"
+            ? lang === "ko"
+              ? "로그인 실패"
+              : "Sign-in failed"
+            : lang === "ko"
+              ? "로그인 처리 중"
+              : "Signing you in"}
         </p>
         <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
           {status === "failed"
-            ? (errorMessage ?? "잠시 후 다시 시도해 주세요.")
-            : "SSO 로그인 화면으로 이동하거나 로그인 결과를 확인하고 있습니다."}
+            ? (errorMessage ??
+              (lang === "ko"
+                ? "잠시 후 다시 시도해 주세요."
+                : "Please try again shortly."))
+            : lang === "ko"
+              ? "SSO 로그인 화면으로 이동하거나 로그인 결과를 확인하고 있습니다."
+              : "Opening the SSO sign-in page or verifying your sign-in result."}
         </p>
         {status === "failed" ? (
           <button
@@ -206,7 +232,7 @@ export function LoginCallbackPage() {
             onClick={() => window.location.assign("/login")}
             className="mt-5 rounded-lg bg-kaist-darkgreen px-4 py-2 text-xs font-extrabold text-white"
           >
-            다시 로그인
+            {lang === "ko" ? "다시 로그인" : "Try again"}
           </button>
         ) : null}
       </section>
@@ -215,16 +241,21 @@ export function LoginCallbackPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
           <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-kaist-greygreen">
-              Privacy Consent
+              {lang === "ko" ? "개인정보 동의" : "Privacy Consent"}
             </p>
             <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-kaist-black">
-              개인정보 제공 동의
+              {lang === "ko" ? "개인정보 제공 동의" : "Personal Data Consent"}
             </h1>
             <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-600">
-              <p>SSO 로그인으로 받은 이름, 이메일, 학번 정보를 서비스 이용에 사용합니다.</p>
               <p>
-                동의하면 다음 로그인부터 필요한 기능을 바로 사용할 수 있습니다. 동의하지
-                않아도 이번 세션에서는 임시 로그인으로 계속 이용할 수 있습니다.
+                {lang === "ko"
+                  ? "SSO 로그인으로 받은 이름, 이메일, 학번 정보를 서비스 이용에 사용합니다."
+                  : "We use your name, email address, and student number received through SSO to provide this service."}
+              </p>
+              <p>
+                {lang === "ko"
+                  ? "동의하면 다음 로그인부터 필요한 기능을 바로 사용할 수 있습니다. 동의하지 않아도 이번 세션에서는 임시 로그인으로 계속 이용할 수 있습니다."
+                  : "If you consent, account features will remain available on future visits. If you decline, you can continue with a temporary session for this visit."}
               </p>
             </div>
 
@@ -242,8 +273,12 @@ export function LoginCallbackPage() {
                 className="rounded-xl border border-kaist-darkgreen/30 bg-white px-5 py-2.5 text-sm font-extrabold text-kaist-darkgreen disabled:opacity-50"
               >
                 {consentSubmitting === "temporary"
-                  ? "처리 중..."
-                  : "저장하지 않고 계속"}
+                  ? lang === "ko"
+                    ? "처리 중..."
+                    : "Processing..."
+                  : lang === "ko"
+                    ? "저장하지 않고 계속"
+                    : "Continue without saving"}
               </button>
               <button
                 type="button"
@@ -252,8 +287,12 @@ export function LoginCallbackPage() {
                 className="rounded-xl bg-kaist-darkgreen px-5 py-2.5 text-sm font-extrabold text-white shadow-sm disabled:opacity-50"
               >
                 {consentSubmitting === "persisted"
-                  ? "처리 중..."
-                  : "동의하고 저장"}
+                  ? lang === "ko"
+                    ? "처리 중..."
+                    : "Processing..."
+                  : lang === "ko"
+                    ? "동의하고 저장"
+                    : "Consent and save"}
               </button>
             </div>
           </section>

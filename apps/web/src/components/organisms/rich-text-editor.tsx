@@ -64,7 +64,9 @@ export function RichTextEditor({
         },
       }),
       Placeholder.configure({
-        placeholder: placeholder || "내용을 입력하세요...",
+        placeholder:
+          placeholder ||
+          (lang === "ko" ? "내용을 입력하세요..." : "Enter content..."),
         emptyEditorClass: "is-editor-empty",
       }),
     ],
@@ -94,7 +96,10 @@ export function RichTextEditor({
 
   const setLink = () => {
     const previousUrl = editor.getAttributes("link").href;
-    const url = window.prompt("URL을 입력하세요:", previousUrl || "https://");
+    const url = window.prompt(
+      lang === "ko" ? "URL을 입력하세요:" : "Enter a URL:",
+      previousUrl || "https://",
+    );
 
     if (url === null) {
       return;
@@ -323,7 +328,10 @@ export function RichTextEditor({
           <>
             <input
               type="text"
-              placeholder={titlePlaceholder || "제목을 입력하세요"}
+              placeholder={
+                titlePlaceholder ||
+                (lang === "ko" ? "제목을 입력하세요" : "Enter a title")
+              }
               value={title}
               onChange={(event) => onTitleChange(event.target.value)}
               className="w-full text-2xl font-semibold text-slate-800 bg-transparent focus:outline-none placeholder:text-slate-300 px-1 pb-3"

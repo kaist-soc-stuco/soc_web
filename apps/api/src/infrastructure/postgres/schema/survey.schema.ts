@@ -1,14 +1,18 @@
 import {
+  type AnyPgColumn,
   boolean,
+  check,
   index,
   integer,
   jsonb,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users } from "./auth.schema";
 import { articles } from "./board.schema";
@@ -31,8 +35,19 @@ export const surveys = pgTable("survey", {
   allowResponseEdit: boolean("allow_response_edit").notNull().default(false),
   isKoreanOnly: boolean("is_korean_only").notNull().default(false),
   isPublished: boolean("is_published").notNull().default(false),
+  lifecycleStatus: varchar("lifecycle_status", { length: 20 })
+    .notNull()
+    .default("DRAFT"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  previousVersionId: uuid("previous_version_id").references(
+    (): AnyPgColumn => surveys.surveyId,
+    { onDelete: "restrict" },
+  ),
+  versionNumber: integer("version_number").notNull().default(1),
   showOnCalendar: boolean("show_on_calendar").notNull().default(false),
-  resultVisibility: varchar("result_visibility", { length: 20 }).notNull(),
+  resultVisibility: varchar("result_visibility", { length: 20 })
+    .notNull()
+    .default("PRIVATE"),
   maxResponseCount: integer("max_response_count"),
   isAlwaysOpen: boolean("is_always_open").notNull().default(false),
   openAt: timestamp("open_at", { withTimezone: true }),
@@ -45,7 +60,26 @@ export const surveys = pgTable("survey", {
     table.isPublished,
   ),
   index("survey_published_created_idx").on(table.isPublished, table.createdAt),
+  index("survey_lifecycle_created_idx").on(table.lifecycleStatus, table.createdAt),
+  index("survey_previous_version_idx").on(table.previousVersionId),
   index("survey_creator_idx").on(table.creatorId),
+  check(
+    "survey_lifecycle_status_check",
+    sql`${table.lifecycleStatus} in ('DRAFT', 'PUBLISHED', 'ARCHIVED')`,
+  ),
+  check(
+    "survey_lifecycle_published_check",
+    sql`(${table.lifecycleStatus} = 'PUBLISHED') = ${table.isPublished}`,
+  ),
+  check(
+    "survey_lifecycle_archived_at_check",
+    sql`(${table.lifecycleStatus} = 'ARCHIVED') = (${table.archivedAt} is not null)`,
+  ),
+  check("survey_version_number_check", sql`${table.versionNumber} >= 1`),
+  check(
+    "survey_previous_version_check",
+    sql`${table.previousVersionId} is null or ${table.previousVersionId} <> ${table.surveyId}`,
+  ),
 ]);
 
 export const surveySections = pgTable("survey_sections", {
@@ -91,6 +125,9 @@ export const surveyResponses = pgTable("survey_responses", {
     .references(() => surveys.surveyId, { onDelete: "cascade" })
     .notNull(),
   userId: uuid("user_id").references(() => users.userId),
+  singleResponseUserId: uuid("single_response_user_id").references(
+    () => users.userId,
+  ),
   status: text("status").notNull().default("submitted"),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -102,6 +139,10 @@ export const surveyResponses = pgTable("survey_responses", {
     table.submittedAt,
   ),
   index("survey_responses_survey_user_idx").on(table.surveyId, table.userId),
+  uniqueIndex("survey_responses_single_response_user_unique_idx").on(
+    table.surveyId,
+    table.singleResponseUserId,
+  ),
   index("survey_responses_user_created_idx").on(table.userId, table.createdAt),
 ]);
 

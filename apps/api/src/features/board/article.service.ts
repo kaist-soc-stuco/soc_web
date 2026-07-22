@@ -21,11 +21,16 @@ import { isoToDate, msToIso, nowMs } from "@soc/shared";
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import {
+  assertArticleScopeAssignable,
+  getReadableArticleScopes,
+} from "./article-access";
+import {
   assertBoardReadable,
   canReadBoard,
   type CurrentUserContext,
 } from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
+import { sanitizeArticleHtml } from "./article-html-sanitizer";
 
 interface ArticleQueryParams {
   page?: number;
@@ -74,6 +79,7 @@ export class ArticleService {
       board.boardId,
       page,
       limit,
+      getReadableArticleScopes(currentUser),
       query,
     );
 
@@ -117,6 +123,7 @@ export class ArticleService {
         searchBy,
         sortBy,
         sortDirection,
+        visibilityScopes: getReadableArticleScopes(currentUser),
       },
     );
 
@@ -142,17 +149,19 @@ export class ArticleService {
 
     assertBoardReadable(board, currentUser);
 
-    if (incrementView) {
-      await this.articleRepository.incrementViewCount(articleId);
-    }
-
     const article = await this.articleRepository.findDetailById(
       board.boardId,
       articleId,
+      getReadableArticleScopes(currentUser),
     );
 
     if (!article) {
       throw new NotFoundException("article_not_found");
+    }
+
+    if (incrementView) {
+      await this.articleRepository.incrementViewCount(articleId);
+      article.viewCount += 1;
     }
 
     return article;
@@ -171,6 +180,24 @@ export class ArticleService {
       throw new BadRequestException("content_too_long");
     }
 
+    assertArticleScopeAssignable(payload.visibilityScope, {
+      authenticated: true,
+      user,
+    });
+
+    const sanitizedContentKo = sanitizeArticleHtml(payload.contentKo);
+    if (!sanitizedContentKo.trim()) {
+      throw new BadRequestException("content_empty_after_sanitization");
+    }
+
+    const sanitizedPayload: ArticleCreateRequest = {
+      ...payload,
+      contentKo: sanitizedContentKo,
+      ...(payload.contentEn === undefined
+        ? {}
+        : { contentEn: sanitizeArticleHtml(payload.contentEn) }),
+    };
+
     const board = await this.boardRepository.findByCode(code);
 
     if (!board || !board.isActive) {
@@ -187,7 +214,7 @@ export class ArticleService {
     return this.articleRepository.createArticle({
       boardId: board.boardId,
       authorUserId: user.id,
-      payload,
+      payload: sanitizedPayload,
     });
   }
 
@@ -204,6 +231,31 @@ export class ArticleService {
     if (payload.contentEn && payload.contentEn.length > MAX_CONTENT_LENGTH) {
       throw new BadRequestException("content_too_long");
     }
+
+    if (payload.visibilityScope) {
+      assertArticleScopeAssignable(payload.visibilityScope, {
+        authenticated: true,
+        user,
+      });
+    }
+
+    const sanitizedContentKo =
+      payload.contentKo === undefined
+        ? undefined
+        : sanitizeArticleHtml(payload.contentKo);
+    if (sanitizedContentKo !== undefined && !sanitizedContentKo.trim()) {
+      throw new BadRequestException("content_empty_after_sanitization");
+    }
+
+    const sanitizedPayload: ArticleUpdateRequest = {
+      ...payload,
+      ...(sanitizedContentKo === undefined
+        ? {}
+        : { contentKo: sanitizedContentKo }),
+      ...(payload.contentEn === undefined
+        ? {}
+        : { contentEn: sanitizeArticleHtml(payload.contentEn) }),
+    };
 
     const board = await this.boardRepository.findByCode(code);
 
@@ -232,7 +284,8 @@ export class ArticleService {
     return this.articleRepository.updateArticle(
       board.boardId,
       articleId,
-      payload,
+      sanitizedPayload,
+      user.id,
     );
   }
 
@@ -268,7 +321,23 @@ export class ArticleService {
     return this.articleRepository.softDeleteArticle(board.boardId, articleId);
   }
 
-  async searchArticles(query?: string, limit = 20): Promise<ArticleListItem[]> {
-    return this.articleRepository.findAllArticles(limit, query);
+  async searchArticles(
+    query: string | undefined,
+    limit: number,
+    currentUser: CurrentUserContext,
+  ): Promise<ArticleListItem[]> {
+    const result = await this.getAllArticles(
+      {
+        limit,
+        page: 1,
+        q: query,
+        searchBy: "title_content",
+        sortBy: "latest",
+        sortDirection: "desc",
+      },
+      currentUser,
+    );
+
+    return result.items;
   }
 }

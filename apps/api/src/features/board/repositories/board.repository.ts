@@ -56,7 +56,8 @@ export class BoardRepository {
       code: row.code,
       nameKo: row.nameKo,
       nameEn: row.nameEn ?? undefined,
-      description: row.description ?? undefined,
+      descriptionKo: row.descriptionKo ?? undefined,
+      descriptionEn: row.descriptionEn ?? undefined,
       readScope: row.readScope as BoardSummary["readScope"],
       writePermissionBit: row.writePermissionId
         ? bitMap.get(row.writePermissionId) ?? 0

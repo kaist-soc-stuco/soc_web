@@ -61,7 +61,9 @@ export function BoardDetailPage() {
         <Header showLogo />
         <main className="flex flex-1 items-center justify-center">
           <p className="text-sm font-bold text-slate-500">
-            존재하지 않는 게시글입니다.
+            {lang === "ko"
+              ? "존재하지 않는 게시글입니다."
+              : "This post does not exist or is unavailable."}
           </p>
         </main>
       </div>
@@ -85,6 +87,7 @@ export function BoardDetailPage() {
           <BoardDetailBreadcrumb
             category={category}
             displayBoardLabel={displayBoardLabel}
+            lang={lang}
           />
 
           <BoardDetailArticleCard
@@ -92,6 +95,7 @@ export function BoardDetailPage() {
             attachmentAssets={attachmentAssets}
             canEdit={canEdit}
             category={category}
+            categoryLabel={displayBoardLabel}
             content={content}
             lang={lang}
             onDeleteArticle={() => void handleDeleteArticle()}
@@ -111,12 +115,17 @@ export function BoardDetailPage() {
             commentError={commentError}
             commentSubmitting={commentSubmitting}
             isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
+            lang={lang}
             onCommentTextChange={setCommentText}
             onCreateComment={handleCreateComment}
             onDeleteComment={handleDeleteComment}
           />
 
-          <BoardDetailAdjacentLinks article={article} category={category} />
+          <BoardDetailAdjacentLinks
+            article={article}
+            category={category}
+            lang={lang}
+          />
         </div>
       </main>
 

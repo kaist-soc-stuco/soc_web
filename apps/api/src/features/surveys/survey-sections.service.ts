@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { SurveySectionsRepository } from "./survey-sections.repository";
-import { SurveysRepository } from "./surveys.repository";
+import { SurveyMutationPolicy } from "./survey-mutation-policy";
 
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
 import type { CreateSectionDto } from "./dto/create-section.dto";
@@ -11,13 +11,13 @@ import type { UpdateSectionDto } from "./dto/update-section.dto";
 export class SurveySectionsService {
   constructor(
     private readonly sectionsRepo: SurveySectionsRepository,
-    private readonly surveysRepo: SurveysRepository,
+    private readonly mutationPolicy: SurveyMutationPolicy,
   ) {}
 
   async create(surveyId: string, dto: CreateSectionDto): Promise<SurveySectionRecord> {
-    const survey = await this.surveysRepo.findById(surveyId);
-    if (!survey) throw new NotFoundException("survey_not_found");
-    return this.sectionsRepo.insert(surveyId, dto);
+    return this.mutationPolicy.withStructureMutation(surveyId, (tx) =>
+      this.sectionsRepo.insert(surveyId, dto, tx),
+    );
   }
 
   async update(
@@ -25,14 +25,23 @@ export class SurveySectionsService {
     sectionId: string,
     dto: UpdateSectionDto,
   ): Promise<SurveySectionRecord> {
-    const section = await this.sectionsRepo.update(sectionId, surveyId, dto);
-    if (!section) throw new NotFoundException("section_not_found");
-    return section;
+    return this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      const section = await this.sectionsRepo.update(
+        sectionId,
+        surveyId,
+        dto,
+        tx,
+      );
+      if (!section) throw new NotFoundException("section_not_found");
+      return section;
+    });
   }
 
   async delete(surveyId: string, sectionId: string): Promise<void> {
-    const section = await this.sectionsRepo.findById(sectionId, surveyId);
-    if (!section) throw new NotFoundException("section_not_found");
-    await this.sectionsRepo.delete(sectionId, surveyId);
+    await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
+      if (!section) throw new NotFoundException("section_not_found");
+      await this.sectionsRepo.delete(sectionId, surveyId, tx);
+    });
   }
 }

@@ -140,7 +140,13 @@ export function useBoardDetailPageController() {
         if (!cancelled) setComments(response.items);
       })
       .catch(() => {
-        if (!cancelled) setCommentError("댓글을 불러오지 못했습니다.");
+        if (!cancelled) {
+          setCommentError(
+            lang === "ko"
+              ? "댓글을 불러오지 못했습니다."
+              : "Failed to load comments.",
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setCommentsLoading(false);
@@ -149,7 +155,7 @@ export function useBoardDetailPageController() {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, article, articleId, category]);
+  }, [apiClient, article, articleId, category, lang]);
 
   const refreshComments = async () => {
     if (!articleId) return;
@@ -172,7 +178,11 @@ export function useBoardDetailPageController() {
       setCommentText("");
       await refreshComments();
     } catch {
-      setCommentError("댓글 작성에 실패했습니다.");
+      setCommentError(
+        lang === "ko"
+          ? "댓글 작성에 실패했습니다."
+          : "Failed to post the comment.",
+      );
     } finally {
       setCommentSubmitting(false);
     }
@@ -181,9 +191,13 @@ export function useBoardDetailPageController() {
   const handleDeleteComment = async (commentId: string) => {
     if (!articleId) return;
     const confirmed = await requestConfirm({
-      confirmLabel: "삭제",
-      description: "삭제한 댓글은 되돌릴 수 없습니다.",
-      title: "댓글을 삭제하시겠습니까?",
+      confirmLabel: lang === "ko" ? "삭제" : "Delete",
+      description:
+        lang === "ko"
+          ? "삭제한 댓글은 되돌릴 수 없습니다."
+          : "A deleted comment cannot be restored.",
+      title:
+        lang === "ko" ? "댓글을 삭제하시겠습니까?" : "Delete this comment?",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -193,16 +207,24 @@ export function useBoardDetailPageController() {
       await apiClient.deleteComment(category, articleId, commentId);
       await refreshComments();
     } catch {
-      setCommentError("댓글 삭제에 실패했습니다.");
+      setCommentError(
+        lang === "ko"
+          ? "댓글 삭제에 실패했습니다."
+          : "Failed to delete the comment.",
+      );
     }
   };
 
   const handleDeleteArticle = async () => {
     if (!articleId || !canEdit) return;
     const confirmed = await requestConfirm({
-      confirmLabel: "삭제",
-      description: "게시글과 연결된 댓글 정보가 함께 삭제됩니다.",
-      title: "게시글을 삭제하시겠습니까?",
+      confirmLabel: lang === "ko" ? "삭제" : "Delete",
+      description:
+        lang === "ko"
+          ? "게시글과 연결된 댓글 정보가 함께 삭제됩니다."
+          : "Comments linked to this post will also be deleted.",
+      title:
+        lang === "ko" ? "게시글을 삭제하시겠습니까?" : "Delete this post?",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -211,7 +233,11 @@ export function useBoardDetailPageController() {
       await apiClient.deleteArticle(category, articleId);
       navigate(`/board/${category}`, { replace: true });
     } catch {
-      alert("게시글 삭제에 실패했습니다.");
+      alert(
+        lang === "ko"
+          ? "게시글 삭제에 실패했습니다."
+          : "Failed to delete the post.",
+      );
     }
   };
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { Injectable } from "@nestjs/common";
@@ -13,6 +13,7 @@ export interface AssetUploadInput {
 
 export interface AssetStorageProvider {
   upload(input: AssetUploadInput): Promise<string>;
+  read(storageKey: string): Promise<Buffer>;
   delete(storageKey: string): Promise<void>;
 }
 
@@ -46,6 +47,21 @@ export class LocalAssetStorageProvider implements AssetStorageProvider {
     await writeFile(path.join(this.uploadDir, storedName), input.buffer);
 
     return `/uploads/assets/${storedName}`;
+  }
+
+  async read(storageKey: string): Promise<Buffer> {
+    const storedName = path.basename(storageKey);
+    if (!storedName) {
+      throw new Error("asset_storage_key_invalid");
+    }
+
+    const uploadRoot = path.resolve(this.uploadDir);
+    const targetPath = path.resolve(uploadRoot, storedName);
+    if (!targetPath.startsWith(`${uploadRoot}${path.sep}`)) {
+      throw new Error("asset_path_outside_upload_dir");
+    }
+
+    return readFile(targetPath);
   }
 
   async delete(storageKey: string): Promise<void> {

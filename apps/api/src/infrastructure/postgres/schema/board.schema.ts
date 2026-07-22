@@ -18,7 +18,8 @@ export const boards = pgTable("board", {
   code: varchar("code", { length: 20 }).notNull().unique(),
   nameKo: varchar("name_ko", { length: 20 }).notNull(),
   nameEn: varchar("name_en", { length: 100 }),
-  description: varchar("description", { length: 255 }),
+  descriptionKo: varchar("description_ko", { length: 255 }),
+  descriptionEn: varchar("description_en", { length: 255 }),
   readScope: varchar("read_scope", { length: 20 }).notNull().default("PUBLIC"),
   writePermissionId: integer("write_permission_id")
     .references(() => permissions.permissionId),
@@ -57,7 +58,8 @@ export const articles = pgTable("article", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   eventStartDate: timestamp("event_start_date", { withTimezone: true }),
   eventEndDate: timestamp("event_end_date", { withTimezone: true }),
-  eventDescription: text("event_description"),
+  eventDescriptionKo: text("event_description_ko"),
+  eventDescriptionEn: text("event_description_en"),
 }, (table) => [
   index("article_board_idx").on(table.boardId),
   index("article_board_status_posted_idx").on(

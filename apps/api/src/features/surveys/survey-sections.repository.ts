@@ -5,6 +5,7 @@ import { msToIso, nowDate } from "@soc/shared";
 import {
   DRIZZLE_DB,
   PostgresDatabase,
+  PostgresTransaction,
 } from "../../infrastructure/postgres/postgres.provider";
 import { surveySections } from "../../infrastructure/postgres/postgres.schema";
 
@@ -30,22 +31,36 @@ export class SurveySectionsRepository {
     };
   }
 
-  async findBySurveyId(surveyId: string): Promise<SurveySectionRecord[]> {
-    const rows = await this.db.query.surveySections.findMany({
+  async findBySurveyId(
+    surveyId: string,
+    tx?: PostgresTransaction,
+  ): Promise<SurveySectionRecord[]> {
+    const db = tx ?? this.db;
+    const rows = await db.query.surveySections.findMany({
       where: eq(surveySections.surveyId, surveyId),
     });
     return rows.map((r) => this.map(r));
   }
 
-  async findById(id: string, surveyId: string): Promise<SurveySectionRecord | null> {
-    const row = await this.db.query.surveySections.findFirst({
+  async findById(
+    id: string,
+    surveyId: string,
+    tx?: PostgresTransaction,
+  ): Promise<SurveySectionRecord | null> {
+    const db = tx ?? this.db;
+    const row = await db.query.surveySections.findFirst({
       where: and(eq(surveySections.id, id), eq(surveySections.surveyId, surveyId)),
     });
     return row ? this.map(row) : null;
   }
 
-  async insert(surveyId: string, dto: CreateSectionDto): Promise<SurveySectionRecord> {
-    const [row] = await this.db
+  async insert(
+    surveyId: string,
+    dto: CreateSectionDto,
+    tx?: PostgresTransaction,
+  ): Promise<SurveySectionRecord> {
+    const db = tx ?? this.db;
+    const [row] = await db
       .insert(surveySections)
       .values({
         surveyId,
@@ -63,6 +78,7 @@ export class SurveySectionsRepository {
     id: string,
     surveyId: string,
     dto: UpdateSectionDto,
+    tx?: PostgresTransaction,
   ): Promise<SurveySectionRecord | null> {
     const set: Partial<typeof surveySections.$inferInsert> & { updatedAt: Date } = {
       updatedAt: nowDate(),
@@ -74,7 +90,8 @@ export class SurveySectionsRepository {
     if (dto.descriptionEn !== undefined) set.descriptionEn = dto.descriptionEn;
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
 
-    const [row] = await this.db
+    const db = tx ?? this.db;
+    const [row] = await db
       .update(surveySections)
       .set(set)
       .where(and(eq(surveySections.id, id), eq(surveySections.surveyId, surveyId)))
@@ -82,8 +99,13 @@ export class SurveySectionsRepository {
     return row ? this.map(row) : null;
   }
 
-  async delete(id: string, surveyId: string): Promise<void> {
-    await this.db
+  async delete(
+    id: string,
+    surveyId: string,
+    tx?: PostgresTransaction,
+  ): Promise<void> {
+    const db = tx ?? this.db;
+    await db
       .delete(surveySections)
       .where(and(eq(surveySections.id, id), eq(surveySections.surveyId, surveyId)));
   }

@@ -6,10 +6,22 @@ import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
-import { surveyAnswers, surveyResponses, users } from "../../infrastructure/postgres/postgres.schema";
+import {
+  surveyAnswers,
+  surveyQuestions,
+  surveyResponses,
+  surveySections,
+  studentFeeStatus,
+  surveys,
+  users,
+} from "../../infrastructure/postgres/postgres.schema";
 
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
+import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
+import type { PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
+import type { QuestionOption, QuestionType } from "@soc/contracts";
+import { validateSurveyAnswers } from "./survey-answer-validation";
 
 type SurveyResponseQueryRow = {
   id: string;
@@ -23,6 +35,104 @@ type SurveyResponseQueryRow = {
   userEmail: string | null;
   userDepartmentKo: string | null;
   userStdNo: string | null;
+};
+
+type InsertSubmissionResult =
+  | {
+      status: "created";
+      response: SurveyResponseRecord;
+      answers: SurveyAnswerRecord[];
+    }
+  | {
+      status: "already_submitted";
+    }
+  | {
+      status: "capacity_full";
+    }
+  | {
+      status: "survey_not_found";
+    }
+  | {
+      status: "survey_not_published";
+    }
+  | {
+      status: "survey_not_open_yet";
+    }
+  | {
+      status: "survey_closed";
+    }
+  | {
+      status: "fee_payer_only";
+    };
+
+type UpdateSubmissionResult =
+  | {
+      status: "updated";
+      response: SurveyResponseRecord;
+      answers: SurveyAnswerRecord[];
+    }
+  | {
+      status:
+        | "survey_not_found"
+        | "survey_not_published"
+        | "survey_not_open_yet"
+        | "survey_closed"
+        | "fee_payer_only"
+        | "response_edit_not_allowed"
+        | "multiple_response_edit_not_supported"
+        | "response_not_found";
+    };
+
+type SubmissionState = {
+  isPublished: boolean;
+  isAlwaysOpen: boolean;
+  openAt: Date | null;
+  closeAt: Date | null;
+};
+
+type SubmissionStateFailure =
+  | "survey_not_published"
+  | "survey_not_open_yet"
+  | "survey_closed";
+
+const getSubmissionStateFailure = (
+  survey: SubmissionState,
+  currentMs: number,
+): SubmissionStateFailure | null => {
+  if (!survey.isPublished) return "survey_not_published";
+  if (survey.isAlwaysOpen) return null;
+  if (survey.openAt && survey.openAt.valueOf() > currentMs) {
+    return "survey_not_open_yet";
+  }
+  if (survey.closeAt && survey.closeAt.valueOf() <= currentMs) {
+    return "survey_closed";
+  }
+  return null;
+};
+
+const SINGLE_RESPONSE_UNIQUE_CONSTRAINT =
+  "survey_responses_single_response_user_unique_idx";
+
+const isSingleResponseUniqueViolation = (error: unknown): boolean => {
+  let current = error;
+
+  while (current && typeof current === "object") {
+    const candidate = current as {
+      cause?: unknown;
+      code?: unknown;
+      constraint?: unknown;
+    };
+    if (
+      candidate.code === "23505" &&
+      candidate.constraint === SINGLE_RESPONSE_UNIQUE_CONSTRAINT
+    ) {
+      return true;
+    }
+    if (!candidate.cause || candidate.cause === current) break;
+    current = candidate.cause;
+  }
+
+  return false;
 };
 
 @Injectable()
@@ -74,6 +184,54 @@ export class SurveyResponsesRepository {
     };
   }
 
+  private async findQuestionsForSurvey(
+    tx: PostgresTransaction,
+    surveyId: string,
+  ): Promise<SurveyQuestionRecord[]> {
+    const rows = await tx
+      .select({ question: surveyQuestions })
+      .from(surveyQuestions)
+      .innerJoin(
+        surveySections,
+        eq(surveyQuestions.sectionId, surveySections.id),
+      )
+      .where(eq(surveySections.surveyId, surveyId));
+
+    return rows.map(({ question }) => ({
+      id: question.id,
+      sectionId: question.sectionId,
+      titleKo: question.titleKo,
+      titleEn: question.titleEn,
+      descriptionKo: question.descriptionKo,
+      descriptionEn: question.descriptionEn,
+      questionType: question.questionType as QuestionType,
+      options: question.options as QuestionOption[] | null,
+      answerRegex: question.answerRegex,
+      isRequired: question.isRequired,
+      editDeadlineAt: question.editDeadlineAt
+        ? msToIso(question.editDeadlineAt.valueOf())
+        : null,
+      sortOrder: question.sortOrder,
+      createdAt: msToIso(question.createdAt.valueOf()),
+      updatedAt: msToIso(question.updatedAt.valueOf()),
+    }));
+  }
+
+  private async satisfiesFeeRequirement(
+    tx: PostgresTransaction,
+    userId: string,
+    feeRequirementPolicy: string,
+  ): Promise<boolean> {
+    if (feeRequirementPolicy !== "PAID_ONLY") return true;
+
+    const [feeStatus] = await tx
+      .select({ status: studentFeeStatus.status })
+      .from(studentFeeStatus)
+      .where(eq(studentFeeStatus.userId, userId))
+      .limit(1);
+    return feeStatus?.status === "PAID";
+  }
+
   async findBySurveyId(surveyId: string): Promise<SurveyResponseRecord[]> {
     const rows = await this.db
       .select(this.responseSelectFields)
@@ -84,8 +242,13 @@ export class SurveyResponsesRepository {
     return rows.map((r) => this.mapResponse(r));
   }
 
-  async findById(id: string, surveyId: string): Promise<SurveyResponseRecord | null> {
-    const rows = await this.db
+  async findById(
+    id: string,
+    surveyId: string,
+    tx?: PostgresTransaction,
+  ): Promise<SurveyResponseRecord | null> {
+    const db = tx ?? this.db;
+    const rows = await db
       .select(this.responseSelectFields)
       .from(surveyResponses)
       .leftJoin(users, eq(surveyResponses.userId, users.userId))
@@ -117,115 +280,223 @@ export class SurveyResponsesRepository {
     return result[0]?.count ?? 0;
   }
 
-  async insertResponse(input: {
-    surveyId: string;
-    userId?: string;
-  }): Promise<SurveyResponseRecord> {
-    const now = nowDate();
-    const [row] = await this.db
-      .insert(surveyResponses)
-      .values({
-        surveyId: input.surveyId,
-        userId: input.userId,
-        status: "submitted",
-        createdAt: now,
-        submittedAt: now,
-        updatedAt: now,
-      })
-      .returning();
-    const inserted = await this.findById(row.id, row.surveyId);
-    if (inserted) return inserted;
-    return this.mapResponse({
-      id: row.id,
-      surveyId: row.surveyId,
-      userId: row.userId,
-      status: row.status,
-      submittedAt: row.submittedAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      userNameKo: null,
-      userEmail: null,
-      userDepartmentKo: null,
-      userStdNo: null,
-    });
-  }
-
-  async insertAnswers(
-    responseId: string,
-    answers: Array<{ questionId: string; content: Record<string, unknown> }>,
-  ): Promise<SurveyAnswerRecord[]> {
-    if (answers.length === 0) return [];
-    const rows = await this.db
-      .insert(surveyAnswers)
-      .values(answers.map((a) => ({ responseId, questionId: a.questionId, content: a.content })))
-      .returning();
-    return rows.map((r) => this.mapAnswer(r));
-  }
-
   async insertSubmission(input: {
     surveyId: string;
     userId: string;
     answers: Array<{ questionId: string; content: Record<string, unknown> }>;
-  }): Promise<{ response: SurveyResponseRecord; answers: SurveyAnswerRecord[] }> {
-    const now = nowDate();
+  }): Promise<InsertSubmissionResult> {
+    const transactionResult = await this.db
+      .transaction(async (tx) => {
+        const [lockedSurvey] = await tx
+          .select({
+            isPublished: surveys.isPublished,
+            isAlwaysOpen: surveys.isAlwaysOpen,
+            openAt: surveys.openAt,
+            closeAt: surveys.closeAt,
+            feeRequirementPolicy: surveys.feeRequirementPolicy,
+            allowMultipleResponses: surveys.allowMultipleResponses,
+            maxResponseCount: surveys.maxResponseCount,
+          })
+          .from(surveys)
+          .where(eq(surveys.surveyId, input.surveyId))
+          .for("update");
 
-    const responseRow = await this.db.transaction(async (tx) => {
-      const [insertedResponse] = await tx
-        .insert(surveyResponses)
-        .values({
-          surveyId: input.surveyId,
-          userId: input.userId,
-          status: "submitted",
-          createdAt: now,
-          submittedAt: now,
-          updatedAt: now,
-        })
-        .returning();
+        if (!lockedSurvey) {
+          return { status: "survey_not_found" } as const;
+        }
 
-      if (input.answers.length > 0) {
-        await tx.insert(surveyAnswers).values(
-          input.answers.map((answer) => ({
-            responseId: insertedResponse.id,
-            questionId: answer.questionId,
-            content: answer.content,
-          })),
+        // The public service performs an early check for fast feedback, but
+        // this is the authoritative state check. It runs only after an
+        // archive/update that already owned the row lock has committed.
+        const now = nowDate();
+        const stateFailure = getSubmissionStateFailure(
+          lockedSurvey,
+          now.valueOf(),
         );
-      }
+        if (stateFailure) {
+          return { status: stateFailure } as const;
+        }
+        if (
+          !(await this.satisfiesFeeRequirement(
+            tx,
+            input.userId,
+            lockedSurvey.feeRequirementPolicy,
+          ))
+        ) {
+          return { status: "fee_payer_only" } as const;
+        }
 
-      return insertedResponse;
-    });
+        const questions = await this.findQuestionsForSurvey(tx, input.surveyId);
+        validateSurveyAnswers(questions, input.answers, now.valueOf());
 
-    const response = await this.findById(responseRow.id, responseRow.surveyId);
-    const answers = await this.findAnswersByResponseId(responseRow.id);
+        const singleResponseUserId = lockedSurvey.allowMultipleResponses
+          ? null
+          : input.userId;
 
-    return {
-      response:
-        response ??
-        this.mapResponse({
-          id: responseRow.id,
-          surveyId: responseRow.surveyId,
-          userId: responseRow.userId,
-          status: responseRow.status,
-          submittedAt: responseRow.submittedAt,
-          createdAt: responseRow.createdAt,
-          updatedAt: responseRow.updatedAt,
-          userNameKo: null,
-          userEmail: null,
-          userDepartmentKo: null,
-          userStdNo: null,
-        }),
-      answers,
-    };
+        if (singleResponseUserId) {
+          const [existingResponse] = await tx
+            .select({ id: surveyResponses.id })
+            .from(surveyResponses)
+            .where(
+              and(
+                eq(surveyResponses.surveyId, input.surveyId),
+                eq(surveyResponses.userId, singleResponseUserId),
+              ),
+            )
+            .limit(1);
+
+          if (existingResponse) {
+            return { status: "already_submitted" } as const;
+          }
+        }
+
+        if (lockedSurvey.maxResponseCount !== null) {
+          const [responseCount] = await tx
+            .select({ count: sql<number>`count(*)::int` })
+            .from(surveyResponses)
+            .where(
+              and(
+                eq(surveyResponses.surveyId, input.surveyId),
+                eq(surveyResponses.status, "submitted"),
+              ),
+            );
+
+          if ((responseCount?.count ?? 0) >= lockedSurvey.maxResponseCount) {
+            return { status: "capacity_full" } as const;
+          }
+        }
+
+        const [insertedResponse] = await tx
+          .insert(surveyResponses)
+          .values({
+            surveyId: input.surveyId,
+            userId: input.userId,
+            singleResponseUserId,
+            status: "submitted",
+            createdAt: now,
+            submittedAt: now,
+            updatedAt: now,
+          })
+          .returning();
+
+        if (input.answers.length > 0) {
+          await tx.insert(surveyAnswers).values(
+            input.answers.map((answer) => ({
+              responseId: insertedResponse.id,
+              questionId: answer.questionId,
+              content: answer.content,
+            })),
+          );
+        }
+
+        const response = await this.findById(
+          insertedResponse.id,
+          insertedResponse.surveyId,
+          tx,
+        );
+        const answers = await this.findAnswersByResponseId(
+          insertedResponse.id,
+          tx,
+        );
+
+        return {
+          status: "created",
+          response:
+            response ??
+            this.mapResponse({
+              id: insertedResponse.id,
+              surveyId: insertedResponse.surveyId,
+              userId: insertedResponse.userId,
+              status: insertedResponse.status,
+              submittedAt: insertedResponse.submittedAt,
+              createdAt: insertedResponse.createdAt,
+              updatedAt: insertedResponse.updatedAt,
+              userNameKo: null,
+              userEmail: null,
+              userDepartmentKo: null,
+              userStdNo: null,
+            }),
+          answers,
+        } as const;
+      })
+      .catch((error: unknown) => {
+        if (isSingleResponseUniqueViolation(error)) {
+          return { status: "already_submitted" } as const;
+        }
+        throw error;
+      });
+
+    return transactionResult;
   }
 
   async updateSubmission(input: {
     responseId: string;
     surveyId: string;
+    userId: string;
     answers: Array<{ questionId: string; content: Record<string, unknown> }>;
-  }): Promise<{ response: SurveyResponseRecord; answers: SurveyAnswerRecord[] }> {
-    const now = nowDate();
+  }): Promise<UpdateSubmissionResult> {
+    const transactionResult = await this.db.transaction(async (tx) => {
+      const [lockedSurvey] = await tx
+        .select({
+          isPublished: surveys.isPublished,
+          isAlwaysOpen: surveys.isAlwaysOpen,
+          openAt: surveys.openAt,
+          closeAt: surveys.closeAt,
+          feeRequirementPolicy: surveys.feeRequirementPolicy,
+          allowResponseEdit: surveys.allowResponseEdit,
+          allowMultipleResponses: surveys.allowMultipleResponses,
+        })
+        .from(surveys)
+        .where(eq(surveys.surveyId, input.surveyId))
+        .for("update");
 
-    const responseRow = await this.db.transaction(async (tx) => {
+      if (!lockedSurvey) {
+        return { status: "survey_not_found" } as const;
+      }
+
+      const now = nowDate();
+      const stateFailure = getSubmissionStateFailure(
+        lockedSurvey,
+        now.valueOf(),
+      );
+      if (stateFailure) {
+        return { status: stateFailure } as const;
+      }
+      if (
+        !(await this.satisfiesFeeRequirement(
+          tx,
+          input.userId,
+          lockedSurvey.feeRequirementPolicy,
+        ))
+      ) {
+        return { status: "fee_payer_only" } as const;
+      }
+      if (!lockedSurvey.allowResponseEdit) {
+        return { status: "response_edit_not_allowed" } as const;
+      }
+      if (lockedSurvey.allowMultipleResponses) {
+        return { status: "multiple_response_edit_not_supported" } as const;
+      }
+
+      const [existingResponse] = await tx
+        .select({ id: surveyResponses.id })
+        .from(surveyResponses)
+        .where(
+          and(
+            eq(surveyResponses.id, input.responseId),
+            eq(surveyResponses.surveyId, input.surveyId),
+            eq(surveyResponses.userId, input.userId),
+            eq(surveyResponses.status, "submitted"),
+          ),
+        )
+        .limit(1);
+      if (!existingResponse) {
+        return { status: "response_not_found" } as const;
+      }
+
+      const questions = await this.findQuestionsForSurvey(tx, input.surveyId);
+      validateSurveyAnswers(questions, input.answers, now.valueOf());
+
       const [updatedResponse] = await tx
         .update(surveyResponses)
         .set({
@@ -256,34 +527,46 @@ export class SurveyResponsesRepository {
         );
       }
 
-      return updatedResponse;
+      const response = await this.findById(
+        updatedResponse.id,
+        updatedResponse.surveyId,
+        tx,
+      );
+      const answers = await this.findAnswersByResponseId(
+        updatedResponse.id,
+        tx,
+      );
+
+      return {
+        status: "updated",
+        response:
+          response ??
+          this.mapResponse({
+            id: updatedResponse.id,
+            surveyId: updatedResponse.surveyId,
+            userId: updatedResponse.userId,
+            status: updatedResponse.status,
+            submittedAt: updatedResponse.submittedAt,
+            createdAt: updatedResponse.createdAt,
+            updatedAt: updatedResponse.updatedAt,
+            userNameKo: null,
+            userEmail: null,
+            userDepartmentKo: null,
+            userStdNo: null,
+          }),
+        answers,
+      } as const;
     });
 
-    const response = await this.findById(responseRow.id, responseRow.surveyId);
-    const answers = await this.findAnswersByResponseId(responseRow.id);
-
-    return {
-      response:
-        response ??
-        this.mapResponse({
-          id: responseRow.id,
-          surveyId: responseRow.surveyId,
-          userId: responseRow.userId,
-          status: responseRow.status,
-          submittedAt: responseRow.submittedAt,
-          createdAt: responseRow.createdAt,
-          updatedAt: responseRow.updatedAt,
-          userNameKo: null,
-          userEmail: null,
-          userDepartmentKo: null,
-          userStdNo: null,
-        }),
-      answers,
-    };
+    return transactionResult;
   }
 
-  async findAnswersByResponseId(responseId: string): Promise<SurveyAnswerRecord[]> {
-    const rows = await this.db.query.surveyAnswers.findMany({
+  async findAnswersByResponseId(
+    responseId: string,
+    tx?: PostgresTransaction,
+  ): Promise<SurveyAnswerRecord[]> {
+    const db = tx ?? this.db;
+    const rows = await db.query.surveyAnswers.findMany({
       where: eq(surveyAnswers.responseId, responseId),
     });
     return rows.map((r) => this.mapAnswer(r));

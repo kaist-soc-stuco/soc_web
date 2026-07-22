@@ -41,7 +41,8 @@ export function useBoardEditPageController() {
 
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
-  const [eventDescription, setEventDescription] = useState("");
+  const [eventDescriptionKo, setEventDescriptionKo] = useState("");
+  const [eventDescriptionEn, setEventDescriptionEn] = useState("");
   const [isEventAlwaysOpen, setIsEventAlwaysOpen] = useState(false);
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
@@ -70,12 +71,16 @@ export function useBoardEditPageController() {
         setIsAnonymous(res.isAnonymous);
         setIsPinned(res.isPinned);
         setAllowComment(res.allowComment);
-        setIsKoreanOnly(res.visibilityScope === "MEMBERS");
+        setIsKoreanOnly(
+          !res.titleEn?.trim() ||
+            !res.contentEn?.trim() ||
+            (category === "행사" && !res.eventDescriptionEn?.trim()),
+        );
         setIsEventAlwaysOpen(
           category === "행사" &&
             !res.eventStartDate &&
             !res.eventEndDate &&
-            Boolean(res.eventDescription),
+            Boolean(res.eventDescriptionKo),
         );
         setEventStartDate(
           res.eventStartDate ? isoToHtmlDatetimeLocal(res.eventStartDate) : "",
@@ -83,7 +88,8 @@ export function useBoardEditPageController() {
         setEventEndDate(
           res.eventEndDate ? isoToHtmlDatetimeLocal(res.eventEndDate) : "",
         );
-        setEventDescription(res.eventDescription || "");
+        setEventDescriptionKo(res.eventDescriptionKo || "");
+        setEventDescriptionEn(res.eventDescriptionEn || "");
         setSelectedSurveyId(res.survey?.surveyId ?? "");
         setInitialSurveyId(res.survey?.surveyId ?? "");
         setAssets(
@@ -179,8 +185,8 @@ export function useBoardEditPageController() {
     if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
       alert(
         lang === "ko"
-          ? "영문 제목과 내용을 입력하거나, 'Korean Speakers Only'를 체크해주세요."
-          : "Please enter English title and content, or check 'Korean Speakers Only'.",
+            ? "영문 제목과 내용을 입력하거나 '한국어 콘텐츠만'을 선택해 주세요."
+            : "Enter an English title and content, or select 'Korean content only'.",
       );
       setActiveTab("en");
       return;
@@ -188,7 +194,8 @@ export function useBoardEditPageController() {
 
     if (category === "행사") {
       if (
-        !eventDescription.trim() ||
+        !eventDescriptionKo.trim() ||
+        (!isKoreanOnly && !eventDescriptionEn.trim()) ||
         (!isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
       ) {
         alert(
@@ -204,10 +211,9 @@ export function useBoardEditPageController() {
       setIsSubmitting(true);
       await apiClient.updateArticle(category, articleId, {
         titleKo,
-        titleEn: titleEn || undefined,
+        titleEn: isKoreanOnly ? "" : titleEn,
         contentKo,
-        contentEn: contentEn || undefined,
-        visibilityScope: isKoreanOnly ? "MEMBERS" : "PUBLIC",
+        contentEn: isKoreanOnly ? "" : contentEn,
         isAnonymous: canConfigurePostSettings ? isAnonymous : false,
         isPinned: canConfigurePostSettings ? isPinned : false,
         allowComment,
@@ -228,8 +234,14 @@ export function useBoardEditPageController() {
               ? null
               : htmlDatetimeLocalToIso(eventEndDate)
             : undefined,
-        eventDescription:
-          category === "행사" ? eventDescription.trim() : undefined,
+        eventDescriptionKo:
+          category === "행사" ? eventDescriptionKo.trim() : undefined,
+        eventDescriptionEn:
+          category === "행사"
+            ? isKoreanOnly
+              ? null
+              : eventDescriptionEn.trim()
+            : undefined,
       });
       if (canConfigurePostSettings && selectedSurveyId) {
         let overwriteSchedule = false;
@@ -319,7 +331,8 @@ export function useBoardEditPageController() {
     contentEn,
     contentKo,
     error,
-    eventDescription,
+    eventDescriptionKo,
+    eventDescriptionEn,
     eventEndDate,
     eventStartDate,
     fileInputRef,
@@ -338,7 +351,8 @@ export function useBoardEditPageController() {
     setAssets,
     setContentEn,
     setContentKo,
-    setEventDescription,
+    setEventDescriptionKo,
+    setEventDescriptionEn,
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,

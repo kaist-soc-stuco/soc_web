@@ -19,6 +19,7 @@ import { ContactsModule } from "./features/contacts/contacts.module";
 import { BulkEmailModule } from "./features/email/bulk-email.module";
 import { CalendarModule } from "./features/calendar/calendar.module";
 import { AuditLogHttpModule } from "./features/audit/audit-log-http.module";
+import { SiteContentModule } from "./features/site-content/site-content.module";
 
 const devOnlyModules =
   process.env.NODE_ENV === "production" ? [] : [AuthDevModule, MockModule];
@@ -46,6 +47,7 @@ const devOnlyModules =
     BulkEmailModule,
     CalendarModule,
     AuditLogHttpModule,
+    SiteContentModule,
     RoleGroupsModule,
     HealthModule,
     ...devOnlyModules,

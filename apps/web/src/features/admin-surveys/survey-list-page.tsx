@@ -176,6 +176,11 @@ function renderTypeBadge(s: SurveyRecord) {
   );
 }
 
+const shouldArchiveSurvey = (survey: SurveyRecord) =>
+  survey.lifecycleStatus === "PUBLISHED" ||
+  (survey.responseCount ?? 0) > 0 ||
+  survey.derivedVersionCount > 0;
+
 export function SurveyListPage() {
   const navigate = useNavigate();
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
@@ -224,21 +229,36 @@ export function SurveyListPage() {
     fetchSurveys();
   }, [client, session, sessionLoading]);
 
-  const handleDelete = async (id: string, title: string) => {
+  const handleDelete = async (survey: SurveyRecord) => {
+    if (survey.lifecycleStatus === "ARCHIVED") return;
+
+    const shouldArchive = shouldArchiveSurvey(survey);
+    const hasDerivedVersions = survey.derivedVersionCount > 0;
     const confirmed = await requestConfirm({
-      confirmLabel: "삭제",
-      description: "삭제한 설문조사는 복구할 수 없습니다.",
-      title: `"${title}" 설문조사를 삭제하시겠습니까?`,
-      tone: "danger",
+      confirmLabel: shouldArchive ? "보관" : "삭제",
+      description: shouldArchive
+        ? hasDerivedVersions
+          ? "파생 버전의 계보를 유지하기 위해 원본을 삭제하지 않고 보관합니다."
+          : "응답 기록은 유지하고 공개 및 캘린더 노출을 중지합니다."
+        : "응답과 파생 버전이 없는 설문만 완전히 삭제할 수 있습니다.",
+      title: `"${survey.titleKo}" 설문조사를 ${shouldArchive ? "보관" : "삭제"}하시겠습니까?`,
+      tone: shouldArchive ? "default" : "danger",
     });
     if (!confirmed) return;
 
-    setDeleting(id);
+    setDeleting(survey.id);
     try {
-      await client.deleteSurvey(id);
-      setSurveys((prev) => prev.filter((s) => s.id !== id));
+      if (shouldArchive) {
+        const archived = await client.archiveSurvey(survey.id);
+        setSurveys((prev) =>
+          prev.map((item) => (item.id === archived.id ? archived : item)),
+        );
+      } else {
+        await client.deleteSurvey(survey.id);
+        setSurveys((prev) => prev.filter((item) => item.id !== survey.id));
+      }
     } catch {
-      alert("삭제에 실패했습니다.");
+      alert(shouldArchive ? "보관에 실패했습니다." : "삭제에 실패했습니다.");
     } finally {
       setDeleting(null);
     }
@@ -419,6 +439,7 @@ export function SurveyListPage() {
                   { value: "all", label: "전체" },
                   { value: "open", label: "진행중" },
                   { value: "closed", label: "마감" },
+                  { value: "archived", label: "보관됨" },
                   { value: "draft", label: "임시저장" }
                 ]}
                 onChange={(value) => setStatusFilter(value as SurveyStatusFilter)}
@@ -581,6 +602,18 @@ export function SurveyListPage() {
                               >
                                 {s.titleKo}
                               </span>
+                              <span
+                                className="w-fit rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500"
+                                title={
+                                  s.previousVersionId
+                                    ? "직전 설문에서 파생된 단계입니다. 같은 단계 번호의 분기가 있을 수 있습니다."
+                                    : "독립적으로 생성된 원본 설문입니다."
+                                }
+                              >
+                                {s.previousVersionId
+                                  ? `파생 단계 v${s.versionNumber}`
+                                  : `원본 v${s.versionNumber}`}
+                              </span>
                               {s.descriptionKo && (
                                 <span className="text-[11.5px] font-semibold text-slate-400 leading-normal line-clamp-1">
                                   {s.descriptionKo}
@@ -601,7 +634,9 @@ export function SurveyListPage() {
 
                           {/* Response Count (center-aligned) */}
                           <td className="px-4 py-4 text-center text-[13.5px] font-extrabold text-slate-800">
-	                            {!s.isPublished ? "—" : `${s.responseCount ?? 0}명`}
+	                            {!s.isPublished && s.lifecycleStatus !== "ARCHIVED"
+                                ? "—"
+                                : `${s.responseCount ?? 0}명`}
                           </td>
 
                           {/* Duration Column (center-aligned, double line, tight spacing, dates and times treated with equal contrast, 24h format) */}
@@ -719,31 +754,45 @@ export function SurveyListPage() {
                     <span>설문 복제</span>
                   </button>
 
-                  <button
-                    onClick={() => {
-                      setActiveRowDropdown(null);
-                      copyLink(activeRowDropdown.id);
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer border-0 bg-transparent"
-                  >
-                    <Link2 className="w-3.5 h-3.5 text-slate-400" />
-                    <span>링크 복사</span>
-                  </button>
+                  {surveys.find((survey) => survey.id === activeRowDropdown.id)
+                    ?.lifecycleStatus !== "ARCHIVED" && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setActiveRowDropdown(null);
+                          copyLink(activeRowDropdown.id);
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer border-0 bg-transparent"
+                      >
+                        <Link2 className="w-3.5 h-3.5 text-slate-400" />
+                        <span>링크 복사</span>
+                      </button>
 
-                  <div className="border-t border-slate-100 my-1" />
+                      <div className="border-t border-slate-100 my-1" />
 
-                  <button
-                    onClick={() => {
-                      const target = surveys.find((survey) => survey.id === activeRowDropdown.id);
-                      setActiveRowDropdown(null);
-                      if (target) handleDelete(target.id, target.titleKo);
-                    }}
-                    disabled={deleting === activeRowDropdown.id}
-                    className="w-full text-left px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors cursor-pointer border-0 bg-transparent disabled:opacity-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>설문 삭제</span>
-                  </button>
+                      <button
+                        onClick={() => {
+                          const target = surveys.find((survey) => survey.id === activeRowDropdown.id);
+                          setActiveRowDropdown(null);
+                          if (target) handleDelete(target);
+                        }}
+                        disabled={deleting === activeRowDropdown.id}
+                        className="w-full text-left px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors cursor-pointer border-0 bg-transparent disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>
+                          {(() => {
+                            const target = surveys.find(
+                              (survey) => survey.id === activeRowDropdown.id,
+                            );
+                            return target && shouldArchiveSurvey(target)
+                              ? "설문 보관"
+                              : "설문 삭제";
+                          })()}
+                        </span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </>,
               document.body,

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { isoToMs, nowMs } from "@soc/shared";
 import { Permissions } from "@soc/contracts";
 
@@ -6,6 +11,7 @@ import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveyResponsesRepository } from "./survey-responses.repository";
+import { SurveyMutationPolicy } from "./survey-mutation-policy";
 
 import type { SurveyRecordWithState } from "./entities/survey.entity";
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
@@ -26,6 +32,7 @@ export class SurveysService {
     private readonly sectionsRepo: SurveySectionsRepository,
     private readonly questionsRepo: SurveyQuestionsRepository,
     private readonly responsesRepo: SurveyResponsesRepository,
+    private readonly mutationPolicy: SurveyMutationPolicy,
   ) {}
 
   private computeState(survey: {
@@ -144,70 +151,133 @@ export class SurveysService {
   }
 
   async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecordWithState> {
-    const current = await this.surveysRepo.findById(id);
-    if (!current) throw new NotFoundException("survey_not_found");
+    return this.mutationPolicy.withSurveyLock(id, async (tx) => {
+      const current = await this.surveysRepo.findById(id, tx);
+      if (!current) throw new NotFoundException("survey_not_found");
+      if (current.lifecycleStatus === "ARCHIVED") {
+        throw new ConflictException("survey_archived_immutable");
+      }
+      await this.mutationPolicy.assertMeaningMutable(tx, id, current, dto);
 
-    const survey = await this.surveysRepo.update(id, dto);
-    if (!survey) throw new NotFoundException("survey_not_found");
-    const computedState = this.computeState(survey);
-    return { ...survey, computedState, responseCount: current.responseCount ?? 0 };
+      const survey = await this.surveysRepo.update(id, dto, tx);
+      if (!survey) throw new NotFoundException("survey_not_found");
+      const computedState = this.computeState(survey);
+      return {
+        ...survey,
+        computedState,
+        responseCount: current.responseCount ?? 0,
+        derivedVersionCount: current.derivedVersionCount,
+      };
+    });
   }
 
   async delete(id: string): Promise<void> {
-    const survey = await this.surveysRepo.findById(id);
-    if (!survey) throw new NotFoundException("survey_not_found");
-    await this.surveysRepo.delete(id);
+    await this.mutationPolicy.withHardDelete(id, (tx) =>
+      this.surveysRepo.delete(id, tx),
+    );
+  }
+
+  async archive(id: string): Promise<SurveyRecordWithState> {
+    return this.mutationPolicy.withSurveyLock(id, async (tx) => {
+      const current = await this.surveysRepo.findById(id, tx);
+      if (!current) throw new NotFoundException("survey_not_found");
+
+      if (current.lifecycleStatus === "ARCHIVED") {
+        return {
+          ...current,
+          computedState: this.computeState(current),
+          responseCount: current.responseCount ?? 0,
+        };
+      }
+
+      const survey = await this.surveysRepo.archive(id, tx);
+      if (!survey) throw new NotFoundException("survey_not_found");
+
+      return {
+        ...survey,
+        computedState: this.computeState(survey),
+        responseCount: current.responseCount ?? 0,
+        derivedVersionCount: current.derivedVersionCount,
+      };
+    });
   }
 
   async duplicate(id: string, creatorId: string): Promise<SurveyRecordWithState> {
-    const original = await this.findDetail(id);
+    return this.mutationPolicy.withSurveyLock(id, async (tx) => {
+      // Duplication is a manager operation and must be able to read drafts and
+      // archived surveys without going through the public detail access gate.
+      const original = await this.surveysRepo.findById(id, tx);
+      if (!original) throw new NotFoundException("survey_not_found");
 
-    const newSurvey = await this.surveysRepo.insert(creatorId, {
-      kind: original.kind,
-      titleKo: `${original.titleKo} (복사본)`,
-      titleEn: original.titleEn ? `${original.titleEn} (Copy)` : undefined,
-      descriptionKo: original.descriptionKo ?? undefined,
-      descriptionEn: original.descriptionEn ?? undefined,
-      feeRequirementPolicy: original.feePayersOnly ? "PAID_ONLY" : "NONE",
-      allowMultipleResponses: original.allowMultipleResponses,
-      allowResponseEdit: original.allowResponseEdit,
-      isKoreanOnly: original.isKoreanOnly,
-      isPublished: false,
-      resultVisibility: original.resultVisibility,
-      maxResponseCount: original.maxResponses ?? undefined,
-      openAt: original.opensAt ?? undefined,
-      closeAt: original.closesAt ?? undefined,
-      connectedArticleId: original.connectedPostId ?? undefined,
-      isAlwaysOpen: original.isAlwaysOpen,
-    });
+      const sections = await this.sectionsRepo.findBySurveyId(id, tx);
+      const sectionsWithQuestions = await Promise.all(
+        sections.map(async (section) => ({
+          ...section,
+          questions: await this.questionsRepo.findBySectionId(section.id, tx),
+        })),
+      );
 
-    for (const section of original.sections) {
-      const newSection = await this.sectionsRepo.insert(newSurvey.id, {
-        titleKo: section.titleKo,
-        titleEn: section.titleEn ?? undefined,
-        descriptionKo: section.descriptionKo ?? undefined,
-        descriptionEn: section.descriptionEn ?? undefined,
-        sortOrder: section.sortOrder,
-      });
+      const newSurvey = await this.surveysRepo.insert(
+        creatorId,
+        {
+          kind: original.kind,
+          titleKo: `${original.titleKo} (복사본)`,
+          titleEn: original.titleEn ? `${original.titleEn} (Copy)` : undefined,
+          descriptionKo: original.descriptionKo ?? undefined,
+          descriptionEn: original.descriptionEn ?? undefined,
+          feeRequirementPolicy: original.feePayersOnly ? "PAID_ONLY" : "NONE",
+          allowMultipleResponses: original.allowMultipleResponses,
+          allowResponseEdit: original.allowResponseEdit,
+          isKoreanOnly: original.isKoreanOnly,
+          isPublished: false,
+          resultVisibility: "PRIVATE",
+          maxResponseCount: original.maxResponses ?? undefined,
+          openAt: original.opensAt ?? undefined,
+          closeAt: original.closesAt ?? undefined,
+          isAlwaysOpen: original.isAlwaysOpen,
+        },
+        tx,
+        {
+          previousVersionId: original.id,
+          versionNumber: original.versionNumber + 1,
+        },
+      );
 
-      for (const question of section.questions) {
-        await this.questionsRepo.insert(newSection.id, {
-          titleKo: question.titleKo,
-          titleEn: question.titleEn ?? undefined,
-          descriptionKo: question.descriptionKo ?? undefined,
-          descriptionEn: question.descriptionEn ?? undefined,
-          questionType: question.questionType,
-          options: question.options ?? undefined,
-          answerRegex: question.answerRegex ?? undefined,
-          isRequired: question.isRequired,
-          editDeadlineAt: question.editDeadlineAt ?? undefined,
-          sortOrder: question.sortOrder,
-        });
+      for (const section of sectionsWithQuestions) {
+        const newSection = await this.sectionsRepo.insert(
+          newSurvey.id,
+          {
+            titleKo: section.titleKo,
+            titleEn: section.titleEn ?? undefined,
+            descriptionKo: section.descriptionKo ?? undefined,
+            descriptionEn: section.descriptionEn ?? undefined,
+            sortOrder: section.sortOrder,
+          },
+          tx,
+        );
+
+        for (const question of section.questions) {
+          await this.questionsRepo.insert(
+            newSection.id,
+            {
+              titleKo: question.titleKo,
+              titleEn: question.titleEn ?? undefined,
+              descriptionKo: question.descriptionKo ?? undefined,
+              descriptionEn: question.descriptionEn ?? undefined,
+              questionType: question.questionType,
+              options: question.options ?? undefined,
+              answerRegex: question.answerRegex ?? undefined,
+              isRequired: question.isRequired,
+              sortOrder: question.sortOrder,
+            },
+            tx,
+          );
+        }
       }
-    }
 
-    const computedState = this.computeState(newSurvey);
-    return { ...newSurvey, computedState, responseCount: 0 };
+      const computedState = this.computeState(newSurvey);
+      return { ...newSurvey, computedState, responseCount: 0 };
+    });
   }
 
   async findSectionWithQuestions(
@@ -303,27 +373,21 @@ export class SurveysService {
                 titleEn: q.titleEn,
                 totalAnswers,
                 choices,
-              };
-            } else {
-              const texts = questionAnswers.map((ans) => {
-                const content = ans.content as Record<string, unknown>;
-                if ("text" in content) return String(content.text);
-                if ("value" in content) return String(content.value);
-                if ("date" in content) return String(content.date);
-                if ("time" in content) return String(content.time);
-                if ("datetime" in content) return String(content.datetime);
-                return JSON.stringify(content);
-              });
-
-              return {
-                questionId: q.id,
-                questionType: q.questionType,
-                titleKo: q.titleKo,
-                titleEn: q.titleEn,
-                totalAnswers,
-                texts,
+                rawAnswersHidden: false,
               };
             }
+
+            // Free text and temporal values are intentionally never part of
+            // the analytics DTO. Managers can review raw responses through
+            // the permission-protected response endpoints instead.
+            return {
+              questionId: q.id,
+              questionType: q.questionType,
+              titleKo: q.titleKo,
+              titleEn: q.titleEn,
+              totalAnswers,
+              rawAnswersHidden: true,
+            };
           }),
         );
       }),

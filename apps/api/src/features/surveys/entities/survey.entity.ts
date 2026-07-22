@@ -1,4 +1,7 @@
-import type { ComputedSurveyState } from "@soc/contracts";
+import type {
+  ComputedSurveyState,
+  SurveyLifecycleStatus,
+} from "@soc/contracts";
 
 export interface SurveyRecord {
   id: string;
@@ -16,6 +19,11 @@ export interface SurveyRecord {
   allowResponseEdit: boolean;
   isKoreanOnly: boolean;
   isPublished: boolean;
+  lifecycleStatus: SurveyLifecycleStatus;
+  archivedAt: string | null;
+  previousVersionId: string | null;
+  versionNumber: number;
+  derivedVersionCount: number;
   showOnCalendar: boolean;
   maxResponses: number | null;
   isAlwaysOpen: boolean;

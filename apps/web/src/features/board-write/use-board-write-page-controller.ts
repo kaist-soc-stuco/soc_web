@@ -53,7 +53,8 @@ export function useBoardWritePageController() {
   const [uploading, setUploading] = useState(false);
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
-  const [eventDescription, setEventDescription] = useState("");
+  const [eventDescriptionKo, setEventDescriptionKo] = useState("");
+  const [eventDescriptionEn, setEventDescriptionEn] = useState("");
   const [isEventAlwaysOpen, setIsEventAlwaysOpen] = useState(false);
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
@@ -217,7 +218,8 @@ export function useBoardWritePageController() {
       isEventAlwaysOpen,
       eventStartDate,
       eventEndDate,
-      eventDescription,
+      eventDescriptionKo,
+      eventDescriptionEn,
       updatedAt: nowMs(),
     };
     localStorage.setItem(key, JSON.stringify(data));
@@ -245,7 +247,10 @@ export function useBoardWritePageController() {
       setIsEventAlwaysOpen(parsed.isEventAlwaysOpen ?? false);
       setEventStartDate(parsed.eventStartDate || "");
       setEventEndDate(parsed.eventEndDate || "");
-      setEventDescription(parsed.eventDescription || "");
+      setEventDescriptionKo(
+        parsed.eventDescriptionKo || parsed.eventDescription || "",
+      );
+      setEventDescriptionEn(parsed.eventDescriptionEn || "");
       setHasDraft(false);
       alert(
         lang === "ko"
@@ -276,7 +281,8 @@ export function useBoardWritePageController() {
     localStorage.removeItem(key);
     setEventStartDate("");
     setEventEndDate("");
-    setEventDescription("");
+    setEventDescriptionKo("");
+    setEventDescriptionEn("");
     setIsEventAlwaysOpen(false);
     setHasDraft(false);
   };
@@ -290,7 +296,8 @@ export function useBoardWritePageController() {
       !isEventAlwaysOpen &&
       !eventStartDate &&
       !eventEndDate &&
-      !eventDescription
+      !eventDescriptionKo &&
+      !eventDescriptionEn
     ) {
       return;
     }
@@ -310,7 +317,8 @@ export function useBoardWritePageController() {
     isEventAlwaysOpen,
     eventStartDate,
     eventEndDate,
-    eventDescription,
+    eventDescriptionKo,
+    eventDescriptionEn,
     selectedCategory,
   ]);
 
@@ -337,8 +345,8 @@ export function useBoardWritePageController() {
     if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
       alert(
         lang === "ko"
-          ? "영문 제목과 내용을 입력하거나, 'Korean Speakers Only'를 체크해주세요."
-          : "Please enter English title and content, or check 'Korean Speakers Only'.",
+            ? "영문 제목과 내용을 입력하거나 '한국어 콘텐츠만'을 선택해 주세요."
+            : "Enter an English title and content, or select 'Korean content only'.",
       );
       setActiveTab("en");
       return;
@@ -346,7 +354,8 @@ export function useBoardWritePageController() {
 
     if (selectedCategory === "행사") {
       if (
-        !eventDescription.trim() ||
+        !eventDescriptionKo.trim() ||
+        (!isKoreanOnly && !eventDescriptionEn.trim()) ||
         (!isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
       ) {
         alert(
@@ -362,10 +371,10 @@ export function useBoardWritePageController() {
       setIsSubmitting(true);
       const article = await apiClient.createArticle(selectedCategory, {
         titleKo,
-        titleEn: titleEn || undefined,
+        titleEn: isKoreanOnly ? undefined : titleEn,
         contentKo,
-        contentEn: contentEn || undefined,
-        visibilityScope: isKoreanOnly ? "MEMBERS" : "PUBLIC",
+        contentEn: isKoreanOnly ? undefined : contentEn,
+        visibilityScope: "PUBLIC",
         isAnonymous: canConfigurePostSettings ? isAnonymous : false,
         isPinned: canConfigurePostSettings ? isPinned : false,
         allowComment: selectedBoard?.allowComment === false ? false : allowComment,
@@ -386,8 +395,14 @@ export function useBoardWritePageController() {
               ? null
               : htmlDatetimeLocalToIso(eventEndDate)
             : undefined,
-        eventDescription:
-          selectedCategory === "행사" ? eventDescription.trim() : undefined,
+        eventDescriptionKo:
+          selectedCategory === "행사" ? eventDescriptionKo.trim() : undefined,
+        eventDescriptionEn:
+          selectedCategory === "행사"
+            ? isKoreanOnly
+              ? undefined
+              : eventDescriptionEn.trim() || undefined
+            : undefined,
       });
       if (canConfigurePostSettings && selectedSurveyId) {
         let overwriteSchedule = false;
@@ -468,7 +483,8 @@ export function useBoardWritePageController() {
     contentEn,
     contentKo,
     draftTime,
-    eventDescription,
+    eventDescriptionKo,
+    eventDescriptionEn,
     eventEndDate,
     eventStartDate,
     fileInputRef,
@@ -492,7 +508,8 @@ export function useBoardWritePageController() {
     setAssets,
     setContentEn,
     setContentKo,
-    setEventDescription,
+    setEventDescriptionKo,
+    setEventDescriptionEn,
     setEventEndDate,
     setEventStartDate,
     setAllowComment,

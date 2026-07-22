@@ -13,6 +13,7 @@ import { SurveysService } from "./surveys.service";
 import { SurveySectionsService } from "./survey-sections.service";
 import { SurveyQuestionsService } from "./survey-questions.service";
 import { SurveyResponsesService } from "./survey-responses.service";
+import { SurveyMutationPolicy } from "./survey-mutation-policy";
 
 import { SurveysController } from "./surveys.controller";
 import { SurveySectionsController } from "./survey-sections.controller";
@@ -38,6 +39,7 @@ import { SurveyResponsesController } from "./survey-responses.controller";
     SurveySectionsService,
     SurveyQuestionsService,
     SurveyResponsesService,
+    SurveyMutationPolicy,
   ],
 })
 export class SurveysModule {}

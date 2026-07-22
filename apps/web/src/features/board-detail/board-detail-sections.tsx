@@ -95,6 +95,7 @@ interface ArticleCardProps {
   attachmentAssets: ArticleAssetItem[];
   canEdit: boolean;
   category: string;
+  categoryLabel: string;
   content: string;
   lang: string;
   onDeleteArticle: () => void;
@@ -109,6 +110,7 @@ export function BoardDetailArticleCard({
   attachmentAssets,
   canEdit,
   category,
+  categoryLabel,
   content,
   lang,
   onDeleteArticle,
@@ -121,14 +123,20 @@ export function BoardDetailArticleCard({
     <article className="w-full rounded-xl border border-card-border-subtle bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]">
       <header>
         <span className="inline-flex rounded-md bg-brand-primary-light px-2 py-1 text-xs font-bold text-brand-primary">
-          {category}
+          {categoryLabel}
         </span>
         <h1 className="mt-3 text-[1.18rem] font-extrabold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
           {title}
         </h1>
         <div className="mt-3 flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-x-2 text-xs font-bold text-slate-500">
-            <span>{article.isAnonymous ? "익명" : article.author.name}</span>
+            <span>
+              {article.isAnonymous
+                ? lang === "ko"
+                  ? "익명"
+                  : "Anonymous"
+                : article.author.name}
+            </span>
             <span className="text-slate-300">·</span>
             <span>{formatDateSlash(article.postedAt)}</span>
             <span className="text-slate-300">·</span>
@@ -143,19 +151,19 @@ export function BoardDetailArticleCard({
               <Link
                 to={`/board/${category}/${article.articleId}/edit`}
                 className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-bold leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                title="수정"
+                title={lang === "ko" ? "수정" : "Edit"}
               >
                 <Edit2 className="h-3.5 w-3.5" />
-                수정
+                {lang === "ko" ? "수정" : "Edit"}
               </Link>
               <button
                 type="button"
                 onClick={onDeleteArticle}
                 className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-bold leading-none text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                title="삭제"
+                title={lang === "ko" ? "삭제" : "Delete"}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                삭제
+                {lang === "ko" ? "삭제" : "Delete"}
               </button>
             </div>
           )}
@@ -182,6 +190,7 @@ export function BoardDetailArticleCard({
       <AttachmentList
         assets={attachmentAssets}
         className="mt-6 border-t border-slate-100 pt-5"
+        lang={lang}
       />
 
       {article.survey && (
@@ -231,14 +240,16 @@ export function BoardDetailArticleCard({
 export function BoardDetailBreadcrumb({
   category,
   displayBoardLabel,
+  lang,
 }: {
   category: string;
   displayBoardLabel: string;
+  lang: string;
 }) {
   return (
     <div className="flex items-center gap-1.5 text-[13px] text-slate-400 font-semibold select-none">
       <Link to="/board" className="hover:text-kaist-darkgreen transition-colors">
-        게시판
+        {lang === "ko" ? "게시판" : "Board"}
       </Link>
       <svg
         className="w-2.5 h-2.5 text-slate-350"
@@ -262,9 +273,11 @@ export function BoardDetailBreadcrumb({
 export function BoardDetailAdjacentLinks({
   article,
   category,
+  lang,
 }: {
   article: ArticleDetailResponse;
   category: string;
+  lang: string;
 }) {
   return (
     <div className="w-full flex flex-col gap-2 mt-2">
@@ -272,16 +285,20 @@ export function BoardDetailAdjacentLinks({
         <AdjacentLink
           article={article.prevArticle}
           category={category}
-          emptyText="이전 게시글이 없습니다."
+          emptyText={
+            lang === "ko" ? "이전 게시글이 없습니다." : "No previous post."
+          }
           icon="prev"
-          label="이전글"
+          label={lang === "ko" ? "이전글" : "Previous"}
+          lang={lang}
         />
         <AdjacentLink
           article={article.nextArticle}
           category={category}
-          emptyText="다음 게시글이 없습니다."
+          emptyText={lang === "ko" ? "다음 게시글이 없습니다." : "No next post."}
           icon="next"
-          label="다음글"
+          label={lang === "ko" ? "다음글" : "Next"}
+          lang={lang}
         />
       </div>
 
@@ -290,7 +307,7 @@ export function BoardDetailAdjacentLinks({
           to={`/board/${category}`}
           className="inline-flex items-center justify-center gap-1 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-lg text-[13px] font-bold text-slate-600 hover:text-slate-800 transition shadow-sm cursor-pointer"
         >
-          목록으로
+          {lang === "ko" ? "목록으로" : "Back to list"}
         </Link>
       </div>
     </div>
@@ -303,12 +320,14 @@ function AdjacentLink({
   emptyText,
   icon,
   label,
+  lang,
 }: {
   article: ArticleDetailResponse["prevArticle"];
   category: string;
   emptyText: string;
   icon: "prev" | "next";
   label: string;
+  lang: string;
 }) {
   const Icon = icon === "prev" ? ChevronUp : ChevronDown;
 
@@ -335,7 +354,7 @@ function AdjacentLink({
           {label}
         </span>
         <span className="text-slate-700 font-semibold truncate group-hover:text-kaist-darkgreen transition-colors">
-          {article.titleKo}
+          {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
         </span>
       </div>
       <span className="text-xs text-slate-400 shrink-0 font-medium ml-4">

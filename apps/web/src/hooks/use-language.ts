@@ -1,48 +1,61 @@
-import { useState, useEffect } from "react";
-import { useCurrentSession } from "./use-current-session";
+import { useEffect, useState } from "react";
 
-export type Language = "ko" | "en";
+import {
+  isLanguage,
+  LANGUAGE_STORAGE_KEY,
+  resolveInitialLanguage,
+  type Language,
+} from "@/lib/i18n";
+
+export type { Language } from "@/lib/i18n";
+
+const LANGUAGE_CHANGE_EVENT = "soc-language-change";
+
+function getBrowserLanguage(): Language {
+  if (typeof window === "undefined") return "ko";
+
+  return resolveInitialLanguage({
+    navigatorLanguages:
+      window.navigator.languages.length > 0
+        ? window.navigator.languages
+        : [window.navigator.language],
+    storedLanguage: window.localStorage.getItem(LANGUAGE_STORAGE_KEY),
+  });
+}
 
 export function useLanguage() {
-  const { data: session } = useCurrentSession();
-  
-  // Determine default language based on session & nameKo === nameEn
-  const getDefaultLanguage = (): Language => {
-    const saved = localStorage.getItem("lang");
-    if (saved === "ko" || saved === "en") return saved;
-    
-    if (session?.authenticated && session.nameKo && session.nameEn) {
-      if (session.nameKo === session.nameEn) {
-        return "en";
-      }
-    }
-    return "ko";
-  };
-
-  const [lang, setLangState] = useState<Language>(getDefaultLanguage);
+  const [lang, setLangState] = useState<Language>(getBrowserLanguage);
 
   useEffect(() => {
-    // When session loads, if there is no user-selected language, re-evaluate
-    if (!localStorage.getItem("lang") && session?.authenticated && session.nameKo && session.nameEn) {
-      setLangState(session.nameKo === session.nameEn ? "en" : "ko");
-    }
-  }, [session]);
-
-  useEffect(() => {
-    const handleLangChange = () => {
-      const current = localStorage.getItem("lang") as Language;
-      if (current === "ko" || current === "en") {
+    const handleLanguageChange = () => {
+      const current = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (isLanguage(current)) {
         setLangState(current);
       }
     };
-    window.addEventListener("lang-change", handleLangChange);
-    return () => window.removeEventListener("lang-change", handleLangChange);
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === LANGUAGE_STORAGE_KEY && isLanguage(event.newValue)) {
+        setLangState(event.newValue);
+      }
+    };
+
+    window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLanguageChange);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   const setLanguage = (newLang: Language) => {
-    localStorage.setItem("lang", newLang);
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, newLang);
     setLangState(newLang);
-    window.dispatchEvent(new Event("lang-change"));
+    window.dispatchEvent(new Event(LANGUAGE_CHANGE_EVENT));
   };
 
   return { lang, setLanguage };

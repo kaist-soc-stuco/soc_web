@@ -1,8 +1,12 @@
 import {
   BadRequestException,
   Controller,
+  Get,
+  Param,
   Post,
   Req,
+  Res,
+  StreamableFile,
   UnauthorizedException,
   UploadedFile,
   UseGuards,
@@ -14,10 +18,14 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Permissions } from "@soc/contracts";
-import { Request } from "express";
+import { Request, Response } from "express";
 
 import { AuthGuard, RequirePermissions } from "../auth/guards";
+import { Cookies } from "../../shared/decorators/cookies.decorator";
+import { AUTH_ACCESS_COOKIE_NAME } from "../auth/auth.tokens";
+import { AuthSessionService } from "../auth/auth-session.service";
 import { AssetService } from "./asset.service";
+import { buildAssetResponseHeaders } from "./asset-response";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -34,6 +42,9 @@ type UploadedAssetFile = {
 };
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+// Multer/ParseFilePipe interpret their configured limit as an exclusive upper
+// bound, so the first invalid size keeps 20 MiB itself valid.
+const FIRST_INVALID_FILE_SIZE_BYTES = MAX_FILE_SIZE_BYTES + 1;
 const ALLOWED_ASSET_MIME_TYPES = new Set([
   "application/msword",
   "application/pdf",
@@ -53,17 +64,49 @@ const ALLOWED_ASSET_MIME_TYPES = new Set([
 
 @Controller("assets")
 export class AssetController {
-  constructor(private readonly assetService: AssetService) {}
+  constructor(
+    private readonly assetService: AssetService,
+    private readonly authSessionService: AuthSessionService,
+  ) {}
+
+  @Get(":assetId/content")
+  async getContent(
+    @Param("assetId") assetId: string,
+    @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    if (!/^\d+$/.test(assetId)) {
+      throw new BadRequestException("asset_id_invalid");
+    }
+
+    const currentUser =
+      await this.authSessionService.getOptionalCurrentUser(accessToken);
+    const file = await this.assetService.getFile(assetId, currentUser);
+    const headers = buildAssetResponseHeaders(file);
+
+    for (const [name, value] of Object.entries(headers)) {
+      response.setHeader(name, value);
+    }
+    response.setHeader("Content-Length", String(file.buffer.byteLength));
+
+    return new StreamableFile(file.buffer);
+  }
 
   @Post("upload")
   @UseGuards(AuthGuard)
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: FIRST_INVALID_FILE_SIZE_BYTES },
+    }),
+  )
   async upload(
     @UploadedFile(
       new ParseFilePipe({
         fileIsRequired: true,
         validators: [
-          new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE_BYTES }),
+          new MaxFileSizeValidator({
+            maxSize: FIRST_INVALID_FILE_SIZE_BYTES,
+          }),
         ],
         exceptionFactory: (error) => new BadRequestException(error),
       }),

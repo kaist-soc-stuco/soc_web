@@ -33,6 +33,7 @@ export interface UnifiedItem {
   resultVisibility?: string;
   maxResponses?: number | null;
   responseCount?: number;
+  visibilityScope?: ArticleListItem["visibilityScope"];
   isAlwaysOpen?: boolean;
   imageUrl?: string | null;
 }
@@ -160,6 +161,7 @@ export const buildUnifiedItems = (
     resultVisibility: survey.resultVisibility,
     maxResponses: survey.maxResponses,
     responseCount: survey.responseCount,
+    visibilityScope: undefined,
     isAlwaysOpen: survey.isAlwaysOpen,
   }));
 
@@ -168,17 +170,20 @@ export const buildUnifiedItems = (
     kind: "EVENT",
     titleKo: event.titleKo,
     titleEn: event.titleEn ?? null,
-    descriptionKo: event.eventDescription ?? null,
-    descriptionEn: event.eventDescription ?? null,
+    descriptionKo: event.eventDescriptionKo ?? null,
+    descriptionEn: event.eventDescriptionEn ?? null,
     computedState: getEventArticleState(event, currentMs),
     opensAt: event.eventStartDate ?? null,
     closesAt: event.eventEndDate ?? null,
     surveyId: event.surveyId,
     feePayersOnly: false,
-    isKoreanOnly: event.visibilityScope === "MEMBERS",
+    // Article visibility controls who may read an event; it is not a language flag.
+    isKoreanOnly:
+      !event.titleEn?.trim() || !event.eventDescriptionEn?.trim(),
     resultVisibility: "PRIVATE",
     maxResponses: null,
     responseCount: 0,
+    visibilityScope: event.visibilityScope,
     isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
     imageUrl: event.imageUrl ?? null,
   }));

@@ -31,7 +31,8 @@ function article(overrides = {}) {
     viewCount: 0,
     eventStartDate: "2026-05-29T00:00:00.000Z",
     eventEndDate: "2026-05-31T00:00:00.000Z",
-    eventDescription: "행사 설명",
+    eventDescriptionKo: "행사 설명",
+    eventDescriptionEn: "Event description",
     surveyId: "survey-child",
     ...overrides,
   };
@@ -83,6 +84,29 @@ test("computes event article state from event dates", () => {
   );
 });
 
+test("does not treat members-only visibility as a language restriction", () => {
+  const [event] = buildUnifiedItems(
+    [],
+    [article({ visibilityScope: "MEMBERS" })],
+    NOW,
+  );
+
+  assert.equal(event.isKoreanOnly, false);
+  assert.equal(event.visibilityScope, "MEMBERS");
+  assert.equal(
+    buildUnifiedItems([], [article({ titleEn: null })], NOW)[0].isKoreanOnly,
+    true,
+  );
+  assert.equal(
+    buildUnifiedItems(
+      [],
+      [article({ eventDescriptionEn: null })],
+      NOW,
+    )[0].isKoreanOnly,
+    true,
+  );
+});
+
 test("builds unified survey and event items", () => {
   const items = buildUnifiedItems([survey()], [article()], NOW);
 
@@ -94,6 +118,8 @@ test("builds unified survey and event items", () => {
     ],
   );
   assert.equal(items[1].surveyId, "survey-child");
+  assert.equal(items[1].descriptionKo, "행사 설명");
+  assert.equal(items[1].descriptionEn, "Event description");
 });
 
 test("keeps event-connected surveys out of the pure survey tab", () => {

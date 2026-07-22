@@ -4,6 +4,7 @@ import { isoToDate } from "@soc/shared";
 import { ArrowRight, Calendar as CalendarIcon, Clock } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
+import { getKoreanHolidayName } from "@/lib/korean-holidays";
 import {
   stripCalendarPrefix,
   type CalendarEvent,
@@ -48,7 +49,7 @@ export function EventsSurveysDayDetails({
             </span>
             {selectedHoliday && (
               <span className="mt-1 inline-flex items-center rounded-full border border-red-100 bg-red-50 px-2.5 py-0.5 text-[10.5px] font-extrabold text-red-500">
-                {selectedHoliday.dateName}
+                {getKoreanHolidayName(selectedHoliday.dateName, lang)}
               </span>
             )}
           </div>

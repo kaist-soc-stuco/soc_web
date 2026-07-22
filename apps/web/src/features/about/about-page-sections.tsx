@@ -1,8 +1,10 @@
 import type { ContactRecord } from "@soc/contracts";
 import type { ReactNode } from "react";
 import {
+  ArrowRight,
   Award,
   Calendar,
+  Compass,
   Info,
   Mail,
   Network,
@@ -10,6 +12,9 @@ import {
   Target,
   User,
 } from "lucide-react";
+import { Link } from "react-router-dom";
+
+import { useLocalizedSiteContent } from "@/features/site-content/site-content";
 
 const TABS = [
   { id: "intro", labelKo: "소개", labelEn: "Intro", icon: Info },
@@ -18,7 +23,9 @@ const TABS = [
   { id: "members", labelKo: "구성원", labelEn: "Members", icon: User },
 ];
 
-export function AboutHero({ lang }: { lang: string }) {
+export function AboutHero() {
+  const description = useLocalizedSiteContent("about.hero.description");
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-kaist-darkgreen to-[#002613] px-4 py-16 text-center text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(113,185,141,0.15),transparent)]" />
@@ -27,9 +34,7 @@ export function AboutHero({ lang }: { lang: string }) {
           KAIST SOC
         </h1>
         <p className="text-lg font-medium tracking-wide text-white/80 md:text-xl">
-          {lang === "ko"
-            ? "전산학부 학생들의 목소리를 대변하고, 더 나은 학업 및 문화 환경을 만들어갑니다."
-            : "We represent the voices of SoC students and build a better academic and cultural environment."}
+          {description}
         </p>
       </div>
     </section>
@@ -104,18 +109,15 @@ export function AboutTabContent({
 }
 
 function IntroSection({ lang }: { lang: string }) {
+  const title = useLocalizedSiteContent("about.intro.title");
+  const body = useLocalizedSiteContent("about.intro.body");
+
   return (
     <div className="animate-in space-y-12 fade-in duration-300">
       <div className="space-y-4">
-        <h2 className="text-2xl font-black text-kaist-black">
-          {lang === "ko"
-            ? "KAIST 전산학부 집행위원회 'SOC'"
-            : "KAIST School of Computing Student Council 'SOC'"}
-        </h2>
+        <h2 className="text-2xl font-black text-kaist-black">{title}</h2>
         <p className="text-base font-medium leading-relaxed text-gray-700">
-          {lang === "ko"
-            ? "SOC(School of Computing Student Council)는 KAIST 전산학부 학부생들을 대표하는 학생자치기구입니다. 전산학부 학생들의 권익을 보호하고 학업, 진로, 문화 교류 등 다방면에서 유익하고 즐거운 대학 생활을 지원하기 위해 다양한 사업을 기획 및 집행하고 있습니다."
-            : "SOC is the student self-governing body representing undergraduate students of the School of Computing at KAIST. We protect students' rights and plan/execute various projects to support beneficial and enjoyable college life in academic, career, and cultural exchange fields."}
+          {body}
         </p>
       </div>
 
@@ -142,11 +144,38 @@ function IntroSection({ lang }: { lang: string }) {
           description={
             lang === "ko"
               ? "바비큐 파티, 야식 이벤트, 전산인의 밤 등 다채로운 친목 및 교류 행사를 마련하여 소속감을 높입니다."
-              : "We build a strong community by preparing various social events like BBQ, midnight snack runs, and SoC night."
+              : "We build a strong community through social events such as BBQ gatherings, late-night snack events, and SOC Night."
           }
           icon={<User className="h-5 w-5" />}
           title={lang === "ko" ? "즐거운 문화 행사" : "Enriching Culture Events"}
         />
+      </div>
+
+      <div className="flex flex-col gap-5 rounded-2xl border border-kaist-darkgreen/15 bg-kaist-lightgreen/10 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-kaist-darkgreen shadow-sm">
+            <Compass aria-hidden="true" className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-kaist-black">
+              {lang === "ko"
+                ? "전산학부 생활 로드맵"
+                : "School of Computing Journey Roadmap"}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-gray-600">
+              {lang === "ko"
+                ? "수업, 프로젝트, 연구와 진로 탐색을 단계별로 살펴보세요."
+                : "Explore coursework, projects, research, and career planning by stage."}
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/about/roadmap"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-5 text-sm font-bold text-white transition-colors hover:bg-kaist-darkgreen/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kaist-darkgreen"
+        >
+          {lang === "ko" ? "로드맵 보기" : "View roadmap"}
+          <ArrowRight aria-hidden="true" className="h-4 w-4" />
+        </Link>
       </div>
     </div>
   );
@@ -196,7 +225,7 @@ function HistorySection({ lang }: { lang: string }) {
           description={
             lang === "ko"
               ? "전산학부 연구실 오픈하우스 확대 운영 및 1:1 선배 학업 멘토링 프로그램 신설"
-              : "Expanded Operation of SoC Research Lab Open House and newly established 1:1 academic mentoring."
+              : "Expanded the School of Computing Research Lab Open House and established 1:1 academic mentoring."
           }
           title={
             lang === "ko"
@@ -214,7 +243,7 @@ function HistorySection({ lang }: { lang: string }) {
           title={
             lang === "ko"
               ? "전산학부 창립 행사 및 교류회 활성화"
-              : "SoC Founding Festival & Social Activities Activation"
+              : "SOC Community Events & Student Exchange"
           }
           year="2024"
         />
@@ -370,8 +399,8 @@ function MemberCard({
   contact: ContactRecord;
   lang: string;
 }) {
-  const name = lang === "ko" ? contact.nameKo : contact.nameEn || contact.nameKo;
-  const role = lang === "ko" ? contact.roleKo : contact.roleEn || contact.roleKo;
+  const name = lang === "ko" ? contact.nameKo : contact.nameEn;
+  const role = lang === "ko" ? contact.roleKo : contact.roleEn;
 
   return (
     <div className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-slate-50/50 p-6 transition-all hover:bg-slate-50 hover:shadow-xs">

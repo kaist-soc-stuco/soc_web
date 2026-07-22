@@ -9,6 +9,39 @@
 
 import { z } from "zod";
 
+// ─── Site Content ────────────────────────────────────────────────────────────
+
+/**
+ * Public-site copy that may be edited through the CMS.
+ *
+ * Keys are deliberately finite: each key has an explicit UI consumer and can
+ * be reviewed independently. Add a key here (and a matching DB enum migration)
+ * when a new editable public section is introduced.
+ */
+export const SITE_CONTENT_KEYS = [
+  "home.hero.title",
+  "home.hero.description",
+  "home.hero.cta",
+  "about.hero.description",
+  "about.intro.title",
+  "about.intro.body",
+  "about.roadmap.title",
+  "about.roadmap.description",
+  "footer.description",
+  "footer.contact",
+] as const;
+
+export const SiteContentKeySchema = z.enum(SITE_CONTENT_KEYS);
+
+const SiteContentValueSchema = z.string().trim().min(1).max(20_000);
+
+export const UpsertSiteContentSchema = z
+  .object({
+    valueKo: SiteContentValueSchema,
+    valueEn: SiteContentValueSchema,
+  })
+  .strict();
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export const ConsentDecisionSchema = z.object({
@@ -28,10 +61,26 @@ export const SsoCallbackBodySchema = z.object({
 export const VisibilityScopeSchema = z.enum(["PUBLIC", "MEMBERS", "STAFF_ONLY"]);
 
 export const ArticleAssetRequestSchema = z.object({
-  assetId: z.string().min(1),
+  assetId: z.string().regex(/^\d+$/),
   usageType: z.enum(["IMAGE", "ATTACHMENT", "THUMBNAIL"]),
   sortOrder: z.number().int().min(0),
 });
+
+const ArticleAssetsSchema = z
+  .array(ArticleAssetRequestSchema)
+  .superRefine((items, context) => {
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (seen.has(item.assetId)) {
+        context.addIssue({
+          code: "custom",
+          message: "duplicate_asset_id",
+          path: [items.indexOf(item), "assetId"],
+        });
+      }
+      seen.add(item.assetId);
+    }
+  });
 
 export const ArticleCreateSchema = z.object({
   titleKo: z.string().min(1).max(255),
@@ -43,10 +92,11 @@ export const ArticleCreateSchema = z.object({
   pinOrder: z.number().int().nullable().optional(),
   isAnonymous: z.boolean().optional(),
   allowComment: z.boolean().optional(),
-  assets: z.array(ArticleAssetRequestSchema).optional(),
+  assets: ArticleAssetsSchema.optional(),
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
-  eventDescription: z.string().nullable().optional(),
+  eventDescriptionKo: z.string().nullable().optional(),
+  eventDescriptionEn: z.string().nullable().optional(),
 });
 
 export const ArticleUpdateSchema = z.object({
@@ -59,10 +109,11 @@ export const ArticleUpdateSchema = z.object({
   pinOrder: z.number().int().nullable().optional(),
   isAnonymous: z.boolean().optional(),
   allowComment: z.boolean().optional(),
-  assets: z.array(ArticleAssetRequestSchema).optional(),
+  assets: ArticleAssetsSchema.optional(),
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
-  eventDescription: z.string().nullable().optional(),
+  eventDescriptionKo: z.string().nullable().optional(),
+  eventDescriptionEn: z.string().nullable().optional(),
 });
 
 // ─── Comment ─────────────────────────────────────────────────────────────────
@@ -78,6 +129,8 @@ export const CommentUpdateSchema = z.object({
 
 // ─── Survey ──────────────────────────────────────────────────────────────────
 
+const SurveyResultVisibilitySchema = z.enum(["PRIVATE", "PUBLIC"]);
+
 export const CreateSurveySchema = z.object({
   kind: z.string().min(1).max(20),
   titleKo: z.string().min(1).max(255),
@@ -91,14 +144,17 @@ export const CreateSurveySchema = z.object({
   isPublished: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
   isAlwaysOpen: z.boolean().optional(),
-  resultVisibility: z.string().min(1).max(20),
+  resultVisibility: SurveyResultVisibilitySchema.default("PRIVATE"),
   maxResponseCount: z.number().int().positive().nullable().optional(),
   openAt: z.string().nullable().optional(),
   closeAt: z.string().nullable().optional(),
   connectedArticleId: z.string().nullable().optional(),
 });
 
-export const UpdateSurveySchema = CreateSurveySchema.partial();
+export const UpdateSurveySchema = CreateSurveySchema.partial().extend({
+  // Do not apply the create-only default to PATCH requests.
+  resultVisibility: SurveyResultVisibilitySchema.optional(),
+});
 
 export const CreateSectionSchema = z.object({
   titleKo: z.string().min(1),
@@ -167,24 +223,36 @@ export const AssignRoleGroupMemberSchema = z.object({
 
 // ─── Finance ─────────────────────────────────────────────────────────────────
 
-export const UpdateStudentFeeStatusSchema = z.object({
-  status: z.enum(["PAID", "UNPAID"]),
-  coverageSemesters: z.number().int().positive().optional(),
-  note: z.string().nullable().optional(),
-});
+export const UpdateStudentFeeStatusSchema = z
+  .object({
+    status: z.enum(["PAID", "UNPAID"]).optional(),
+    coverageSemesters: z.number().int().positive().optional(),
+    note: z.string().nullable().optional(),
+  })
+  .refine(
+    (value) =>
+      value.status !== undefined ||
+      value.coverageSemesters !== undefined ||
+      value.note !== undefined,
+    { message: "fee_status_update_required" },
+  );
 
 // ─── Executive Contacts ──────────────────────────────────────────────────────
 
+const RequiredContactTextSchema = z.string().trim().min(1).max(100);
+
 export const CreateContactSchema = z.object({
-  nameKo: z.string().min(1).max(100),
-  nameEn: z.string().max(100).nullable().optional(),
-  roleKo: z.string().min(1).max(100),
-  roleEn: z.string().max(100).nullable().optional(),
+  nameKo: RequiredContactTextSchema,
+  nameEn: RequiredContactTextSchema,
+  roleKo: RequiredContactTextSchema,
+  roleEn: RequiredContactTextSchema,
   email: z.string().email().or(z.literal("")).nullable().optional(),
   phoneNumber: z.string().max(50).nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
 
+// PATCH keeps the same validation and normalization rules as creation, but
+// only applies them to fields the caller actually supplies.
 export const UpdateContactSchema = CreateContactSchema.partial();
 
 // ─── Bulk Email ──────────────────────────────────────────────────────────────

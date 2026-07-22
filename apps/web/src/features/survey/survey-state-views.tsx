@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle,
   Calendar,
   CheckCircle2,
   Clock,
@@ -103,26 +102,6 @@ export function PreviewNoticeView({ lang }: { lang: string }) {
         {lang === "ko"
           ? "관리자 미리보기입니다. 아직 공개되지 않은 설문이며 실제 응답 제출은 비활성화되어 있습니다."
           : "Admin preview. This survey is not published yet, so submitting responses is disabled."}
-      </p>
-    </div>
-  );
-}
-
-export function KoreanOnlyWarningView({ lang }: { lang: string }) {
-  return (
-    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-xl text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
-      <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 mb-6 border border-red-100">
-        <AlertTriangle className="w-8 h-8" />
-      </div>
-      <h2 className="text-2xl font-bold text-kaist-black mb-3">
-        {lang === "ko"
-          ? "한국어 사용자 전용 설문"
-          : "Korean-language survey only"}
-      </h2>
-      <p className="text-sm text-kaist-grey/80 leading-relaxed mb-4">
-        {lang === "ko"
-          ? "이 설문은 한국어 사용자만 응답할 수 있도록 제한되어 있습니다."
-          : "This survey is restricted to Korean-language users."}
       </p>
     </div>
   );

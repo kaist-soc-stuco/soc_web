@@ -22,7 +22,7 @@ export interface SurveySettingsFormValues {
   descriptionKo?: string;
   descriptionEn?: string;
   kind: string;
-  resultVisibility: string;
+  resultVisibility: "PRIVATE" | "PUBLIC";
   feePayersOnly?: boolean;
   isKoreanOnly?: boolean;
   allowMultipleResponses?: boolean;
@@ -40,6 +40,7 @@ interface SurveySettingsFormProps {
   saving: boolean;
   isEdit: boolean;
   isOngoing?: boolean;
+  isArchived?: boolean;
   showArticleSearch: boolean;
   articleSearchResults: ArticleListItem[];
   selectedArticleTitle: string | null;
@@ -54,6 +55,7 @@ export function SurveySettingsForm({
   saving,
   isEdit,
   isOngoing = false,
+  isArchived = false,
   showArticleSearch,
   articleSearchResults,
   selectedArticleTitle,
@@ -98,7 +100,11 @@ export function SurveySettingsForm({
     "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-gray-300 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
 
   return (
-    <form className="space-y-8" onSubmit={handleSubmit(onSubmit)}>
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <fieldset
+        className="m-0 min-w-0 space-y-8 border-0 p-0"
+        disabled={isArchived}
+      >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
         {/* 좌측 메인 영역 */}
         <div className="lg:col-span-2 h-full space-y-6 bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 md:p-8 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
@@ -239,7 +245,11 @@ export function SurveySettingsForm({
               메타데이터 설정
             </span>
             <div className="flex items-center gap-2">
-              {isPublished ? (
+              {isArchived ? (
+                <span className="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-extrabold text-violet-700 border border-violet-200">
+                  보관됨
+                </span>
+              ) : isPublished ? (
                 <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700 border border-emerald-200">
                   게시됨
                 </span>
@@ -620,7 +630,11 @@ export function SurveySettingsForm({
 
       {/* 고정 하단 바 스타일 버튼 */}
       <div className="bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 shadow-[0_20px_60px_rgba(11,31,18,0.08)] flex justify-end gap-3">
-        {isOngoing ? (
+        {isArchived ? (
+          <p className="text-sm font-semibold text-violet-700">
+            보관된 설문은 읽기 전용입니다. 새 변경본은 설문 목록에서 복제하세요.
+          </p>
+        ) : isOngoing ? (
           <button
             type="submit"
             disabled={saving}
@@ -700,6 +714,7 @@ export function SurveySettingsForm({
           </>
         )}
       </div>
+      </fieldset>
     </form>
   );
 }

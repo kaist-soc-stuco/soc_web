@@ -11,8 +11,10 @@ export interface MyArticleItem {
   articleId: string;
   boardId: number;
   boardNameKo: string;
+  boardNameEn: string | null;
   boardCode: string;
   titleKo: string;
+  titleEn: string | null;
   status: ArticleStatus;
   visibilityScope: VisibilityScope;
   postedAt: string;
@@ -28,8 +30,10 @@ export interface MyCommentItem {
   articleId: string;
   boardId: number;
   boardNameKo: string;
+  boardNameEn: string | null;
   boardCode: string;
   articleTitleKo: string;
+  articleTitleEn: string | null;
   content: string;
   status: CommentStatus;
   createdAt: string;
@@ -43,6 +47,7 @@ export interface MySurveyResponseItem {
   responseId: string;
   surveyId: string;
   surveyTitleKo: string;
+  surveyTitleEn: string | null;
   status: ResponseStatus;
   submittedAt: string | null;
 }
@@ -56,7 +61,9 @@ export type MyActivityType = "survey" | "post" | "comment";
 export interface MyActivityItem {
   type: MyActivityType;
   resourceId: string;
-  title: string;
+  titleKo: string;
+  titleEn: string | null;
+  commentContent: string | null;
   occurredAt: string;
   articleId: string | null;
   boardCode: string | null;

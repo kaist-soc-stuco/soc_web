@@ -111,6 +111,14 @@ export const createSurveyApi = ({
     );
   },
 
+  archiveSurvey: async (surveyId: string): Promise<SurveyRecord> => {
+    return requestJson<SurveyRecord>(
+      `${surveyBaseUrl}/${surveyId}/archive`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   duplicateSurvey: async (surveyId: string): Promise<SurveyRecord> => {
     return requestJson<SurveyRecord>(
       `${surveyBaseUrl}/${surveyId}/duplicate`,

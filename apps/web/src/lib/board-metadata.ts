@@ -27,7 +27,8 @@ export type BoardMetadata = Pick<
   BoardSummary,
   | "allowComment"
   | "code"
-  | "description"
+  | "descriptionEn"
+  | "descriptionKo"
   | "nameEn"
   | "nameKo"
   | "writePermissionBit"
@@ -126,7 +127,8 @@ export const getFallbackBoards = (): BoardMetadata[] =>
       code,
       nameKo: code,
       nameEn: metadata.labelEn,
-      description: metadata.descriptionKo,
+      descriptionKo: metadata.descriptionKo,
+      descriptionEn: metadata.descriptionEn,
       allowComment: true,
       writePermissionBit: metadata.writePermissionBit,
     };
@@ -175,8 +177,8 @@ export const getBoardDescriptionFromMetadata = (
   }
 
   return lang === "ko"
-    ? board.description || fallback.descriptionKo
-    : fallback.descriptionEn;
+    ? board.descriptionKo || fallback.descriptionKo
+    : board.descriptionEn || fallback.descriptionEn;
 };
 
 export const getBoardWritePermissionBitFromMetadata = (

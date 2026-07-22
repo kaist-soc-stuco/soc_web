@@ -10,9 +10,9 @@ import {
 export const executiveContacts = pgTable("executive_contact", {
   id: uuid("id").defaultRandom().primaryKey(),
   nameKo: varchar("name_ko", { length: 100 }).notNull(),
-  nameEn: varchar("name_en", { length: 100 }),
+  nameEn: varchar("name_en", { length: 100 }).notNull(),
   roleKo: varchar("role_ko", { length: 100 }).notNull(),
-  roleEn: varchar("role_en", { length: 100 }),
+  roleEn: varchar("role_en", { length: 100 }).notNull(),
   email: varchar("email", { length: 255 }),
   phoneNumber: varchar("phone_number", { length: 50 }),
   sortOrder: integer("sort_order").notNull().default(0),

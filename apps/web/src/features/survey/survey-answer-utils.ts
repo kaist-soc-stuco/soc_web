@@ -106,9 +106,6 @@ export function getAudienceLabel(survey: SurveyDetailResponse, lang: string) {
   if (survey.feePayersOnly) {
     return lang === "ko" ? "과비 납부자" : "Paid members";
   }
-  if (survey.isKoreanOnly) {
-    return lang === "ko" ? "한국어 사용자" : "Korean-language users";
-  }
   return lang === "ko" ? "로그인 회원" : "Signed-in members";
 }
 

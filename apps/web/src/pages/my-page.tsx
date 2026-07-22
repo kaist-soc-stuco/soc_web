@@ -23,6 +23,7 @@ export function MyPage() {
     initialLoading,
     isAdmin,
     isContentRefreshing,
+    lang,
     loadError,
     menuItems,
     session,
@@ -42,6 +43,7 @@ export function MyPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 md:px-8 flex gap-8 items-start">
         <MyPageSidebar
           activeMenu={activeMenu}
+          lang={lang}
           menuItems={menuItems}
           onLogout={() => void handleLogout()}
           onMenuChange={setActiveMenu}
@@ -49,9 +51,12 @@ export function MyPage() {
 
         <section className="flex-1 min-w-0">
           {initialLoading ? (
-            <MyPageLoadingState />
+            <MyPageLoadingState lang={lang} />
           ) : !canUseMyPage ? (
-            <MyPageUnavailableState authenticated={session?.authenticated} />
+            <MyPageUnavailableState
+              authenticated={session?.authenticated}
+              lang={lang}
+            />
           ) : (
             <div className="flex flex-col gap-5 w-full">
               {loadError && (
@@ -65,6 +70,7 @@ export function MyPage() {
                   activities={allActivities}
                   displayName={displayName}
                   isAdmin={isAdmin}
+                  lang={lang}
                   onShowAllActivities={showAllActivities}
                   stats={stats}
                   userInfo={userInfo}
@@ -75,6 +81,7 @@ export function MyPage() {
                 <MyPageProfilePanel
                   displayName={displayName}
                   isAdmin={isAdmin}
+                  lang={lang}
                   userInfo={userInfo}
                 />
               )}
@@ -90,6 +97,7 @@ export function MyPage() {
                     setCurrentPage(1);
                   }}
                   loading={isContentRefreshing}
+                  lang={lang}
                   totalPages={totalPages}
                 />
               )}

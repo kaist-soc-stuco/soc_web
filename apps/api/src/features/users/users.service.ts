@@ -12,6 +12,10 @@ import type {
   AdminUserListResponse,
   AdminUserRecord,
   FeeStatus,
+  MyActivityListResponse,
+  MyArticleListResponse,
+  MyCommentListResponse,
+  MySurveyResponseListResponse,
   StudentFeeListResponse,
   StudentFeeStatusRecord,
 } from "@soc/contracts";
@@ -142,7 +146,7 @@ export class UsersService {
   async updateStudentFeeStatus(
     userId: string,
     input: {
-      status: FeeStatus;
+      status?: FeeStatus;
       coverageSemesters?: number;
       note?: string | null;
       verifiedBy?: string;
@@ -183,7 +187,10 @@ export class UsersService {
     );
   }
 
-  async getMyArticles(userId: string, options: { page: number; limit: number }) {
+  async getMyArticles(
+    userId: string,
+    options: { page: number; limit: number },
+  ): Promise<MyArticleListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
       this.usersRepository.getMyArticles(userId, limit, offset),
@@ -193,7 +200,10 @@ export class UsersService {
     return { items, limit, page, total };
   }
 
-  async getMyComments(userId: string, options: { page: number; limit: number }) {
+  async getMyComments(
+    userId: string,
+    options: { page: number; limit: number },
+  ): Promise<MyCommentListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
       this.usersRepository.getMyComments(userId, limit, offset),
@@ -203,7 +213,10 @@ export class UsersService {
     return { items, limit, page, total };
   }
 
-  async getMySurveyResponses(userId: string, options: { page: number; limit: number }) {
+  async getMySurveyResponses(
+    userId: string,
+    options: { page: number; limit: number },
+  ): Promise<MySurveyResponseListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
       this.usersRepository.getMySurveyResponses(userId, limit, offset),
@@ -213,7 +226,10 @@ export class UsersService {
     return { items, limit, page, total };
   }
 
-  async getMyActivities(userId: string, options: { page: number; limit: number }) {
+  async getMyActivities(
+    userId: string,
+    options: { page: number; limit: number },
+  ): Promise<MyActivityListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, articleTotal, commentTotal, surveyTotal] = await Promise.all([
       this.usersRepository.getMyActivities(userId, limit, offset),

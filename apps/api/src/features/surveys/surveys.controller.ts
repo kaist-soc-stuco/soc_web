@@ -80,6 +80,12 @@ export class SurveysController {
     return this.surveysService.delete(id);
   }
 
+  @Post(":id/archive")
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  archive(@Param("id", ParseUUIDPipe) id: string) {
+    return this.surveysService.archive(id);
+  }
+
   @Post(":id/duplicate")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
   duplicate(

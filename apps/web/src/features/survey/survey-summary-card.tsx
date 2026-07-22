@@ -3,6 +3,7 @@ import {
   Calendar,
   ClipboardList,
   Clock,
+  Languages,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -68,6 +69,12 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
           <Calendar className="h-3.5 w-3.5 text-kaist-darkgreen" />
           {getScheduleLabel(survey, lang)}
         </span>
+        {survey.isKoreanOnly && (
+          <span className="inline-flex items-center gap-1.5">
+            <Languages className="h-3.5 w-3.5 text-kaist-darkgreen" />
+            {lang === "ko" ? "한국어 콘텐츠만 제공" : "Content available in Korean only"}
+          </span>
+        )}
       </div>
     </section>
   );
