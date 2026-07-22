@@ -61,13 +61,7 @@ export function EventsPage() {
 
   return (
     <SiteLayout>
-      <div className="relative overflow-hidden bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
-        <img
-          src="/kaist_logo.png"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute right-[clamp(2rem,12vw,13rem)] top-[-30px] hidden w-[380px] rotate-[-13deg] opacity-80 md:block"
-        />
+      <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
         <div className={pageContainerClass}>
           <h1 className="text-[36px] font-extrabold tracking-tight text-white">설문조사</h1>
           <p className="mt-2 text-[24px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 행사를 확인하고 설문에 참여하세요</p>

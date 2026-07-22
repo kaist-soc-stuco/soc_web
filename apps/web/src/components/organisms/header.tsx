@@ -47,7 +47,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       href: '/about',
       dropdown: [
         { label: '소개', to: '/about' },
-        { label: 'FAQ', to: '/board/QnA' },
+        { label: 'FAQ', to: '/faq' },
         { label: '로드맵', to: '/about/roadmap' },
         { label: '일정', to: '/calendar' },
       ],
