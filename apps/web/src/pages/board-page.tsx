@@ -9,6 +9,7 @@ export function BoardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const pageContainerClass = 'mx-auto w-full px-[12vw]';
   
   const postsPerPage = 10;
   
@@ -43,8 +44,8 @@ export function BoardPage() {
       <Header showLogo={true} />
       
       <main className="flex-1 w-full mx-auto">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7">
-          <div className="mx-auto max-w-[1600px]">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+          <div className={pageContainerClass}>
             <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">
               {category} 게시판
             </h1>
@@ -55,9 +56,9 @@ export function BoardPage() {
         </div>
 
         <div className="bg-[#F7FCFC]">
-          <div className="mx-auto max-w-[1600px] border-b border-kaist-grey/30 px-6">
-            <div className="flex flex-wrap items-end justify-between gap-8">
-              <div className="flex flex-wrap items-stretch gap-10">
+          <div className="border-b border-kaist-grey/30">
+            <div className={`${pageContainerClass} flex flex-wrap items-end justify-between gap-8`}>
+              <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-12 xl:gap-16">
                 {boardCategories.map((board, index) => (
                   <Link
                     key={board}
@@ -66,7 +67,7 @@ export function BoardPage() {
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}
                   >
-                    <div className={`relative flex items-center justify-center h-full text-[28px] font-extrabold tracking-tight transition-colors ${
+                    <div className={`relative flex items-center justify-center h-full text-lg lg:text-2xl font-extrabold tracking-tight transition-colors ${
                       category === board
                         ? 'text-kaist-darkgreen'
                         : 'text-kaist-greygreen hover:text-kaist-darkgreen'
@@ -74,7 +75,7 @@ export function BoardPage() {
                       <span className="py-5">{board}</span>
                       <span 
                         className={`absolute bottom-0 left-0 right-0 h-1.5 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
-                          category === board ? 'scale-x-100' : hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
+                          category === board ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'
                         }`}
                       />
                     </div>
@@ -83,9 +84,9 @@ export function BoardPage() {
               </div>
               
               <div className="flex items-center">
-                <div className="relative flex items-center gap-2 border-b border-kaist-darkgreen/40 pb-2">
-                  <span className="text-[20px] font-semibold text-[#9AA69F]">제목</span>
-                  <span className="text-sm text-kaist-darkgreen">⌄</span>
+                <div className="relative flex items-center gap-2 border-b border-kaist-darkgreen/40 mb-4">
+                  <span className="text-lg font-semibold text-[#9AA69F]">제목</span>
+                  <span className="text-lg text-kaist-darkgreen mb-2">⌄</span>
                   <input
                     type="text"
                     placeholder=""
@@ -100,12 +101,12 @@ export function BoardPage() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-[1600px] px-6 pb-16 pt-10">
+        <div className={`${pageContainerClass} pb-16 py-2`}>
           <div className="flex gap-6">
             <div className="flex-[5]">
-              <div className="grid grid-cols-12 gap-4 border-b-2 border-kaist-darkgreen-main py-4 text-sm font-extrabold tracking-tight text-kaist-darkgreen">
+              <div className="grid grid-cols-12 gap-4 border-b-3 border-kaist-darkgreen-main py-4 text-sm lg:text-lg font-extrabold tracking-tight text-kaist-darkgreen">
                 <div className="col-span-1 text-center">번호</div>
-                <div className="col-span-1 text-center">말머리</div>
+                <div className="col-span-1 text-center">분류</div>
                 <div className="col-span-7 text-center">제목</div>
                 <div className="col-span-1 text-center">글쓴이</div>
                 <div className="col-span-1 text-center">작성일</div>
@@ -118,26 +119,26 @@ export function BoardPage() {
                     <Link
                       key={post.id}
                       to={`/board/${category}/${post.id}`}
-                      className="grid grid-cols-12 gap-4 py-4 hover:bg-kaist-grey/5 transition-colors group"
+                      className="grid grid-cols-12 gap-4 py-5 hover:bg-kaist-grey/5 transition-colors group"
                     >
-                      <div className="col-span-1 grid place-content-center text-center text-sm font-semibold text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-sm lg:text-base font-semibold text-kaist-grey">
                         {post.id}
                       </div>
                       <div className="col-span-1 text-center">
-                        <span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-semibold tracking-tight">
+                        <span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs lg:text-sm font-semibold tracking-tight">
                           {post.category}
                         </span>
                       </div>
-                      <div className="col-span-7 flex items-center pl-8 text-left text-sm font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
+                      <div className="col-span-7 flex items-center pl-8 text-left text-sm lg:text-lg font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
                         {post.title}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-sm font-semibold tracking-tight text-kaist-black">
+                      <div className="col-span-1 grid place-content-center text-center text-sm lg:text-base font-semibold tracking-tight text-kaist-black">
                         {post.author}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-xs lg:text-base font-medium tracking-tight text-kaist-grey">
                         {post.date}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-xs lg:text-base font-medium tracking-tight text-kaist-grey">
                         {post.views}
                       </div>
                     </Link>

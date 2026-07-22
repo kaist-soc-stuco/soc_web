@@ -101,34 +101,38 @@ export function Hero() {
       </div>
       
       {/* Logo section */}
-      <div className="relative z-10 flex h-14 items-center justify-start px-4">
+      <div className="relative z-10 flex h-16 items-center justify-start px-6 lg:h-[85px] lg:px-7">
         <div className="flex items-center gap-2 md:gap-4">
           <img 
             src="/kaist_logo.png" 
             alt="KAIST Logo" 
-            className="h-6 w-auto"
+            className="h-6 w-auto lg:h-[39px]"
           />
-          <div className="h-6 w-px bg-gray-300" />
+          <div className="h-6 w-px bg-gray-300 lg:h-5" />
           <img 
             src="/logo.png" 
             alt="SOC Logo" 
-            className="h-7 w-auto"
+            className="h-7 w-auto lg:h-[42px]"
           />
         </div>
       </div>
 
       {/* Content - Vertically centered */}
-      <div className="absolute inset-0 z-10 flex items-center px-6 md:px-12 lg:px-24">
-        <div className="max-w-7xl flex items-start gap-8">
+      <div className="absolute inset-0 z-10 flex items-center px-8 md:px-12 lg:px-[15.6%]">
+        <div className="flex max-w-7xl items-start gap-6 lg:gap-8">
           {/* Green Accent Bar */}
-          <div className="mt-8 h-12 w-4 bg-kaist-lightgreen2" />
+          <div className="mt-5 h-11 w-3 bg-kaist-lightgreen2 lg:mt-11 lg:h-[54px] lg:w-[11px]" />
           
           {/* Title */}
           <h1 
-            className="mt-4 text-5xl font-black leading-[150%] tracking-[-0.011em] text-kaist-white max-w-md md:max-w-lg lg:max-w-xl"
+            className="mt-1 max-w-md text-4xl font-black leading-[150%] tracking-normal text-kaist-white md:text-5xl lg:mt-4 lg:max-w-xl lg:text-[72px]"
             style={{ fontFamily: "'Roboto Slab', serif" }}
           >
-            KAIST School Of Computing
+            KAIST
+            <br />
+            School Of
+            <br />
+            Computing
           </h1>
         </div>
       </div>

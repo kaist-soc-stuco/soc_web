@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { mockEvents } from '@/lib/mock-data';
 
 interface EventCardProps {
@@ -9,47 +9,85 @@ interface EventCardProps {
   title: string;
   date: string;
   status: 'ongoing' | 'completed';
+  summary: string;
 }
 
-function EventCard({ id, image, title, date, status }: EventCardProps) {
+function EventCard({ id, image, title, date, status, summary }: EventCardProps) {
   return (
-    <Link to={`/events/${id}/survey`} className="w-[calc(25%-1.75rem)] flex-shrink-0">
-      {/* Image */}
-      <div 
-        className="aspect-[3/4] w-full rounded-[1px] bg-cover bg-center"
-        style={{ backgroundImage: `url(${image})` }}
-      />
-      {/* Status & Date */}
-      <div className="mt-3 flex items-center justify-between">
-        <div 
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-tight text-kaist-white ${
-            status === 'ongoing' 
-              ? 'bg-kaist-lightgreen2' 
-              : 'bg-kaist-darkgreen'
-          }`}
-        >
+    <Link
+      to={`/events/${id}/survey`}
+      className="group flex h-full min-h-[280px] min-w-0 flex-col overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md md:min-h-[300px] lg:min-h-0"
+    >
+      <div className="relative h-[60.2%] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
+        <div
+          className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+          style={{ backgroundImage: `url(${image})` }}
+        />
+        <span className="absolute left-4 top-4 rounded-full bg-kaist-darkgreen px-3 py-1 text-[10px] font-semibold tracking-tight text-kaist-white lg:text-xs">
           {status === 'ongoing' ? '진행중' : '완료'}
-        </div>
-        <span className="text-xs font-semibold tracking-tight text-kaist-grey">
-          {date}
         </span>
       </div>
-      
-      {/* Title */}
-      <h3 className="mt-2 text-base font-extrabold tracking-tight text-kaist-black line-clamp-2">
-        {title}
-      </h3>
+
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
+        <span className="mb-1 text-[10px] font-bold tracking-tight text-[#5b93c4] lg:text-xs">
+          이벤트
+        </span>
+        <h3 className="truncate text-lg font-extrabold tracking-tight text-kaist-black lg:text-2xl">
+          {title}
+        </h3>
+        <p className="mt-2 line-clamp-2 text-xs font-semibold leading-normal tracking-tight text-kaist-grey">
+          {summary}
+        </p>
+        <div className="mt-auto flex items-center gap-2 text-[10px] font-semibold tracking-tight text-kaist-greygreen lg:text-xs">
+          <CalendarDays className="h-3.5 w-3.5" />
+          {date}
+        </div>
+      </div>
     </Link>
   );
 }
 
 export function EventCarousel() {
+  const carouselRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [itemsPerPage, setItemsPerPage] = useState(1);
+  const [pageWidth, setPageWidth] = useState(0);
   
-  const events = [...mockEvents, ...mockEvents.map((event) => ({ ...event, id: event.id + 100 }))];
+  const events = useMemo(
+    () => [...mockEvents, ...mockEvents.map((event) => ({ ...event, id: event.id + 100 }))],
+    [],
+  );
 
-  const itemsPerPage = 4;
   const totalPages = Math.ceil(events.length / itemsPerPage);
+  const pageGap = 24;
+
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    if (!carousel) return;
+
+    const updateItemsPerPage = () => {
+      const width = carousel.getBoundingClientRect().width;
+      const minCardWidth = 210;
+      const gap = 20;
+      const sideGutter = width >= 768 ? 8 : 4;
+      const availableWidth = Math.max(0, width - sideGutter * 2);
+      const visibleCards = Math.floor((availableWidth + gap) / (minCardWidth + gap));
+
+      setPageWidth(width);
+      setItemsPerPage(Math.max(1, Math.min(4, visibleCards)));
+    };
+
+    updateItemsPerPage();
+
+    const observer = new ResizeObserver(updateItemsPerPage);
+    observer.observe(carousel);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages - 1));
+  }, [totalPages]);
 
   const handlePrevPage = () => {
     setCurrentPage((prev) => (prev === 0 ? totalPages - 1 : prev - 1));
@@ -60,34 +98,41 @@ export function EventCarousel() {
   };
 
   return (
-    <section className="h-full bg-kaist-white overflow-hidden">
-      <div className="h-full w-full px-4 md:px-4 pt-8 flex flex-col">        
+    <section className="h-full overflow-hidden bg-kaist-white">
+      <div className="flex h-full w-full flex-col px-6 pt-6 lg:px-12 lg:pt-12">
         {/* Event Cards with Navigation Arrows */}
-        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           {/* Left Arrow - positioned at image vertical center */}
           <button
             onClick={handlePrevPage}
-            className={`absolute left-0 z-10 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
+            className={`absolute left-0 z-10 text-kaist-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.9)] filter transition-transform hover:scale-110 ${
               currentPage === 0 ? 'opacity-0 pointer-events-none' : ''
             }`}
-            style={{ top: 'calc(37.5% - 1rem)' }} // 이미지 aspect-[3/4]의 중앙 (전체 카드 높이의 약 37.5%)
             aria-label="Previous page"
           >
-            <ChevronLeft className="h-6 w-6 md:h-8 md:w-8" />
+            <ChevronLeft className="ml-1 mb-2 h-9 w-9 stroke-[2.5] md:h-11 md:w-11" />
           </button>
 
           {/* Event Cards Container with Slide Animation */}
-          <div className="w-full overflow-hidden">
+          <div ref={carouselRef} className="h-full w-full overflow-hidden py-2">
             <div 
-              className="flex transition-transform duration-500 ease-in-out"
+              className="flex h-full transition-transform duration-500 ease-in-out"
               style={{
-                transform: `translateX(-${currentPage * 100}%)`,
+                gap: pageGap,
+                transform: `translateX(-${currentPage * (pageWidth + pageGap)}px)`,
               }}
             >
               {Array.from({ length: totalPages }).map((_, pageIndex) => (
-                <div key={pageIndex} className="w-full flex-shrink-0 flex justify-center gap-3">
-                  {events.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage).map((event, index) => (
-                    <EventCard key={`${pageIndex}-${index}`} {...event} />
+                <div
+                  key={pageIndex}
+                  className="grid h-full flex-shrink-0 items-stretch gap-4 px-1 md:gap-5 md:px-2"
+                  style={{
+                    gridTemplateColumns: `repeat(${itemsPerPage}, minmax(0, 1fr))`,
+                    width: pageWidth ? `${pageWidth}px` : '100%',
+                  }}
+                >
+                  {events.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage).map((event) => (
+                    <EventCard key={event.id} {...event} />
                   ))}
                 </div>
               ))}
@@ -97,26 +142,25 @@ export function EventCarousel() {
           {/* Right Arrow - positioned at image vertical center */}
           <button
             onClick={handleNextPage}
-            className={`absolute right-0 z-10 text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${
+            className={`absolute right-0 z-10 text-kaist-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.9)] filter transition-transform hover:scale-110 ${
               currentPage === totalPages - 1 ? 'opacity-0 pointer-events-none' : ''
             }`}
-            style={{ top: 'calc(37.5% - 1rem)' }}
             aria-label="Next page"
           >
-            <ChevronRight className="h-6 w-6 md:h-8 md:w-8" />
+            <ChevronRight className="mr-1 mb-2 h-9 w-9 stroke-[2.5] md:h-11 md:w-11" />
           </button>
         </div>
 
         {/* Carousel Dots */}
-        <div className="flex-shrink-0 mt-6 mb-2 flex items-center justify-center gap-2 md:gap-4">
+        <div className="mb-5 mt-5 flex flex-shrink-0 items-center justify-center gap-3 md:gap-4 lg:mb-6 lg:mt-6">
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i}
               onClick={() => setCurrentPage(i)}
               className={`rounded-full transition-all ${
                 i === currentPage 
-                  ? 'h-4 w-4 md:h-4 md:w-4 bg-kaist-darkgreen' 
-                  : 'h-3 w-3 md:h-3 md:w-3 bg-kaist-lightgreen hover:bg-kaist-lightgreen2'
+                  ? 'h-4 w-4 bg-kaist-darkgreen md:h-5 md:w-5' 
+                  : 'h-3.5 w-3.5 bg-kaist-greygreen hover:bg-kaist-lightgreen2'
               }`}
               aria-label={`Go to page ${i + 1}`}
             />

@@ -6,30 +6,32 @@ import { Calendar } from '@/components/organisms/calendar';
 
 export function HomePage() {
   return (
-    <div 
-      className="bg-kaist-white min-h-screen flex flex-col" 
-    >
-      <div className="flex flex-1">
-        {/* Left Hero Image - 1/3 width, scrolls with content */}
-        <aside className="hidden lg:block lg:w-1/3 min-h-screen">
+    <div className="flex min-h-dvh flex-col bg-kaist-white lg:h-dvh lg:overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <section className="h-[42dvh] min-h-[360px] lg:hidden">
+          <Hero />
+        </section>
+
+        {/* Left Hero Image */}
+        <aside className="hidden lg:block lg:h-dvh lg:basis-[34.375%]">
           <Hero />
         </aside>
 
-        {/* Right Side - Main Content (2/3) */}
-        <div className="w-full lg:w-2/3">
+        {/* Right Side - Main Content */}
+        <div className="flex w-full min-w-0 flex-col lg:h-dvh lg:basis-[65.625%]">
           <Header />
-          <main className="flex flex-col">
+          <main className="flex flex-1 min-h-0 flex-col overflow-y-auto lg:overflow-hidden">
             {/* Event Carousel */}
-            <div className="min-h-[300px]">
+            <div className="min-h-[360px] flex-none lg:min-h-0 lg:flex-[1.36]">
               <EventCarousel />
             </div>
             
             {/* Notice & Calendar Side by Side */}
-            <div className="flex flex-col lg:flex-row gap-4 px-6 lg:px-8 py-2">
-              <div className="flex-[2]">
+            <div className="flex flex-1 flex-col gap-6 px-6 pb-7 pt-3 md:px-8 lg:min-h-0 lg:flex-row lg:gap-10 lg:px-14 lg:pb-8">
+              <div className="min-h-0 flex-[2]">
                 <NoticeBoard />
               </div>
-              <div className="flex-1">
+              <div className="min-h-[300px] flex-1 lg:min-h-0">
                 <Calendar clickable />
               </div>
             </div>

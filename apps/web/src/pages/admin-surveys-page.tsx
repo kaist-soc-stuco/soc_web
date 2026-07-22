@@ -5,7 +5,7 @@ export function AdminSurveysPage() {
   return (
     <section>
       <div className="mb-8 border-b border-kaist-grey/25 pb-5">
-        <h2 className="text-[44px] font-extrabold tracking-tight text-kaist-black">설문조사 관리</h2>
+        <h1 className="text-[36px] font-extrabold tracking-tight text-kaist-black lg:text-[44px]">설문조사 관리</h1>
       </div>
 
       <AdminList

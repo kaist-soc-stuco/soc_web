@@ -14,6 +14,7 @@ import { BoardWritePage } from '@/pages/board-write-page';
 import { CalendarPage } from '@/pages/calendar-page';
 import { EventsPage } from '@/pages/events-page';
 import { EventSurveyPage } from '@/pages/event-survey-page';
+import { FaqPage } from '@/pages/faq-page';
 import { RoadmapPage } from '@/pages/roadmap-page';
 import { TreeLogin } from '@/pages/login-page';
 import { LoginConsentPage } from '@/pages/login-consent-page';
@@ -27,6 +28,7 @@ export function App() {
         <Route path="/events/:eventId/survey" element={<EventSurveyPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/about/roadmap" element={<RoadmapPage />} />
+        <Route path="/faq" element={<FaqPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/board/:category" element={<BoardPage />} />
         <Route path="/board/:category/write" element={<BoardWritePage />} />
