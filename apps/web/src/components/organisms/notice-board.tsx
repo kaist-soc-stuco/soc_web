@@ -9,16 +9,16 @@ interface NoticeItemProps {
 
 function NoticeItem({ category, title, date }: NoticeItemProps) {
   return (
-    <Link to={`/board/${category}/1`} className="flex h-full min-h-0 items-center justify-between gap-3 py-1 transition hover:bg-kaist-grey/5">
-      <div className="flex items-center gap-4 flex-1 min-w-0">
-        <span className="inline-flex flex-shrink-0 items-center rounded-full bg-kaist-darkgreen px-3 py-1 text-xs font-semibold tracking-tight text-kaist-white">
+    <Link to={`/board/${category}/1`} className="flex h-full min-h-0 items-center justify-between gap-2.5 py-0.5 transition hover:bg-kaist-grey/5">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="inline-flex flex-shrink-0 items-center rounded-full bg-kaist-darkgreen px-2.5 py-0.5 text-[10px] font-semibold tracking-tight text-kaist-white">
           {category}
         </span>
-        <span className="truncate text-sm font-semibold tracking-tight text-kaist-black lg:text-base">
+        <span className="truncate text-sm font-semibold tracking-tight text-kaist-black lg:text-[12px]">
           {title}
         </span>
       </div>
-      <span className="flex-shrink-0 text-xs font-semibold tracking-tight text-kaist-grey lg:text-md">
+      <span className="flex-shrink-0 text-[10px] font-semibold tracking-tight text-kaist-grey lg:text-[10px]">
         {date}
       </span>
     </Link>
@@ -63,11 +63,11 @@ export function NoticeBoard() {
   const visibleNotices = currentNotices.slice(0, 8);
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-kaist-white lg:pr-12">
+    <section className="flex h-full min-h-0 flex-col bg-kaist-white lg:pr-9">
       <div className="flex h-full min-h-0 w-full flex-col">
         {/* Tabs */}
-        <div className="flex flex-shrink-0 items-stretch justify-between pl-1 gap-4 border-b-2 border-kaist-grey/30">
-          <div className="flex flex-wrap items-stretch gap-4 lg:gap-6">
+        <div className="flex flex-shrink-0 items-stretch justify-between gap-3 border-b-2 border-kaist-grey/30 pl-1">
+          <div className="flex flex-wrap items-stretch gap-3 lg:gap-5">
             {tabs.map((tab, index) => (
               <div
                 key={index}
@@ -77,13 +77,13 @@ export function NoticeBoard() {
               >
                 <button
                   onClick={() => setActiveTab(index)}
-                  className={`relative flex items-center justify-center h-full text-xl font-extrabold tracking-tight transition-colors ${
+                  className={`relative flex h-full items-center justify-center text-base font-bold tracking-tight transition-colors ${
                     activeTab === index 
                       ? 'text-kaist-darkgreen' 
                       : 'text-kaist-greygreen hover:text-kaist-darkgreen'
                   }`}
                 >
-                  <span className="py-2">{tab.label}</span>
+                  <span className="py-1.5">{tab.label}</span>
                   <span 
                     className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
                       activeTab === index ? 'scale-x-100' : hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
@@ -101,8 +101,8 @@ export function NoticeBoard() {
             onMouseEnter={() => setHoveredIndex(tabs.length)}
             onMouseLeave={() => setHoveredIndex(null)}
           >
-            <div className="relative flex items-center justify-center h-full text-base font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors">
-              <span className="py-2">+</span>
+            <div className="relative flex h-full items-center justify-center text-sm font-bold tracking-tight text-kaist-greygreen transition-colors hover:text-kaist-darkgreen">
+              <span className="py-1.5">+</span>
               <span 
                 className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
                   hoveredIndex === tabs.length ? 'scale-x-100' : 'scale-x-0'

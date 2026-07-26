@@ -59,7 +59,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative"
       onMouseLeave={() => setHoveredIndex(null)}
     >
-      <div className="flex h-18 w-full items-stretch justify-between">
+      <div className="flex h-13 w-full items-stretch justify-between">
         {/* Left Section: Logo + Navigation */}
         <div className="flex items-stretch">
           {/* Logo Section (conditional) */}
@@ -79,7 +79,7 @@ export function Header({ showLogo = false }: HeaderProps) {
               >
                 <Link
                   to={item.href} 
-                  className="relative flex items-center justify-center w-64 h-full text-sm lg:text-lg font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors"
+                  className="relative flex h-full w-52 items-center justify-center text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main"
                 >
                   <span className="py-2">{item.label}</span>
                   <span 
@@ -119,7 +119,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       <div 
         className={`absolute left-0 pl-4 w-full bg-kaist-white shadow-lg overflow-hidden transition-all duration-300 ease-out ${
           hoveredIndex !== null 
-            ? 'max-h-180 opacity-100 translate-y-0' 
+            ? 'max-h-[36rem] opacity-100 translate-y-0' 
             : 'max-h-0 opacity-0 -translate-y-4'
         }`}
         style={{ top: 'calc(100% + 1px)', zIndex: 40 }}
@@ -128,7 +128,7 @@ export function Header({ showLogo = false }: HeaderProps) {
           {navItems.map((item, index) => (
             <div
               key={index}
-              className={`w-64 px-4 ${
+              className={`w-52 px-3 ${
                 index === 0 ? '' : ''
               } ${
                 index < navItems.length - 1 ? 'border-r border-kaist-grey/30' : 'border-r border-kaist-grey/30'
@@ -143,7 +143,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                         ? 'opacity-100 translate-x-0' 
                         : 'opacity-0 -translate-x-2'
                     } ${
-                      subIndex < item.dropdown.length - 1 ? 'border-b border-kaist-grey/30' : 'pb-10'
+                      subIndex < item.dropdown.length - 1 ? 'border-b border-kaist-grey/30' : 'pb-6'
                     } ${
                       subIndex === 0 ? 'pt-1' : ''
                     }` }
@@ -153,7 +153,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                     >
                       <Link
                       to={subItem.to}
-                      className={`block text-sm lg:text-lg font-semibold tracking-tight text-center py-4 transition-all ${
+                      className={`block py-3 text-center text-sm font-semibold tracking-tight transition-all lg:text-sm ${
                         hoveredIndex === index
                           ? 'text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1'
                           : 'text-kaist-grey'

@@ -4,8 +4,8 @@ import { adminSurveyRows } from '@/lib/mock-data';
 export function AdminSurveysPage() {
   return (
     <section>
-      <div className="mb-8 border-b border-kaist-grey/25 pb-5">
-        <h1 className="text-[36px] font-extrabold tracking-tight text-kaist-black lg:text-[44px]">설문조사 관리</h1>
+      <div className="mb-6 border-b border-kaist-grey/25 pb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-kaist-black">설문조사 관리</h1>
       </div>
 
       <AdminList

@@ -10,21 +10,21 @@ export function AboutPage() {
   return (
     <SiteLayout>
       <div className="flex min-h-[calc(100vh-72px)] flex-col bg-[#F7FCFC] lg:h-[calc(100vh-72px)] lg:overflow-hidden">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
           <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">전산학부 소개</h1>
-            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">카이스트 전산학부란?</p>
+            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">전산학부 소개</h1>
+            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">카이스트 전산학부란?</p>
           </div>
         </div>
 
         <div className="flex flex-1 items-center py-7 lg:py-0">
-          <div className={`${pageContainerClass} grid w-full gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] lg:gap-10 xl:gap-14`}>
-            <section className="min-h-[530px] rounded-[8px] border border-kaist-grey/25 bg-white px-6 py-8 sm:px-10 lg:min-h-[560px] lg:px-9 lg:py-9 xl:min-h-[590px] xl:px-[42px]">
-              <h2 className="text-[26px] font-extrabold leading-normal tracking-tight text-kaist-darkgreen md:text-[30px] xl:text-[32px]">
+          <div className={`${pageContainerClass} grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,410px)] lg:gap-8 xl:gap-10`}>
+            <section className="min-h-[500px] rounded-[8px] border border-kaist-grey/25 bg-white px-6 py-7 sm:px-10 lg:min-h-[520px] lg:px-8 lg:py-8 xl:min-h-[540px] xl:px-9">
+              <h2 className="text-[24px] font-extrabold leading-normal tracking-tight text-kaist-darkgreen md:text-[28px] xl:text-[30px]">
                 KAIST SoC(School Of Computing)
               </h2>
 
-              <div className="mt-10 space-y-10 text-[15px] font-regular leading-[2] tracking-tight text-black md:text-[18px] lg:text-[18px] xl:text-[21px]">
+              <div className="mt-8 space-y-8 text-[15px] font-normal leading-[1.9] tracking-tight text-black md:text-[16px] lg:text-[17px] xl:text-[18px]">
                 <p>
                   컴퓨팅은 현대사회의 모든 영역에서 활용되고 있으며, 특히 최근에는 빅데이터와 이를 이용한 소셜 컴퓨팅이 주목을 받고 있듯이,
                   컴퓨팅의 패러다임은 하드웨어로부터 소프트웨어를 거쳐 이제 인간 중심으로 변화 하고 있다. 삶의 질을 향상시키기 위해서는 인간에
@@ -43,10 +43,10 @@ export function AboutPage() {
               </div>
             </section>
 
-            <aside className="flex flex-col gap-7">
-              <section className="rounded-[8px] border border-kaist-grey/25 bg-white px-8 py-6 lg:min-h-[410px]">
+            <aside className="flex flex-col gap-6">
+              <section className="rounded-[8px] border border-kaist-grey/25 bg-white px-7 py-5 lg:min-h-[370px]">
                 <div className="mb-3 flex items-start justify-between gap-4">
-                  <h2 className="text-[28px] font-extrabold leading-normal tracking-tight text-kaist-darkgreen md:text-[32px]">FAQ</h2>
+                  <h2 className="text-[24px] font-extrabold leading-normal tracking-tight text-kaist-darkgreen md:text-[28px]">FAQ</h2>
                   <Link
                     to="/faq"
                     className="mt-2 inline-flex items-center justify-center rounded-[5px] border border-kaist-darkgreen px-3 py-1.5 text-[13px] font-extrabold tracking-tight text-kaist-darkgreen transition hover:bg-kaist-darkgreen hover:text-kaist-white"
@@ -57,11 +57,11 @@ export function AboutPage() {
 
                 <div className="divide-y divide-[#d7e2da]">
                   {faqItems.map((item, index) => (
-                    <Link key={`${item.question}-${index}`} to="/faq" className="block py-5 first:pt-2 last:pb-0">
-                      <p className="text-[15px] font-semibold leading-normal tracking-tight text-kaist-darkgreen-main md:text-[18px] xl:text-[18px]">
+                    <Link key={`${item.question}-${index}`} to="/faq" className="block py-4 first:pt-2 last:pb-0">
+                      <p className="text-[15px] font-semibold leading-normal tracking-tight text-kaist-darkgreen-main md:text-[16px]">
                         Q: {item.question}
                       </p>
-                      <p className="mt-2 text-[13px] font-regular leading-normal tracking-tight text-kaist-black md:text-[18px] xl:text-[16px]">
+                      <p className="mt-2 text-[13px] font-normal leading-normal tracking-tight text-kaist-black md:text-[15px]">
                         A: {item.answer}
                       </p>
                     </Link>
@@ -69,16 +69,16 @@ export function AboutPage() {
                 </div>
               </section>
 
-              <section className="rounded-[8px] border border-kaist-grey/25 bg-white px-8 py-7">
-                <h2 className="mt-2 text-[24px] font-extrabold leading-normal tracking-tight text-kaist-black md:text-[26px]">
+              <section className="rounded-[8px] border border-kaist-grey/25 bg-white px-7 py-6">
+                <h2 className="mt-1 text-[22px] font-extrabold leading-normal tracking-tight text-kaist-black md:text-[24px]">
                   전산학부 로드맵
                 </h2>
-                <p className="mt-5 text-[15px] font-semibold leading-[1.8] tracking-tight text-[#8192a3] md:text-[16px]">
+                <p className="mt-4 text-[14px] font-semibold leading-[1.75] tracking-tight text-[#8192a3] md:text-[15px]">
                   전공 기초부터 연구, 프로젝트, 진로 설계까지 흐름을 확인할 수 있도록 정리한 페이지로 이동합니다.
                 </p>
                 <Link
                   to="/about/roadmap"
-                  className="mt-8 inline-flex items-center justify-center rounded-[5px] bg-kaist-darkgreen px-6 py-3.5 text-[16px] font-extrabold tracking-tight text-kaist-white transition hover:bg-kaist-darkgreen-main"
+                  className="mt-7 inline-flex items-center justify-center rounded-[5px] bg-kaist-darkgreen px-5 py-3 text-[14px] font-extrabold tracking-tight text-kaist-white transition hover:bg-kaist-darkgreen-main"
                 >
                   로드맵 바로가기
                 </Link>

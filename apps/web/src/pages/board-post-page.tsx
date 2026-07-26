@@ -61,12 +61,12 @@ export function BoardPostPage() {
 
       <main className="flex-1 w-full mx-auto">
         {/* Banner */}
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
           <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">
+            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">
               {category} 게시판
             </h1>
-            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">
+            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">
               {boardInfo[category]?.description || ''}
             </p>
           </div>
@@ -76,15 +76,15 @@ export function BoardPostPage() {
         <div className={`${pageContainerClass} pb-16 py-2`}>
 
           {/* Post Meta */}
-          <div className="flex flex-col gap-5 border-b-3 border-kaist-darkgreen-main py-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+          <div className="flex flex-col gap-5 border-b-2 border-kaist-darkgreen-main py-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
             <div className="min-w-0">
               <span className="mb-3 inline-block w-fit rounded-full bg-kaist-darkgreen px-3 py-1 text-xs font-semibold tracking-tight text-kaist-white lg:text-sm">
                 {post.category}
               </span>
-              <h2 className="mb-2 text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[32px]">
+              <h2 className="mb-2 text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[28px]">
                 {post.title}
               </h2>
-              <div className="flex flex-wrap items-center gap-2 pt-2 text-sm font-medium tracking-tight text-kaist-grey lg:text-base">
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-sm font-medium tracking-tight text-kaist-grey">
                 <span className="font-semibold text-kaist-black">{post.author}</span>
                 <span className="text-kaist-grey">|</span>
                 <span>{post.date}</span>
@@ -112,21 +112,21 @@ export function BoardPostPage() {
           </div>
 
           {/* Post Body */}
-          <div className="py-8 lg:py-10">
+          <div className="py-7 lg:py-8">
             <div className="flow-root">
               <div
                 className="mb-6 aspect-[3/4] w-full max-w-[min(100%,340px)] rounded-[5px] bg-cover bg-center md:float-left md:mb-6 md:mr-[clamp(2rem,3vw,3rem)] md:w-[clamp(240px,24vw,340px)]"
                 style={{ backgroundImage: `url(${post.image})` }}
               />
 
-              <h3 className="mb-3 text-xl font-extrabold tracking-tight text-kaist-black lg:text-2xl">
+              <h3 className="mb-3 text-xl font-extrabold tracking-tight text-kaist-black lg:text-[22px]">
                 {post.title}
               </h3>
-              <p className="mb-6 text-sm font-medium leading-relaxed tracking-tight text-kaist-grey lg:text-base">
+              <p className="mb-6 text-sm font-medium leading-relaxed tracking-tight text-kaist-grey">
                 {post.summary}
               </p>
 
-              <div className="whitespace-pre-line text-sm font-medium leading-7 tracking-tight text-kaist-black lg:text-base lg:leading-8">
+              <div className="whitespace-pre-line text-sm font-medium leading-7 tracking-tight text-kaist-black">
                 {post.content}
               </div>
             </div>

@@ -16,30 +16,30 @@ function EventCard({ id, image, title, date, status, summary }: EventCardProps) 
   return (
     <Link
       to={`/events/${id}/survey`}
-      className="group flex h-full min-h-[280px] min-w-0 flex-col overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md md:min-h-[300px] lg:min-h-0"
+      className="group flex aspect-[270/359] h-auto max-h-full min-h-[240px] w-full min-w-0 flex-col self-center overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.18),1px_2px_4px_rgba(0,0,0,0.14)] transition hover:-translate-y-0.5 hover:shadow-md md:min-h-[260px] lg:min-h-0"
     >
       <div className="relative h-[60.2%] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
         <div
           className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
           style={{ backgroundImage: `url(${image})` }}
         />
-        <span className="absolute left-4 top-4 rounded-full bg-kaist-darkgreen px-3 py-1 text-[10px] font-semibold tracking-tight text-kaist-white lg:text-xs">
+        <span className="absolute left-3 top-3 rounded-full bg-kaist-darkgreen px-2.5 py-1 text-[10px] font-semibold tracking-tight text-kaist-white">
           {status === 'ongoing' ? '진행중' : '완료'}
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
-        <span className="mb-1 text-[10px] font-bold tracking-tight text-[#5b93c4] lg:text-xs">
+      <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2.5">
+        <span className="mb-1 text-[10px] font-bold tracking-tight text-[#5b93c4]">
           이벤트
         </span>
-        <h3 className="truncate text-lg font-extrabold tracking-tight text-kaist-black lg:text-2xl">
+        <h3 className="truncate text-base font-extrabold tracking-tight text-kaist-black lg:text-xl">
           {title}
         </h3>
-        <p className="mt-2 line-clamp-2 text-xs font-semibold leading-normal tracking-tight text-kaist-grey">
+        <p className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-normal tracking-tight text-kaist-grey">
           {summary}
         </p>
-        <div className="mt-auto flex items-center gap-2 text-[10px] font-semibold tracking-tight text-kaist-greygreen lg:text-xs">
-          <CalendarDays className="h-3.5 w-3.5" />
+        <div className="mt-auto flex items-center gap-1.5 text-[10px] font-semibold tracking-tight text-kaist-greygreen">
+          <CalendarDays className="h-3 w-3" />
           {date}
         </div>
       </div>
@@ -67,7 +67,7 @@ export function EventCarousel() {
 
     const updateItemsPerPage = () => {
       const width = carousel.getBoundingClientRect().width;
-      const minCardWidth = 210;
+      const minCardWidth = 170;
       const gap = 20;
       const sideGutter = width >= 768 ? 8 : 4;
       const availableWidth = Math.max(0, width - sideGutter * 2);
@@ -99,7 +99,7 @@ export function EventCarousel() {
 
   return (
     <section className="h-full overflow-hidden bg-kaist-white">
-      <div className="flex h-full w-full flex-col px-6 pt-6 lg:px-12 lg:pt-12">
+      <div className="flex h-full w-full flex-col px-5 pt-5 lg:px-10 lg:pt-9">
         {/* Event Cards with Navigation Arrows */}
         <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           {/* Left Arrow - positioned at image vertical center */}
@@ -125,7 +125,7 @@ export function EventCarousel() {
               {Array.from({ length: totalPages }).map((_, pageIndex) => (
                 <div
                   key={pageIndex}
-                  className="grid h-full flex-shrink-0 items-stretch gap-4 px-1 md:gap-5 md:px-2"
+                  className="grid h-full flex-shrink-0 items-stretch gap-3 px-1 md:gap-4 md:px-2"
                   style={{
                     gridTemplateColumns: `repeat(${itemsPerPage}, minmax(0, 1fr))`,
                     width: pageWidth ? `${pageWidth}px` : '100%',
@@ -152,15 +152,15 @@ export function EventCarousel() {
         </div>
 
         {/* Carousel Dots */}
-        <div className="mb-5 mt-5 flex flex-shrink-0 items-center justify-center gap-3 md:gap-4 lg:mb-6 lg:mt-6">
+        <div className="mb-4 mt-4 flex flex-shrink-0 items-center justify-center gap-2.5 md:gap-3 lg:mb-5 lg:mt-5">
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i}
               onClick={() => setCurrentPage(i)}
               className={`rounded-full transition-all ${
                 i === currentPage 
-                  ? 'h-4 w-4 bg-kaist-darkgreen md:h-5 md:w-5' 
-                  : 'h-3.5 w-3.5 bg-kaist-greygreen hover:bg-kaist-lightgreen2'
+                  ? 'h-3.5 w-3.5 bg-kaist-darkgreen md:h-4 md:w-4' 
+                  : 'h-3 w-3 bg-kaist-greygreen hover:bg-kaist-lightgreen2'
               }`}
               aria-label={`Go to page ${i + 1}`}
             />

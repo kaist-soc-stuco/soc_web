@@ -101,31 +101,31 @@ export function Hero() {
       </div>
       
       {/* Logo section */}
-      <div className="relative z-10 flex h-16 items-center justify-start px-6 lg:h-[85px] lg:px-7">
-        <div className="flex items-center gap-2 md:gap-4">
+      <div className="relative z-10 flex h-14 items-center justify-start px-5 lg:h-[68px] lg:px-6">
+        <div className="flex items-center gap-2 md:gap-3">
           <img 
             src="/kaist_logo.png" 
             alt="KAIST Logo" 
-            className="h-6 w-auto lg:h-[39px]"
+            className="h-5 w-auto lg:h-[31px]"
           />
-          <div className="h-6 w-px bg-gray-300 lg:h-5" />
+          <div className="h-5 w-px bg-gray-300 lg:h-4" />
           <img 
             src="/logo.png" 
             alt="SOC Logo" 
-            className="h-7 w-auto lg:h-[42px]"
+            className="h-6 w-auto lg:h-[34px]"
           />
         </div>
       </div>
 
       {/* Content - Vertically centered */}
-      <div className="absolute inset-0 z-10 flex items-center px-8 md:px-12 lg:px-[15.6%]">
-        <div className="flex max-w-7xl items-start gap-6 lg:gap-8">
+      <div className="absolute inset-0 z-10 flex items-center px-7 md:px-10 lg:px-[14%]">
+        <div className="flex max-w-7xl items-start gap-5 lg:gap-6">
           {/* Green Accent Bar */}
-          <div className="mt-5 h-11 w-3 bg-kaist-lightgreen2 lg:mt-11 lg:h-[54px] lg:w-[11px]" />
+          <div className="mt-4 h-9 w-2.5 bg-kaist-lightgreen2 lg:mt-9 lg:h-[43px] lg:w-[9px]" />
           
           {/* Title */}
           <h1 
-            className="mt-1 max-w-md text-4xl font-black leading-[150%] tracking-normal text-kaist-white md:text-5xl lg:mt-4 lg:max-w-xl lg:text-[72px]"
+            className="mt-1 max-w-md text-3xl font-black leading-[150%] tracking-normal text-kaist-white md:text-4xl lg:mt-3 lg:max-w-lg lg:text-[58px]"
             style={{ fontFamily: "'Roboto Slab', serif" }}
           >
             KAIST
