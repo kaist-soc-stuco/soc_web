@@ -83,8 +83,8 @@ export function Calendar({ clickable = false }: CalendarProps) {
     >
       <div className="flex-1 flex flex-col overflow-hidden border-b border-kaist-grey/30">
         {/* Header */}
-        <div className="mb-2 mt-1 flex-shrink-0 relative flex items-center justify-center">
-          <div className="flex items-center gap-4">
+        <div className="relative mb-1.5 mt-0.5 flex flex-shrink-0 items-center justify-center">
+          <div className="flex items-center gap-3">
             {/* Left Arrow */}
             <button
               onClick={handlePrevMonth}
@@ -95,10 +95,10 @@ export function Calendar({ clickable = false }: CalendarProps) {
                 !canGoPrev ? 'opacity-0 pointer-events-none' : ''
               }`}
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
 
-            <h3 className="text-base md:text-lg font-extrabold tracking-tight text-kaist-darkgreen">
+            <h3 className="text-sm font-extrabold tracking-tight text-kaist-darkgreen md:text-base">
               {currentYear}년 {currentMonth}월
             </h3>
 
@@ -112,7 +112,7 @@ export function Calendar({ clickable = false }: CalendarProps) {
                 !canGoNext ? 'opacity-0 pointer-events-none' : ''
               }`}
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
@@ -120,7 +120,7 @@ export function Calendar({ clickable = false }: CalendarProps) {
           <Link
             to="/calendar"
             onClick={(event) => event.stopPropagation()}
-            className="absolute right-0 text-base md:text-lg font-extrabold tracking-tight text-kaist-greygreen hover:text-kaist-darkgreen transition-colors"
+            className="absolute right-0 text-sm font-bold tracking-tight text-kaist-greygreen transition-colors hover:text-kaist-darkgreen md:text-sm"
             aria-label="캘린더로 이동"
           >
             +
@@ -128,13 +128,13 @@ export function Calendar({ clickable = false }: CalendarProps) {
         </div>
 
         {/* Divider */}
-        <div className="mb-2 h-0.5 w-full bg-kaist-grey/30 flex-shrink-0" />
+        <div className="mt-1 mb-1.5 h-0.5 w-full flex-shrink-0 bg-kaist-grey/30" />
 
         {/* Weekday Headers */}
-        <div className="mb-3 grid grid-cols-7 gap-x-2 flex-shrink-0">
+        <div className="mb-2 grid flex-shrink-0 grid-cols-7 gap-x-1.5">
           {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
             <div key={index} className="text-center">
-              <span className="text-xs font-semibold tracking-tight text-kaist-grey">
+              <span className="text-[11px] font-semibold tracking-tight text-kaist-grey">
                 {day}
               </span>
             </div>
@@ -142,13 +142,13 @@ export function Calendar({ clickable = false }: CalendarProps) {
         </div>
 
         {/* Calendar Grid */}
-        <div className="flex-1 grid grid-cols-7 grid-rows-5 gap-x-2 gap-y-1 overflow-y-auto">
+        <div className="grid flex-1 grid-cols-7 grid-rows-5 gap-x-1.5 gap-y-1 overflow-y-auto">
           {days.map((item, index) => (
-            <div key={index} className="relative flex flex-col items-center h-full">
+            <div key={index} className="relative flex h-full flex-col items-center">
               {item.day && (
                 <>
                   <span
-                    className={`text-sm tracking-tight ${
+                    className={`text-xs tracking-tight ${
                       item.today
                         ? 'font-semibold text-kaist-darkgreen'
                         : item.isCurrentMonth
@@ -158,12 +158,12 @@ export function Calendar({ clickable = false }: CalendarProps) {
                   >
                     {item.day}
                   </span>
-                  <div className="mt-1 h-3 w-full max-w-[28px]">
+                  <div className="mt-1 h-3 w-full max-w-[36px]">
                     {item.event && (
                       <div
-                        className={`h-full rounded-full ${item.event.color} flex items-center justify-center`}
+                        className={`h-full rounded-full ${item.event.color} flex items-center justify-center py-1`}
                       >
-                        <span className="text-[6px] font-normal tracking-tight text-kaist-white truncate px-1">
+                        <span className="text-[8px] font-normal tracking-tight text-kaist-white truncate px-1">
                           {item.event.title}
                         </span>
                       </div>

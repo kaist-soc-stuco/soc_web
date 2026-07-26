@@ -9,35 +9,35 @@ export function EventSurveyPage() {
 
   return (
     <SiteLayout>
-      <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7">
-        <div className="mx-auto max-w-[1600px]">
-          <h1 className="text-[36px] font-extrabold tracking-tight text-white">설문조사</h1>
-          <p className="mt-2 text-[24px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 소식을 알려 드립니다</p>
+      <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
+        <div className="mx-auto w-full px-[12vw]">
+          <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-white">설문조사</h1>
+          <p className="text-[20px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 소식을 알려 드립니다</p>
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1600px] px-6 py-8">
-        <h2 className="text-[32px] font-extrabold tracking-tight text-kaist-black">설문 제목이 들어가는 곳입니다</h2>
+      <div className="mx-auto w-full px-[12vw] py-8">
+        <h2 className="text-[28px] font-extrabold tracking-tight text-kaist-black">설문 제목이 들어가는 곳입니다</h2>
 
         <div className="mt-6 overflow-hidden rounded-[15px] bg-white shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
           <div className="w-[123px] rounded-tr-[15px] bg-kaist-darkgreen-main px-4 py-2 text-[18px] font-semibold text-white">1 중 1 섹션</div>
           <div className="h-[10px] bg-kaist-darkgreen-main" />
           <div className="px-6 py-6">
-            <h3 className="text-[32px] font-semibold text-kaist-black">설문 제목(32pt)</h3>
-            <p className="mt-3 text-[20px] font-semibold text-kaist-black/85">세부 내용(20pt)</p>
+            <h3 className="text-[28px] font-semibold text-kaist-black">설문 제목(28pt)</h3>
+            <p className="mt-3 text-[18px] font-semibold text-kaist-black/85">세부 내용(18pt)</p>
           </div>
         </div>
 
-        <div className="mt-14 space-y-10">
-          <section className="rounded-[15px] bg-white p-8 shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
-            <h4 className="text-[28px] font-semibold tracking-tight text-kaist-black">블록 제목(28pt)</h4>
-            <p className="mt-4 text-[20px] font-semibold text-[#9AA69F]">단답형 텍스트 입력란(20pt)</p>
+        <div className="mt-10 space-y-8">
+          <section className="rounded-[15px] bg-white p-7 shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
+            <h4 className="text-[24px] font-semibold tracking-tight text-kaist-black">블록 제목(24pt)</h4>
+            <p className="mt-4 text-[18px] font-semibold text-[#9AA69F]">단답형 텍스트 입력란(18pt)</p>
             <div className="mt-2 max-w-[660px] border-b border-kaist-grey/60" />
           </section>
 
-          <section className="rounded-[15px] bg-white p-8 shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
-            <h4 className="text-[28px] font-semibold tracking-tight text-kaist-black">블록 제목(28pt)</h4>
-            <div className="mt-6 grid grid-cols-[170px_repeat(5,minmax(0,1fr))] gap-y-8 text-[20px] font-semibold text-kaist-black">
+          <section className="rounded-[15px] bg-white p-7 shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
+            <h4 className="text-[24px] font-semibold tracking-tight text-kaist-black">블록 제목(24pt)</h4>
+            <div className="mt-6 grid grid-cols-[150px_repeat(5,minmax(0,1fr))] gap-y-7 text-[18px] font-semibold text-kaist-black">
               <div />
               <div>선택지 1</div>
               <div>선택지 2</div>
@@ -57,11 +57,11 @@ export function EventSurveyPage() {
             </div>
           </section>
 
-          <section className="rounded-[15px] bg-white p-8 shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
-            <h4 className="text-[28px] font-semibold tracking-tight text-kaist-black">블록 제목(28pt)</h4>
+          <section className="rounded-[15px] bg-white p-7 shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
+            <h4 className="text-[24px] font-semibold tracking-tight text-kaist-black">블록 제목(24pt)</h4>
             <div className="mt-6 space-y-6">
               {['항목 A', '항목 B'].map((label) => (
-                <label key={label} className="flex items-center gap-6 text-[20px] font-semibold text-kaist-black">
+                <label key={label} className="flex items-center gap-5 text-[18px] font-semibold text-kaist-black">
                   <input type="checkbox" className="h-5 w-5 accent-kaist-darkgreen-main" />
                   {label}
                 </label>

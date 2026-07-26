@@ -61,16 +61,16 @@ export function EventsPage() {
 
   return (
     <SiteLayout>
-      <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+      <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
         <div className={pageContainerClass}>
-          <h1 className="text-[36px] font-extrabold tracking-tight text-white">설문조사</h1>
-          <p className="mt-2 text-[24px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 행사를 확인하고 설문에 참여하세요</p>
+          <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-white">설문조사</h1>
+          <p className="text-[20px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 행사를 확인하고 설문에 참여하세요</p>
         </div>
       </div>
 
       <div className="border-b border-kaist-grey/30 bg-[#F7FCFC]">
-        <div className={`${pageContainerClass} flex flex-wrap items-end justify-between gap-8`}>
-          <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-12 xl:gap-16">
+          <div className={`${pageContainerClass} flex flex-wrap items-end justify-between gap-8`}>
+          <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-10">
             {eventTabs.map((tab, index) => (
               <button
                 key={tab}
@@ -81,11 +81,11 @@ export function EventsPage() {
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 <span
-                  className={`relative flex h-full items-center justify-center text-lg font-extrabold tracking-tight transition-colors lg:text-2xl ${
+                  className={`relative flex h-full items-center justify-center text-lg font-extrabold tracking-tight transition-colors ${
                     activeTab === tab ? 'text-kaist-darkgreen' : 'text-kaist-greygreen hover:text-kaist-darkgreen'
                   }`}
                 >
-                  <span className="py-5">{tab}</span>
+                  <span className="py-3">{tab}</span>
                   <span
                     className={`absolute bottom-0 left-0 right-0 h-1.5 origin-center bg-kaist-darkgreen transition-transform duration-200 ${
                       activeTab === tab ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'
@@ -96,9 +96,9 @@ export function EventsPage() {
             ))}
           </div>
 
-          <div className="mb-4 flex items-center gap-2 border-b border-kaist-darkgreen/40">
-            <span>제목</span>
-            <span className="mb-2 text-lg text-kaist-darkgreen">⌄</span>
+          <div className="mb-2.5 flex items-center gap-2 border-b border-kaist-darkgreen/40">
+            <span className="text-base font-semibold text-[#9AA69F]">제목</span>
+            <span className="mb-2 text-base text-kaist-darkgreen">⌄</span>
             <input
               type="text"
               value={searchQuery}
@@ -111,7 +111,7 @@ export function EventsPage() {
         </div>
       </div>
 
-      <section className={`${pageContainerClass} bg-[#F7FCFC] pb-16 pt-10`}>
+      <section className={`${pageContainerClass} bg-[#F7FCFC] pb-16 pt-8`}>
         <div className="grid grid-cols-[repeat(auto-fit,270px)] justify-center gap-x-6 gap-y-[51px] min-[1900px]:justify-between">
           {currentEvents.map((event) => (
             <Link
@@ -152,7 +152,7 @@ export function EventsPage() {
           </div>
         ) : null}
 
-        <div className="mt-16 flex items-center justify-center gap-2 text-[18px] font-semibold tracking-tight text-kaist-black">
+        <div className="mt-8 flex items-center justify-center gap-2 text-[12px] font-medium tracking-tight text-kaist-black">
           <button
             type="button"
             onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
@@ -170,7 +170,7 @@ export function EventsPage() {
               key={page}
               type="button"
               onClick={() => handlePageChange(page)}
-              className={`h-[33px] min-w-[33px] rounded-[5px] px-3 transition-colors ${
+                className={`h-[28px] min-w-[28px] rounded-[5px] px-2 transition-colors ${
                 currentPage === page ? 'bg-kaist-darkgreen-main text-kaist-white' : 'text-kaist-black hover:bg-kaist-grey/10'
               }`}
             >

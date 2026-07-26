@@ -149,32 +149,32 @@ export function CalendarPage() {
   return (
     <SiteLayout>
       <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
           <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">전산학부 캘린더</h1>
-            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">학사, 행사, 복지 일정을 한눈에 확인하세요</p>
+            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">전산학부 캘린더</h1>
+            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">학사, 행사, 복지 일정을 한눈에 확인하세요</p>
           </div>
         </div>
 
-        <section className={`${pageContainerClass} pb-16 pt-10`}>
-          <div className="mb-6 grid gap-4 rounded-[8px] border border-kaist-grey/25 bg-white p-5">
+        <section className={`${pageContainerClass} pb-16 pt-8`}>
+          <div className="mb-5 grid gap-3 rounded-[8px] border border-kaist-grey/25 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <button
                   type="button"
                   onClick={() => moveMonth(-1)}
-                  className="grid h-10 w-10 place-items-center rounded-full border border-kaist-grey/25 text-kaist-darkgreen transition hover:bg-kaist-grey/10"
+                  className="grid h-9 w-9 place-items-center rounded-full border border-kaist-grey/25 text-kaist-darkgreen transition hover:bg-kaist-grey/10"
                   aria-label="이전 달"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h2 className="text-[28px] font-extrabold tracking-tight text-kaist-black">
+                <h2 className="text-[24px] font-extrabold tracking-tight text-kaist-black">
                   {viewDate.getFullYear()}년 {viewDate.getMonth() + 1}월
                 </h2>
                 <button
                   type="button"
                   onClick={() => moveMonth(1)}
-                  className="grid h-10 w-10 place-items-center rounded-full border border-kaist-grey/25 text-kaist-darkgreen transition hover:bg-kaist-grey/10"
+                  className="grid h-9 w-9 place-items-center rounded-full border border-kaist-grey/25 text-kaist-darkgreen transition hover:bg-kaist-grey/10"
                   aria-label="다음 달"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -199,7 +199,7 @@ export function CalendarPage() {
                   key={category}
                   type="button"
                   onClick={() => setActiveCategory(category)}
-                  className={`rounded-full border px-3 py-1.5 text-[13px] font-extrabold tracking-tight transition ${
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold tracking-tight transition ${
                     activeCategory === category
                       ? 'border-kaist-darkgreen bg-kaist-darkgreen text-kaist-white'
                       : 'border-kaist-grey/25 bg-white text-kaist-black hover:bg-kaist-grey/10'
@@ -211,11 +211,11 @@ export function CalendarPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
             <section className="overflow-hidden rounded-[8px] border border-kaist-grey/25 bg-white">
-              <div className="grid grid-cols-7 border-b border-kaist-grey/25 bg-[#F7FCFC] text-center text-[15px] font-extrabold tracking-tight text-kaist-greygreen">
+              <div className="grid grid-cols-7 border-b border-kaist-grey/25 bg-[#F7FCFC] text-center text-[14px] font-extrabold tracking-tight text-kaist-greygreen">
                 {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-                  <div key={day} className="py-4">
+                  <div key={day} className="py-3">
                     {day}
                   </div>
                 ))}
@@ -234,13 +234,13 @@ export function CalendarPage() {
                       key={dateKey}
                       type="button"
                       onClick={() => setSelectedDate(dateKey)}
-                      className={`min-h-[132px] border-r border-t border-kaist-grey/15 p-3 text-left transition hover:bg-kaist-grey/5 ${
+                      className={`min-h-[112px] border-r border-t border-kaist-grey/15 p-2.5 text-left transition hover:bg-kaist-grey/5 ${
                         isSelected ? 'bg-kaist-lightgreen2/20' : 'bg-white'
                       }`}
                     >
                       <div className="mb-3 flex items-center justify-between">
                         <span
-                          className={`grid h-8 w-8 place-items-center rounded-full text-[15px] font-extrabold ${
+                          className={`grid h-7 w-7 place-items-center rounded-full text-[14px] font-extrabold ${
                             isToday
                               ? 'bg-kaist-darkgreen text-kaist-white'
                               : isCurrentMonth
@@ -269,11 +269,11 @@ export function CalendarPage() {
               </div>
             </section>
 
-            <aside className="space-y-6">
-              <section className="rounded-[8px] border border-kaist-grey/25 bg-white p-6">
+            <aside className="space-y-5">
+              <section className="rounded-[8px] border border-kaist-grey/25 bg-white p-5">
                 <div className="flex items-center gap-3">
                   <CalendarDays className="h-5 w-5 text-kaist-darkgreen" />
-                  <h2 className="text-[20px] font-extrabold tracking-tight text-kaist-black">{selectedDate}</h2>
+                  <h2 className="text-[18px] font-extrabold tracking-tight text-kaist-black">{selectedDate}</h2>
                 </div>
 
                 <div className="mt-5 space-y-4">

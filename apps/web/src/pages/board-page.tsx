@@ -44,12 +44,12 @@ export function BoardPage() {
       <Header showLogo={true} />
       
       <main className="flex-1 w-full mx-auto">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
           <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">
+            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">
               {category} 게시판
             </h1>
-            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">
+            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">
               {boardInfo[category]?.description || ''}
             </p>
           </div>
@@ -58,7 +58,7 @@ export function BoardPage() {
         <div className="bg-[#F7FCFC]">
           <div className="border-b border-kaist-grey/30">
             <div className={`${pageContainerClass} flex flex-wrap items-end justify-between gap-8`}>
-              <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-12 xl:gap-16">
+              <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-10">
                 {boardCategories.map((board, index) => (
                   <Link
                     key={board}
@@ -67,12 +67,12 @@ export function BoardPage() {
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}
                   >
-                    <div className={`relative flex items-center justify-center h-full text-lg lg:text-2xl font-extrabold tracking-tight transition-colors ${
+                    <div className={`relative flex items-center justify-center h-full text-lg font-extrabold tracking-tight transition-colors ${
                       category === board
                         ? 'text-kaist-darkgreen'
                         : 'text-kaist-greygreen hover:text-kaist-darkgreen'
                     }`}>
-                      <span className="py-5">{board}</span>
+                      <span className="py-3">{board}</span>
                       <span 
                         className={`absolute bottom-0 left-0 right-0 h-1.5 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
                           category === board ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'
@@ -84,9 +84,9 @@ export function BoardPage() {
               </div>
               
               <div className="flex items-center">
-                <div className="relative flex items-center gap-2 border-b border-kaist-darkgreen/40 mb-4">
-                  <span className="text-lg font-semibold text-[#9AA69F]">제목</span>
-                  <span className="text-lg text-kaist-darkgreen mb-2">⌄</span>
+                <div className="relative flex items-center gap-2 border-b border-kaist-darkgreen/40 mb-2.5">
+                  <span className="text-base font-semibold text-[#9AA69F]">제목</span>
+                  <span className="text-base text-kaist-darkgreen mb-2">⌄</span>
                   <input
                     type="text"
                     placeholder=""
@@ -104,7 +104,7 @@ export function BoardPage() {
         <div className={`${pageContainerClass} pb-16 py-2`}>
           <div className="flex gap-6">
             <div className="flex-[5]">
-              <div className="grid grid-cols-12 gap-4 border-b-3 border-kaist-darkgreen-main py-4 text-sm lg:text-lg font-extrabold tracking-tight text-kaist-darkgreen">
+              <div className="grid grid-cols-12 gap-4 border-b-2 border-kaist-darkgreen-main py-2 pb-3.5 text-sm lg:text-base font-extrabold tracking-tight text-kaist-darkgreen">
                 <div className="col-span-1 text-center">번호</div>
                 <div className="col-span-1 text-center">분류</div>
                 <div className="col-span-7 text-center">제목</div>
@@ -119,26 +119,26 @@ export function BoardPage() {
                     <Link
                       key={post.id}
                       to={`/board/${category}/${post.id}`}
-                      className="grid grid-cols-12 gap-4 py-5 hover:bg-kaist-grey/5 transition-colors group"
+                      className="grid grid-cols-12 gap-4 py-3.5 hover:bg-kaist-grey/5 transition-colors group"
                     >
-                      <div className="col-span-1 grid place-content-center text-center text-sm lg:text-base font-semibold text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium text-kaist-grey">
                         {post.id}
                       </div>
                       <div className="col-span-1 text-center">
-                        <span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs lg:text-sm font-semibold tracking-tight">
+                        <span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-regular tracking-tight">
                           {post.category}
                         </span>
                       </div>
-                      <div className="col-span-7 flex items-center pl-8 text-left text-sm lg:text-lg font-semibold tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
+                      <div className="col-span-7 flex items-center pl-8 text-left text-sm font-medium tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
                         {post.title}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-sm lg:text-base font-semibold tracking-tight text-kaist-black">
+                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium tracking-tight text-kaist-black">
                         {post.author}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs lg:text-base font-medium tracking-tight text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
                         {post.date}
                       </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs lg:text-base font-medium tracking-tight text-kaist-grey">
+                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
                         {post.views}
                       </div>
                     </Link>
@@ -169,7 +169,7 @@ export function BoardPage() {
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                          className={`min-w-[33px] h-[33px] px-3 rounded-[5px] text-[18px] font-semibold tracking-tight transition-colors ${
+                          className={`min-w-[28px] h-[28px] px-2 rounded-[5px] text-[12px] font-medium tracking-tight transition-colors ${
                             currentPage === page
                               ? 'bg-kaist-darkgreen-main text-kaist-white'
                               : 'text-kaist-black hover:bg-kaist-grey/10'
@@ -194,7 +194,7 @@ export function BoardPage() {
                 )}
                 <Link
                   to={`/board/${category}/write`}
-                  className="absolute right-0 rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition-colors hover:bg-kaist-darkgreen hover:text-kaist-white"
+                  className="absolute right-0 rounded-[5px] border border-kaist-darkgreen bg-white px-4 py-2 text-xs font-semibold tracking-tight text-kaist-darkgreen transition-colors hover:bg-kaist-darkgreen hover:text-kaist-white"
                 >
                   글쓰기
                 </Link>

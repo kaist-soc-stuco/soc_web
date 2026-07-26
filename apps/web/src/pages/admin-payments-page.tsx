@@ -4,13 +4,13 @@ import { adminPaymentRows } from '@/lib/mock-data';
 export function AdminPaymentsPage() {
   return (
     <section>
-      <div className="mb-8 border-b border-kaist-grey/25 pb-5">
-        <h1 className="text-[36px] font-extrabold tracking-tight text-kaist-black lg:text-[44px]">과비 납부 관리</h1>
+      <div className="mb-6 border-b border-kaist-grey/25 pb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-kaist-black">과비 납부 관리</h1>
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <div className="rounded-[5px] border border-kaist-grey/25 bg-white px-4 py-1.5 text-sm font-semibold text-kaist-black">2026</div>
-        <span className="text-[18px] font-extrabold text-kaist-black">학년도</span>
+        <span className="text-base font-extrabold text-kaist-black">학년도</span>
       </div>
 
       <AdminList

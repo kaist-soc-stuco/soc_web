@@ -20,19 +20,19 @@ function SurveyEditorHeader({
 
   return (
     <>
-      <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7">
-        <p className="text-[36px] font-extrabold tracking-tight text-white">설문조사 관리</p>
-        <p className="mt-2 text-[24px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 소식을 알려 드립니다</p>
+      <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-[12vw] py-8">
+        <p className="mb-2 text-[32px] font-extrabold tracking-tight text-white">설문조사 관리</p>
+        <p className="text-[20px] font-semibold tracking-tight text-white">카이스트 전산학부의 다양한 소식을 알려 드립니다</p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-kaist-grey/30 px-8 py-4">
-        <div className="flex items-center gap-10 text-[32px] font-extrabold tracking-tight">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-kaist-grey/30 px-[12vw] py-3">
+        <div className="flex items-center gap-8 text-[24px] font-extrabold tracking-tight">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => onTabChange(tab.key)}
-              className={activeTab === tab.key ? 'border-b-4 border-kaist-darkgreen-main pb-2 text-kaist-darkgreen-main' : 'text-[#9AA69F]'}
+            className={activeTab === tab.key ? 'border-b-3 border-kaist-darkgreen-main pb-2 text-kaist-darkgreen-main' : 'text-[#9AA69F]'}
             >
               {tab.label}
             </button>
@@ -42,11 +42,11 @@ function SurveyEditorHeader({
         <div className="flex items-center gap-4">
           <Link
             to="/admin/surveys"
-            className="rounded-[5px] bg-kaist-darkgreen-main px-6 py-2 text-[20px] font-semibold text-white"
+            className="rounded-[5px] bg-kaist-darkgreen-main px-5 py-2 text-base font-semibold text-white"
           >
             임시저장
           </Link>
-          <button type="button" className="rounded-[5px] bg-kaist-darkgreen-main px-6 py-2 text-[20px] font-semibold text-white">
+          <button type="button" className="rounded-[5px] bg-kaist-darkgreen-main px-5 py-2 text-base font-semibold text-white">
             게시
           </button>
         </div>
@@ -57,24 +57,24 @@ function SurveyEditorHeader({
 
 function SurveyQuestionTab({ surveyTitle }: { surveyTitle: string }) {
   return (
-    <div className="px-8 py-8">
+    <div className="px-[12vw] py-8">
       <div className="overflow-hidden rounded-[15px] bg-white shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
         <div className="w-[123px] rounded-tr-[15px] bg-kaist-darkgreen-main px-4 py-2 text-[18px] font-semibold text-white">1 중 1 섹션</div>
         <div className="h-[10px] bg-kaist-darkgreen-main" />
         <div className="px-6 py-6">
-          <h2 className="text-[32px] font-semibold tracking-tight text-kaist-black">설문 제목(32pt)</h2>
-          <p className="mt-4 text-[20px] font-semibold text-kaist-black/90">세부 내용(20pt)</p>
+          <h2 className="text-[28px] font-semibold tracking-tight text-kaist-black">설문 제목(28pt)</h2>
+          <p className="mt-4 text-[18px] font-semibold text-kaist-black/90">세부 내용(18pt)</p>
         </div>
       </div>
 
-      <div className="mt-14 grid gap-6 xl:grid-cols-[1fr_90px]">
+      <div className="mt-10 grid gap-6 xl:grid-cols-[1fr_80px]">
         <div className="overflow-hidden rounded-[15px] bg-white shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
           <div className="flex">
             <div className="w-[13px] rounded-bl-[15px] rounded-tl-[15px] bg-kaist-darkgreen-main" />
             <div className="flex-1 px-6 py-6">
               <div className="mb-4 flex items-center justify-between gap-4">
-                <div className="w-full max-w-[724px] rounded-[5px] bg-[#86D8A7] px-4 py-3 text-[28px] font-semibold tracking-tight text-kaist-black">
-                  블록 제목(28pt) <span className="text-[#D15F57]">*</span>
+                <div className="w-full max-w-[724px] rounded-[5px] bg-[#86D8A7] px-4 py-3 text-[24px] font-semibold tracking-tight text-kaist-black">
+                  블록 제목(24pt) <span className="text-[#D15F57]">*</span>
                 </div>
                 <div className="flex items-center gap-4 text-xl text-kaist-grey">
                   <span>⧉</span>
@@ -92,15 +92,15 @@ function SurveyQuestionTab({ surveyTitle }: { surveyTitle: string }) {
                 <span>▾</span>
               </div>
 
-              <div className="mt-5 max-w-[660px] border-b border-kaist-grey/60 pb-1 text-[20px] font-semibold text-[#9AA69F]">
-                단답형 텍스트 입력란(20pt)
+              <div className="mt-5 max-w-[660px] border-b border-kaist-grey/60 pb-1 text-[18px] font-semibold text-[#9AA69F]">
+                단답형 텍스트 입력란(18pt)
               </div>
             </div>
           </div>
         </div>
 
         <div className="rounded-[15px] bg-white px-4 py-5 shadow-[0_1px_6px_rgba(0,0,0,0.14)]">
-          <div className="flex flex-col items-center gap-5 text-2xl text-kaist-black/70">
+          <div className="flex flex-col items-center gap-4 text-xl text-kaist-black/70">
             <span>⊕</span>
             <span>📄</span>
             <span className="text-lg font-bold">Tt</span>

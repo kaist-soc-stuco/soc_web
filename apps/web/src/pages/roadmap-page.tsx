@@ -211,23 +211,23 @@ export function RoadmapPage() {
   return (
     <SiteLayout>
       <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-12">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
           <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">전산학부 로드맵</h1>
-            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">전산학부 과목 흐름과 선수과목을 확인하세요</p>
+            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">전산학부 로드맵</h1>
+            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">전산학부 과목 흐름과 선수과목을 확인하세요</p>
           </div>
         </div>
 
-        <section className={`${pageContainerClass} pb-16 pt-10`}>
-          <div className="mb-6 grid gap-4 rounded-[8px] border border-kaist-grey/25 bg-white p-5">
-            <label className="flex items-center gap-3 border-b border-kaist-grey/25 pb-4">
+        <section className={`${pageContainerClass} pb-16 pt-8`}>
+          <div className="mb-5 grid gap-3 rounded-[8px] border border-kaist-grey/25 bg-white p-4">
+            <label className="flex items-center gap-3 border-b border-kaist-grey/25 pb-3">
               <Search className="h-5 w-5 text-kaist-greygreen" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="과목명 또는 코드로 검색"
-                className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold tracking-tight text-kaist-black placeholder:text-kaist-greygreen focus:outline-none"
+                className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold tracking-tight text-kaist-black placeholder:text-kaist-greygreen focus:outline-none"
               />
             </label>
 
@@ -237,7 +237,7 @@ export function RoadmapPage() {
                   key={track}
                   type="button"
                   onClick={() => setTrackFilter(track)}
-                  className={`rounded-full border px-3 py-1.5 text-[13px] font-extrabold tracking-tight transition ${
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold tracking-tight transition ${
                     trackFilter === track
                       ? 'border-kaist-darkgreen bg-kaist-darkgreen text-kaist-white'
                       : 'border-kaist-grey/25 bg-white text-kaist-black hover:bg-kaist-grey/10'
@@ -252,7 +252,7 @@ export function RoadmapPage() {
               <button
                 type="button"
                 onClick={() => setRowFilter('전체')}
-                className={`rounded-full border px-3 py-1.5 text-[13px] font-extrabold tracking-tight transition ${
+                className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold tracking-tight transition ${
                   rowFilter === '전체'
                     ? 'border-kaist-darkgreen-main bg-kaist-darkgreen-main text-kaist-white'
                     : 'border-kaist-grey/25 bg-white text-kaist-black hover:bg-kaist-grey/10'
@@ -265,7 +265,7 @@ export function RoadmapPage() {
                   key={row}
                   type="button"
                   onClick={() => setRowFilter(row)}
-                  className={`rounded-full border px-3 py-1.5 text-[13px] font-extrabold tracking-tight transition ${
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold tracking-tight transition ${
                     rowFilter === row
                       ? 'border-kaist-darkgreen-main bg-kaist-darkgreen-main text-kaist-white'
                       : 'border-kaist-grey/25 bg-white text-kaist-black hover:bg-kaist-grey/10'
@@ -277,7 +277,7 @@ export function RoadmapPage() {
             </div>
           </div>
 
-          <div className="mb-6 flex flex-wrap items-center gap-3 text-[13px] font-bold tracking-tight">
+          <div className="mb-5 flex flex-wrap items-center gap-2.5 text-[12px] font-bold tracking-tight">
             <span className="rounded-full border border-kaist-darkgreen bg-white px-3 py-1.5 text-kaist-darkgreen">필수 과목</span>
             <span className="rounded-full border border-kaist-grey/25 bg-white px-3 py-1.5 text-kaist-black">선택 과목</span>
             <span className="rounded-full border border-dashed border-kaist-darkgreen bg-white px-3 py-1.5 text-kaist-darkgreen">비정기 개설</span>
@@ -286,20 +286,20 @@ export function RoadmapPage() {
             <span className="rounded-full bg-kaist-grey/10 px-3 py-1.5 text-kaist-grey">참고 과목</span>
           </div>
 
-          <div className="overflow-x-auto rounded-[8px] border border-kaist-grey/25 bg-white p-5">
-            <div className="min-w-[1320px] space-y-4">
+          <div className="overflow-x-auto rounded-[8px] border border-kaist-grey/25 bg-white p-4">
+            <div className="min-w-[1220px] space-y-3">
               {rows.map((row) => {
                 const courses = csRoadmapCourses.filter((course) => course.row === row);
 
                 return (
-                  <div key={row} className="grid grid-cols-[112px_repeat(9,minmax(0,1fr))] gap-3">
-                    <div className="flex items-center text-[15px] font-extrabold tracking-tight text-kaist-darkgreen">{rowLabels[row]}</div>
+                  <div key={row} className="grid grid-cols-[96px_repeat(9,minmax(0,1fr))] gap-2.5">
+                    <div className="flex items-center text-[14px] font-extrabold tracking-tight text-kaist-darkgreen">{rowLabels[row]}</div>
                     {Array.from({ length: 9 }, (_, index) => {
                       const column = index + 1;
                       const course = courses.find((item) => item.column === column);
 
                       if (!course) {
-                        return <div key={column} className="min-h-[126px] rounded-[8px] bg-[#F7FCFC]" />;
+                        return <div key={column} className="min-h-[112px] rounded-[8px] bg-[#F7FCFC]" />;
                       }
 
                       const isRequired = csRequiredCourseCodes.includes(course.code);
@@ -332,7 +332,7 @@ export function RoadmapPage() {
                           key={course.code}
                           onMouseEnter={() => setHoverCode(course.code)}
                           onMouseLeave={() => setHoverCode(null)}
-                          className={`relative min-h-[126px] rounded-[8px] border p-3 transition ${relationClass} ${
+                          className={`relative min-h-[112px] rounded-[8px] border p-2.5 transition ${relationClass} ${
                             isIrregular && !isActive ? 'border-dashed' : ''
                           } ${isDimmedByRelation || !isFiltered ? 'opacity-30' : 'opacity-100'} ${
                             isSelected ? 'ring-2 ring-kaist-darkgreen-main/35' : ''
@@ -391,13 +391,13 @@ export function RoadmapPage() {
           </div>
 
           {selectedCourse ? (
-            <aside className="fixed bottom-6 right-6 z-50 max-h-[calc(100vh-120px)] w-[min(380px,calc(100vw-48px))] overflow-y-auto rounded-[8px] border border-kaist-grey/25 bg-white p-6 shadow-[0_18px_48px_rgba(0,0,0,0.16)]">
+            <aside className="fixed bottom-6 right-6 z-50 max-h-[calc(100vh-120px)] w-[min(360px,calc(100vw-48px))] overflow-y-auto rounded-[8px] border border-kaist-grey/25 bg-white p-5 shadow-[0_18px_48px_rgba(0,0,0,0.16)]">
               {selectedCourse ? (
                 <>
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-[13px] font-extrabold tracking-tight text-kaist-darkgreen-main">CS{selectedCourse.code}</p>
-                      <h2 className="mt-2 text-[24px] font-extrabold leading-normal tracking-tight text-kaist-black">{selectedCourse.name}</h2>
+                      <h2 className="mt-2 text-[22px] font-extrabold leading-normal tracking-tight text-kaist-black">{selectedCourse.name}</h2>
                     </div>
                     <button
                       type="button"

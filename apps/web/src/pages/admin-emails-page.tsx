@@ -1,12 +1,12 @@
 export function AdminEmailsPage() {
   return (
     <section>
-      <div className="mb-8 border-b border-kaist-grey/25 pb-5">
-        <h1 className="text-[36px] font-extrabold tracking-tight text-kaist-black lg:text-[44px]">이메일 일괄발송</h1>
+      <div className="mb-6 border-b border-kaist-grey/25 pb-4">
+        <h1 className="text-[32px] font-extrabold tracking-tight text-kaist-black">이메일 일괄발송</h1>
       </div>
 
       <div className="overflow-hidden rounded-[8px] border border-kaist-grey/25 bg-white">
-        <div className="border-b-3 border-kaist-darkgreen-main px-5 py-4 text-lg font-extrabold tracking-tight text-kaist-darkgreen">보내기</div>
+        <div className="border-b-2 border-kaist-darkgreen-main px-5 py-3 text-base font-extrabold tracking-tight text-kaist-darkgreen">보내기</div>
 
         <div className="grid gap-0 border-b border-kaist-grey/20">
           {[

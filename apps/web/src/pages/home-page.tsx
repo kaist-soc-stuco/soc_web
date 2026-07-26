@@ -22,12 +22,12 @@ export function HomePage() {
           <Header />
           <main className="flex flex-1 min-h-0 flex-col overflow-y-auto lg:overflow-hidden">
             {/* Event Carousel */}
-            <div className="min-h-[360px] flex-none lg:min-h-0 lg:flex-[1.36]">
+            <div className="min-h-[320px] flex-none lg:min-h-0 lg:flex-[1.28]">
               <EventCarousel />
             </div>
             
             {/* Notice & Calendar Side by Side */}
-            <div className="flex flex-1 flex-col gap-6 px-6 pb-7 pt-3 md:px-8 lg:min-h-0 lg:flex-row lg:gap-10 lg:px-14 lg:pb-8">
+            <div className="flex flex-1 flex-col gap-5 px-5 pb-6 pt-2 md:px-7 lg:min-h-0 lg:flex-row lg:gap-8 lg:px-11 lg:pb-7">
               <div className="min-h-0 flex-[2]">
                 <NoticeBoard />
               </div>

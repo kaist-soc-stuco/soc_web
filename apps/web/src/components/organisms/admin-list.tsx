@@ -29,9 +29,9 @@ export function AdminList<T extends Record<string, string>>({
 
   return (
     <section className="bg-transparent">
-      <div className="mb-6 flex flex-col gap-3 border-b border-kaist-grey/25 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mb-5 flex flex-col gap-3 border-b border-kaist-grey/25 pb-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-[28px] font-extrabold tracking-tight text-kaist-black lg:text-[32px]">{title}</h2>
+          <h2 className="text-[24px] font-extrabold tracking-tight text-kaist-black lg:text-[28px]">{title}</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-kaist-grey">{description}</p>
         </div>
         {actionLabel && actionBasePath ? (
@@ -46,7 +46,7 @@ export function AdminList<T extends Record<string, string>>({
 
       <div className="overflow-x-auto">
         <div
-          className="grid min-w-[760px] gap-4 border-b-3 border-kaist-darkgreen-main py-4 text-sm font-extrabold tracking-tight text-kaist-darkgreen lg:text-lg"
+          className="grid min-w-[760px] gap-4 border-b-2 border-kaist-darkgreen-main py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen lg:text-base"
           style={{ gridTemplateColumns }}
         >
           {columns.map((column) => (
@@ -61,7 +61,7 @@ export function AdminList<T extends Record<string, string>>({
           {rows.map((row) => (
             <div
               key={row.id}
-              className={`grid items-center gap-4 text-sm text-kaist-black transition-colors hover:bg-kaist-grey/5 lg:text-base ${compact ? 'py-4' : 'py-5'}`}
+              className={`grid items-center gap-4 text-sm text-kaist-black transition-colors hover:bg-kaist-grey/5 ${compact ? 'py-3.5' : 'py-4'}`}
               style={{ gridTemplateColumns }}
             >
               {columns.map((column) => (
