@@ -67,6 +67,18 @@ export class PiiCipherService {
       throw new Error("PII ciphertext invalid");
     }
   }
+  isValidEnvelope(field: string, value: string): boolean {
+    try {
+      this.decrypt(field, value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  looksLikeEnvelope(value: string): boolean {
+    return value.startsWith(`${ENVELOPE_PREFIX}:`);
+  }
   private encryptWithKid(kid: string, field: string, value: string): string {
     const plainText = Buffer.from(value, "utf8");
     if (!field || plainText.length > MAX_PLAINTEXT_BYTES) throw new Error("PII value rejected");

@@ -230,4 +230,31 @@ export class UsersRepository {
       return this.mapRowToUserRecord(updated);
     });
   }
+  async backfillLegacyPii(input: { cursor?: UserCursor; limit: number }): Promise<{ processed: number; cursor: UserCursor | null }> {
+    const predicates: SQL[] = [];
+    if (input.cursor) {
+      const createdAt = new Date(input.cursor.createdAt);
+      predicates.push(or(gt(users.createdAt, createdAt), and(eq(users.createdAt, createdAt), gt(users.id, input.cursor.id)))!);
+    }
+    const rows = await this.db.select().from(users)
+      .where(predicates.length ? and(...predicates) : undefined)
+      .orderBy(asc(users.createdAt), asc(users.id))
+      .limit(input.limit);
+    for (const row of rows) {
+      const values: Record<string, string | null> = {};
+      for (const [key, field] of Object.entries(PII_FIELDS)) {
+        const value = row[key as keyof typeof row] as string | null;
+        if (value === null || this.piiCipher.isValidEnvelope(field, value) || this.piiCipher.looksLikeEnvelope(value)) continue;
+        values[key] = this.piiCipher.encrypt(field, value);
+      }
+      if (Object.keys(values).length) {
+        await this.db.update(users).set({ ...values, updatedAt: new Date() }).where(eq(users.id, row.id));
+      }
+    }
+    const last = rows.at(-1);
+    return {
+      processed: rows.length,
+      cursor: last ? { createdAt: last.createdAt.toISOString(), id: last.id } : null,
+    };
+  }
 }
