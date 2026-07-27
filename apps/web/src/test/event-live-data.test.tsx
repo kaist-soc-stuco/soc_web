@@ -130,14 +130,14 @@ describe('event live data', () => {
     expect(screen.queryByText('2026 봄맞이 간식 이벤트')).not.toBeInTheDocument();
   });
 
-  it('keeps survey cards available when an event request is pending', async () => {
+  it('does not retain survey mock cards when an event request is pending', async () => {
     getEventsMock.mockReturnValueOnce(new Promise<EventListResponse>(() => {}));
     renderEventsPage();
 
     expect(screen.getByText('행사를 불러오는 중입니다')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '설문조사' }));
 
-    expect((await screen.findAllByRole('heading', { name: '2026 봄맞이 간식 이벤트' })).length).toBeGreaterThan(0);
+    expect(screen.queryByText('2026 봄맞이 간식 이벤트')).not.toBeInTheDocument();
     expect(screen.queryByText('행사를 불러오는 중입니다')).not.toBeInTheDocument();
   });
 
