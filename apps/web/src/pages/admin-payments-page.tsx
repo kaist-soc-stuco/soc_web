@@ -1,5 +1,4 @@
 import { AdminList } from '@/components/organisms/admin-list';
-import { adminPaymentRows } from '@/lib/mock-data';
 
 export function AdminPaymentsPage() {
   return (
@@ -15,7 +14,7 @@ export function AdminPaymentsPage() {
 
       <AdminList
         title="과비 납부 리스트"
-        description="과비 납부 현황을 한 번에 확인할 수 있도록 Figma 표 스타일에 맞춘 기본 리스트입니다."
+        description="결제 내역은 아직 API에서 제공되지 않아 표시할 수 없습니다."
         columns={[
           { key: 'id', label: '번호' },
           { key: 'year', label: '학년도' },
@@ -24,7 +23,7 @@ export function AdminPaymentsPage() {
           { key: 'status', label: '상태' },
           { key: 'updatedAt', label: '수정일' },
         ]}
-        rows={adminPaymentRows}
+        rows={[]}
         compact
       />
     </section>
