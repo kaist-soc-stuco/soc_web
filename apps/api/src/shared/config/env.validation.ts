@@ -271,6 +271,22 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       30,
       365,
     ),
+    CONTACT_PURGE_GRACE_DAYS: asPositiveBoundedInteger(
+      config.CONTACT_PURGE_GRACE_DAYS,
+      'CONTACT_PURGE_GRACE_DAYS',
+      30,
+      365,
+    ),
+    MAIL_PROVIDER_ENABLED: asBoolean(
+      config.MAIL_PROVIDER_ENABLED,
+      'MAIL_PROVIDER_ENABLED',
+      false,
+    ),
+    CHAT_PROVIDER_ENABLED: asBoolean(
+      config.CHAT_PROVIDER_ENABLED,
+      'CHAT_PROVIDER_ENABLED',
+      false,
+    ),
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,
     POSTGRES_USER: postgresUser,

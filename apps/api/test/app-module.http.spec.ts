@@ -45,13 +45,16 @@ describe('AppModule composition', () => {
     Object.assign(process.env, originalEnvironment);
   });
 
-  it('registers production infrastructure, health, and survey modules', async () => {
+  it('registers each Phase 6 module exactly once alongside production infrastructure', async () => {
     const { AppModule } = await import('../src/app.module');
     const imports = Reflect.getMetadata('imports', AppModule) as Array<{ name?: string }>;
     const moduleNames = imports.map((module) => module.name).filter(Boolean);
 
     expect(moduleNames).toEqual(
-      expect.arrayContaining(['PostgresModule', 'RedisModule', 'AuthModule', 'UsersModule', 'HealthModule', 'SurveysModule']),
+      expect.arrayContaining(['PostgresModule', 'RedisModule', 'AuthModule', 'UsersModule', 'HealthModule', 'SurveysModule', 'ContactsModule', 'NotificationsModule', 'ChatModule']),
     );
+    for (const moduleName of ['ContactsModule', 'NotificationsModule', 'ChatModule']) {
+      expect(moduleNames.filter((name) => name === moduleName)).toHaveLength(1);
+    }
   });
 });

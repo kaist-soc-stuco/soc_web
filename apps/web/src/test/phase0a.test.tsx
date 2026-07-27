@@ -21,13 +21,13 @@ describe('static site content', () => {
 });
 
 describe('AdminContactsPage', () => {
-  it('reports that contacts are unavailable without rendering personal contact data', () => {
+  it('does not render fallback contact data while the live contact request is pending', () => {
     const { container } = render(<AdminContactsPage />);
 
     expect(screen.getByRole('heading', { name: '집행위 연락망' })).toBeVisible();
-    expect(screen.getByText('연락처 정보는 현재 제공되지 않습니다.')).toBeVisible();
-    expect(screen.getByText('이메일')).toBeVisible();
-    expect(screen.getByText('전화번호')).toBeVisible();
+    expect(screen.getByText('연락처 정보를 불러오는 중입니다.')).toBeVisible();
+    expect(screen.getByLabelText('이메일')).toBeVisible();
+    expect(screen.getByLabelText('전화번호')).toBeVisible();
     expect(container).not.toHaveTextContent(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
     expect(container).not.toHaveTextContent(/(?:01[0-9]|0[2-9][0-9])-?\d{3,4}-?\d{4}/);
   });

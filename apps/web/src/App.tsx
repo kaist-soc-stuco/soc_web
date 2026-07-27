@@ -19,6 +19,7 @@ import { FaqPage } from '@/pages/faq-page';
 import { RoadmapPage } from '@/pages/roadmap-page';
 import { TreeLogin } from '@/pages/login-page';
 import { LoginConsentPage } from '@/pages/login-consent-page';
+import { ChatPage } from '@/pages/chat-page';
 import { getEvent } from '@/lib/event-api';
 
 export function LegacyEventSurveyResolver() {
@@ -75,6 +76,7 @@ export function App() {
         <Route path="/board/:category" element={<BoardPage />} />
         <Route path="/board/:category/write" element={<BoardWritePage />} />
         <Route path="/board/:category/:id" element={<BoardPostPage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route path="/admin" element={<AdminPage />}>
           <Route index element={<Navigate to="payments" replace />} />
           <Route path="payments" element={<AdminPaymentsPage />} />

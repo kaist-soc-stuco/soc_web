@@ -5,6 +5,7 @@ export * from "./http/faq";
 export * from "./http/event";
 export * from "./http/board";
 export * from "./http/survey";
+export * from "./http/contact";
 export * from "./errors/app-error";
 export * from "./security-baseline";
 export * from "./release-manifest";

@@ -5,9 +5,12 @@ import { ConfigModule } from '@nestjs/config';
 
 import { AuthModule } from './features/auth/auth.module';
 import { BoardsModule } from './features/boards/boards.module';
+import { ChatModule } from './features/chat/chat.module';
+import { ContactsModule } from './features/contacts/contacts.module';
 import { FaqsModule } from './features/faqs/faqs.module';
 import { EventsModule } from './features/events/events.module';
 import { HealthModule } from './features/health/health.module';
+import { NotificationsModule } from './features/notifications/notifications.module';
 import { PermissionsModule } from './features/permissions/permissions.module';
 import { UsersModule } from './features/users/users.module';
 import { SurveysModule } from './features/surveys/surveys.module';
@@ -38,6 +41,9 @@ import { ClockModule } from './shared/time/clock.module';
     BoardsModule,
     EventsModule,
     SurveysModule,
+    ContactsModule,
+    NotificationsModule,
+    ChatModule,
     HealthModule,
   ],
 })

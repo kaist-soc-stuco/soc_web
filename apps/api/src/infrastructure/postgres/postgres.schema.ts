@@ -760,3 +760,66 @@ export const surveyExports = pgTable(
     check("survey_exports_retention_lifecycle", sql`${table.retentionDeadlineAt} >= ${table.requestedAt}`),
   ],
 );
+export const contacts = pgTable(
+  "contacts",
+  {
+    // The primary key is the stable contact identifier; contact values are never used as identifiers.
+    id: uuid("id").defaultRandom().primaryKey(),
+    nameEnvelope: text("name_envelope").notNull(),
+    emailEnvelope: text("email_envelope"),
+    phoneEnvelope: text("phone_envelope"),
+    affiliationEnvelope: text("affiliation_envelope"),
+    noteEnvelope: text("note_envelope"),
+    kaistUidEnvelope: text("kaist_uid_envelope"),
+    yearEnvelope: text("year_envelope"),
+    roleEnvelope: text("role_envelope"),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    deletedByUserId: uuid("deleted_by_user_id").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    retentionDeadlineAt: timestamp("retention_deadline_at", { withTimezone: true }).notNull(),
+    holdUntil: timestamp("hold_until", { withTimezone: true }),
+  },
+  (table) => [
+    index("contacts_created_id_idx").on(table.createdAt, table.id),
+    index("contacts_retention_idx").on(table.retentionDeadlineAt),
+    check("contacts_name_envelope_shape", sql`${table.nameEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_email_envelope_shape", sql`${table.emailEnvelope} IS NULL OR ${table.emailEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_phone_envelope_shape", sql`${table.phoneEnvelope} IS NULL OR ${table.phoneEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_affiliation_envelope_shape", sql`${table.affiliationEnvelope} IS NULL OR ${table.affiliationEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_note_envelope_shape", sql`${table.noteEnvelope} IS NULL OR ${table.noteEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_kaist_uid_envelope_shape", sql`${table.kaistUidEnvelope} IS NULL OR ${table.kaistUidEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_year_envelope_shape", sql`${table.yearEnvelope} IS NULL OR ${table.yearEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_role_envelope_shape", sql`${table.roleEnvelope} IS NULL OR ${table.roleEnvelope} ~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'`),
+    check("contacts_envelopes_nonblank", sql`btrim(${table.nameEnvelope}) <> '' AND (${table.emailEnvelope} IS NULL OR btrim(${table.emailEnvelope}) <> '') AND (${table.phoneEnvelope} IS NULL OR btrim(${table.phoneEnvelope}) <> '') AND (${table.affiliationEnvelope} IS NULL OR btrim(${table.affiliationEnvelope}) <> '') AND (${table.noteEnvelope} IS NULL OR btrim(${table.noteEnvelope}) <> '') AND (${table.kaistUidEnvelope} IS NULL OR btrim(${table.kaistUidEnvelope}) <> '') AND (${table.yearEnvelope} IS NULL OR btrim(${table.yearEnvelope}) <> '') AND (${table.roleEnvelope} IS NULL OR btrim(${table.roleEnvelope}) <> '')`),
+    check("contacts_deletion_lifecycle", sql`(${table.deletedAt} IS NULL AND ${table.deletedByUserId} IS NULL) OR (${table.deletedAt} IS NOT NULL AND ${table.deletedByUserId} IS NOT NULL AND ${table.deletedAt} >= ${table.createdAt})`),
+    check("contacts_retention_lifecycle", sql`${table.retentionDeadlineAt} >= ${table.createdAt}`),
+    check("contacts_hold_lifecycle", sql`${table.holdUntil} IS NULL OR ${table.holdUntil} >= ${table.createdAt}`),
+  ],
+);
+
+export const contactAuditLog = pgTable(
+  "contact_audit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // Deliberately no foreign key: audit entries remain after a contact is purged.
+    contactId: uuid("contact_id").notNull(),
+    actorUserId: uuid("actor_user_id").references(() => users.id),
+    actorSystemIdentity: text("actor_system_identity"),
+    action: text("action").notNull(),
+    changedFieldNames: text("changed_field_names").notNull(),
+    correlationId: text("correlation_id").notNull(),
+    reasonCode: text("reason_code"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("contact_audit_log_actor_identity", sql`(${table.actorUserId} IS NOT NULL) <> (${table.actorSystemIdentity} IS NOT NULL)`),
+    check("contact_audit_log_system_identity_nonblank", sql`${table.actorSystemIdentity} IS NULL OR btrim(${table.actorSystemIdentity}) <> ''`),
+    check("contact_audit_log_action_identifier", sql`${table.action} ~ '^[A-Z][A-Z0-9_]{1,63}$'`),
+    check("contact_audit_log_changed_fields", sql`${table.changedFieldNames} ~ '^(name|email|phone|affiliation|note|kaistUid|year|role|retentionDeadlineAt|holdUntil|deletedAt)(,(name|email|phone|affiliation|note|kaistUid|year|role|retentionDeadlineAt|holdUntil|deletedAt))*$'`),
+    check("contact_audit_log_correlation_id", sql`${table.correlationId} ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'`),
+    check("contact_audit_log_reason_code", sql`${table.reasonCode} IS NULL OR ${table.reasonCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`),
+  ],
+);

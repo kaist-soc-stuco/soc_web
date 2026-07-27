@@ -6,6 +6,7 @@
     "dev": "pnpm --filter @soc/shared build && ts-node-dev --respawn --transpile-only src/main.ts",
     "content:purge": "ts-node --transpile-only src/commands/content-purge.ts",
     "survey:purge": "ts-node --transpile-only src/commands/survey-response-purge.ts",
+    "contact:purge": "ts-node --transpile-only src/commands/contact-purge.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
