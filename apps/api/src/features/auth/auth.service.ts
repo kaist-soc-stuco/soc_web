@@ -151,6 +151,7 @@ export class AuthService {
     const userMobile = typeof userInfo.user_mbtlnum === "string" && userInfo.user_mbtlnum.trim() ? userInfo.user_mbtlnum : undefined;
     const existingUser = await this.usersService.findBySsoUserId(ssoUserId);
     if (existingUser) {
+      await this.usersService.ensureCanonicalSsoSubject(existingUser.id, ssoUserId);
       return { kind: "persisted", session: await this.authSessionService.issuePersistedSession(existingUser.id), userId: existingUser.id };
     }
 

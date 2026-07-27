@@ -20,6 +20,10 @@ const validConfig = () => {
     AUTH_JWT_ISSUER: 'soc-api-test',
     AUTH_JWT_PUBLIC_KEYS_JSON: JSON.stringify({ active: publicPem }),
     AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'test-encryption-seed',
+    PII_ENCRYPTION_ACTIVE_KID: 'pii-active',
+    PII_ENCRYPTION_KEYS_JSON: JSON.stringify({
+      'pii-active': Buffer.alloc(32, 7).toString('base64'),
+    }),
     PUBLIC_ORIGIN: 'https://web.example.test',
     SSO_AUTH_API_URL: 'https://sso.example.test/auth',
     SSO_CLIENT_SECRET: 'test-secret',
@@ -67,5 +71,19 @@ describe('authentication environment validation', () => {
       previous: 'not-a-public-key',
     });
     expect(() => validateEnv(config)).toThrow('Invalid ES256 JWT key configuration');
+  });
+
+  it('rejects missing, unknown, or malformed PII encryption keys', () => {
+    const missing = validConfig();
+    delete (missing as Partial<typeof missing>).PII_ENCRYPTION_KEYS_JSON;
+    expect(() => validateEnv(missing)).toThrow();
+
+    const unknown = validConfig();
+    unknown.PII_ENCRYPTION_ACTIVE_KID = 'missing';
+    expect(() => validateEnv(unknown)).toThrow('Invalid PII encryption key configuration');
+
+    const malformed = validConfig();
+    malformed.PII_ENCRYPTION_KEYS_JSON = JSON.stringify({ 'pii-active': 'too-short' });
+    expect(() => validateEnv(malformed)).toThrow('Invalid PII encryption key configuration');
   });
 });

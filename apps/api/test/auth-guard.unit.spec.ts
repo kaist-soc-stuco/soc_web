@@ -60,7 +60,8 @@ describe('AuthGuard', () => {
 
     await expect(guard.canActivate(context as never)).resolves.toBe(true);
     expect(users.findById).toHaveBeenCalledWith('user-1');
-    expect(request).toMatchObject({ user: { id: 'user-1', permission: 7 } });
+    expect(request).toMatchObject({ user: { id: 'user-1' } });
+    expect((request as { user?: unknown }).user).not.toHaveProperty('permission');
   });
 
   it('rejects a persisted session whose subject no longer has a user record', async () => {

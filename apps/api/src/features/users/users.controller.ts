@@ -1,34 +1,71 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Inject, Param, Patch, Query, Req, UseGuards } from "@nestjs/common";
+import type { AdminFeeUpdateRequest, AdminUserListQuery, PatchMeRequest } from "@soc/contracts";
+import type { Request } from "express";
 
-import {
-  AuthGuard,
-  PermissionFlags,
-  PermissionGuard,
-  RequirePermission,
-} from "../../shared/guards";
+import { AuthGuard } from "../../shared/guards";
 import { UsersService } from "./users.service";
 
-/**
- * 사용자 조회 관련 API 골격입니다.
- *
- * TODO:
- * - 실제로 외부에 노출할 API만 남기세요.
- * - 내부 전용이면 controller 대신 service만 두는 편이 나을 수도 있습니다.
- */
-@Controller("users")
-export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+type AuthenticatedRequest = Request & { requestId?: string; user: { id: string } };
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  /**
-    * 사용자 영구 저장 여부 확인용 예시 endpoint입니다.
-   */
-  @Get(":userId/persisted-profile")
-  @UseGuards(AuthGuard, PermissionGuard)
-  @RequirePermission(PermissionFlags.TUITION_MANAGE)
-  async getPersistedProfileStatus(@Param("userId") userId: string) {
-    return {
-      hasPersistedProfile: await this.usersService.hasPersistedProfile(userId),
+function requireAllowedKeys(value: unknown, allowedKeys: readonly string[], errorCode: string): asserts value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new BadRequestException(errorCode);
+  if (Object.keys(value).some((key) => !allowedKeys.includes(key))) throw new BadRequestException(errorCode);
+}
+
+function requireUuid(value: string): void {
+  if (!UUID_PATTERN.test(value)) throw new BadRequestException("invalid_user_id");
+}
+
+@Controller("users")
+@UseGuards(AuthGuard)
+export class UsersController {
+  constructor(@Inject(UsersService) private readonly usersService: UsersService) {}
+
+  @Get("me")
+  async getMe(@Req() request: AuthenticatedRequest) {
+    return this.usersService.getMe(request.user.id);
+  }
+
+  @Patch("me")
+  async patchMe(@Req() request: AuthenticatedRequest, @Body() body: PatchMeRequest) {
+    requireAllowedKeys(body, ["userEmail", "userMobile"], "invalid_profile_update");
+    return this.usersService.patchMe(request.user.id, {
+      userEmail: body.userEmail as string | null | undefined,
+      userMobile: body.userMobile as string | null | undefined,
+    });
+  }
+
+  @Get("me/fee")
+  async getMyFee(@Req() request: AuthenticatedRequest) {
+    return this.usersService.getFeeSelf(request.user.id);
+  }
+
+  @Get("admin")
+  async listAdmin(@Req() request: AuthenticatedRequest, @Query() query: AdminUserListQuery) {
+    requireAllowedKeys(query, ["cursor", "limit", "kaistUid", "studentOrEmployeeNumber", "feeStatus"], "invalid_user_query");
+    return this.usersService.listAdmin(request.user.id, query);
+  }
+
+  @Get("admin/:userId")
+  async getAdmin(@Req() request: AuthenticatedRequest, @Param("userId") userId: string) {
+    requireUuid(userId);
+    return this.usersService.getAdmin(request.user.id, userId);
+  }
+
+  @Patch("admin/:userId/fee")
+  async updateFee(
+    @Req() request: AuthenticatedRequest,
+    @Param("userId") userId: string,
+    @Body() body: AdminFeeUpdateRequest,
+  ) {
+    requireAllowedKeys(body, ["feeStatus", "reasonCode"], "invalid_fee_update");
+    requireUuid(userId);
+    return this.usersService.updateFeeAdmin(
+      request.user.id,
       userId,
-    };
+      { feeStatus: body.feeStatus, reasonCode: body.reasonCode },
+      request.requestId ?? "",
+    );
   }
 }

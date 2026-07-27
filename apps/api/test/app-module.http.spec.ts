@@ -13,6 +13,10 @@ const testEnvironment = {
   AUTH_JWT_ES256_PRIVATE_KEY: privatePem,
   AUTH_JWT_ISSUER: 'soc-api-test',
   AUTH_JWT_PUBLIC_KEYS_JSON: JSON.stringify({ 'test-key': publicPem }),
+  PII_ENCRYPTION_ACTIVE_KID: 'test-pii-key',
+  PII_ENCRYPTION_KEYS_JSON: JSON.stringify({
+    'test-pii-key': Buffer.alloc(32, 9).toString('base64'),
+  }),
   SSO_AUTH_API_URL: 'https://sso.test/auth',
   SSO_CLIENT_SECRET: 'test-client-secret',
   PUBLIC_ORIGIN: 'https://web.test',

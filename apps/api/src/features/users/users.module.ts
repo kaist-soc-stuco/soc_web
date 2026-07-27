@@ -1,22 +1,17 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { forwardRef, Module } from "@nestjs/common";
 
-import { AuthModule } from '../auth/auth.module';
-import { AuthGuard, PermissionGuard } from '../../shared/guards';
-import { PostgresModule } from '../../infrastructure/postgres/postgres.module';
-import { RedisModule } from '../../infrastructure/redis/redis.module';
-import { UsersRepository } from './repositories/users.repository';
-import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
+import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
+import { AuthGuard } from "../../shared/guards";
+import { PiiCipherService } from "../../shared/security/pii-cipher.service";
+import { AuthModule } from "../auth/auth.module";
+import { UsersController } from "./users.controller";
+import { UsersRepository } from "./repositories/users.repository";
+import { UsersService } from "./users.service";
 
 @Module({
-  imports: [PostgresModule, RedisModule, forwardRef(() => AuthModule)],
+  imports: [PostgresModule, forwardRef(() => AuthModule)],
   controllers: [UsersController],
-  providers: [
-    UsersRepository,
-    UsersService,
-    AuthGuard,
-    PermissionGuard,
-  ],
+  providers: [UsersRepository, UsersService, AuthGuard, PiiCipherService],
   exports: [UsersService],
 })
 export class UsersModule {}

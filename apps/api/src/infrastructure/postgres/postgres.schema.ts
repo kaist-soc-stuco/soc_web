@@ -148,7 +148,19 @@ export const permissionChangeRequests = pgTable(
       "permission_change_requests_actor_separation_check",
       sql`(${table.approverUserId} IS NULL OR (${table.approverUserId} <> ${table.requesterUserId} AND ${table.approverUserId} <> ${table.targetUserId})) AND (${table.activatorUserId} IS NULL OR ${table.activatorUserId} <> ${table.requesterUserId})`,
     ),
-    uniqueIndex("permission_change_requests_request_hash_unique").on(table.requestHash),
+    check(
+      "permission_change_requests_requested_reason_code_technical_identifier_check",
+      sql`${table.requestedReasonCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`,
+    ),
+    check(
+      "permission_change_requests_approval_reason_code_technical_identifier_check",
+      sql`${table.approvalReasonCode} IS NULL OR ${table.approvalReasonCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`,
+    ),
+    check(
+      "permission_change_requests_activation_reason_code_technical_identifier_check",
+      sql`${table.activationReasonCode} IS NULL OR ${table.activationReasonCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`,
+    ),
+    index("permission_change_requests_request_hash_idx").on(table.requestHash),
     index("permission_change_requests_pending_idx").on(table.status, table.expiresAt),
   ],
 );
@@ -165,7 +177,18 @@ export const permissionAuditLog = pgTable(
     reasonCode: text("reason_code"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("permission_audit_log_occurred_at_idx").on(table.occurredAt)],
+  (table) => [
+    check(
+      "permission_audit_log_action_technical_identifier_check",
+      sql`${table.action} ~ '^[A-Z][A-Z0-9_]{1,63}$'`,
+    ),
+    check(
+      "permission_audit_log_reason_code_technical_identifier_check",
+      sql`${table.reasonCode} IS NULL OR ${table.reasonCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`,
+    ),
+    index("permission_audit_log_occurred_at_idx").on(table.occurredAt),
+    index("permission_audit_log_occurred_at_id_idx").on(table.occurredAt, table.id),
+  ],
 );
 
 export const authorizationBootstrapState = pgTable("authorization_bootstrap_state", {
@@ -180,6 +203,7 @@ export const authorizationBackfillProgress = pgTable("authorization_backfill_pro
   id: uuid("id").defaultRandom().primaryKey(),
   jobKey: text("job_key").notNull().unique(),
   lastProcessedUserId: uuid("last_processed_user_id").references(() => users.id),
+  upperBoundUserId: uuid("upper_bound_user_id").references(() => users.id),
   batchSize: integer("batch_size").notNull().default(500),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -37,6 +37,12 @@ const asPort = (value: unknown, name: string, fallback: number): number => {
 
   return port;
 };
+const asBoolean = (value: unknown, name: string, fallback: boolean): boolean => {
+  if (value === undefined) return fallback;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  throw new Error(`Invalid boolean value for ${name}`);
+};
 const asJwtKeys = (config: Record<string, unknown>) => {
   const activeKid = asString(config.AUTH_JWT_ACTIVE_KID, 'AUTH_JWT_ACTIVE_KID');
   const privatePem = asString(
@@ -94,9 +100,46 @@ const asJwtKeys = (config: Record<string, unknown>) => {
 
   return { activeKid, privatePem, publicKeysJson };
 };
+const asPiiKeys = (config: Record<string, unknown>) => {
+  const activeKid = asString(
+    config.PII_ENCRYPTION_ACTIVE_KID,
+    'PII_ENCRYPTION_ACTIVE_KID',
+  );
+  const keysJson = asString(
+    config.PII_ENCRYPTION_KEYS_JSON,
+    'PII_ENCRYPTION_KEYS_JSON',
+  );
+
+  try {
+    const parsed = JSON.parse(keysJson) as unknown;
+    if (
+      !parsed
+      || Array.isArray(parsed)
+      || typeof parsed !== 'object'
+      || typeof (parsed as Record<string, unknown>)[activeKid] !== 'string'
+      || !Object.entries(parsed as Record<string, unknown>).every(
+        ([kid, value]) => {
+          if (
+            !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(kid)
+            || typeof value !== 'string'
+          ) return false;
+          const key = Buffer.from(value, 'base64');
+          return key.length === 32 && key.toString('base64') === value;
+        },
+      )
+    ) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error('Invalid PII encryption key configuration');
+  }
+
+  return { activeKid, keysJson };
+};
 
 export const validateEnv = (config: Record<string, unknown>): Record<string, unknown> => {
   const jwtKeys = asJwtKeys(config);
+  const piiKeys = asPiiKeys(config);
   const postgresHost = asString(config.POSTGRES_HOST, 'POSTGRES_HOST', 'localhost');
   const postgresPort = asPort(config.POSTGRES_PORT, 'POSTGRES_PORT', 5432);
   const postgresUser = asString(config.POSTGRES_USER, 'POSTGRES_USER', 'soc');
@@ -129,6 +172,13 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
     ),
     PUBLIC_ORIGIN: asOrigin(config.PUBLIC_ORIGIN, 'PUBLIC_ORIGIN'),
+    PII_ENCRYPTION_ACTIVE_KID: piiKeys.activeKid,
+    PII_ENCRYPTION_KEYS_JSON: piiKeys.keysJson,
+    AUTHORIZATION_OPERATIONS_ENABLED: asBoolean(
+      config.AUTHORIZATION_OPERATIONS_ENABLED,
+      'AUTHORIZATION_OPERATIONS_ENABLED',
+      false,
+    ),
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,
     POSTGRES_USER: postgresUser,

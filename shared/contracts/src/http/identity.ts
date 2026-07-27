@@ -38,7 +38,16 @@ export interface UserMeResponse extends UserProfile {
 export interface PatchMeRequest {
   userEmail?: string | null;
   userMobile?: string | null;
-  privacyConsentAt?: string | null;
+}
+
+export interface AdminUserProfile {
+  id: string;
+  kaistUid: string | null;
+  studentOrEmployeeNumber: string | null;
+  nameKr: string | null;
+  nameEn: string | null;
+  majorMask: number;
+  privacyConsentAt: string | null;
 }
 
 export interface AdminUserListQuery {
@@ -49,7 +58,7 @@ export interface AdminUserListQuery {
   feeStatus?: FeeStatus;
 }
 
-export interface AdminUserListItem extends UserProfile {
+export interface AdminUserListItem extends AdminUserProfile {
   grants: EffectivePermissionGrant[];
 }
 
@@ -58,7 +67,7 @@ export interface AdminUserListResponse {
   nextCursor: string | null;
 }
 
-export interface AdminUserGetResponse extends UserProfile {
+export interface AdminUserGetResponse extends AdminUserProfile {
   grants: EffectivePermissionGrant[];
 }
 
@@ -131,8 +140,6 @@ export interface PermissionAuditEntry {
 export interface PermissionAuditListQuery {
   cursor?: string;
   limit?: number;
-  recordId?: string;
-  action?: string;
 }
 
 export interface PermissionAuditListResponse {

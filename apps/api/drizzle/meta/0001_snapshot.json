@@ -27,6 +27,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "upper_bound_user_id": {
+          "name": "upper_bound_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "batch_size": {
           "name": "batch_size",
           "type": "integer",
@@ -56,6 +62,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "last_processed_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "authorization_backfill_progress_upper_bound_user_id_users_id_fk": {
+          "name": "authorization_backfill_progress_upper_bound_user_id_users_id_fk",
+          "tableFrom": "authorization_backfill_progress",
+          "tableTo": "users",
+          "columnsFrom": [
+            "upper_bound_user_id"
           ],
           "columnsTo": [
             "id"
@@ -202,6 +221,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "permission_audit_log_occurred_at_id_idx": {
+          "name": "permission_audit_log_occurred_at_id_idx",
+          "columns": [
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -222,7 +262,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "permission_audit_log_action_technical_identifier_check": {
+          "name": "permission_audit_log_action_technical_identifier_check",
+          "value": "\"permission_audit_log\".\"action\" ~ '^[A-Z][A-Z0-9_]{1,63}$'"
+        },
+        "permission_audit_log_reason_code_technical_identifier_check": {
+          "name": "permission_audit_log_reason_code_technical_identifier_check",
+          "value": "\"permission_audit_log\".\"reason_code\" IS NULL OR \"permission_audit_log\".\"reason_code\" ~ '^[A-Z][A-Z0-9_]{1,63}$'"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.permission_change_requests": {
@@ -358,8 +407,8 @@
         }
       },
       "indexes": {
-        "permission_change_requests_request_hash_unique": {
-          "name": "permission_change_requests_request_hash_unique",
+        "permission_change_requests_request_hash_idx": {
+          "name": "permission_change_requests_request_hash_idx",
           "columns": [
             {
               "expression": "request_hash",
@@ -368,7 +417,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -473,6 +522,18 @@
         "permission_change_requests_actor_separation_check": {
           "name": "permission_change_requests_actor_separation_check",
           "value": "(\"permission_change_requests\".\"approver_user_id\" IS NULL OR (\"permission_change_requests\".\"approver_user_id\" <> \"permission_change_requests\".\"requester_user_id\" AND \"permission_change_requests\".\"approver_user_id\" <> \"permission_change_requests\".\"target_user_id\")) AND (\"permission_change_requests\".\"activator_user_id\" IS NULL OR \"permission_change_requests\".\"activator_user_id\" <> \"permission_change_requests\".\"requester_user_id\")"
+        },
+        "permission_change_requests_requested_reason_code_technical_identifier_check": {
+          "name": "permission_change_requests_requested_reason_code_technical_identifier_check",
+          "value": "\"permission_change_requests\".\"requested_reason_code\" ~ '^[A-Z][A-Z0-9_]{1,63}$'"
+        },
+        "permission_change_requests_approval_reason_code_technical_identifier_check": {
+          "name": "permission_change_requests_approval_reason_code_technical_identifier_check",
+          "value": "\"permission_change_requests\".\"approval_reason_code\" IS NULL OR \"permission_change_requests\".\"approval_reason_code\" ~ '^[A-Z][A-Z0-9_]{1,63}$'"
+        },
+        "permission_change_requests_activation_reason_code_technical_identifier_check": {
+          "name": "permission_change_requests_activation_reason_code_technical_identifier_check",
+          "value": "\"permission_change_requests\".\"activation_reason_code\" IS NULL OR \"permission_change_requests\".\"activation_reason_code\" ~ '^[A-Z][A-Z0-9_]{1,63}$'"
         }
       },
       "isRLSEnabled": false

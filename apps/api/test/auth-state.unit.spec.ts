@@ -13,7 +13,10 @@ const configuration = {
 
 function makeService(rawState: string | null) {
   const redis = { getdel: vi.fn().mockResolvedValue(rawState), set: vi.fn() };
-  const users = { findBySsoUserId: vi.fn().mockResolvedValue(null) };
+  const users = {
+    ensureCanonicalSsoSubject: vi.fn(),
+    findBySsoUserId: vi.fn().mockResolvedValue(null),
+  };
   const sessions = { issuePersistedSession: vi.fn() };
   const pending = { save: vi.fn() };
   const config = { get: (name: string) => configuration[name as keyof typeof configuration] };

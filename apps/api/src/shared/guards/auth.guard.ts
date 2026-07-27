@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -14,15 +15,14 @@ interface AuthenticatedRequest {
   cookies?: Record<string, string | undefined>;
   user?: {
     id: string;
-    permission: number;
   };
 }
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
-    private readonly authSessionService: AuthSessionService,
-    private readonly usersService: UsersService,
+    @Inject(AuthSessionService) private readonly authSessionService: AuthSessionService,
+    @Inject(UsersService) private readonly usersService: UsersService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -48,7 +48,6 @@ export class AuthGuard implements CanActivate {
 
     request.user = {
       id: user.id,
-      permission: user.permission,
     };
 
     return true;
