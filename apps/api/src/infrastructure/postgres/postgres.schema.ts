@@ -317,6 +317,8 @@ export const authorizationBackfillProgress = pgTable("authorization_backfill_pro
   jobKey: text("job_key").notNull().unique(),
   lastProcessedUserId: uuid("last_processed_user_id").references(() => users.id),
   upperBoundUserId: uuid("upper_bound_user_id").references(() => users.id),
+  lastProcessedCreatedAt: timestamp("last_processed_created_at", { withTimezone: true }),
+  upperBoundCreatedAt: timestamp("upper_bound_created_at", { withTimezone: true }),
   batchSize: integer("batch_size").notNull().default(500),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
