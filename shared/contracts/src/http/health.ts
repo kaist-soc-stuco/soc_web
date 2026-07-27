@@ -1,12 +1,16 @@
 export interface HealthDependency {
   ok: boolean;
   latencyMs: number;
-  message?: string;
 }
 
-export interface HealthResponse {
-  status: 'ok' | 'degraded';
-  postgres: HealthDependency;
-  redis: HealthDependency;
+export interface LivenessResponse {
+  status: 'ok';
   timestamp: string;
 }
+
+export interface ReadinessResponse extends LivenessResponse {
+  postgres: HealthDependency;
+  redis: HealthDependency;
+}
+
+export type HealthResponse = ReadinessResponse;

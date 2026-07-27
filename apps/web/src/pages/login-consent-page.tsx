@@ -1,12 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
-
-import {
-  clearStoredAuthState,
-  readStoredAuthState,
-  writeStoredAuthState,
-} from '@/lib/auth-storage';
 
 const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
@@ -32,46 +26,17 @@ const resolveApiBaseUrl = (): string => {
 };
 
 export function LoginConsentPage() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const query = new URLSearchParams(location.search);
   const [submitting, setSubmitting] = useState<null | 'persisted' | 'temporary'>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
 
-  const pendingLoginToken = useMemo(() => {
-    const queryToken = query.get('pendingLoginToken');
-    if (queryToken) {
-      return queryToken;
-    }
-
-    const stored = readStoredAuthState();
-    return stored?.pendingLoginToken ?? null;
-  }, [query]);
-
   const submitDecision = async (consent: boolean) => {
-    if (!pendingLoginToken) {
-      setErrorMessage('pendingLoginToken이 없습니다. 로그인부터 다시 진행해 주세요.');
-      return;
-    }
-
     setSubmitting(consent ? 'persisted' : 'temporary');
     setErrorMessage(null);
 
     try {
-      const payload = await apiClient.submitConsentDecision({
-        consent,
-        pendingLoginToken,
-      });
-
-      if (payload.storageMode === 'temporary') {
-        writeStoredAuthState({
-          temporarySession: payload.temporarySession,
-        });
-      } else {
-        clearStoredAuthState();
-      }
-
+      await apiClient.submitConsentDecision({ consent });
       navigate('/login?status=success&reason=consent_processed', {
         replace: true,
       });
@@ -106,13 +71,12 @@ export function LoginConsentPage() {
           <div className="space-y-4 text-sm font-medium leading-7 text-kaist-grey">
             <p>저장 항목: SSO 식별자, 이메일, 휴대전화</p>
             <p>비동의 시에는 temporary 모드로 로그인되며, 개인정보 영구 저장이 필요한 기능은 제한됩니다.</p>
-            <p>pendingLoginToken: {pendingLoginToken ?? '없음'}</p>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-4">
             <button
               type="button"
-              disabled={!pendingLoginToken || submitting !== null}
+              disabled={submitting !== null}
               onClick={() => void submitDecision(true)}
               className="rounded-full bg-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-white disabled:bg-kaist-grey"
             >
@@ -120,7 +84,7 @@ export function LoginConsentPage() {
             </button>
             <button
               type="button"
-              disabled={!pendingLoginToken || submitting !== null}
+              disabled={submitting !== null}
               onClick={() => void submitDecision(false)}
               className="rounded-full border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen disabled:border-kaist-grey disabled:text-kaist-grey"
             >
@@ -134,15 +98,6 @@ export function LoginConsentPage() {
             </div>
           ) : null}
 
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={clearStoredAuthState}
-              className="text-sm font-semibold text-kaist-greygreen underline"
-            >
-              저장된 로그인 상태 초기화
-            </button>
-          </div>
         </section>
       </div>
     </main>

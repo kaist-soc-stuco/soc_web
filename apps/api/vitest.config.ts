@@ -10,14 +10,14 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
-          include: ['test/security-baseline.spec.ts'],
+          include: ['test/security-baseline.spec.ts', 'test/**/*.unit.spec.ts'],
         },
       },
       {
         extends: true,
         test: {
           name: 'http',
-          include: ['test/app.http.spec.ts', 'test/app-module.http.spec.ts'],
+          include: ['test/app.http.spec.ts', 'test/app-module.http.spec.ts', 'test/auth.http.spec.ts', 'test/origin.http.spec.ts'],
         },
       },
       {

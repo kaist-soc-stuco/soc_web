@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 
-import { clearStoredAuthState, readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 import { createEmptyAuthSession, getAuthSessionSummary } from '@/lib/auth-session';
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
@@ -15,7 +14,6 @@ interface SsoStartPayload {
   state: string;
 }
 
-const LAST_CONSUMED_RESULT_TOKEN_KEY = 'soc.auth.last-consumed-result-token';
 
 const deriveStartUrl = (redirectUri: string): string | null => {
   if (!redirectUri) {
@@ -94,30 +92,28 @@ const submitAuthorizeForm = (payload: SsoStartPayload): void => {
   form.submit();
 };
 
+const LOGIN_RESULT_MESSAGES: Record<string, string> = {
+  success: '로그인이 완료되었습니다.',
+  'consent-required': '개인정보 저장 동의가 필요합니다.',
+  error: '로그인 중 오류가 발생했습니다.',
+  logged_out: '로그아웃되었습니다.',
+  session_expired: '세션이 만료되었습니다. 다시 로그인해 주세요.',
+  sso_authorize_failed: 'SSO 인증에 실패했습니다. 다시 시도해 주세요.',
+  origin_required_or_mismatch: '요청을 처리할 수 없습니다. 다시 시도해 주세요.',
+};
+
 const getResultMessage = (searchParams: URLSearchParams): string => {
-  const message =
-    searchParams.get('message') ??
-    searchParams.get('reason') ??
-    searchParams.get('error') ??
-    searchParams.get('detail') ??
-    searchParams.get('description');
-
-  if (message) {
-    return message;
+  for (const code of [
+    searchParams.get('errorCode'),
+    searchParams.get('reason'),
+    searchParams.get('status'),
+  ]) {
+    if (code && LOGIN_RESULT_MESSAGES[code]) {
+      return LOGIN_RESULT_MESSAGES[code];
+    }
   }
 
-  const status = searchParams.get('status');
-  if (status === 'success') {
-    return '로그인이 완료되었습니다.';
-  }
-  if (status === 'consent-required') {
-    return '개인정보 저장 동의가 필요합니다.';
-  }
-  if (status === 'error') {
-    return '로그인 중 오류가 발생했습니다.';
-  }
-
-  return '표시할 결과가 없습니다.';
+  return '로그인 결과를 확인할 수 없습니다.';
 };
 
 export function TreeLogin() {
@@ -143,85 +139,13 @@ export function TreeLogin() {
   const startUrlEnv = import.meta.env.VITE_SSO_START_URL ?? '';
   const redirectUri = import.meta.env.VITE_SSO_REDIRECT_URI ?? '';
   const startUrl = resolveStartUrl(startUrlEnv, redirectUri);
-  const consumedResultTokenRef = useRef<Set<string>>(new Set());
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
 
-  const status = searchParams.get('status');
-  const reason = searchParams.get('reason');
-  const resultToken = searchParams.get('resultToken');
-  const errorCode = searchParams.get('errorCode');
-  const userId = searchParams.get('userId');
-  const pendingLoginToken = searchParams.get('pendingLoginToken');
-  const storageMode = searchParams.get('storageMode');
   const resultMessage = getResultMessage(searchParams);
 
-  useEffect(() => {
-    if (!status) {
-      return;
-    }
-
-    if (status === 'consent-required' && pendingLoginToken) {
-      writeStoredAuthState({
-        pendingLoginToken,
-      });
-
-      navigate('/login/consent', {
-        replace: true,
-      });
-      return;
-    }
-
-    if (status === 'success' && resultToken) {
-      const consumedByRef = consumedResultTokenRef.current.has(resultToken);
-      const consumedBySessionStorage =
-        typeof window !== 'undefined' &&
-        window.sessionStorage.getItem(LAST_CONSUMED_RESULT_TOKEN_KEY) === resultToken;
-
-      if (consumedByRef || consumedBySessionStorage) {
-        return;
-      }
-
-      consumedResultTokenRef.current.add(resultToken);
-
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(LAST_CONSUMED_RESULT_TOKEN_KEY, resultToken);
-      }
-
-      void apiClient.consumeLoginResult(resultToken)
-        .then(() => {
-          clearStoredAuthState();
-
-          navigate('/login?status=success&reason=ok', {
-            replace: true,
-          });
-        })
-        .catch((error) => {
-          consumedResultTokenRef.current.delete(resultToken);
-
-          if (
-            typeof window !== 'undefined' &&
-            window.sessionStorage.getItem(LAST_CONSUMED_RESULT_TOKEN_KEY) === resultToken
-          ) {
-            window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
-          }
-
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : '로그인 결과 조회 중 오류가 발생했습니다.',
-          );
-        });
-    }
-  }, [
-    navigate,
-    apiClient,
-    pendingLoginToken,
-    resultToken,
-    status,
-  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -283,11 +207,6 @@ export function TreeLogin() {
 
     try {
       await apiClient.logout();
-      clearStoredAuthState();
-
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
-      }
 
       setSessionSummary({
         ...createEmptyAuthSession(),
@@ -307,8 +226,10 @@ export function TreeLogin() {
     setRefreshTestMessage(null);
 
     try {
-      const result = await apiClient.checkAccessToken();
-      setRefreshTestMessage(`성공: access-check ok (mode=${result.mode})`);
+      await apiClient.refreshSession();
+      const summary = await getAuthSessionSummary(apiClient);
+      setSessionSummary(summary);
+      setRefreshTestMessage(`성공: 세션 갱신 완료 (mode=${summary.storageMode ?? 'none'})`);
     } catch (error) {
       setRefreshTestMessage(
         error instanceof Error
@@ -320,16 +241,15 @@ export function TreeLogin() {
     }
   };
 
-  const hasResult = Boolean(
-    status ||
-      searchParams.get('message') ||
-      searchParams.get('reason') ||
-      searchParams.get('error') ||
-        searchParams.get('errorCode') ||
-        searchParams.get('resultToken') ||
-        searchParams.get('storageMode') ||
-        searchParams.get('pendingLoginToken'),
-  );
+  const hasResult = [
+    'status',
+    'message',
+    'reason',
+    'error',
+    'detail',
+    'description',
+    'errorCode',
+  ].some((name) => searchParams.has(name));
 
   return (
     <main className="min-h-screen bg-kaist-white px-6 py-12 text-kaist-black">
@@ -427,14 +347,7 @@ export function TreeLogin() {
           <section className="rounded-2xl border border-kaist-darkgreen/20 bg-kaist-darkgreen/5 p-6 shadow-sm">
             <h2 className="text-xl font-extrabold tracking-tight">로그인 결과</h2>
             <div className="mt-4 space-y-2 text-sm font-medium text-kaist-black">
-              <p>status: {status ?? '없음'}</p>
-              <p>message: {resultMessage}</p>
-              <p>reason: {reason ?? '없음'}</p>
-              <p>resultToken: {resultToken ?? '없음'}</p>
-              <p>errorCode: {errorCode ?? '없음'}</p>
-              <p>userId: {userId ?? '없음'}</p>
-              <p>storageMode: {storageMode ?? '없음'}</p>
-              <p>temporarySessionId: {readStoredAuthState()?.temporarySession?.sessionId ?? '없음'}</p>
+              <p>{resultMessage}</p>
             </div>
           </section>
         ) : (

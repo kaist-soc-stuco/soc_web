@@ -1,12 +1,8 @@
 import type {
   ConsentDecisionRequest,
-  ConsentDecisionResponse,
-  GreetingResponse,
   HealthResponse,
   LoginSessionResponse,
   LoginStartResponse,
-  LogoutResponse,
-  RefreshResponse,
 } from "@soc/contracts";
 
 export interface ApiClientOptions {
@@ -15,20 +11,14 @@ export interface ApiClientOptions {
 }
 
 export class ApiClientHttpError extends Error {
-  constructor(public readonly status: number) {
+  constructor(
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly requestId?: string,
+  ) {
     super(`HTTP ${status}`);
     this.name = "ApiClientHttpError";
   }
-}
-
-interface LoginResultResponse {
-  storageMode: "persisted" | "temporary";
-  userId?: string;
-}
-
-interface AccessCheckResponse {
-  mode: "persisted" | "temporary";
-  ok: boolean;
 }
 
 const withNoTrailingSlash = (value: string): string =>
@@ -40,36 +30,60 @@ const resolveAuthBaseUrl = (normalizedBaseUrl: string): string => {
   }
 
   if (/\/api$/i.test(normalizedBaseUrl)) {
-    // Reverse proxy usually maps /api/* -> backend /v1/*
     return `${normalizedBaseUrl}/auth`;
   }
 
   return `${normalizedBaseUrl}/v1/auth`;
 };
-
-const isAuthExpiredStatus = (status: number): boolean => status === 401 || status === 403;
-
-const redirectToLogin = (): void => {
-  if (typeof window === "undefined") {
-    return;
+const resolveHealthUrl = (normalizedBaseUrl: string): string => {
+  if (normalizedBaseUrl.startsWith("/")) {
+    return "/health/ready";
   }
 
-  const target = "/login?status=error&reason=session_expired";
-  const current = `${window.location.pathname}${window.location.search}`;
+  try {
+    return new URL("/health/ready", normalizedBaseUrl).toString();
+  } catch {
+    return `${normalizedBaseUrl}/health/ready`;
+  }
+};
 
-  if (current === target) {
-    return;
+
+const readError = async (response: Response): Promise<ApiClientHttpError> => {
+  let code: string | undefined;
+  let requestId: string | undefined;
+
+  try {
+    const envelope: unknown = await response.json();
+    if (typeof envelope === "object" && envelope !== null) {
+      const value = envelope as { code?: unknown; message?: unknown; requestId?: unknown };
+      if (
+        typeof value.code === "string" &&
+        typeof value.message === "string" &&
+        typeof value.requestId === "string"
+      ) {
+        code = value.code;
+        requestId = value.requestId;
+      }
+    }
+  } catch {
+    // Malformed or empty error responses have no safe metadata to retain.
   }
 
-  window.location.assign(target);
+  return new ApiClientHttpError(response.status, code, requestId);
 };
 
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    throw new ApiClientHttpError(response.status);
+    throw await readError(response);
   }
 
   return response.json() as Promise<T>;
+};
+
+const expectNoContent = async (response: Response): Promise<void> => {
+  if (response.status !== 204) {
+    throw await readError(response);
+  }
 };
 
 export const createApiClient = ({
@@ -80,27 +94,19 @@ export const createApiClient = ({
   const authBaseUrl = resolveAuthBaseUrl(normalizedBaseUrl);
   let refreshInFlight: Promise<void> | null = null;
 
-  const sendRefreshRequest = async (): Promise<void> => {
+  const request = (url: string, init: RequestInit): Promise<Response> =>
+    fetcher(url, { credentials: "include", ...init });
+
+  const refreshSession = async (): Promise<void> => {
     if (!refreshInFlight) {
       refreshInFlight = (async () => {
-        const response = await fetcher(`${authBaseUrl}/refresh`, {
-          body: JSON.stringify({}),
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        });
+        let response = await request(`${authBaseUrl}/refresh`, { method: "POST" });
 
-          if (!response.ok) {
-            const error = new ApiClientHttpError(response.status);
-
-            if (isAuthExpiredStatus(response.status)) {
-              redirectToLogin();
-            }
-
-            throw error;
+        if (response.status === 409) {
+          response = await request(`${authBaseUrl}/refresh`, { method: "POST" });
         }
+
+        await expectNoContent(response);
       })();
     }
 
@@ -111,111 +117,32 @@ export const createApiClient = ({
     }
   };
 
-  const requestJson = async <T>(
-    url: string,
-    init: RequestInit,
-    options?: { retryOnUnauthorized?: boolean },
-  ): Promise<T> => {
-    const response = await fetcher(url, {
-      credentials: "include",
-      ...init,
-    });
-
-    if (response.status === 401 && options?.retryOnUnauthorized) {
-      await sendRefreshRequest();
-
-      const retriedResponse = await fetcher(url, {
-        credentials: "include",
-        ...init,
-      });
-
-      return readJson<T>(retriedResponse);
-    }
-
-    return readJson<T>(response);
-  };
+  const requestJson = async <T>(url: string, init: RequestInit): Promise<T> =>
+    readJson<T>(await request(url, init));
 
   return {
-    getLoginStartPayload: async (): Promise<LoginStartResponse> => {
-      return requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, {
-        method: "GET",
-      });
-    },
+    getLoginStartPayload: async (): Promise<LoginStartResponse> =>
+      requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, { method: "GET" }),
+    getSession: async (): Promise<LoginSessionResponse> =>
+      requestJson<LoginSessionResponse>(`${authBaseUrl}/session`, { method: "GET" }),
 
-    getSession: async (sessionId?: string): Promise<LoginSessionResponse> => {
-      const query = sessionId
-        ? `?sessionId=${encodeURIComponent(sessionId)}`
-        : "";
-      return requestJson<LoginSessionResponse>(`${authBaseUrl}/session${query}`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
-    },
-
-    checkAccessToken: async (): Promise<AccessCheckResponse> => {
-      return requestJson<AccessCheckResponse>(`${authBaseUrl}/access-check`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
-    },
-
-    submitConsentDecision: async (
-      input: ConsentDecisionRequest,
-    ): Promise<ConsentDecisionResponse> => {
-      return requestJson<ConsentDecisionResponse>(`${authBaseUrl}/login/consent`, {
+    submitConsentDecision: async (input: ConsentDecisionRequest): Promise<void> => {
+      const response = await request(`${authBaseUrl}/login/consent`, {
         body: JSON.stringify(input),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      }, {
-        retryOnUnauthorized: true,
-      });
-    },
-
-    consumeLoginResult: async (resultToken: string): Promise<LoginResultResponse> => {
-      return requestJson<LoginResultResponse>(
-        `${authBaseUrl}/login/result?resultToken=${encodeURIComponent(resultToken)}`,
-        {
-          method: "GET",
-        },
-      );
-    },
-
-    refreshSession: async (): Promise<RefreshResponse> => {
-      return requestJson<RefreshResponse>(`${authBaseUrl}/refresh`, {
-        body: JSON.stringify({}),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         method: "POST",
       });
+      await expectNoContent(response);
     },
 
-    logout: async (): Promise<LogoutResponse> => {
-      return requestJson<LogoutResponse>(`${authBaseUrl}/logout`, {
-        body: JSON.stringify({}),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      });
+    refreshSession,
+
+    logout: async (): Promise<void> => {
+      const response = await request(`${authBaseUrl}/logout`, { method: "POST" });
+      await expectNoContent(response);
     },
 
-    getHealth: async (): Promise<HealthResponse> => {
-      return requestJson<HealthResponse>(`${normalizedBaseUrl}/health`, {
-        method: "GET",
-      });
-    },
-
-    getGreeting: async (): Promise<GreetingResponse> => {
-      return requestJson<GreetingResponse>(`${normalizedBaseUrl}/v1/mock/greeting`, {
-        method: "GET",
-      }, {
-        retryOnUnauthorized: true,
-      });
-    },
+    getHealth: async (): Promise<HealthResponse> =>
+      requestJson<HealthResponse>(resolveHealthUrl(normalizedBaseUrl), { method: "GET" }),
   };
 };

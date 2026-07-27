@@ -89,6 +89,9 @@ importers:
       drizzle-kit:
         specifier: 0.31.5
         version: 0.31.5
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       supertest:
         specifier: ^7.1.4
         version: 7.2.2
@@ -5058,7 +5061,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.2
+      hasown: 2.0.4
       math-intrinsics: 1.1.0
 
   get-port@7.2.0: {}

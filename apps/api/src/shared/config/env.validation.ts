@@ -1,3 +1,5 @@
+import { createPrivateKey, createPublicKey } from 'node:crypto';
+
 const asString = (value: unknown, name: string, fallback?: string): string => {
   if (typeof value === 'string' && value.trim().length > 0) {
     return value;
@@ -8,6 +10,21 @@ const asString = (value: unknown, name: string, fallback?: string): string => {
   }
 
   throw new Error(`Missing environment variable: ${name}`);
+};
+const asOrigin = (value: unknown, name: string): string => {
+  const origin = asString(value, name);
+
+  try {
+    const parsed = new URL(origin);
+
+    if (parsed.origin !== origin) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error(`Invalid origin for ${name}: ${origin}`);
+  }
+
+  return origin;
 };
 
 const asPort = (value: unknown, name: string, fallback: number): number => {
@@ -20,8 +37,66 @@ const asPort = (value: unknown, name: string, fallback: number): number => {
 
   return port;
 };
+const asJwtKeys = (config: Record<string, unknown>) => {
+  const activeKid = asString(config.AUTH_JWT_ACTIVE_KID, 'AUTH_JWT_ACTIVE_KID');
+  const privatePem = asString(
+    config.AUTH_JWT_ES256_PRIVATE_KEY,
+    'AUTH_JWT_ES256_PRIVATE_KEY',
+  );
+  const publicKeysJson = asString(
+    config.AUTH_JWT_PUBLIC_KEYS_JSON,
+    'AUTH_JWT_PUBLIC_KEYS_JSON',
+  );
+
+  try {
+    const publicKeys = JSON.parse(publicKeysJson) as unknown;
+    if (
+      !publicKeys ||
+      Array.isArray(publicKeys) ||
+      typeof publicKeys !== 'object' ||
+      !Object.values(publicKeys).every(
+        (value) => typeof value === 'string' && value.trim().length > 0,
+      ) ||
+      typeof (publicKeys as Record<string, unknown>)[activeKid] !== 'string'
+    ) {
+      throw new Error();
+    }
+
+    const privateKey = createPrivateKey(privatePem);
+    if (
+      privateKey.asymmetricKeyType !== 'ec' ||
+      privateKey.asymmetricKeyDetails?.namedCurve !== 'prime256v1'
+    ) {
+      throw new Error();
+    }
+    const derivedPublicKey = createPublicKey(privateKey);
+    const parsedPublicKeys = Object.values(
+      publicKeys as Record<string, string>,
+    ).map((value) => createPublicKey(value));
+    if (
+      parsedPublicKeys.some(
+        (key) =>
+          key.asymmetricKeyType !== 'ec' ||
+          key.asymmetricKeyDetails?.namedCurve !== 'prime256v1',
+      )
+    ) {
+      throw new Error();
+    }
+    const activePublicKey = createPublicKey(
+      (publicKeys as Record<string, string>)[activeKid],
+    );
+    if (!derivedPublicKey.equals(activePublicKey)) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error('Invalid ES256 JWT key configuration');
+  }
+
+  return { activeKid, privatePem, publicKeysJson };
+};
 
 export const validateEnv = (config: Record<string, unknown>): Record<string, unknown> => {
+  const jwtKeys = asJwtKeys(config);
   const postgresHost = asString(config.POSTGRES_HOST, 'POSTGRES_HOST', 'localhost');
   const postgresPort = asPort(config.POSTGRES_PORT, 'POSTGRES_PORT', 5432);
   const postgresUser = asString(config.POSTGRES_USER, 'POSTGRES_USER', 'soc');
@@ -44,14 +119,16 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     ),
     SSO_AUTH_API_URL: asString(config.SSO_AUTH_API_URL, 'SSO_AUTH_API_URL'),
     SSO_CLIENT_SECRET: asString(config.SSO_CLIENT_SECRET, 'SSO_CLIENT_SECRET'),
-    AUTH_JWT_SECRET: asString(
-      config.AUTH_JWT_SECRET,
-      'AUTH_JWT_SECRET'
-    ),
+    AUTH_JWT_PUBLIC_KEYS_JSON: jwtKeys.publicKeysJson,
+    AUTH_JWT_ACTIVE_KID: jwtKeys.activeKid,
+    AUTH_JWT_ES256_PRIVATE_KEY: jwtKeys.privatePem,
+    AUTH_JWT_ISSUER: asString(config.AUTH_JWT_ISSUER, 'AUTH_JWT_ISSUER'),
+    AUTH_JWT_AUDIENCE: asString(config.AUTH_JWT_AUDIENCE, 'AUTH_JWT_AUDIENCE'),
     AUTH_PENDING_LOGIN_ENCRYPTION_KEY: asString(
       config.AUTH_PENDING_LOGIN_ENCRYPTION_KEY,
       'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
     ),
+    PUBLIC_ORIGIN: asOrigin(config.PUBLIC_ORIGIN, 'PUBLIC_ORIGIN'),
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,
     POSTGRES_USER: postgresUser,

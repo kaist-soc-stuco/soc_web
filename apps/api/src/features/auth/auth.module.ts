@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { RedisModule } from '../../infrastructure/redis/redis.module';
 import { UsersModule } from '../users/users.module';
@@ -9,7 +9,7 @@ import { AuthSessionService } from './auth-session.service';
 import { AuthService } from './auth.service';
 
 @Module({
-  imports: [RedisModule, UsersModule],
+  imports: [RedisModule, forwardRef(() => UsersModule)],
   controllers: [AuthController],
   providers: [
     AuthService,
@@ -17,5 +17,6 @@ import { AuthService } from './auth.service';
     AuthSessionService,
     PendingLoginRepository,
   ],
+  exports: [AuthSessionService],
 })
 export class AuthModule {}

@@ -5,10 +5,9 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Request } from "express";
-import { isExpired } from "@soc/shared";
+import { AUTH_ACCESS_COOKIE_NAME } from "../../features/auth/auth.tokens";
 
-import { AuthSessionRepository } from "../../features/auth/auth-session.repository";
-import { AUTH_SESSION_COOKIE_NAME } from "../../features/auth/auth.tokens";
+import { AuthSessionService } from "../../features/auth/auth-session.service";
 import { UsersService } from "../../features/users/users.service";
 
 interface AuthenticatedRequest {
@@ -22,7 +21,7 @@ interface AuthenticatedRequest {
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
-    private readonly authSessionRepository: AuthSessionRepository,
+    private readonly authSessionService: AuthSessionService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -30,25 +29,18 @@ export class AuthGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<Request & AuthenticatedRequest>();
-    const sessionId = request.cookies?.[AUTH_SESSION_COOKIE_NAME];
+    const accessToken = request.cookies?.[AUTH_ACCESS_COOKIE_NAME];
 
-    if (!sessionId) {
-      throw new UnauthorizedException("session_cookie_missing");
+    if (!accessToken) {
+      throw new UnauthorizedException("access_cookie_missing");
     }
 
-    const session = await this.authSessionRepository.findBySessionId(sessionId);
-
-    if (
-      !session ||
-      session.mode !== "persisted" ||
-      !session.userId ||
-      session.revoked ||
-      isExpired(session.expiresAt)
-    ) {
+    const claims = await this.authSessionService.validateAccessToken(accessToken);
+    if (claims.mode !== "persisted") {
       throw new UnauthorizedException("session_invalid");
     }
 
-    const user = await this.usersService.findById(session.userId);
+    const user = await this.usersService.findById(claims.sub);
 
     if (!user) {
       throw new UnauthorizedException("user_not_found");

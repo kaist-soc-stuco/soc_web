@@ -1,37 +1,45 @@
 import {
   BadRequestException,
+  ConflictException,
   InternalServerErrorException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { randomUUID } from "node:crypto";
-import jwt, { type JwtPayload } from "jsonwebtoken";
-import { nowIso, isExpired, secondsUntil, expiresAtMs } from "@soc/shared";
+import {
+  createPrivateKey,
+  createPublicKey,
+  randomUUID,
+  sign,
+  verify,
+} from "node:crypto";
+import { expiresAtMs, isExpired } from "@soc/shared";
 
 import type {
   AuthSessionRecord,
   AuthSessionSummary,
   ConsentDecisionRequest,
+  ConsentDecisionResult,
+  IssuedSessionResult,
   LogoutRequest,
-  PendingSsoUser,
   PersistedAccessTokenClaims,
   RefreshSessionRequest,
+  RefreshSessionResult,
   RefreshTokenClaims,
   TemporaryAccessTokenClaims,
+  TokenClaims,
 } from "./auth.types";
 import { AuthSessionRepository } from "./auth-session.repository";
 import { PendingLoginRepository } from "./pending-login.repository";
 import { UsersService } from "../users/users.service";
 import {
-  AUTH_ACCESS_TOKEN_TTL_SECONDS,
   AUTH_REFRESH_TOKEN_TTL_SECONDS,
-  AUTH_TEMPORARY_REFRESH_TTL_SECONDS,
+  AUTH_TEMPORARY_TOKEN_TTL_SECONDS,
 } from "./auth.tokens";
 
-/**
- * access/refresh token 발급과 rotation, consent 기반 세션 처리를 담당합니다.
- */
+const ACCESS_TTL_SECONDS = 15 * 60;
+const CLOCK_SKEW_SECONDS = 30;
+
 @Injectable()
 export class AuthSessionService {
   constructor(
@@ -41,366 +49,316 @@ export class AuthSessionService {
     private readonly usersService: UsersService,
   ) {}
 
-  /** JWT 서명/검증에 사용할 필수 시크릿을 반환합니다. */
-  private getJwtSecret(): string {
-    const secret = this.configService.get<string>("AUTH_JWT_SECRET");
-
-    if (secret && secret.trim().length > 0) {
-      return secret;
+  private jwtConfig() {
+    const activeKid = this.required("AUTH_JWT_ACTIVE_KID");
+    const privatePem = this.required("AUTH_JWT_ES256_PRIVATE_KEY");
+    const issuer = this.required("AUTH_JWT_ISSUER");
+    const audience = this.required("AUTH_JWT_AUDIENCE");
+    let publicKeys: Record<string, string>;
+    try {
+      publicKeys = JSON.parse(this.required("AUTH_JWT_PUBLIC_KEYS_JSON")) as Record<string, string>;
+    } catch {
+      throw new InternalServerErrorException("AUTH_JWT_PUBLIC_KEYS_JSON_invalid");
     }
-
-    throw new InternalServerErrorException("AUTH_JWT_SECRET_is_required");
+    if (
+      !publicKeys ||
+      Array.isArray(publicKeys) ||
+      !Object.values(publicKeys).every(
+        (value) => typeof value === "string" && value.trim(),
+      ) ||
+      !publicKeys[activeKid]
+    ) {
+      throw new InternalServerErrorException("AUTH_JWT_PUBLIC_KEYS_JSON_invalid");
+    }
+    return { activeKid, audience, issuer, privatePem, publicKeys };
   }
 
-  /** 세션 모드에 맞는 access token 클레임을 구성해 서명합니다. */
+  private required(name: string): string {
+    const value = this.configService.get<string>(name);
+    if (!value?.trim()) throw new InternalServerErrorException(`${name}_is_required`);
+    return value;
+  }
+
+  private encode(value: object): string {
+    return Buffer.from(JSON.stringify(value)).toString("base64url");
+  }
+
+  private signToken(claims: TokenClaims | RefreshTokenClaims): string {
+    const config = this.jwtConfig();
+    const header = { alg: "ES256", kid: config.activeKid };
+    const signingInput = `${this.encode(header)}.${this.encode(claims)}`;
+    const signature = sign("sha256", Buffer.from(signingInput), {
+      key: createPrivateKey(config.privatePem),
+      dsaEncoding: "ieee-p1363",
+    });
+    return `${signingInput}.${signature.toString("base64url")}`;
+  }
+
+  private verifyToken(token: string, refresh: boolean): TokenClaims | RefreshTokenClaims {
+    const invalid = () => {
+      throw new UnauthorizedException(
+        refresh ? "invalid_refresh_token" : "invalid_access_token",
+      );
+    };
+    const decodeBase64Url = (value: string): Buffer => {
+      if (!/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) invalid();
+      const decoded = Buffer.from(value, "base64url");
+      if (decoded.toString("base64url") !== value) invalid();
+      return decoded;
+    };
+    const parts = token.split(".");
+    if (parts.length !== 3) invalid();
+
+    let header: unknown;
+    let payload: unknown;
+    let signature: Uint8Array = new Uint8Array();
+    try {
+      const headerBytes = decodeBase64Url(parts[0]);
+      const payloadBytes = decodeBase64Url(parts[1]);
+      signature = decodeBase64Url(parts[2]);
+      if (signature.length !== 64) invalid();
+      header = JSON.parse(headerBytes.toString("utf8"));
+      payload = JSON.parse(payloadBytes.toString("utf8"));
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      invalid();
+    }
+
+    if (
+      !header ||
+      typeof header !== "object" ||
+      Array.isArray(header) ||
+      Object.keys(header).length !== 2 ||
+      (header as Record<string, unknown>).alg !== "ES256" ||
+      typeof (header as Record<string, unknown>).kid !== "string" ||
+      !(header as Record<string, string>).kid
+    ) invalid();
+
+    const config = this.jwtConfig();
+    const publicPem = config.publicKeys[(header as Record<string, string>).kid];
+    if (!publicPem) invalid();
+    try {
+      if (!verify(
+        "sha256",
+        Buffer.from(`${parts[0]}.${parts[1]}`),
+        { key: createPublicKey(publicPem), dsaEncoding: "ieee-p1363" },
+        signature,
+      )) invalid();
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      invalid();
+    }
+
+    const claimValues =
+      payload && typeof payload === "object"
+        ? (payload as Record<string, unknown>)
+        : {};
+    if (claimValues.iss !== config.issuer || claimValues.aud !== config.audience) invalid();
+
+    const now = Math.floor(Date.now() / 1000);
+    if (
+      typeof claimValues.iat !== "number" ||
+      !Number.isFinite(claimValues.iat) ||
+      typeof claimValues.exp !== "number" ||
+      !Number.isFinite(claimValues.exp) ||
+      claimValues.iat > now + CLOCK_SKEW_SECONDS ||
+      claimValues.exp <= now - CLOCK_SKEW_SECONDS
+    ) invalid();
+
+    const required = ["iss", "aud", "sub", "sid", "mode", "iat", "exp"];
+    if (refresh) required.push("jti");
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      Array.isArray(payload) ||
+      Object.keys(claimValues).some((key) => !required.includes(key)) ||
+      required.some(
+        (key) => typeof claimValues[key] !==
+          (key === "iat" || key === "exp" ? "number" : "string"),
+      ) ||
+      (claimValues.mode !== "persisted" && claimValues.mode !== "temporary")
+    ) invalid();
+    return claimValues as unknown as TokenClaims | RefreshTokenClaims;
+  }
+
+  private tokenClaims(record: AuthSessionRecord, ttl: number): TokenClaims {
+    const now = Math.floor(Date.now() / 1000);
+    return {
+      aud: this.jwtConfig().audience, exp: now + ttl, iat: now,
+      iss: this.jwtConfig().issuer, mode: record.mode,
+      sid: record.sessionId, sub: record.mode === "persisted" ? record.userId! : record.pendingLoginId!,
+    };
+  }
+
   private issueAccessToken(record: AuthSessionRecord): string {
-    const claims: PersistedAccessTokenClaims | TemporaryAccessTokenClaims =
-      record.mode === "persisted"
-        ? {
-            mode: "persisted",
-            sub: record.userId ?? "",
-            userId: record.userId ?? "",
-          }
-        : {
-            mode: "temporary",
-            pendingLoginId: record.pendingLoginId ?? "",
-            sub: record.pendingLoginId ?? "",
-          };
-
-    return jwt.sign(claims, this.getJwtSecret(), {
-      expiresIn: AUTH_ACCESS_TOKEN_TTL_SECONDS,
-    });
+    return this.signToken(this.tokenClaims(record, ACCESS_TTL_SECONDS));
   }
 
-  /** 세션/회전 식별자(jti)를 포함한 refresh token을 발급합니다. */
-  private issueRefreshToken(record: AuthSessionRecord, refreshJti: string): string {
-    const subject = record.mode === "persisted" ? record.userId : record.pendingLoginId;
-    const claims: RefreshTokenClaims = {
-      jti: refreshJti,
-      mode: record.mode,
-      sid: record.sessionId,
-      sub: subject ?? "",
-    };
-
-    return jwt.sign(claims, this.getJwtSecret(), {
-      expiresIn: Math.max(secondsUntil(record.expiresAt), 1),
-    });
+  private issueRefreshToken(record: AuthSessionRecord, jti: string): string {
+    const ttl = Math.max(1, Math.floor((record.expiresAt - Date.now()) / 1000));
+    return this.signToken({ ...this.tokenClaims(record, ttl), jti });
   }
 
-  /** refresh token 서명/필수 클레임을 검증하고 정규화된 클레임을 반환합니다. */
-  private verifyRefreshToken(refreshToken: string): RefreshTokenClaims {
-    let decoded: string | JwtPayload;
-
-    try {
-      decoded = jwt.verify(refreshToken, this.getJwtSecret());
-    } catch {
-      throw new UnauthorizedException("invalid_refresh_token");
-    }
-
-    if (typeof decoded === "string") {
-      throw new UnauthorizedException("invalid_refresh_token");
-    }
-
-    const sid = typeof decoded.sid === "string" ? decoded.sid : undefined;
-    const jti = typeof decoded.jti === "string" ? decoded.jti : undefined;
-    const sub = typeof decoded.sub === "string" ? decoded.sub : undefined;
-    const mode =
-      decoded.mode === "persisted" || decoded.mode === "temporary"
-        ? decoded.mode
-        : undefined;
-
-    if (!sid || !jti || !sub || !mode) {
-      throw new UnauthorizedException("invalid_refresh_token");
-    }
-
-    return {
-      jti,
-      mode,
-      sid,
-      sub,
-    };
-  }
-
-  /** access token을 검증하고 temporary/persisted 클레임으로 분기해 반환합니다. */
-  validateAccessToken(
-    accessToken: string | undefined,
-  ): PersistedAccessTokenClaims | TemporaryAccessTokenClaims {
-    if (!accessToken) {
-      throw new UnauthorizedException("access_token_missing");
-    }
-
-    let decoded: string | JwtPayload;
-
-    try {
-      decoded = jwt.verify(accessToken, this.getJwtSecret());
-    } catch {
-      throw new UnauthorizedException("invalid_access_token");
-    }
-
-    if (typeof decoded === "string") {
-      throw new UnauthorizedException("invalid_access_token");
-    }
-
-    const mode = decoded.mode;
-
-    if (mode === "persisted") {
-      const userId = typeof decoded.userId === "string" ? decoded.userId : undefined;
-
-      if (!userId) {
-        throw new UnauthorizedException("invalid_access_token");
-      }
-
-      return {
-        mode: "persisted",
-        sub: userId,
-        userId,
-      };
-    }
-
-    if (mode === "temporary") {
-      const pendingLoginId =
-        typeof decoded.pendingLoginId === "string"
-          ? decoded.pendingLoginId
-          : undefined;
-
-      if (!pendingLoginId) {
-        throw new UnauthorizedException("invalid_access_token");
-      }
-
-      return {
-        mode: "temporary",
-        pendingLoginId,
-        sub: pendingLoginId,
-      };
-    }
-
-    throw new UnauthorizedException("invalid_access_token");
-  }
-
-  /** 세션 존재 여부, 만료, revoke 상태를 공통 검증합니다. */
   private assertActiveSession(record: AuthSessionRecord | null): asserts record is AuthSessionRecord {
-    if (!record) {
-      throw new UnauthorizedException("session_not_found");
-    }
-
-    if (record.revoked || isExpired(record.expiresAt)) {
-      throw new UnauthorizedException("session_expired_or_revoked");
-    }
+    if (!record) throw new UnauthorizedException("session_not_found");
+    if (record.revoked || isExpired(record.expiresAt)) throw new UnauthorizedException("session_expired_or_revoked");
   }
 
-  /**
-    * 영구 사용자용 access/refresh token 쌍을 발급합니다.
-   */
-  async issuePersistedSession(userId: string): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    session: AuthSessionRecord;
-  }> {
+  async issuePersistedSession(userId: string): Promise<IssuedSessionResult> {
     const sessionId = randomUUID();
-    const refreshJti = randomUUID();
-
     const session: AuthSessionRecord = {
-      expiresAt: expiresAtMs(AUTH_REFRESH_TOKEN_TTL_SECONDS),
-      mode: "persisted",
-      refreshJti,
-      revoked: false,
-      sessionId,
-      userId,
+      expiresAt: expiresAtMs(AUTH_REFRESH_TOKEN_TTL_SECONDS), familyId: sessionId,
+      familyVersion: 0, mode: "persisted", refreshJti: randomUUID(),
+      revoked: false, sessionId, userId,
     };
-
     await this.authSessionRepository.save(session);
-
-    return {
-      accessToken: this.issueAccessToken(session),
-      refreshToken: this.issueRefreshToken(session, refreshJti),
-      session,
-    };
+    return { accessToken: this.issueAccessToken(session), refreshToken: this.issueRefreshToken(session, session.refreshJti), session };
   }
 
-  /**
-    * 비동의 임시 로그인용 access/refresh(또는 session key) 세트를 발급합니다.
-   */
-  async issueTemporarySession(
-    pendingLoginId: string,
-    pendingUser: PendingSsoUser,
-  ): Promise<{
-    accessToken: string;
-    refreshToken?: string;
-    session: AuthSessionRecord;
-  }> {
+  async issueTemporarySession(pendingLoginId: string, expiresAt: number): Promise<AuthSessionRecord> {
     const sessionId = randomUUID();
-    const refreshJti = randomUUID();
-
     const session: AuthSessionRecord = {
-      expiresAt: Math.min(
-        pendingUser.expiresAt,
-        expiresAtMs(AUTH_TEMPORARY_REFRESH_TTL_SECONDS),
-      ),
-      mode: "temporary",
-      pendingLoginId,
-      refreshJti,
-      revoked: false,
-      sessionId,
+      expiresAt: Math.min(expiresAt, expiresAtMs(AUTH_TEMPORARY_TOKEN_TTL_SECONDS)),
+      familyId: sessionId, familyVersion: 0, mode: "temporary",
+      pendingLoginId, refreshJti: randomUUID(), revoked: false, sessionId,
     };
-
     await this.authSessionRepository.save(session);
-
-    return {
-      accessToken: this.issueAccessToken(session),
-      refreshToken: this.issueRefreshToken(session, refreshJti),
-      session,
-    };
+    return session;
   }
 
-  /**
-    * refresh token을 검증하고 rotation을 수행합니다.
-   */
-  async rotateRefreshToken(refreshToken: string): Promise<{
-    accessToken: string;
-    refreshToken?: string;
-    sessionId: string;
-    storageMode: "temporary" | "persisted";
-  }> {
-    const claims = this.verifyRefreshToken(refreshToken);
+  async rotateRefreshToken(refreshToken: string): Promise<RefreshSessionResult> {
+    const claims = this.verifyToken(refreshToken, true) as RefreshTokenClaims;
     const session = await this.authSessionRepository.findBySessionId(claims.sid);
-
     this.assertActiveSession(session);
-
-    if (!session.refreshJti || session.refreshJti !== claims.jti) {
-      await this.authSessionRepository.revoke(claims.sid);
-      throw new UnauthorizedException("refresh_token_reused_or_invalid");
+    if (session.mode !== claims.mode || (session.mode === "persisted" ? session.userId : session.pendingLoginId) !== claims.sub) {
+      throw new UnauthorizedException("invalid_refresh_token");
     }
-
-    const rotatedJti = randomUUID();
-    const rotatedSession: AuthSessionRecord = {
+    const jti = randomUUID();
+    const outcome = await this.authSessionRepository.rotateRefresh(
+      session.sessionId,
+      claims.jti,
+      jti,
+      session.expiresAt,
+    );
+    if (outcome === "already_rotated") throw new ConflictException("refresh_already_rotated");
+    if (outcome === "replayed") throw new UnauthorizedException("refresh_replay_detected");
+    if (outcome !== "rotated") throw new UnauthorizedException("invalid_refresh_token");
+    const rotated = {
       ...session,
-      refreshJti: rotatedJti,
+      familyVersion: session.familyVersion + 1,
+      previousRefreshJti: session.refreshJti,
+      refreshJti: jti,
+      rotatedAtMs: Date.now(),
     };
-
-    await this.authSessionRepository.save(rotatedSession);
-
-    return {
-      accessToken: this.issueAccessToken(rotatedSession),
-      refreshToken: this.issueRefreshToken(rotatedSession, rotatedJti),
-      sessionId: rotatedSession.sessionId,
-      storageMode: rotatedSession.mode,
-    };
+    return { accessToken: this.issueAccessToken(rotated), refreshToken: this.issueRefreshToken(rotated, jti), sessionId: session.sessionId, storageMode: session.mode };
   }
 
-  /**
-    * 로그아웃 시 세션을 revoke합니다.
-   */
+  async validateAccessToken(accessToken: string | undefined): Promise<PersistedAccessTokenClaims | TemporaryAccessTokenClaims> {
+    if (!accessToken) throw new UnauthorizedException("access_token_missing");
+    const claims = this.verifyToken(accessToken, false) as TokenClaims;
+    const session = await this.authSessionRepository.findBySessionId(claims.sid);
+    this.assertActiveSession(session);
+    if (session.mode !== claims.mode || (session.mode === "persisted" ? session.userId : session.pendingLoginId) !== claims.sub) {
+      throw new UnauthorizedException("invalid_access_token");
+    }
+    return claims as PersistedAccessTokenClaims | TemporaryAccessTokenClaims;
+  }
+
+  async handleConsentDecision(input: ConsentDecisionRequest): Promise<ConsentDecisionResult> {
+    if (!input.pendingLoginToken?.trim()) throw new BadRequestException("pending_login_token_is_required");
+    const pending = await this.pendingLoginRepository.reserve(input.pendingLoginToken);
+    if (!pending) throw new UnauthorizedException("pending_login_not_found_or_expired");
+    try {
+      if (input.consent) {
+        const user = await this.usersService.upsertConsentedSsoUser({
+          consentedAt: new Date().toISOString(), ssoUserId: pending.ssoUserId,
+          userEmail: pending.userEmail, userMobile: pending.userMobile,
+        });
+        const result = {
+          kind: "persisted" as const,
+          session: await this.issuePersistedSession(user.id),
+          userId: user.id,
+        };
+        await this.pendingLoginRepository.complete(input.pendingLoginToken);
+        return result;
+      }
+      const session = await this.issueTemporarySession(input.pendingLoginToken, pending.expiresAt);
+      await this.pendingLoginRepository.complete(input.pendingLoginToken);
+      return { kind: "temporary", session, temporaryHandle: session.sessionId };
+    } catch (error) {
+      await this.pendingLoginRepository.release(input.pendingLoginToken);
+      throw error;
+    }
+  }
+
+  async getSession(input: {
+    accessToken?: string;
+    temporaryToken?: string;
+  }): Promise<AuthSessionSummary> {
+    let sessionId = input.temporaryToken;
+    if (input.accessToken) {
+      try {
+        sessionId = (await this.validateAccessToken(input.accessToken)).sid;
+      } catch {
+        return { authenticated: false, canUsePersistentFeatures: false, requiresConsent: false, storageMode: null };
+      }
+    }
+    if (!sessionId) return { authenticated: false, canUsePersistentFeatures: false, requiresConsent: false, storageMode: null };
+    const session = await this.authSessionRepository.findBySessionId(sessionId);
+    if (
+      !session ||
+      session.revoked ||
+      isExpired(session.expiresAt) ||
+      (!input.accessToken && session.mode !== "temporary")
+    ) {
+      return { authenticated: false, canUsePersistentFeatures: false, requiresConsent: false, storageMode: null };
+    }
+    return { authenticated: true, canUsePersistentFeatures: session.mode === "persisted", requiresConsent: session.mode === "temporary", storageMode: session.mode, userId: session.userId };
+  }
+
+  async refreshSession(input: RefreshSessionRequest): Promise<RefreshSessionResult> {
+    if (!input.refreshToken) throw new BadRequestException("refresh_token_missing");
+    return this.rotateRefreshToken(input.refreshToken);
+  }
+
   async revokeSession(sessionId: string): Promise<void> {
     await this.authSessionRepository.revoke(sessionId);
   }
 
-  /**
-    * 개인정보 저장 동의/비동의 결정을 처리합니다.
-   */
-  async handleConsentDecision(input: ConsentDecisionRequest): Promise<{
-    accessToken?: string;
-    refreshToken?: string;
-    sessionId?: string;
-    storageMode: "temporary" | "persisted";
-    userId?: string;
-  }> {
-    const pendingUser = await this.pendingLoginRepository.find(
-      input.pendingLoginToken,
-    );
-
-    if (!pendingUser) {
-      throw new UnauthorizedException("pending_login_not_found_or_expired");
+  async logout(input: LogoutRequest = {}): Promise<{ ok: true }> {
+    let sessionId: string | undefined;
+    if (input.accessToken) {
+      try {
+        sessionId = (await this.validateAccessToken(input.accessToken)).sid;
+      } catch {
+        // A malformed access token must not prevent refresh-token revocation.
+      }
     }
-
-    if (input.consent) {
-      const consentedAt = nowIso();
-      const persistedUser = await this.usersService.upsertConsentedSsoUser({
-        consentedAt,
-        ssoUserId: pendingUser.ssoUserId,
-        userEmail: pendingUser.userEmail,
-        userMobile: pendingUser.userMobile,
-      });
-
-      const issued = await this.issuePersistedSession(persistedUser.id);
-      await this.pendingLoginRepository.delete(input.pendingLoginToken);
-
-      return {
-        accessToken: issued.accessToken,
-        refreshToken: issued.refreshToken,
-        sessionId: issued.session.sessionId,
-        storageMode: "persisted",
-        userId: persistedUser.id,
-      };
+    if (!sessionId && input.refreshToken) {
+      try {
+        const claims = this.verifyToken(input.refreshToken, true) as RefreshTokenClaims;
+        const session = await this.authSessionRepository.findBySessionId(claims.sid);
+        this.assertActiveSession(session);
+        if (
+          session.mode !== claims.mode ||
+          (session.mode === "persisted" ? session.userId : session.pendingLoginId) !==
+            claims.sub
+        ) throw new UnauthorizedException("invalid_refresh_token");
+        sessionId = session.sessionId;
+      } catch {
+        // Logout remains idempotent for stale or malformed cookies.
+      }
     }
-
-    const issued = await this.issueTemporarySession(input.pendingLoginToken, pendingUser);
-    await this.pendingLoginRepository.delete(input.pendingLoginToken);
-
-    return {
-      accessToken: issued.accessToken,
-      refreshToken: issued.refreshToken,
-      sessionId: issued.session.sessionId,
-      storageMode: "temporary",
-    };
-  }
-
-  /**
-    * 현재 로그인 세션 상태를 조회합니다.
-   */
-  async getSession(sessionId?: string): Promise<AuthSessionSummary> {
-    if (!sessionId) {
-      return {
-        authenticated: false,
-        canUsePersistentFeatures: false,
-        requiresConsent: false,
-        storageMode: null,
-      };
+    if (!sessionId && input.temporaryToken) {
+      const session = await this.authSessionRepository.findBySessionId(input.temporaryToken);
+      if (
+        session &&
+        session.mode === "temporary" &&
+        !session.revoked &&
+        !isExpired(session.expiresAt)
+      ) sessionId = session.sessionId;
     }
-
-    const session = await this.authSessionRepository.findBySessionId(sessionId);
-
-    if (!session || session.revoked || isExpired(session.expiresAt)) {
-      return {
-        authenticated: false,
-        canUsePersistentFeatures: false,
-        requiresConsent: false,
-        storageMode: null,
-      };
-    }
-
-    return {
-      authenticated: true,
-      canUsePersistentFeatures: session.mode === "persisted",
-      requiresConsent: session.mode === "temporary",
-      storageMode: session.mode,
-      userId: session.userId,
-    };
-  }
-
-  /**
-    * refresh 요청을 처리합니다.
-   */
-  async refreshSession(input: RefreshSessionRequest): Promise<{
-    accessToken?: string;
-    refreshToken?: string;
-    sessionId: string;
-    storageMode: "temporary" | "persisted";
-  }> {
-    if (!input.refreshToken) {
-      throw new BadRequestException("refreshToken_is_required");
-    }
-
-    return this.rotateRefreshToken(input.refreshToken);
-  }
-
-  /**
-    * 로그아웃을 처리합니다.
-   */
-  async logout(input?: LogoutRequest): Promise<{ ok: boolean }> {
-    if (input?.sessionId) {
-      await this.revokeSession(input.sessionId);
-    }
-
+    if (sessionId) await this.revokeSession(sessionId);
     return { ok: true };
   }
 }

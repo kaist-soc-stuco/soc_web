@@ -1,10 +1,21 @@
+import { generateKeyPairSync } from 'node:crypto';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+const privatePem = privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
+const publicPem = publicKey.export({ format: 'pem', type: 'spki' }).toString();
 
 const testEnvironment = {
   AUTH_JWT_SECRET: 'test-jwt-secret',
   AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'test-encryption-key',
+  AUTH_JWT_ACTIVE_KID: 'test-key',
+  AUTH_JWT_AUDIENCE: 'soc-web-test',
+  AUTH_JWT_ES256_PRIVATE_KEY: privatePem,
+  AUTH_JWT_ISSUER: 'soc-api-test',
+  AUTH_JWT_PUBLIC_KEYS_JSON: JSON.stringify({ 'test-key': publicPem }),
   SSO_AUTH_API_URL: 'https://sso.test/auth',
   SSO_CLIENT_SECRET: 'test-client-secret',
+  PUBLIC_ORIGIN: 'https://web.test',
   VITE_SSO_CLIENT_ID: 'test-client-id',
   VITE_SSO_LOGIN_URL: 'https://sso.test/login',
   VITE_SSO_REDIRECT_URI: 'https://api.test/auth/login',
