@@ -96,6 +96,7 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
       feeStatus: 'PAID',
       reasonCode: 'PAYMENT',
       requestId: createHash('sha256').update('corr-1', 'utf8').digest('hex'),
+      requestFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
   });
 });
@@ -111,13 +112,11 @@ describe('UsersRepository fee audit transaction', () => {
     const values = vi.fn().mockResolvedValue(undefined);
     const tx = {
       execute: vi.fn().mockResolvedValue({ rows: [{ id: 'grant-1' }] }),
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([]) })),
-        })),
-      })),
+      select: vi.fn()
+        .mockImplementationOnce(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([]) })) })) }))
+        .mockImplementationOnce(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([{ recordId: targetId, requestFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }]) })) })) })),
       update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn(() => ({ returning: vi.fn().mockResolvedValue([updated]) })) })) })),
-      insert: vi.fn(() => ({ values })),
+      insert: vi.fn(() => ({ values: vi.fn((input) => { values(input); return { onConflictDoNothing: vi.fn().mockResolvedValue(undefined) }; }) })),
     };
     const db = { transaction: vi.fn() };
     db.transaction.mockImplementation(async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx));
@@ -125,13 +124,14 @@ describe('UsersRepository fee audit transaction', () => {
       encrypt: (_field: string, value: string | null) => value,
       decrypt: (_field: string, value: string | null) => value,
     } as never).updateFeeWithAudit({
-      actorUserId: actorId, requestId: 'corr-1', feeStatus: 'PAID', reasonCode: 'PAYMENT', userId: targetId,
+      actorUserId: actorId, requestId: 'corr-1', requestFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', feeStatus: 'PAID', reasonCode: 'PAYMENT', userId: targetId,
     });
     expect(db.transaction).toHaveBeenCalledOnce();
     expect(tx.update).toHaveBeenCalledOnce();
     expect(values).toHaveBeenCalledWith({
       actorUserId: actorId, action: 'FEE_STATUS_UPDATED', changedFieldNames: 'feeStatus',
       correlationId: 'corr-1', reasonCode: 'PAYMENT', recordId: targetId,
+      requestFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
     expect(result).toMatchObject({ id: targetId, feeStatus: 'PAID' });
   });

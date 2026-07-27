@@ -102,6 +102,7 @@ describe('users fee PostgreSQL transaction', () => {
       feeStatus: 'PAID',
       reasonCode: 'contains pii@example.test',
       requestId: 'fee-failure-injection',
+      requestFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       userId: targetId,
     })).rejects.toThrow();
     expect((await pool.query('SELECT fee_status FROM users WHERE id = $1', [targetId])).rows[0]!.fee_status).toBe('UNKNOWN');

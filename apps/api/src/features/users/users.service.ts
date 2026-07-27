@@ -26,6 +26,8 @@ const FEE_STATUSES = new Set<FeeStatus>(["UNKNOWN", "UNPAID", "PAID"]);
 const isFeeStatus = (value: unknown): value is FeeStatus => typeof value === "string" && FEE_STATUSES.has(value as FeeStatus);
 const auditCorrelationId = (requestId: string) =>
   createHash("sha256").update(requestId, "utf8").digest("hex");
+const auditRequestFingerprint = (input: { actorUserId: string; feeStatus: FeeStatus; reasonCode: string; requestId: string; userId: string }) =>
+  createHash("sha256").update(JSON.stringify([input.requestId, input.actorUserId, input.userId, input.feeStatus, input.reasonCode]), "utf8").digest("hex");
 @Injectable()
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
@@ -182,6 +184,7 @@ export class UsersService {
       feeStatus: input.feeStatus,
       reasonCode: input.reasonCode,
       requestId: auditCorrelationId(requestId),
+      requestFingerprint: auditRequestFingerprint({ actorUserId, feeStatus: input.feeStatus, reasonCode: input.reasonCode, requestId, userId }),
       userId,
     });
     if (result === "forbidden") throw new ForbiddenException("insufficient_permission");

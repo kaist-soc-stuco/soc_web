@@ -174,6 +174,7 @@ export class UsersRepository {
     feeStatus: UserRecord["feeStatus"];
     reasonCode: string;
     requestId: string;
+    requestFingerprint: string;
     userId: string;
   }): Promise<UserRecord | "conflict" | "forbidden" | null> {
     return this.db.transaction(async (tx) => {
@@ -196,21 +197,18 @@ export class UsersRepository {
       if (authority.rows.length === 0) return "forbidden";
 
       const [existingAudit] = await tx
-        .select({ recordId: permissionAuditLog.recordId })
+        .select({ recordId: permissionAuditLog.recordId, requestFingerprint: permissionAuditLog.requestFingerprint })
         .from(permissionAuditLog)
         .where(and(
           eq(permissionAuditLog.action, "FEE_STATUS_UPDATED"),
-          eq(permissionAuditLog.actorUserId, input.actorUserId),
           eq(permissionAuditLog.correlationId, input.requestId),
         ))
         .limit(1);
       if (existingAudit) {
-        if (existingAudit.recordId !== input.userId) return "forbidden";
-        const [existingUser] = await tx.select().from(users).where(eq(users.id, input.userId)).for("update");
+        if (existingAudit.requestFingerprint !== input.requestFingerprint) return "conflict";
+        const [existingUser] = await tx.select().from(users).where(eq(users.id, existingAudit.recordId)).for("update");
         if (!existingUser) return null;
-        return existingUser.feeStatus === input.feeStatus
-          ? this.mapRowToUserRecord(existingUser)
-          : "conflict";
+        return this.mapRowToUserRecord(existingUser);
       }
 
       const [updated] = await tx
@@ -225,8 +223,18 @@ export class UsersRepository {
         changedFieldNames: "feeStatus",
         correlationId: input.requestId,
         reasonCode: input.reasonCode,
+        requestFingerprint: input.requestFingerprint,
         recordId: updated.id,
-      });
+      }).onConflictDoNothing();
+      const [recordedAudit] = await tx.select({ recordId: permissionAuditLog.recordId, requestFingerprint: permissionAuditLog.requestFingerprint })
+        .from(permissionAuditLog)
+        .where(and(eq(permissionAuditLog.action, "FEE_STATUS_UPDATED"), eq(permissionAuditLog.correlationId, input.requestId)))
+        .limit(1);
+      if (!recordedAudit || recordedAudit.requestFingerprint !== input.requestFingerprint) return "conflict";
+      if (recordedAudit.recordId !== updated.id) {
+        const [recordedUser] = await tx.select().from(users).where(eq(users.id, recordedAudit.recordId));
+        return recordedUser ? this.mapRowToUserRecord(recordedUser) : null;
+      }
       return this.mapRowToUserRecord(updated);
     });
   }
