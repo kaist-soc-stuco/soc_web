@@ -9,6 +9,8 @@ export function BoardPage() {
   const { category = 'notice' } = useParams<{ category: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [cursorHistory, setCursorHistory] = useState<string[]>(['']);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [boards, setBoards] = useState<Board[]>([]);
   const [board, setBoard] = useState<Board | null>(null);
@@ -17,13 +19,14 @@ export function BoardPage() {
   const [error, setError] = useState(false);
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
 
-  const postsPerPage = 10;
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(false);
     setCurrentPage(1);
+    setCursorHistory(['']);
+    setNextCursor(null);
     Promise.all([
       boardApi.list({ locale: 'ko' }, controller.signal),
       boardApi.articles(category, { locale: 'ko', limit: 50 }, controller.signal),
@@ -32,6 +35,7 @@ export function BoardPage() {
       setBoards(registry.items.filter((item) => !item.config.isHidden));
       setBoard(selected);
       setPosts(articleList.items);
+      setNextCursor(articleList.nextCursor);
       if (!selected) setError(true);
     }).catch((cause: unknown) => {
       if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
@@ -39,22 +43,45 @@ export function BoardPage() {
     return () => controller.abort();
   }, [category]);
 
-  const filteredPosts = posts.filter((post) => (post.title.value ?? '').toLowerCase().includes(searchQuery.toLowerCase()));
-  const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
-  const startIndex = (currentPage - 1) * postsPerPage;
-  const currentPosts = filteredPosts.slice(startIndex, startIndex + postsPerPage);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(false);
+    setCurrentPage(1);
+    setCursorHistory(['']);
+    setNextCursor(null);
+    boardApi.articles(category, { locale: 'ko', limit: 50 }, controller.signal)
+      .then((articleList) => {
+        setPosts(articleList.items);
+        setNextCursor(articleList.nextCursor);
+      })
+      .catch((cause: unknown) => {
+        if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [category, searchQuery]);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const currentPosts = posts.filter((post) => (post.title.value ?? '').toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const getPageNumbers = () => {
-    const pages = [];
-    const startPage = Math.max(1, currentPage - 2);
-    const endPage = Math.min(totalPages, startPage + 4);
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
-    return pages;
+  const handlePageChange = async (page: number) => {
+    if (page <= 0 || page === currentPage || page > currentPage + 1) return;
+    const cursor = page === currentPage + 1 ? nextCursor : cursorHistory[page - 1];
+    if (!cursor && page === currentPage + 1) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const articleList = await boardApi.articles(category, { locale: 'ko', limit: 50, cursor: cursor || undefined });
+      setPosts(articleList.items);
+      setNextCursor(articleList.nextCursor);
+      setCursorHistory((history) => page === history.length + 1 ? [...history, cursor!] : history);
+      setCurrentPage(page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (cause: unknown) {
+      if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -140,39 +167,25 @@ export function BoardPage() {
               </div>
 
               <div className="mt-8 flex items-center justify-center relative">
-                {totalPages > 1 && (
+                {(currentPage > 1 || nextCursor) && (
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1 || loading}
                       className={`p-1 transition-colors ${
-                        currentPage === 1
+                        currentPage === 1 || loading
                           ? 'text-kaist-grey/30 cursor-not-allowed'
                           : 'text-kaist-darkgreen hover:bg-kaist-grey/10'
                       }`}
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>
-
-                    {getPageNumbers().map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                          className={`min-w-[28px] h-[28px] px-2 rounded-[5px] text-[12px] font-medium tracking-tight transition-colors ${
-                            currentPage === page
-                              ? 'bg-kaist-darkgreen-main text-kaist-white'
-                              : 'text-kaist-black hover:bg-kaist-grey/10'
-                          }`}
-                        >
-                          {page}
-                      </button>
-                    ))}
-
+                    <span className="min-w-[28px] text-center text-[12px] font-medium text-kaist-black">{currentPage}</span>
                     <button
-                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={!nextCursor || loading}
                       className={`p-2 transition-colors ${
-                        currentPage === totalPages
+                        !nextCursor || loading
                           ? 'text-kaist-grey/30 cursor-not-allowed'
                           : 'text-kaist-darkgreen hover:bg-kaist-grey/10'
                       }`}
