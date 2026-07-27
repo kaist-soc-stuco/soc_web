@@ -8,6 +8,13 @@
       "when": 1774792770091,
       "tag": "0000_dizzy_hawkeye",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785128695306,
+      "tag": "0001_open_giant_girl",
+      "breakpoints": true
     }
   ]
 }

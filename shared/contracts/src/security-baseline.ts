@@ -151,6 +151,23 @@ export const ACTOR_PII_PROJECTION_POLICY = {
     prohibitedFields: ["beforeValue", "afterValue", "plaintext", "ciphertext", "hash"],
   },
 } as const;
+export const AUTHORIZATION_GRANT_POLICY = {
+  runtimeAuthority: "effective_permission_grants_only",
+  legacyPermission: "read_only_backfill_input_never_runtime_authority",
+  canonicalSubject: "sso_subject_immutable_once_set",
+  permissionChange: {
+    request: "immutable_hashed_record",
+    requiredTransitions: ["PENDING", "APPROVED", "ACTIVATED"],
+    terminalStates: ["REJECTED", "CANCELLED", "EXPIRED"],
+    approvalAndActivation: "requester_distinct_from_approver_and_activator_approver_may_activate",
+    expiresAfterHours: 24,
+  },
+  audit: {
+    appendOnly: true,
+    minimizedFields: ["actorId", "action", "recordId", "changedFieldNames", "timestamp", "correlationId", "reasonCode"],
+    piiAndValues: "forbidden",
+  },
+} as const;
 
 export const COMPATIBILITY_BACKFILL_POLICY = {
   stages: {

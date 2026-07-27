@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -14,6 +15,7 @@ import {
 
 const TEST_TIMEOUT_MS = CONTAINER_STARTUP_TIMEOUT_MS * 3 + 30_000;
 const MIGRATIONS_FOLDER = resolve(__dirname, '../drizzle');
+const JOURNAL_PATH = resolve(MIGRATIONS_FOLDER, 'meta/_journal.json');
 const GETDEL_KEY = 'infrastructure:getdel:00000000-0000-4000-8000-000000000001';
 const CAS_KEY = 'infrastructure:cas:00000000-0000-4000-8000-000000000002';
 
@@ -70,7 +72,10 @@ describe('containerized infrastructure', () => {
     const migrationJournal = await postgres.query<{ count: string }>(
       'SELECT count(*) FROM "drizzle"."__drizzle_migrations"',
     );
-    expect(migrationJournal.rows[0]?.count).toBe('1');
+    const journal = JSON.parse(await readFile(JOURNAL_PATH, 'utf8')) as {
+      entries: unknown[];
+    };
+    expect(migrationJournal.rows[0]?.count).toBe(String(journal.entries.length));
   });
 
   it('supports Redis GETDEL atomically', async () => {
