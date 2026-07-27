@@ -1,24 +1,45 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Header } from '@/components/organisms/header';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { boardCategories, boardInfo, createMockPosts } from '@/lib/mock-data';
+import { boardApi } from '@/lib/board-api';
+import type { ArticleSummary, Board } from '@soc/contracts';
 
 export function BoardPage() {
-  const { category = '공지' } = useParams<{ category: string }>();
+  const { category = 'notice' } = useParams<{ category: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [board, setBoard] = useState<Board | null>(null);
+  const [posts, setPosts] = useState<ArticleSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
-  
+
   const postsPerPage = 10;
-  
-  const mockPosts = createMockPosts(category);
 
-  const filteredPosts = mockPosts.filter(post =>
-    post.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(false);
+    setCurrentPage(1);
+    Promise.all([
+      boardApi.list({ locale: 'ko' }, controller.signal),
+      boardApi.articles(category, { locale: 'ko', limit: 100 }, controller.signal),
+    ]).then(([registry, articleList]) => {
+      const selected = registry.items.find((item) => item.code === category) ?? null;
+      setBoards(registry.items.filter((item) => !item.config.isHidden));
+      setBoard(selected);
+      setPosts(articleList.items);
+      if (!selected) setError(true);
+    }).catch((cause: unknown) => {
+      if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
+    }).finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [category]);
 
+  const filteredPosts = posts.filter((post) => (post.title.value ?? '').toLowerCase().includes(searchQuery.toLowerCase()));
   const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
   const startIndex = (currentPage - 1) * postsPerPage;
   const currentPosts = filteredPosts.slice(startIndex, startIndex + postsPerPage);
@@ -32,12 +53,10 @@ export function BoardPage() {
     const pages = [];
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(totalPages, startPage + 4);
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
+    for (let i = startPage; i <= endPage; i++) pages.push(i);
     return pages;
   };
+
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F7FCFC]">
@@ -47,10 +66,10 @@ export function BoardPage() {
         <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
           <div className={pageContainerClass}>
             <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">
-              {category} 게시판
+              {board?.title.value ?? category} 게시판
             </h1>
             <p className="text-[20px] font-semibold tracking-tight text-kaist-white">
-              {boardInfo[category]?.description || ''}
+              {board?.description.value ?? ''}
             </p>
           </div>
         </div>
@@ -59,25 +78,11 @@ export function BoardPage() {
           <div className="border-b border-kaist-grey/30">
             <div className={`${pageContainerClass} flex flex-wrap items-end justify-between gap-8`}>
               <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-10">
-                {boardCategories.map((board, index) => (
-                  <Link
-                    key={board}
-                    to={`/board/${board}`}
-                    className="relative group"
-                    onMouseEnter={() => setHoveredIndex(index)}
-                    onMouseLeave={() => setHoveredIndex(null)}
-                  >
-                    <div className={`relative flex items-center justify-center h-full text-lg font-extrabold tracking-tight transition-colors ${
-                      category === board
-                        ? 'text-kaist-darkgreen'
-                        : 'text-kaist-greygreen hover:text-kaist-darkgreen'
-                    }`}>
-                      <span className="py-3">{board}</span>
-                      <span 
-                        className={`absolute bottom-0 left-0 right-0 h-1.5 bg-kaist-darkgreen transition-transform duration-200 origin-center ${
-                          category === board ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'
-                        }`}
-                      />
+                {boards.map((item, index) => (
+                  <Link key={item.code} to={`/board/${item.code}`} className="relative group" onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
+                    <div className={`relative flex items-center justify-center h-full text-lg font-extrabold tracking-tight transition-colors ${category === item.code ? 'text-kaist-darkgreen' : 'text-kaist-greygreen hover:text-kaist-darkgreen'}`}>
+                      <span className="py-3">{item.title.value}</span>
+                      <span className={`absolute bottom-0 left-0 right-0 h-1.5 bg-kaist-darkgreen transition-transform duration-200 origin-center ${category === item.code ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'}`} />
                     </div>
                   </Link>
                 ))}
@@ -114,39 +119,23 @@ export function BoardPage() {
               </div>
 
               <div className="divide-y divide-kaist-grey/20 border-b border-kaist-grey/20">
-                {currentPosts.length > 0 ? (
+                {loading ? (
+                  <div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">게시글을 불러오는 중입니다</p></div>
+                ) : error ? (
+                  <div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">게시글을 불러오지 못했습니다</p></div>
+                ) : currentPosts.length > 0 ? (
                   currentPosts.map((post) => (
-                    <Link
-                      key={post.id}
-                      to={`/board/${category}/${post.id}`}
-                      className="grid grid-cols-12 gap-4 py-3.5 hover:bg-kaist-grey/5 transition-colors group"
-                    >
-                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium text-kaist-grey">
-                        {post.id}
-                      </div>
-                      <div className="col-span-1 text-center">
-                        <span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-regular tracking-tight">
-                          {post.category}
-                        </span>
-                      </div>
-                      <div className="col-span-7 flex items-center pl-8 text-left text-sm font-medium tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">
-                        {post.title}
-                      </div>
-                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium tracking-tight text-kaist-black">
-                        {post.author}
-                      </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
-                        {post.date}
-                      </div>
-                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">
-                        {post.views}
-                      </div>
+                    <Link key={post.id} to={`/board/${post.boardCode}/${post.id}`} className="grid grid-cols-12 gap-4 py-3.5 hover:bg-kaist-grey/5 transition-colors group">
+                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium text-kaist-grey">{post.id}</div>
+                      <div className="col-span-1 text-center"><span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-regular tracking-tight">{board?.title.value ?? post.boardCode}</span></div>
+                      <div className="col-span-7 flex items-center pl-8 text-left text-sm font-medium tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">{post.title.value}</div>
+                      <div className="col-span-1" />
+                      <div className="col-span-1 grid place-content-center text-center text-xs font-medium tracking-tight text-kaist-grey">{post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('ko-KR') : ''}</div>
+                      <div className="col-span-1" />
                     </Link>
                   ))
                 ) : (
-                  <div className="py-20 text-center text-kaist-grey">
-                    <p className="text-base font-semibold">게시글이 없습니다</p>
-                  </div>
+                  <div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">게시글이 없습니다</p></div>
                 )}
               </div>
 
