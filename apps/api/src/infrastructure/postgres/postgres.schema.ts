@@ -72,6 +72,17 @@ export const users = pgTable(
     uniqueIndex("users_kaist_uid_unique").on(table.kaistUid),
   ],
 );
+export const userPiiBackfillProgress = pgTable("user_pii_backfill_progress", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  jobKey: text("job_key").notNull().unique(),
+  lastProcessedCreatedAt: timestamp("last_processed_created_at", { withTimezone: true }),
+  lastProcessedUserId: uuid("last_processed_user_id").references(() => users.id),
+  upperBoundCreatedAt: timestamp("upper_bound_created_at", { withTimezone: true }),
+  upperBoundUserId: uuid("upper_bound_user_id").references(() => users.id),
+  batchSize: integer("batch_size").notNull().default(500),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const permissionDefinitions = pgTable(
   "permission_definitions",
