@@ -199,6 +199,7 @@ export const permissionAuditLog = pgTable(
     changedFieldNames: text("changed_field_names").notNull(),
     correlationId: text("correlation_id").notNull(),
     reasonCode: text("reason_code"),
+    requestFingerprint: text("request_fingerprint"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -210,6 +211,13 @@ export const permissionAuditLog = pgTable(
       "permission_audit_log_reason_code_technical_identifier_check",
       sql`${table.reasonCode} IS NULL OR ${table.reasonCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`,
     ),
+    check(
+      "permission_audit_log_request_fingerprint_check",
+      sql`${table.requestFingerprint} IS NULL OR ${table.requestFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    uniqueIndex("permission_audit_log_fee_idempotency_unique")
+      .on(table.actorUserId, table.correlationId)
+      .where(sql`${table.action} = 'FEE_STATUS_UPDATED'`),
     index("permission_audit_log_occurred_at_idx").on(table.occurredAt),
     index("permission_audit_log_occurred_at_id_idx").on(table.occurredAt, table.id),
   ],

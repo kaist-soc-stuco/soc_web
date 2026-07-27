@@ -2,68 +2,15 @@
   "version": "7",
   "dialect": "postgresql",
   "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1774792770091,
-      "tag": "0000_dizzy_hawkeye",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1785128695306,
-      "tag": "0001_open_giant_girl",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1785133158266,
-      "tag": "0002_steep_firestar",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1785133226463,
-      "tag": "0003_flimsy_silhouette",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1785145142795,
-      "tag": "0004_cute_hedge_knight",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1785149579244,
-      "tag": "0005_ancient_loki",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1785166946887,
-      "tag": "0006_phase6_contacts",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1785170070557,
-      "tag": "0007_phase2_migration_repair",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1785171000000,
-      "tag": "0008_phase2_user_pii",
-      "breakpoints": true
-    }
+    { "idx": 0, "version": "7", "when": 1774792770091, "tag": "0000_dizzy_hawkeye", "breakpoints": true },
+    { "idx": 1, "version": "7", "when": 1785128695306, "tag": "0001_open_giant_girl", "breakpoints": true },
+    { "idx": 2, "version": "7", "when": 1785133158266, "tag": "0002_steep_firestar", "breakpoints": true },
+    { "idx": 3, "version": "7", "when": 1785133226463, "tag": "0003_flimsy_silhouette", "breakpoints": true },
+    { "idx": 4, "version": "7", "when": 1785145142795, "tag": "0004_cute_hedge_knight", "breakpoints": true },
+    { "idx": 5, "version": "7", "when": 1785149579244, "tag": "0005_ancient_loki", "breakpoints": true },
+    { "idx": 6, "version": "7", "when": 1785166946887, "tag": "0006_phase6_contacts", "breakpoints": true },
+    { "idx": 7, "version": "7", "when": 1785170070557, "tag": "0007_phase2_migration_repair", "breakpoints": true },
+    { "idx": 8, "version": "7", "when": 1785171000000, "tag": "0008_phase2_user_pii", "breakpoints": true },
+    { "idx": 9, "version": "7", "when": 1785172000000, "tag": "0009_phase2_fee_idempotency", "breakpoints": true }
   ]
 }
