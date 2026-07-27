@@ -1,11 +1,25 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import type { PublicFaqListResponse } from '@soc/contracts';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
-import { faqPreviewItems } from '@/lib/mock-data';
+import { getFaqs } from '@/lib/faq-api';
+import { localizedText } from '@/lib/localized-content';
+
 
 export function AboutPage() {
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
-  const faqItems = faqPreviewItems.slice(0, 3);
+  const [faqItems, setFaqItems] = useState<PublicFaqListResponse['topics'][number]['items']>([]);
+  const [faqStatus, setFaqStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+
+  useEffect(() => {
+    getFaqs()
+      .then((response) => {
+        setFaqItems(response.topics.flatMap((topic) => topic.items).slice(0, 3));
+        setFaqStatus('ready');
+      })
+      .catch(() => setFaqStatus('error'));
+  }, []);
 
   return (
     <SiteLayout>
@@ -56,13 +70,13 @@ export function AboutPage() {
                 </div>
 
                 <div className="divide-y divide-[#d7e2da]">
-                  {faqItems.map((item, index) => (
-                    <Link key={`${item.question}-${index}`} to="/faq" className="block py-4 first:pt-2 last:pb-0">
+                  {faqStatus === 'loading' ? <p className="py-6 text-sm text-kaist-grey">FAQ를 불러오는 중입니다</p> : faqStatus === 'error' ? <p role="alert" className="py-6 text-sm text-kaist-grey">FAQ를 불러오지 못했습니다</p> : faqItems.length === 0 ? <p className="py-6 text-sm text-kaist-grey">등록된 FAQ가 없습니다</p> : faqItems.map((item, index) => (
+                    <Link key={`${item.id}-${index}`} to="/faq" className="block py-4 first:pt-2 last:pb-0">
                       <p className="text-[15px] font-semibold leading-normal tracking-tight text-kaist-darkgreen-main md:text-[16px]">
-                        Q: {item.question}
+                        Q: {localizedText(item.question)}
                       </p>
                       <p className="mt-2 text-[13px] font-normal leading-normal tracking-tight text-kaist-black md:text-[15px]">
-                        A: {item.answer}
+                        A: {localizedText(item.answer)}
                       </p>
                     </Link>
                   ))}

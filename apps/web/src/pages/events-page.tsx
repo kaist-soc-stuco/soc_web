@@ -5,7 +5,7 @@ import type { EventItem } from '@soc/contracts';
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { getEvents } from '@/lib/event-api';
 import { localizedText } from '@/lib/localized-content';
-import { mockEvents } from '@/lib/mock-data';
+import { surveyApi } from '@/lib/survey-api';
 import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 const eventTabs = ['설문조사', '행사'] as const;
@@ -35,6 +35,8 @@ export function EventsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventLoadState, setEventLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [surveys, setSurveys] = useState<Awaited<ReturnType<typeof surveyApi.list>>['items']>([]);
+  const [surveyLoadState, setSurveyLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
   const activeTab: EventTab = searchParams.get('type') === 'event' ? '행사' : '설문조사';
 
@@ -66,6 +68,14 @@ export function EventsPage() {
       cancelled = true;
     };
   }, [activeTab]);
+  useEffect(() => {
+    if (activeTab !== '설문조사') { setSurveyLoadState('idle'); return; }
+    let cancelled = false;
+    setSurveys([]);
+    setSurveyLoadState('loading');
+    surveyApi.list().then((response) => { if (!cancelled) { setSurveys(response.items.filter((survey) => survey.state === 'OPEN' || survey.state === 'SCHEDULED')); setSurveyLoadState('ready'); } }).catch(() => { if (!cancelled) setSurveyLoadState('error'); });
+    return () => { cancelled = true; };
+  }, [activeTab]);
 
   const cardEvents = useMemo<EventCard[]>(
     () =>
@@ -78,12 +88,15 @@ export function EventsPage() {
             status: event.startAtMs > Date.now() ? 'upcoming' : event.endAtMs > Date.now() ? 'ongoing' : 'completed',
             href: '/calendar',
           }))
-        : Array.from({ length: 18 }, (_, index) => ({
-            ...mockEvents[index % mockEvents.length],
-            id: index + 1,
-            href: `/events/${index + 1}/survey`,
+        : surveys.map((survey) => ({
+            id: survey.id,
+            title: localizedText(survey.title),
+            summary: survey.description ? localizedText(survey.description) : '',
+            date: survey.closesAt ? new Date(survey.closesAt).toLocaleDateString('ko-KR') : '',
+            status: 'upcoming',
+            href: `/events/${survey.id}/survey`,
           })),
-    [activeTab, events],
+  [activeTab, events, surveys],
   );
 
   const filteredEvents = cardEvents.filter((event) => event.title.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -92,7 +105,9 @@ export function EventsPage() {
   const currentEvents = filteredEvents.slice((currentPage - 1) * cardsPerPage, currentPage * cardsPerPage);
   const eventIsLoading = activeTab === '행사' && (eventLoadState === 'idle' || eventLoadState === 'loading');
   const eventHasError = activeTab === '행사' && eventLoadState === 'error';
-  const canRenderCards = activeTab === '설문조사' || eventLoadState === 'ready';
+  const surveyIsLoading = activeTab === '설문조사' && (surveyLoadState === 'idle' || surveyLoadState === 'loading');
+  const surveyHasError = activeTab === '설문조사' && surveyLoadState === 'error';
+  const canRenderCards = activeTab === '행사' ? eventLoadState === 'ready' : surveyLoadState === 'ready';
 
   const handleTabChange = (tab: EventTab) => {
     setSearchParams({ type: tab === '행사' ? 'event' : 'survey' });
@@ -210,18 +225,12 @@ export function EventsPage() {
           ))}
         </div>
 
-        {eventIsLoading ? (
-          <div className="py-20 text-center text-kaist-grey">
-            <p className="text-base font-semibold">행사를 불러오는 중입니다</p>
-          </div>
-        ) : eventHasError ? (
-          <div className="py-20 text-center text-kaist-grey">
-            <p className="text-base font-semibold">행사를 불러오지 못했습니다</p>
-          </div>
+        {eventIsLoading || surveyIsLoading ? (
+          <div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">{activeTab === '행사' ? '행사를' : '설문을'} 불러오는 중입니다</p></div>
+        ) : eventHasError || surveyHasError ? (
+          <div className="py-20 text-center text-kaist-grey"><p role="alert" className="text-base font-semibold">{activeTab === '행사' ? '행사를' : '설문을'} 불러오지 못했습니다</p></div>
         ) : currentEvents.length === 0 ? (
-          <div className="py-20 text-center text-kaist-grey">
-            <p className="text-base font-semibold">행사가 없습니다</p>
-          </div>
+          <div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">{activeTab === '행사' ? '행사가' : '설문이'} 없습니다</p></div>
         ) : null}
 
         <div className="mt-8 flex items-center justify-center gap-2 text-[12px] font-medium tracking-tight text-kaist-black">
