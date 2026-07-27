@@ -10,7 +10,30 @@ export interface TestInfrastructure {
   stop(): Promise<void>;
 }
 
+function externalInfrastructure(): TestInfrastructure | null {
+  const databaseUrl = process.env.TEST_DATABASE_URL?.trim();
+  const redisUrl = process.env.TEST_REDIS_URL?.trim();
+
+  if (!databaseUrl && !redisUrl) {
+    return null;
+  }
+  if (!databaseUrl || !redisUrl) {
+    throw new Error(
+      'TEST_DATABASE_URL and TEST_REDIS_URL must be configured together',
+    );
+  }
+
+  return {
+    databaseUrl,
+    redisUrl,
+    stop: async (): Promise<void> => undefined,
+  };
+}
 export async function startTestInfrastructure(): Promise<TestInfrastructure> {
+  const external = externalInfrastructure();
+  if (external) {
+    return external;
+  }
   let postgres: StartedPostgreSqlContainer | undefined;
   let redis: StartedTestContainer | undefined;
 
