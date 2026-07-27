@@ -22,7 +22,7 @@ describe('UsersController HTTP boundary', () => {
   beforeEach(async () => {
     users = {
       findById: vi.fn().mockResolvedValue({ id: actorId, permission: 999 }), getMe: vi.fn(), patchMe: vi.fn(), getFeeSelf: vi.fn(),
-      listAdmin: vi.fn(), getAdmin: vi.fn(), updateFeeAdmin: vi.fn(),
+      listAdmin: vi.fn(), listAdminFees: vi.fn(), getAdmin: vi.fn(), updateFeeAdmin: vi.fn(),
     };
     sessions = { validateAccessToken: vi.fn().mockResolvedValue({ mode: 'persisted', sub: actorId, sid: 'session-1' }) };
     const module = await Test.createTestingModule({
@@ -72,6 +72,37 @@ describe('UsersController HTTP boundary', () => {
     expect(list.body).toEqual({ items: [{ id: targetId, nameEn: 'Ada', grants: [] }], nextCursor: null });
     expect(detail.body).toEqual({ id: targetId, nameEn: 'Ada', grants: [] });
     expect(`${list.text}${detail.text}`).not.toMatch(/ssoSubject|ssoUserId|permission|userMobile/i);
+  });
+  it('authorizes and shapes the current admin fee projection', async () => {
+    users.listAdminFees.mockResolvedValue({
+      items: [{
+        id: targetId,
+        kaistUid: 'k1',
+        studentOrEmployeeNumber: 's1',
+        nameKr: '에이다',
+        nameEn: 'Ada',
+        feeStatus: 'PAID',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      }],
+    });
+    const response = await authenticatedGet('/api/users/admin/fees').expect(200);
+    expect(response.body).toEqual({
+      items: [{
+        id: targetId,
+        kaistUid: 'k1',
+        studentOrEmployeeNumber: 's1',
+        nameKr: '에이다',
+        nameEn: 'Ada',
+        feeStatus: 'PAID',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      }],
+    });
+    expect(users.listAdminFees).toHaveBeenCalledWith(actorId);
+  });
+  it('does not expose fee rows when FEES_MANAGE is denied', async () => {
+    users.listAdminFees.mockRejectedValue(new ForbiddenException('insufficient_permission'));
+    const response = await authenticatedGet('/api/users/admin/fees').expect(403);
+    expect(response.body).toEqual({ code: 'insufficient_permission', message: 'Request failed', requestId: expect.any(String) });
   });
 
   it('rejects unknown keys and malformed user IDs before forwarding to the service', async () => {

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  AdminFeeListResponse,
   AdminFeeUpdateResponse,
   AdminUserGetResponse,
   AdminUserListResponse,
@@ -154,6 +155,21 @@ export class UsersService {
     return {
       items: items.map((user) => ({ ...this.adminUserProfile(user), grants: grants.get(user.id) ?? [] })),
       nextCursor: hasMore ? this.encodeCursor(items.at(-1)!) : null,
+    };
+  }
+  async listAdminFees(actorUserId: string): Promise<AdminFeeListResponse> {
+    await this.requireAdminFees(actorUserId);
+    const rows = await this.usersRepository.listCurrentFees();
+    return {
+      items: rows.map((user) => ({
+        feeStatus: user.feeStatus,
+        id: user.id,
+        kaistUid: user.kaistUid,
+        nameEn: user.nameEn,
+        nameKr: user.nameKr,
+        studentOrEmployeeNumber: user.studentOrEmployeeNumber,
+        updatedAt: user.updatedAt,
+      })),
     };
   }
 

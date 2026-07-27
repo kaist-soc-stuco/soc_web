@@ -40,6 +40,10 @@ export class UsersController {
   async getMyFee(@Req() request: AuthenticatedRequest) {
     return this.usersService.getFeeSelf(request.user.id);
   }
+  @Get("admin/fees")
+  async listAdminFees(@Req() request: AuthenticatedRequest) {
+    return this.usersService.listAdminFees(request.user.id);
+  }
 
   @Get("admin")
   async listAdmin(@Req() request: AuthenticatedRequest, @Query() query: AdminUserListQuery) {

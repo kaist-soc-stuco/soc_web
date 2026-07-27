@@ -96,6 +96,10 @@ export class UsersRepository {
     const rows = await this.db.select().from(users).where(predicates.length ? and(...predicates) : undefined).orderBy(asc(users.createdAt), asc(users.id)).limit(input.limit);
     return rows.map((row) => this.mapRowToUserRecord(row));
   }
+  async listCurrentFees(): Promise<UserRecord[]> {
+    const rows = await this.db.select().from(users).orderBy(asc(users.updatedAt), asc(users.id));
+    return rows.map((row) => this.mapRowToUserRecord(row));
+  }
 
   async findEffectiveGrants(userIds: string[]): Promise<Map<string, EffectivePermissionGrant[]>> {
     const result = new Map<string, EffectivePermissionGrant[]>();

@@ -146,3 +146,16 @@ export interface PermissionAuditListResponse {
   items: PermissionAuditEntry[];
   nextCursor: string | null;
 }
+export interface AdminFeeListItem {
+  id: string;
+  kaistUid: string | null;
+  studentOrEmployeeNumber: string | null;
+  nameKr: string | null;
+  nameEn: string | null;
+  feeStatus: FeeStatus;
+  updatedAt: string;
+}
+
+export interface AdminFeeListResponse {
+  items: AdminFeeListItem[];
+}
