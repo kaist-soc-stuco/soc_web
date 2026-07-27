@@ -7,7 +7,7 @@ import { boardInfo } from '@/lib/mock-data';
 const mockPrevPost = {
   id: 0,
   title: '전산학부 2026년 봄학기 오리엔테이션 안내',
-  author: '박지수',
+  author: '학생회',
   date: '26.03.03',
   views: 204,
 };
@@ -15,7 +15,7 @@ const mockPrevPost = {
 const mockNextPost = {
   id: 2,
   title: '3월 학생회 정기 회의 결과 공유',
-  author: '김민준',
+  author: '학생회',
   date: '26.03.05',
   views: 178,
 };
@@ -24,7 +24,7 @@ const mockPost = {
   id: 1,
   category: '공지',
   title: '2026년 1학기 전산학부 학생회 활동 안내',
-  author: '조성원',
+  author: '학생회',
   date: '26.03.04',
   views: 312,
   summary: '2026년 1학기를 맞이하여 전산학부 학생회의 주요 활동 일정과 안내사항을 공지합니다.',

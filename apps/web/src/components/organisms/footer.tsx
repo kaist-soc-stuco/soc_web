@@ -9,16 +9,8 @@ export function Footer() {
           </h4>
           <div className="space-y-1">
             <p className="text-xs md:text-sm font-semibold tracking-tight text-kaist-white break-all">
-              회장 홍길동 hongdong@kaist.ac.kr
+              대표 연락처는 준비 중입니다.
             </p>
-            <div className="flex flex-col md:flex-row gap-1 md:gap-2">
-              <p className="text-xs md:text-sm font-semibold tracking-tight text-kaist-white break-all">
-                부회장 조길동 jodong@kaist.ac.kr
-              </p>
-              <p className="text-xs md:text-sm font-semibold tracking-tight text-kaist-white break-all">
-                부회장 김길동 jodong@kaist.ac.kr
-              </p>
-            </div>
           </div>
         </div>
 
@@ -29,16 +21,8 @@ export function Footer() {
           </h4>
           <div className="space-y-1">
             <p className="text-xs md:text-sm font-semibold tracking-tight text-kaist-white break-all">
-              과대표 홍길동 hongdong@kaist.ac.kr
+              대표 연락처는 준비 중입니다.
             </p>
-            <div className="flex flex-col md:flex-row gap-1 md:gap-2">
-              <p className="text-xs md:text-sm font-semibold tracking-tight text-kaist-white break-all">
-                부과대표 조길동 jodong@kaist.ac.kr
-              </p>
-              <p className="text-xs md:text-sm font-semibold tracking-tight text-kaist-white break-all">
-                부과대표 김길동 jodong@kaist.ac.kr
-              </p>
-            </div>
           </div>
         </div>
 

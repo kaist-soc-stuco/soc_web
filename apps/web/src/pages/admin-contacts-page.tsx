@@ -1,4 +1,3 @@
-import { adminContactRows } from '@/lib/mock-data';
 
 export function AdminContactsPage() {
   return (
@@ -30,24 +29,9 @@ export function AdminContactsPage() {
         </div>
 
         <div className="min-w-[1040px] divide-y divide-kaist-grey/20 border-b border-kaist-grey/20">
-          {adminContactRows.map((row) => (
-            <div
-              key={row.id}
-              className="grid grid-cols-[96px_1.1fr_1.2fr_2fr_1.5fr_1fr_0.8fr] items-center py-3.5 text-sm transition-colors hover:bg-kaist-grey/5"
-            >
-              <div className="flex justify-center">
-                <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-kaist-grey/15 text-[13px] font-extrabold text-kaist-darkgreen">
-                  {row.name.slice(0, 1)}
-                </div>
-              </div>
-              <div className="text-center font-semibold text-kaist-darkgreen">{row.name}</div>
-              <div className="text-center font-semibold text-kaist-darkgreen">{row.role}</div>
-              <div className="truncate text-center font-semibold text-[#39404B]">{row.email}</div>
-              <div className="text-center font-semibold text-[#39404B]">{row.phone}</div>
-              <div className="text-center font-semibold text-[#39404B]">{row.affiliation}</div>
-              <div className="text-center font-semibold text-[#39404B]">{row.note}</div>
-            </div>
-          ))}
+          <div className="py-8 text-center text-sm font-semibold text-[#39404B]">
+            연락처 정보는 현재 제공되지 않습니다.
+          </div>
         </div>
       </div>
     </section>

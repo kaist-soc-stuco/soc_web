@@ -7,6 +7,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "verify:privacy": "node scripts/verify-privacy-baseline.mjs",
     "test": "echo 'no tests yet'"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 
-import { adminMenu } from '@/lib/mock-data';
+import { adminMenu } from '@/lib/static-site-content';
 
 export function AdminDashboardPage() {
   return (

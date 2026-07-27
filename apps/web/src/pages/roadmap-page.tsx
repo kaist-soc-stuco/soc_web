@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, Search, X } from 'lucide-react';
 
-import { csIrregularCourseCodes, csRequiredCourseCodes, csRoadmapCourses, type RoadmapCourse } from '@/lib/mock-data';
+import { csIrregularCourseCodes, csRequiredCourseCodes, csRoadmapCourses, type RoadmapCourse } from '@/lib/static-site-content';
 import { SiteLayout } from '@/components/organisms/site-layout';
 
 const rowLabels: Record<number, string> = {

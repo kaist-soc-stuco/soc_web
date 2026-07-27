@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { Header } from '@/components/organisms/header';
-import { adminMenu } from '@/lib/mock-data';
+import { adminMenu } from '@/lib/static-site-content';
 
 export function AdminPage() {
   return (
