@@ -65,6 +65,23 @@ describe('origin middleware HTTP contract', () => {
   it.each(['post', 'put', 'patch', 'delete'] as const)('rejects %s without an exact Origin header', async (method) => {
     const response = await request(app!.getHttpServer())[method]('/api/origin-probe').expect(403);
     expect(response.body).toMatchObject({ code: 'origin_required_or_mismatch', requestId: expect.any(String) });
+    expect(response.headers['x-request-id']).toBe(response.body.requestId);
+  });
+
+  it.each([
+    ['/api', 'post'],
+    ['/api/?probe=1', 'put'],
+    ['/api?probe=1', 'patch'],
+    ['/api/', 'delete'],
+  ] as const)('rejects unsafe requests to API root variant %s', async (path, method) => {
+    const response = await request(app!.getHttpServer())[method](path)
+      .set('x-request-id', 'root-request')
+      .expect(403);
+    expect(response.body.requestId).toBe('root-request');
+    expect(response.headers['x-request-id']).toBe('root-request');
+  });
+  it.each(['/api', '/api/?probe=1'])('does not apply Origin policy to safe GET API root %s', async (path) => {
+    await request(app!.getHttpServer()).get(path).set('Origin', 'https://mismatch.example.test').expect(404);
   });
 
   it.each([
@@ -78,6 +95,7 @@ describe('origin middleware HTTP contract', () => {
       .post('/api/origin-probe')
       .set('Origin', origin)
       .expect(403);
+    expect(response.headers['x-request-id']).toBe(response.body.requestId);
     expect(response.body).toMatchObject({ code: 'origin_required_or_mismatch', requestId: expect.any(String) });
   });
 

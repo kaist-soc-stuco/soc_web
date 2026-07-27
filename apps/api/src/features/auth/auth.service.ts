@@ -6,13 +6,14 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { nowIso, expiresAtMs } from "@soc/shared";
 
 import { REDIS_CLIENT } from '../../infrastructure/redis/redis.provider';
 import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
+import { AuthStateRepository } from "./auth-state.repository";
 import type { LoginCallbackResult } from "./auth.types";
 
 interface SsoConfig {
@@ -30,11 +31,13 @@ interface StoredLoginState {
   createdAt: string;
   expiresAt: number;
   nonce: string;
+  bindingHash: string;
 }
 
 interface LoginStartPayload extends SsoConfig {
   nonce: string;
   state: string;
+  transactionSecret: string;
 }
 
 
@@ -66,6 +69,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly authSessionService: AuthSessionService,
     private readonly pendingLoginRepository: PendingLoginRepository,
+    private readonly authStateRepository: AuthStateRepository,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
     this.startConfig = this.loadStartConfig();
@@ -79,32 +83,38 @@ export class AuthService {
     const config = this.readStartConfig();
     const state = randomUUID();
     const nonce = randomUUID();
+    const transactionSecret = randomBytes(32).toString("base64url");
 
     await this.storePendingState(state, {
       nonce,
       createdAt: nowIso(),
       expiresAt: expiresAtMs(STATE_TTL_SECONDS),
+      bindingHash: this.hashBinding(transactionSecret),
     });
 
     return {
       ...config,
       nonce,
       state,
+      transactionSecret,
     };
   }
 
   /**
     * SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
    */
-  async handleLoginCallback(body: CallbackBody): Promise<LoginCallbackResult> {
+  async handleLoginCallback(body: CallbackBody, transactionSecret?: string): Promise<LoginCallbackResult> {
     if (body.error || body.errorCode) {
       throw new UnauthorizedException("sso_authorize_failed");
     }
-    if (!body.state || !body.code) {
+    if (!body.state || !body.code || !transactionSecret) {
       throw new UnauthorizedException("invalid_or_expired_state");
     }
 
-    const rawState = await this.redis.getdel(this.buildRedisKey(body.state));
+    const rawState = await this.authStateRepository.compareAndDelete(
+      this.buildRedisKey(body.state),
+      this.hashBinding(transactionSecret),
+    );
     const storedState = rawState ? this.parseStoredState(rawState) : null;
     if (!storedState || storedState.expiresAt <= Date.now()) {
       throw new UnauthorizedException("invalid_or_expired_state");
@@ -217,6 +227,9 @@ export class AuthService {
     } catch {
       return null;
     }
+  }
+  private hashBinding(secret: string): string {
+    return createHash("sha256").update(secret).digest("hex");
   }
 
 

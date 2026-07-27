@@ -13,18 +13,20 @@ export const createOriginMiddleware = (publicOrigin: string) =>
 
     if (
       !UNSAFE_METHODS.has(request.method) ||
-      !path.startsWith("/api/") ||
+      (path !== "/api" && !path.startsWith("/api/")) ||
       (request.method === "POST" && path === CALLBACK_PATH)
     ) {
       next();
       return;
     }
 
+    const requestId = request.requestId ?? request.get("x-request-id") ?? "unknown";
     if (request.get("origin") !== publicOrigin) {
+      response.setHeader("x-request-id", requestId);
       response.status(403).json({
         code: "origin_required_or_mismatch",
         message: "Origin is required and must match the configured public origin",
-        requestId: request.requestId ?? request.get("x-request-id") ?? "unknown",
+        requestId,
       });
       return;
     }

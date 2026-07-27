@@ -59,7 +59,7 @@ describe('PendingLoginRepository', () => {
     expect(raw).not.toContain(pending.userEmail);
     expect(raw).not.toContain(pending.userMobile);
     redis.eval.mockResolvedValueOnce([1, raw]);
-    await expect(instance.reserve('flow-token')).resolves.toEqual(pending);
+    await expect(instance.reserve('flow-token')).resolves.toMatchObject({ pending, reservationToken: expect.any(String) });
   });
 
   it('fails closed with an operational error when authenticated ciphertext is corrupted', async () => {
@@ -91,15 +91,19 @@ describe('PendingLoginRepository', () => {
     await instance.save('flow-token', pending, 60);
     redis.eval.mockResolvedValueOnce([1, readStored()]);
 
-    await expect(instance.reserve('flow-token')).resolves.toEqual(pending);
+    const reservation = (await instance.reserve('flow-token'))!;
+    expect(reservation.pending).toEqual(pending);
     expect(redis.eval).toHaveBeenCalledWith(
       expect.stringContaining('record.state = "processing"'),
       1,
       'auth:pending-login:flow-token',
       String(now),
+      '30000',
+      expect.any(String),
     );
-
-    await instance.complete('flow-token');
-    expect(redis.del).toHaveBeenCalledWith('auth:pending-login:flow-token');
+    await instance.complete('flow-token', 'stale-owner-token');
+    expect(redis.eval).toHaveBeenLastCalledWith(expect.stringContaining('reservationToken ~= ARGV[1]'), 1, 'auth:pending-login:flow-token', 'stale-owner-token');
+    await instance.complete('flow-token', reservation.reservationToken);
+    expect(redis.eval).toHaveBeenCalledWith(expect.stringContaining('reservationToken ~= ARGV[1]'), 1, 'auth:pending-login:flow-token', reservation.reservationToken);
   });
 });

@@ -117,9 +117,10 @@ describe('AuthController HTTP contract', () => {
     expect(response.headers.location).toBe(`${PUBLIC_ORIGIN}/login?status=success`);
     expect(response.headers.location).not.toMatch(/[?&](?:code|state|token|access_token)=/i);
     expect(response.body).toEqual({});
-    expect(cookieNames(response.headers['set-cookie'])).toEqual(['soc_at', 'soc_rt']);
+    expect(cookieNames(response.headers['set-cookie'])).toEqual(['soc_sso_state', 'soc_at', 'soc_rt']);
     expectCookie(response.headers['set-cookie'], 'soc_at', '/api');
     expectCookie(response.headers['set-cookie'], 'soc_rt', '/api/auth');
+    expectCookie(response.headers['set-cookie'], 'soc_sso_state', '/api/auth/login');
   });
 
   it('sets only the flow cookie and redirects cleanly when consent is required', async () => {
@@ -134,8 +135,9 @@ describe('AuthController HTTP contract', () => {
     expect(response.headers.location).toBe(`${PUBLIC_ORIGIN}/login/consent`);
     expect(response.headers.location).not.toMatch(/[?&](?:code|state|token|access_token)=/i);
     expect(response.body).toEqual({});
-    expect(cookieNames(response.headers['set-cookie'])).toEqual(['soc_flow']);
+    expect(cookieNames(response.headers['set-cookie'])).toEqual(['soc_sso_state', 'soc_flow']);
     expectCookie(response.headers['set-cookie'], 'soc_flow', '/api/auth');
+    expectCookie(response.headers['set-cookie'], 'soc_sso_state', '/api/auth/login');
   });
 
   it('rejects login callback bodies that are not form-urlencoded before calling the service', async () => {

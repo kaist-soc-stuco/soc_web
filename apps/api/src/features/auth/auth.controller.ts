@@ -25,8 +25,9 @@ import {
   AUTH_REFRESH_TOKEN_TTL_SECONDS,
   AUTH_TEMPORARY_COOKIE_NAME,
   AUTH_TEMPORARY_TOKEN_TTL_SECONDS,
+  AUTH_SSO_STATE_COOKIE_NAME,
+  AUTH_SSO_STATE_TTL_SECONDS,
 } from "./auth.tokens";
-
 @Controller("auth")
 export class AuthController {
   constructor(
@@ -86,21 +87,29 @@ export class AuthController {
   }
 
   @Get("login/start")
-  async startLogin() {
-    return this.authService.createLoginStartPayload();
+  async startLogin(@Res() response: Response) {
+    const payload = await this.authService.createLoginStartPayload();
+    response.cookie(AUTH_SSO_STATE_COOKIE_NAME, payload.transactionSecret, {
+      httpOnly: true, maxAge: AUTH_SSO_STATE_TTL_SECONDS * 1000,
+      path: "/api/auth/login", sameSite: "none", secure: true,
+    });
+    const { transactionSecret: _secret, ...publicPayload } = payload;
+    return response.json(publicPayload);
   }
 
   @Post("login")
   async handleLoginCallback(
     @Body() body: SsoCallbackBodyDto,
     @Headers("content-type") contentType: string | undefined,
+    @Cookies(AUTH_SSO_STATE_COOKIE_NAME) transactionSecret: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
+    this.clearCookie(response, AUTH_SSO_STATE_COOKIE_NAME, "/api/auth/login");
     if (!contentType?.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
       throw new UnsupportedMediaTypeException("login_callback_requires_form_urlencoded_body");
     }
 
-    const result = await this.authService.handleLoginCallback(body);
+    const result = await this.authService.handleLoginCallback(body, transactionSecret);
     const publicOrigin = this.configService.getOrThrow<string>("PUBLIC_ORIGIN");
 
     if (result.kind === "persisted") {

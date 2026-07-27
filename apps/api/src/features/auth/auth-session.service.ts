@@ -266,8 +266,9 @@ export class AuthSessionService {
 
   async handleConsentDecision(input: ConsentDecisionRequest): Promise<ConsentDecisionResult> {
     if (!input.pendingLoginToken?.trim()) throw new BadRequestException("pending_login_token_is_required");
-    const pending = await this.pendingLoginRepository.reserve(input.pendingLoginToken);
-    if (!pending) throw new UnauthorizedException("pending_login_not_found_or_expired");
+    const reservation = await this.pendingLoginRepository.reserve(input.pendingLoginToken);
+    if (!reservation) throw new UnauthorizedException("pending_login_not_found_or_expired");
+    const { pending, reservationToken } = reservation;
     try {
       if (input.consent) {
         const user = await this.usersService.upsertConsentedSsoUser({
@@ -279,14 +280,14 @@ export class AuthSessionService {
           session: await this.issuePersistedSession(user.id),
           userId: user.id,
         };
-        await this.pendingLoginRepository.complete(input.pendingLoginToken);
+        await this.pendingLoginRepository.complete(input.pendingLoginToken, reservationToken);
         return result;
       }
       const session = await this.issueTemporarySession(input.pendingLoginToken, pending.expiresAt);
-      await this.pendingLoginRepository.complete(input.pendingLoginToken);
+      await this.pendingLoginRepository.complete(input.pendingLoginToken, reservationToken);
       return { kind: "temporary", session, temporaryHandle: session.sessionId };
     } catch (error) {
-      await this.pendingLoginRepository.release(input.pendingLoginToken);
+      await this.pendingLoginRepository.release(input.pendingLoginToken, reservationToken);
       throw error;
     }
   }

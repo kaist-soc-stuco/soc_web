@@ -122,6 +122,38 @@ describe('authentication environment validation', () => {
     config.AUTH_JWT_PUBLIC_KEYS_JSON = JSON.stringify({ active: keyPair().publicPem });
     expect(() => validateEnv(config)).toThrow('Invalid ES256 JWT key configuration');
   });
+  it('rejects malformed private key material', () => {
+    expect(() => validateEnv({
+      ...validConfig(),
+      AUTH_JWT_ES256_PRIVATE_KEY: 'not-a-private-key',
+    })).toThrow('Invalid ES256 JWT key configuration');
+  });
+
+  it('rejects an RSA private key', () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    expect(() => validateEnv({
+      ...validConfig(),
+      AUTH_JWT_ES256_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
+    })).toThrow('Invalid ES256 JWT key configuration');
+  });
+
+  it.each([
+    ['P-384', 'secp384r1'],
+    ['P-521', 'secp521r1'],
+  ])('rejects an active %s public key', (_label, namedCurve) => {
+    const { publicKey } = generateKeyPairSync('ec', { namedCurve });
+    const config = validConfig();
+    config.AUTH_JWT_PUBLIC_KEYS_JSON = JSON.stringify({
+      active: publicKey.export({ format: 'pem', type: 'spki' }).toString(),
+    });
+    expect(() => validateEnv(config)).toThrow('Invalid ES256 JWT key configuration');
+  });
+
+  it('rejects a missing active key id', () => {
+    const config = validConfig();
+    delete (config as Partial<typeof config>).AUTH_JWT_ACTIVE_KID;
+    expect(() => validateEnv(config)).toThrow('Missing environment variable: AUTH_JWT_ACTIVE_KID');
+  });
 
   it('rejects a missing active public key', () => {
     const config = validConfig();

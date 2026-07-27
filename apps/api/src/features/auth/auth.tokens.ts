@@ -7,3 +7,5 @@ export const AUTH_ACCESS_COOKIE_NAME = "soc_at";
 export const AUTH_REFRESH_COOKIE_NAME = "soc_rt";
 export const AUTH_FLOW_COOKIE_NAME = "soc_flow";
 export const AUTH_TEMPORARY_COOKIE_NAME = "soc_tmp";
+export const AUTH_SSO_STATE_COOKIE_NAME = "soc_sso_state";
+export const AUTH_SSO_STATE_TTL_SECONDS = 5 * 60;

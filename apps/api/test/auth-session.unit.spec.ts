@@ -135,20 +135,20 @@ describe('AuthSessionService ES256 sessions', () => {
   it('reserves and completes a pending consent flow before issuing a persisted session', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, pending, users, repository } = service();
-    pending.reserve.mockResolvedValueOnce({ expiresAt: now + 60_000, ssoUserId: 'sso-1', userEmail: 'user@test.invalid' }).mockResolvedValueOnce(null);
+    pending.reserve.mockResolvedValueOnce({ pending: { expiresAt: now + 60_000, ssoUserId: 'sso-1', userEmail: 'user@test.invalid' }, reservationToken: 'reservation-1' }).mockResolvedValueOnce(null);
     users.upsertConsentedSsoUser.mockResolvedValue({ id: 'user-1' });
 
     await expect(instance.handleConsentDecision({ consent: true, pendingLoginToken: 'flow-token' })).resolves.toMatchObject({ kind: 'persisted', userId: 'user-1' });
     await expect(instance.handleConsentDecision({ consent: true, pendingLoginToken: 'flow-token' })).rejects.toBeInstanceOf(UnauthorizedException);
     expect(pending.reserve).toHaveBeenCalledTimes(2);
-    expect(pending.complete).toHaveBeenCalledWith('flow-token');
+    expect(pending.complete).toHaveBeenCalledWith('flow-token', 'reservation-1');
     expect(repository.save).toHaveBeenCalledOnce();
     vi.restoreAllMocks();
   });
   it('creates a temporary session after declined consent and exposes it only through its temporary handle', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, pending, repository, users } = service();
-    pending.reserve.mockResolvedValue({ expiresAt: now + 60_000, ssoUserId: 'sso-1' });
+    pending.reserve.mockResolvedValue({ pending: { expiresAt: now + 60_000, ssoUserId: 'sso-1' }, reservationToken: 'reservation-1' });
 
     const result = await instance.handleConsentDecision({ consent: false, pendingLoginToken: 'flow-token' });
     expect(result).toMatchObject({ kind: 'temporary', temporaryHandle: expect.any(String) });
@@ -173,7 +173,7 @@ describe('AuthSessionService ES256 sessions', () => {
       mode: 'temporary',
       pendingLoginId: 'flow-token',
     }));
-    expect(pending.complete).toHaveBeenCalledWith('flow-token');
+    expect(pending.complete).toHaveBeenCalledWith('flow-token', 'reservation-1');
     expect(users.upsertConsentedSsoUser).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });
@@ -228,8 +228,11 @@ describe('AuthSessionService ES256 sessions', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, pending, users } = service();
     pending.reserve.mockResolvedValue({
-      expiresAt: now + 60_000,
-      ssoUserId: 'sso-1',
+      pending: {
+        expiresAt: now + 60_000,
+        ssoUserId: 'sso-1',
+      },
+      reservationToken: 'reservation-1',
     });
     users.upsertConsentedSsoUser.mockRejectedValue(new Error('database unavailable'));
 
@@ -237,7 +240,7 @@ describe('AuthSessionService ES256 sessions', () => {
       consent: true,
       pendingLoginToken: 'flow-token',
     })).rejects.toThrow('database unavailable');
-    expect(pending.release).toHaveBeenCalledWith('flow-token');
+    expect(pending.release).toHaveBeenCalledWith('flow-token', 'reservation-1');
     vi.restoreAllMocks();
   });
 });

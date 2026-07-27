@@ -12,7 +12,8 @@ const configuration = {
 };
 
 function makeService(rawState: string | null) {
-  const redis = { getdel: vi.fn().mockResolvedValue(rawState), set: vi.fn() };
+  const authState = { compareAndDelete: vi.fn().mockResolvedValue(rawState) };
+  const redis = { eval: vi.fn(), set: vi.fn() };
   const users = {
     ensureCanonicalSsoSubject: vi.fn(),
     findBySsoUserId: vi.fn().mockResolvedValue(null),
@@ -21,8 +22,9 @@ function makeService(rawState: string | null) {
   const pending = { save: vi.fn() };
   const config = { get: (name: string) => configuration[name as keyof typeof configuration] };
   return {
-    instance: new AuthService(config as never, users as never, sessions as never, pending as never, redis as never),
+    instance: new AuthService(config as never, users as never, sessions as never, pending as never, authState as never, redis as never),
     redis,
+    authState,
     users,
     sessions,
     pending,
@@ -34,18 +36,18 @@ describe('AuthService SSO state consumption', () => {
 
   it('uses Redis GETDEL before the SSO exchange and consumes state only once', async () => {
     const state = JSON.stringify({ createdAt: new Date().toISOString(), expiresAt: Date.now() + 60_000, nonce: 'nonce-1' });
-    const { instance, redis, pending } = makeService(state);
+    const { instance, authState, pending } = makeService(state);
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ nonce: 'nonce-1', userInfo: { user_id: 'sso-user' } }) });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' })).resolves.toMatchObject({ kind: 'consent_required' });
-    expect(redis.getdel).toHaveBeenCalledWith('auth:sso:state:state-1');
+    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, 'transaction-secret')).resolves.toMatchObject({ kind: 'consent_required' });
+    expect(authState.compareAndDelete).toHaveBeenCalledWith('auth:sso:state:state-1', expect.any(String));
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(redis.getdel.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
+    expect(authState.compareAndDelete.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
     expect(pending.save).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ ssoUserId: 'sso-user' }), 600);
 
-    redis.getdel.mockResolvedValueOnce(null);
-    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' })).rejects.toBeInstanceOf(UnauthorizedException);
+    authState.compareAndDelete.mockResolvedValueOnce(null);
+    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, 'transaction-secret')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
@@ -58,14 +60,14 @@ describe('AuthService SSO state consumption', () => {
     ['state missing expiresAt', JSON.stringify({ createdAt: new Date().toISOString(), nonce: 'nonce-1' })],
     ['state with non-number expiresAt', JSON.stringify({ createdAt: new Date().toISOString(), expiresAt: 'tomorrow', nonce: 'nonce-1' })],
   ])('rejects %s callback state without exchanging or creating side effects', async (_name, rawState) => {
-    const { instance, redis, users, sessions, pending } = makeService(rawState);
+    const { instance, authState, users, sessions, pending } = makeService(rawState);
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' })).rejects.toMatchObject({
+    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, 'transaction-secret')).rejects.toMatchObject({
       response: expect.objectContaining({ message: 'invalid_or_expired_state' }),
     });
-    expect(redis.getdel).toHaveBeenCalledOnce();
+    expect(authState.compareAndDelete).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(users.findBySsoUserId).not.toHaveBeenCalled();
     expect(sessions.issuePersistedSession).not.toHaveBeenCalled();
@@ -73,14 +75,14 @@ describe('AuthService SSO state consumption', () => {
   });
 
   it('rejects provider authorization errors before consuming state', async () => {
-    const { instance, redis, users, sessions, pending } = makeService(null);
+    const { instance, authState, users, sessions, pending } = makeService(null);
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(instance.handleLoginCallback({ error: 'access_denied', state: 'state-1' })).rejects.toMatchObject({
+    await expect(instance.handleLoginCallback({ error: 'access_denied', state: 'state-1' }, 'transaction-secret')).rejects.toMatchObject({
       response: expect.objectContaining({ message: 'sso_authorize_failed' }),
     });
-    expect(redis.getdel).not.toHaveBeenCalled();
+    expect(authState.compareAndDelete).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(users.findBySsoUserId).not.toHaveBeenCalled();
     expect(sessions.issuePersistedSession).not.toHaveBeenCalled();
@@ -93,14 +95,14 @@ describe('AuthService SSO state consumption', () => {
     ['invalid JSON', { ok: true, json: async () => { throw new Error('invalid json'); } }, 'sso_exchange_failed'],
   ])('consumes state before rejecting %s without creating a session or pending login', async (_name, response, message) => {
     const rawState = JSON.stringify({ createdAt: new Date().toISOString(), expiresAt: Date.now() + 60_000, nonce: 'nonce-1' });
-    const { instance, redis, users, sessions, pending } = makeService(rawState);
+    const { instance, authState, users, sessions, pending } = makeService(rawState);
     const fetchMock = vi.fn().mockResolvedValue(response);
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' })).rejects.toMatchObject({
+    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, 'transaction-secret')).rejects.toMatchObject({
       response: expect.objectContaining({ message }),
     });
-    expect(redis.getdel.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
+    expect(authState.compareAndDelete.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
     expect(users.findBySsoUserId).not.toHaveBeenCalled();
     expect(sessions.issuePersistedSession).not.toHaveBeenCalled();
     expect(pending.save).not.toHaveBeenCalled();
@@ -108,16 +110,39 @@ describe('AuthService SSO state consumption', () => {
 
   it('consumes state before a network exchange failure without creating side effects', async () => {
     const rawState = JSON.stringify({ createdAt: new Date().toISOString(), expiresAt: Date.now() + 60_000, nonce: 'nonce-1' });
-    const { instance, redis, users, sessions, pending } = makeService(rawState);
+    const { instance, authState, users, sessions, pending } = makeService(rawState);
     const fetchMock = vi.fn().mockRejectedValue(new Error('network unavailable'));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' })).rejects.toMatchObject({
+    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, 'transaction-secret')).rejects.toMatchObject({
       response: expect.objectContaining({ message: 'sso_exchange_failed' }),
     });
-    expect(redis.getdel.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
+    expect(authState.compareAndDelete.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
     expect(users.findBySsoUserId).not.toHaveBeenCalled();
     expect(sessions.issuePersistedSession).not.toHaveBeenCalled();
     expect(pending.save).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['missing transaction cookie', undefined],
+    ['mismatched transaction cookie', 'wrong-secret'],
+  ])('rejects %s before exchange', async (_name, secret) => {
+    const state = JSON.stringify({ createdAt: new Date().toISOString(), expiresAt: Date.now() + 60_000, nonce: 'nonce-1' });
+    const { instance, authState } = makeService(state);
+    if (secret) authState.compareAndDelete.mockResolvedValueOnce(null);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, secret)).rejects.toMatchObject({
+      response: expect.objectContaining({ message: 'invalid_or_expired_state' }),
+    });
+    if (secret) expect(authState.compareAndDelete).toHaveBeenCalledOnce();
+    else expect(authState.compareAndDelete).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('issues a transaction secret and binds stored state to its hash', async () => {
+    const { instance, authState } = makeService(null);
+    const payload = await instance.createLoginStartPayload();
+    expect(payload.transactionSecret).toEqual(expect.any(String));
+    expect(authState.compareAndDelete).not.toHaveBeenCalled();
   });
 });

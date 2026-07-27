@@ -18,12 +18,13 @@ if not raw then return {0} end
 local ttl = redis.call("TTL", KEYS[1])
 if ttl <= 0 then return {0} end
 local record = cjson.decode(raw)
-if record.state == "processing" and record.reservedAtMs and
-   tonumber(record.reservedAtMs) > tonumber(ARGV[1]) - 30000 then
+if record.state == "processing" and record.leaseExpiresAtMs and
+   tonumber(record.leaseExpiresAtMs) > tonumber(ARGV[1]) then
   return {0}
 end
 record.state = "processing"
-record.reservedAtMs = tonumber(ARGV[1])
+record.reservationToken = ARGV[3]
+record.leaseExpiresAtMs = tonumber(ARGV[1]) + tonumber(ARGV[2])
 local reserved = cjson.encode(record)
 redis.call("SET", KEYS[1], reserved, "EX", ttl)
 return {1, reserved}
@@ -35,11 +36,20 @@ if not raw then return 0 end
 local ttl = redis.call("TTL", KEYS[1])
 if ttl <= 0 then return 0 end
 local record = cjson.decode(raw)
-if record.state ~= "processing" then return 0 end
+if record.state ~= "processing" or record.reservationToken ~= ARGV[1] then return 0 end
 record.state = "pending"
-record.reservedAtMs = nil
+record.reservationToken = nil
+record.leaseExpiresAtMs = nil
 redis.call("SET", KEYS[1], cjson.encode(record), "EX", ttl)
 return 1
+`;
+
+const COMPLETE_PENDING_LOGIN_LUA = `
+local raw = redis.call("GET", KEYS[1])
+if not raw then return 0 end
+local record = cjson.decode(raw)
+if record.state ~= "processing" or record.reservationToken ~= ARGV[1] then return 0 end
+return redis.call("DEL", KEYS[1])
 `;
 
 interface StoredPendingSsoUser {
@@ -49,6 +59,8 @@ interface StoredPendingSsoUser {
   expiresAt: number;
   state?: "pending" | "processing";
   reservedAtMs?: number;
+  reservationToken?: string;
+  leaseExpiresAtMs?: number;
 }
 
 @Injectable()
@@ -165,6 +177,9 @@ export class PendingLoginRepository {
       (parsed.reservedAtMs !== undefined &&
         (typeof parsed.reservedAtMs !== "number" ||
           !Number.isFinite(parsed.reservedAtMs))) ||
+      (parsed.reservationToken !== undefined && typeof parsed.reservationToken !== "string") ||
+      (parsed.leaseExpiresAtMs !== undefined &&
+        (typeof parsed.leaseExpiresAtMs !== "number" || !Number.isFinite(parsed.leaseExpiresAtMs))) ||
       typeof parsed.encryptedSsoUserId !== "string" ||
       !parsed.encryptedSsoUserId ||
       (parsed.encryptedUserEmail !== undefined &&
@@ -198,26 +213,23 @@ export class PendingLoginRepository {
   }
 
 
-  async reserve(pendingLoginToken: string): Promise<PendingSsoUser | null> {
+  async reserve(pendingLoginToken: string): Promise<{ pending: PendingSsoUser; reservationToken: string } | null> {
+    const reservationToken = randomBytes(32).toString("base64url");
     const result = (await this.redis.eval(
-      RESERVE_PENDING_LOGIN_LUA,
-      1,
-      this.buildKey(pendingLoginToken),
-      String(Date.now()),
+      RESERVE_PENDING_LOGIN_LUA, 1, this.buildKey(pendingLoginToken),
+      String(Date.now()), "30000", reservationToken,
     )) as [number, string?];
-    return result[0] === 1 && result[1] ? this.parse(result[1]) : null;
+    if (result[0] !== 1 || !result[1]) return null;
+    const pending = this.parse(result[1]);
+    return pending ? { pending, reservationToken } : null;
   }
 
-  async release(pendingLoginToken: string): Promise<void> {
-    await this.redis.eval(
-      RELEASE_PENDING_LOGIN_LUA,
-      1,
-      this.buildKey(pendingLoginToken),
-    );
+  async release(pendingLoginToken: string, reservationToken: string): Promise<void> {
+    await this.redis.eval(RELEASE_PENDING_LOGIN_LUA, 1, this.buildKey(pendingLoginToken), reservationToken);
   }
 
-  async complete(pendingLoginToken: string): Promise<void> {
-    await this.redis.del(this.buildKey(pendingLoginToken));
+  async complete(pendingLoginToken: string, reservationToken: string): Promise<void> {
+    await this.redis.eval(COMPLETE_PENDING_LOGIN_LUA, 1, this.buildKey(pendingLoginToken), reservationToken);
   }
 
 }

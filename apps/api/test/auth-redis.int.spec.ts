@@ -85,18 +85,18 @@ describe('live Redis authentication transitions', () => {
       userEmail: 'live@example.invalid',
     }, 60);
 
-    await expect(pendingLogins.reserve('flow-live')).resolves.toEqual({
+    const first = await pendingLogins.reserve('flow-live');
+    expect(first?.pending).toEqual({
       expiresAt,
       ssoUserId: 'sso-live',
       userEmail: 'live@example.invalid',
       userMobile: undefined,
     });
     await expect(pendingLogins.reserve('flow-live')).resolves.toBeNull();
-    await pendingLogins.release('flow-live');
-    await expect(pendingLogins.reserve('flow-live')).resolves.toMatchObject({
-      ssoUserId: 'sso-live',
-    });
-    await pendingLogins.complete('flow-live');
+    await pendingLogins.release('flow-live', first!.reservationToken);
+    const second = (await pendingLogins.reserve('flow-live'))!;
+    expect(second.pending).toMatchObject({ ssoUserId: 'sso-live' });
+    await pendingLogins.complete('flow-live', second.reservationToken);
     await expect(pendingLogins.reserve('flow-live')).resolves.toBeNull();
   });
 });

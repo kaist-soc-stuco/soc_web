@@ -7,6 +7,7 @@ import { PendingLoginRepository } from './pending-login.repository';
 import { AuthSessionRepository } from './auth-session.repository';
 import { AuthSessionService } from './auth-session.service';
 import { AuthService } from './auth.service';
+import { AuthStateRepository } from './auth-state.repository';
 
 @Module({
   imports: [RedisModule, forwardRef(() => UsersModule)],
@@ -16,6 +17,7 @@ import { AuthService } from './auth.service';
     AuthSessionRepository,
     AuthSessionService,
     PendingLoginRepository,
+    AuthStateRepository,
   ],
   exports: [AuthSessionService],
 })
