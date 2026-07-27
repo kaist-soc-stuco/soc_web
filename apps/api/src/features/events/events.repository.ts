@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gt, inArray, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 
 import { DRIZZLE_DB, type PostgresDatabase } from '../../infrastructure/postgres/postgres.provider';
-import { events, permissionAuditLog } from '../../infrastructure/postgres/postgres.schema';
+import { contentMatchers, events, permissionAuditLog, surveys } from '../../infrastructure/postgres/postgres.schema';
 
 export type EventVisibility = 'PUBLIC' | 'AUTHENTICATED' | 'COMMITTEE';
 
@@ -25,7 +25,29 @@ export class EventsRepository {
     )).limit(1);
     return event ?? null;
   }
-
+  async findPublicSurveyIdByEventId(eventId: string): Promise<string | null> {
+    const [match] = await this.db
+      .select({ surveyId: surveys.id })
+      .from(contentMatchers)
+      .innerJoin(surveys, eq(contentMatchers.surveyId, surveys.id))
+      .where(and(
+        eq(contentMatchers.eventId, eventId),
+        isNull(contentMatchers.articleId),
+        inArray(surveys.state, ['OPEN', 'SCHEDULED', 'CLOSED']),
+      ))
+      .orderBy(
+        sql`case
+          when ${surveys.state} = 'CLOSED' then 2
+          when ${surveys.closesAt} is not null and ${surveys.closesAt} <= current_timestamp then 2
+          when ${surveys.opensAt} is not null and ${surveys.opensAt} > current_timestamp then 1
+          else 0
+        end`,
+        desc(contentMatchers.createdAt),
+        desc(contentMatchers.id),
+      )
+      .limit(1);
+    return match?.surveyId ?? null;
+  }
 
   async create(input: typeof events.$inferInsert) {
     return this.db.transaction(async (tx) => {

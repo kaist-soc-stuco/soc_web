@@ -10,6 +10,7 @@ import { EventsModule } from './features/events/events.module';
 import { HealthModule } from './features/health/health.module';
 import { PermissionsModule } from './features/permissions/permissions.module';
 import { UsersModule } from './features/users/users.module';
+import { SurveysModule } from './features/surveys/surveys.module';
 import { PostgresModule } from './infrastructure/postgres/postgres.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { validateEnv } from './shared/config/env.validation';
@@ -36,6 +37,7 @@ import { ClockModule } from './shared/time/clock.module';
     FaqsModule,
     BoardsModule,
     EventsModule,
+    SurveysModule,
     HealthModule,
   ],
 })

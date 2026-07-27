@@ -36,6 +36,13 @@
       "when": 1785145142795,
       "tag": "0004_cute_hedge_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785149579244,
+      "tag": "0005_ancient_loki",
+      "breakpoints": true
     }
   ]
 }

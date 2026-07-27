@@ -20,6 +20,7 @@ export interface EventItem {
   location: string;
   visibility: EventVisibility;
   updatedAt: string;
+  surveyId?: string | null;
 }
 
 export interface EventListResponse {

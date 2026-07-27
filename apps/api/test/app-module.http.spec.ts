@@ -6,7 +6,6 @@ const privatePem = privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(
 const publicPem = publicKey.export({ format: 'pem', type: 'spki' }).toString();
 
 const testEnvironment = {
-  AUTH_JWT_SECRET: 'test-jwt-secret',
   AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'test-pending-encryption-key-at-least-32-bytes',
   AUTH_JWT_ACTIVE_KID: 'test-key',
   AUTH_JWT_AUDIENCE: 'soc-web-test',
@@ -17,41 +16,42 @@ const testEnvironment = {
   PII_ENCRYPTION_KEYS_JSON: JSON.stringify({
     'test-pii-key': Buffer.alloc(32, 9).toString('base64'),
   }),
+  SURVEY_PHONE_HASH_HMAC_KEY: Buffer.alloc(32, 7).toString('base64'),
+  SURVEY_PHONE_HASH_HMAC_VERSION: 'test-survey-phone-v1',
   SSO_AUTH_API_URL: 'https://sso.test/auth',
   SSO_CLIENT_SECRET: 'test-client-secret',
   PUBLIC_ORIGIN: 'https://web.test',
   VITE_SSO_CLIENT_ID: 'test-client-id',
   VITE_SSO_LOGIN_URL: 'https://sso.test/login',
   VITE_SSO_REDIRECT_URI: 'https://api.test/auth/login',
+  POSTGRES_PASSWORD: 'test-postgres-password',
 };
 
 describe('AppModule composition', () => {
   let originalEnvironment: Record<string, string | undefined>;
 
   beforeEach(() => {
-    originalEnvironment = Object.fromEntries(
-      Object.keys(testEnvironment).map((name) => [name, process.env[name]]),
-    );
+    originalEnvironment = { ...process.env };
+    for (const name of Object.keys(process.env)) {
+      delete process.env[name];
+    }
     Object.assign(process.env, testEnvironment);
   });
 
   afterEach(() => {
-    for (const [name, value] of Object.entries(originalEnvironment)) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
+    for (const name of Object.keys(process.env)) {
+      delete process.env[name];
     }
+    Object.assign(process.env, originalEnvironment);
   });
 
-  it('registers production infrastructure and health modules', async () => {
+  it('registers production infrastructure, health, and survey modules', async () => {
     const { AppModule } = await import('../src/app.module');
     const imports = Reflect.getMetadata('imports', AppModule) as Array<{ name?: string }>;
     const moduleNames = imports.map((module) => module.name).filter(Boolean);
 
     expect(moduleNames).toEqual(
-      expect.arrayContaining(['PostgresModule', 'RedisModule', 'AuthModule', 'UsersModule', 'HealthModule']),
+      expect.arrayContaining(['PostgresModule', 'RedisModule', 'AuthModule', 'UsersModule', 'HealthModule', 'SurveysModule']),
     );
   });
 });

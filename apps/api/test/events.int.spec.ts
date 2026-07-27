@@ -43,7 +43,7 @@ run('events PostgreSQL protocol (external TEST_DATABASE_URL)', () => {
     const created = await Promise.all(Array.from({ length: 201 }, (_, index) => service.create(managerId, { ...event, titleKr: `제목${index}`, titleEn: `Title${index}`, startAtMs: start + index * 1_000, endAtMs: start + (index + 1) * 1_000, visibility: index === 0 ? 'AUTHENTICATED' : index === 1 ? 'COMMITTEE' : 'PUBLIC' })));
     const publicRows = await service.list(undefined, { fromMs: start, toMs: start + 300_000 });
     expect(publicRows.items).toHaveLength(199);
-    expect(publicRows.items.every((item) => item.visibility === 'PUBLIC')).toBe(true);
+    expect(publicRows.items.every((item) => item.visibility === 'PUBLIC' && !Object.hasOwn(item, 'surveyId'))).toBe(true);
     const authenticated = await service.list(userId, { fromMs: start, toMs: start + 300_000, locale: 'en' });
     expect(authenticated.items).toHaveLength(200);
     expect(authenticated.items[0]!.title.value).toBe('Title0');
@@ -97,5 +97,111 @@ run('events PostgreSQL protocol (external TEST_DATABASE_URL)', () => {
     await expect(service.create(managerId, event)).rejects.toThrow();
     expect((await pool.query('SELECT count(*) FROM events')).rows[0]!.count).toBe('0');
     await pool.query('DROP TRIGGER reject_event_audit_trigger ON permission_audit_log; DROP FUNCTION reject_event_audit()');
+  });
+  it('resolves visible event matchers by effective timed state and keeps list provenance unqueried', async () => {
+    const created = await service.create(managerId, event);
+    const surveyIds: Record<string, string> = {};
+    const now = Date.now();
+    const candidates = [
+      { name: 'DRAFT', state: 'DRAFT', opensAt: null, closesAt: null },
+      { name: 'ARCHIVED', state: 'ARCHIVED', opensAt: null, closesAt: null },
+      { name: 'CLOSED', state: 'OPEN', opensAt: null, closesAt: new Date(now - 86_400_000) },
+      { name: 'SCHEDULED', state: 'SCHEDULED', opensAt: new Date(now + 86_400_000), closesAt: new Date(now + 172_800_000) },
+      { name: 'OPEN', state: 'SCHEDULED', opensAt: new Date(now - 86_400_000), closesAt: new Date(now + 86_400_000) },
+    ] as const;
+    for (const candidate of candidates) {
+      const inserted = await pool.query<{ id: string }>(
+        `INSERT INTO surveys (state, response_retention_days, created_by_user_id, updated_by_user_id)
+         VALUES ('DRAFT', 365, $1, $1) RETURNING id`,
+        [managerId],
+      );
+      const surveyId = inserted.rows[0]!.id;
+      await pool.query(
+        `INSERT INTO survey_revisions (survey_id, revision, title_kr, title_en, created_by_user_id)
+         VALUES ($1, 1, $2, $2, $3)`,
+        [surveyId, candidate.name, managerId],
+      );
+      await pool.query(
+        `WITH inserted_section AS (
+           INSERT INTO survey_sections (survey_revision_id, ordinal, title_kr, title_en)
+           SELECT id, 0, '기본', 'Basic' FROM survey_revisions WHERE survey_id = $1
+           RETURNING id
+         )
+         INSERT INTO survey_questions (section_id, ordinal, type, prompt_kr, prompt_en)
+         SELECT id, 0, 'SHORT_TEXT', '질문', 'Question' FROM inserted_section`,
+        [surveyId],
+      );
+      if (candidate.state !== 'DRAFT') {
+        await pool.query('UPDATE survey_revisions SET published_at = now() WHERE survey_id = $1', [surveyId]);
+        await pool.query(
+          'UPDATE surveys SET state = $2, opens_at = $3, closes_at = $4 WHERE id = $1',
+          [surveyId, candidate.state, candidate.opensAt, candidate.closesAt],
+        );
+      }
+      await pool.query(
+        `INSERT INTO content_matchers (event_id, survey_id, created_by_user_id)
+         VALUES ($1, $2, $3)`,
+        [created.id, surveyId, managerId],
+      );
+      surveyIds[candidate.name] = surveyId;
+    }
+
+    await expect(service.get(undefined, created.id, 'ko')).resolves.toMatchObject({ surveyId: surveyIds.OPEN });
+    await pool.query('DELETE FROM content_matchers WHERE event_id = $1 AND survey_id = $2', [created.id, surveyIds.OPEN]);
+    await expect(service.get(undefined, created.id, 'ko')).resolves.toMatchObject({ surveyId: surveyIds.SCHEDULED });
+    await pool.query('DELETE FROM content_matchers WHERE event_id = $1 AND survey_id = $2', [created.id, surveyIds.SCHEDULED]);
+    await expect(service.get(undefined, created.id, 'ko')).resolves.toMatchObject({ surveyId: surveyIds.CLOSED });
+    await pool.query('DELETE FROM content_matchers WHERE event_id = $1', [created.id]);
+    await expect(service.get(undefined, created.id, 'ko')).resolves.toEqual(expect.objectContaining({ surveyId: null }));
+  });
+  it('keeps manually closed matchers terminal behind competing effective open and scheduled matchers', async () => {
+    const created = await service.create(managerId, event);
+    const now = Date.now();
+    const addMatcher = async (state: 'OPEN' | 'SCHEDULED' | 'CLOSED', opensAt: Date | null, closesAt: Date | null) => {
+      const survey = await pool.query<{ id: string }>(
+        `INSERT INTO surveys (state, response_retention_days, created_by_user_id, updated_by_user_id)
+         VALUES ('DRAFT', 365, $1, $1) RETURNING id`,
+        [managerId],
+      );
+      const surveyId = survey.rows[0]!.id;
+      await pool.query(
+        `INSERT INTO survey_revisions (survey_id, revision, title_kr, title_en, created_by_user_id)
+         VALUES ($1, 1, 'matcher', 'matcher', $2)`,
+        [surveyId, managerId],
+      );
+      await pool.query(
+        `WITH inserted_section AS (
+           INSERT INTO survey_sections (survey_revision_id, ordinal, title_kr, title_en)
+           SELECT id, 0, '기본', 'Basic' FROM survey_revisions WHERE survey_id = $1
+           RETURNING id
+         )
+         INSERT INTO survey_questions (section_id, ordinal, type, prompt_kr, prompt_en)
+         SELECT id, 0, 'SHORT_TEXT', '질문', 'Question' FROM inserted_section`,
+        [surveyId],
+      );
+      await pool.query('UPDATE survey_revisions SET published_at = now() WHERE survey_id = $1', [surveyId]);
+      await pool.query(
+        'UPDATE surveys SET state = $2, opens_at = $3, closes_at = $4 WHERE id = $1',
+        [surveyId, state, opensAt, closesAt],
+      );
+      await pool.query(
+        'INSERT INTO content_matchers (event_id, survey_id, created_by_user_id) VALUES ($1, $2, $3)',
+        [created.id, surveyId, managerId],
+      );
+      return surveyId;
+    };
+
+    const closedWithoutDates = await addMatcher('CLOSED', null, null);
+    const closedWithFutureDates = await addMatcher('CLOSED', new Date(now + 86_400_000), new Date(now + 172_800_000));
+    const scheduled = await addMatcher('SCHEDULED', new Date(now + 86_400_000), new Date(now + 172_800_000));
+    const open = await addMatcher('OPEN', new Date(now - 86_400_000), new Date(now + 86_400_000));
+
+    await expect(service.get(undefined, created.id, 'ko')).resolves.toMatchObject({ surveyId: open });
+    await pool.query('DELETE FROM content_matchers WHERE event_id = $1 AND survey_id = $2', [created.id, open]);
+    await expect(service.get(undefined, created.id, 'ko')).resolves.toMatchObject({ surveyId: scheduled });
+    await pool.query('DELETE FROM content_matchers WHERE event_id = $1 AND survey_id = $2', [created.id, scheduled]);
+    await expect(service.get(undefined, created.id, 'ko')).resolves.toMatchObject({
+      surveyId: expect.stringMatching(new RegExp(`^(${closedWithoutDates}|${closedWithFutureDates})$`)),
+    });
   });
 });

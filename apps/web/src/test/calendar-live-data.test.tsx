@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { EventListResponse } from '@soc/contracts';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CalendarPage } from '@/pages/calendar-page';
 
@@ -11,14 +11,20 @@ const getEventsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/event-api', () => ({ getEvents: getEventsMock }));
 
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2026-07-27T12:00:00+09:00'));
+});
+
 afterEach(() => {
   cleanup();
   getEventsMock.mockReset();
+  vi.useRealTimers();
 });
 
 const renderCalendar = () => render(<MemoryRouter><CalendarPage /></MemoryRouter>);
 
-const today = new Date();
+const today = new Date('2026-07-27T12:00:00+09:00');
 const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
@@ -37,6 +43,7 @@ const calendarResponse: EventListResponse = {
       location: 'N1 회의실',
       visibility: 'PUBLIC',
       updatedAt: '2026-07-27T00:00:00.000Z',
+      surveyId: null,
     },
   ],
 };
@@ -58,6 +65,22 @@ describe('CalendarPage live data', () => {
     expect((await screen.findAllByText('전산학부 학생회 정기 회의')).length).toBeGreaterThan(0);
     expect(screen.getByText('학부 구성원을 위한 행사 일정을 논의합니다.')).toBeVisible();
     expect(screen.getByText('N1 회의실')).toBeVisible();
+  });
+  it('maps non-null English DTO content into the calendar', async () => {
+    getEventsMock.mockResolvedValueOnce({
+      ...calendarResponse,
+      locale: 'en',
+      items: [{
+        ...calendarResponse.items[0]!,
+        title: { value: 'Computer Science Committee Meeting', translationUnavailable: false },
+        description: { value: 'Discussing events for department members.', translationUnavailable: false },
+      }],
+    });
+
+    renderCalendar();
+
+    expect((await screen.findAllByText('Computer Science Committee Meeting')).length).toBeGreaterThan(0);
+    expect(screen.getByText('Discussing events for department members.')).toBeVisible();
   });
 
   it('shows an explicit calendar API failure', async () => {

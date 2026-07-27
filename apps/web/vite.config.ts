@@ -11,6 +11,7 @@ const workspaceRoot = path.resolve(__dirname, "../..");
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, workspaceRoot, "");
   const port = Number.parseInt(env.WEB_PORT ?? "5173", 10);
+  const apiProxyTarget = env.VITE_API_PROXY_TARGET?.trim();
 
   return {
     envDir: workspaceRoot,
@@ -23,6 +24,16 @@ export default defineConfig(({ mode }) => {
     server: {
       port: Number.isNaN(port) ? 5173 : port,
       allowedHosts: ["soc-student-council.kws.inet.sparcs.net"],
+      ...(apiProxyTarget
+        ? {
+            proxy: {
+              "/api": {
+                target: apiProxyTarget,
+                changeOrigin: true,
+              },
+            },
+          }
+        : {}),
     },
   };
 });

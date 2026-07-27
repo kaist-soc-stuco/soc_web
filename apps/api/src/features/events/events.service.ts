@@ -44,7 +44,7 @@ export class EventsService {
     const locale = this.locale(localeValue);
     const event = await this.repository.findVisibleById(id, await this.visibleTo(actorUserId));
     if (!event) throw new NotFoundException('event_not_found');
-    return this.publicEvent(event, locale);
+    return this.publicEvent(event, locale, await this.repository.findPublicSurveyIdByEventId(event.id));
   }
 
   async create(actorUserId: string, input: CreateEventRequest): Promise<AdminEvent> {
@@ -224,7 +224,7 @@ export class EventsService {
     id: string; titleKr: string; titleEn: string; descriptionKr: string; descriptionEn: string;
     startAt: Date; endAt: Date; allDay: boolean; allDayStartDate: string | null; allDayEndDate: string | null;
     location: string; visibility: EventVisibility; updatedAt: Date;
-  }, locale: ContentLocale): EventItem {
+  }, locale: ContentLocale, surveyId?: string | null): EventItem {
     const title = locale === 'ko' ? event.titleKr : event.titleEn;
     const description = locale === 'ko' ? event.descriptionKr : event.descriptionEn;
     return {
@@ -239,6 +239,7 @@ export class EventsService {
       location: event.location,
       visibility: event.visibility,
       updatedAt: event.updatedAt.toISOString(),
+      ...(surveyId === undefined ? {} : { surveyId }),
     };
   }
 

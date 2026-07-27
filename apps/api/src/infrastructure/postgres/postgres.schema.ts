@@ -40,6 +40,10 @@ export const eventVisibilityEnum = pgEnum("event_visibility", [
   "AUTHENTICATED",
   "COMMITTEE",
 ]);
+export const surveyStateEnum = pgEnum("survey_state", ["DRAFT", "SCHEDULED", "OPEN", "CLOSED", "ARCHIVED"]);
+export const surveyResponseStateEnum = pgEnum("survey_response_state", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WAITLISTED"]);
+export const surveyQuestionTypeEnum = pgEnum("survey_question_type", ["SHORT_TEXT", "LONG_TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "NUMBER", "DATE"]);
+export const surveyFeeRestrictionEnum = pgEnum("survey_fee_restriction", ["ANY", "PAID_ONLY"]);
 
 export const users = pgTable(
   "users",
@@ -521,5 +525,238 @@ export const purgeAuditLog = pgTable(
     check("purge_audit_log_correlation_identifier", sql`${table.correlationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'`),
     index("purge_audit_log_subject_idx").on(table.subjectType, table.subjectId, table.occurredAt),
     index("purge_audit_log_occurred_at_idx").on(table.occurredAt),
+  ],
+);
+export const surveys = pgTable(
+  "surveys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    state: surveyStateEnum("state").notNull().default("DRAFT"),
+    currentRevision: integer("current_revision").notNull().default(1),
+    guestAllowed: boolean("guest_allowed").notNull().default(false),
+    phoneRequired: boolean("phone_required").notNull().default(false),
+    feeRestriction: surveyFeeRestrictionEnum("fee_restriction").notNull().default("ANY"),
+    cap: integer("cap"),
+    opensAt: timestamp("opens_at", { withTimezone: true }),
+    closesAt: timestamp("closes_at", { withTimezone: true }),
+    editDeadlineAt: timestamp("edit_deadline_at", { withTimezone: true }),
+    responseRetentionDays: integer("response_retention_days").notNull(),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("surveys_revision_positive", sql`${table.currentRevision} > 0`),
+    check("surveys_cap_positive", sql`${table.cap} IS NULL OR ${table.cap} > 0`),
+    check("surveys_guest_identity_lifecycle", sql`NOT ${table.phoneRequired} OR ${table.guestAllowed}`),
+    check("surveys_window_lifecycle", sql`${table.opensAt} IS NULL OR ${table.closesAt} IS NULL OR ${table.opensAt} < ${table.closesAt}`),
+    check("surveys_edit_deadline_lifecycle", sql`${table.editDeadlineAt} IS NULL OR ${table.closesAt} IS NULL OR ${table.editDeadlineAt} <= ${table.closesAt}`),
+    check("surveys_response_retention_days_bounded", sql`${table.responseRetentionDays} BETWEEN 1 AND 3650`),
+  ],
+);
+
+export const surveyRevisions = pgTable(
+  "survey_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    surveyId: uuid("survey_id").notNull().references(() => surveys.id),
+    revision: integer("revision").notNull(),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+    descriptionKr: text("description_kr"),
+    descriptionEn: text("description_en"),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("survey_revisions_survey_revision_unique").on(table.surveyId, table.revision),
+    check("survey_revisions_revision_positive", sql`${table.revision} > 0`),
+    check("survey_revisions_title_kr_nonblank", sql`btrim(${table.titleKr}) <> ''`),
+    check("survey_revisions_title_en_nonblank", sql`btrim(${table.titleEn}) <> ''`),
+    check("survey_revisions_description_kr_nonblank", sql`${table.descriptionKr} IS NULL OR btrim(${table.descriptionKr}) <> ''`),
+    check("survey_revisions_description_en_nonblank", sql`${table.descriptionEn} IS NULL OR btrim(${table.descriptionEn}) <> ''`),
+  ],
+);
+
+export const surveySections = pgTable(
+  "survey_sections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    surveyRevisionId: uuid("survey_revision_id").notNull().references(() => surveyRevisions.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+  },
+  (table) => [
+    uniqueIndex("survey_sections_revision_ordinal_unique").on(table.surveyRevisionId, table.ordinal),
+    check("survey_sections_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
+    check("survey_sections_title_kr_nonblank", sql`btrim(${table.titleKr}) <> ''`),
+    check("survey_sections_title_en_nonblank", sql`btrim(${table.titleEn}) <> ''`),
+  ],
+);
+
+export const surveyQuestions = pgTable(
+  "survey_questions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sectionId: uuid("section_id").notNull().references(() => surveySections.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    type: surveyQuestionTypeEnum("type").notNull(),
+    promptKr: text("prompt_kr").notNull(),
+    promptEn: text("prompt_en").notNull(),
+    helpTextKr: text("help_text_kr"),
+    helpTextEn: text("help_text_en"),
+    required: boolean("required").notNull().default(false),
+    validationRegex: text("validation_regex"),
+    numberMin: integer("number_min"),
+    numberMax: integer("number_max"),
+    dateMin: date("date_min"),
+    dateMax: date("date_max"),
+  },
+  (table) => [
+    uniqueIndex("survey_questions_section_ordinal_unique").on(table.sectionId, table.ordinal),
+    check("survey_questions_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
+    check("survey_questions_number_bounds", sql`${table.numberMin} IS NULL OR ${table.numberMax} IS NULL OR ${table.numberMin} <= ${table.numberMax}`),
+    check("survey_questions_date_bounds", sql`${table.dateMin} IS NULL OR ${table.dateMax} IS NULL OR ${table.dateMin} <= ${table.dateMax}`),
+    check("survey_questions_prompt_kr_nonblank", sql`btrim(${table.promptKr}) <> ''`),
+    check("survey_questions_prompt_en_nonblank", sql`btrim(${table.promptEn}) <> ''`),
+    check("survey_questions_help_text_kr_nonblank", sql`${table.helpTextKr} IS NULL OR btrim(${table.helpTextKr}) <> ''`),
+    check("survey_questions_help_text_en_nonblank", sql`${table.helpTextEn} IS NULL OR btrim(${table.helpTextEn}) <> ''`),
+  ],
+);
+
+export const surveyChoiceOptions = pgTable(
+  "survey_choice_options",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    questionId: uuid("question_id").notNull().references(() => surveyQuestions.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    valueKr: text("value_kr").notNull(),
+    valueEn: text("value_en").notNull(),
+  },
+  (table) => [
+    uniqueIndex("survey_choice_options_question_ordinal_unique").on(table.questionId, table.ordinal),
+    check("survey_choice_options_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
+    check("survey_choice_options_value_kr_nonblank", sql`btrim(${table.valueKr}) <> ''`),
+    check("survey_choice_options_value_en_nonblank", sql`btrim(${table.valueEn}) <> ''`),
+  ],
+);
+
+export const surveyResponses = pgTable(
+  "survey_responses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    surveyId: uuid("survey_id").notNull().references(() => surveys.id),
+    surveyRevisionId: uuid("survey_revision_id").notNull().references(() => surveyRevisions.id),
+    campusUserId: uuid("campus_user_id").references(() => users.id),
+    guestPhoneCiphertext: text("guest_phone_ciphertext"),
+    guestPhoneHash: text("guest_phone_hash"),
+    guestPhoneHashVersion: text("guest_phone_hash_version"),
+    state: surveyResponseStateEnum("state").notNull().default("DRAFT"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id),
+    reviewReason: text("review_reason"),
+    retentionDeadlineAt: timestamp("retention_deadline_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("survey_responses_identity_xor", sql`(${table.campusUserId} IS NOT NULL AND ${table.guestPhoneCiphertext} IS NULL AND ${table.guestPhoneHash} IS NULL AND ${table.guestPhoneHashVersion} IS NULL) OR (${table.campusUserId} IS NULL AND ((${table.guestPhoneCiphertext} IS NULL AND ${table.guestPhoneHash} IS NULL AND ${table.guestPhoneHashVersion} IS NULL) OR (${table.guestPhoneCiphertext} IS NOT NULL AND ${table.guestPhoneHash} IS NOT NULL AND ${table.guestPhoneHashVersion} IS NOT NULL)))`),
+    check("survey_responses_guest_phone_ciphertext_nonblank", sql`${table.guestPhoneCiphertext} IS NULL OR btrim(${table.guestPhoneCiphertext}) <> ''`),
+    check("survey_responses_guest_phone_hash_shape", sql`${table.guestPhoneHash} IS NULL OR ${table.guestPhoneHash} ~ '^[A-Za-z0-9_-]{43}$'`),
+    check("survey_responses_guest_phone_hash_version_shape", sql`${table.guestPhoneHashVersion} IS NULL OR ${table.guestPhoneHashVersion} ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'`),
+    check("survey_responses_submission_lifecycle", sql`(${table.state} IN ('SUBMITTED', 'APPROVED', 'REJECTED', 'WAITLISTED')) = (${table.submittedAt} IS NOT NULL)`),
+    check("survey_responses_review_lifecycle", sql`(${table.state} IN ('DRAFT', 'SUBMITTED') AND ${table.reviewedAt} IS NULL AND ${table.reviewedByUserId} IS NULL AND ${table.reviewReason} IS NULL) OR (${table.state} IN ('APPROVED', 'WAITLISTED') AND ${table.reviewedAt} IS NOT NULL AND ${table.reviewedByUserId} IS NOT NULL AND ${table.reviewReason} IS NULL) OR (${table.state} = 'REJECTED' AND ${table.reviewedAt} IS NOT NULL AND ${table.reviewedByUserId} IS NOT NULL AND ${table.reviewReason} IS NOT NULL AND btrim(${table.reviewReason}) <> '')`),
+    check("survey_responses_retention_lifecycle", sql`${table.retentionDeadlineAt} >= ${table.createdAt}`),
+    uniqueIndex("survey_responses_campus_user_unique").on(table.surveyId, table.campusUserId).where(sql`${table.campusUserId} IS NOT NULL`),
+    index("survey_responses_retention_deadline_idx").on(table.retentionDeadlineAt),
+  ],
+);
+
+export const surveyResponseAnswers = pgTable(
+  "survey_response_answers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    responseId: uuid("response_id").notNull().references(() => surveyResponses.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull().references(() => surveyQuestions.id),
+    textValue: text("text_value"),
+    numberValue: integer("number_value"),
+    dateValue: date("date_value"),
+    choiceOptionIds: text("choice_option_ids"),
+  },
+  (table) => [uniqueIndex("survey_response_answers_response_question_unique").on(table.responseId, table.questionId)],
+);
+export const surveyGuestIdentityHashes = pgTable(
+  "survey_guest_identity_hashes",
+  {
+    responseId: uuid("response_id").notNull().references(() => surveyResponses.id, { onDelete: "cascade" }),
+    surveyId: uuid("survey_id").notNull().references(() => surveys.id),
+    keyVersion: text("key_version").notNull(),
+    hash: text("hash").notNull(),
+  },
+  (table) => [
+    uniqueIndex("survey_guest_identity_hashes_response_version_unique").on(table.responseId, table.keyVersion),
+    uniqueIndex("survey_guest_identity_hashes_survey_version_hash_unique").on(table.surveyId, table.keyVersion, table.hash),
+    index("survey_guest_identity_hashes_response_idx").on(table.responseId),
+    check("survey_guest_identity_hashes_key_version_shape", sql`${table.keyVersion} ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'`),
+    check("survey_guest_identity_hashes_hash_shape", sql`${table.hash} ~ '^[A-Za-z0-9_-]{43}$'`),
+  ],
+);
+
+export const contentMatchers = pgTable(
+  "content_matchers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id").references(() => articles.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id").references(() => events.id, { onDelete: "cascade" }),
+    surveyId: uuid("survey_id").notNull().references(() => surveys.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("content_matchers_survey_one_content_target", sql`num_nonnulls(${table.articleId}, ${table.eventId}) = 1`),
+    uniqueIndex("content_matchers_article_survey_unique").on(table.articleId, table.surveyId).where(sql`${table.eventId} IS NULL`),
+    uniqueIndex("content_matchers_event_survey_unique").on(table.eventId, table.surveyId).where(sql`${table.articleId} IS NULL`),
+  ],
+);
+
+export const surveyAuditLog = pgTable(
+  "survey_audit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    surveyId: uuid("survey_id").notNull().references(() => surveys.id),
+    responseId: uuid("response_id").references(() => surveyResponses.id, { onDelete: "set null" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id),
+    action: text("action").notNull(),
+    changedFieldNames: text("changed_field_names").notNull(),
+    correlationId: text("correlation_id").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("survey_audit_log_action_identifier", sql`${table.action} ~ '^[A-Z][A-Z0-9_]{1,63}$'`),
+    check("survey_audit_log_changed_field_names_identifier_list", sql`${table.changedFieldNames} ~ '^[a-z][a-z0-9_]{0,63}(,[a-z][a-z0-9_]{0,63})*$' AND octet_length(${table.changedFieldNames}) <= 1024`),
+    check("survey_audit_log_correlation_id_identifier", sql`${table.correlationId} ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'`),
+    index("survey_audit_log_survey_occurred_idx").on(table.surveyId, table.occurredAt),
+  ],
+);
+
+export const surveyExports = pgTable(
+  "survey_exports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    surveyId: uuid("survey_id").notNull().references(() => surveys.id),
+    requestedByUserId: uuid("requested_by_user_id").notNull().references(() => users.id),
+    format: text("format").notNull().default("CSV"),
+    status: text("status").notNull().default("ACCEPTED"),
+    retentionDeadlineAt: timestamp("retention_deadline_at", { withTimezone: true }).notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("survey_exports_format_csv", sql`${table.format} = 'CSV'`),
+    check("survey_exports_status_accepted", sql`${table.status} = 'ACCEPTED'`),
+    check("survey_exports_retention_lifecycle", sql`${table.retentionDeadlineAt} >= ${table.requestedAt}`),
   ],
 );

@@ -18,6 +18,44 @@ const asEncryptionSecret = (value: unknown, name: string): string => {
   }
   return secret;
 };
+const asHmacSecret = (value: unknown, name: string): string => {
+  const secret = asString(value, name);
+  const key = Buffer.from(secret, 'base64');
+  if (key.length !== 32 || key.toString('base64') !== secret) {
+    throw new Error(`Invalid HMAC key for ${name}: requires canonical base64 encoding of exactly 32 bytes`);
+  }
+  return secret;
+};
+const asHmacKeyVersion = (value: unknown, name: string): string => {
+  const version = asString(value, name);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(version)) {
+    throw new Error(`Invalid HMAC key version for ${name}`);
+  }
+  return version;
+};
+const asPriorHmacKeys = (value: unknown, name: string, activeVersion: string): string => {
+  if (value === undefined) return '{}';
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`Invalid HMAC keyring for ${name}: explicit empty keyring is not allowed`);
+  }
+  const raw = value;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`Invalid HMAC keyring for ${name}`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.getPrototypeOf(parsed) !== Object.prototype) {
+    throw new Error(`Invalid HMAC keyring for ${name}`);
+  }
+  const entries = Object.entries(parsed as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
+  for (const [version, key] of entries) {
+    asHmacKeyVersion(version, `${name} version`);
+    if (version === activeVersion) throw new Error(`Invalid HMAC keyring for ${name}: active version duplicated`);
+    asHmacSecret(key, `${name}.${version}`);
+  }
+  return JSON.stringify(Object.fromEntries(entries));
+};
 const asOrigin = (value: unknown, name: string): string => {
   const origin = asString(value, name);
 
@@ -178,6 +216,10 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
   const redisHost = asString(config.REDIS_HOST, 'REDIS_HOST', 'localhost');
   const redisPort = asPort(config.REDIS_PORT, 'REDIS_PORT', 6379);
   const redisUrl = asString(config.REDIS_URL, 'REDIS_URL', `redis://${redisHost}:${redisPort}`);
+  const surveyHmacVersion = asHmacKeyVersion(
+    config.SURVEY_PHONE_HASH_HMAC_VERSION,
+    'SURVEY_PHONE_HASH_HMAC_VERSION',
+  );
 
   return {
     ...config,
@@ -203,6 +245,16 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     PUBLIC_ORIGIN: asOrigin(config.PUBLIC_ORIGIN, 'PUBLIC_ORIGIN'),
     PII_ENCRYPTION_ACTIVE_KID: piiKeys.activeKid,
     PII_ENCRYPTION_KEYS_JSON: piiKeys.keysJson,
+    SURVEY_PHONE_HASH_HMAC_KEY: asHmacSecret(
+      config.SURVEY_PHONE_HASH_HMAC_KEY,
+      'SURVEY_PHONE_HASH_HMAC_KEY',
+    ),
+    SURVEY_PHONE_HASH_HMAC_VERSION: surveyHmacVersion,
+    SURVEY_PHONE_HASH_HMAC_PRIOR_KEYS_JSON: asPriorHmacKeys(
+      config.SURVEY_PHONE_HASH_HMAC_PRIOR_KEYS_JSON,
+      'SURVEY_PHONE_HASH_HMAC_PRIOR_KEYS_JSON',
+      surveyHmacVersion,
+    ),
     AUTHORIZATION_OPERATIONS_ENABLED: asBoolean(
       config.AUTHORIZATION_OPERATIONS_ENABLED,
       'AUTHORIZATION_OPERATIONS_ENABLED',

@@ -24,6 +24,8 @@ const validConfig = () => {
     PII_ENCRYPTION_KEYS_JSON: JSON.stringify({
       'pii-active': Buffer.alloc(32, 7).toString('base64'),
     }),
+    SURVEY_PHONE_HASH_HMAC_KEY: Buffer.alloc(32, 9).toString('base64'),
+    SURVEY_PHONE_HASH_HMAC_VERSION: 'test-survey-phone-v1',
     PUBLIC_ORIGIN: 'https://web.example.test',
     SSO_AUTH_API_URL: 'https://sso.example.test/auth',
     SSO_CLIENT_SECRET: 'test-secret',
@@ -38,11 +40,81 @@ describe('authentication environment validation', () => {
   it('accepts a matching P-256 active key pair', () => {
     expect(validateEnv(validConfig())).toMatchObject({ AUTH_JWT_ACTIVE_KID: 'active' });
   });
+  it('preserves the validated survey HMAC key and version exactly', () => {
+    const config = validConfig();
+    expect(validateEnv(config)).toMatchObject({
+      SURVEY_PHONE_HASH_HMAC_KEY: config.SURVEY_PHONE_HASH_HMAC_KEY,
+      SURVEY_PHONE_HASH_HMAC_VERSION: config.SURVEY_PHONE_HASH_HMAC_VERSION,
+    });
+  });
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+  ])('rejects a %s survey phone HMAC key', (_case, SURVEY_PHONE_HASH_HMAC_KEY) => {
+    expect(() => validateEnv({
+      ...validConfig(),
+      SURVEY_PHONE_HASH_HMAC_KEY,
+    })).toThrow('Missing environment variable: SURVEY_PHONE_HASH_HMAC_KEY');
+  });
+  it.each([
+    ['31 decoded bytes', Buffer.alloc(31).toString('base64')],
+    ['33 decoded bytes', Buffer.alloc(33).toString('base64')],
+    ['non-canonical padding', `${Buffer.alloc(32).toString('base64')}\n`],
+    ['non-base64 text', 'test-survey-phone-hmac-key-at-least-32-bytes'],
+  ])('rejects a survey phone HMAC key with %s', (_case, SURVEY_PHONE_HASH_HMAC_KEY) => {
+    expect(() => validateEnv({
+      ...validConfig(),
+      SURVEY_PHONE_HASH_HMAC_KEY,
+    })).toThrow('Invalid HMAC key for SURVEY_PHONE_HASH_HMAC_KEY: requires canonical base64 encoding of exactly 32 bytes');
+  });
+  it('accepts a canonical base64 survey phone HMAC key decoding to exactly 32 bytes', () => {
+    const SURVEY_PHONE_HASH_HMAC_KEY = Buffer.alloc(32, 3).toString('base64');
+    expect(validateEnv({
+      ...validConfig(),
+      SURVEY_PHONE_HASH_HMAC_KEY,
+    })).toMatchObject({ SURVEY_PHONE_HASH_HMAC_KEY });
+  });
+  it('validates and canonicalizes prior survey HMAC keys without duplicating the active version', () => {
+    const priorKey = Buffer.alloc(32, 4).toString('base64');
+    expect(validateEnv({
+      ...validConfig(),
+      SURVEY_PHONE_HASH_HMAC_PRIOR_KEYS_JSON: JSON.stringify({ previous: priorKey }),
+    })).toMatchObject({
+      SURVEY_PHONE_HASH_HMAC_PRIOR_KEYS_JSON: JSON.stringify({ previous: priorKey }),
+    });
+    for (const priorKeys of [
+      'not-json',
+      JSON.stringify({ 'test-survey-phone-v1': priorKey }),
+      JSON.stringify({ previous: Buffer.alloc(31).toString('base64') }),
+      JSON.stringify({ 'invalid version': priorKey }),
+    ]) {
+      expect(() => validateEnv({
+        ...validConfig(),
+        SURVEY_PHONE_HASH_HMAC_PRIOR_KEYS_JSON: priorKeys,
+      })).toThrow(/Invalid HMAC/);
+    }
+  });
+  it.each([
+    ['missing', undefined, 'Missing environment variable: SURVEY_PHONE_HASH_HMAC_VERSION'],
+    ['empty', '', 'Missing environment variable: SURVEY_PHONE_HASH_HMAC_VERSION'],
+    ['invalid', 'version with spaces', 'Invalid HMAC key version for SURVEY_PHONE_HASH_HMAC_VERSION'],
+  ])('rejects a %s survey phone HMAC version', (_case, SURVEY_PHONE_HASH_HMAC_VERSION, message) => {
+    expect(() => validateEnv({
+      ...validConfig(),
+      SURVEY_PHONE_HASH_HMAC_VERSION,
+    })).toThrow(message);
+  });
   it('rejects an undersized pending-login encryption key', () => {
     expect(() => validateEnv({
       ...validConfig(),
       AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'too-short',
     })).toThrow('Invalid encryption key for AUTH_PENDING_LOGIN_ENCRYPTION_KEY');
+  });
+  it('rejects a malformed survey phone HMAC key with an HMAC-specific diagnostic', () => {
+    expect(() => validateEnv({
+      ...validConfig(),
+      SURVEY_PHONE_HASH_HMAC_KEY: 'too-short',
+    })).toThrow('Invalid HMAC key for SURVEY_PHONE_HASH_HMAC_KEY: requires canonical base64 encoding of exactly 32 bytes');
   });
 
   it('rejects a public key that does not match the active private key', () => {

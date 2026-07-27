@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { EventListResponse } from '@soc/contracts';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { EventCarousel } from '@/components/organisms/event-carousel';
 import { EventsPage } from '@/pages/events-page';
@@ -25,6 +25,10 @@ beforeAll(() => {
 
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
 });
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
+
 
 afterEach(() => {
   cleanup();
@@ -47,6 +51,7 @@ const eventResponse: EventListResponse = {
       location: 'N1 101호',
       visibility: 'PUBLIC',
       updatedAt: '2026-07-27T00:00:00.000Z',
+      surveyId: null,
     },
   ],
 };
@@ -66,6 +71,23 @@ describe('event live data', () => {
     expect(await screen.findByText('2026 신입생 오리엔테이션')).toBeVisible();
     expect(screen.getByText('전산학부 신입생을 위한 안내 행사입니다.')).toBeVisible();
   });
+  it('maps non-null English DTO content into the event carousel', async () => {
+    getUpcomingEventsMock.mockResolvedValueOnce({
+      ...eventResponse,
+      locale: 'en',
+      items: [{
+        ...eventResponse.items[0]!,
+        title: { value: 'Freshman Orientation 2026', translationUnavailable: false },
+        description: { value: 'Orientation for incoming computer science students.', translationUnavailable: false },
+      }],
+    });
+
+    render(<MemoryRouter><EventCarousel /></MemoryRouter>);
+
+    expect(await screen.findByText('Freshman Orientation 2026')).toBeVisible();
+    expect(screen.getByText('Orientation for incoming computer science students.')).toBeVisible();
+  });
+
 
   it('renders event-page API data rather than mock event cards', async () => {
     getEventsMock.mockResolvedValueOnce(eventResponse);
@@ -75,6 +97,22 @@ describe('event live data', () => {
     expect(await screen.findByRole('heading', { name: '2026 신입생 오리엔테이션' })).toBeVisible();
     expect(screen.getByText('전산학부 신입생을 위한 안내 행사입니다.')).toBeVisible();
     expect(screen.queryByText('2026 봄맞이 간식 이벤트')).not.toBeInTheDocument();
+  });
+  it('maps non-null English DTO content into event cards', async () => {
+    getEventsMock.mockResolvedValueOnce({
+      ...eventResponse,
+      locale: 'en',
+      items: [{
+        ...eventResponse.items[0]!,
+        title: { value: 'Freshman Orientation 2026', translationUnavailable: false },
+        description: { value: 'Orientation for incoming computer science students.', translationUnavailable: false },
+      }],
+    });
+
+    renderEventsPage();
+
+    expect(await screen.findByRole('heading', { name: 'Freshman Orientation 2026' })).toBeVisible();
+    expect(screen.getByText('Orientation for incoming computer science students.')).toBeVisible();
   });
 
   it('keeps the event surface explicit for API failures and empty results', async () => {
