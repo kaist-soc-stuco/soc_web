@@ -19,7 +19,7 @@ const validConfig = () => {
     AUTH_JWT_ES256_PRIVATE_KEY: privatePem,
     AUTH_JWT_ISSUER: 'soc-api-test',
     AUTH_JWT_PUBLIC_KEYS_JSON: JSON.stringify({ active: publicPem }),
-    AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'test-encryption-seed',
+    AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'test-encryption-seed-at-least-32-bytes',
     PII_ENCRYPTION_ACTIVE_KID: 'pii-active',
     PII_ENCRYPTION_KEYS_JSON: JSON.stringify({
       'pii-active': Buffer.alloc(32, 7).toString('base64'),
@@ -30,12 +30,19 @@ const validConfig = () => {
     VITE_SSO_CLIENT_ID: 'test-client',
     VITE_SSO_LOGIN_URL: 'https://sso.example.test/login',
     VITE_SSO_REDIRECT_URI: 'https://api.example.test/api/auth/login',
+    POSTGRES_PASSWORD: 'test-postgres-password',
   };
 };
 
 describe('authentication environment validation', () => {
   it('accepts a matching P-256 active key pair', () => {
     expect(validateEnv(validConfig())).toMatchObject({ AUTH_JWT_ACTIVE_KID: 'active' });
+  });
+  it('rejects an undersized pending-login encryption key', () => {
+    expect(() => validateEnv({
+      ...validConfig(),
+      AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'too-short',
+    })).toThrow('Invalid encryption key for AUTH_PENDING_LOGIN_ENCRYPTION_KEY');
   });
 
   it('rejects a public key that does not match the active private key', () => {
@@ -86,4 +93,77 @@ describe('authentication environment validation', () => {
     malformed.PII_ENCRYPTION_KEYS_JSON = JSON.stringify({ 'pii-active': 'too-short' });
     expect(() => validateEnv(malformed)).toThrow('Invalid PII encryption key configuration');
   });
+});
+
+describe('content configuration validation', () => {
+  it('defaults the purge grace period and asset provider gate to disabled', () => {
+    expect(validateEnv(validConfig())).toMatchObject({
+      ASSET_PROVIDER_ENABLED: false,
+      CONTENT_PURGE_GRACE_DAYS: 30,
+    });
+  });
+  it('accepts an enabled asset provider', () => {
+    expect(validateEnv({ ...validConfig(), ASSET_PROVIDER_ENABLED: 'true' })).toMatchObject({
+      ASSET_PROVIDER_ENABLED: true,
+    });
+  });
+
+  it.each([
+    ['1', 1],
+    ['365', 365],
+  ])('accepts a bounded positive content purge grace period: %s', (CONTENT_PURGE_GRACE_DAYS, expected) => {
+    expect(
+      validateEnv({
+        ...validConfig(),
+        CONTENT_PURGE_GRACE_DAYS,
+      }),
+    ).toMatchObject({
+      CONTENT_PURGE_GRACE_DAYS: expected,
+    });
+  });
+
+  it.each(['0', '-1', '1.5', '30days', '', '036', '366', '9007199254740992'])(
+    'rejects an invalid content purge grace period: %s',
+    (CONTENT_PURGE_GRACE_DAYS) => {
+      expect(() =>
+        validateEnv({ ...validConfig(), CONTENT_PURGE_GRACE_DAYS }),
+      ).toThrow('Invalid positive integer value for CONTENT_PURGE_GRACE_DAYS');
+    },
+  );
+  it.each([
+    ['API_PORT', '1'],
+    ['API_PORT', '65535'],
+    ['POSTGRES_PORT', '1'],
+    ['POSTGRES_PORT', '65535'],
+    ['REDIS_PORT', '1'],
+    ['REDIS_PORT', '65535'],
+  ])('accepts canonical port boundaries for %s: %s', (name, value) => {
+    expect(validateEnv({ ...validConfig(), [name]: value })).toMatchObject({
+      [name]: Number(value),
+    });
+  });
+
+  it.each(['0', '0001', 5432, '65536', '1.5', '123port', '', ' 5432 '])(
+    'rejects non-canonical port values: %s',
+    (value) => {
+      expect(() => validateEnv({ ...validConfig(), API_PORT: value })).toThrow(
+        `Invalid port value for API_PORT: ${value}`,
+      );
+    },
+  );
+
+  it.each([undefined, ''])('requires a non-empty Postgres password', (POSTGRES_PASSWORD) => {
+    expect(() =>
+      validateEnv({ ...validConfig(), POSTGRES_PASSWORD }),
+    ).toThrow('Missing environment variable: POSTGRES_PASSWORD');
+  });
+
+  it.each(['TRUE', '1', '', 'false '])(
+    'rejects an invalid asset provider gate value: %s',
+    (ASSET_PROVIDER_ENABLED) => {
+      expect(() =>
+        validateEnv({ ...validConfig(), ASSET_PROVIDER_ENABLED }),
+      ).toThrow('Invalid boolean value for ASSET_PROVIDER_ENABLED');
+    },
+  );
 });

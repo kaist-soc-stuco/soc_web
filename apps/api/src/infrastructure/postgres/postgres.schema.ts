@@ -3,12 +3,14 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -314,5 +316,210 @@ export const studentCouncilRoleSnapshots = pgTable(
       table.kaistUidSnapshot,
       table.year,
     ),
+  ],
+);
+export const boardPermissionEnum = pgEnum("board_permission", ["PUBLIC", "AUTHENTICATED", "COMMITTEE", "ADMIN"]);
+export const articleStatusEnum = pgEnum("article_status", ["DRAFT", "PUBLISHED", "DELETED", "HIDDEN"]);
+export const articleScopeEnum = pgEnum("article_scope", ["ALL", "KAIST", "SOC", "AUTHOR_AND_STAFF", "STAFF"]);
+export const commentStatusEnum = pgEnum("comment_status", ["PUBLISHED", "SECRET", "DELETED"]);
+export const reactionTypeEnum = pgEnum("reaction_type", ["LIKE", "DISLIKE"]);
+export const assetTypeEnum = pgEnum("asset_type", ["IMAGE", "ATTACHMENT", "IMAGE_THUMBNAIL"]);
+export const assetStatusEnum = pgEnum("asset_status", ["INITIATED", "COMPLETED", "DELETED"]);
+export const assetObjectDeletionStatusEnum = pgEnum("asset_object_deletion_status", ["PENDING", "DELETED", "FAILED"]);
+export const legalHoldStatusEnum = pgEnum("legal_hold_status", ["ACTIVE", "RELEASED"]);
+export const purgeSubjectTypeEnum = pgEnum("purge_subject_type", ["ARTICLE", "COMMENT", "ASSET"]);
+export const purgeActionEnum = pgEnum("purge_action", ["SCHEDULED", "HELD", "PURGED", "CANCELLED"]);
+
+export const boards = pgTable(
+  "boards",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: text("code").notNull(),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+    descriptionKr: text("description_kr").notNull(),
+    descriptionEn: text("description_en").notNull(),
+    readPermission: boardPermissionEnum("read_permission").notNull(),
+    writePermission: boardPermissionEnum("write_permission").notNull().default("AUTHENTICATED"),
+    commentPermission: boardPermissionEnum("comment_permission").notNull().default("AUTHENTICATED"),
+    commentsAllowed: boolean("comments_allowed").notNull().default(true),
+    secretArticlesAllowed: boolean("secret_articles_allowed").notNull().default(false),
+    reactionsAllowed: boolean("reactions_allowed").notNull().default(true),
+    displayOrder: integer("display_order").notNull(),
+    isHidden: boolean("is_hidden").notNull().default(false),
+    showOnHome: boolean("show_on_home").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("boards_code_nonempty", sql`btrim(${table.code}) <> ''`),
+    check("boards_title_kr_nonempty", sql`btrim(${table.titleKr}) <> ''`),
+    check("boards_title_en_nonempty", sql`btrim(${table.titleEn}) <> ''`),
+    check("boards_description_kr_nonempty", sql`btrim(${table.descriptionKr}) <> ''`),
+    check("boards_description_en_nonempty", sql`btrim(${table.descriptionEn}) <> ''`),
+    check("boards_display_order_nonnegative", sql`${table.displayOrder} >= 0`),
+    uniqueIndex("boards_code_unique").on(table.code),
+    uniqueIndex("boards_display_order_unique").on(table.displayOrder),
+    index("boards_home_idx").on(table.showOnHome, table.isHidden, table.displayOrder),
+  ],
+);
+
+export const articles = pgTable(
+  "articles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    boardId: uuid("board_id").notNull().references(() => boards.id),
+    authorUserId: uuid("author_user_id").notNull().references(() => users.id),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+    bodyKr: text("body_kr").notNull(),
+    bodyEn: text("body_en").notNull(),
+    status: articleStatusEnum("status").notNull().default("DRAFT"),
+    scope: articleScopeEnum("scope").notNull(),
+    isPinned: boolean("is_pinned").notNull().default(false),
+    pinnedOrder: integer("pinned_order"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    purgeAfter: timestamp("purge_after", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("articles_title_kr_nonempty", sql`btrim(${table.titleKr}) <> ''`),
+    check("articles_title_en_nonempty", sql`btrim(${table.titleEn}) <> ''`),
+    check("articles_body_kr_nonempty", sql`btrim(${table.bodyKr}) <> ''`),
+    check("articles_body_en_nonempty", sql`btrim(${table.bodyEn}) <> ''`),
+    check("articles_pinned_order_nonnegative", sql`${table.pinnedOrder} IS NULL OR ${table.pinnedOrder} >= 0`),
+    check("articles_pinned_state", sql`${table.isPinned} = (${table.pinnedOrder} IS NOT NULL)`),
+    check("articles_deleted_at_status", sql`(${table.status} = 'DELETED') = (${table.deletedAt} IS NOT NULL)`),
+    check("articles_purge_lifecycle", sql`(${table.status} = 'DELETED' AND ${table.deletedAt} IS NOT NULL AND ${table.purgeAfter} IS NOT NULL AND ${table.purgeAfter} >= ${table.deletedAt}) OR (${table.status} <> 'DELETED' AND ${table.deletedAt} IS NULL AND ${table.purgeAfter} IS NULL)`),
+    check("articles_published_at_lifecycle", sql`(${table.status} <> 'PUBLISHED' OR ${table.publishedAt} IS NOT NULL) AND (${table.status} <> 'DRAFT' OR ${table.publishedAt} IS NULL)`),
+    index("articles_board_list_idx").on(table.boardId, table.status, table.publishedAt),
+    index("articles_purge_idx").on(table.status, table.purgeAfter),
+  ],
+);
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id").notNull().references(() => articles.id),
+    parentCommentId: uuid("parent_comment_id"),
+    authorUserId: uuid("author_user_id").notNull().references(() => users.id),
+    body: text("body").notNull(),
+    status: commentStatusEnum("status").notNull().default("PUBLISHED"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    purgeAfter: timestamp("purge_after", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("comments_body_nonempty", sql`btrim(${table.body}) <> ''`),
+    check("comments_deleted_at_status", sql`(${table.status} = 'DELETED') = (${table.deletedAt} IS NOT NULL)`),
+    check("comments_purge_lifecycle", sql`(${table.status} = 'DELETED' AND ${table.deletedAt} IS NOT NULL AND ${table.purgeAfter} IS NOT NULL AND ${table.purgeAfter} >= ${table.deletedAt}) OR (${table.status} <> 'DELETED' AND ${table.deletedAt} IS NULL AND ${table.purgeAfter} IS NULL)`),
+    unique("comments_article_id_unique").on(table.articleId, table.id),
+    foreignKey({
+      name: "comments_parent_same_article_fk",
+      columns: [table.articleId, table.parentCommentId],
+      foreignColumns: [table.articleId, table.id],
+    }),
+    index("comments_article_list_idx").on(table.articleId, table.createdAt),
+    index("comments_purge_idx").on(table.status, table.purgeAfter),
+  ],
+);
+
+export const articleReactions = pgTable(
+  "article_reactions",
+  {
+    articleId: uuid("article_id").notNull().references(() => articles.id),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    type: reactionTypeEnum("type").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("article_reactions_article_user_unique").on(table.articleId, table.userId),
+    index("article_reactions_article_type_idx").on(table.articleId, table.type),
+  ],
+);
+
+export const assets = pgTable(
+  "assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id").notNull().references(() => articles.id),
+    displayOrder: integer("display_order").notNull(),
+    type: assetTypeEnum("type").notNull(),
+    status: assetStatusEnum("status").notNull().default("INITIATED"),
+    provider: text("provider").notNull(),
+    objectKey: text("object_key").notNull(),
+    contentType: text("content_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    checksumSha256: text("checksum_sha256"),
+    objectDeletionStatus: assetObjectDeletionStatusEnum("object_deletion_status").notNull().default("PENDING"),
+    objectDeletionAttempts: integer("object_deletion_attempts").notNull().default(0),
+    lastObjectDeletionErrorCode: text("last_object_deletion_error_code"),
+    initiatedByUserId: uuid("initiated_by_user_id").notNull().references(() => users.id),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    purgeAfter: timestamp("purge_after", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("assets_display_order_nonnegative", sql`${table.displayOrder} >= 0`),
+    check("assets_byte_size_positive", sql`${table.byteSize} > 0`),
+    check("assets_object_deletion_attempts_nonnegative", sql`${table.objectDeletionAttempts} >= 0`),
+    check("assets_object_deletion_error_code_technical_identifier", sql`${table.lastObjectDeletionErrorCode} IS NULL OR ${table.lastObjectDeletionErrorCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`),
+    check("assets_completed_at_lifecycle", sql`(${table.status} = 'INITIATED' AND ${table.completedAt} IS NULL) OR (${table.status} = 'COMPLETED' AND ${table.completedAt} IS NOT NULL) OR ${table.status} = 'DELETED'`),
+    check("assets_deleted_at_status", sql`(${table.status} = 'DELETED') = (${table.deletedAt} IS NOT NULL)`),
+    check("assets_purge_lifecycle", sql`(${table.status} = 'DELETED' AND ${table.deletedAt} IS NOT NULL AND ${table.purgeAfter} IS NOT NULL AND ${table.purgeAfter} >= ${table.deletedAt}) OR (${table.status} <> 'DELETED' AND ${table.deletedAt} IS NULL AND ${table.purgeAfter} IS NULL)`),
+    check("assets_object_deletion_status_lifecycle", sql`${table.objectDeletionStatus} <> 'DELETED' OR ${table.status} = 'DELETED'`),
+    uniqueIndex("assets_article_display_order_unique").on(table.articleId, table.displayOrder).where(sql`${table.status} <> 'DELETED'`),
+    index("assets_purge_idx").on(table.status, table.purgeAfter),
+  ],
+);
+
+export const legalHolds = pgTable(
+  "legal_holds",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id").references(() => articles.id, { onDelete: "cascade" }),
+    commentId: uuid("comment_id").references(() => comments.id, { onDelete: "cascade" }),
+    assetId: uuid("asset_id").references(() => assets.id, { onDelete: "cascade" }),
+    status: legalHoldStatusEnum("status").notNull().default("ACTIVE"),
+    reasonCode: text("reason_code").notNull(),
+    placedByUserId: uuid("placed_by_user_id").notNull().references(() => users.id),
+    releasedByUserId: uuid("released_by_user_id").references(() => users.id),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("legal_holds_one_subject", sql`num_nonnulls(${table.articleId}, ${table.commentId}, ${table.assetId}) = 1`),
+    check("legal_holds_release_state", sql`(${table.status} = 'RELEASED') = (${table.releasedAt} IS NOT NULL)`),
+    check("legal_holds_released_by_lifecycle", sql`(${table.status} = 'RELEASED') = (${table.releasedByUserId} IS NOT NULL)`),
+    check("legal_holds_reason_code_technical_identifier", sql`${table.reasonCode} ~ '^[A-Z][A-Z0-9_]{1,63}$'`),
+    index("legal_holds_active_article_idx").on(table.articleId).where(sql`${table.status} = 'ACTIVE'`),
+    index("legal_holds_active_comment_idx").on(table.commentId).where(sql`${table.status} = 'ACTIVE'`),
+    index("legal_holds_active_asset_idx").on(table.assetId).where(sql`${table.status} = 'ACTIVE'`),
+  ],
+);
+
+export const purgeAuditLog = pgTable(
+  "purge_audit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    subjectType: purgeSubjectTypeEnum("subject_type").notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    action: purgeActionEnum("action").notNull(),
+    actorUserId: uuid("actor_user_id").references(() => users.id),
+    legalHoldId: uuid("legal_hold_id"),
+    correlationId: text("correlation_id").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("purge_audit_log_correlation_identifier", sql`${table.correlationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'`),
+    index("purge_audit_log_subject_idx").on(table.subjectType, table.subjectId, table.occurredAt),
+    index("purge_audit_log_occurred_at_idx").on(table.occurredAt),
   ],
 );

@@ -7,7 +7,7 @@ const publicPem = publicKey.export({ format: 'pem', type: 'spki' }).toString();
 
 const testEnvironment = {
   AUTH_JWT_SECRET: 'test-jwt-secret',
-  AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'test-encryption-key',
+  AUTH_PENDING_LOGIN_ENCRYPTION_KEY: 'test-pending-encryption-key-at-least-32-bytes',
   AUTH_JWT_ACTIVE_KID: 'test-key',
   AUTH_JWT_AUDIENCE: 'soc-web-test',
   AUTH_JWT_ES256_PRIVATE_KEY: privatePem,

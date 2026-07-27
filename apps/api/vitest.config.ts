@@ -22,6 +22,7 @@ export default defineConfig({
             'test/app.http.spec.ts',
             'test/app-module.http.spec.ts',
             'test/auth.http.spec.ts',
+            'test/boards.http.spec.ts',
             'test/events.http.spec.ts',
             'test/faqs.http.spec.ts',
             'test/origin.http.spec.ts',

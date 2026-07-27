@@ -11,6 +11,13 @@ const asString = (value: unknown, name: string, fallback?: string): string => {
 
   throw new Error(`Missing environment variable: ${name}`);
 };
+const asEncryptionSecret = (value: unknown, name: string): string => {
+  const secret = asString(value, name);
+  if (Buffer.byteLength(secret, 'utf8') < 32) {
+    throw new Error(`Invalid encryption key for ${name}: requires at least 32 bytes`);
+  }
+  return secret;
+};
 const asOrigin = (value: unknown, name: string): string => {
   const origin = asString(value, name);
 
@@ -28,10 +35,14 @@ const asOrigin = (value: unknown, name: string): string => {
 };
 
 const asPort = (value: unknown, name: string, fallback: number): number => {
-  const raw = typeof value === 'string' ? value : String(fallback);
-  const port = Number.parseInt(raw, 10);
+  const raw = value === undefined ? String(fallback) : value;
 
-  if (Number.isNaN(port) || port <= 0) {
+  if (typeof raw !== 'string' || !/^[1-9]\d{0,4}$/.test(raw)) {
+    throw new Error(`Invalid port value for ${name}: ${String(raw)}`);
+  }
+
+  const port = Number(raw);
+  if (port > 65_535) {
     throw new Error(`Invalid port value for ${name}: ${raw}`);
   }
 
@@ -42,6 +53,24 @@ const asBoolean = (value: unknown, name: string, fallback: boolean): boolean => 
   if (value === true || value === 'true') return true;
   if (value === false || value === 'false') return false;
   throw new Error(`Invalid boolean value for ${name}`);
+};
+const asPositiveBoundedInteger = (
+  value: unknown,
+  name: string,
+  fallback: number,
+  maximum: number,
+): number => {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) {
+    throw new Error(`Invalid positive integer value for ${name}`);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > maximum) {
+    throw new Error(`Invalid positive integer value for ${name}`);
+  }
+
+  return parsed;
 };
 const asJwtKeys = (config: Record<string, unknown>) => {
   const activeKid = asString(config.AUTH_JWT_ACTIVE_KID, 'AUTH_JWT_ACTIVE_KID');
@@ -143,7 +172,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
   const postgresHost = asString(config.POSTGRES_HOST, 'POSTGRES_HOST', 'localhost');
   const postgresPort = asPort(config.POSTGRES_PORT, 'POSTGRES_PORT', 5432);
   const postgresUser = asString(config.POSTGRES_USER, 'POSTGRES_USER', 'soc');
-  const postgresPassword = asString(config.POSTGRES_PASSWORD, 'POSTGRES_PASSWORD', 'soc');
+  const postgresPassword = asString(config.POSTGRES_PASSWORD, 'POSTGRES_PASSWORD');
   const postgresDb = asString(config.POSTGRES_DB, 'POSTGRES_DB', 'soc_web');
 
   const redisHost = asString(config.REDIS_HOST, 'REDIS_HOST', 'localhost');
@@ -167,7 +196,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     AUTH_JWT_ES256_PRIVATE_KEY: jwtKeys.privatePem,
     AUTH_JWT_ISSUER: asString(config.AUTH_JWT_ISSUER, 'AUTH_JWT_ISSUER'),
     AUTH_JWT_AUDIENCE: asString(config.AUTH_JWT_AUDIENCE, 'AUTH_JWT_AUDIENCE'),
-    AUTH_PENDING_LOGIN_ENCRYPTION_KEY: asString(
+    AUTH_PENDING_LOGIN_ENCRYPTION_KEY: asEncryptionSecret(
       config.AUTH_PENDING_LOGIN_ENCRYPTION_KEY,
       'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
     ),
@@ -178,6 +207,17 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       config.AUTHORIZATION_OPERATIONS_ENABLED,
       'AUTHORIZATION_OPERATIONS_ENABLED',
       false,
+    ),
+    ASSET_PROVIDER_ENABLED: asBoolean(
+      config.ASSET_PROVIDER_ENABLED,
+      'ASSET_PROVIDER_ENABLED',
+      false,
+    ),
+    CONTENT_PURGE_GRACE_DAYS: asPositiveBoundedInteger(
+      config.CONTENT_PURGE_GRACE_DAYS,
+      'CONTENT_PURGE_GRACE_DAYS',
+      30,
+      365,
     ),
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,

@@ -29,6 +29,13 @@
       "when": 1785133226463,
       "tag": "0003_flimsy_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785145142795,
+      "tag": "0004_cute_hedge_knight",
+      "breakpoints": true
     }
   ]
 }
