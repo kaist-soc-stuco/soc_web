@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { ContactDto, ContactValues, CreateContactRequest, PatchContactRequest } from '@soc/contracts';
@@ -45,7 +46,7 @@ export class ContactsService {
   private date(value: unknown, fallback?: Date) { if (value === undefined && fallback) return fallback; if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(value)) this.invalid('invalid_contact_date'); const parsed = new Date(value); if (Number.isNaN(parsed.valueOf()) || parsed.toISOString() !== value) this.invalid('invalid_contact_date'); return parsed; }
   private optionalDate(value: unknown) { return value === undefined || value === null ? null : this.date(value); }
   private future(value: Date, now: Date) { if (value < now) this.invalid('invalid_contact_date'); }
-  private correlation(value: string) { if (!CORRELATION.test(value)) this.invalid('invalid_correlation_id'); return value; }
+  private correlation(value: string) { if (!CORRELATION.test(value)) this.invalid('invalid_correlation_id'); return randomUUID(); }
   private deadline(now: Date) { const days = Number(this.config.get('CONTACT_PURGE_GRACE_DAYS') ?? 30); if (!Number.isInteger(days) || days < 1 || days > 365) throw new Error('invalid_contact_purge_grace_days'); return new Date(now.getTime() + days * 86400000); }
   private invalid(code: string): never { throw new UnprocessableEntityException(code); }
 }
