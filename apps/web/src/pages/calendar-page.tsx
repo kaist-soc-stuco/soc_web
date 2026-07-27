@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin, Search } from 'lucide-react';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
+import type { EventItem } from '@soc/contracts';
 
+import { getEvents } from '@/lib/event-api';
+import { localizedText } from '@/lib/localized-content';
 type CalendarCategory = '전체' | '학사' | '행사' | '학생회' | '복지' | '연구';
 
 interface CalendarEvent {
-  id: number;
+  id: string;
   date: string;
-  endDate?: string;
+  endDate: string;
   title: string;
   category: Exclude<CalendarCategory, '전체'>;
   time: string;
@@ -18,72 +21,40 @@ interface CalendarEvent {
 
 const calendarCategories: CalendarCategory[] = ['전체', '학사', '행사', '학생회', '복지', '연구'];
 
-const calendarEvents: CalendarEvent[] = [
-  {
-    id: 1,
-    date: '2026-05-06',
-    title: '학생회 정기 회의',
-    category: '학생회',
-    time: '18:00',
-    location: 'N1 회의실',
-    summary: '5월 학생회 주요 사업과 건의사항 처리 현황을 점검합니다.',
-  },
-  {
-    id: 2,
-    date: '2026-05-08',
-    endDate: '2026-05-10',
-    title: 'Human of CS 신청기간',
+function formatTime(event: EventItem) {
+  if (event.allDay) return '종일';
+  return new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(event.startAtMs);
+}
+
+function previousDateKey(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function toCalendarEvent(event: EventItem): CalendarEvent {
+  const date = event.allDay && event.allDayStartDate
+    ? event.allDayStartDate
+    : toDateKey(new Date(event.startAtMs));
+  const endDate = event.allDay && event.allDayEndDate
+    ? previousDateKey(event.allDayEndDate)
+    : toDateKey(new Date(event.endAtMs - 1));
+
+  return {
+    id: event.id,
+    date,
+    endDate,
+    title: localizedText(event.title),
     category: '행사',
-    time: '상시',
-    location: '온라인',
-    summary: '전산학부 구성원 인터뷰 프로젝트 신청을 받습니다.',
-  },
-  {
-    id: 3,
-    date: '2026-05-14',
-    title: '연구실 오픈랩 투어',
-    category: '연구',
-    time: '16:00',
-    location: 'E3-1',
-    summary: '연구실별 소개와 질의응답 세션을 진행합니다.',
-  },
-  {
-    id: 4,
-    date: '2026-05-18',
-    title: '전산학부 체육대회',
-    category: '행사',
-    time: '13:00',
-    location: '대운동장',
-    summary: '학부 구성원이 함께 참여하는 봄 체육대회입니다.',
-  },
-  {
-    id: 5,
-    date: '2026-05-21',
-    title: '시험기간 간식 배부',
-    category: '복지',
-    time: '19:00',
-    location: 'N1 로비',
-    summary: '중간고사 기간 구성원을 위한 간식 배부가 진행됩니다.',
-  },
-  {
-    id: 6,
-    date: '2026-05-27',
-    title: '전공 설명회',
-    category: '학사',
-    time: '17:00',
-    location: '양승택 오디토리움',
-    summary: '전산학부 전공 이수 흐름과 로드맵을 안내합니다.',
-  },
-  {
-    id: 7,
-    date: '2026-06-03',
-    title: '기말고사 준비 세션',
-    category: '학사',
-    time: '18:30',
-    location: '온라인',
-    summary: '주요 전공 과목 학습 팁과 질의응답을 공유합니다.',
-  },
-];
+    time: formatTime(event),
+    location: event.location,
+    summary: localizedText(event.description),
+  };
+}
+
+function occursOn(event: CalendarEvent, dateKey: string) {
+  return event.date <= dateKey && dateKey <= event.endDate;
+}
 
 const categoryStyles: Record<Exclude<CalendarCategory, '전체'>, string> = {
   학사: 'bg-[#dbeafe] text-[#1d4ed8]',
@@ -115,15 +86,40 @@ function getMonthDays(viewDate: Date) {
 
 export function CalendarPage() {
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
-  const [viewDate, setViewDate] = useState(() => new Date(2026, 4, 1));
-  const [selectedDate, setSelectedDate] = useState('2026-05-08');
+  const [viewDate, setViewDate] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [activeCategory, setActiveCategory] = useState<CalendarCategory>('전체');
   const [searchQuery, setSearchQuery] = useState('');
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+
+  useEffect(() => {
+    const fromMs = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getTime();
+    const toMs = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1).getTime();
+    let cancelled = false;
+
+    setEvents([]);
+    setLoadState('loading');
+    getEvents(fromMs, toMs)
+      .then((response) => {
+        if (!cancelled) {
+          setEvents(response.items.map(toCalendarEvent));
+          setLoadState('ready');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadState('error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewDate]);
 
   const monthDays = useMemo(() => getMonthDays(viewDate), [viewDate]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
-  const filteredEvents = calendarEvents.filter((event) => {
+  const filteredEvents = events.filter((event) => {
     const matchesCategory = activeCategory === '전체' || event.category === activeCategory;
     const matchesSearch =
       normalizedQuery.length === 0 ||
@@ -135,15 +131,18 @@ export function CalendarPage() {
   });
 
   const eventsByDate = new Map<string, CalendarEvent[]>();
-  for (const event of filteredEvents) {
-    eventsByDate.set(event.date, [...(eventsByDate.get(event.date) ?? []), event]);
+  for (const date of monthDays) {
+    const dateKey = toDateKey(date);
+    eventsByDate.set(dateKey, filteredEvents.filter((event) => occursOn(event, dateKey)));
   }
 
-  const selectedEvents = filteredEvents.filter((event) => event.date === selectedDate);
-  const upcomingEvents = filteredEvents.filter((event) => event.date >= selectedDate).slice(0, 5);
+  const selectedEvents = filteredEvents.filter((event) => occursOn(event, selectedDate));
+  const upcomingEvents = filteredEvents.filter((event) => event.endDate >= selectedDate).slice(0, 5);
 
   const moveMonth = (offset: number) => {
-    setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+    const next = new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1);
+    setViewDate(next);
+    setSelectedDate(toDateKey(next));
   };
 
   return (
@@ -210,8 +209,16 @@ export function CalendarPage() {
               ))}
             </div>
           </div>
+          {loadState === 'loading' ? (
+            <p className="mb-5 text-center text-[14px] font-semibold text-kaist-grey">일정을 불러오는 중입니다</p>
+          ) : loadState === 'error' ? (
+            <p className="mb-5 text-center text-[14px] font-semibold text-kaist-grey">일정을 불러오지 못했습니다</p>
+          ) : events.length === 0 ? (
+            <p className="mb-5 text-center text-[14px] font-semibold text-kaist-grey">이번 달 일정이 없습니다</p>
+          ) : null}
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          {loadState === 'ready' && events.length > 0 ? (
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
             <section className="overflow-hidden rounded-[8px] border border-kaist-grey/25 bg-white">
               <div className="grid grid-cols-7 border-b border-kaist-grey/25 bg-[#F7FCFC] text-center text-[14px] font-extrabold tracking-tight text-kaist-greygreen">
                 {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
@@ -227,7 +234,7 @@ export function CalendarPage() {
                   const dayEvents = eventsByDate.get(dateKey) ?? [];
                   const isCurrentMonth = date.getMonth() === viewDate.getMonth();
                   const isSelected = dateKey === selectedDate;
-                  const isToday = dateKey === '2026-05-08';
+                  const isToday = dateKey === toDateKey(new Date());
 
                   return (
                     <button
@@ -321,7 +328,8 @@ export function CalendarPage() {
                 </div>
               </section>
             </aside>
-          </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </SiteLayout>

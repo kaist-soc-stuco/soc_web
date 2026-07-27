@@ -1,36 +1,98 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { EventItem } from '@soc/contracts';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
+import { getEvents } from '@/lib/event-api';
+import { localizedText } from '@/lib/localized-content';
 import { mockEvents } from '@/lib/mock-data';
 import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 const eventTabs = ['설문조사', '행사'] as const;
+const EVENT_WINDOW_MS = 92 * 24 * 60 * 60 * 1000;
 
 type EventTab = (typeof eventTabs)[number];
+
+interface EventCard {
+  id: string | number;
+  title: string;
+  summary: string;
+  date: string;
+  status: 'upcoming' | 'ongoing' | 'completed';
+  href: string;
+  image?: string;
+}
+
+function formatEventDate(event: EventItem) {
+  const start = new Date(event.startAtMs);
+  return `${String(start.getFullYear()).slice(-2)}.${String(start.getMonth() + 1).padStart(2, '0')}.${String(start.getDate()).padStart(2, '0')}`;
+}
 
 export function EventsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [eventLoadState, setEventLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
   const activeTab: EventTab = searchParams.get('type') === 'event' ? '행사' : '설문조사';
 
-  const cardEvents = useMemo(
+  useEffect(() => {
+    if (activeTab !== '행사') {
+      setEventLoadState('idle');
+      return;
+    }
+
+    const now = Date.now();
+    const fromMs = now - EVENT_WINDOW_MS / 2;
+    const toMs = now + EVENT_WINDOW_MS / 2;
+    let cancelled = false;
+
+    setEvents([]);
+    setEventLoadState('loading');
+    getEvents(fromMs, toMs)
+      .then((response) => {
+        if (!cancelled) {
+          setEvents(response.items);
+          setEventLoadState('ready');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setEventLoadState('error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  const cardEvents = useMemo<EventCard[]>(
     () =>
-      Array.from({ length: 18 }, (_, index) => ({
-        ...mockEvents[index % mockEvents.length],
-        id: index + 1,
-      })),
-    [],
+      activeTab === '행사'
+        ? events.map((event) => ({
+            id: event.id,
+            title: localizedText(event.title),
+            summary: localizedText(event.description),
+            date: formatEventDate(event),
+            status: event.startAtMs > Date.now() ? 'upcoming' : event.endAtMs > Date.now() ? 'ongoing' : 'completed',
+            href: '/calendar',
+          }))
+        : Array.from({ length: 18 }, (_, index) => ({
+            ...mockEvents[index % mockEvents.length],
+            id: index + 1,
+            href: `/events/${index + 1}/survey`,
+          })),
+    [activeTab, events],
   );
 
   const filteredEvents = cardEvents.filter((event) => event.title.toLowerCase().includes(searchQuery.toLowerCase()));
-
   const cardsPerPage = 10;
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / cardsPerPage));
   const currentEvents = filteredEvents.slice((currentPage - 1) * cardsPerPage, currentPage * cardsPerPage);
+  const eventIsLoading = activeTab === '행사' && (eventLoadState === 'idle' || eventLoadState === 'loading');
+  const eventHasError = activeTab === '행사' && eventLoadState === 'error';
+  const canRenderCards = activeTab === '설문조사' || eventLoadState === 'ready';
 
   const handleTabChange = (tab: EventTab) => {
     setSearchParams({ type: tab === '행사' ? 'event' : 'survey' });
@@ -113,19 +175,21 @@ export function EventsPage() {
 
       <section className={`${pageContainerClass} bg-[#F7FCFC] pb-16 pt-8`}>
         <div className="grid grid-cols-[repeat(auto-fit,270px)] justify-center gap-x-6 gap-y-[51px] min-[1900px]:justify-between">
-          {currentEvents.map((event) => (
+          {canRenderCards && currentEvents.map((event) => (
             <Link
               key={event.id}
-              to={`/events/${event.id}/survey`}
+              to={event.href}
               className="group flex h-[359px] w-[270px] min-w-0 flex-col overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <div className="relative h-[60.2%] min-h-[168px] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
-                  style={{ backgroundImage: `url(${event.image})` }}
-                />
+                {event.image ? (
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+                    style={{ backgroundImage: `url(${event.image})` }}
+                  />
+                ) : null}
                 <span className="absolute left-4 top-4 rounded-full bg-kaist-darkgreen px-3 py-1 text-[10px] font-semibold tracking-tight text-kaist-white lg:text-xs">
-                  {event.status === 'ongoing' ? '진행중' : '완료'}
+                  {event.status === 'upcoming' ? '예정' : event.status === 'ongoing' ? '진행중' : '완료'}
                 </span>
               </div>
 
@@ -146,7 +210,15 @@ export function EventsPage() {
           ))}
         </div>
 
-        {currentEvents.length === 0 ? (
+        {eventIsLoading ? (
+          <div className="py-20 text-center text-kaist-grey">
+            <p className="text-base font-semibold">행사를 불러오는 중입니다</p>
+          </div>
+        ) : eventHasError ? (
+          <div className="py-20 text-center text-kaist-grey">
+            <p className="text-base font-semibold">행사를 불러오지 못했습니다</p>
+          </div>
+        ) : currentEvents.length === 0 ? (
           <div className="py-20 text-center text-kaist-grey">
             <p className="text-base font-semibold">행사가 없습니다</p>
           </div>

@@ -1,30 +1,66 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
+import type { PublicFaqListResponse } from '@soc/contracts';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
-import { faqCategories, faqItems, type FaqCategory } from '@/lib/mock-data';
+import { getFaqs } from '@/lib/faq-api';
+import { localizedText } from '@/lib/localized-content';
+
+type FaqCategory = 'all' | string;
 
 export function FaqPage() {
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
-  const [activeCategory, setActiveCategory] = useState<FaqCategory>('전체');
+  const [topics, setTopics] = useState<PublicFaqListResponse['topics']>([]);
+  const [activeCategory, setActiveCategory] = useState<FaqCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [openId, setOpenId] = useState<number | null>(faqItems[0]?.id ?? null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
-  const filteredItems = useMemo(
-    () =>
-      faqItems.filter((item) => {
-        const matchesCategory = activeCategory === '전체' || item.category === activeCategory;
-        const normalizedQuery = searchQuery.trim().toLowerCase();
-        const matchesSearch =
-          normalizedQuery.length === 0 ||
-          item.question.toLowerCase().includes(normalizedQuery) ||
-          item.answer.toLowerCase().includes(normalizedQuery) ||
-          item.category.toLowerCase().includes(normalizedQuery);
+  const loadFaqs = async () => {
+    setStatus('loading');
 
-        return matchesCategory && matchesSearch;
-      }),
-    [activeCategory, searchQuery],
+    try {
+      const response = await getFaqs();
+      setTopics(response.topics);
+      setOpenId(response.topics.flatMap((topic) => topic.items)[0]?.id ?? null);
+      setStatus('ready');
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  useEffect(() => {
+    void loadFaqs();
+  }, []);
+
+  const categories = useMemo(
+    () => topics.map((topic) => ({ id: topic.id, title: localizedText(topic.title) })),
+    [topics],
   );
+
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return topics.flatMap((topic) =>
+      topic.items
+        .filter((item) => {
+          const matchesCategory = activeCategory === 'all' || topic.id === activeCategory;
+          const matchesSearch =
+            normalizedQuery.length === 0 ||
+            localizedText(item.question).toLowerCase().includes(normalizedQuery) ||
+            localizedText(item.answer).toLowerCase().includes(normalizedQuery) ||
+            localizedText(topic.title).toLowerCase().includes(normalizedQuery);
+
+          return matchesCategory && matchesSearch;
+        })
+        .map((item) => ({
+          ...item,
+          category: localizedText(topic.title),
+          question: localizedText(item.question),
+          answer: localizedText(item.answer),
+        })),
+    );
+  }, [activeCategory, searchQuery, topics]);
 
   const handleCategoryChange = (category: FaqCategory) => {
     setActiveCategory(category);
@@ -61,24 +97,41 @@ export function FaqPage() {
             </div>
 
             <div className="mb-8 grid grid-cols-2 border border-kaist-grey/25 bg-white sm:grid-cols-3">
-              {faqCategories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => handleCategoryChange(category)}
-                  className={`h-[48px] border-b border-r border-kaist-grey/25 text-[14px] font-extrabold tracking-tight transition last:border-r-0 sm:[&:nth-child(3n)]:border-r-0 ${
-                    activeCategory === category
-                      ? 'bg-kaist-darkgreen-main text-kaist-white'
-                      : 'bg-white text-kaist-black hover:bg-kaist-grey/10'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
+              {status === 'ready'
+                ? [{ id: 'all', title: '전체' }, ...categories].map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => handleCategoryChange(category.id)}
+                      className={`h-[48px] border-b border-r border-kaist-grey/25 text-[14px] font-extrabold tracking-tight transition last:border-r-0 sm:[&:nth-child(3n)]:border-r-0 ${
+                        activeCategory === category.id
+                          ? 'bg-kaist-darkgreen-main text-kaist-white'
+                          : 'bg-white text-kaist-black hover:bg-kaist-grey/10'
+                      }`}
+                    >
+                      {category.title}
+                    </button>
+                  ))
+                : null}
             </div>
 
             <div className="overflow-hidden rounded-[8px] border border-kaist-grey/15 bg-white">
-              {filteredItems.length > 0 ? (
+              {status === 'loading' ? (
+                <div className="px-6 py-16 text-center text-kaist-grey">
+                  <p className="text-base font-semibold">FAQ를 불러오는 중입니다</p>
+                </div>
+              ) : status === 'error' ? (
+                <div className="px-6 py-16 text-center text-kaist-grey">
+                  <p className="text-base font-semibold">FAQ를 불러오지 못했습니다</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadFaqs()}
+                    className="mt-4 text-sm font-extrabold text-kaist-darkgreen-main underline"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              ) : filteredItems.length > 0 ? (
                 filteredItems.map((item) => {
                   const isOpen = openId === item.id;
 
@@ -111,7 +164,9 @@ export function FaqPage() {
                 })
               ) : (
                 <div className="px-6 py-16 text-center text-kaist-grey">
-                  <p className="text-base font-semibold">검색 결과가 없습니다</p>
+                  <p className="text-base font-semibold">
+                    {topics.some((topic) => topic.items.length > 0) ? '검색 결과가 없습니다' : '등록된 FAQ가 없습니다'}
+                  </p>
                 </div>
               )}
             </div>

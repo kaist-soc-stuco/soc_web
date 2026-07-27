@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgEnum,
@@ -30,6 +31,12 @@ export const permissionChangeRequestStatusEnum = pgEnum("permission_change_reque
   "REJECTED",
   "CANCELLED",
   "EXPIRED",
+]);
+export const faqStatusEnum = pgEnum("faq_status", ["DRAFT", "PUBLISHED"]);
+export const eventVisibilityEnum = pgEnum("event_visibility", [
+  "PUBLIC",
+  "AUTHENTICATED",
+  "COMMITTEE",
 ]);
 
 export const users = pgTable(
@@ -191,6 +198,87 @@ export const permissionAuditLog = pgTable(
   ],
 );
 
+export const faqTopics = pgTable(
+  "faq_topics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+    displayOrder: integer("display_order").notNull(),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("faq_topics_title_kr_nonempty", sql`btrim(${table.titleKr}) <> ''`),
+    check("faq_topics_title_en_nonempty", sql`btrim(${table.titleEn}) <> ''`),
+    check("faq_topics_display_order_nonnegative", sql`${table.displayOrder} >= 0`),
+    uniqueIndex("faq_topics_display_order_unique").on(table.displayOrder),
+  ],
+);
+
+export const faqs = pgTable(
+  "faqs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    topicId: uuid("topic_id").notNull().references(() => faqTopics.id),
+    questionKr: text("question_kr").notNull(),
+    questionEn: text("question_en").notNull(),
+    answerKr: text("answer_kr").notNull(),
+    answerEn: text("answer_en").notNull(),
+    displayOrder: integer("display_order").notNull(),
+    status: faqStatusEnum("status").notNull().default("DRAFT"),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("faqs_question_kr_nonempty", sql`btrim(${table.questionKr}) <> ''`),
+    check("faqs_question_en_nonempty", sql`btrim(${table.questionEn}) <> ''`),
+    check("faqs_answer_kr_nonempty", sql`btrim(${table.answerKr}) <> ''`),
+    check("faqs_answer_en_nonempty", sql`btrim(${table.answerEn}) <> ''`),
+    check("faqs_display_order_nonnegative", sql`${table.displayOrder} >= 0`),
+    uniqueIndex("faqs_topic_display_order_unique").on(table.topicId, table.displayOrder),
+    index("faqs_public_list_idx").on(table.status, table.topicId, table.displayOrder),
+  ],
+);
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+    descriptionKr: text("description_kr").notNull(),
+    descriptionEn: text("description_en").notNull(),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    allDay: boolean("all_day").notNull().default(false),
+    allDayStartDate: date("all_day_start_date"),
+    allDayEndDate: date("all_day_end_date"),
+    location: text("location").notNull(),
+    visibility: eventVisibilityEnum("visibility").notNull().default("PUBLIC"),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("events_title_kr_nonempty", sql`btrim(${table.titleKr}) <> ''`),
+    check("events_title_en_nonempty", sql`btrim(${table.titleEn}) <> ''`),
+    check("events_description_kr_nonempty", sql`btrim(${table.descriptionKr}) <> ''`),
+    check("events_description_en_nonempty", sql`btrim(${table.descriptionEn}) <> ''`),
+    check("events_location_nonempty", sql`btrim(${table.location}) <> ''`),
+    check("events_time_order", sql`${table.endAt} > ${table.startAt}`),
+    check(
+      "events_all_day_dates",
+      sql`(${table.allDay} = false AND ${table.allDayStartDate} IS NULL AND ${table.allDayEndDate} IS NULL) OR (${table.allDay} = true AND ${table.allDayStartDate} IS NOT NULL AND ${table.allDayEndDate} IS NOT NULL AND ${table.allDayEndDate} > ${table.allDayStartDate})`,
+    ),
+    index("events_range_idx").on(table.startAt, table.endAt),
+    index("events_visibility_range_idx").on(table.visibility, table.startAt, table.endAt),
+  ],
+);
 export const authorizationBootstrapState = pgTable("authorization_bootstrap_state", {
   id: uuid("id").defaultRandom().primaryKey(),
   fingerprint: text("fingerprint").notNull().unique(),

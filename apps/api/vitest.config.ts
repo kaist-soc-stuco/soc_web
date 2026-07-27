@@ -18,7 +18,16 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'http',
-          include: ['test/app.http.spec.ts', 'test/app-module.http.spec.ts', 'test/auth.http.spec.ts', 'test/origin.http.spec.ts', 'test/permissions.http.spec.ts', 'test/users.http.spec.ts'],
+          include: [
+            'test/app.http.spec.ts',
+            'test/app-module.http.spec.ts',
+            'test/auth.http.spec.ts',
+            'test/events.http.spec.ts',
+            'test/faqs.http.spec.ts',
+            'test/origin.http.spec.ts',
+            'test/permissions.http.spec.ts',
+            'test/users.http.spec.ts',
+          ],
         },
       },
       {

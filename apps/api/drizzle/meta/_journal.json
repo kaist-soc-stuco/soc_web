@@ -15,6 +15,20 @@
       "when": 1785128695306,
       "tag": "0001_open_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785133158266,
+      "tag": "0002_steep_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785133226463,
+      "tag": "0003_flimsy_silhouette",
+      "breakpoints": true
     }
   ]
 }
