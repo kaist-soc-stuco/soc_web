@@ -211,4 +211,11 @@ describe('permissions PostgreSQL protocol', () => {
     expect(second.items[0]!.id).not.toBe(first.items[0]!.id);
     expect(new Set([...first.items, ...second.items].map((entry) => entry.id))).toEqual(new Set(idsForAudit));
   });
+  it('enforces append-only permission audit history while allowing inserts', async () => {
+    const id = '50000000-0000-4000-8000-000000000001';
+    await pool.query("INSERT INTO permission_audit_log (id, action, changed_field_names, correlation_id) VALUES ($1, 'AUDIT_EVENT', 'status', 'append-only-test')", [id]);
+    await expect(pool.query("UPDATE permission_audit_log SET action = 'AUDIT_CHANGED' WHERE id = $1", [id])).rejects.toThrow(/append-only/);
+    await expect(pool.query('DELETE FROM permission_audit_log WHERE id = $1', [id])).rejects.toThrow(/append-only/);
+    expect((await pool.query('SELECT action FROM permission_audit_log WHERE id = $1', [id])).rows).toEqual([{ action: 'AUDIT_EVENT' }]);
+  });
 });
