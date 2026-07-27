@@ -2440,6 +2440,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "request_fingerprint": {
+          "name": "request_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2478,6 +2484,28 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "permission_audit_log_fee_idempotency_unique": {
+          "name": "permission_audit_log_fee_idempotency_unique",
+          "columns": [
+            {
+              "expression": "actor_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "correlation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"permission_audit_log\".\"action\" = 'FEE_STATUS_UPDATED'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2506,6 +2534,10 @@
         "permission_audit_log_reason_code_technical_identifier_check": {
           "name": "permission_audit_log_reason_code_technical_identifier_check",
           "value": "\"permission_audit_log\".\"reason_code\" IS NULL OR \"permission_audit_log\".\"reason_code\" ~ '^[A-Z][A-Z0-9_]{1,63}$'"
+        },
+        "permission_audit_log_request_fingerprint_check": {
+          "name": "permission_audit_log_request_fingerprint_check",
+          "value": "\"permission_audit_log\".\"request_fingerprint\" IS NULL OR \"permission_audit_log\".\"request_fingerprint\" ~ '^[0-9a-f]{64}$'"
         }
       },
       "isRLSEnabled": false
