@@ -8,4 +8,4 @@ COMPOSE_FILE="$ROOT_DIR/compose.yml"
 docker compose -f "$COMPOSE_FILE" up -d postgres
 docker compose -f "$COMPOSE_FILE" run --rm db-migrate
 
-echo "Drizzle generate/push completed"
+echo "Drizzle migrations completed"

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "declaration": false,
     "incremental": false,
+    "rootDir": "src",
     "sourceMap": false
   },
   "exclude": ["test", "dist", "**/*.spec.ts"]

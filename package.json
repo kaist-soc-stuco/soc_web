@@ -11,6 +11,12 @@
     "db:seed": "bash infra/scripts/db-seed.sh",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "test:api:unit": "pnpm --filter @soc/api test:unit",
+    "test:api:int": "pnpm --filter @soc/api test:int",
+    "test:api:http": "pnpm --filter @soc/api test:http",
+    "test:migrations": "node --test infra/scripts/verify-migrations.test.mjs && bash infra/scripts/test-migrations.sh",
+    "test:web:unit": "pnpm --filter @soc/web test:unit",
+    "test:web:e2e": "pnpm --filter @soc/web test:e2e"
   }
 }
