@@ -26,4 +26,4 @@ async function request(path: string, signal?: AbortSignal): Promise<unknown> {
   if (!response.ok) { const envelope = isErrorEnvelope(payload) ? payload : undefined; throw new FeeApiError(response.status, envelope?.code, envelope?.message); }
   return payload;
 }
-export const feeApi = { listCurrent: async (signal?: AbortSignal) => decode(await request('/admin/fees', signal), isAdminFeeListResponse) };
+export const feeApi = { listCurrent: async (signal?: AbortSignal) => decode(await request('/users/admin/fees', signal), isAdminFeeListResponse) };

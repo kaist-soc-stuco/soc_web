@@ -41,6 +41,6 @@ export const boardApi = {
   get: (code: string, lang?: ContentLocale, signal?: AbortSignal) => request(`/boards/${encodeURIComponent(code)}${query({ locale: lang })}`, 'GET', undefined, signal).then((v) => decode(v, (x): x is { locale: ContentLocale; board: Board } => isObject(x) && has(x, ['locale','board']) && locale(x.locale) && isBoard(x.board))),
   articles: (code: string, params: ArticleListQuery = {}, signal?: AbortSignal) => request(`/boards/${encodeURIComponent(code)}/articles${query(params as Dict)}`, 'GET', undefined, signal).then((v) => decode(v, isArticleList)),
   article: (id: string, lang?: ContentLocale, signal?: AbortSignal) => request(`/articles/${encodeURIComponent(id)}${query({ locale: lang })}`, 'GET', undefined, signal).then((v) => decode(v, isDetail)),
-  createDraft: (code: string, input: CreateArticleRequest, signal?: AbortSignal) => request(`/admin/boards/${encodeURIComponent(code)}/articles`, 'POST', input, signal).then((v) => decode(v, isArticle)),
-  publish: (id: string, signal?: AbortSignal) => request(`/admin/articles/${encodeURIComponent(id)}/publish`, 'POST', undefined, signal).then((v) => decode(v, isArticle)),
+  createDraft: (code: string, input: CreateArticleRequest, signal?: AbortSignal) => request(`/boards/${encodeURIComponent(code)}/articles`, 'POST', input, signal).then((v) => decode(v, isArticle)),
+  publish: (id: string, signal?: AbortSignal) => request(`/articles/${encodeURIComponent(id)}/publish`, 'POST', undefined, signal).then((v) => decode(v, isArticle)),
 };

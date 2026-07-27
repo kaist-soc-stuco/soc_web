@@ -26,7 +26,7 @@ export function BoardPage() {
     setCurrentPage(1);
     Promise.all([
       boardApi.list({ locale: 'ko' }, controller.signal),
-      boardApi.articles(category, { locale: 'ko', limit: 100 }, controller.signal),
+      boardApi.articles(category, { locale: 'ko', limit: 50 }, controller.signal),
     ]).then(([registry, articleList]) => {
       const selected = registry.items.find((item) => item.code === category) ?? null;
       setBoards(registry.items.filter((item) => !item.config.isHidden));

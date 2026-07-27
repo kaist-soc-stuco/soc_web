@@ -7,7 +7,7 @@ describe('feeApi', () => {
   it('loads the credentialed current-fee endpoint', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ items: [item] }), { status: 200 }));
     await expect(feeApi.listCurrent()).resolves.toEqual({ items: [item] });
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/fees', expect.objectContaining({ credentials: 'include' }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/users/admin/fees', expect.objectContaining({ credentials: 'include' }));
   });
   it('maps API errors and rejects malformed payloads', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ code: 'forbidden', message: 'no' }), { status: 403 }));
