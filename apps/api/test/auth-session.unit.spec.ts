@@ -137,6 +137,7 @@ describe('AuthSessionService ES256 sessions', () => {
     const { instance, pending, users, repository } = service();
     pending.reserve.mockResolvedValueOnce({ pending: { expiresAt: now + 60_000, ssoUserId: 'sso-1', userEmail: 'user@test.invalid' }, reservationToken: 'reservation-1' }).mockResolvedValueOnce(null);
     users.upsertConsentedSsoUser.mockResolvedValue({ id: 'user-1' });
+    pending.complete.mockResolvedValue(true);
 
     await expect(instance.handleConsentDecision({ consent: true, pendingLoginToken: 'flow-token' })).resolves.toMatchObject({ kind: 'persisted', userId: 'user-1' });
     await expect(instance.handleConsentDecision({ consent: true, pendingLoginToken: 'flow-token' })).rejects.toBeInstanceOf(UnauthorizedException);
@@ -149,6 +150,7 @@ describe('AuthSessionService ES256 sessions', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, pending, repository, users } = service();
     pending.reserve.mockResolvedValue({ pending: { expiresAt: now + 60_000, ssoUserId: 'sso-1' }, reservationToken: 'reservation-1' });
+    pending.complete.mockResolvedValue(true);
 
     const result = await instance.handleConsentDecision({ consent: false, pendingLoginToken: 'flow-token' });
     expect(result).toMatchObject({ kind: 'temporary', temporaryHandle: expect.any(String) });

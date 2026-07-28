@@ -280,11 +280,27 @@ export class AuthSessionService {
           session: await this.issuePersistedSession(user.id),
           userId: user.id,
         };
-        await this.pendingLoginRepository.complete(input.pendingLoginToken, reservationToken);
+        if (
+          !(await this.pendingLoginRepository.complete(
+            input.pendingLoginToken,
+            reservationToken,
+          ))
+        ) {
+          await this.authSessionRepository.revoke(result.session.session.sessionId);
+          throw new ConflictException("pending_login_ownership_lost");
+        }
         return result;
       }
       const session = await this.issueTemporarySession(input.pendingLoginToken, pending.expiresAt);
-      await this.pendingLoginRepository.complete(input.pendingLoginToken, reservationToken);
+      if (
+        !(await this.pendingLoginRepository.complete(
+          input.pendingLoginToken,
+          reservationToken,
+        ))
+      ) {
+        await this.authSessionRepository.revoke(session.sessionId);
+        throw new ConflictException("pending_login_ownership_lost");
+      }
       return { kind: "temporary", session, temporaryHandle: session.sessionId };
     } catch (error) {
       await this.pendingLoginRepository.release(input.pendingLoginToken, reservationToken);

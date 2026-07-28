@@ -228,8 +228,14 @@ export class PendingLoginRepository {
     await this.redis.eval(RELEASE_PENDING_LOGIN_LUA, 1, this.buildKey(pendingLoginToken), reservationToken);
   }
 
-  async complete(pendingLoginToken: string, reservationToken: string): Promise<void> {
-    await this.redis.eval(COMPLETE_PENDING_LOGIN_LUA, 1, this.buildKey(pendingLoginToken), reservationToken);
+  async complete(pendingLoginToken: string, reservationToken: string): Promise<boolean> {
+    const result = await this.redis.eval(
+      COMPLETE_PENDING_LOGIN_LUA,
+      1,
+      this.buildKey(pendingLoginToken),
+      reservationToken,
+    );
+    return Number(result) === 1;
   }
 
 }
