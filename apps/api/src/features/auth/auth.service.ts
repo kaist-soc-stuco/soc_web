@@ -51,6 +51,7 @@ interface CallbackBody {
 
 const STATE_TTL_SECONDS = 300;
 const PENDING_LOGIN_TTL_SECONDS = 10 * 60;
+const SSO_EXCHANGE_TIMEOUT_MS = 5_000;
 
 const isSsoApiResponse = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -122,6 +123,8 @@ export class AuthService {
 
     const config = this.readCallbackConfig();
     let response: Response;
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), SSO_EXCHANGE_TIMEOUT_MS);
     try {
       response = await fetch(config.authApiUrl, {
         method: "POST",
@@ -132,14 +135,25 @@ export class AuthService {
           code: body.code,
           redirect_uri: config.redirectUri,
         }).toString(),
+        signal: abortController.signal,
       });
     } catch {
       throw new UnauthorizedException("sso_exchange_failed");
+    } finally {
+      clearTimeout(timeout);
     }
 
     let parsedResponse: unknown;
     try {
-      parsedResponse = await response.json();
+      let jsonTimeout: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        jsonTimeout = setTimeout(() => reject(new Error("sso response timeout")), SSO_EXCHANGE_TIMEOUT_MS);
+      });
+      try {
+        parsedResponse = await Promise.race([response.json(), timeoutPromise]);
+      } finally {
+        if (jsonTimeout) clearTimeout(jsonTimeout);
+      }
     } catch {
       throw new UnauthorizedException("sso_exchange_failed");
     }
