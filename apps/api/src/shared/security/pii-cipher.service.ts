@@ -10,6 +10,7 @@ import { ConfigService } from "@nestjs/config";
 const ENVELOPE_PREFIX = "enc:v1";
 const KID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MAX_PLAINTEXT_BYTES = 8_192;
+const RESERVED_ENVELOPE_PREFIX = "enc:";
 
 @Injectable()
 export class PiiCipherService {
@@ -77,7 +78,7 @@ export class PiiCipherService {
   }
 
   looksLikeEnvelope(value: string): boolean {
-    return value.startsWith(`${ENVELOPE_PREFIX}:`);
+    return value.startsWith(RESERVED_ENVELOPE_PREFIX);
   }
   private encryptWithKid(kid: string, field: string, value: string): string {
     const plainText = Buffer.from(value, "utf8");

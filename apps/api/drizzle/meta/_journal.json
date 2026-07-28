@@ -92,6 +92,13 @@
       "when": 1785174000000,
       "tag": "0012_phase2_pii_contract",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785175000000,
+      "tag": "0013_phase2_pii_contract_gate",
+      "breakpoints": true
     }
   ]
 }

@@ -35,25 +35,31 @@ export class UsersRepository {
     private readonly piiCipher: PiiCipherService,
   ) {}
 
+  private decryptPii(field: string, value: string | null): string | null {
+    return value === null || !this.piiCipher.looksLikeEnvelope(value)
+      ? value
+      : this.piiCipher.decrypt(field, value);
+  }
+
   private mapRowToUserRecord(row: typeof users.$inferSelect): UserRecord {
     return {
       createdAt: row.createdAt.toISOString(),
       feeStatus: row.feeStatus,
       id: row.id,
-      kaistUid: this.piiCipher.decrypt(PII_FIELDS.kaistUid, row.kaistUid),
+      kaistUid: this.decryptPii(PII_FIELDS.kaistUid, row.kaistUid),
       majorMask: row.majorMask,
-      nameEn: this.piiCipher.decrypt(PII_FIELDS.nameEn, row.nameEn),
-      nameKr: this.piiCipher.decrypt(PII_FIELDS.nameKr, row.nameKr),
+      nameEn: this.decryptPii(PII_FIELDS.nameEn, row.nameEn),
+      nameKr: this.decryptPii(PII_FIELDS.nameKr, row.nameKr),
       privacyConsentAt: row.privacyConsentAt?.toISOString() ?? null,
       ssoSubject: row.ssoSubject,
       ssoUserId: row.ssoUserId,
-      studentOrEmployeeNumber: this.piiCipher.decrypt(
+      studentOrEmployeeNumber: this.decryptPii(
         PII_FIELDS.studentOrEmployeeNumber,
         row.studentOrEmployeeNumber,
       ),
       updatedAt: row.updatedAt.toISOString(),
-      userEmail: this.piiCipher.decrypt(PII_FIELDS.userEmail, row.userEmail),
-      userMobile: this.piiCipher.decrypt(PII_FIELDS.userMobile, row.userMobile),
+      userEmail: this.decryptPii(PII_FIELDS.userEmail, row.userEmail),
+      userMobile: this.decryptPii(PII_FIELDS.userMobile, row.userMobile),
     };
   }
 
