@@ -123,6 +123,7 @@ describe('UsersRepository fee audit transaction', () => {
     const result = await new UsersRepository(db as never, {
       encrypt: (_field: string, value: string | null) => value,
       decrypt: (_field: string, value: string | null) => value,
+      looksLikeEnvelope: (value: string) => value.startsWith('enc:'),
     } as never).updateFeeWithAudit({
       actorUserId: actorId, requestId: 'corr-1', requestFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', feeStatus: 'PAID', reasonCode: 'PAYMENT', userId: targetId,
     });
