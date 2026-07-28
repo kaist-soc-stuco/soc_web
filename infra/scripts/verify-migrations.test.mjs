@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,7 @@ const releasedTags = [
 
 async function releasedFixture(t) {
   const root = await fixture(t, releasedTags.map((tag, idx) => ({ idx, tag })));
+  await writeFile(join(root, "meta", "_journal.json"), await readFile(join(canonicalMigrationsDir, "meta", "_journal.json")));
   for (const [idx, tag] of releasedTags.entries()) {
     await writeFile(join(root, `${tag}.sql`), await readFile(join(canonicalMigrationsDir, `${tag}.sql`)));
     await writeFile(join(root, "meta", `${String(idx).padStart(4, "0")}_snapshot.json`), await readFile(join(canonicalMigrationsDir, "meta", `${String(idx).padStart(4, "0")}_snapshot.json`)));
@@ -149,4 +150,15 @@ test("rejects rewrites of every released migration SQL and snapshot", async (t) 
     await writeFile(join(snapshotRoot, "meta", `${String(idx).padStart(4, "0")}_snapshot.json`), "{}\n");
     await expectFailure(snapshotRoot, new RegExp(`${tag === "0000_dizzy_hawkeye" ? "immutable baseline snapshot checksum mismatch" : `immutable migration snapshot checksum mismatch: ${tag}`}`));
   }
+});
+test("rejects released journal metadata changes", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "verify-migrations-canonical-"));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  await rm(root, { force: true, recursive: true });
+  await cp(canonicalMigrationsDir, root, { recursive: true });
+  const journalPath = join(root, "meta", "_journal.json");
+  const journal = JSON.parse(await readFile(journalPath, "utf8"));
+  journal.entries[1].when += 1;
+  await writeFile(journalPath, JSON.stringify(journal));
+  await expectFailure(root, /immutable journal metadata mismatch: 0001_open_giant_girl/);
 });

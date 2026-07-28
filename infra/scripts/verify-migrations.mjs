@@ -40,12 +40,45 @@ const pinned = {
   "0012_phase2_pii_contract": ["7db6199bf86039c5b54fbdcf0c992b4248898bf0685c9264fddecfaaee61cdfd", "cb4cc1e2f9e7be32e8877ad64966a9257c87b7499f15e8ae282dab73adf70909"],
   "0013_phase2_pii_contract_gate": ["0850426320624e02b26a59b930a29c1e1d42a6ded758734daea4ebe6c4cbdebb", "214c7b2061b0e05a7d58f6aa67be6708c7b7fb29ebf6897983ea0b17ac052635"],
 };
+const canonicalJournal = {
+  version: "7",
+  dialect: "postgresql",
+  entries: [
+    [0, "0000_dizzy_hawkeye", 1774792770091, true],
+    [1, "0001_open_giant_girl", 1785128695306, true],
+    [2, "0002_steep_firestar", 1785133158266, true],
+    [3, "0003_flimsy_silhouette", 1785133226463, true],
+    [4, "0004_cute_hedge_knight", 1785145142795, true],
+    [5, "0005_ancient_loki", 1785149579244, true],
+    [6, "0006_phase6_contacts", 1785166946887, true],
+    [7, "0007_phase2_migration_repair", 1785170070557, true],
+    [8, "0008_phase2_user_pii", 1785171000000, true],
+    [9, "0009_phase2_fee_idempotency", 1785172000000, true],
+    [10, "0010_phase2_backfill_boundary", 1785171619782, true],
+    [11, "0011_phase2_permission_audit_append_only", 1785173000000, true],
+    [12, "0012_phase2_pii_contract", 1785174000000, true],
+    [13, "0013_phase2_pii_contract_gate", 1785175000000, true],
+  ],
+};
 function fail(message) { throw new Error(`Migration verification failed: ${message}`); }
 function checksum(content) { return createHash("sha256").update(content).digest("hex"); }
 if (!existsSync(journalPath)) fail("required immutable journal file is missing");
 let journal;
 try { journal = JSON.parse(await readFile(journalPath, "utf8")); } catch (error) { fail(`journal is not valid JSON: ${error.message}`); }
 if (!Array.isArray(journal.entries) || journal.entries.length === 0) fail("journal must contain at least the immutable baseline entry");
+const canonicalEntries = canonicalJournal.entries;
+const isCanonicalJournal = journal.entries.length === canonicalEntries.length
+  && journal.entries.every((entry, position) => entry.tag === canonicalEntries[position][1]);
+if (isCanonicalJournal) {
+  if (journal.version !== canonicalJournal.version) fail(`immutable journal version mismatch: expected ${canonicalJournal.version}`);
+  if (journal.dialect !== canonicalJournal.dialect) fail(`immutable journal dialect mismatch: expected ${canonicalJournal.dialect}`);
+  journal.entries.forEach((entry, position) => {
+    const [idx, tag, when, breakpoints] = canonicalEntries[position];
+    if (entry.idx !== idx || entry.tag !== tag || entry.when !== when || entry.breakpoints !== breakpoints || entry.version !== canonicalJournal.version) {
+      fail(`immutable journal metadata mismatch: ${tag}`);
+    }
+  });
+}
 const tags = new Set(); const migrationFiles = [];
 for (let position = 0; position < journal.entries.length; position += 1) {
   const entry = journal.entries[position];
