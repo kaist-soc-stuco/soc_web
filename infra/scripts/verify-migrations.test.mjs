@@ -14,6 +14,31 @@ const canonicalMigrationsDir = resolve(scriptDir, "../../apps/api/drizzle");
 const baselineTag = "0000_dizzy_hawkeye";
 const baselineSql = await readFile(join(canonicalMigrationsDir, `${baselineTag}.sql`));
 const baselineSnapshot = await readFile(join(canonicalMigrationsDir, "meta", "0000_snapshot.json"));
+const releasedTags = [
+  "0000_dizzy_hawkeye",
+  "0001_open_giant_girl",
+  "0002_steep_firestar",
+  "0003_flimsy_silhouette",
+  "0004_cute_hedge_knight",
+  "0005_ancient_loki",
+  "0006_phase6_contacts",
+  "0007_phase2_migration_repair",
+  "0008_phase2_user_pii",
+  "0009_phase2_fee_idempotency",
+  "0010_phase2_backfill_boundary",
+  "0011_phase2_permission_audit_append_only",
+  "0012_phase2_pii_contract",
+  "0013_phase2_pii_contract_gate",
+];
+
+async function releasedFixture(t) {
+  const root = await fixture(t, releasedTags.map((tag, idx) => ({ idx, tag })));
+  for (const [idx, tag] of releasedTags.entries()) {
+    await writeFile(join(root, `${tag}.sql`), await readFile(join(canonicalMigrationsDir, `${tag}.sql`)));
+    await writeFile(join(root, "meta", `${String(idx).padStart(4, "0")}_snapshot.json`), await readFile(join(canonicalMigrationsDir, "meta", `${String(idx).padStart(4, "0")}_snapshot.json`)));
+  }
+  return root;
+}
 
 async function fixture(t, entries = [{ idx: 0, tag: baselineTag }]) {
   const root = await mkdtemp(join(tmpdir(), "verify-migrations-"));
@@ -91,7 +116,7 @@ test("rejects orphan SQL migrations", async (t) => {
 test("rejects an invalid immutable baseline snapshot", async (t) => {
   const root = await fixture(t);
   await writeFile(join(root, "meta", "0000_snapshot.json"), "not json");
-  await expectFailure(root, /immutable baseline snapshot is not valid JSON/);
+  await expectFailure(root, /migration snapshot is not valid JSON: 0000_dizzy_hawkeye/);
 });
 
 test("rejects immutable baseline SQL changes", async (t) => {
@@ -112,5 +137,16 @@ test("requires the immutable baseline at journal entry zero", async (t) => {
     { idx: 1, tag: baselineTag },
   ]);
   await writeFile(join(root, "0000_other.sql"), "CREATE TABLE other_table (id integer);\n");
-  await expectFailure(root, /immutable baseline must remain journal entry 0/);
+  await expectFailure(root, /journal migration is not pinned: 0000_other/);
+});
+test("rejects rewrites of every released migration SQL and snapshot", async (t) => {
+  for (const [idx, tag] of releasedTags.entries()) {
+    const sqlRoot = await releasedFixture(t);
+    await writeFile(join(sqlRoot, `${tag}.sql`), "CREATE TABLE rewritten (id integer);\n");
+    await expectFailure(sqlRoot, new RegExp(`${tag === "0000_dizzy_hawkeye" ? "immutable baseline SQL" : "immutable migration SQL"} checksum mismatch: ${tag}`));
+
+    const snapshotRoot = await releasedFixture(t);
+    await writeFile(join(snapshotRoot, "meta", `${String(idx).padStart(4, "0")}_snapshot.json`), "{}\n");
+    await expectFailure(snapshotRoot, new RegExp(`${tag === "0000_dizzy_hawkeye" ? "immutable baseline snapshot checksum mismatch" : `immutable migration snapshot checksum mismatch: ${tag}`}`));
+  }
 });
