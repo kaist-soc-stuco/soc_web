@@ -1,7 +1,4 @@
-import { resolve } from 'node:path';
-
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -9,10 +6,10 @@ import * as schema from '../src/infrastructure/postgres/postgres.schema';
 import { PiiCipherService } from '../src/shared/security/pii-cipher.service';
 import { UsersRepository } from '../src/features/users/repositories/users.repository';
 import { UsersService } from '../src/features/users/users.service';
+import { migrateWithCompletedPiiBackfill } from './utils/staged-migrations';
 import { CONTAINER_STARTUP_TIMEOUT_MS, startTestInfrastructure, type TestInfrastructure } from './utils/test-containers';
 
 const TIMEOUT = CONTAINER_STARTUP_TIMEOUT_MS * 3 + 30_000;
-const MIGRATIONS = resolve(__dirname, '../drizzle');
 const actorId = '30000000-0000-4000-8000-000000000001';
 const targetId = '30000000-0000-4000-8000-000000000002';
 
@@ -40,7 +37,7 @@ describe('users fee PostgreSQL transaction', () => {
   beforeAll(async () => {
     infrastructure = await startTestInfrastructure();
     pool = new Pool({ connectionString: infrastructure.databaseUrl, connectionTimeoutMillis: CONTAINER_STARTUP_TIMEOUT_MS });
-    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+    await migrateWithCompletedPiiBackfill(pool);
     piiCipher = new PiiCipherService({
       get: (name: string) => name === 'PII_ENCRYPTION_ACTIVE_KID'
         ? 'test-pii'

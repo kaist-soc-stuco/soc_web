@@ -1,34 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Header } from '@/components/organisms/header';
 import { boardApi } from '@/lib/board-api';
 import type { Article, Board } from '@soc/contracts';
 
 export function BoardPostPage() {
-  const { category = 'notice', id } = useParams<{ category: string; id: string }>();
+  const { category = 'soc-notice', id } = useParams<{ category: string; id: string }>();
   const [article, setArticle] = useState<Article | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
+  const requestId = useRef(0);
 
   useEffect(() => {
+    const activeRequest = ++requestId.current;
+    setArticle(null);
+    setBoard(null);
+    setError(false);
     if (!id) {
       setLoading(false);
       return;
     }
+
     const controller = new AbortController();
     setLoading(true);
-    setError(false);
     Promise.all([boardApi.article(id, 'ko', controller.signal), boardApi.get(category, 'ko', controller.signal)])
       .then(([detail, boardResponse]) => {
+        if (activeRequest !== requestId.current) return;
+        if (detail.article.boardCode !== category) {
+          setError(true);
+          return;
+        }
         setArticle(detail.article);
         setBoard(boardResponse.board);
       })
       .catch((cause: unknown) => {
-        if ((cause as { name?: string }).name !== 'AbortError') setError(true);
+        if (activeRequest === requestId.current && (cause as { name?: string }).name !== 'AbortError') setError(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (activeRequest === requestId.current) setLoading(false);
+      });
     return () => controller.abort();
   }, [category, id]);
 

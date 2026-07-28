@@ -9,7 +9,7 @@ const main = async () => {
   try {
     const limit = Number(process.argv[2] ?? process.env.USER_PII_BACKFILL_BATCH_SIZE ?? 100);
     if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error('invalid_limit');
-    app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+    app = await NestFactory.createApplicationContext(AppModule, { abortOnError: false, logger: false });
     const repository = app.get(UsersRepository);
     let cursor: UserCursor | undefined;
     let processed = 0;
@@ -20,9 +20,10 @@ const main = async () => {
       cursor = batch.cursor;
     }
     process.stdout.write(`${JSON.stringify({ ok: true, processed })}\n`);
-  } catch {
+  } catch (error) {
     process.exitCode = 1;
-    process.stderr.write('user_pii_backfill_failed\n');
+    const diagnostic = error instanceof Error ? `${error.name}:${error.message}` : 'UnknownError';
+    process.stderr.write(`user_pii_backfill_failed:${diagnostic}\n`);
   } finally {
     await app?.close();
   }

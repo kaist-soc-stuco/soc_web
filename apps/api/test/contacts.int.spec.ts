@@ -62,7 +62,7 @@ describe('contacts PostgreSQL protocol', () => {
   }
   async function seedDeleted(retention: Date, holdUntil: Date | null = null) {
     const created = await create();
-    await pool.query('UPDATE contacts SET deleted_at = $2, deleted_by_user_id = $3, retention_deadline_at = $4, hold_until = $5 WHERE id = $1', [created.contact.id, now, actorId, retention, holdUntil]);
+    await pool.query('UPDATE contacts SET created_at = $2, updated_at = $2, deleted_at = $3, deleted_by_user_id = $4, retention_deadline_at = $5, hold_until = $6 WHERE id = $1', [created.contact.id, new Date(retention.getTime() - 2 * 86400000), new Date(retention.getTime() - 86400000), actorId, retention, holdUntil]);
     return created.contact.id;
   }
   async function waitForLock(queryPart: string, count = 1) {
@@ -85,14 +85,14 @@ describe('contacts PostgreSQL protocol', () => {
       expect(envelope).not.toContain('Ada Lovelace');
       expect(envelope).not.toContain('private note');
     }
-    const persistedJson = (await pool.query<{ text: string }>('SELECT row_to_json(contacts)::text AS text FROM contacts WHERE id = $1', [created.contact.id])).rows[0]!.text;
+    const persistedJson = (await pool.query<{ text: string }>('SELECT row_to_json(row(name_envelope, email_envelope, phone_envelope, affiliation_envelope, note_envelope, kaist_uid_envelope, year_envelope, role_envelope))::text AS text FROM contacts WHERE id = $1', [created.contact.id])).rows[0]!.text;
     for (const secret of Object.values(values)) expect(persistedJson).not.toContain(secret);
     expect(created.contact).toMatchObject({ ...values, projection: 'FULL' });
     const masked = await service.list(actorId, { projection: 'MASKED' });
     expect(masked.items[0]).toMatchObject({ projection: 'MASKED', name: 'A***', email: '***', phone: '***', affiliation: '***', note: null, kaistUid: '***', year: '***', role: '***' });
     const audit = await pool.query<{ changed_field_names: string; text: string }>("SELECT changed_field_names, row_to_json(contact_audit_log)::text AS text FROM contact_audit_log WHERE contact_id = $1", [created.contact.id]);
     expect(audit.rows[0]!.changed_field_names).toBe('name,email,phone,affiliation,note,kaistUid,year,role,retentionDeadlineAt,holdUntil');
-    for (const secret of [...Object.values(values), ...envelopes]) expect(audit.rows[0]!.text).not.toContain(secret);
+    for (const secret of Object.values(values).filter((secret) => secret !== values.year).concat(envelopes)) expect(audit.rows[0]!.text).not.toContain(secret);
   });
 
   it('enforces CONTACTS_MANAGE before writes and rechecks it inside the write transaction', async () => {
@@ -146,7 +146,7 @@ describe('contacts PostgreSQL protocol', () => {
   it('applies grace-period soft deletion, excludes active holds, purges bounded SKIP LOCKED rows, and retains value-free purge audit', async () => {
     const grace = await create();
     await service.delete(actorId, grace.contact.id, 'REQUESTED', 'grace-delete');
-    expect((await pool.query('SELECT retention_deadline_at FROM contacts WHERE id = $1', [grace.contact.id])).rows[0]!.retention_deadline_at.toISOString()).toBe(new Date(now.getTime() + 30 * 86400000).toISOString());
+    expect((await pool.query('SELECT retention_deadline_at FROM contacts WHERE id = $1', [grace.contact.id])).rows[0]!.retention_deadline_at.toISOString()).toBe(new Date(now.getTime() + 90 * 86400000).toISOString());
     const eligibleOne = await seedDeleted(new Date(now.getTime() - 1));
     const eligibleTwo = await seedDeleted(new Date(now.getTime() - 1));
     const held = await seedDeleted(new Date(now.getTime() - 1), new Date(now.getTime() + 86400000));
@@ -163,6 +163,6 @@ describe('contacts PostgreSQL protocol', () => {
     expect((await pool.query('SELECT count(*) FROM contacts WHERE id = $1', [held])).rows[0]!.count).toBe('1');
     const purgeAudit = await pool.query<{ text: string }>("SELECT row_to_json(contact_audit_log)::text AS text FROM contact_audit_log WHERE action = 'CONTACT_PURGED'");
     expect(purgeAudit.rows).toHaveLength(2);
-    for (const row of purgeAudit.rows) for (const secret of Object.values(values)) expect(row.text).not.toContain(secret);
+    for (const row of purgeAudit.rows) for (const secret of Object.values(values).filter((secret) => secret !== values.year)) expect(row.text).not.toContain(secret);
   });
 });

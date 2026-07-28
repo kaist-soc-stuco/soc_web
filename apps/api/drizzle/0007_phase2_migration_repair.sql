@@ -29,12 +29,12 @@ DROP INDEX IF EXISTS "permission_change_requests_request_hash_unique";--> statem
 CREATE INDEX IF NOT EXISTS "permission_change_requests_request_hash_idx" ON "permission_change_requests" USING btree ("request_hash");--> statement-breakpoint
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'permission_change_requests_prevent_payload_mutation') THEN
-    CREATE OR REPLACE FUNCTION "public"."permission_change_requests_prevent_payload_mutation"() RETURNS trigger LANGUAGE plpgsql AS $$fn$
+    CREATE OR REPLACE FUNCTION "public"."permission_change_requests_prevent_payload_mutation"() RETURNS trigger LANGUAGE plpgsql AS $fn$
     BEGIN
       IF NEW.target_user_id IS DISTINCT FROM OLD.target_user_id OR NEW.action IS DISTINCT FROM OLD.action OR NEW.requested_reason_code IS DISTINCT FROM OLD.requested_reason_code OR NEW.permission_definition_id IS DISTINCT FROM OLD.permission_definition_id OR NEW.scope IS DISTINCT FROM OLD.scope OR NEW.scope_id IS DISTINCT FROM OLD.scope_id OR NEW.request_hash IS DISTINCT FROM OLD.request_hash OR NEW.requester_user_id IS DISTINCT FROM OLD.requester_user_id OR NEW.requested_at IS DISTINCT FROM OLD.requested_at OR NEW.expires_at IS DISTINCT FROM OLD.expires_at THEN RAISE EXCEPTION 'permission change request payload is immutable'; END IF;
       RETURN NEW;
     END;
-    $$fn$;
+    $fn$;
     CREATE TRIGGER "permission_change_requests_prevent_payload_mutation" BEFORE UPDATE ON "permission_change_requests" FOR EACH ROW EXECUTE FUNCTION "public"."permission_change_requests_prevent_payload_mutation"();
   END IF;
 END $$;--> statement-breakpoint

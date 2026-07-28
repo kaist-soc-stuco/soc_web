@@ -1,12 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/organisms/header';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { boardApi } from '@/lib/board-api';
 import type { ArticleSummary, Board } from '@soc/contracts';
 
 export function BoardPage() {
-  const { category = 'notice' } = useParams<{ category: string }>();
+  const { category = 'soc-notice' } = useParams<{ category: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [cursorHistory, setCursorHistory] = useState<string[]>(['']);
@@ -18,49 +18,41 @@ export function BoardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
+  const requestId = useRef(0);
 
 
   useEffect(() => {
     const controller = new AbortController();
+    const activeRequest = ++requestId.current;
     setLoading(true);
     setError(false);
     setCurrentPage(1);
     setCursorHistory(['']);
     setNextCursor(null);
+    setBoard(null);
+    setPosts([]);
+
     Promise.all([
       boardApi.list({ locale: 'ko' }, controller.signal),
       boardApi.articles(category, { locale: 'ko', limit: 50 }, controller.signal),
     ]).then(([registry, articleList]) => {
+      if (activeRequest !== requestId.current) return;
       const selected = registry.items.find((item) => item.code === category) ?? null;
       setBoards(registry.items.filter((item) => !item.config.isHidden));
       setBoard(selected);
+      if (!selected) {
+        setError(true);
+        return;
+      }
       setPosts(articleList.items);
       setNextCursor(articleList.nextCursor);
-      if (!selected) setError(true);
     }).catch((cause: unknown) => {
-      if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
-    }).finally(() => setLoading(false));
+      if (activeRequest === requestId.current && !(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
+    }).finally(() => {
+      if (activeRequest === requestId.current) setLoading(false);
+    });
     return () => controller.abort();
   }, [category]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError(false);
-    setCurrentPage(1);
-    setCursorHistory(['']);
-    setNextCursor(null);
-    boardApi.articles(category, { locale: 'ko', limit: 50 }, controller.signal)
-      .then((articleList) => {
-        setPosts(articleList.items);
-        setNextCursor(articleList.nextCursor);
-      })
-      .catch((cause: unknown) => {
-        if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
-      })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-  }, [category, searchQuery]);
 
   const currentPosts = posts.filter((post) => (post.title.value ?? '').toLowerCase().includes(searchQuery.toLowerCase()));
 

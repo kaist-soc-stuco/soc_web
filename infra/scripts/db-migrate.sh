@@ -48,7 +48,7 @@ fs.writeFileSync(path, JSON.stringify(journal, null, 2) + "\n");
 run_migrations "$tmp_dir/drizzle"
 (
   cd "$API_DIR"
-  pnpm exec tsx src/commands/user-pii-backfill.ts
+  pnpm exec ts-node --transpile-only src/commands/user-pii-backfill.ts
 )
 run_migrations "$API_DIR/drizzle"
 

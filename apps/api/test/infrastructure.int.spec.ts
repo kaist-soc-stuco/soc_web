@@ -1,8 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { drizzle } from 'drizzle-orm/node-postgres';
 import Redis from 'ioredis';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -12,6 +10,7 @@ import {
   startTestInfrastructure,
   type TestInfrastructure,
 } from './utils/test-containers';
+import { migrateWithCompletedPiiBackfill } from './utils/staged-migrations';
 
 const TEST_TIMEOUT_MS = CONTAINER_STARTUP_TIMEOUT_MS * 3 + 30_000;
 const MIGRATIONS_FOLDER = resolve(__dirname, '../drizzle');
@@ -62,7 +61,7 @@ describe('containerized infrastructure', () => {
     const connection = await postgres.query<{ connected: number }>('SELECT 1 AS connected');
     expect(connection.rows).toEqual([{ connected: 1 }]);
 
-    await migrate(drizzle(postgres), { migrationsFolder: MIGRATIONS_FOLDER });
+    await migrateWithCompletedPiiBackfill(postgres);
 
     const usersTable = await postgres.query<{ table_name: string }>(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",

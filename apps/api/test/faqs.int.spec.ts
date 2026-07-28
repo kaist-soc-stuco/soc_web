@@ -1,15 +1,12 @@
-import { resolve } from 'node:path';
-
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { FaqsRepository } from '../src/features/faqs/faqs.repository';
 import { FaqsService } from '../src/features/faqs/faqs.service';
+import { migrateWithCompletedPiiBackfill } from './utils/staged-migrations';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
-const migrations = resolve(__dirname, '../drizzle');
 const actorId = '11111111-1111-4111-8111-111111111111';
 const clock = new Date('2026-07-27T12:00:00.000Z');
 let pool: Pool;
@@ -19,7 +16,7 @@ let service: FaqsService;
 describe.skipIf(!databaseUrl)('FAQ PostgreSQL protocol', () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    await migrate(drizzle(pool), { migrationsFolder: migrations });
+    await migrateWithCompletedPiiBackfill(pool);
     const repository = new FaqsRepository(drizzle(pool) as never);
     service = new FaqsService(repository, { hasPermission: async () => true } as never, { now: () => clock } as never);
   });

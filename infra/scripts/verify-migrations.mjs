@@ -32,13 +32,14 @@ const pinned = {
   "0004_cute_hedge_knight": ["7bd4f4dd68c0da9e3945cb1e7d01b89d2b454fd97ca7c644b697cbfa05bddaa9", "51b184508c776b408e1e0019c4d6d38bf0e3d1f073ed06480c599882cf560859"],
   "0005_ancient_loki": ["9d7fc456687687d1fd860606df893dbd597ba7c8b895f6c2b29e39910fb62d1e", "48cf9d729bfc264dcb0e2403d2c7313133f9239ed1dc72151370a5d4b9c84579"],
   "0006_phase6_contacts": ["1d3ceb28788194b819e6be1e5574a899348c130e1685027e510626619db95624", "06ac3c2e077c12aac8dec8cd54171f8c3a80e4386550b0b2dc62783e8e62efcd"],
-  "0007_phase2_migration_repair": ["b511d495b5c80ab4b8c518b59befc6184958779b551568c7a0bc60b5be2f1a67", "6b32c88a5271b8161156beab337a1abc4ea5798be46c53b4bb6f21e5b04a3282"],
+  "0007_phase2_migration_repair": ["7ee1afb4da8d60b116286517c81cc3686e0e65c3975e12266a9f3e45c274b285", "6b32c88a5271b8161156beab337a1abc4ea5798be46c53b4bb6f21e5b04a3282"],
   "0008_phase2_user_pii": ["e328b826c96e9389821e83c2a9d1c24cb97283e2381d7f7e5a8ca8f3ec21b8c5", "fbf1b41bbf7192d9abdeceeeaa776f975e8dda51d83009d50026752ad769ab16"],
   "0009_phase2_fee_idempotency": ["bcc8f7072636236057c07ffb3d0840b62d6b720358ecdc6babf5b45a0c162a43", "938705175c0c3aef64af3fdb95d27101b64fe92052ba31ac5daf94fdd94b5ec5"],
   "0010_phase2_backfill_boundary": ["31d2ca8a763f52b7dcc76a665221802d394a5319197832c781107bafe68ae383", "7f042cb0b839a8e404a2940b38351fd4d02b330e45763474a2e546b90ed0f3b1"],
   "0011_phase2_permission_audit_append_only": ["18ba1f3bd32470e5ac12c22fdcd6e4eb0ac44b6c98cddb3a45de9fded50c91b9", "ffc8e70e62a94f95e14365b45dcc44c92da1305820c73bf22fa1b4413bd85003"],
   "0012_phase2_pii_contract": ["7db6199bf86039c5b54fbdcf0c992b4248898bf0685c9264fddecfaaee61cdfd", "cb4cc1e2f9e7be32e8877ad64966a9257c87b7499f15e8ae282dab73adf70909"],
-  "0013_phase2_pii_contract_gate": ["0850426320624e02b26a59b930a29c1e1d42a6ded758734daea4ebe6c4cbdebb", "214c7b2061b0e05a7d58f6aa67be6708c7b7fb29ebf6897983ea0b17ac052635"],
+  "0013_phase2_pii_contract_gate": ["facf473a42a76e7c2bc4394179a395f359aa7aad54922b3d43a7693f1a4e79d1", "214c7b2061b0e05a7d58f6aa67be6708c7b7fb29ebf6897983ea0b17ac052635"],
+  "0014_phase2_permission_transition_cursor": ["de2a7611f15f3d4e81f8a89799aa4c35c6253230e20c6a62a3dfb77472cfc85f", "3c9bfe7caaf0630bbe2932a11f0cd05b27abe547292a77b667490fc9c37fc25f"],
 };
 const canonicalJournal = {
   version: "7",
@@ -58,6 +59,7 @@ const canonicalJournal = {
     [11, "0011_phase2_permission_audit_append_only", 1785173000000, true],
     [12, "0012_phase2_pii_contract", 1785174000000, true],
     [13, "0013_phase2_pii_contract_gate", 1785175000000, true],
+    [14, "0014_phase2_permission_transition_cursor", 1785176000000, true],
   ],
 };
 function fail(message) { throw new Error(`Migration verification failed: ${message}`); }

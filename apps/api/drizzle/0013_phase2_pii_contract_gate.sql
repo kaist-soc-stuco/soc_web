@@ -7,23 +7,32 @@ BEGIN
     SELECT 1 FROM "user_pii_backfill_progress"
     WHERE job_key = 'users' AND completed_at IS NOT NULL
   ) INTO incomplete;
+  IF incomplete AND NOT EXISTS (
+    SELECT 1
+    FROM "users"
+    WHERE kaist_uid IS NOT NULL
+       OR student_or_employee_number IS NOT NULL
+       OR name_kr IS NOT NULL
+       OR name_en IS NOT NULL
+       OR user_email IS NOT NULL
+       OR user_mobile IS NOT NULL
+  ) THEN
+    INSERT INTO "user_pii_backfill_progress" ("job_key", "completed_at")
+    VALUES ('users', now())
+    ON CONFLICT ("job_key") DO UPDATE SET "completed_at" = COALESCE("user_pii_backfill_progress"."completed_at", EXCLUDED."completed_at");
+    incomplete := false;
+  END IF;
   IF incomplete THEN
     RAISE EXCEPTION 'users PII backfill must be completed before encrypted-only enforcement';
   END IF;
   IF EXISTS (
     SELECT 1 FROM "users"
-    WHERE kaist_uid LIKE 'enc:%' AND kaist_uid !~ '^enc:v1:'
-       OR student_or_employee_number LIKE 'enc:%' AND student_or_employee_number !~ '^enc:v1:'
-       OR name_kr LIKE 'enc:%' AND name_kr !~ '^enc:v1:'
-       OR name_en LIKE 'enc:%' AND name_en !~ '^enc:v1:'
-       OR user_email LIKE 'enc:%' AND user_email !~ '^enc:v1:'
-       OR user_mobile LIKE 'enc:%' AND user_mobile !~ '^enc:v1:'
-       OR (kaist_uid IS NOT NULL AND kaist_uid !~ '^enc:v1:')
-       OR (student_or_employee_number IS NOT NULL AND student_or_employee_number !~ '^enc:v1:')
-       OR (name_kr IS NOT NULL AND name_kr !~ '^enc:v1:')
-       OR (name_en IS NOT NULL AND name_en !~ '^enc:v1:')
-       OR (user_email IS NOT NULL AND user_email !~ '^enc:v1:')
-       OR (user_mobile IS NOT NULL AND user_mobile !~ '^enc:v1:')
+    WHERE (kaist_uid IS NOT NULL AND kaist_uid !~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$')
+       OR (student_or_employee_number IS NOT NULL AND student_or_employee_number !~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$')
+       OR (name_kr IS NOT NULL AND name_kr !~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$')
+       OR (name_en IS NOT NULL AND name_en !~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$')
+       OR (user_email IS NOT NULL AND user_email !~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$')
+       OR (user_mobile IS NOT NULL AND user_mobile !~ '^enc:v1:[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$')
   ) THEN
     RAISE EXCEPTION 'users contain plaintext or unknown PII envelopes';
   END IF;

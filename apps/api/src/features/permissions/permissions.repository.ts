@@ -213,23 +213,33 @@ export class PermissionsRepository {
   async backfillLegacyPermissions() {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('authorization_backfill_legacy_permission_v1'))`);
-      const [progress] = await tx.select().from(authorizationBackfillProgress).where(eq(authorizationBackfillProgress.jobKey, "legacy_permission_v1")).for("update");
-      const [boundary] = progress ? [] : await tx.select({ createdAt: users.createdAt, id: users.id }).from(users).orderBy(desc(users.createdAt), desc(users.id)).limit(1);
+      const [progress] = await tx.select({
+        id: authorizationBackfillProgress.id,
+        jobKey: authorizationBackfillProgress.jobKey,
+        lastProcessedUserId: authorizationBackfillProgress.lastProcessedUserId,
+        upperBoundUserId: authorizationBackfillProgress.upperBoundUserId,
+        lastProcessedCreatedAt: sql<string | null>`${authorizationBackfillProgress.lastProcessedCreatedAt}::text`,
+        upperBoundCreatedAt: sql<string | null>`${authorizationBackfillProgress.upperBoundCreatedAt}::text`,
+      }).from(authorizationBackfillProgress).where(eq(authorizationBackfillProgress.jobKey, "legacy_permission_v1")).for("update");
+      const [boundary] = !progress?.upperBoundCreatedAt || !progress.upperBoundUserId
+        ? await tx.select({ createdAt: sql<string>`${users.createdAt}::text`, id: users.id }).from(users).orderBy(desc(users.createdAt), desc(users.id)).limit(1)
+        : [];
       const upperCreatedAt = progress?.upperBoundCreatedAt ?? boundary?.createdAt ?? null;
       const upperId = progress?.upperBoundUserId ?? boundary?.id ?? null;
       const afterCreatedAt = progress?.lastProcessedCreatedAt;
       const afterId = progress?.lastProcessedUserId;
-      const batch = await tx.select({ id: users.id, createdAt: users.createdAt, permission: users.permission })
+      const batch = await tx.select({ id: users.id, createdAt: sql<string>`${users.createdAt}::text`, permission: users.permission })
         .from(users)
         .where(and(
-          afterCreatedAt && afterId ? sql`(${users.createdAt}, ${users.id}) > (${afterCreatedAt}, ${afterId}::uuid)` : undefined,
-          upperCreatedAt && upperId ? sql`(${users.createdAt}, ${users.id}) <= (${upperCreatedAt}, ${upperId}::uuid)` : sql`false`,
+          afterCreatedAt && afterId ? sql`(${users.createdAt}, ${users.id}) > (${afterCreatedAt}::timestamptz, ${afterId}::uuid)` : undefined,
+          upperCreatedAt && upperId ? sql`(${users.createdAt}, ${users.id}) <= (${upperCreatedAt}::timestamptz, ${upperId}::uuid)` : sql`false`,
         ))
         .orderBy(asc(users.createdAt), asc(users.id)).limit(500);
       const last = batch.at(-1);
-      const values = { lastProcessedCreatedAt: last?.createdAt ?? progress?.lastProcessedCreatedAt ?? null, lastProcessedUserId: last?.id ?? progress?.lastProcessedUserId ?? null, completedAt: last ? null : sql`now()`, updatedAt: sql`now()` };
+      const lastCreatedAt = last?.createdAt ?? progress?.lastProcessedCreatedAt ?? null;
+      const values = { lastProcessedCreatedAt: lastCreatedAt ? sql`${lastCreatedAt}::timestamptz` : null, lastProcessedUserId: last?.id ?? progress?.lastProcessedUserId ?? null, completedAt: last ? null : sql`now()`, updatedAt: sql`now()` };
       if (progress) await tx.update(authorizationBackfillProgress).set(values).where(eq(authorizationBackfillProgress.id, progress.id));
-      else await tx.insert(authorizationBackfillProgress).values({ jobKey: "legacy_permission_v1", ...values, upperBoundCreatedAt: upperCreatedAt, upperBoundUserId: upperId, batchSize: 500 });
+      else await tx.insert(authorizationBackfillProgress).values({ jobKey: "legacy_permission_v1", ...values, upperBoundCreatedAt: upperCreatedAt ? sql`${upperCreatedAt}::timestamptz` : null, upperBoundUserId: upperId, batchSize: 500 });
       for (const row of batch) if (row.permission !== 0) await tx.insert(permissionAuditLog).values({ actorUserId: null, action: "LEGACY_PERMISSION_DENIED_REVIEW", recordId: row.id, changedFieldNames: "permission", correlationId: "legacy_permission_v1", reasonCode: "AMBIGUOUS_LEGACY_VALUE" });
       return { processed: batch.length, completed: batch.length === 0 };
     });

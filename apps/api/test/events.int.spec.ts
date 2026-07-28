@@ -1,16 +1,13 @@
-import { resolve } from 'node:path';
-
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { EventsRepository } from '../src/features/events/events.repository';
 import { EventsService } from '../src/features/events/events.service';
 
+import { migrateWithCompletedPiiBackfill } from './utils/staged-migrations';
 const databaseUrl = process.env.TEST_DATABASE_URL?.trim();
 const run = databaseUrl ? describe : describe.skip;
-const migrationsFolder = resolve(__dirname, '../drizzle');
 const managerId = '10000000-0000-4000-8000-000000000001';
 const userId = '10000000-0000-4000-8000-000000000002';
 const start = Date.parse('2026-03-01T00:00:00.000Z');
@@ -20,7 +17,7 @@ run('events PostgreSQL protocol (external TEST_DATABASE_URL)', () => {
   let pool: Pool; let service: EventsService; let repository: EventsRepository;
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    await migrate(drizzle(pool), { migrationsFolder });
+    await migrateWithCompletedPiiBackfill(pool);
     repository = new EventsRepository(drizzle(pool) as never);
     service = new EventsService(
       repository,

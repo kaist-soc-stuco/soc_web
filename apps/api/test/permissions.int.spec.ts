@@ -1,16 +1,13 @@
-import { resolve } from 'node:path';
-
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PermissionsRepository } from '../src/features/permissions/permissions.repository';
 import { PermissionsService } from '../src/features/permissions/permissions.service';
+import { migrateWithCompletedPiiBackfill } from './utils/staged-migrations';
 import { CONTAINER_STARTUP_TIMEOUT_MS, startTestInfrastructure, type TestInfrastructure } from './utils/test-containers';
 
 const TIMEOUT = CONTAINER_STARTUP_TIMEOUT_MS * 3 + 30_000;
-const MIGRATIONS = resolve(__dirname, '../drizzle');
 const ids = {
   requester: '10000000-0000-4000-8000-000000000001', target: '10000000-0000-4000-8000-000000000002',
   approver: '10000000-0000-4000-8000-000000000003', activator: '10000000-0000-4000-8000-000000000004',
@@ -44,7 +41,7 @@ describe('permissions PostgreSQL protocol', () => {
   beforeAll(async () => {
     infrastructure = await startTestInfrastructure();
     pool = new Pool({ connectionString: infrastructure.databaseUrl, connectionTimeoutMillis: CONTAINER_STARTUP_TIMEOUT_MS });
-    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+    await migrateWithCompletedPiiBackfill(pool);
     repository = new PermissionsRepository(drizzle(pool) as never);
     service = new PermissionsService(repository, { get: () => 'bootstrap-subject' } as never);
   }, TIMEOUT);
@@ -100,9 +97,9 @@ describe('permissions PostgreSQL protocol', () => {
     await pool.query("UPDATE permission_grants SET revoked_at = now() WHERE user_id = $1 AND permission_definition_id = $2", [ids.approver, definitions.PERMISSION_APPROVE]);
     await expect(service.approve(ids.approver, pending.id, 'REVIEWED')).rejects.toMatchObject({ response: { message: 'permission_request_not_approvable' } });
     await grant(ids.approver, definitions.PERMISSION_APPROVE);
-    await pool.query('ALTER TABLE permission_change_requests DISABLE TRIGGER permission_change_requests_prevent_payload_mutation');
+    await pool.query('ALTER TABLE permission_change_requests DISABLE TRIGGER permission_change_requests_prevent_payload_mutation, DISABLE TRIGGER permission_change_requests_enforce_transition');
     await pool.query("UPDATE permission_change_requests SET expires_at = now() - interval '1 second' WHERE id = $1", [pending.id]);
-    await pool.query('ALTER TABLE permission_change_requests ENABLE TRIGGER permission_change_requests_prevent_payload_mutation');
+    await pool.query('ALTER TABLE permission_change_requests ENABLE TRIGGER permission_change_requests_prevent_payload_mutation, ENABLE TRIGGER permission_change_requests_enforce_transition');
     await expect(service.approve(ids.approver, pending.id, 'REVIEWED')).rejects.toMatchObject({ response: { message: 'permission_request_not_approvable' } });
     expect((await pool.query('SELECT status FROM permission_change_requests WHERE id = $1', [pending.id])).rows[0]!.status).toBe('EXPIRED');
     const activationRecheck = await service.request(ids.requester, { targetUserId: ids.target, action: 'GRANT', permission: 'FEE_WRITE', scope: 'BOARD', scopeId: 'board-c', reasonCode: 'OPS' });
@@ -213,7 +210,7 @@ describe('permissions PostgreSQL protocol', () => {
   });
   it('enforces append-only permission audit history while allowing inserts', async () => {
     const id = '50000000-0000-4000-8000-000000000001';
-    await pool.query("INSERT INTO permission_audit_log (id, action, changed_field_names, correlation_id) VALUES ($1, 'AUDIT_EVENT', 'status', 'append-only-test')", [id]);
+    await pool.query("INSERT INTO permission_audit_log (id, action, record_id, changed_field_names, correlation_id) VALUES ($1, 'AUDIT_EVENT', $1, 'status', 'append-only-test')", [id]);
     await expect(pool.query("UPDATE permission_audit_log SET action = 'AUDIT_CHANGED' WHERE id = $1", [id])).rejects.toThrow(/append-only/);
     await expect(pool.query('DELETE FROM permission_audit_log WHERE id = $1', [id])).rejects.toThrow(/append-only/);
     expect((await pool.query('SELECT action FROM permission_audit_log WHERE id = $1', [id])).rows).toEqual([{ action: 'AUDIT_EVENT' }]);

@@ -11,13 +11,12 @@ COPY shared/contracts/package.json shared/contracts/package.json
 COPY shared/common/package.json shared/common/package.json
 COPY shared/config/package.json shared/config/package.json
 
-RUN pnpm install --filter @soc/web... --no-frozen-lockfile
-
 COPY apps/web apps/web
 COPY shared/api-client shared/api-client
 COPY shared/contracts shared/contracts
 COPY shared/common shared/common
 COPY shared/config shared/config
+RUN pnpm install --no-frozen-lockfile
 
 WORKDIR /app/apps/web
 
