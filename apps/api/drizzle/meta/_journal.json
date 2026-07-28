@@ -85,6 +85,13 @@
       "when": 1785173000000,
       "tag": "0011_phase2_permission_audit_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785174000000,
+      "tag": "0012_phase2_pii_contract",
+      "breakpoints": true
     }
   ]
 }

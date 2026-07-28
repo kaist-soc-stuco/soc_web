@@ -10,6 +10,7 @@ import {
   permissionDefinitions,
   permissionGrants,
   users,
+  userPiiBackfillProgress,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { PiiCipherService } from "../../../shared/security/pii-cipher.service";
 import type { EffectivePermissionGrant, UserRecord } from "../entities/user";
@@ -243,30 +244,58 @@ export class UsersRepository {
     });
   }
   async backfillLegacyPii(input: { cursor?: UserCursor; limit: number }): Promise<{ processed: number; cursor: UserCursor | null }> {
-    const predicates: SQL[] = [];
-    if (input.cursor) {
-      const createdAt = new Date(input.cursor.createdAt);
-      predicates.push(or(gt(users.createdAt, createdAt), and(eq(users.createdAt, createdAt), gt(users.id, input.cursor.id)))!);
-    }
-    const rows = await this.db.select().from(users)
-      .where(predicates.length ? and(...predicates) : undefined)
-      .orderBy(asc(users.createdAt), asc(users.id))
-      .limit(input.limit);
-    for (const row of rows) {
-      const values: Record<string, string | null> = {};
-      for (const [key, field] of Object.entries(PII_FIELDS)) {
-        const value = row[key as keyof typeof row] as string | null;
-        if (value === null || this.piiCipher.isValidEnvelope(field, value) || this.piiCipher.looksLikeEnvelope(value)) continue;
-        values[key] = this.piiCipher.encrypt(field, value);
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('user_pii_backfill'))`);
+      let [progress] = await tx.select().from(userPiiBackfillProgress)
+        .where(eq(userPiiBackfillProgress.jobKey, "users"))
+        .for("update").limit(1);
+      if (!progress) {
+        const [upper] = await tx.select({ createdAt: users.createdAt, id: users.id })
+          .from(users).orderBy(sql`${users.createdAt} DESC`, sql`${users.id} DESC`).limit(1);
+        [progress] = await tx.insert(userPiiBackfillProgress).values({
+          jobKey: "users",
+          batchSize: input.limit,
+          upperBoundCreatedAt: upper?.createdAt ?? null,
+          upperBoundUserId: upper?.id ?? null,
+        }).returning();
       }
-      if (Object.keys(values).length) {
-        await this.db.update(users).set({ ...values, updatedAt: new Date() }).where(eq(users.id, row.id));
+      if (progress.completedAt) return { processed: 0, cursor: null };
+      const predicates: SQL[] = [];
+      if (progress.lastProcessedCreatedAt && progress.lastProcessedUserId) {
+        predicates.push(or(
+          gt(users.createdAt, progress.lastProcessedCreatedAt),
+          and(eq(users.createdAt, progress.lastProcessedCreatedAt), gt(users.id, progress.lastProcessedUserId)),
+        )!);
       }
-    }
-    const last = rows.at(-1);
-    return {
-      processed: rows.length,
-      cursor: last ? { createdAt: last.createdAt.toISOString(), id: last.id } : null,
-    };
+      if (progress.upperBoundCreatedAt && progress.upperBoundUserId) {
+        predicates.push(or(
+          sql`${users.createdAt} < ${progress.upperBoundCreatedAt}`,
+          and(eq(users.createdAt, progress.upperBoundCreatedAt), sql`${users.id} <= ${progress.upperBoundUserId}`),
+        )!);
+      }
+      const rows = await tx.select().from(users)
+        .where(and(...predicates)).orderBy(asc(users.createdAt), asc(users.id)).limit(input.limit);
+      for (const row of rows) {
+        const values: Record<string, string | null> = {};
+        for (const [key, field] of Object.entries(PII_FIELDS)) {
+          const value = row[key as keyof typeof row] as string | null;
+          if (value === null || this.piiCipher.isValidEnvelope(field, value)) continue;
+          if (this.piiCipher.looksLikeEnvelope(value)) throw new Error(`invalid_pii_envelope:${field}`);
+          values[key] = this.piiCipher.encrypt(field, value);
+        }
+        if (Object.keys(values).length) {
+          await tx.update(users).set({ ...values, updatedAt: sql`now()` }).where(eq(users.id, row.id));
+        }
+      }
+      const last = rows.at(-1);
+      const completed = rows.length < input.limit;
+      await tx.update(userPiiBackfillProgress).set({
+        lastProcessedCreatedAt: last?.createdAt ?? progress.lastProcessedCreatedAt,
+        lastProcessedUserId: last?.id ?? progress.lastProcessedUserId,
+        completedAt: completed ? new Date() : null,
+        updatedAt: sql`now()`,
+      }).where(eq(userPiiBackfillProgress.id, progress.id));
+      return { processed: rows.length, cursor: last ? { createdAt: last.createdAt.toISOString(), id: last.id } : null };
+    });
   }
 }
