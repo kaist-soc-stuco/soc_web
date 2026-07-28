@@ -44,6 +44,21 @@ redis.call("SET", KEYS[1], cjson.encode(record), "EX", ttl)
 return 1
 `;
 
+const RENEW_PENDING_LOGIN_LUA = `
+local raw = redis.call("GET", KEYS[1])
+if not raw then return 0 end
+local ttl = redis.call("TTL", KEYS[1])
+if ttl <= 0 then return 0 end
+local record = cjson.decode(raw)
+if record.state ~= "processing" or record.reservationToken ~= ARGV[1] or
+   not record.leaseExpiresAtMs or tonumber(record.leaseExpiresAtMs) <= tonumber(ARGV[2]) then
+  return 0
+end
+record.leaseExpiresAtMs = tonumber(ARGV[2]) + tonumber(ARGV[3])
+redis.call("SET", KEYS[1], cjson.encode(record), "EX", ttl)
+return 1
+`;
+
 const COMPLETE_PENDING_LOGIN_LUA = `
 local raw = redis.call("GET", KEYS[1])
 if not raw then return 0 end
@@ -238,4 +253,15 @@ export class PendingLoginRepository {
     return Number(result) === 1;
   }
 
+  async renew(pendingLoginToken: string, reservationToken: string): Promise<boolean> {
+    const result = await this.redis.eval(
+      RENEW_PENDING_LOGIN_LUA,
+      1,
+      this.buildKey(pendingLoginToken),
+      reservationToken,
+      String(Date.now()),
+      "30000",
+    );
+    return Number(result) === 1;
+  }
 }

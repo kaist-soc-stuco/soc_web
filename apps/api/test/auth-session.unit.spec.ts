@@ -52,7 +52,7 @@ function service(session = record()) {
   const repository = {
     save: vi.fn(), findBySessionId: vi.fn().mockResolvedValue(session), rotateRefresh: vi.fn().mockResolvedValue('rotated'), revoke: vi.fn(),
   };
-  const pending = { reserve: vi.fn(), complete: vi.fn(), release: vi.fn() };
+  const pending = { reserve: vi.fn(), renew: vi.fn().mockResolvedValue(true), complete: vi.fn(), release: vi.fn() };
   const users = { upsertConsentedSsoUser: vi.fn() };
   return { instance: new AuthSessionService(configService as never, repository as never, pending as never, users as never), repository, pending, users };
 }

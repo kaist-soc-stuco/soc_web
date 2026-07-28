@@ -269,17 +269,25 @@ export class AuthSessionService {
     const reservation = await this.pendingLoginRepository.reserve(input.pendingLoginToken);
     if (!reservation) throw new UnauthorizedException("pending_login_not_found_or_expired");
     const { pending, reservationToken } = reservation;
+    const assertOwnership = async () => {
+      if (!(await this.pendingLoginRepository.renew(input.pendingLoginToken, reservationToken))) {
+        throw new ConflictException("pending_login_ownership_lost");
+      }
+    };
     try {
       if (input.consent) {
+        await assertOwnership();
         const user = await this.usersService.upsertConsentedSsoUser({
           consentedAt: new Date().toISOString(), ssoUserId: pending.ssoUserId,
           userEmail: pending.userEmail, userMobile: pending.userMobile,
         });
+        await assertOwnership();
         const result = {
           kind: "persisted" as const,
           session: await this.issuePersistedSession(user.id),
           userId: user.id,
         };
+        await assertOwnership();
         if (
           !(await this.pendingLoginRepository.complete(
             input.pendingLoginToken,
@@ -291,7 +299,9 @@ export class AuthSessionService {
         }
         return result;
       }
+      await assertOwnership();
       const session = await this.issueTemporarySession(input.pendingLoginToken, pending.expiresAt);
+      await assertOwnership();
       if (
         !(await this.pendingLoginRepository.complete(
           input.pendingLoginToken,
