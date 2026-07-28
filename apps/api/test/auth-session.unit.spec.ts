@@ -226,6 +226,29 @@ describe('AuthSessionService ES256 sessions', () => {
     vi.restoreAllMocks();
   });
 
+  it('does not persist consent after a delayed renewal loses ownership to a competing decline', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    const { instance, pending, users, repository } = service();
+    pending.reserve.mockResolvedValue({
+      pending: { expiresAt: now + 60_000, ssoUserId: 'sso-1' },
+      reservationToken: 'consent-owner',
+    });
+    let releaseRenewal!: (owned: boolean) => void;
+    pending.renew.mockImplementationOnce(() => new Promise<boolean>((resolve) => {
+      releaseRenewal = resolve;
+    }));
+
+    const decision = instance.handleConsentDecision({ consent: true, pendingLoginToken: 'flow-token' });
+    await Promise.resolve();
+    releaseRenewal(false);
+
+    await expect(decision).rejects.toMatchObject({ message: 'pending_login_ownership_lost' });
+    expect(users.upsertConsentedSsoUser).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(pending.complete).not.toHaveBeenCalled();
+    expect(pending.release).toHaveBeenCalledWith('flow-token', 'consent-owner');
+    vi.restoreAllMocks();
+  });
   it('releases a reserved consent flow when persistence fails', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, pending, users } = service();

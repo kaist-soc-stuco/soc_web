@@ -106,4 +106,23 @@ describe('PendingLoginRepository', () => {
     await instance.complete('flow-token', reservation.reservationToken);
     expect(redis.eval).toHaveBeenCalledWith(expect.stringContaining('reservationToken ~= ARGV[1]'), 1, 'auth:pending-login:flow-token', reservation.reservationToken);
   });
+  it('does not renew a lease after a competing consent owner takes it', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    const { instance, readStored, redis } = repository();
+    await instance.save('flow-token', { expiresAt: now + 60_000, ssoUserId: 'sso-subject-1' }, 60);
+    redis.eval.mockResolvedValueOnce([1, readStored()]);
+    const reservation = (await instance.reserve('flow-token'))!;
+    redis.eval.mockResolvedValueOnce(0);
+
+    await expect(instance.renew('flow-token', reservation.reservationToken)).resolves.toBe(false);
+    expect(redis.eval).toHaveBeenLastCalledWith(
+      expect.stringContaining('leaseExpiresAtMs'),
+      1,
+      'auth:pending-login:flow-token',
+      reservation.reservationToken,
+      String(now),
+      '30000',
+    );
+    vi.restoreAllMocks();
+  });
 });
