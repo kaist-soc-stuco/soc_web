@@ -1,21 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import { Logo } from '@/components/atoms/logo';
 import { invalidateBoardCatalog, loadBoardCatalog, useBoardCatalog } from '@/lib/board-catalog';
 import { getAuthSessionSnapshot, getAuthSessionSummary } from '@/lib/auth-session';
+import { invalidateAdminGrants, useAdminGrants } from '@/lib/admin-grants';
+import { visibleAdminMenu } from '@/lib/static-site-content';
 interface HeaderProps {
   showLogo?: boolean;
 }
 
 export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
   const [authenticated, setAuthenticated] = useState(false);
   const boardCatalog = useBoardCatalog();
+  const grants = useAdminGrants();
   const [boardRetrying, setBoardRetrying] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   useEffect(() => {
     let active = true;
     void getAuthSessionSummary(createApiClient({ baseUrl: '/api' }))
@@ -23,6 +29,21 @@ export function Header({ showLogo = false }: HeaderProps) {
       .catch(() => undefined);
     return () => { active = false; };
   }, [location.key]);
+  useEffect(() => setMobileOpen(false), [location.pathname, location.search]);
+
+  const logout = async () => {
+    if (logoutLoading) return;
+    setLogoutLoading(true);
+    try {
+      await createApiClient({ baseUrl: '/api' }).logout();
+      setAuthenticated(false);
+      invalidateAdminGrants();
+      navigate('/login?status=success&reason=logged_out', { replace: true });
+    } finally {
+      setLogoutLoading(false);
+      setMobileOpen(false);
+    }
+  };
 
   useEffect(() => {
     const update = () => {
@@ -62,6 +83,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       ],
     },
   ];
+  const hasAdminAccess = grants.status === 'ready' && visibleAdminMenu(grants.grants).length > 0;
   const terminalCatalogError = boardCatalog.status === 'error'
     && typeof boardCatalog.error === 'object'
     && boardCatalog.error !== null
@@ -145,17 +167,31 @@ export function Header({ showLogo = false }: HeaderProps) {
           </div>
         </div>
 
-        {/* Right Section: Account */}
-        <div className="flex items-center gap-2 md:gap-6 pr-6">
-          <Link
-            to={authenticated ? "/admin" : "/login"}
-            className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
-          >
-            <span className="py-2">{authenticated ? '마이페이지' : '로그인'}</span>
-            <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
-          </Link>
+        <div className="flex items-center gap-3 pr-4 md:pr-6">
+          {authenticated ? (
+            <>
+              <Link to="/mypage" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">마이페이지</Link>
+              {hasAdminAccess ? <Link to="/admin" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">관리자 센터</Link> : null}
+              <button type="button" onClick={() => void logout()} disabled={logoutLoading} className="hidden text-sm font-bold text-kaist-grey hover:text-kaist-darkgreen-main disabled:opacity-50 sm:block">
+                {logoutLoading ? '로그아웃 중' : '로그아웃'}
+              </button>
+            </>
+          ) : <Link to="/login" className="text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">로그인</Link>}
+          <button type="button" aria-label="메뉴 열기" aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
+            메뉴
+          </button>
         </div>
       </div>
+      {mobileOpen ? (
+        <nav aria-label="모바일 메뉴" className="border-t border-kaist-grey/20 bg-white p-4 md:hidden">
+          <ul className="space-y-3">
+            {navItems.flatMap((item) => item.dropdown).map((item) => <li key={item.to}><Link className="block font-semibold" to={item.to}>{item.label}</Link></li>)}
+            {authenticated ? <li><Link className="block font-semibold" to="/mypage">마이페이지</Link></li> : null}
+            {authenticated && hasAdminAccess ? <li><Link className="block font-semibold" to="/admin">관리자 센터</Link></li> : null}
+            {authenticated ? <li><button type="button" disabled={logoutLoading} onClick={() => void logout()} className="font-semibold text-kaist-darkgreen">{logoutLoading ? '로그아웃 중' : '로그아웃'}</button></li> : null}
+          </ul>
+        </nav>
+      ) : null}
 
       {/* Full Dropdown Menu - DDP Style */}
       <div 

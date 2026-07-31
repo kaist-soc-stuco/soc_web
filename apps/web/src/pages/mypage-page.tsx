@@ -6,21 +6,30 @@ import { profileApi, ProfileApiError } from '@/lib/profile-api';
 import { surveyApi } from '@/lib/survey-api';
 
 const feeLabel = { PAID: '납부 완료', UNPAID: '미납', UNKNOWN: '확인 중' } as const;
+const responseStateLabel: Record<string, string> = {
+  DRAFT: '작성 중',
+  SUBMITTED: '제출 완료',
+  REVIEWED: '검토 완료',
+  REJECTED: '반려',
+};
 const value = (input: string | null) => input || '-';
 
 export function MyPage() {
   const [profile, setProfile] = useState<UserMeResponse | null>(null);
-  const [surveyResponses, setSurveyResponses] = useState<MySurveyResponsesResponse['items']>([]);
+  const [surveyResponses, setSurveyResponses] = useState<MySurveyResponsesResponse['items'] | null>(null);
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [status, setStatus] = useState<'loading' | 'ready' | 'saving' | 'error'>('loading');
   const [message, setMessage] = useState('');
+  const [surveyError, setSurveyError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     void profileApi.get(controller.signal).then((loaded) => {
       setProfile(loaded);
-      void surveyApi.mineAll(controller.signal).then((surveys) => setSurveyResponses(surveys.items)).catch(() => undefined);
+      void surveyApi.mineAll(controller.signal)
+        .then((surveys) => setSurveyResponses(surveys.items))
+        .catch(() => setSurveyError(true));
       setEmail(loaded.userEmail ?? '');
       setMobile(loaded.userMobile ?? '');
       setStatus('ready');
@@ -77,16 +86,19 @@ export function MyPage() {
             </form>
             <section className="rounded-lg border border-kaist-grey/25 bg-white p-6 md:col-span-2">
               <h2 className="text-xl font-extrabold text-kaist-darkgreen">내 설문 응답</h2>
-              {surveyResponses.length === 0 ? <p className="mt-4 text-sm">제출한 설문 응답이 없습니다.</p> : (
+              {surveyError ? <p role="alert" className="mt-4 text-sm text-red-600">설문 응답을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p> : null}
+              {!surveyError && surveyResponses === null ? <p role="status" className="mt-4 text-sm">설문 응답을 불러오는 중입니다.</p> : null}
+              {!surveyError && surveyResponses?.length === 0 ? <p className="mt-4 text-sm">제출한 설문 응답이 없습니다.</p> : null}
+              {surveyResponses && surveyResponses.length > 0 ? (
                 <ul className="mt-4 divide-y">
                   {surveyResponses.map(({ survey, response }) => (
-                    <li key={response.id} className="flex items-center justify-between py-3">
+                    <li key={response.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <a className="font-semibold underline" href={`/survey/${survey.id}`}>{survey.title.value}</a>
-                      <span className="text-sm">{response.state} · {response.submittedAt ? new Date(response.submittedAt).toLocaleString() : '-'}</span>
+                      <span className="text-sm">{responseStateLabel[response.state] ?? '상태 확인 중'} · {response.submittedAt ? new Date(response.submittedAt).toLocaleString('ko-KR') : '제출 전'}</span>
                     </li>
                   ))}
                 </ul>
-              )}
+              ) : null}
             </section>
           </div>
         ) : null}

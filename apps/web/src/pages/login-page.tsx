@@ -295,13 +295,12 @@ export function TreeLogin() {
             </p>
             <h1 className="text-4xl font-extrabold tracking-tight">통합 로그인</h1>
             <p className="text-base font-medium leading-7 text-kaist-grey">
-              이 페이지는 start/init endpoint에서 payload를 받아 SSO authorize form을 직접 submit하고,
-              완료 후에는 `/api/auth/login`에서 처리된 결과를 조회합니다.
+              학과 서비스를 이용하려면 KAIST 통합 계정으로 로그인해 주세요.
             </p>
           </div>
         </div>
 
-        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
+        {import.meta.env.DEV ? <section className="rounded-2xl border border-amber-300 bg-amber-50 p-6 shadow-sm">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-xl bg-kaist-darkgreen/6 p-4">
               <p className="text-sm font-semibold text-kaist-greygreen">Start URL</p>
@@ -322,6 +321,9 @@ export function TreeLogin() {
               </p>
             </div>
           </div>
+        </section> : null}
+
+        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
 
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <button
@@ -350,14 +352,16 @@ export function TreeLogin() {
             >
               {logoutLoading ? '로그아웃 처리 중' : '로그아웃'}
             </button>
-            <button
-              type="button"
-              onClick={() => void handleRefreshFlowTest()}
-              disabled={refreshTestLoading}
-              className="rounded-full border border-kaist-greygreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-greygreen transition hover:bg-kaist-greygreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
-            >
-              {refreshTestLoading ? 'refresh 테스트 중' : '401/refresh 테스트'}
-            </button>
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                onClick={() => void handleRefreshFlowTest()}
+                disabled={refreshTestLoading}
+                className="rounded-full border border-kaist-greygreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-greygreen transition hover:bg-kaist-greygreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+              >
+                {refreshTestLoading ? 'refresh 테스트 중' : '401/refresh 테스트'}
+              </button>
+            ) : null}
           </div>
 
           {refreshTestMessage ? (
@@ -373,7 +377,7 @@ export function TreeLogin() {
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
+        {import.meta.env.DEV ? <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-extrabold tracking-tight">서버 흐름</h2>
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm font-medium leading-7 text-kaist-grey">
             <li>브라우저가 start/init endpoint를 `fetch`합니다.</li>
@@ -382,7 +386,7 @@ export function TreeLogin() {
             <li>SSO 서버가 `/api/auth/login`으로 `POST` 콜백을 보냅니다.</li>
             <li>서버가 `code`를 사용자 정보 API로 교환한 뒤 `/login?status=...`로 되돌립니다.</li>
           </ol>
-        </section>
+        </section> : null}
 
         {hasResult ? (
           <section className="rounded-2xl border border-kaist-darkgreen/20 bg-kaist-darkgreen/5 p-6 shadow-sm">
@@ -400,7 +404,7 @@ export function TreeLogin() {
           </section>
         )}
 
-        <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
+        {import.meta.env.DEV ? <section className="rounded-2xl border border-kaist-grey/20 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-extrabold tracking-tight">현재 세션 조회</h2>
           <div className="mt-4 space-y-2 text-sm font-medium text-kaist-black">
             <p>authenticated: {String(sessionSummary?.authenticated ?? false)}</p>
@@ -412,7 +416,7 @@ export function TreeLogin() {
             <p>requiresConsent: {String(sessionSummary?.requiresConsent ?? false)}</p>
             <p>userId: {sessionSummary?.userId ?? '없음'}</p>
           </div>
-        </section>
+        </section> : null}
       </div>
     </main>
   );
