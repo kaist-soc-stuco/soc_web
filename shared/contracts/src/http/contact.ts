@@ -120,19 +120,17 @@ export interface MailCreateRequest extends MailPreviewRequest {}
 export interface MailGetRequest { id: string; }
 export interface MailCancelRequest { reasonCode?: string; }
 
-export type MailPreviewResult = FeatureDisabledResult;
-export type MailCreateResult = FeatureDisabledResult;
+export type MailPreviewResult = FeatureDisabledResult | { ok: true; recipients: number; subject: string; body: string };
+export type MailCreateResult = FeatureDisabledResult | { ok: true; id: string; status: "SENT" };
 export type MailGetResult = FeatureDisabledResult;
 export type MailCancelResult = FeatureDisabledResult;
 
-export interface ChatPageResponse {
-  kind: "EXTERNAL_LINK_NOTICE";
-  externalUrl: string;
-  notice: string;
-}
+export type ChatPageResponse =
+  | { kind: "EXTERNAL_LINK_NOTICE"; externalUrl: string; notice: string }
+  | { kind: "INTERNAL_CHAT"; notice: string };
 
 export interface ChatMessageRequest {
   body: string;
 }
 
-export type ChatMessageResult = FeatureDisabledResult;
+export type ChatMessageResult = FeatureDisabledResult | { ok: true; reply: string };

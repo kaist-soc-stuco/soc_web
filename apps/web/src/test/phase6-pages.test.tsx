@@ -89,15 +89,18 @@ describe('Phase 6 contact, mail, and chat pages', () => {
     expect(screen.queryByText('홍길동')).not.toBeInTheDocument();
   });
 
-  it('clearly disables mail composition while the provider is unavailable', () => {
+  it('previews and sends configured mail composition', async () => {
+    api.contactApi.mailPreview.mockResolvedValue({ ok: true, recipients: 1, subject: '제목', body: '본문' });
+    api.contactApi.mailCreate.mockResolvedValue({ ok: true, id: 'mail-1', status: 'SENT' });
     render(<AdminEmailsPage />);
-
-    expect(screen.getByText('현재 사용할 수 없는 기능입니다.')).toBeVisible();
-    expect(screen.queryByRole('button', { name: '미리보기' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '보내기' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('받는 사람')).not.toBeInTheDocument();
-    expect(api.contactApi.mailPreview).not.toHaveBeenCalled();
-    expect(api.contactApi.mailCreate).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('연락처 ID'), { target: { value: '10000000-0000-4000-8000-000000000001' } });
+    fireEvent.change(screen.getByLabelText('메일 제목'), { target: { value: ' 제목 ' } });
+    fireEvent.change(screen.getByLabelText('메일 본문'), { target: { value: ' 본문 ' } });
+    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    expect(await screen.findByText('1명에게 발송할 메일을 확인했습니다.')).toBeVisible();
+    expect(api.contactApi.mailPreview).toHaveBeenCalledWith({ contactIds: ['10000000-0000-4000-8000-000000000001'], subject: '제목', body: '본문' });
+    fireEvent.click(screen.getByRole('button', { name: '발송' }));
+    expect(await screen.findByText('메일을 발송했습니다. (mail-1)')).toBeVisible();
   });
 
   it('loads the static external chat link without browser storage or a message submission surface', async () => {
@@ -114,5 +117,14 @@ describe('Phase 6 contact, mail, and chat pages', () => {
     expect(api.contactApi.chatMessage).not.toHaveBeenCalled();
     expect(getItem).not.toHaveBeenCalled();
     expect(setItem).not.toHaveBeenCalled();
+  });
+  it('submits messages when the internal chat provider is configured', async () => {
+    api.contactApi.chatPage.mockResolvedValue({ kind: 'INTERNAL_CHAT', notice: '내부 채팅' });
+    api.contactApi.chatMessage.mockResolvedValue({ ok: true, reply: '응답' });
+    render(<ChatPage />);
+    fireEvent.change(await screen.findByLabelText('메시지'), { target: { value: '질문' } });
+    fireEvent.click(screen.getByRole('button', { name: '전송' }));
+    expect(await screen.findByText('응답')).toBeVisible();
+    expect(api.contactApi.chatMessage).toHaveBeenCalledWith({ body: '질문' });
   });
 });

@@ -92,6 +92,17 @@ const asBoolean = (value: unknown, name: string, fallback: boolean): boolean => 
   if (value === false || value === 'false') return false;
   throw new Error(`Invalid boolean value for ${name}`);
 };
+const asOptionalUrl = (value: unknown, name: string): string | undefined => {
+  if (value === undefined) return undefined;
+  const raw = asString(value, name);
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost') throw new Error();
+    return raw.replace(/\/+$/, '');
+  } catch {
+    throw new Error(`Invalid URL for ${name}`);
+  }
+};
 const asPositiveBoundedInteger = (
   value: unknown,
   name: string,
@@ -220,6 +231,16 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     config.SURVEY_PHONE_HASH_HMAC_VERSION,
     'SURVEY_PHONE_HASH_HMAC_VERSION',
   );
+  const mailEnabled = asBoolean(config.MAIL_PROVIDER_ENABLED, 'MAIL_PROVIDER_ENABLED', false);
+  const chatEnabled = asBoolean(config.CHAT_PROVIDER_ENABLED, 'CHAT_PROVIDER_ENABLED', false);
+  const mailUrl = asOptionalUrl(config.MAIL_PROVIDER_URL, 'MAIL_PROVIDER_URL');
+  const mailToken = config.MAIL_PROVIDER_TOKEN === undefined ? undefined : asString(config.MAIL_PROVIDER_TOKEN, 'MAIL_PROVIDER_TOKEN');
+  const mailFrom = config.MAIL_FROM === undefined ? undefined : asString(config.MAIL_FROM, 'MAIL_FROM');
+  const chatUrl = asOptionalUrl(config.CHAT_PROVIDER_URL, 'CHAT_PROVIDER_URL');
+  const chatToken = config.CHAT_PROVIDER_TOKEN === undefined ? undefined : asString(config.CHAT_PROVIDER_TOKEN, 'CHAT_PROVIDER_TOKEN');
+  const chatModel = config.CHAT_PROVIDER_MODEL === undefined ? undefined : asString(config.CHAT_PROVIDER_MODEL, 'CHAT_PROVIDER_MODEL');
+  if (mailEnabled && (!mailUrl || !mailToken || !mailFrom)) throw new Error('Incomplete mail provider configuration');
+  if (chatEnabled && (!chatUrl || !chatToken || !chatModel)) throw new Error('Incomplete chat provider configuration');
 
   return {
     ...config,
@@ -277,16 +298,14 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       30,
       365,
     ),
-    MAIL_PROVIDER_ENABLED: asBoolean(
-      config.MAIL_PROVIDER_ENABLED,
-      'MAIL_PROVIDER_ENABLED',
-      false,
-    ),
-    CHAT_PROVIDER_ENABLED: asBoolean(
-      config.CHAT_PROVIDER_ENABLED,
-      'CHAT_PROVIDER_ENABLED',
-      false,
-    ),
+    MAIL_PROVIDER_ENABLED: mailEnabled,
+    MAIL_PROVIDER_URL: mailUrl,
+    MAIL_PROVIDER_TOKEN: mailToken,
+    MAIL_FROM: mailFrom,
+    CHAT_PROVIDER_ENABLED: chatEnabled,
+    CHAT_PROVIDER_URL: chatUrl,
+    CHAT_PROVIDER_TOKEN: chatToken,
+    CHAT_PROVIDER_MODEL: chatModel,
     POSTGRES_HOST: postgresHost,
     POSTGRES_PORT: postgresPort,
     POSTGRES_USER: postgresUser,

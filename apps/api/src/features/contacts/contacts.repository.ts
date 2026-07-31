@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { DRIZZLE_DB, type PostgresDatabase } from '../../infrastructure/postgres/postgres.provider';
 import { contactAuditLog, contacts, permissionDefinitions, permissionGrants } from '../../infrastructure/postgres/postgres.schema';
 
@@ -23,6 +23,10 @@ export class ContactsRepository {
       }
       return rows;
     });
+  }
+
+  byIds(ids: string[]): Promise<ContactRow[]> {
+    return this.db.select().from(contacts).where(and(inArray(contacts.id, ids), isNull(contacts.deletedAt)));
   }
 
   async create(actorUserId: string, values: ContactCreateValues, audit: AuditInput): Promise<ContactRow | null> {

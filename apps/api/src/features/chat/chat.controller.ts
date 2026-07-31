@@ -20,7 +20,7 @@ export class ChatMessagesController {
   constructor(@Inject(ChatService) private readonly chat: ChatService) {}
 
   @Post('messages')
-  send(@Body() body: unknown): never {
+  send(@Body() body: unknown) {
     return this.chat.send(body);
   }
 }
