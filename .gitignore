@@ -46,3 +46,6 @@ lerna-debug.log*
 
 # Opencode
 .opencode
+.gjc/
+**/test-results/
+.docker-test.env
