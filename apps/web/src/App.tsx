@@ -18,6 +18,7 @@ import { AdminFaqsPage } from '@/pages/admin-faqs-page';
 import { AdminEventsPage } from '@/pages/admin-events-page';
 import { AboutPage } from '@/pages/about-page';
 import { HomePage } from '@/pages/home-page';
+import { BoardHubPage } from '@/pages/board-hub-page';
 import { BoardPage } from '@/pages/board-page';
 import { BoardPostPage } from '@/pages/board-post-page';
 import { BoardWritePage } from '@/pages/board-write-page';
@@ -83,6 +84,7 @@ export function App() {
         <Route path="/about/roadmap" element={<RoadmapPage />} />
         <Route path="/faq" element={<FaqPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/board" element={<BoardHubPage />} />
         <Route path="/board/:category" element={<BoardPage />} />
         <Route path="/board/:category/write" element={<BoardWritePage />} />
         <Route path="/board/:category/:id" element={<BoardPostPage />} />

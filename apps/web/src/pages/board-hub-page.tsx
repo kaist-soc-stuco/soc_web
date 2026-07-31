@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Board, ContentLocale } from '@soc/contracts';
+import type { BoardListResponse, ContentLocale } from '@soc/contracts';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { boardApi } from '@/lib/board-api';
@@ -8,7 +8,7 @@ import { localizedText } from '@/lib/localized-content';
 
 export function BoardHubPage() {
   const [locale, setLocale] = useState<ContentLocale>('ko');
-  const [boards, setBoards] = useState<Board[]>([]);
+  const [boards, setBoards] = useState<BoardListResponse['items']>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -16,7 +16,7 @@ export function BoardHubPage() {
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    boardApi.list({ locale, latestLimit: 3 }, controller.signal)
+    boardApi.list({ locale, latestLimit: 1 }, controller.signal)
       .then(({ items }) => setBoards(items.filter((board) => !board.config.isHidden)))
       .catch((cause: unknown) => {
         if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(true);
