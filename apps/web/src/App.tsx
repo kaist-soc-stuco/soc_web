@@ -25,6 +25,7 @@ import { RoadmapPage } from '@/pages/roadmap-page';
 import { TreeLogin } from '@/pages/login-page';
 import { LoginConsentPage } from '@/pages/login-consent-page';
 import { ChatPage } from '@/pages/chat-page';
+import { MyPage } from '@/pages/mypage-page';
 import { getEvent } from '@/lib/event-api';
 
 export function LegacyEventSurveyResolver() {
@@ -82,6 +83,7 @@ export function App() {
         <Route path="/board/:category/write" element={<BoardWritePage />} />
         <Route path="/board/:category/:id" element={<BoardPostPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/mypage" element={<MyPage />} />
         <Route path="/admin" element={<AdminPage />}>
           <Route index element={<AdminIndexRedirect />} />
           <Route path="payments" element={<AdminPaymentsPage />} />
