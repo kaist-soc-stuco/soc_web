@@ -119,7 +119,8 @@ test('management failures surface stale and article-conflict protection', async 
 test('non-managers are denied before board administration is loaded', async ({ page }) => {
   await mockBoards(page, false);
   await page.goto('/admin/boards');
-  await expect(page.getByText('게시판 관리 권한이 없습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '403' })).toContainText('이 관리 페이지에 접근할 권한이 없습니다.');
+  await expect(page.getByText('접근 가능한 관리 메뉴가 없습니다.', { exact: true })).toBeVisible();
 });
 test('a manager patch propagates its title and display order to the mounted header', async ({ page }) => {
   await mockBoards(page);

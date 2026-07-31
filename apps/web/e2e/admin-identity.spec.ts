@@ -56,7 +56,8 @@ test('admin identity routes preserve payments and expose no finance route', asyn
   }
 
   await page.goto('/admin/finance');
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/admin\/finance$/);
+  await expect(page.getByRole('region', { name: '404' })).toContainText('요청한 페이지를 찾을 수 없습니다.');
   await expect(page.getByRole('heading', { name: /finance/i })).toHaveCount(0);
   await expect(page.getByText(/finance/i)).toHaveCount(0);
 });
@@ -104,6 +105,6 @@ test('direct admin routes fail closed when the grants snapshot is unauthenticate
   await page.route('**/api/users/admin*', (route) => route.abort());
 
   await page.goto('/admin/users');
-  await expect(page.getByText('사용자 관리 권한이 없습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '403' })).toContainText('이 관리 페이지에 접근할 권한이 없습니다.');
   await expect(page.getByText('관리 메뉴를 불러올 수 없습니다.', { exact: true })).toBeVisible();
 });
