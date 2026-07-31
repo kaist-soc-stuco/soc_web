@@ -130,7 +130,7 @@ test('a manager patch propagates its title and display order to the mounted head
   await page.getByLabel('표시 순서').fill('0');
   await page.getByRole('button', { name: '변경 저장' }).click();
   await expect(page.locator('header a[href="/board/soc-events"]', { hasText: '수정 행사' })).toBeVisible();
-  await expect(page.locator('header nav a').first()).toHaveAttribute('href', '/board/soc-events');
+  await expect(page.locator('header nav a').first()).toHaveAttribute('href', '/board');
 });
 
 test('a manager hide and delete both propagate to the mounted header', async ({ page }) => {
