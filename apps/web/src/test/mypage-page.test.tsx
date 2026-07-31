@@ -27,6 +27,9 @@ describe('mypage', () => {
     expect(await screen.findByText('홍길동')).toBeTruthy();
     expect(screen.getByText('납부 완료')).toBeTruthy();
     expect((screen.getByLabelText('이메일') as HTMLInputElement).value).toBe('old@example.com');
+    expect(screen.getByText('Gil Dong Hong')).toBeTruthy();
+    expect(screen.getByText('전산학부')).toBeTruthy();
+    expect(screen.getByText(/동의 완료/)).toBeTruthy();
   });
 
   it('updates only editable contact details', async () => {
@@ -44,5 +47,13 @@ describe('mypage', () => {
     getMock.mockRejectedValue(new Error('offline'));
     render(<MemoryRouter><MyPage /></MemoryRouter>);
     expect((await screen.findByRole('alert')).textContent).toContain('내 정보를 불러오지 못했습니다.');
+  });
+
+  it('retries a failed profile load', async () => {
+    getMock.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(profile);
+    render(<MemoryRouter><MyPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: '다시 시도' }));
+    expect(await screen.findByText('홍길동')).toBeTruthy();
+    expect(getMock).toHaveBeenCalledTimes(2);
   });
 });
