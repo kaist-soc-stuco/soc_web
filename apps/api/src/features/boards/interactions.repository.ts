@@ -181,6 +181,25 @@ export class InteractionsRepository {
       return { kind: 'deleted' as const };
     });
   }
+  article(articleId: string) {
+    return this.db.select().from(articles).where(eq(articles.id, articleId)).limit(1).then((rows) => rows[0] ?? null);
+  }
+
+  createAsset(values: typeof assets.$inferInsert) {
+    return this.db.insert(assets).values(values).returning().then((rows) => rows[0]!);
+  }
+
+  asset(assetId: string) {
+    return this.db.select().from(assets).where(eq(assets.id, assetId)).limit(1).then((rows) => rows[0] ?? null);
+  }
+
+  completeAsset(assetId: string, checksumSha256: string | null, now: Date) {
+    return this.db.update(assets).set({ status: 'COMPLETED', checksumSha256, completedAt: now, updatedAt: now }).where(and(eq(assets.id, assetId), eq(assets.status, 'INITIATED'))).returning().then((rows) => rows[0] ?? null);
+  }
+
+  deleteAsset(assetId: string, now: Date, purgeAfter: Date) {
+    return this.db.update(assets).set({ status: 'DELETED', deletedAt: now, purgeAfter, updatedAt: now }).where(and(eq(assets.id, assetId), isNull(assets.deletedAt))).returning().then((rows) => rows[0] ?? null);
+  }
 
   private async lockArticleWithBoard(
     tx: Parameters<Parameters<PostgresDatabase['transaction']>[0]>[0],

@@ -142,19 +142,57 @@ export class InteractionsService {
     return { type: null };
   }
 
-  async initiateAsset(_actorUserId: string, _articleId: string, _input: InitiateAssetRequest, correlationId?: string): Promise<AssetInitiatedResponse> {
+  async initiateAsset(actorUserId: string, articleId: string, input: InitiateAssetRequest, correlationId?: string): Promise<AssetInitiatedResponse> {
     if (correlationId !== undefined) this.correlation(correlationId);
-    this.assetProviderUnavailable();
+    const configuration = this.assetConfiguration();
+    const article = await this.repository.article(articleId);
+    if (!article) throw new NotFoundException('article_not_found');
+    if (article.authorUserId !== actorUserId && !await this.isManager(actorUserId)) throw new ForbiddenException('insufficient_permission');
+    try {
+      const response = await fetch(`${configuration.url}/uploads/initiate`, {
+        method: 'POST', headers: { authorization: `Bearer ${configuration.token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ articleId, ...input }), signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error();
+      const provider: unknown = await response.json();
+      const objectKey = (provider as { objectKey?: unknown }).objectKey;
+      const uploadUrl = (provider as { uploadUrl?: unknown }).uploadUrl;
+      const uploadHeaders = (provider as { uploadHeaders?: unknown }).uploadHeaders;
+      if (typeof objectKey !== 'string' || typeof uploadUrl !== 'string' || !uploadHeaders || typeof uploadHeaders !== 'object' || Array.isArray(uploadHeaders) || !Object.values(uploadHeaders).every((value) => typeof value === 'string')) throw new Error();
+      const row = await this.repository.createAsset({ articleId, displayOrder: input.displayOrder, type: input.type, provider: 'http', objectKey, contentType: input.contentType, byteSize: input.byteSize, checksumSha256: input.checksumSha256 ?? null, initiatedByUserId: actorUserId });
+      return { asset: this.asset(row), uploadUrl, uploadHeaders: uploadHeaders as Record<string, string> };
+    } catch { throw new ServiceUnavailableException('asset_provider_unavailable'); }
   }
 
-  async completeAsset(_actorUserId: string, _assetId: string, _input: CompleteAssetRequest, correlationId?: string): Promise<Asset> {
+  async completeAsset(actorUserId: string, assetId: string, input: CompleteAssetRequest, correlationId?: string): Promise<Asset> {
     if (correlationId !== undefined) this.correlation(correlationId);
-    this.assetProviderUnavailable();
+    const configuration = this.assetConfiguration();
+    const current = await this.repository.asset(assetId);
+    if (!current) throw new NotFoundException('asset_not_found');
+    const article = await this.repository.article(current.articleId);
+    if (!article || article.authorUserId !== actorUserId && !await this.isManager(actorUserId)) throw new ForbiddenException('insufficient_permission');
+    try {
+      const response = await fetch(`${configuration.url}/uploads/${encodeURIComponent(current.objectKey)}/complete`, { method: 'POST', headers: { authorization: `Bearer ${configuration.token}`, 'content-type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(30_000) });
+      const payload: unknown = response.ok ? await response.json() : null;
+      if (!response.ok || (payload as { clean?: unknown })?.clean !== true) throw new Error();
+      const completed = await this.repository.completeAsset(assetId, input.checksumSha256 ?? current.checksumSha256, this.clock.now());
+      if (!completed) throw new ConflictException('asset_not_initiated');
+      return this.asset(completed);
+    } catch (error) { if (error instanceof ConflictException) throw error; throw new ServiceUnavailableException('asset_provider_unavailable'); }
   }
 
-  async deleteAsset(_actorUserId: string, _assetId: string, correlationId?: string): Promise<void> {
+  async deleteAsset(actorUserId: string, assetId: string, correlationId?: string): Promise<void> {
     if (correlationId !== undefined) this.correlation(correlationId);
-    this.assetProviderUnavailable();
+    const configuration = this.assetConfiguration();
+    const current = await this.repository.asset(assetId);
+    if (!current) throw new NotFoundException('asset_not_found');
+    const article = await this.repository.article(current.articleId);
+    if (!article || article.authorUserId !== actorUserId && !await this.isManager(actorUserId)) throw new ForbiddenException('insufficient_permission');
+    try {
+      const response = await fetch(`${configuration.url}/uploads/${encodeURIComponent(current.objectKey)}`, { method: 'DELETE', headers: { authorization: `Bearer ${configuration.token}` }, signal: AbortSignal.timeout(10_000) });
+      if (!response.ok && response.status !== 404) throw new Error();
+      await this.repository.deleteAsset(assetId, this.clock.now(), this.purgeAfter(this.clock.now()));
+    } catch { throw new ServiceUnavailableException('asset_provider_unavailable'); }
   }
 
   private async validateCommentMutation(
@@ -292,9 +330,12 @@ export class InteractionsService {
     return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
-  private assetProviderUnavailable(): never {
-    // No provider or malware-scan adapter is wired, so enabled configuration is also fail-closed.
-    throw new ServiceUnavailableException('feature_disabled');
+  private assetConfiguration() {
+    if (this.config.get('ASSET_PROVIDER_ENABLED') !== true) throw new ServiceUnavailableException('feature_disabled');
+    const url = this.config.get<string>('ASSET_PROVIDER_URL');
+    const token = this.config.get<string>('ASSET_PROVIDER_TOKEN');
+    if (!url || !token) throw new ServiceUnavailableException('feature_disabled');
+    return { url, token };
   }
 
   private correlation(correlationId: string): void {

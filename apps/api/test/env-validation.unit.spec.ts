@@ -207,8 +207,9 @@ describe('content configuration validation', () => {
     });
   });
   it('accepts an enabled asset provider', () => {
-    expect(validateEnv({ ...validConfig(), ASSET_PROVIDER_ENABLED: 'true' })).toMatchObject({
+    expect(validateEnv({ ...validConfig(), ASSET_PROVIDER_ENABLED: 'true', ASSET_PROVIDER_URL: 'https://assets.example.test', ASSET_PROVIDER_TOKEN: 'secret' })).toMatchObject({
       ASSET_PROVIDER_ENABLED: true,
+      ASSET_PROVIDER_URL: 'https://assets.example.test',
     });
   });
 

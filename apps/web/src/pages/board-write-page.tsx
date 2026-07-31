@@ -13,6 +13,7 @@ export function BoardWritePage() {
   const [titleEn, setTitleEn] = useState('');
   const [bodyKr, setBodyKr] = useState('');
   const [bodyEn, setBodyEn] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +64,16 @@ export function BoardWritePage() {
         ...values,
         scope: 'ALL',
       });
+      if (attachment) {
+        const initiated = await boardApi.initiateAsset(draft.id, {
+          displayOrder: 0,
+          type: 'ATTACHMENT',
+          contentType: attachment.type || 'application/octet-stream',
+          byteSize: attachment.size,
+        });
+        await boardApi.uploadAsset(initiated.uploadUrl, initiated.uploadHeaders, attachment);
+        await boardApi.completeAsset(initiated.asset.id);
+      }
       const published = await boardApi.publish(draft.id);
       navigate(`/board/${category}/${published.id}`);
     } catch {
@@ -93,6 +104,7 @@ export function BoardWritePage() {
                 <label className="grid gap-3"><span className="text-sm font-extrabold">Body</span><textarea required value={bodyEn} onChange={(event) => setBodyEn(event.target.value)} rows={12} className="min-h-[280px] rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-4" /></label>
               </fieldset>
             </div>
+            <label className="mb-6 grid gap-2"><span className="text-sm font-extrabold text-kaist-darkgreen">첨부파일 (선택)</span><input aria-label="첨부파일" type="file" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /></label>
             {error && <p role="alert" className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
             <div className="flex flex-wrap justify-end gap-3 border-t border-kaist-grey/20 pt-6"><Link to={`/board/${category}`} className="inline-flex items-center rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold tracking-tight text-kaist-darkgreen">취소</Link><button disabled={pending || !boardReady} type="submit" className="inline-flex items-center rounded-[5px] border border-kaist-darkgreen bg-kaist-darkgreen px-6 py-2 text-sm font-extrabold tracking-tight text-white disabled:opacity-50">{pending ? '등록 중...' : '등록하기'}</button></div>
           </form>}

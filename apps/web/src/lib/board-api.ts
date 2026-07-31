@@ -1,6 +1,6 @@
 import type {
   AdminBoard, AdminBoardListResponse, AppErrorResponse, Article, ArticleDetailResponse, ArticleListQuery, ArticleListResponse, ArticleReactionResponse, ArticleScope, ArticleSummary,
-  Board, BoardListQuery, BoardListResponse, Comment, ContentLocale, CreateArticleRequest, CreateBoardRequest, CreateCommentRequest, DeleteBoardRequest, PutArticleReactionRequest, VersionedPatchBoardRequest,
+  Asset, AssetInitiatedResponse, Board, BoardListQuery, BoardListResponse, Comment, CompleteAssetRequest, ContentLocale, CreateArticleRequest, CreateBoardRequest, CreateCommentRequest, DeleteBoardRequest, InitiateAssetRequest, PutArticleReactionRequest, VersionedPatchBoardRequest,
 } from '@soc/contracts';
 import { invalidateBoardCatalog } from './board-catalog';
 
@@ -77,6 +77,12 @@ export const boardApi = {
   article: (id: string, lang?: ContentLocale, signal?: AbortSignal) => request(`/articles/${encodeURIComponent(id)}${query({ locale: lang })}`, 'GET', undefined, signal).then((v) => decode(v, isDetail)),
   createDraft: (code: string, input: CreateArticleRequest, signal?: AbortSignal) => request(`/boards/${encodeURIComponent(code)}/articles`, 'POST', input, signal).then((v) => decode(v, isArticle)),
   publish: (id: string, signal?: AbortSignal) => request(`/articles/${encodeURIComponent(id)}/publish`, 'POST', undefined, signal).then((v) => decode(v, isArticle)),
+  initiateAsset: (id: string, input: InitiateAssetRequest) => request(`/articles/${encodeURIComponent(id)}/assets/initiate`, 'POST', input).then((v) => decode(v, (x): x is AssetInitiatedResponse => exact(x, ['asset', 'uploadUrl', 'uploadHeaders']) && isAsset(x.asset) && isString(x.uploadUrl) && isObject(x.uploadHeaders) && Object.values(x.uploadHeaders).every(isString))),
+  uploadAsset: async (uploadUrl: string, uploadHeaders: Record<string, string>, file: File) => {
+    const response = await fetch(uploadUrl, { method: 'PUT', headers: uploadHeaders, body: file });
+    if (!response.ok) throw new BoardApiError(response.status);
+  },
+  completeAsset: (id: string, input: CompleteAssetRequest = {}) => request(`/assets/${encodeURIComponent(id)}/complete`, 'POST', input).then((v) => decode(v, (x): x is Asset => isAsset(x))),
   createComment: (id: string, input: CreateCommentRequest) => request(`/articles/${encodeURIComponent(id)}/comments`, 'POST', input).then((v) => decode(v, (x): x is Comment => isComment(x))),
   deleteComment: (id: string) => request(`/comments/${encodeURIComponent(id)}`, 'DELETE').then((v) => { if (v !== undefined) throw new BoardApiProtocolError(); }),
   putReaction: (id: string, input: PutArticleReactionRequest) => request(`/articles/${encodeURIComponent(id)}/reaction`, 'PUT', input).then((v) => decode(v, (x): x is ArticleReactionResponse => exact(x, ['type']) && (x.type === 'LIKE' || x.type === 'DISLIKE' || x.type === null))),

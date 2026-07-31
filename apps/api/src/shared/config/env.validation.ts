@@ -233,6 +233,9 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
   );
   const mailEnabled = asBoolean(config.MAIL_PROVIDER_ENABLED, 'MAIL_PROVIDER_ENABLED', false);
   const chatEnabled = asBoolean(config.CHAT_PROVIDER_ENABLED, 'CHAT_PROVIDER_ENABLED', false);
+  const assetEnabled = asBoolean(config.ASSET_PROVIDER_ENABLED, 'ASSET_PROVIDER_ENABLED', false);
+  const assetUrl = asOptionalUrl(config.ASSET_PROVIDER_URL, 'ASSET_PROVIDER_URL');
+  const assetToken = config.ASSET_PROVIDER_TOKEN === undefined ? undefined : asString(config.ASSET_PROVIDER_TOKEN, 'ASSET_PROVIDER_TOKEN');
   const mailUrl = asOptionalUrl(config.MAIL_PROVIDER_URL, 'MAIL_PROVIDER_URL');
   const mailToken = config.MAIL_PROVIDER_TOKEN === undefined ? undefined : asString(config.MAIL_PROVIDER_TOKEN, 'MAIL_PROVIDER_TOKEN');
   const mailFrom = config.MAIL_FROM === undefined ? undefined : asString(config.MAIL_FROM, 'MAIL_FROM');
@@ -241,6 +244,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
   const chatModel = config.CHAT_PROVIDER_MODEL === undefined ? undefined : asString(config.CHAT_PROVIDER_MODEL, 'CHAT_PROVIDER_MODEL');
   if (mailEnabled && (!mailUrl || !mailToken || !mailFrom)) throw new Error('Incomplete mail provider configuration');
   if (chatEnabled && (!chatUrl || !chatToken || !chatModel)) throw new Error('Incomplete chat provider configuration');
+  if (assetEnabled && (!assetUrl || !assetToken)) throw new Error('Incomplete asset provider configuration');
 
   return {
     ...config,
@@ -281,11 +285,9 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       'AUTHORIZATION_OPERATIONS_ENABLED',
       false,
     ),
-    ASSET_PROVIDER_ENABLED: asBoolean(
-      config.ASSET_PROVIDER_ENABLED,
-      'ASSET_PROVIDER_ENABLED',
-      false,
-    ),
+    ASSET_PROVIDER_ENABLED: assetEnabled,
+    ASSET_PROVIDER_URL: assetUrl,
+    ASSET_PROVIDER_TOKEN: assetToken,
     CONTENT_PURGE_GRACE_DAYS: asPositiveBoundedInteger(
       config.CONTENT_PURGE_GRACE_DAYS,
       'CONTENT_PURGE_GRACE_DAYS',

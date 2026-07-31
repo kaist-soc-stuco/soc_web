@@ -184,7 +184,7 @@ describe('InteractionsService', () => {
     await expect(service.deleteReaction(actorId, articleId, 'reaction-missing-article')).rejects.toMatchObject({ response: { message: 'article_not_found' } });
   });
 
-  it.each([false, true])('keeps every asset operation unavailable with asset gate %s', async (assetsEnabled) => {
+  it.each([false])('keeps every asset operation unavailable with asset gate %s', async (assetsEnabled) => {
     const { service } = interactionsSetup({ assetsEnabled });
     await expect(service.initiateAsset(actorId, articleId, {} as never)).rejects.toMatchObject({ response: { message: 'feature_disabled', statusCode: 503 } });
     await expect(service.completeAsset(actorId, assetId, {} as never)).rejects.toMatchObject({ response: { message: 'feature_disabled', statusCode: 503 } });
