@@ -19,6 +19,8 @@ services:
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
+      args:
+        VITE_ENABLE_DEVELOPMENT_LOGIN: 'false'
     env_file:
       - ../../.env
     expose:

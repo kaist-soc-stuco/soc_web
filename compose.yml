@@ -21,6 +21,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        VITE_ENABLE_DEVELOPMENT_LOGIN: ${VITE_ENABLE_DEVELOPMENT_LOGIN:-true}
     env_file:
       - .env
     ports:

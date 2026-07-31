@@ -17,6 +17,8 @@ COPY shared/contracts shared/contracts
 COPY shared/common shared/common
 COPY shared/config shared/config
 RUN pnpm install --no-frozen-lockfile
+ARG VITE_ENABLE_DEVELOPMENT_LOGIN=false
+ENV VITE_ENABLE_DEVELOPMENT_LOGIN=$VITE_ENABLE_DEVELOPMENT_LOGIN
 RUN pnpm --filter @soc/web build
 
 WORKDIR /app/apps/web

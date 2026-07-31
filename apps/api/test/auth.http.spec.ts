@@ -87,7 +87,7 @@ describe('AuthController HTTP contract', () => {
     await app?.close();
     app = undefined;
   });
-  it('creates a development user and sets persisted cookies only in development', async () => {
+  it('creates the development administrator and sets persisted cookies only in development', async () => {
     users.findBySsoUserId.mockResolvedValue(null);
     users.createFromSsoUser.mockResolvedValue({ id: 'development-user-id' });
     authSessionService.issuePersistedSession.mockResolvedValue({
@@ -98,17 +98,51 @@ describe('AuthController HTTP contract', () => {
     const response = await request(app!.getHttpServer())
       .post('/api/auth/development/login')
       .set('Origin', PUBLIC_ORIGIN)
+      .send({ account: 'admin' })
       .expect(204);
 
     expect(users.createFromSsoUser).toHaveBeenCalledWith({
       consentedAt: expect.any(String),
-      ssoUserId: 'development-user',
-      userEmail: 'developer@example.test',
+      ssoUserId: 'development-admin',
+      userEmail: 'development-admin@example.test',
     });
     expect(users.grantAllDevelopmentPermissions).toHaveBeenCalledWith('development-user-id');
     expect(authSessionService.issuePersistedSession).toHaveBeenCalledWith('development-user-id');
     expectCookie(response.headers['set-cookie'], 'soc_at', '/api');
     expectCookie(response.headers['set-cookie'], 'soc_rt', '/api/auth');
+  });
+
+  it('creates a normal development user without granting administrator permissions', async () => {
+    users.findBySsoUserId.mockResolvedValue(null);
+    users.createFromSsoUser.mockResolvedValue({ id: 'development-user-1-id' });
+    authSessionService.issuePersistedSession.mockResolvedValue({
+      accessToken: 'development-access',
+      refreshToken: 'development-refresh',
+    });
+
+    await request(app!.getHttpServer())
+      .post('/api/auth/development/login')
+      .set('Origin', PUBLIC_ORIGIN)
+      .send({ account: 'user-1' })
+      .expect(204);
+
+    expect(users.createFromSsoUser).toHaveBeenCalledWith({
+      consentedAt: expect.any(String),
+      ssoUserId: 'development-user-1',
+      userEmail: 'development-user-1@example.test',
+    });
+    expect(users.grantAllDevelopmentPermissions).not.toHaveBeenCalled();
+    expect(authSessionService.issuePersistedSession).toHaveBeenCalledWith('development-user-1-id');
+  });
+
+  it('rejects unknown development account identities', async () => {
+    await request(app!.getHttpServer())
+      .post('/api/auth/development/login')
+      .set('Origin', PUBLIC_ORIGIN)
+      .send({ account: 'arbitrary-user' })
+      .expect(400);
+
+    expect(users.findBySsoUserId).not.toHaveBeenCalled();
   });
 
   it('marks production auth cookies Secure', async () => {

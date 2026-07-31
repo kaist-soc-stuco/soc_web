@@ -1,6 +1,14 @@
-import { IsBoolean, IsString } from "class-validator";
+import { IsBoolean, IsIn, IsString } from "class-validator";
 
 export type StorageMode = "temporary" | "persisted";
+
+export const DEVELOPMENT_ACCOUNT_IDS = ["admin", "user-1", "user-2"] as const;
+export type DevelopmentAccountId = (typeof DEVELOPMENT_ACCOUNT_IDS)[number];
+
+export class DevelopmentLoginRequestDto {
+  @IsIn(DEVELOPMENT_ACCOUNT_IDS)
+  account!: DevelopmentAccountId;
+}
 
 export interface PendingSsoUser {
   expiresAt: number;

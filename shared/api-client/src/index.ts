@@ -10,6 +10,8 @@ export interface ApiClientOptions {
   fetcher?: typeof fetch;
 }
 
+export type DevelopmentAccountId = "admin" | "user-1" | "user-2";
+
 export class ApiClientHttpError extends Error {
   constructor(
     public readonly status: number,
@@ -125,8 +127,12 @@ export const createApiClient = ({
       requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, { method: "GET" }),
     getSession: async (): Promise<LoginSessionResponse> =>
       requestJson<LoginSessionResponse>(`${authBaseUrl}/session`, { method: "GET" }),
-    loginWithDevelopmentAccount: async (): Promise<void> => {
-      const response = await request(`${authBaseUrl}/development/login`, { method: "POST" });
+    loginWithDevelopmentAccount: async (account: DevelopmentAccountId): Promise<void> => {
+      const response = await request(`${authBaseUrl}/development/login`, {
+        body: JSON.stringify({ account }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
       await expectNoContent(response);
     },
 

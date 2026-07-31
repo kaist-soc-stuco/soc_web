@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { createApiClient } from '@soc/api-client';
+import { createApiClient, type DevelopmentAccountId } from '@soc/api-client';
 
 import { beginAuthSessionTransition, createEmptyAuthSession, getAuthSessionSnapshot, getAuthSessionSummary, setAuthSession } from '@/lib/auth-session';
 import { invalidateAdminGrants, refetchAdminGrants } from '@/lib/admin-grants';
@@ -124,7 +124,7 @@ export function TreeLogin() {
   const searchParams = new URLSearchParams(location.search);
   const [loading, setLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [developmentLoginLoading, setDevelopmentLoginLoading] = useState(false);
+  const [developmentLoginLoading, setDevelopmentLoginLoading] = useState<DevelopmentAccountId | null>(null);
   const [refreshTestLoading, setRefreshTestLoading] = useState(false);
   const [refreshTestMessage, setRefreshTestMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -210,11 +210,11 @@ export function TreeLogin() {
       setLoading(false);
     }
   };
-  const handleDevelopmentLogin = async () => {
-    setDevelopmentLoginLoading(true);
+  const handleDevelopmentLogin = async (account: DevelopmentAccountId) => {
+    setDevelopmentLoginLoading(account);
     setErrorMessage(null);
     try {
-      await apiClient.loginWithDevelopmentAccount();
+      await apiClient.loginWithDevelopmentAccount(account);
       beginAuthSessionTransition();
       setSessionSummary(await getAuthSessionSummary(apiClient));
       void loadBoardCatalog().catch(() => undefined);
@@ -223,7 +223,7 @@ export function TreeLogin() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '개발용 로그인에 실패했습니다.');
     } finally {
-      setDevelopmentLoginLoading(false);
+      setDevelopmentLoginLoading(null);
     }
   };
 
@@ -334,15 +334,24 @@ export function TreeLogin() {
             >
               {loading ? 'SSO 로그인 진행 중' : 'SSO 로그인 시작'}
             </button>
-            {import.meta.env.DEV ? (
-              <button
-                type="button"
-                onClick={() => void handleDevelopmentLogin()}
-                disabled={developmentLoginLoading}
-                className="rounded-full border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition hover:bg-kaist-darkgreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
-              >
-                {developmentLoginLoading ? '개발용 로그인 처리 중' : '개발용 계정으로 로그인'}
-              </button>
+            {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEVELOPMENT_LOGIN === 'true') ? (
+              <>
+                {([
+                  ['admin', '관리자 계정'],
+                  ['user-1', '일반 사용자 1'],
+                  ['user-2', '일반 사용자 2'],
+                ] as const).map(([account, label]) => (
+                  <button
+                    key={account}
+                    type="button"
+                    onClick={() => void handleDevelopmentLogin(account)}
+                    disabled={developmentLoginLoading !== null}
+                    className="rounded-full border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition hover:bg-kaist-darkgreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+                  >
+                    {developmentLoginLoading === account ? '로그인 처리 중' : label}
+                  </button>
+                ))}
+              </>
             ) : null}
             <button
               type="button"

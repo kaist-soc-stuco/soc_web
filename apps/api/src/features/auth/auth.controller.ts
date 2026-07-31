@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   ConflictException,
   Controller,
   ForbiddenException,
@@ -14,7 +15,7 @@ import { ConfigService } from "@nestjs/config";
 import type { Response } from "express";
 
 import { Cookies } from "../../shared/decorators/cookies.decorator";
-import { ConsentDecisionRequestDto, SsoCallbackBodyDto } from "./auth.types";
+import { ConsentDecisionRequestDto, DevelopmentLoginRequestDto, SsoCallbackBodyDto } from "./auth.types";
 import { AuthSessionService } from "./auth-session.service";
 import { UsersService } from "../users/users.service";
 import { AuthService } from "./auth.service";
@@ -164,19 +165,27 @@ export class AuthController {
     return this.authSessionService.getSession({ accessToken, temporaryToken });
   }
   @Post("development/login")
-  async loginWithDevelopmentAccount(@Res() response: Response): Promise<void> {
+  async loginWithDevelopmentAccount(
+    @Body() body: DevelopmentLoginRequestDto,
+    @Res() response: Response,
+  ): Promise<void> {
     if (this.configService.get<string>("NODE_ENV") !== "development") {
       throw new ForbiddenException("development_login_disabled");
     }
 
-    const ssoUserId = "development-user";
-    const user = await this.usersService.findBySsoUserId(ssoUserId)
+    const account = {
+      admin: { ssoUserId: "development-admin", userEmail: "development-admin@example.test", administrator: true },
+      "user-1": { ssoUserId: "development-user-1", userEmail: "development-user-1@example.test", administrator: false },
+      "user-2": { ssoUserId: "development-user-2", userEmail: "development-user-2@example.test", administrator: false },
+    }[body.account];
+    if (!account) throw new BadRequestException("development_account_invalid");
+    const user = await this.usersService.findBySsoUserId(account.ssoUserId)
       ?? await this.usersService.createFromSsoUser({
         consentedAt: new Date().toISOString(),
-        ssoUserId,
-        userEmail: "developer@example.test",
+        ssoUserId: account.ssoUserId,
+        userEmail: account.userEmail,
       });
-    await this.usersService.grantAllDevelopmentPermissions(user.id);
+    if (account.administrator) await this.usersService.grantAllDevelopmentPermissions(user.id);
     const session = await this.authSessionService.issuePersistedSession(user.id);
     this.setPersistedCookies(response, session.accessToken, session.refreshToken);
     response.status(204).send();

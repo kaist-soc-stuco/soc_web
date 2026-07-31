@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
       getSession: vi.fn(),
       submitConsentDecision: vi.fn(),
       logout: vi.fn(),
+      loginWithDevelopmentAccount: vi.fn(),
     },
     beginAuthSessionTransition: vi.fn(() => { snapshot.epoch += 1; }),
     getAuthSessionSummary: vi.fn(),
@@ -54,6 +55,7 @@ beforeEach(() => {
   mocks.snapshot.epoch = 0;
   mocks.apiClient.submitConsentDecision.mockResolvedValue(undefined);
   mocks.apiClient.logout.mockResolvedValue(undefined);
+  mocks.apiClient.loginWithDevelopmentAccount.mockResolvedValue(undefined);
   mocks.getAuthSessionSummary.mockResolvedValue(authenticatedSession);
   mocks.loadBoardCatalog.mockResolvedValue(undefined);
   mocks.refetchAdminGrants.mockResolvedValue(undefined);
@@ -105,5 +107,25 @@ describe('consent completion', () => {
     expect(mocks.snapshot.epoch).toBe(1);
     expect(mocks.setAuthSession).toHaveBeenCalledTimes(1);
     expect(mocks.loadBoardCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers three fixed development identities and logs in with the selected account', async () => {
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<TreeLogin />} />
+          <Route path="/" element={<p>홈</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('button', { name: '관리자 계정' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '일반 사용자 1' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '일반 사용자 2' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '일반 사용자 2' }));
+
+    await waitFor(() => expect(mocks.apiClient.loginWithDevelopmentAccount).toHaveBeenCalledWith('user-2'));
+    expect(await screen.findByText('홈')).toBeVisible();
   });
 });
