@@ -1,24 +1,24 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AdminRouteGuard, NotFoundPage } from '@/components/organisms/admin-route-guard';
-
-import { AdminPage } from '@/pages/admin-page';
-import { AboutPage } from '@/pages/about-page';
-import { HomePage } from '@/pages/home-page';
-import { BoardHubPage } from '@/pages/board-hub-page';
-import { BoardPage } from '@/pages/board-page';
-import { BoardPostPage } from '@/pages/board-post-page';
-import { BoardWritePage } from '@/pages/board-write-page';
-import { CalendarPage } from '@/pages/calendar-page';
-import { EventsPage } from '@/pages/events-page';
-import { EventSurveyPage } from '@/pages/event-survey-page';
-import { FaqPage } from '@/pages/faq-page';
-import { RoadmapPage } from '@/pages/roadmap-page';
-import { TreeLogin } from '@/pages/login-page';
-import { LoginConsentPage } from '@/pages/login-consent-page';
-import { ChatPage } from '@/pages/chat-page';
-import { MyPage } from '@/pages/mypage-page';
 import { getEvent } from '@/lib/event-api';
+
+const AdminPage = lazy(() => import('@/pages/admin-page').then((module) => ({ default: module.AdminPage })));
+const AboutPage = lazy(() => import('@/pages/about-page').then((module) => ({ default: module.AboutPage })));
+const HomePage = lazy(() => import('@/pages/home-page').then((module) => ({ default: module.HomePage })));
+const BoardHubPage = lazy(() => import('@/pages/board-hub-page').then((module) => ({ default: module.BoardHubPage })));
+const BoardPage = lazy(() => import('@/pages/board-page').then((module) => ({ default: module.BoardPage })));
+const BoardPostPage = lazy(() => import('@/pages/board-post-page').then((module) => ({ default: module.BoardPostPage })));
+const BoardWritePage = lazy(() => import('@/pages/board-write-page').then((module) => ({ default: module.BoardWritePage })));
+const CalendarPage = lazy(() => import('@/pages/calendar-page').then((module) => ({ default: module.CalendarPage })));
+const EventsPage = lazy(() => import('@/pages/events-page').then((module) => ({ default: module.EventsPage })));
+const EventSurveyPage = lazy(() => import('@/pages/event-survey-page').then((module) => ({ default: module.EventSurveyPage })));
+const FaqPage = lazy(() => import('@/pages/faq-page').then((module) => ({ default: module.FaqPage })));
+const RoadmapPage = lazy(() => import('@/pages/roadmap-page').then((module) => ({ default: module.RoadmapPage })));
+const TreeLogin = lazy(() => import('@/pages/login-page').then((module) => ({ default: module.TreeLogin })));
+const LoginConsentPage = lazy(() => import('@/pages/login-consent-page').then((module) => ({ default: module.LoginConsentPage })));
+const ChatPage = lazy(() => import('@/pages/chat-page').then((module) => ({ default: module.ChatPage })));
+const MyPage = lazy(() => import('@/pages/mypage-page').then((module) => ({ default: module.MyPage })));
 
 const AdminDashboardPage = lazy(() => import('@/pages/admin-dashboard-page').then((module) => ({ default: module.AdminDashboardPage })));
 const AdminPaymentsPage = lazy(() => import('@/pages/admin-payments-page').then((module) => ({ default: module.AdminPaymentsPage })));
