@@ -14,6 +14,7 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
   const [authenticated, setAuthenticated] = useState(false);
@@ -34,14 +35,17 @@ export function Header({ showLogo = false }: HeaderProps) {
   const logout = async () => {
     if (logoutLoading) return;
     setLogoutLoading(true);
+    setLogoutError('');
     try {
       await createApiClient({ baseUrl: '/api' }).logout();
       setAuthenticated(false);
       invalidateAdminGrants();
       navigate('/login?status=success&reason=logged_out', { replace: true });
+      setMobileOpen(false);
+    } catch {
+      setLogoutError('로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setLogoutLoading(false);
-      setMobileOpen(false);
     }
   };
 
@@ -61,7 +65,7 @@ export function Header({ showLogo = false }: HeaderProps) {
   const navItems = [
     {
       label: '게시판',
-      href: boardItems[0]?.to,
+      href: '/board',
       dropdown: boardItems,
     },
     {
@@ -160,6 +164,11 @@ export function Header({ showLogo = false }: HeaderProps) {
               </div>
             ))}
           </nav>
+          {boardCatalog.status === 'error' ? (
+            <button type="button" onClick={() => void retryBoardCatalog()} disabled={boardRetrying} className="hidden px-3 text-xs font-bold text-red-700 md:block disabled:opacity-50">
+              {boardRetrying ? '세션 확인 중' : '게시판 다시 불러오기'}
+            </button>
+          ) : null}
           <div className="sr-only" aria-live="polite">
             {boardCatalog.status === 'loading' && '게시판 정보를 불러오는 중입니다.'}
             {boardCatalog.status === 'error' && '게시판 정보를 불러오지 못했습니다.'}
@@ -192,6 +201,7 @@ export function Header({ showLogo = false }: HeaderProps) {
           </ul>
         </nav>
       ) : null}
+      {logoutError ? <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm font-semibold text-red-700">{logoutError}</p> : null}
 
       {/* Full Dropdown Menu - DDP Style */}
       <div 
