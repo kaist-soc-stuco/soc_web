@@ -1,6 +1,6 @@
 import type {
-  AdminBoard, AdminBoardListResponse, AppErrorResponse, Article, ArticleDetailResponse, ArticleListQuery, ArticleListResponse, ArticleScope, ArticleSummary,
-  Board, BoardListQuery, BoardListResponse, ContentLocale, CreateArticleRequest, CreateBoardRequest, DeleteBoardRequest, VersionedPatchBoardRequest,
+  AdminBoard, AdminBoardListResponse, AppErrorResponse, Article, ArticleDetailResponse, ArticleListQuery, ArticleListResponse, ArticleReactionResponse, ArticleScope, ArticleSummary,
+  Board, BoardListQuery, BoardListResponse, Comment, ContentLocale, CreateArticleRequest, CreateBoardRequest, CreateCommentRequest, DeleteBoardRequest, PutArticleReactionRequest, VersionedPatchBoardRequest,
 } from '@soc/contracts';
 import { invalidateBoardCatalog } from './board-catalog';
 
@@ -77,6 +77,10 @@ export const boardApi = {
   article: (id: string, lang?: ContentLocale, signal?: AbortSignal) => request(`/articles/${encodeURIComponent(id)}${query({ locale: lang })}`, 'GET', undefined, signal).then((v) => decode(v, isDetail)),
   createDraft: (code: string, input: CreateArticleRequest, signal?: AbortSignal) => request(`/boards/${encodeURIComponent(code)}/articles`, 'POST', input, signal).then((v) => decode(v, isArticle)),
   publish: (id: string, signal?: AbortSignal) => request(`/articles/${encodeURIComponent(id)}/publish`, 'POST', undefined, signal).then((v) => decode(v, isArticle)),
+  createComment: (id: string, input: CreateCommentRequest) => request(`/articles/${encodeURIComponent(id)}/comments`, 'POST', input).then((v) => decode(v, (x): x is Comment => isComment(x))),
+  deleteComment: (id: string) => request(`/comments/${encodeURIComponent(id)}`, 'DELETE').then((v) => { if (v !== undefined) throw new BoardApiProtocolError(); }),
+  putReaction: (id: string, input: PutArticleReactionRequest) => request(`/articles/${encodeURIComponent(id)}/reaction`, 'PUT', input).then((v) => decode(v, (x): x is ArticleReactionResponse => exact(x, ['type']) && (x.type === 'LIKE' || x.type === 'DISLIKE' || x.type === null))),
+  deleteReaction: (id: string) => request(`/articles/${encodeURIComponent(id)}/reaction`, 'DELETE').then((v) => decode(v, (x): x is ArticleReactionResponse => exact(x, ['type']) && x.type === null)),
   adminList: (signal?: AbortSignal) => request('/admin/boards', 'GET', undefined, signal).then((v) => decode(v, isAdminList)),
   adminCreate: (input: CreateBoardRequest, signal?: AbortSignal) => request('/admin/boards', 'POST', input, signal).then((v) => {
     const board = decode(v, isAdminBoard);

@@ -52,3 +52,15 @@ describe('boardApi', () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+it('creates comments and toggles article reactions with credentialed requests', async () => {
+  const comment = { id: 'comment-1', articleId: 'article-1', parentCommentId: null, body: '좋은 글입니다.', status: 'PUBLISHED', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+  const fetchMock = vi.spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(new Response(JSON.stringify(comment), { status: 201 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ type: 'LIKE' }), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ type: null }), { status: 200 }));
+  await expect(boardApi.createComment('article/1', { body: '좋은 글입니다.' })).resolves.toEqual(comment);
+  await expect(boardApi.putReaction('article/1', { type: 'LIKE' })).resolves.toEqual({ type: 'LIKE' });
+  await expect(boardApi.deleteReaction('article/1')).resolves.toEqual({ type: null });
+  expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/articles/article%2F1/comments', expect.objectContaining({ method: 'POST', credentials: 'include' }));
+  expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/articles/article%2F1/reaction', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ type: 'LIKE' }) }));
+});

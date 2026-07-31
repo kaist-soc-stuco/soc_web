@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Header } from '@/components/organisms/header';
 import { boardApi } from '@/lib/board-api';
-import type { Article, Board } from '@soc/contracts';
+import type { Article, Board, Comment, ReactionType } from '@soc/contracts';
 
 export function BoardPostPage() {
   const { category = 'soc-notice', id } = useParams<{ category: string; id: string }>();
   const [article, setArticle] = useState<Article | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [reaction, setReaction] = useState<ReactionType | null>(null);
+  const [commentBody, setCommentBody] = useState('');
+  const [interactionError, setInteractionError] = useState('');
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
@@ -18,6 +22,8 @@ export function BoardPostPage() {
     setArticle(null);
     setBoard(null);
     setError(false);
+    setComments([]);
+    setReaction(null);
     if (!id) {
       setLoading(false);
       return;
@@ -33,6 +39,8 @@ export function BoardPostPage() {
           return;
         }
         setArticle(detail.article);
+        setComments(detail.comments);
+        setReaction(detail.myReaction);
         setBoard(boardResponse.board);
       })
       .catch((cause: unknown) => {
@@ -45,6 +53,23 @@ export function BoardPostPage() {
   }, [category, id]);
 
   const date = article?.publishedAt ?? article?.updatedAt;
+  const addComment = async () => {
+    if (!id || !commentBody.trim()) return;
+    setInteractionError('');
+    try {
+      const created = await boardApi.createComment(id, { body: commentBody.trim() });
+      setComments((current) => [...current, created]);
+      setCommentBody('');
+    } catch { setInteractionError('댓글을 등록하지 못했습니다. 로그인과 게시판 권한을 확인해 주세요.'); }
+  };
+  const react = async (type: ReactionType) => {
+    if (!id) return;
+    setInteractionError('');
+    try {
+      const result = reaction === type ? await boardApi.deleteReaction(id) : await boardApi.putReaction(id, { type });
+      setReaction(result.type);
+    } catch { setInteractionError('반응을 저장하지 못했습니다.'); }
+  };
   return (
     <div className="min-h-screen flex flex-col bg-[#F7FCFC]"><Header showLogo />
       <main className="flex-1 w-full mx-auto">
@@ -63,6 +88,9 @@ export function BoardPostPage() {
               {date && <div className="pt-1 text-sm font-medium text-kaist-grey">{new Date(date).toLocaleDateString('ko-KR')}</div>}
             </div><Link to={`/board/${category}`} className="rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold text-kaist-darkgreen">글 목록</Link></div>
             <div className="py-7 lg:py-8"><div className="whitespace-pre-line text-sm font-medium leading-7 tracking-tight text-kaist-black">{article.body.value}</div></div>
+            {board?.config.reactionsAllowed ? <div className="flex gap-2 border-t py-5"><button aria-pressed={reaction === 'LIKE'} onClick={() => void react('LIKE')} className="rounded border px-4 py-2">좋아요{reaction === 'LIKE' ? ' 취소' : ''}</button><button aria-pressed={reaction === 'DISLIKE'} onClick={() => void react('DISLIKE')} className="rounded border px-4 py-2">싫어요{reaction === 'DISLIKE' ? ' 취소' : ''}</button></div> : null}
+            {board?.config.commentsAllowed ? <section className="border-t py-6"><h3 className="text-xl font-extrabold">댓글</h3><ul className="mt-4 divide-y">{comments.map((comment) => <li key={comment.id} className="py-3 text-sm">{comment.status === 'DELETED' ? '삭제된 댓글입니다.' : comment.status === 'SECRET' ? '비밀 댓글' : comment.body}</li>)}</ul><div className="mt-4 flex gap-2"><textarea aria-label="댓글" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} className="min-h-20 flex-1 rounded border px-3 py-2" /><button disabled={!commentBody.trim()} onClick={() => void addComment()} className="self-end rounded bg-kaist-darkgreen px-5 py-2 font-bold text-white disabled:opacity-50">등록</button></div></section> : null}
+            {interactionError ? <p role="alert" className="pb-4 text-sm text-red-600">{interactionError}</p> : null}
           </>}
         </div>
       </main>
