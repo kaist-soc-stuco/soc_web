@@ -5,7 +5,6 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import type {
   ContentMatcherDto,
-  ExportSurveyAcceptedResponse,
   GetMySurveyResponseResponse,
   ReplaceSectionQuestionsRequest,
   SubmitSurveyResponse,
@@ -48,9 +47,7 @@ describe('Survey HTTP boundary', () => {
       surveyId, responseCount: 5, suppressed: false,
       questions: [{ questionId: '10000000-0000-4000-8000-000000000006', suppressed: false, responseCount: 5, choices: [{ choiceOptionId: '10000000-0000-4000-8000-000000000007', count: 3 }] }],
     } satisfies SurveyAggregateResponse;
-    const exportAccepted = {
-      exportId: 'export-1', status: 'ACCEPTED', acceptedAt: '2026-07-27T00:00:00.000Z',
-    } satisfies ExportSurveyAcceptedResponse;
+    const surveyExport = { filename: 'survey.csv', csv: '' };
     const matcher = {
       id: matcherId, articleId: surveyId, eventId: null, surveyId, createdAt: '2026-07-27T00:00:00.000Z',
     } satisfies ContentMatcherDto;
@@ -60,7 +57,7 @@ describe('Survey HTTP boundary', () => {
       create: vi.fn().mockResolvedValue(survey), patch: vi.fn().mockResolvedValue(survey), publish: vi.fn().mockResolvedValue({ survey }),
       sections: vi.fn().mockResolvedValue(survey), questions: vi.fn().mockResolvedValue(survey), review: vi.fn().mockResolvedValue(response),
       aggregate: vi.fn().mockResolvedValue(aggregate),
-      export: vi.fn().mockResolvedValue(exportAccepted),
+      export: vi.fn().mockResolvedValue(surveyExport),
       matcher: vi.fn().mockResolvedValue(matcher),
       deleteMatcher: vi.fn().mockResolvedValue(undefined),
     };
@@ -88,8 +85,8 @@ describe('Survey HTTP boundary', () => {
   const authenticated = (method: 'post' | 'patch' | 'put' | 'delete' | 'get', path: string) =>
     request(app.getHttpServer())[method](path).set('Cookie', 'soc_at=access-token');
 
-  it('exposes exactly the fourteen approved method/path operations and response bodies', async () => {
-    const trace = 'survey-http-14';
+  it('exposes exactly the seventeen approved method/path operations and response bodies', async () => {
+    const trace = 'survey-http-17';
     const guestPhone = '+821012345678';
     const excludedPhoneStorageFields = ['guestPhone', 'guestPhoneCiphertext', 'guestPhoneHash', 'guestPhoneHashVersion'];
     const detail = {
@@ -107,7 +104,6 @@ describe('Survey HTTP boundary', () => {
       surveyId, responseCount: 5, suppressed: false,
       questions: [{ questionId: '10000000-0000-4000-8000-000000000006', suppressed: false, responseCount: 5, choices: [{ choiceOptionId: '10000000-0000-4000-8000-000000000007', count: 3 }] }],
     } satisfies SurveyAggregateResponse;
-    const exportAccepted = { exportId: 'export-1', status: 'ACCEPTED', acceptedAt: '2026-07-27T00:00:00.000Z' };
     const matcher = { id: matcherId, articleId: surveyId, eventId: null, surveyId, createdAt: '2026-07-27T00:00:00.000Z' } satisfies ContentMatcherDto;
     const create = {
       title: { kr: '설문', en: 'Survey' }, description: { kr: '설명', en: 'Description' }, guestAllowed: true, phoneRequired: true,
@@ -138,7 +134,7 @@ describe('Survey HTTP boundary', () => {
       { method: 'put', path: `/api/admin/sections/${sectionId}/questions`, body: questions, status: 200, expectedBody: detail },
       { method: 'post', path: `/api/admin/survey-responses/${responseId}/review`, body: { state: 'APPROVED', reason: null }, status: 201, expectedBody: projectedResponse, phoneDerived: true },
       { method: 'get', path: `/api/admin/surveys/${surveyId}/aggregate`, status: 200, expectedBody: aggregate },
-      { method: 'post', path: `/api/admin/surveys/${surveyId}/export`, body: { format: 'CSV' }, status: 202, expectedBody: exportAccepted },
+      { method: 'post', path: `/api/admin/surveys/${surveyId}/export`, body: { format: 'CSV' }, status: 200, expectedBody: '' },
       { method: 'post', path: '/api/admin/content-matchers', body: { articleId: surveyId, surveyId }, status: 201, expectedBody: matcher },
       { method: 'delete', path: `/api/admin/content-matchers/${matcherId}`, status: 204, expectedBody: '' },
     ];
@@ -157,11 +153,13 @@ describe('Survey HTTP boundary', () => {
     }).sort();
 
     expect(registry).toEqual([
-      'DELETE /api/admin/content-matchers/:id', 'GET /api/admin/surveys/:id/aggregate',
+      'DELETE /api/admin/content-matchers/:id', 'GET /api/admin/survey-responses/:id',
+      'GET /api/admin/surveys/:id/aggregate', 'GET /api/admin/surveys/:id/responses',
       'GET /api/surveys', 'GET /api/surveys/:id', 'GET /api/surveys/:id/responses/me',
-      'PATCH /api/admin/surveys/:id', 'POST /api/admin/content-matchers', 'POST /api/admin/survey-responses/:id/review',
-      'POST /api/admin/surveys', 'POST /api/admin/surveys/:id/export', 'POST /api/admin/surveys/:id/publish',
-      'POST /api/surveys/:id/responses', 'PUT /api/admin/sections/:id/questions', 'PUT /api/admin/surveys/:id/sections',
+      'GET /api/surveys/responses/me', 'PATCH /api/admin/surveys/:id', 'POST /api/admin/content-matchers',
+      'POST /api/admin/survey-responses/:id/review', 'POST /api/admin/surveys', 'POST /api/admin/surveys/:id/export',
+      'POST /api/admin/surveys/:id/publish', 'POST /api/surveys/:id/responses',
+      'PUT /api/admin/sections/:id/questions', 'PUT /api/admin/surveys/:id/sections',
     ]);
 
     for (const route of routes) {

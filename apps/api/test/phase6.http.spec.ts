@@ -1,5 +1,6 @@
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
@@ -25,13 +26,24 @@ const contact = { id, name: 'Ada', email: 'ada@example.test', phone: null, affil
 describe('Phase 6 HTTP contracts', () => {
   let app: INestApplication; let contacts: Record<string, ReturnType<typeof vi.fn>>; let permissions: { hasPermission: ReturnType<typeof vi.fn> }; let notifications: NotificationsService;
   beforeEach(async () => {
-    contacts = { list: vi.fn(), create: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+    contacts = { list: vi.fn(), create: vi.fn(), patch: vi.fn(), delete: vi.fn(), mailRecipients: vi.fn().mockResolvedValue(['ada@example.test']) };
     permissions = { hasPermission: vi.fn().mockResolvedValue(true) };
     const sessions = { validateAccessToken: vi.fn().mockResolvedValue({ mode: 'persisted', sub: actor, sid: 'session-1' }) };
-    const module = await Test.createTestingModule({ controllers: [ContactsController, NotificationsController, ChatController, ChatMessagesController], providers: [AuthGuard, OptionalAuthGuard, ChatService, NotificationsService, { provide: ContactsService, useValue: contacts }, { provide: PermissionsService, useValue: permissions }, { provide: AuthSessionService, useValue: sessions }, { provide: UsersService, useValue: { findById: vi.fn().mockResolvedValue({ id: actor }) } }] }).compile();
+    const configuration = {
+      MAIL_PROVIDER_ENABLED: true,
+      MAIL_PROVIDER_URL: 'https://mail.example.test/send',
+      MAIL_PROVIDER_TOKEN: 'mail-token',
+      MAIL_FROM: 'committee@example.test',
+      CHAT_PROVIDER_ENABLED: true,
+      CHAT_PROVIDER_URL: 'https://chat.example.test',
+      CHAT_PROVIDER_TOKEN: 'chat-token',
+      CHAT_PROVIDER_MODEL: 'committee-chat',
+    } as const;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: 'Committee reply' } }] }) }));
+    const module = await Test.createTestingModule({ controllers: [ContactsController, NotificationsController, ChatController, ChatMessagesController], providers: [AuthGuard, OptionalAuthGuard, ChatService, NotificationsService, { provide: ConfigService, useValue: { get: vi.fn((key: keyof typeof configuration) => configuration[key]) } }, { provide: ContactsService, useValue: contacts }, { provide: PermissionsService, useValue: permissions }, { provide: AuthSessionService, useValue: sessions }, { provide: UsersService, useValue: { findById: vi.fn().mockResolvedValue({ id: actor }) } }] }).compile();
     notifications = module.get(NotificationsService); vi.spyOn(notifications, 'preview'); vi.spyOn(notifications, 'send'); app = module.createNestApplication(); const middleware = new RequestIdMiddleware(); app.use(middleware.use.bind(middleware)); app.use(cookieParser()); app.useGlobalFilters(new HttpExceptionFilter()); app.setGlobalPrefix('api'); await app.init();
   });
-  afterEach(async () => { await app.close(); });
+  afterEach(async () => { await app?.close(); vi.unstubAllGlobals(); });
   const get = (path: string) => request(app.getHttpServer()).get(path).set('Cookie', 'soc_at=token');
   const post = (path: string) => request(app.getHttpServer()).post(path).set('Cookie', 'soc_at=token');
   const patch = (path: string) => request(app.getHttpServer()).patch(path).set('Cookie', 'soc_at=token');
@@ -53,22 +65,25 @@ describe('Phase 6 HTTP contracts', () => {
     await get('/api/admin/contacts?unknown=1').expect(422); await post('/api/admin/contacts').send({ name: 'Ada', extra: true }).expect(422);
   });
 
-  it('requires authentication on contacts and mail, then MAIL_SEND before canonical disabled mail responses', async () => {
+  it('requires authentication and MAIL_SEND before configured mail operations', async () => {
     await request(app.getHttpServer()).get('/api/admin/contacts').expect(401); await request(app.getHttpServer()).post('/api/admin/mail/preview').send({ contactIds: [id], subject: 's', body: 'b' }).expect(401);
     permissions.hasPermission.mockResolvedValueOnce(false);
     const forbidden = await post('/api/admin/mail/preview').send({ contactIds: [id], subject: 's', body: 'b' }).expect(403); expect(forbidden.body).toMatchObject({ code: 'insufficient_permission' });
-    for (const [method, path, body] of [['post', '/api/admin/mail/preview', { contactIds: [id], subject: 's', body: 'b' }], ['post', '/api/admin/mail', { contactIds: [id], subject: 's', body: 'b' }], ['get', `/api/admin/mail/${id}`, undefined], ['post', `/api/admin/mail/${id}/cancel`, { reasonCode: 'CANCELLED' }]] as const) {
-      const response = method === 'get' ? await get(path).expect(503) : await post(path).send(body).expect(503); expect(response.body).toEqual({ code: 'feature_disabled', message: 'Internal server error', requestId: expect.any(String) });
+    await post('/api/admin/mail/preview').send({ contactIds: [id], subject: 's', body: 'b' }).expect(200, { ok: true, recipients: 1, subject: 's', body: 'b' });
+    const sent = await post('/api/admin/mail').send({ contactIds: [id], subject: 's', body: 'b' }).expect(202);
+    expect(sent.body).toMatchObject({ ok: true, id: expect.any(String), status: 'SENT' });
+    for (const [method, path, body] of [['get', `/api/admin/mail/${id}`, undefined], ['post', `/api/admin/mail/${id}/cancel`, { reasonCode: 'CANCELLED' }]] as const) {
+      const response = method === 'get' ? await get(path).expect(503) : await post(path).send(body).expect(503); expect(response.body).toEqual({ code: 'operation_not_supported', message: 'Internal server error', requestId: expect.any(String) });
     }
     expect(notifications.preview).toHaveBeenCalledWith(actor, expect.any(String), { contactIds: [id], subject: 's', body: 'b' });
     expect(notifications.send).toHaveBeenCalledWith(actor, expect.any(String), { contactIds: [id], subject: 's', body: 'b' });
     await post('/api/admin/mail/preview?bad=1').send({ contactIds: [id], subject: 's', body: 'b' }).expect(400); await get('/api/admin/mail/not-uuid').expect(400);
   });
 
-  it('serves the exact static chat notice and authenticates, strictly validates, and disables messages', async () => {
-    await request(app.getHttpServer()).get('/api/chat').expect(200, { kind: 'EXTERNAL_LINK_NOTICE', externalUrl: 'https://chatgpt.com/', notice: 'Chat is provided by an external service. Messages are not sent to this server.' });
+  it('serves configured chat and authenticates and strictly validates messages', async () => {
+    await request(app.getHttpServer()).get('/api/chat').expect(200, { kind: 'INTERNAL_CHAT', notice: 'Messages are sent to the configured committee chat provider.' });
     await request(app.getHttpServer()).post('/api/chat/messages').send({ body: 'hello' }).expect(401);
     const invalid = await post('/api/chat/messages').send({ body: ' ', extra: true }).expect(422); expect(invalid.body).toMatchObject({ code: 'invalid_chat_message' });
-    const disabled = await post('/api/chat/messages').send({ body: 'hello' }).expect(503); expect(disabled.body).toEqual({ code: 'feature_disabled', message: 'Internal server error', requestId: expect.any(String) }); expect(disabled.text).not.toContain('hello');
+    const sent = await post('/api/chat/messages').send({ body: 'hello' }).expect(201); expect(sent.body).toEqual({ ok: true, reply: 'Committee reply' }); expect(JSON.stringify(sent.body)).not.toContain('hello');
   });
 });
