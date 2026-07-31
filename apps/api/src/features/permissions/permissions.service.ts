@@ -35,6 +35,7 @@ export class PermissionsService {
     this.validateScope(input.scope, input.scopeId);
     if (!PermissionChangeActions.includes(input.action)) throw new BadRequestException("invalid_permission_action");
     const required = input.action === "GRANT" ? "PERMISSION_GRANT" : "PERMISSION_REVOKE";
+    await this.requirePermission(actorUserId, "USERS_MANAGE", "GLOBAL");
     await this.requirePermission(actorUserId, required, input.scope, input.scopeId);
     const definition = await this.repository.findDefinition(input.permission);
     if (!definition) throw new NotFoundException("permission_definition_not_found");
@@ -43,7 +44,7 @@ export class PermissionsService {
     }
     const requestHash = this.hash({ action: input.action, permissionDefinitionId: definition.id, reasonCode: input.reasonCode, requesterUserId: actorUserId, scope: input.scope, scopeId: input.scopeId ?? null, targetUserId: input.targetUserId });
     try {
-      const created = await this.repository.createRequest({ targetUserId: input.targetUserId, action: input.action, reasonCode: input.reasonCode, permissionDefinitionId: definition.id, scope: input.scope, scopeId: input.scopeId ?? null, requestHash, requesterUserId: actorUserId, authorityKey: required });
+      const created = await this.repository.createRequest({ targetUserId: input.targetUserId, action: input.action, reasonCode: input.reasonCode, permissionDefinitionId: definition.id, scope: input.scope, scopeId: input.scopeId ?? null, requestHash, requesterUserId: actorUserId, authorityKey: required, usersManageAuthorityKey: "USERS_MANAGE" });
       if (!created) throw new ForbiddenException("insufficient_permission");
       return {
         id: created.id,
@@ -99,12 +100,52 @@ export class PermissionsService {
     const items = rows.slice(0, boundedLimit);
     return {
       items: items.map((entry) => ({
-        ...entry,
+        id: entry.id,
+        actorUserId: entry.actorUserId,
+        action: entry.action,
+        recordId: entry.recordId,
         changedFieldNames: entry.changedFieldNames.split(",").filter(Boolean),
+        correlationId: entry.correlationId,
+        reasonCode: entry.reasonCode,
         occurredAt: entry.occurredAt.toISOString(),
       })),
       nextCursor: hasMore
         ? Buffer.from(JSON.stringify({ occurredAt: items.at(-1)!.occurredAt.toISOString(), id: items.at(-1)!.id })).toString("base64url")
+        : null,
+    };
+  }
+  async listDefinitions(actorUserId: string) {
+    if (!(await this.repository.hasAnyWorkflowAuthority(actorUserId))) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+    return { items: await this.repository.listActiveDefinitions() };
+  }
+
+  async listRequests(
+    actorUserId: string,
+    stage: "REQUESTED" | "APPROVAL" | "ACTIVATION",
+    limit = 50,
+    cursor?: string,
+  ) {
+    const boundedLimit = Math.min(Math.max(Number.isInteger(limit) ? limit : 50, 1), 100);
+    let before: { requestedAt: Date; id: string } | undefined;
+    if (cursor) {
+      try {
+        const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as { requestedAt?: string; id?: string };
+        const requestedAt = new Date(parsed.requestedAt ?? "");
+        if (Number.isNaN(requestedAt.valueOf()) || typeof parsed.id !== "string" || !UUID_PATTERN.test(parsed.id)) throw new Error();
+        before = { requestedAt, id: parsed.id };
+      } catch {
+        throw new BadRequestException("invalid_permission_queue_cursor");
+      }
+    }
+    const rows = await this.repository.listRequests(actorUserId, stage, boundedLimit + 1, before);
+    const hasMore = rows.length > boundedLimit;
+    const items = rows.slice(0, boundedLimit).map((request) => this.requestResponse(request, request));
+    return {
+      items,
+      nextCursor: hasMore
+        ? Buffer.from(JSON.stringify({ requestedAt: items.at(-1)!.requestedAt, id: items.at(-1)!.id })).toString("base64url")
         : null,
     };
   }

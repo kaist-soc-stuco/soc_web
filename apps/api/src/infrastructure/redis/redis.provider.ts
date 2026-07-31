@@ -9,7 +9,6 @@ export const redisProvider: Provider = {
   inject: [ConfigService],
   useFactory: (configService: ConfigService): Redis => {
     const redis = new Redis(configService.get<string>('REDIS_URL', 'redis://localhost:6379'), {
-      lazyConnect: true,
       maxRetriesPerRequest: 1,
       // Request-path authentication operations must fail immediately while Redis is unavailable.
       enableOfflineQueue: false,

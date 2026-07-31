@@ -125,6 +125,10 @@ export const createApiClient = ({
       requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, { method: "GET" }),
     getSession: async (): Promise<LoginSessionResponse> =>
       requestJson<LoginSessionResponse>(`${authBaseUrl}/session`, { method: "GET" }),
+    loginWithDevelopmentAccount: async (): Promise<void> => {
+      const response = await request(`${authBaseUrl}/development/login`, { method: "POST" });
+      await expectNoContent(response);
+    },
 
     submitConsentDecision: async (input: ConsentDecisionRequest): Promise<void> => {
       const response = await request(`${authBaseUrl}/login/consent`, {

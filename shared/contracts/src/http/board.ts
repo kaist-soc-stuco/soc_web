@@ -89,6 +89,9 @@ export interface BoardListResponse {
   locale: ContentLocale;
   items: Array<Board & { latestArticles?: ArticleSummary[] }>;
 }
+export interface AdminBoardListResponse {
+  items: AdminBoard[];
+}
 
 export interface BoardDetailResponse {
   locale: ContentLocale;
@@ -103,7 +106,12 @@ export interface CreateBoardRequest extends BoardConfig {
   descriptionEn: string;
 }
 
-export type PatchBoardRequest = Partial<Omit<CreateBoardRequest, "code">>;
+export type PatchBoardFields = Partial<Omit<CreateBoardRequest, "code">>;
+export type PatchBoardRequest = PatchBoardFields;
+export type VersionedPatchBoardRequest = { expectedUpdatedAt: string } & PatchBoardFields;
+export interface DeleteBoardRequest {
+  expectedUpdatedAt: string;
+}
 
 export interface ArticleListQuery {
   locale?: ContentLocale;
@@ -205,12 +213,15 @@ export interface BoardCreateOperation {
   response: AdminBoard;
 }
 
+export interface AdminBoardListOperation {
+  response: AdminBoardListResponse;
+}
 export interface BoardPatchOperation {
-  request: PatchBoardRequest;
+  request: VersionedPatchBoardRequest;
   response: AdminBoard;
 }
-
 export interface BoardDeleteOperation {
+  request: DeleteBoardRequest;
   response: void;
 }
 

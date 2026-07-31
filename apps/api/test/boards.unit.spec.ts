@@ -16,7 +16,7 @@ const createBoard = () => ({ code: ' notice ', titleKr: ' 공지 ', titleEn: ' N
 const createArticle = () => ({ titleKr: ' 제목 ', titleEn: ' Title ', bodyKr: ' 본문 ', bodyEn: ' Body ', scope: 'ALL' as const, isPinned: false, pinnedOrder: null });
 
 function boardSetup(grants: readonly string[] = ['BOARD_MANAGE', 'COMMITTEE_MEMBER']) {
-  const repository = { listVisible: vi.fn(), listVisibleHomeWithLatest: vi.fn(), findVisibleByCode: vi.fn(), create: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+  const repository = { listVisible: vi.fn(), listVisibleHomeWithLatest: vi.fn(), findVisibleByCode: vi.fn(), listAll: vi.fn(), create: vi.fn(), patch: vi.fn(), delete: vi.fn() };
   const permissions = { hasPermission: vi.fn().mockImplementation(async (_id: string, name: string) => grants.includes(name)) };
   return { repository, permissions, service: new BoardsService(repository as never, permissions as never, { now: () => now } as never) };
 }
@@ -63,6 +63,16 @@ describe('BoardsService', () => {
     const { repository, service } = boardSetup(); repository.findVisibleByCode.mockResolvedValue(null);
     await expect(service.get(actorId, 'notice', 'ko')).rejects.toBeInstanceOf(NotFoundException);
   });
+  it('requires board management for the admin catalog and preserves repository order', async () => {
+    const denied = boardSetup([]);
+    await expect(denied.service.adminList(actorId)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(denied.repository.listAll).not.toHaveBeenCalled();
+
+    const { repository, service } = boardSetup();
+    repository.listAll.mockResolvedValue([board({ id: otherId, displayOrder: 2 }), board({ id: boardId, displayOrder: 10 })]);
+    await expect(service.adminList(actorId)).resolves.toMatchObject({ items: [{ id: otherId, displayOrder: 2 }, { id: boardId, displayOrder: 10 }] });
+    expect(repository.listAll).toHaveBeenCalledOnce();
+  });
 
   it('requires BOARD_MANAGE before board writes, normalizes writes, and maps conflicts', async () => {
     const denied = boardSetup([]);
@@ -72,8 +82,8 @@ describe('BoardsService', () => {
     await service.create(actorId, createBoard(), correlationId);
     expect(permissions.hasPermission).toHaveBeenCalledWith(actorId, 'BOARD_MANAGE', 'GLOBAL');
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: actorId, correlationId, now, values: expect.objectContaining({ code: 'notice', titleKr: '공지' }) }));
-    await service.patch(actorId, boardId, { titleKr: ' 수정 ' }, correlationId);
-    expect(repository.patch).toHaveBeenCalledWith(boardId, expect.objectContaining({ correlationId, values: { titleKr: '수정' }, changedFieldNames: 'title' }));
+    await service.patch(actorId, boardId, { titleKr: ' 수정 ', expectedUpdatedAt: now.toISOString() }, correlationId);
+    expect(repository.patch).toHaveBeenCalledWith(boardId, expect.objectContaining({ correlationId, expectedUpdatedAt: now.toISOString(), values: { titleKr: '수정' }, changedFieldNames: 'title' }));
     repository.create.mockRejectedValueOnce({ cause: { code: '23505' } });
     await expect(service.create(actorId, createBoard(), correlationId)).rejects.toBeInstanceOf(ConflictException);
     repository.create.mockRejectedValueOnce({ cause: { code: '40001' } });
@@ -83,12 +93,21 @@ describe('BoardsService', () => {
   it('rejects empty, unknown, and invalid board input and maps deletion outcomes', async () => {
     const { repository, service } = boardSetup();
     for (const input of [{}, { ...createBoard(), unexpected: true }, { ...createBoard(), code: '1bad' }, { ...createBoard(), displayOrder: -1 }]) await expect(service.create(actorId, input as never, correlationId)).rejects.toMatchObject({ response: { message: /invalid_board/ } });
-    await expect(service.patch(actorId, boardId, {}, correlationId)).rejects.toMatchObject({ response: { message: 'invalid_board' } });
+    await expect(service.patch(actorId, boardId, {} as never, correlationId)).rejects.toMatchObject({ response: { message: 'invalid_board' } });
     repository.delete.mockResolvedValueOnce('has_articles');
-    await expect(service.delete(actorId, boardId, correlationId)).rejects.toMatchObject({ response: { message: 'board_has_articles' } });
+    await expect(service.delete(actorId, boardId, now.toISOString(), correlationId)).rejects.toMatchObject({ response: { message: 'board_has_articles' } });
     repository.delete.mockResolvedValueOnce('missing');
-    await expect(service.delete(actorId, boardId, correlationId)).rejects.toMatchObject({ response: { message: 'board_not_found' } });
-    expect(repository.delete).toHaveBeenLastCalledWith(boardId, actorId, correlationId);
+    await expect(service.delete(actorId, boardId, now.toISOString(), correlationId)).rejects.toMatchObject({ response: { message: 'board_not_found' } });
+    expect(repository.delete).toHaveBeenLastCalledWith(boardId, actorId, correlationId, now.toISOString());
+  });
+  it('requires a valid board version and maps stale writes without hiding the conflict', async () => {
+    const { repository, service } = boardSetup();
+    repository.patch.mockResolvedValueOnce('stale');
+    await expect(service.patch(actorId, boardId, { titleKr: '수정', expectedUpdatedAt: now.toISOString() }, correlationId))
+      .rejects.toMatchObject({ response: { message: 'board_stale' } });
+    repository.delete.mockResolvedValueOnce('stale');
+    await expect(service.delete(actorId, boardId, now.toISOString(), correlationId))
+      .rejects.toMatchObject({ response: { message: 'board_stale' } });
   });
 });
 

@@ -14,9 +14,10 @@ describe('static site content', () => {
     expect(csRoadmapCourses).toContainEqual(
       expect.objectContaining({ code: '204', name: '이산구조', row: 2, column: 2 }),
     );
-    expect(adminMenu).toContainEqual({ label: '집행위 연락망', to: '/admin/contacts' });
+    expect(adminMenu).toContainEqual({ label: '집행위 연락망', to: '/admin/contacts', access: { kind: 'GLOBAL', permission: 'CONTACTS_MANAGE' } });
     expect(adminMenu).not.toContainEqual(expect.objectContaining({ email: expect.any(String) }));
     expect(adminMenu).not.toContainEqual(expect.objectContaining({ mobile: expect.any(String) }));
+    expect(adminMenu).toContainEqual({ label: '권한 관리', to: '/admin/permissions', access: { kind: 'WORKFLOW' } });
   });
 });
 

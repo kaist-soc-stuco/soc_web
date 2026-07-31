@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
+import { beginAuthSessionTransition, getAuthSessionSummary } from '@/lib/auth-session';
+import { refetchAdminGrants } from '@/lib/admin-grants';
+import { loadBoardCatalog } from '@/lib/board-catalog';
 
 const withNoTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
@@ -37,6 +40,10 @@ export function LoginConsentPage() {
 
     try {
       await apiClient.submitConsentDecision({ consent });
+      beginAuthSessionTransition();
+      await getAuthSessionSummary(apiClient);
+      void loadBoardCatalog().catch(() => undefined);
+      void refetchAdminGrants().catch(() => undefined);
       navigate('/login?status=success&reason=consent_processed', {
         replace: true,
       });

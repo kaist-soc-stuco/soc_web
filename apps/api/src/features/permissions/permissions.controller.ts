@@ -11,6 +11,7 @@ const REASON_CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
 const REQUEST_KEYS = ["targetUserId", "action", "permission", "scope", "scopeId", "reasonCode"] as const;
 const REASON_KEYS = ["reasonCode"] as const;
 const AUDIT_QUERY_KEYS = ["limit", "cursor"] as const;
+const QUEUE_QUERY_KEYS = ["stage", "limit", "cursor"] as const;
 
 type AuthenticatedRequest = Request & { user: { id: string } };
 type PermissionRequestBody = {
@@ -85,6 +86,23 @@ function validateAuditQuery(query: unknown): { limit?: number; cursor?: string }
 
   return { cursor, limit: Number(limit) };
 }
+function validateQueueQuery(query: unknown): { stage: "REQUESTED" | "APPROVAL" | "ACTIVATION"; limit?: number; cursor?: string } {
+  if (!isPlainObject(query) || !hasOnlyKeys(query, QUEUE_QUERY_KEYS)) throw new BadRequestException("invalid_permission_queue_query");
+
+  const { cursor, limit, stage } = query;
+  if (stage !== "REQUESTED" && stage !== "APPROVAL" && stage !== "ACTIVATION") {
+    throw new BadRequestException("invalid_permission_queue_query");
+  }
+  if (cursor !== undefined && (typeof cursor !== "string" || cursor.length === 0)) {
+    throw new BadRequestException("invalid_permission_queue_query");
+  }
+  if (limit === undefined) return { stage, cursor };
+  if (typeof limit !== "string" || !/^(?:[1-9]|[1-9][0-9]|100)$/.test(limit)) {
+    throw new BadRequestException("invalid_permission_queue_query");
+  }
+  return { stage, cursor, limit: Number(limit) };
+}
+
 
 function requireOperationsEnabled(): void {
   if (process.env.AUTHORIZATION_OPERATIONS_ENABLED !== "true") {
@@ -124,6 +142,16 @@ export class PermissionsController {
     return this.permissionsService.backfillLegacyPermissions(request.user.id);
   }
 
+  @Get("definitions")
+  async definitions(@Req() request: AuthenticatedRequest) {
+    return this.permissionsService.listDefinitions(request.user.id);
+  }
+
+  @Get("requests")
+  async requests(@Req() request: AuthenticatedRequest, @Query() query: unknown) {
+    const { stage, limit, cursor } = validateQueueQuery(query);
+    return this.permissionsService.listRequests(request.user.id, stage, limit, cursor);
+  }
   @Get("audit")
   async audit(@Req() request: AuthenticatedRequest, @Query() query: unknown) {
     if (!(await this.permissionsService.hasPermission(request.user.id, "PERMISSION_AUDIT", "GLOBAL"))) throw new ForbiddenException("insufficient_permission");

@@ -64,6 +64,28 @@ describe('PermissionsService authority protocol', () => {
     await expect(service.request(ids.requester, { targetUserId: ids.target, action: 'GRANT', permission: 'FEE_WRITE', scope: 'BOARD', scopeId: 'board-a', reasonCode: 'OPERATIONS' })).rejects.toMatchObject({ response: { message: 'insufficient_permission' } });
     expect(repository.createRequest).not.toHaveBeenCalled();
   });
+  it('requires USERS_MANAGE before definition or target lookup, then requires action authority before creating', async () => {
+    const { service, repository } = subject({ findEffectivePermission: vi.fn().mockResolvedValue([]) });
+    await expect(service.request(ids.requester, { targetUserId: ids.target, action: 'GRANT', permission: 'FEE_WRITE', scope: 'BOARD', scopeId: 'board-a', reasonCode: 'OPERATIONS' })).rejects.toMatchObject({ response: { message: 'insufficient_permission' } });
+    expect(repository.findDefinition).not.toHaveBeenCalled();
+    expect(repository.userExists).not.toHaveBeenCalled();
+    expect(repository.createRequest).not.toHaveBeenCalled();
+
+    repository.findEffectivePermission.mockResolvedValueOnce([{ id: 'users-manage' }]).mockResolvedValueOnce([]);
+    await expect(service.request(ids.requester, { targetUserId: ids.target, action: 'GRANT', permission: 'FEE_WRITE', scope: 'BOARD', scopeId: 'board-a', reasonCode: 'OPERATIONS' })).rejects.toMatchObject({ response: { message: 'insufficient_permission' } });
+    expect(repository.findDefinition).not.toHaveBeenCalled();
+    expect(repository.userExists).not.toHaveBeenCalled();
+    expect(repository.createRequest).not.toHaveBeenCalled();
+  });
+
+  it('creates only when both USERS_MANAGE and action authority are effective', async () => {
+    const { service, repository } = subject({ findEffectivePermission: vi.fn().mockResolvedValue([{ id: 'authority' }]) });
+    await expect(service.request(ids.requester, { targetUserId: ids.target, action: 'GRANT', permission: 'FEE_WRITE', scope: 'BOARD', scopeId: 'board-a', reasonCode: 'OPERATIONS' })).resolves.toMatchObject({ id: ids.request, status: 'PENDING' });
+    expect(repository.createRequest).toHaveBeenCalledWith(expect.objectContaining({
+      authorityKey: 'PERMISSION_GRANT',
+      usersManageAuthorityKey: 'USERS_MANAGE',
+    }));
+  });
 
   it('requires PERMISSION_GRANT for grants and PERMISSION_REVOKE for revokes', async () => {
     const { service, repository } = subject();

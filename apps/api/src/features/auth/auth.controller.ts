@@ -2,6 +2,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   Headers,
   Inject,
@@ -15,6 +16,7 @@ import type { Response } from "express";
 import { Cookies } from "../../shared/decorators/cookies.decorator";
 import { ConsentDecisionRequestDto, SsoCallbackBodyDto } from "./auth.types";
 import { AuthSessionService } from "./auth-session.service";
+import { UsersService } from "../users/users.service";
 import { AuthService } from "./auth.service";
 import {
   AUTH_ACCESS_COOKIE_NAME,
@@ -33,6 +35,7 @@ export class AuthController {
   constructor(
     @Inject(AuthService) private readonly authService: AuthService,
     @Inject(AuthSessionService) private readonly authSessionService: AuthSessionService,
+    @Inject(UsersService) private readonly usersService: UsersService,
     @Inject(ConfigService) private readonly configService: ConfigService,
   ) {}
 
@@ -159,6 +162,24 @@ export class AuthController {
     @Cookies(AUTH_TEMPORARY_COOKIE_NAME) temporaryToken: string | undefined,
   ) {
     return this.authSessionService.getSession({ accessToken, temporaryToken });
+  }
+  @Post("development/login")
+  async loginWithDevelopmentAccount(@Res() response: Response): Promise<void> {
+    if (this.configService.get<string>("NODE_ENV") !== "development") {
+      throw new ForbiddenException("development_login_disabled");
+    }
+
+    const ssoUserId = "development-user";
+    const user = await this.usersService.findBySsoUserId(ssoUserId)
+      ?? await this.usersService.createFromSsoUser({
+        consentedAt: new Date().toISOString(),
+        ssoUserId,
+        userEmail: "developer@example.test",
+      });
+    await this.usersService.grantAllDevelopmentPermissions(user.id);
+    const session = await this.authSessionService.issuePersistedSession(user.id);
+    this.setPersistedCookies(response, session.accessToken, session.refreshToken);
+    response.status(204).send();
   }
 
   @Post("refresh")

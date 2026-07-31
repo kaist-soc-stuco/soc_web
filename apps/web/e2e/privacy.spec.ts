@@ -1,6 +1,31 @@
 import { expect, test } from '@playwright/test';
+const contactGrantResponse = {
+  id: 'admin-user',
+  feeStatus: 'UNKNOWN',
+  kaistUid: null,
+  majorMask: 0,
+  nameEn: null,
+  nameKr: null,
+  privacyConsentAt: null,
+  studentOrEmployeeNumber: null,
+  userEmail: null,
+  userMobile: null,
+  grants: [{
+    id: 'contacts-grant',
+    permission: 'CONTACTS_MANAGE',
+    scope: 'GLOBAL',
+    scopeId: null,
+    activatedFrom: '2026-01-01T00:00:00.000Z',
+    expiresAt: null,
+  }],
+};
+
 
 test('admin contacts reflects live empty and unauthorized states without fallback PII', async ({ page }) => {
+  await page.route('**/api/users/me', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(contactGrantResponse),
+  }));
   let resolveRequest!: () => void;
   await page.route('**/api/admin/contacts?projection=MASKED', async (route) => {
     await new Promise<void>((resolve) => {
@@ -28,12 +53,16 @@ test('admin contacts reflects live empty and unauthorized states without fallbac
     body: JSON.stringify({ code: 'forbidden' }),
   }));
   await page.getByLabel('연락처 표시 방식').selectOption('FULL');
-  await expect(page.getByRole('alert')).toHaveText('연락처 관리 권한이 없습니다.');
+  await expect(page.getByText('연락처 관리 권한이 없습니다.', { exact: true })).toBeVisible();
   await expect(main).not.toContainText(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   await expect(main).not.toContainText(/(?:01[0-9]|0[2-9][0-9])-?\d{3,4}-?\d{4}/);
 });
 
 test('authenticated contacts render only API-provided masked contact data', async ({ page }) => {
+  await page.route('**/api/users/me', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(contactGrantResponse),
+  }));
   await page.route('**/api/admin/contacts?projection=MASKED', (route) => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({
@@ -51,7 +80,7 @@ test('authenticated contacts render only API-provided masked contact data', asyn
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
         deletedAt: null,
-        retentionDeadlineAt: null,
+        retentionDeadlineAt: '2026-02-01T00:00:00.000Z',
         holdUntil: null,
       }],
       nextCursor: null,
@@ -74,5 +103,5 @@ test('static roadmap and admin navigation render without an API service', async 
 
   await expect(page.getByRole('heading', { name: '전산학부 로드맵' })).toBeVisible();
   await expect(page.getByRole('button', { name: /CS101 프로그래밍기초/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: '마이페이지' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '로그인' })).toBeVisible();
 });

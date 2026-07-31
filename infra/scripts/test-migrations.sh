@@ -88,4 +88,22 @@ if [[ "$applied_migrations" != "$expected_migrations" ]]; then
   exit 1
 fi
 
+# Re-run the reconciliation SQL against an upgraded-style fixture. The test
+# database is disposable, so this can prove exact-fingerprint updates without
+# rewriting migration history or touching a developer database.
+query_database "UPDATE boards SET title_kr = '집행위 공지' WHERE code = 'soc-notice'; UPDATE boards SET title_kr = '관리자 행사' WHERE code = 'soc-events';" >/dev/null
+board_timestamps_before="$(query_database "SELECT code || '|' || created_at || '|' || updated_at FROM boards WHERE code IN ('soc-notice', 'soc-events') ORDER BY code;")"
+query_database "$(< "$ROOT_DIR/apps/api/drizzle/0015_board_title_reconciliation.sql")" >/dev/null
+reconciled_notice="$(query_database "SELECT title_kr FROM boards WHERE code = 'soc-notice';")"
+customized_events="$(query_database "SELECT title_kr FROM boards WHERE code = 'soc-events';")"
+board_timestamps_after="$(query_database "SELECT code || '|' || created_at || '|' || updated_at FROM boards WHERE code IN ('soc-notice', 'soc-events') ORDER BY code;")"
+if [[ "$reconciled_notice" != "공지" || "$customized_events" != "관리자 행사" ]]; then
+  echo "Board title reconciliation did not preserve the exact-fingerprint boundary" >&2
+  exit 1
+fi
+if [[ "$board_timestamps_after" != "$board_timestamps_before" ]]; then
+  echo "Board title reconciliation changed board timestamps" >&2
+  exit 1
+fi
+
 echo "Migration test passed"

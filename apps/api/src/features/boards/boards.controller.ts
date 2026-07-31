@@ -33,6 +33,7 @@ import {
   parseCreateArticleRequest,
   parseCreateBoardRequest,
   parseCreateCommentRequest,
+  parseDeleteBoardRequest,
   parseInitiateAssetRequest,
   parsePatchArticleRequest,
   parsePatchBoardRequest,
@@ -90,6 +91,11 @@ export class PublicArticlesController {
 @UseGuards(AuthGuard)
 export class AdminBoardsController {
   constructor(@Inject(BoardsService) private readonly boards: BoardsService) {}
+  @Get()
+  list(@Req() request: AuthenticatedRequest) {
+    return this.boards.adminList(request.user.id);
+  }
+
 
   @Post()
   @HttpCode(201)
@@ -104,8 +110,9 @@ export class AdminBoardsController {
 
   @Delete(':id')
   @HttpCode(204)
-  async delete(@Req() request: AuthenticatedRequest, @Param('id') id: unknown): Promise<void> {
-    await this.boards.delete(request.user.id, parseBoardId(id), request.requestId);
+  async delete(@Req() request: AuthenticatedRequest, @Param('id') id: unknown, @Body() body: unknown): Promise<void> {
+    const { expectedUpdatedAt } = parseDeleteBoardRequest(body);
+    await this.boards.delete(request.user.id, parseBoardId(id), expectedUpdatedAt, request.requestId);
   }
 }
 

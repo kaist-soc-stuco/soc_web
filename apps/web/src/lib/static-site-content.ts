@@ -1,3 +1,6 @@
+import type { EffectivePermissionGrant } from '@soc/contracts';
+import { hasAdminGrant, type AdminGrantRequirement } from './admin-access';
+
 export const roadmapMilestones = [
   '1학년: 기초 프로그래밍, 자료구조, 수리 기초 다지기',
   '2학년: 시스템, 알고리즘, 프로젝트 경험 확장',
@@ -62,9 +65,23 @@ export const csRoadmapCourses: RoadmapCourse[] = [
   { code: '489', row: 6, column: 9, name: '컴퓨터윤리와사회문제' },
 ];
 
-export const adminMenu = [
-  { label: '과비 납부 관리', to: '/admin/payments' },
-  { label: '설문조사 관리', to: '/admin/surveys' },
-  { label: '이메일 일괄발송', to: '/admin/emails' },
-  { label: '집행위 연락망', to: '/admin/contacts' },
+export interface AdminMenuItem {
+  label: string;
+  to: string;
+  access: AdminGrantRequirement;
+}
+
+export const adminMenu: readonly AdminMenuItem[] = [
+  { label: '과비 납부 관리', to: '/admin/payments', access: { kind: 'GLOBAL', permission: 'FEES_MANAGE' } },
+  { label: '설문조사 관리', to: '/admin/surveys', access: { kind: 'GLOBAL', permission: 'SURVEY_MANAGE' } },
+  { label: '이메일 일괄발송', to: '/admin/emails', access: { kind: 'GLOBAL', permission: 'MAIL_SEND' } },
+  { label: '집행위 연락망', to: '/admin/contacts', access: { kind: 'GLOBAL', permission: 'CONTACTS_MANAGE' } },
+  { label: '사용자 관리', to: '/admin/users', access: { kind: 'GLOBAL', permission: 'USERS_MANAGE' } },
+  { label: '권한 관리', to: '/admin/permissions', access: { kind: 'WORKFLOW' } },
+  { label: '권한 감사 로그', to: '/admin/audit-logs', access: { kind: 'GLOBAL', permission: 'PERMISSION_AUDIT' } },
+  { label: '게시판 관리', to: '/admin/boards', access: { kind: 'GLOBAL', permission: 'BOARD_MANAGE' } },
 ];
+
+export function visibleAdminMenu(grants: readonly EffectivePermissionGrant[]): AdminMenuItem[] {
+  return adminMenu.filter((item) => hasAdminGrant(grants, item.access));
+}

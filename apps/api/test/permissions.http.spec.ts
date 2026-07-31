@@ -22,7 +22,7 @@ describe('PermissionsController HTTP boundary', () => {
   let users: { findById: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    permissions = { request: vi.fn(), approve: vi.fn(), activate: vi.fn(), bootstrap: vi.fn(), backfillLegacyPermissions: vi.fn(), hasPermission: vi.fn(), listAudit: vi.fn() };
+    permissions = { request: vi.fn(), approve: vi.fn(), activate: vi.fn(), bootstrap: vi.fn(), backfillLegacyPermissions: vi.fn(), hasPermission: vi.fn(), listAudit: vi.fn(), listDefinitions: vi.fn(), listRequests: vi.fn() };
     users = { findById: vi.fn().mockResolvedValue({ id: actorId, permission: 999 }) };
     const module = await Test.createTestingModule({
       controllers: [PermissionsController],
@@ -43,7 +43,7 @@ describe('PermissionsController HTTP boundary', () => {
   const get = (path: string) => request(app!.getHttpServer()).get(path).set('Cookie', 'soc_at=access-token');
 
   it('does not disclose permission routes or request existence before authentication', async () => {
-    for (const [method, path] of [['post', '/api/permissions/requests'], ['post', `/api/permissions/requests/${requestId}/approve`], ['post', `/api/permissions/requests/${requestId}/activate`], ['post', '/api/permissions/bootstrap'], ['post', '/api/permissions/backfill/legacy'], ['get', '/api/permissions/audit']] as const) {
+    for (const [method, path] of [['post', '/api/permissions/requests'], ['post', `/api/permissions/requests/${requestId}/approve`], ['post', `/api/permissions/requests/${requestId}/activate`], ['post', '/api/permissions/bootstrap'], ['post', '/api/permissions/backfill/legacy'], ['get', '/api/permissions/definitions'], ['get', '/api/permissions/requests?stage=REQUESTED'], ['get', '/api/permissions/audit']] as const) {
       const client = request(app!.getHttpServer());
       const response = await (method === 'get' ? client.get(path) : client.post(path)).expect(401);
       expect(response.body).toEqual({ code: 'access_cookie_missing', message: 'Request failed', requestId: expect.any(String) });
@@ -87,6 +87,28 @@ describe('PermissionsController HTTP boundary', () => {
     expect(missing.body).toEqual({ code: 'permission_request_not_approvable', message: 'Request failed', requestId: expect.any(String) });
     expect(missing.text).not.toContain(requestId);
   });
+  it('returns canonical forbidden responses without leaking request identifiers', async () => {
+    permissions.request.mockRejectedValueOnce(new ForbiddenException('insufficient_permission'));
+    const response = await post('/api/permissions/requests').send(input).expect(403);
+    expect(response.body).toEqual({ code: 'insufficient_permission', message: 'Request failed', requestId: expect.any(String) });
+    expect(response.text).not.toContain(targetId);
+    expect(response.text).not.toContain(requestId);
+  });
+
+  it('validates queue queries and forwards definitions and queue responses unchanged', async () => {
+    permissions.listDefinitions.mockResolvedValue({ items: [{ key: 'FEE_WRITE', description: 'Write fees' }] });
+    permissions.listRequests.mockResolvedValue({ items: [{ id: requestId, status: 'PENDING' }], nextCursor: null });
+
+    await get('/api/permissions/definitions').expect(200, { items: [{ key: 'FEE_WRITE', description: 'Write fees' }] });
+    expect(permissions.listDefinitions).toHaveBeenCalledWith(actorId);
+    await get('/api/permissions/requests?stage=APPROVAL&limit=2&cursor=cursor-1').expect(200, { items: [{ id: requestId, status: 'PENDING' }], nextCursor: null });
+    expect(permissions.listRequests).toHaveBeenCalledWith(actorId, 'APPROVAL', 2, 'cursor-1');
+
+    for (const query of ['', '?stage=NOPE', '?stage=REQUESTED&limit=0', '?stage=REQUESTED&cursor=', '?stage=REQUESTED&unknown=value']) {
+      const response = await get(`/api/permissions/requests${query}`).expect(400);
+      expect(response.body).toEqual({ code: 'invalid_permission_queue_query', message: 'Request failed', requestId: expect.any(String) });
+    }
+  });
 
   it('blocks bootstrap and backfill unless operations are enabled, then forwards the actor', async () => {
     const previous = process.env.AUTHORIZATION_OPERATIONS_ENABLED;
@@ -110,8 +132,35 @@ describe('PermissionsController HTTP boundary', () => {
     const denied = await get('/api/permissions/audit?limit=2').expect(403);
     expect(denied.body).toEqual({ code: 'insufficient_permission', message: 'Request failed', requestId: expect.any(String) });
     expect(permissions.listAudit).not.toHaveBeenCalled();
-    permissions.hasPermission.mockResolvedValue(true); permissions.listAudit.mockResolvedValue({ items: [], nextCursor: null });
-    await get('/api/permissions/audit?limit=2&cursor=cursor-1').expect(200, { items: [], nextCursor: null });
+    permissions.hasPermission.mockResolvedValue(true);
+    permissions.listAudit.mockResolvedValue({
+      items: [{
+        id: 'audit-1',
+        actorUserId: actorId,
+        action: 'PERMISSION_REQUEST_CREATED',
+        recordId: requestId,
+        changedFieldNames: ['status'],
+        correlationId: 'correlation-1',
+        reasonCode: 'OPS',
+        occurredAt: '2026-01-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+    const audit = await get('/api/permissions/audit?limit=2&cursor=cursor-1').expect(200);
+    expect(audit.body).toEqual({
+      items: [{
+        id: 'audit-1',
+        actorUserId: actorId,
+        action: 'PERMISSION_REQUEST_CREATED',
+        recordId: requestId,
+        changedFieldNames: ['status'],
+        correlationId: 'correlation-1',
+        reasonCode: 'OPS',
+        occurredAt: '2026-01-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+    expect(audit.text).not.toContain('requestFingerprint');
     expect(permissions.hasPermission).toHaveBeenLastCalledWith(actorId, 'PERMISSION_AUDIT', 'GLOBAL');
     expect(permissions.listAudit).toHaveBeenCalledWith(2, 'cursor-1');
     for (const query of ['?limit=0', '?limit=101', '?unknown=value']) {

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 
-import { createEmptyAuthSession, getAuthSessionSummary } from '@/lib/auth-session';
+import { beginAuthSessionTransition, createEmptyAuthSession, getAuthSessionSnapshot, getAuthSessionSummary, setAuthSession } from '@/lib/auth-session';
+import { invalidateAdminGrants, refetchAdminGrants } from '@/lib/admin-grants';
+import { loadBoardCatalog } from '@/lib/board-catalog';
 
 const stripTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
 
@@ -122,6 +124,7 @@ export function TreeLogin() {
   const searchParams = new URLSearchParams(location.search);
   const [loading, setLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [developmentLoginLoading, setDevelopmentLoginLoading] = useState(false);
   const [refreshTestLoading, setRefreshTestLoading] = useState(false);
   const [refreshTestMessage, setRefreshTestMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -149,11 +152,18 @@ export function TreeLogin() {
 
   useEffect(() => {
     let cancelled = false;
+    if (searchParams.get('status') === 'success' && searchParams.get('reason') !== 'consent_processed') beginAuthSessionTransition();
+    const priorEpoch = getAuthSessionSnapshot().epoch;
 
     void getAuthSessionSummary(apiClient)
       .then((summary) => {
         if (!cancelled) {
           setSessionSummary(summary);
+          if (getAuthSessionSnapshot().epoch !== priorEpoch) {
+            void loadBoardCatalog().catch(() => undefined);
+            if (summary.authenticated) void refetchAdminGrants().catch(() => undefined);
+            else invalidateAdminGrants();
+          }
         }
       })
       .catch(() => {
@@ -200,6 +210,23 @@ export function TreeLogin() {
       setLoading(false);
     }
   };
+  const handleDevelopmentLogin = async () => {
+    setDevelopmentLoginLoading(true);
+    setErrorMessage(null);
+    try {
+      await apiClient.loginWithDevelopmentAccount();
+      beginAuthSessionTransition();
+      setSessionSummary(await getAuthSessionSummary(apiClient));
+      void loadBoardCatalog().catch(() => undefined);
+      void refetchAdminGrants().catch(() => undefined);
+      navigate('/', { replace: true });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : '개발용 로그인에 실패했습니다.');
+    } finally {
+      setDevelopmentLoginLoading(false);
+    }
+  };
+
 
   const handleLogout = async () => {
     setLogoutLoading(true);
@@ -207,6 +234,10 @@ export function TreeLogin() {
 
     try {
       await apiClient.logout();
+      beginAuthSessionTransition();
+      setAuthSession(createEmptyAuthSession());
+      invalidateAdminGrants();
+      void loadBoardCatalog().catch(() => undefined);
 
       setSessionSummary({
         ...createEmptyAuthSession(),
@@ -301,6 +332,16 @@ export function TreeLogin() {
             >
               {loading ? 'SSO 로그인 진행 중' : 'SSO 로그인 시작'}
             </button>
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                onClick={() => void handleDevelopmentLogin()}
+                disabled={developmentLoginLoading}
+                className="rounded-full border border-kaist-darkgreen px-6 py-3 text-sm font-extrabold tracking-tight text-kaist-darkgreen transition hover:bg-kaist-darkgreen hover:text-kaist-white disabled:cursor-not-allowed disabled:border-kaist-grey disabled:text-kaist-grey"
+              >
+                {developmentLoginLoading ? '개발용 로그인 처리 중' : '개발용 계정으로 로그인'}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => void handleLogout()}

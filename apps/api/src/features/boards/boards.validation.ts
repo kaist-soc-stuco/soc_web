@@ -11,7 +11,8 @@ import type {
   CreateCommentRequest,
   InitiateAssetRequest,
   PatchArticleRequest,
-  PatchBoardRequest,
+  VersionedPatchBoardRequest,
+  DeleteBoardRequest,
   PatchCommentRequest,
   PutArticleReactionRequest,
 } from '@soc/contracts';
@@ -223,9 +224,19 @@ export function parseCreateBoardRequest(value: unknown): CreateBoardRequest {
   };
 }
 
-export function parsePatchBoardRequest(value: unknown): PatchBoardRequest {
-  const input = objectWithAllowedKeys(value, ['titleKr', 'titleEn', 'descriptionKr', 'descriptionEn', 'readPermission', 'writePermission', 'commentPermission', 'commentsAllowed', 'secretArticlesAllowed', 'reactionsAllowed', 'displayOrder', 'isHidden', 'showOnHome'], 'invalid_board', true);
-  const result: PatchBoardRequest = {};
+function boardVersion(value: unknown): string {
+  if (typeof value !== 'string') fail('invalid_board_version');
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) fail('invalid_board_version');
+  return value;
+}
+
+export function parsePatchBoardRequest(value: unknown): VersionedPatchBoardRequest {
+  const input = objectWithAllowedKeys(value, ['expectedUpdatedAt', 'titleKr', 'titleEn', 'descriptionKr', 'descriptionEn', 'readPermission', 'writePermission', 'commentPermission', 'commentsAllowed', 'secretArticlesAllowed', 'reactionsAllowed', 'displayOrder', 'isHidden', 'showOnHome'], 'invalid_board');
+  const expectedUpdatedAt = boardVersion(required(input, 'expectedUpdatedAt', 'invalid_board_version'));
+  const result: VersionedPatchBoardRequest = { expectedUpdatedAt };
+  const mutableKeys = Object.keys(input).filter((key) => key !== 'expectedUpdatedAt');
+  if (mutableKeys.length === 0) fail('invalid_board');
   if ('titleKr' in input) result.titleKr = text(input.titleKr, 'invalid_board');
   if ('titleEn' in input) result.titleEn = text(input.titleEn, 'invalid_board');
   if ('descriptionKr' in input) result.descriptionKr = text(input.descriptionKr, 'invalid_board');
@@ -240,6 +251,11 @@ export function parsePatchBoardRequest(value: unknown): PatchBoardRequest {
   if ('isHidden' in input) result.isHidden = boolean(input.isHidden, 'invalid_board');
   if ('showOnHome' in input) result.showOnHome = boolean(input.showOnHome, 'invalid_board');
   return result;
+}
+
+export function parseDeleteBoardRequest(value: unknown): DeleteBoardRequest {
+  const input = objectWithAllowedKeys(value, ['expectedUpdatedAt'], 'invalid_board');
+  return { expectedUpdatedAt: boardVersion(required(input, 'expectedUpdatedAt', 'invalid_board_version')) };
 }
 
 export function parseCreateArticleRequest(value: unknown): CreateArticleRequest {

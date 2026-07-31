@@ -1,9 +1,14 @@
 import { NavLink, Outlet } from 'react-router-dom';
-
 import { Header } from '@/components/organisms/header';
-import { adminMenu } from '@/lib/static-site-content';
+
+import { useAdminGrants } from '@/lib/admin-grants';
+import { visibleAdminMenu } from '@/lib/static-site-content';
 
 export function AdminPage() {
+  const grants = useAdminGrants();
+  const menu = visibleAdminMenu(grants.grants);
+  const loading = grants.status === 'idle' || grants.status === 'loading';
+
   return (
     <div className="min-h-screen bg-[#F7FCFC] text-kaist-black">
       <Header showLogo />
@@ -13,8 +18,11 @@ export function AdminPage() {
           <div className="px-6 py-7 xl:py-9">
             <p className="text-[22px] font-extrabold tracking-tight">마이페이지</p>
 
-            <nav className="mt-8 flex flex-wrap gap-x-7 gap-y-4 xl:mt-10 xl:block xl:space-y-7">
-              {adminMenu.map((item) => (
+            <nav className="mt-8 flex flex-wrap gap-x-7 gap-y-4 xl:mt-10 xl:block xl:space-y-7" aria-label="관리 메뉴">
+              {loading && <p className="text-[16px] font-medium text-kaist-white/90">권한을 확인하는 중입니다.</p>}
+              {grants.status === 'error' && <p role="alert" className="text-[16px] font-medium text-kaist-white/90">관리 메뉴를 불러올 수 없습니다.</p>}
+              {!loading && grants.status !== 'error' && menu.length === 0 && <p role="alert" className="text-[16px] font-medium text-kaist-white/90">접근 가능한 관리 메뉴가 없습니다.</p>}
+              {!loading && grants.status !== 'error' && menu.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}

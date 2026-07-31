@@ -13,11 +13,12 @@ export type BoardMutation = {
   actorUserId: string;
   correlationId: string;
   now: Date;
+  expectedUpdatedAt: string;
   values: Partial<typeof boards.$inferInsert>;
   changedFieldNames: string;
 };
 
-export type BoardCreateMutation = Omit<BoardMutation, 'values'> & {
+export type BoardCreateMutation = Omit<BoardMutation, 'values' | 'expectedUpdatedAt'> & {
   values: BoardCreateValues;
 };
 
@@ -30,6 +31,11 @@ export class BoardsRepository {
       .where(eq(boards.isHidden, false))
       .orderBy(asc(boards.displayOrder), asc(boards.id));
   }
+  listAll() {
+    return this.db.select().from(boards)
+      .orderBy(asc(boards.displayOrder), asc(boards.id));
+  }
+
 
   async listVisibleHomeWithLatest(now: Date) {
     const visibleBoards = await this.db.select().from(boards)
@@ -76,7 +82,9 @@ export class BoardsRepository {
     return this.db.transaction(async (tx) => {
       const [current] = await tx.select().from(boards).where(eq(boards.id, id)).for('update');
       if (!current) return null;
-      const [updated] = await tx.update(boards).set({ ...input.values, updatedAt: input.now }).where(eq(boards.id, id)).returning();
+      if (current.updatedAt.toISOString() !== input.expectedUpdatedAt) return 'stale' as const;
+      const nextUpdatedAt = new Date(Math.max(input.now.getTime(), current.updatedAt.getTime() + 1));
+      const [updated] = await tx.update(boards).set({ ...input.values, updatedAt: nextUpdatedAt }).where(eq(boards.id, id)).returning();
       await tx.insert(permissionAuditLog).values({
         actorUserId: input.actorUserId,
         action: 'BOARD_UPDATED',
@@ -89,10 +97,11 @@ export class BoardsRepository {
     });
   }
 
-  async delete(id: string, actorUserId: string, correlationId: string): Promise<'deleted' | 'has_articles' | 'missing'> {
+  async delete(id: string, actorUserId: string, correlationId: string, expectedUpdatedAt: string): Promise<'deleted' | 'has_articles' | 'missing' | 'stale'> {
     return this.db.transaction(async (tx) => {
-      const [board] = await tx.select({ id: boards.id }).from(boards).where(eq(boards.id, id)).for('update');
+      const [board] = await tx.select().from(boards).where(eq(boards.id, id)).for('update');
       if (!board) return 'missing';
+      if (board.updatedAt.toISOString() !== expectedUpdatedAt) return 'stale';
       const [article] = await tx.select({ id: articles.id }).from(articles).where(eq(articles.boardId, id)).limit(1);
       if (article) return 'has_articles';
       await tx.delete(boards).where(eq(boards.id, id));

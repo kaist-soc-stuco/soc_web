@@ -67,6 +67,14 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
     expect(page.items).toHaveLength(1); expect(page.nextCursor).toBeTypeOf('string');
     await expect(service.listAdmin(actorId, { cursor: 'not-a-cursor' })).rejects.toMatchObject({ response: expect.objectContaining({ message: 'invalid_cursor' }) });
     expect(repo.list).toHaveBeenCalledTimes(1);
+    for (const cursor of [
+      Buffer.from(JSON.stringify({ createdAt: 'not-a-date', id: targetId })).toString('base64url'),
+      Buffer.from(JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z', id: 'not-a-uuid' })).toString('base64url'),
+      Buffer.from(JSON.stringify({ createdAt: '2026-01-01T00:00:00.000Z' })).toString('base64url'),
+    ]) {
+      await expect(service.listAdmin(actorId, { cursor })).rejects.toMatchObject({ response: expect.objectContaining({ message: 'invalid_cursor' }) });
+    }
+    expect(repo.list).toHaveBeenCalledTimes(1);
     await service.listAdmin(actorId, { limit: 999 });
     expect(repo.list).toHaveBeenLastCalledWith({ limit: 101, cursor: undefined });
   });

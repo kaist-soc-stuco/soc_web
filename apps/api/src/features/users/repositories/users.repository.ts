@@ -123,6 +123,34 @@ export class UsersRepository {
     }
     return result;
   }
+  async grantAllActivePermissions(userId: string): Promise<void> {
+    await this.db.execute(sql`
+      INSERT INTO permission_grants (
+        user_id,
+        permission_definition_id,
+        scope,
+        scope_id,
+        granted_by_user_id
+      )
+      SELECT
+        ${userId}::uuid,
+        definition.id,
+        'GLOBAL'::permission_grant_scope,
+        NULL,
+        ${userId}::uuid
+      FROM permission_definitions AS definition
+      WHERE definition.is_active = true
+        AND NOT EXISTS (
+          SELECT 1
+          FROM permission_grants AS existing
+          WHERE existing.user_id = ${userId}::uuid
+            AND existing.permission_definition_id = definition.id
+            AND existing.scope = 'GLOBAL'::permission_grant_scope
+            AND existing.scope_id IS NULL
+            AND existing.revoked_at IS NULL
+        )
+    `);
+  }
 
   async insert(input: {
     privacyConsentAt: string | null;

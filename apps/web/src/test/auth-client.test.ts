@@ -25,6 +25,17 @@ describe('cookie-only auth client', () => {
     expect(fetcher.mock.calls[0][1]).not.toHaveProperty('session');
     expect(fetcher.mock.calls[0][1]).not.toHaveProperty('storage');
   });
+  it('starts development login with cookie credentials and no client-supplied identity', async () => {
+    const fetcher = vi.fn().mockResolvedValue(response(204));
+    const client = createApiClient({ baseUrl: '/api', fetcher });
+
+    await client.loginWithDevelopmentAccount();
+
+    expect(fetcher).toHaveBeenCalledWith('/api/auth/development/login', {
+      credentials: 'include',
+      method: 'POST',
+    });
+  });
   it('retains only canonical error code and request ID metadata', async () => {
     const fetcher = vi.fn().mockResolvedValue(
       response(403, {

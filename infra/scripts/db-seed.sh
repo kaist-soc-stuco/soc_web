@@ -11,5 +11,8 @@ INSERT INTO demo_events (event_name)
 VALUES ('seeded-event')
 ON CONFLICT DO NOTHING;
 SQL
+docker compose -f "$COMPOSE_FILE" exec -T postgres psql \
+  -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
+  < "$ROOT_DIR/infra/docker/postgres/seed-development-user.sql"
 
 echo "Seed completed"

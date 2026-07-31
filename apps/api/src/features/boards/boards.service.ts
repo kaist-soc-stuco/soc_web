@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type {
   AdminBoard,
+  AdminBoardListResponse,
   ArticleSummary,
   Board,
   BoardConfig,
@@ -17,7 +18,8 @@ import type {
   BoardPermission,
   ContentLocale,
   CreateBoardRequest,
-  PatchBoardRequest,
+  PatchBoardFields,
+  VersionedPatchBoardRequest,
 } from '@soc/contracts';
 
 import { Clock } from '../../shared/time/clock';
@@ -93,7 +95,12 @@ export class BoardsService {
     }
   }
 
-  async patch(actorUserId: string, id: string, input: PatchBoardRequest, correlationId: string): Promise<AdminBoard> {
+  async adminList(actorUserId: string): Promise<AdminBoardListResponse> {
+    await this.requireManager(actorUserId);
+    return { items: (await this.repository.listAll()).map((row) => this.adminBoard(row)) };
+  }
+
+  async patch(actorUserId: string, id: string, input: VersionedPatchBoardRequest, correlationId: string): Promise<AdminBoard> {
     correlationId = this.correlation(correlationId);
     await this.requireManager(actorUserId);
     this.uuid(id);
@@ -103,24 +110,27 @@ export class BoardsService {
         actorUserId,
         correlationId,
         now: this.clock.now(),
+        expectedUpdatedAt: input.expectedUpdatedAt,
         values,
         changedFieldNames: this.changedFields(input),
       });
       if (!updated) throw new NotFoundException('board_not_found');
+      if (updated === 'stale') throw new ConflictException('board_stale');
       return this.adminBoard(updated);
     } catch (error) {
-      if (error instanceof NotFoundException) throw error;
+      if (error instanceof NotFoundException || error instanceof ConflictException) throw error;
       this.mapWriteError(error);
     }
   }
 
-  async delete(actorUserId: string, id: string, correlationId: string): Promise<void> {
+  async delete(actorUserId: string, id: string, expectedUpdatedAt: string, correlationId: string): Promise<void> {
     correlationId = this.correlation(correlationId);
     await this.requireManager(actorUserId);
     this.uuid(id);
     try {
-      const result = await this.repository.delete(id, actorUserId, correlationId);
+      const result = await this.repository.delete(id, actorUserId, correlationId, expectedUpdatedAt);
       if (result === 'missing') throw new NotFoundException('board_not_found');
+      if (result === 'stale') throw new ConflictException('board_stale');
       if (result === 'has_articles') throw new ConflictException('board_has_articles');
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ConflictException) throw error;
@@ -154,14 +164,15 @@ export class BoardsService {
     };
   }
 
-  private patchValues(input: PatchBoardRequest) {
-    this.input(input, true);
+  private patchValues(input: VersionedPatchBoardRequest) {
+    const { expectedUpdatedAt: _, ...fields } = input;
+    this.input(fields, true);
     const result: Record<string, string | number | boolean> = {};
-    for (const [key, value] of Object.entries(input)) result[key] = typeof value === 'string' && ['titleKr', 'titleEn', 'descriptionKr', 'descriptionEn'].includes(key) ? value.trim() : value as string | number | boolean;
+    for (const [key, value] of Object.entries(fields)) result[key] = typeof value === 'string' && ['titleKr', 'titleEn', 'descriptionKr', 'descriptionEn'].includes(key) ? value.trim() : value as string | number | boolean;
     return result;
   }
 
-  private input(input: unknown, patch: boolean): asserts input is CreateBoardRequest | PatchBoardRequest {
+  private input(input: unknown, patch: boolean): asserts input is CreateBoardRequest | PatchBoardFields {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new UnprocessableEntityException('invalid_board');
     const source = input as Record<string, unknown>;
     const allowed = patch ? PATCH_FIELDS : BOARD_FIELDS;
@@ -230,7 +241,7 @@ export class BoardsService {
   private order(value: unknown): asserts value is number { if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 2_147_483_647) throw new UnprocessableEntityException('invalid_board_order'); }
   private uuid(value: unknown): asserts value is string { if (typeof value !== 'string' || !UUID_PATTERN.test(value)) throw new UnprocessableEntityException('invalid_board'); }
   private correlation(value: unknown): string { if (typeof value !== 'string' || !CORRELATION_ID_PATTERN.test(value)) throw new UnprocessableEntityException('invalid_correlation_id'); return value; }
-  private changedFields(input: PatchBoardRequest): string { return [...new Set(Object.keys(input).map((key) => key === 'titleKr' || key === 'titleEn' ? 'title' : key === 'descriptionKr' || key === 'descriptionEn' ? 'description' : key))].join(','); }
+  private changedFields(input: VersionedPatchBoardRequest): string { return [...new Set(Object.keys(input).filter((key) => key !== 'expectedUpdatedAt').map((key) => key === 'titleKr' || key === 'titleEn' ? 'title' : key === 'descriptionKr' || key === 'descriptionEn' ? 'description' : key))].join(','); }
 
   private mapWriteError(error: unknown): never {
     let current: unknown = error;

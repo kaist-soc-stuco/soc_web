@@ -30,7 +30,7 @@ describe('Boards HTTP boundary', () => {
   let interactions: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(async () => {
-    boards = { list: vi.fn().mockResolvedValue({ locale: 'ko', items: [] }), get: vi.fn().mockResolvedValue({ locale: 'ko', board: { id: boardId, code: 'notice' } }), create: vi.fn().mockResolvedValue({ id: boardId }), patch: vi.fn().mockResolvedValue({ id: boardId }), delete: vi.fn() };
+    boards = { list: vi.fn().mockResolvedValue({ locale: 'ko', items: [] }), get: vi.fn().mockResolvedValue({ locale: 'ko', board: { id: boardId, code: 'notice' } }), adminList: vi.fn().mockResolvedValue({ items: [{ id: boardId, displayOrder: 0 }] }), create: vi.fn().mockResolvedValue({ id: boardId }), patch: vi.fn().mockResolvedValue({ id: boardId }), delete: vi.fn() };
     articles = { list: vi.fn().mockResolvedValue({ locale: 'ko', items: [], nextCursor: null }), get: vi.fn().mockResolvedValue(article), create: vi.fn().mockResolvedValue(article), patch: vi.fn().mockResolvedValue(article), publish: vi.fn().mockResolvedValue(article), softDelete: vi.fn() };
     interactions = { detailExtras: vi.fn().mockResolvedValue({ comments: [{ id: commentId, body: 'visible' }], assets: [{ id: assetId, contentType: 'image/png' }], myReaction: 'LIKE' }), createComment: vi.fn().mockResolvedValue({ id: commentId }), patchComment: vi.fn().mockResolvedValue({ id: commentId }), deleteComment: vi.fn(), putReaction: vi.fn().mockResolvedValue({ type: 'LIKE' }), deleteReaction: vi.fn().mockResolvedValue({ type: null }), initiateAsset: vi.fn().mockRejectedValue(new ServiceUnavailableException('feature_disabled')), completeAsset: vi.fn().mockRejectedValue(new ServiceUnavailableException('feature_disabled')), deleteAsset: vi.fn().mockRejectedValue(new ServiceUnavailableException('feature_disabled')) };
     const module = await Test.createTestingModule({
@@ -66,10 +66,16 @@ describe('Boards HTTP boundary', () => {
     await request(app.getHttpServer()).get('/api/boards').set('Cookie', 'soc_at=malformed').expect(401);
     expect(boards.list).toHaveBeenCalledTimes(1);
   });
+  it('requires authentication for the ordered admin board catalog', async () => {
+    await request(app.getHttpServer()).get('/api/admin/boards').expect(401);
+    await request(app.getHttpServer()).get('/api/admin/boards').set('Cookie', 'soc_at=access-token').expect(200);
+    expect(boards.adminList).toHaveBeenCalledTimes(1);
+    expect(boards.adminList).toHaveBeenCalledWith(actorId);
+  });
 
   it('requires authentication for every write without disclosing target identifiers', async () => {
     const cases = [
-      ['post', '/api/admin/boards', boardInput], ['patch', `/api/admin/boards/${boardId}`, { titleEn: 'Edited' }], ['delete', `/api/admin/boards/${boardId}`, undefined],
+      ['post', '/api/admin/boards', boardInput], ['patch', `/api/admin/boards/${boardId}`, { titleEn: 'Edited', expectedUpdatedAt: article.updatedAt }], ['delete', `/api/admin/boards/${boardId}`, { expectedUpdatedAt: article.updatedAt }],
       ['post', '/api/boards/notice/articles', articleInput], ['patch', `/api/articles/${articleId}`, { titleEn: 'Edited' }], ['post', `/api/articles/${articleId}/publish`, undefined], ['delete', `/api/articles/${articleId}`, undefined],
       ['post', `/api/articles/${articleId}/comments`, { body: 'Comment' }], ['patch', `/api/comments/${commentId}`, { body: 'Edited' }], ['delete', `/api/comments/${commentId}`, undefined],
       ['put', `/api/articles/${articleId}/reaction`, { type: 'LIKE' }], ['delete', `/api/articles/${articleId}/reaction`, undefined],
@@ -85,8 +91,8 @@ describe('Boards HTTP boundary', () => {
 
   it('forwards every enabled mutation with the authenticated actor and exact request values', async () => {
     await authenticated('post', '/api/admin/boards').send(boardInput).expect(201);
-    await authenticated('patch', `/api/admin/boards/${boardId}`).send({ titleEn: 'Edited' }).expect(200);
-    await authenticated('delete', `/api/admin/boards/${boardId}`).expect(204);
+    await authenticated('patch', `/api/admin/boards/${boardId}`).send({ titleEn: 'Edited', expectedUpdatedAt: article.updatedAt }).expect(200);
+    await authenticated('delete', `/api/admin/boards/${boardId}`).send({ expectedUpdatedAt: article.updatedAt }).expect(204);
     await authenticated('post', '/api/boards/notice/articles').send(articleInput).expect(201);
     await authenticated('patch', `/api/articles/${articleId}`).send({ titleEn: 'Edited' }).expect(200);
     await authenticated('post', `/api/articles/${articleId}/publish`).expect(200);
@@ -96,7 +102,7 @@ describe('Boards HTTP boundary', () => {
     await authenticated('delete', `/api/comments/${commentId}`).expect(204);
     await authenticated('put', `/api/articles/${articleId}/reaction`).send({ type: 'LIKE' }).expect(200);
     await authenticated('delete', `/api/articles/${articleId}/reaction`).expect(200);
-    expect(boards.create).toHaveBeenCalledWith(actorId, boardInput, 'boards-http-mutation'); expect(boards.patch).toHaveBeenCalledWith(actorId, boardId, { titleEn: 'Edited' }, 'boards-http-mutation'); expect(boards.delete).toHaveBeenCalledWith(actorId, boardId, 'boards-http-mutation');
+    expect(boards.create).toHaveBeenCalledWith(actorId, boardInput, 'boards-http-mutation'); expect(boards.patch).toHaveBeenCalledWith(actorId, boardId, { titleEn: 'Edited', expectedUpdatedAt: article.updatedAt }, 'boards-http-mutation'); expect(boards.delete).toHaveBeenCalledWith(actorId, boardId, article.updatedAt, 'boards-http-mutation');
     expect(articles.create).toHaveBeenCalledWith(actorId, 'notice', articleInput, 'boards-http-mutation'); expect(articles.patch).toHaveBeenCalledWith(actorId, articleId, { titleEn: 'Edited' }, 'boards-http-mutation'); expect(articles.publish).toHaveBeenCalledWith(actorId, articleId, 'boards-http-mutation'); expect(articles.softDelete).toHaveBeenCalledWith(actorId, articleId, 'boards-http-mutation');
     expect(interactions.createComment).toHaveBeenCalledWith(actorId, articleId, { body: 'Comment' }, 'boards-http-mutation'); expect(interactions.patchComment).toHaveBeenCalledWith(actorId, commentId, { body: 'Edited' }, 'boards-http-mutation'); expect(interactions.deleteComment).toHaveBeenCalledWith(actorId, commentId, 'boards-http-mutation'); expect(interactions.putReaction).toHaveBeenCalledWith(actorId, articleId, { type: 'LIKE' }, 'boards-http-mutation'); expect(interactions.deleteReaction).toHaveBeenCalledWith(actorId, articleId, 'boards-http-mutation');
   });
@@ -108,12 +114,22 @@ describe('Boards HTTP boundary', () => {
       '/api/articles/not-a-uuid', `/api/articles/${articleId}?locale=en&locale=ko`,
     ]) await request(app.getHttpServer()).get(path).expect(422);
     for (const [method, path, body] of [
-      ['post', '/api/admin/boards', {}], ['post', '/api/admin/boards', { ...boardInput, extra: true }], ['post', '/api/admin/boards', { ...boardInput, commentsAllowed: 'true' }], ['patch', `/api/admin/boards/${boardId}`, {}], ['patch', `/api/admin/boards/not-a-uuid`, { titleEn: 'Edited' }],
+      ['post', '/api/admin/boards', {}], ['post', '/api/admin/boards', { ...boardInput, extra: true }], ['post', '/api/admin/boards', { ...boardInput, commentsAllowed: 'true' }], ['patch', `/api/admin/boards/${boardId}`, {}], ['patch', `/api/admin/boards/${boardId}`, { titleEn: 'Edited' }], ['patch', `/api/admin/boards/not-a-uuid`, { titleEn: 'Edited', expectedUpdatedAt: article.updatedAt }], ['delete', `/api/admin/boards/${boardId}`], ['delete', `/api/admin/boards/${boardId}`, { expectedUpdatedAt: 'not-a-date' }],
       ['post', '/api/boards/1notice/articles', articleInput], ['post', '/api/boards/notice/articles', { ...articleInput, scope: 'INVALID' }], ['post', '/api/boards/notice/articles', { ...articleInput, isPinned: true, pinnedOrder: null }], ['patch', `/api/articles/${articleId}`, {}], ['patch', `/api/articles/${articleId}`, { isPinned: false, pinnedOrder: 1 }], ['patch', '/api/articles/not-a-uuid', { titleEn: 'Edited' }],
       ['post', `/api/articles/${articleId}/comments`, {}], ['post', `/api/articles/${articleId}/comments`, { body: 1 }], ['patch', `/api/comments/${commentId}`, {}], ['patch', '/api/comments/not-a-uuid', { body: 'Edited' }], ['put', `/api/articles/${articleId}/reaction`, {}], ['put', `/api/articles/${articleId}/reaction`, { type: 'HEART' }],
       ['post', `/api/articles/${articleId}/assets/initiate`, { displayOrder: 0, type: 'IMAGE', contentType: 'invalid', byteSize: 1 }], ['post', `/api/articles/${articleId}/assets/initiate`, { displayOrder: 0, type: 'IMAGE', contentType: 'image/png', byteSize: 0 }], ['post', `/api/articles/${articleId}/assets/initiate`, { displayOrder: 0, type: 'IMAGE', contentType: 'image/png', byteSize: 1, checksumSha256: 'bad' }], ['post', `/api/assets/${assetId}/complete`, { checksumSha256: 'bad' }],
     ] as const) await authenticated(method, path).send(body).expect(422);
     expect([...Object.values(boards), ...Object.values(articles), ...Object.values(interactions)].every((mock) => mock.mock.calls.length === 0)).toBe(true);
+  });
+  it('rejects missing or malformed board versions and returns stale conflicts', async () => {
+    const missingPatch = await authenticated('patch', `/api/admin/boards/${boardId}`).send({ titleEn: 'Edited' }).expect(422);
+    const malformedDelete = await authenticated('delete', `/api/admin/boards/${boardId}`).send({ expectedUpdatedAt: 'not-a-date' }).expect(422);
+    expect(missingPatch.body.code).toBe('invalid_board_version');
+    expect(malformedDelete.body.code).toBe('invalid_board_version');
+    boards.patch.mockRejectedValueOnce(new ConflictException('board_stale'));
+    boards.delete.mockRejectedValueOnce(new ConflictException('board_stale'));
+    await authenticated('patch', `/api/admin/boards/${boardId}`).send({ titleEn: 'Edited', expectedUpdatedAt: article.updatedAt }).expect(409);
+    await authenticated('delete', `/api/admin/boards/${boardId}`).send({ expectedUpdatedAt: article.updatedAt }).expect(409);
   });
 
   it('returns declared no-disclosure, feature-disabled, missing-reaction, and asset-provider errors', async () => {

@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
 import { Logo } from '@/components/atoms/logo';
-
+import { invalidateBoardCatalog, loadBoardCatalog, useBoardCatalog } from '@/lib/board-catalog';
+import { getAuthSessionSnapshot, getAuthSessionSummary } from '@/lib/auth-session';
 interface HeaderProps {
   showLogo?: boolean;
 }
@@ -10,6 +12,17 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
+  const [authenticated, setAuthenticated] = useState(false);
+  const boardCatalog = useBoardCatalog();
+  const [boardRetrying, setBoardRetrying] = useState(false);
+  const location = useLocation();
+  useEffect(() => {
+    let active = true;
+    void getAuthSessionSummary(createApiClient({ baseUrl: '/api' }))
+      .then((session) => { if (active) setAuthenticated(session.authenticated); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [location.key]);
 
   useEffect(() => {
     const update = () => {
@@ -20,19 +33,15 @@ export function Header({ showLogo = false }: HeaderProps) {
     return () => window.removeEventListener('resize', update);
   }, [showLogo]);
   
+  const boardItems = (boardCatalog.status === 'ready' ? boardCatalog.items : []).map((board) => ({
+    label: board.title || board.code,
+    to: `/board/${encodeURIComponent(board.code)}`,
+  }));
   const navItems = [
     {
       label: '게시판',
-      href: '/board/공지',
-      dropdown: [
-        { label: '공지', to: '/board/공지' },
-        { label: '행사', to: '/board/행사' },
-        { label: 'HoC', to: '/board/HoC' },
-        { label: '홍보글', to: '/board/홍보글' },
-        { label: '건의사항', to: '/board/건의사항' },
-        { label: '연구실', to: '/board/연구실' },
-        { label: 'QnA', to: '/board/QnA' },
-      ],
+      href: boardItems[0]?.to,
+      dropdown: boardItems,
     },
     {
       label: '행사 & 설문조사',
@@ -53,6 +62,29 @@ export function Header({ showLogo = false }: HeaderProps) {
       ],
     },
   ];
+  const terminalCatalogError = boardCatalog.status === 'error'
+    && typeof boardCatalog.error === 'object'
+    && boardCatalog.error !== null
+    && 'status' in boardCatalog.error
+    && boardCatalog.error.status === 401;
+  const retryBoardCatalog = async () => {
+    if (boardRetrying) return;
+    setBoardRetrying(true);
+    try {
+      if (!terminalCatalogError) {
+        invalidateBoardCatalog();
+        await loadBoardCatalog();
+        return;
+      }
+      const before = getAuthSessionSnapshot().epoch;
+      await getAuthSessionSummary(createApiClient({ baseUrl: '/api' }));
+      if (getAuthSessionSnapshot().epoch !== before) await loadBoardCatalog();
+    } catch {
+      // The catalog/session stores expose the fail-closed error state.
+    } finally {
+      setBoardRetrying(false);
+    }
+  };
 
   return (
     <header 
@@ -77,20 +109,40 @@ export function Header({ showLogo = false }: HeaderProps) {
                 className="relative group"
                 onMouseEnter={() => setHoveredIndex(index)}
               >
-                <Link
-                  to={item.href} 
-                  className="relative flex h-full w-52 items-center justify-center text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main"
-                >
-                  <span className="py-2">{item.label}</span>
-                  <span 
-                    className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${
-                      hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
-                    }`}
-                  />
-                </Link>
+                {item.href ? (
+                  <Link
+                    to={item.href}
+                    className="relative flex h-full w-52 items-center justify-center text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main"
+                  >
+                    <span className="py-2">{item.label}</span>
+                    <span
+                      className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${
+                        hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
+                      }`}
+                    />
+                  </Link>
+                ) : index === 0 && boardCatalog.status === 'error' ? (
+                  <button
+                    type="button"
+                    onClick={() => void retryBoardCatalog()}
+                    disabled={boardRetrying}
+                    className="flex h-full w-52 items-center justify-center text-sm font-bold text-red-700 disabled:opacity-50"
+                  >
+                    {boardRetrying ? '세션 확인 중' : '게시판 다시 불러오기'}
+                  </button>
+                ) : (
+                  <span className="flex h-full w-52 items-center justify-center text-sm font-bold text-kaist-grey">
+                    {boardCatalog.status === 'loading' || boardCatalog.status === 'idle' ? '게시판 불러오는 중' : '표시할 게시판 없음'}
+                  </span>
+                )}
               </div>
             ))}
           </nav>
+          <div className="sr-only" aria-live="polite">
+            {boardCatalog.status === 'loading' && '게시판 정보를 불러오는 중입니다.'}
+            {boardCatalog.status === 'error' && '게시판 정보를 불러오지 못했습니다.'}
+            {boardCatalog.status === 'ready' && boardItems.length === 0 && '표시할 게시판이 없습니다.'}
+          </div>
         </div>
 
         {/* Right Section: Search, Notification, Login */}
@@ -106,10 +158,10 @@ export function Header({ showLogo = false }: HeaderProps) {
             </svg>
           </button>
           <Link
-            to="/admin"
+            to={authenticated ? "/admin" : "/login"}
             className="relative flex items-center text-sm lg:text-base font-extrabold tracking-tight text-kaist-black hover:text-kaist-darkgreen-main transition-colors group"
           >
-            <span className="py-2">마이페이지</span>
+            <span className="py-2">{authenticated ? '마이페이지' : '로그인'}</span>
             <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
           </Link>
         </div>

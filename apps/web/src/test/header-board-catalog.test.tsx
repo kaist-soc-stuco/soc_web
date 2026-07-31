@@ -1,0 +1,46 @@
+import '@testing-library/jest-dom/vitest';
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+
+const catalog = vi.hoisted(() => ({ current: { status: 'idle' as 'idle' | 'loading' | 'ready' | 'error', items: [] as readonly { code: string; title: string }[], error: undefined as unknown }, load: vi.fn(), invalidate: vi.fn() }));
+vi.mock('@/lib/board-catalog', () => ({ useBoardCatalog: () => catalog.current, loadBoardCatalog: catalog.load, invalidateBoardCatalog: catalog.invalidate }));
+vi.mock('@/lib/auth-session', () => ({ getAuthSessionSnapshot: vi.fn(() => ({ epoch: 1 })), getAuthSessionSummary: vi.fn().mockResolvedValue({ authenticated: false }) }));
+vi.mock('@soc/api-client', () => ({ createApiClient: vi.fn(() => ({})) }));
+vi.mock('@/components/atoms/logo', () => ({ Logo: () => <span>logo</span> }));
+
+import { Header } from '@/components/organisms/header';
+
+const renderHeader = () => render(<MemoryRouter><Header /></MemoryRouter>);
+
+afterEach(cleanup);
+beforeEach(() => { catalog.current = { status: 'idle', items: [], error: undefined }; catalog.load.mockReset(); catalog.invalidate.mockReset(); });
+
+describe('Header board catalog navigation', () => {
+  it('renders board links only from a ready catalog', () => {
+    catalog.current = { status: 'ready', items: [{ code: 'notice', title: '공지' }], error: undefined };
+    renderHeader();
+    fireEvent.mouseEnter(screen.getByRole('link', { name: '게시판' }).parentElement!);
+    expect(screen.getByRole('link', { name: '공지' })).toHaveAttribute('href', '/board/notice');
+  });
+
+  it.each([
+    ['loading', '게시판 정보를 불러오는 중입니다.'],
+    ['error', '게시판 정보를 불러오지 못했습니다.'],
+    ['ready', '표시할 게시판이 없습니다.'],
+  ] as const)('announces the %s catalog state accessibly without stale board links', (status, announcement) => {
+    catalog.current = { status, items: status === 'error' ? [{ code: 'stale', title: '오래된 게시판' }] : [], error: status === 'error' ? new Error('offline') : undefined };
+    renderHeader();
+    expect(screen.getByText(announcement)).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByRole('link', { name: '오래된 게시판' })).not.toBeInTheDocument();
+  });
+
+  it('offers an accessible retry only for catalog errors', () => {
+    catalog.current = { status: 'error', items: [], error: new Error('offline') };
+    renderHeader();
+    fireEvent.click(screen.getByRole('button', { name: '게시판 다시 불러오기' }));
+    expect(catalog.load).toHaveBeenCalledTimes(1);
+    expect(catalog.invalidate).toHaveBeenCalledTimes(1);
+  });
+});

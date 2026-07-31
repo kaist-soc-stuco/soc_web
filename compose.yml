@@ -12,7 +12,7 @@ services:
     ports:
       - '${API_PORT:-3000}:3000'
     depends_on:
-      db-migrate:
+      db-seed:
         condition: service_completed_successfully
       redis:
         condition: service_started
@@ -60,6 +60,19 @@ services:
       POSTGRES_PORT: 5432
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
     command: ['sh', '-c', 'pnpm --filter @soc/api db:migrate']
+  db-seed:
+    image: postgres:16-alpine
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./infra/docker/postgres/seed-development-user.sql:/seed-development-user.sql:ro
+    command: ['psql', '-v', 'ON_ERROR_STOP=1', '-f', '/seed-development-user.sql']
 
   redis:
     image: redis:7-alpine

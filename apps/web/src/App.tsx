@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 
+import { AdminIndexRedirect } from '@/pages/admin-index-redirect';
 import { AdminPage } from '@/pages/admin-page';
 import { AdminPaymentsPage } from '@/pages/admin-payments-page';
 import { AdminSurveysPage } from '@/pages/admin-surveys-page';
 import { AdminSurveyEditPage } from '@/pages/admin-survey-edit-page';
 import { AdminContactsPage } from '@/pages/admin-contacts-page';
 import { AdminEmailsPage } from '@/pages/admin-emails-page';
+import { AdminUsersPage } from '@/pages/admin-users-page';
+import { AdminPermissionsPage } from '@/pages/admin-permissions-page';
+import { AdminAuditLogsPage } from '@/pages/admin-audit-logs-page';
+import { AdminBoardsPage } from '@/pages/admin-boards-page';
 import { AboutPage } from '@/pages/about-page';
 import { HomePage } from '@/pages/home-page';
 import { BoardPage } from '@/pages/board-page';
@@ -78,12 +83,16 @@ export function App() {
         <Route path="/board/:category/:id" element={<BoardPostPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/admin" element={<AdminPage />}>
-          <Route index element={<Navigate to="payments" replace />} />
+          <Route index element={<AdminIndexRedirect />} />
           <Route path="payments" element={<AdminPaymentsPage />} />
           <Route path="surveys" element={<AdminSurveysPage />} />
           <Route path="surveys/:surveyId/edit" element={<AdminSurveyEditPage />} />
           <Route path="emails" element={<AdminEmailsPage />} />
           <Route path="contacts" element={<AdminContactsPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="permissions" element={<AdminPermissionsPage />} />
+          <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+          <Route path="boards" element={<AdminBoardsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<TreeLogin />} />

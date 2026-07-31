@@ -29,6 +29,8 @@ const releasedTags = [
   "0011_phase2_permission_audit_append_only",
   "0012_phase2_pii_contract",
   "0013_phase2_pii_contract_gate",
+  "0014_phase2_permission_transition_cursor",
+  "0015_board_title_reconciliation",
 ];
 
 async function releasedFixture(t) {
@@ -161,4 +163,22 @@ test("rejects released journal metadata changes", async (t) => {
   journal.entries[1].when += 1;
   await writeFile(journalPath, JSON.stringify(journal));
   await expectFailure(root, /immutable journal metadata mismatch: 0001_open_giant_girl/);
+});
+test("reconciles exactly five default board titles without touching timestamps, policy, or customized rows", async () => {
+  const sql = await readFile(join(canonicalMigrationsDir, "0015_board_title_reconciliation.sql"), "utf8");
+  const updates = sql.match(/UPDATE "boards"[\s\S]*?;/g) ?? [];
+  assert.equal(updates.length, 5);
+  assert.deepEqual(
+    updates.map((statement) => statement.match(/SET "title_kr" = '([^']+)'/)?.[1]),
+    ["공지", "행사", "HoC", "홍보글", "건의사항 및 QnA"],
+  );
+  for (const statement of updates) {
+    assert.match(statement, /^UPDATE "boards"\nSET "title_kr" = '[^']+'\nWHERE "code" = '[a-z-]+'/);
+    assert.match(statement, /^UPDATE "boards"\nSET "title_kr" = '[^']+'\nWHERE /);
+    for (const preservedColumn of [
+      "title_kr", "title_en", "description_kr", "description_en", "read_permission",
+      "write_permission", "comment_permission", "comments_allowed", "secret_articles_allowed",
+      "reactions_allowed", "display_order", "is_hidden", "show_on_home",
+    ]) assert.match(statement, new RegExp(`"${preservedColumn}" = `));
+  }
 });

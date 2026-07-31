@@ -23,6 +23,7 @@ const DEFAULT_PAGE_SIZE = 25;
 
 const REASON_CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FEE_STATUSES = new Set<FeeStatus>(["UNKNOWN", "UNPAID", "PAID"]);
 const isFeeStatus = (value: unknown): value is FeeStatus => typeof value === "string" && FEE_STATUSES.has(value as FeeStatus);
 const auditCorrelationId = (requestId: string) =>
@@ -63,7 +64,7 @@ export class UsersService {
     if (!cursor) return undefined;
     try {
       const value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as { createdAt?: string; id?: string };
-      if (!value.createdAt || !value.id || Number.isNaN(Date.parse(value.createdAt)) || !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value.id)) throw new Error();
+      if (!value.createdAt || !value.id || Number.isNaN(Date.parse(value.createdAt)) || !UUID_PATTERN.test(value.id)) throw new Error();
       return { createdAt: value.createdAt, id: value.id };
     } catch {
       throw new BadRequestException("invalid_cursor");
@@ -98,6 +99,9 @@ export class UsersService {
 
   async hasPersistedProfile(userId: string): Promise<boolean> {
     return Boolean((await this.usersRepository.findById(userId))?.privacyConsentAt);
+  }
+  async grantAllDevelopmentPermissions(userId: string): Promise<void> {
+    await this.usersRepository.grantAllActivePermissions(userId);
   }
 
   async markConsent(userId: string, consentedAt: string): Promise<void> {

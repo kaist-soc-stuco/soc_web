@@ -29,12 +29,14 @@ async function grant(userId: string, definitionId: string, scope = 'GLOBAL', sco
 }
 async function base() {
   for (const id of Object.values(ids)) await seedUser(id);
-  const keys = await Promise.all(['PERMISSION_GRANT', 'PERMISSION_REVOKE', 'PERMISSION_APPROVE', 'PERMISSION_ACTIVATE', 'FEE_WRITE'].map(definition));
+  const permissionKeys = ['PERMISSION_GRANT', 'PERMISSION_REVOKE', 'PERMISSION_APPROVE', 'PERMISSION_ACTIVATE', 'FEE_WRITE', 'USERS_MANAGE'];
+  const keys = await Promise.all(permissionKeys.map(definition));
   await grant(ids.requester, keys[0]!);
   await grant(ids.requester, keys[1]!);
+  await grant(ids.requester, keys[5]!);
   await grant(ids.approver, keys[2]!);
   await grant(ids.activator, keys[3]!);
-  return Object.fromEntries(['PERMISSION_GRANT', 'PERMISSION_REVOKE', 'PERMISSION_APPROVE', 'PERMISSION_ACTIVATE', 'FEE_WRITE'].map((key, i) => [key, keys[i]!])) as Record<string, string>;
+  return Object.fromEntries(permissionKeys.map((key, i) => [key, keys[i]!])) as Record<string, string>;
 }
 
 describe('permissions PostgreSQL protocol', () => {
@@ -111,6 +113,80 @@ describe('permissions PostgreSQL protocol', () => {
       expect(row.changed_field_names).not.toMatch(/userEmail|userMobile|kaistUid|studentOrEmployeeNumber|before|afterValue/i);
       expect(row.reason_code).not.toMatch(/@|010-/);
     }
+  });
+  it('lists only active definitions in key order and never exposes audit request fingerprints', async () => {
+    const definitions = await base();
+    await pool.query("UPDATE permission_definitions SET is_active = false WHERE id = $1", [definitions.FEE_WRITE]);
+    await pool.query("INSERT INTO permission_audit_log (action, record_id, changed_field_names, correlation_id, request_fingerprint) VALUES ('SAFE_AUDIT', $1, 'status', 'safe-audit', $2)", [ids.target, 'a'.repeat(64)]);
+
+    await expect(service.listDefinitions(ids.approver)).resolves.toEqual({
+      items: [
+        { key: 'PERMISSION_ACTIVATE', description: 'PERMISSION_ACTIVATE' },
+        { key: 'PERMISSION_APPROVE', description: 'PERMISSION_APPROVE' },
+        { key: 'PERMISSION_GRANT', description: 'PERMISSION_GRANT' },
+        { key: 'PERMISSION_REVOKE', description: 'PERMISSION_REVOKE' },
+        { key: 'USERS_MANAGE', description: 'USERS_MANAGE' },
+      ],
+    });
+    const audit = await service.listAudit();
+    expect(audit.items.find((item) => item.action === 'SAFE_AUDIT')).not.toHaveProperty('requestFingerprint');
+  });
+
+  it('rechecks both request authorities transactionally without writing when either is revoked', async () => {
+    const definitions = await base();
+    await pool.query("UPDATE permission_grants SET revoked_at = now() WHERE user_id = $1 AND permission_definition_id = $2", [ids.requester, definitions.USERS_MANAGE]);
+    await expect(repository.createRequest({
+      targetUserId: ids.target, action: 'GRANT', reasonCode: 'OPS', permissionDefinitionId: definitions.FEE_WRITE,
+      scope: 'BOARD', scopeId: 'board-a', requestHash: 'a'.repeat(64), requesterUserId: ids.requester,
+      authorityKey: 'PERMISSION_GRANT', usersManageAuthorityKey: 'USERS_MANAGE',
+    })).resolves.toBeNull();
+    expect((await pool.query('SELECT count(*) FROM permission_change_requests')).rows[0]!.count).toBe('0');
+    expect((await pool.query('SELECT count(*) FROM permission_audit_log')).rows[0]!.count).toBe('0');
+
+    await grant(ids.requester, definitions.USERS_MANAGE);
+    await pool.query("UPDATE permission_grants SET revoked_at = now() WHERE user_id = $1 AND permission_definition_id = $2", [ids.requester, definitions.PERMISSION_GRANT]);
+    await expect(repository.createRequest({
+      targetUserId: ids.target, action: 'GRANT', reasonCode: 'OPS', permissionDefinitionId: definitions.FEE_WRITE,
+      scope: 'BOARD', scopeId: 'board-a', requestHash: 'b'.repeat(64), requesterUserId: ids.requester,
+      authorityKey: 'PERMISSION_GRANT', usersManageAuthorityKey: 'USERS_MANAGE',
+    })).resolves.toBeNull();
+    expect((await pool.query('SELECT count(*) FROM permission_change_requests')).rows[0]!.count).toBe('0');
+    expect((await pool.query('SELECT count(*) FROM permission_audit_log')).rows[0]!.count).toBe('0');
+  });
+
+  it('lists queue stages by authority, scope, actor separation, expiry, and tied composite cursor without writes', async () => {
+    const definitions = await base();
+    await pool.query("UPDATE permission_grants SET revoked_at = now() WHERE user_id = $1 AND permission_definition_id = $2", [ids.approver, definitions.PERMISSION_APPROVE]);
+    await grant(ids.approver, definitions.PERMISSION_APPROVE, 'BOARD', 'board-a');
+    const first = await service.request(ids.requester, { targetUserId: ids.target, action: 'GRANT', permission: 'FEE_WRITE', scope: 'BOARD', scopeId: 'board-a', reasonCode: 'OPS' });
+    const second = await service.request(ids.requester, { targetUserId: ids.target, action: 'GRANT', permission: 'FEE_WRITE', scope: 'BOARD', scopeId: 'board-b', reasonCode: 'OPS' });
+    await pool.query('ALTER TABLE permission_change_requests DISABLE TRIGGER permission_change_requests_prevent_payload_mutation, DISABLE TRIGGER permission_change_requests_enforce_transition');
+    await pool.query("UPDATE permission_change_requests SET requested_at = '2025-01-01T00:00:00.000Z' WHERE id IN ($1, $2)", [first.id, second.id]);
+    await pool.query('ALTER TABLE permission_change_requests ENABLE TRIGGER permission_change_requests_prevent_payload_mutation, ENABLE TRIGGER permission_change_requests_enforce_transition');
+
+    const beforePendingReads = await pool.query('SELECT (SELECT count(*) FROM permission_change_requests) AS requests, (SELECT count(*) FROM permission_audit_log) AS audit');
+    const requested = await service.listRequests(ids.requester, 'REQUESTED', 1);
+    expect(requested.items).toHaveLength(1);
+    const requestedNext = await service.listRequests(ids.requester, 'REQUESTED', 1, requested.nextCursor!);
+    expect(new Set([...requested.items, ...requestedNext.items].map((item) => item.id))).toEqual(new Set([first.id, second.id]));
+    expect(await service.hasPermission(ids.approver, 'USERS_MANAGE', 'GLOBAL')).toBe(false);
+    expect(await service.hasPermission(ids.activator, 'USERS_MANAGE', 'GLOBAL')).toBe(false);
+    expect((await service.listRequests(ids.approver, 'APPROVAL')).items.map((item) => item.id)).toEqual([first.id]);
+    expect((await service.listRequests(ids.requester, 'APPROVAL')).items).toEqual([]);
+    expect((await service.listRequests(ids.activator, 'ACTIVATION')).items).toEqual([]);
+    expect(await pool.query('SELECT (SELECT count(*) FROM permission_change_requests) AS requests, (SELECT count(*) FROM permission_audit_log) AS audit')).toEqual(beforePendingReads);
+
+    await service.approve(ids.approver, first.id, 'REVIEWED');
+    const beforeActivationRead = await pool.query('SELECT (SELECT count(*) FROM permission_change_requests) AS requests, (SELECT count(*) FROM permission_audit_log) AS audit');
+    expect((await service.listRequests(ids.activator, 'ACTIVATION')).items.map((item) => item.id)).toContain(first.id);
+    expect(await pool.query('SELECT (SELECT count(*) FROM permission_change_requests) AS requests, (SELECT count(*) FROM permission_audit_log) AS audit')).toEqual(beforeActivationRead);
+
+    await pool.query('ALTER TABLE permission_change_requests DISABLE TRIGGER permission_change_requests_prevent_payload_mutation, DISABLE TRIGGER permission_change_requests_enforce_transition');
+    await pool.query("UPDATE permission_change_requests SET expires_at = now() - interval '1 second' WHERE id = $1", [second.id]);
+    await pool.query('ALTER TABLE permission_change_requests ENABLE TRIGGER permission_change_requests_prevent_payload_mutation, ENABLE TRIGGER permission_change_requests_enforce_transition');
+    const beforeExpiredRead = await pool.query('SELECT (SELECT count(*) FROM permission_change_requests) AS requests, (SELECT count(*) FROM permission_audit_log) AS audit');
+    expect((await service.listRequests(ids.approver, 'APPROVAL')).items.map((item) => item.id)).not.toContain(second.id);
+    expect(await pool.query('SELECT (SELECT count(*) FROM permission_change_requests) AS requests, (SELECT count(*) FROM permission_audit_log) AS audit')).toEqual(beforeExpiredRead);
   });
 
   it('bootstraps only once and rejects wrong subject, missing definitions, or any existing grant', async () => {

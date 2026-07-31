@@ -42,9 +42,13 @@ export class PermissionsRepository {
   async createRequest(input: {
     targetUserId: string; action: PermissionChangeAction; reasonCode: string; permissionDefinitionId: string;
     scope: PermissionScope; scopeId: string | null; requestHash: string; requesterUserId: string; authorityKey: string;
+    usersManageAuthorityKey: string;
   }) {
     return this.db.transaction(async (tx) => {
-      if (!(await this.hasEffectiveAuthority(tx, input.requesterUserId, input.authorityKey, input.scope, input.scopeId))) return null;
+      if (
+        !(await this.hasEffectiveGlobalAuthority(tx, input.requesterUserId, input.usersManageAuthorityKey))
+        || !(await this.hasEffectiveAuthority(tx, input.requesterUserId, input.authorityKey, input.scope, input.scopeId))
+      ) return null;
       const [record] = await tx.insert(permissionChangeRequests).values({
         targetUserId: input.targetUserId, action: input.action, requestedReasonCode: input.reasonCode,
         permissionDefinitionId: input.permissionDefinitionId, scope: input.scope, scopeId: input.scopeId,
@@ -86,13 +90,108 @@ export class PermissionsRepository {
   }
 
   async listAudit(limit: number, before?: { occurredAt: Date; id: string }) {
-    return this.db.select().from(permissionAuditLog)
+    return this.db.select({
+      id: permissionAuditLog.id,
+      actorUserId: permissionAuditLog.actorUserId,
+      action: permissionAuditLog.action,
+      recordId: permissionAuditLog.recordId,
+      changedFieldNames: permissionAuditLog.changedFieldNames,
+      correlationId: permissionAuditLog.correlationId,
+      reasonCode: permissionAuditLog.reasonCode,
+      occurredAt: permissionAuditLog.occurredAt,
+    }).from(permissionAuditLog)
       .where(and(
         before
           ? sql`(${permissionAuditLog.occurredAt}, ${permissionAuditLog.id}) < (${before.occurredAt}, ${before.id}::uuid)`
           : undefined,
       ))
       .orderBy(sql`${permissionAuditLog.occurredAt} DESC`, sql`${permissionAuditLog.id} DESC`).limit(limit);
+  }
+
+  async hasAnyWorkflowAuthority(actorUserId: string): Promise<boolean> {
+    const authority = await this.db.execute(sql`
+      SELECT 1
+      FROM permission_grants grant_record
+      INNER JOIN permission_definitions definition ON definition.id = grant_record.permission_definition_id
+      WHERE grant_record.user_id = ${actorUserId}
+        AND definition.key IN ('PERMISSION_GRANT', 'PERMISSION_REVOKE', 'PERMISSION_APPROVE', 'PERMISSION_ACTIVATE')
+        AND definition.is_active = true
+        AND grant_record.activated_from <= now()
+        AND grant_record.revoked_at IS NULL
+        AND (grant_record.expires_at IS NULL OR grant_record.expires_at > now())
+      LIMIT 1
+    `);
+    return authority.rows.length === 1;
+  }
+
+  async listActiveDefinitions() {
+    return this.db.select({
+      key: permissionDefinitions.key,
+      description: permissionDefinitions.description,
+    }).from(permissionDefinitions)
+      .where(eq(permissionDefinitions.isActive, true))
+      .orderBy(asc(permissionDefinitions.key));
+  }
+
+  async listRequests(
+    actorUserId: string,
+    stage: "REQUESTED" | "APPROVAL" | "ACTIVATION",
+    limit: number,
+    before?: { requestedAt: Date; id: string },
+  ) {
+    const authorityKey = stage === "APPROVAL" ? "PERMISSION_APPROVE" : "PERMISSION_ACTIVATE";
+    const stageCondition = stage === "REQUESTED"
+      ? and(
+        eq(permissionChangeRequests.status, "PENDING"),
+        eq(permissionChangeRequests.requesterUserId, actorUserId),
+      )
+      : and(
+        eq(permissionChangeRequests.status, stage === "APPROVAL" ? "PENDING" : "APPROVED"),
+        sql`${permissionChangeRequests.requesterUserId} <> ${actorUserId}::uuid`,
+        stage === "APPROVAL" ? sql`${permissionChangeRequests.targetUserId} <> ${actorUserId}::uuid` : undefined,
+        sql`EXISTS (
+          SELECT 1
+          FROM permission_grants grant_record
+          INNER JOIN permission_definitions authority_definition ON authority_definition.id = grant_record.permission_definition_id
+          WHERE grant_record.user_id = ${actorUserId}
+            AND authority_definition.key = ${authorityKey}
+            AND authority_definition.is_active = true
+            AND grant_record.activated_from <= now()
+            AND grant_record.revoked_at IS NULL
+            AND (grant_record.expires_at IS NULL OR grant_record.expires_at > now())
+            AND (
+              grant_record.scope = 'GLOBAL'
+              OR (
+                grant_record.scope = ${permissionChangeRequests.scope}
+                AND grant_record.scope_id IS NOT DISTINCT FROM ${permissionChangeRequests.scopeId}
+              )
+            )
+        )`,
+      );
+
+    return this.db.select({
+      id: permissionChangeRequests.id,
+      targetUserId: permissionChangeRequests.targetUserId,
+      action: permissionChangeRequests.action,
+      permission: permissionDefinitions.key,
+      scope: permissionChangeRequests.scope,
+      scopeId: permissionChangeRequests.scopeId,
+      status: permissionChangeRequests.status,
+      requestedAt: permissionChangeRequests.requestedAt,
+      approvedAt: permissionChangeRequests.approvedAt,
+      activatedAt: permissionChangeRequests.activatedAt,
+      expiresAt: permissionChangeRequests.expiresAt,
+    }).from(permissionChangeRequests)
+      .innerJoin(permissionDefinitions, eq(permissionDefinitions.id, permissionChangeRequests.permissionDefinitionId))
+      .where(and(
+        stageCondition,
+        gt(permissionChangeRequests.expiresAt, sql`now()`),
+        before
+          ? sql`(${permissionChangeRequests.requestedAt}, ${permissionChangeRequests.id}) < (${before.requestedAt}, ${before.id}::uuid)`
+          : undefined,
+      ))
+      .orderBy(desc(permissionChangeRequests.requestedAt), desc(permissionChangeRequests.id))
+      .limit(limit);
   }
 
   async approveRequest(id: string, actorUserId: string, reasonCode: string, authorityKey: string) {
@@ -245,6 +344,23 @@ export class PermissionsRepository {
     });
   }
 
+  private async hasEffectiveGlobalAuthority(tx: NodePgDatabase, actorUserId: string, authorityKey: string) {
+    const authority = await tx.execute(sql`
+      SELECT 1
+      FROM permission_grants grant_record
+      INNER JOIN permission_definitions definition ON definition.id = grant_record.permission_definition_id
+      WHERE grant_record.user_id = ${actorUserId}
+        AND definition.key = ${authorityKey}
+        AND definition.is_active = true
+        AND grant_record.activated_from <= now()
+        AND grant_record.revoked_at IS NULL
+        AND (grant_record.expires_at IS NULL OR grant_record.expires_at > now())
+        AND grant_record.scope = 'GLOBAL'
+      LIMIT 1
+      FOR UPDATE OF grant_record
+    `);
+    return authority.rows.length === 1;
+  }
   private async hasEffectiveAuthority(tx: NodePgDatabase, actorUserId: string, authorityKey: string, scope: PermissionScope, scopeId: string | null) {
     const authority = await tx.execute(sql`
       SELECT 1

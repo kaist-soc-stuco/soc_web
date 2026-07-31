@@ -13,7 +13,7 @@
 
 1. 브라우저는 `VITE_SSO_START_URL`이 있으면 그 값을, 없으면 `VITE_SSO_REDIRECT_URI`로부터 파생한 `/start` URL을 `fetch`한다.
 2. 서버는 `state`와 `nonce`를 생성해 Redis에 저장하고, authorize payload를 반환한다.
-3. 반환 payload는 JSON init payload이거나 vendor-compatible HTML form payload일 수 있다.
+3. 서버는 authorize에 필요한 JSON payload를 반환한다.
 4. 프런트는 반환된 `loginUrl`, `client_id`, `redirect_uri`, `state`, `nonce`를 사용해 hidden `POST` form을 직접 만들어 SSO authorize로 제출한다.
 5. SSO 서버는 등록된 `redirect_uri`인 `POST /api/auth/login`으로 `state`와 `code`를 전달한다.
 6. 서버는 전달받은 `code`와 `client_secret`을 사용해 사용자 정보 요청 API를 호출한다.
@@ -110,11 +110,10 @@ SSO_AUTH_API_URL=https://sso.kaist.ac.kr/auth/api/single/auth
 
 현재 `apps/web/src/pages/login-page.tsx`와 `apps/web/src/pages/login-consent-page.tsx`는 다음을 구현한다.
 
-- `VITE_SSO_START_URL` 또는 `VITE_SSO_REDIRECT_URI`에서 파생한 start URL 표시
-- start/init endpoint `fetch` 후 authorize form submit
+- `VITE_SSO_START_URL` 또는 `VITE_SSO_REDIRECT_URI`에서 파생한 start URL 사용
+- start endpoint의 JSON payload로 hidden authorize `POST` form 생성
 - `/login?status=...&reason=...` 결과 표시
-++
-- `status=consent-required` + `pendingLoginToken` 수신 시 동의 페이지(`/login/consent`)로 이동
-- `status=success` + `resultToken` 수신 시 `GET /auth/login/result`로 1회 교환 후 access/refresh/session 저장
-- 저장된 sessionId로 `GET /auth/session` 호출해 세션 상태 표시
-- 동의 페이지에서 `POST /auth/login/consent` 호출 후 결과 토큰/세션 저장
+- 동의가 필요한 신규 사용자는 HttpOnly `soc_flow` 쿠키를 통해 `/login/consent`로 이동
+- 동의 완료 후 서버가 `soc_at`/`soc_rt` 또는 `soc_tmp` HttpOnly 쿠키 발급
+- 브라우저 저장소에는 access token, refresh token, session ID를 저장하지 않음
+- `GET /api/auth/session` 요청에 쿠키를 포함해 현재 세션 상태 조회

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthController } from '../src/features/auth/auth.controller';
 import { AuthSessionService } from '../src/features/auth/auth-session.service';
 import { AuthService } from '../src/features/auth/auth.service';
+import { UsersService } from '../src/features/users/users.service';
 import { createOriginMiddleware } from '../src/shared/middleware/origin.middleware';
 
 const PUBLIC_ORIGIN = 'https://committee.example.test';
@@ -39,8 +40,10 @@ describe('AuthController HTTP contract', () => {
     handleConsentDecision: ReturnType<typeof vi.fn>;
     getSession: ReturnType<typeof vi.fn>;
     refreshSession: ReturnType<typeof vi.fn>;
+    issuePersistedSession: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
   };
+  let users: { createFromSsoUser: ReturnType<typeof vi.fn>; findBySsoUserId: ReturnType<typeof vi.fn>; grantAllDevelopmentPermissions: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     authService = {
@@ -52,6 +55,12 @@ describe('AuthController HTTP contract', () => {
       getSession: vi.fn(),
       refreshSession: vi.fn(),
       logout: vi.fn(),
+      issuePersistedSession: vi.fn(),
+    };
+    users = {
+      createFromSsoUser: vi.fn(),
+      findBySsoUserId: vi.fn(),
+      grantAllDevelopmentPermissions: vi.fn(),
     };
 
     const module = await Test.createTestingModule({
@@ -59,7 +68,8 @@ describe('AuthController HTTP contract', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: AuthSessionService, useValue: authSessionService },
-        { provide: ConfigService, useValue: { getOrThrow: vi.fn().mockReturnValue(PUBLIC_ORIGIN) } },
+        { provide: ConfigService, useValue: { get: vi.fn().mockReturnValue("development"), getOrThrow: vi.fn().mockReturnValue(PUBLIC_ORIGIN) } },
+        { provide: UsersService, useValue: users },
       ],
     }).compile();
 
@@ -76,6 +86,29 @@ describe('AuthController HTTP contract', () => {
   afterEach(async () => {
     await app?.close();
     app = undefined;
+  });
+  it('creates a development user and sets persisted cookies only in development', async () => {
+    users.findBySsoUserId.mockResolvedValue(null);
+    users.createFromSsoUser.mockResolvedValue({ id: 'development-user-id' });
+    authSessionService.issuePersistedSession.mockResolvedValue({
+      accessToken: 'development-access',
+      refreshToken: 'development-refresh',
+    });
+
+    const response = await request(app!.getHttpServer())
+      .post('/api/auth/development/login')
+      .set('Origin', PUBLIC_ORIGIN)
+      .expect(204);
+
+    expect(users.createFromSsoUser).toHaveBeenCalledWith({
+      consentedAt: expect.any(String),
+      ssoUserId: 'development-user',
+      userEmail: 'developer@example.test',
+    });
+    expect(users.grantAllDevelopmentPermissions).toHaveBeenCalledWith('development-user-id');
+    expect(authSessionService.issuePersistedSession).toHaveBeenCalledWith('development-user-id');
+    expectCookie(response.headers['set-cookie'], 'soc_at', '/api');
+    expectCookie(response.headers['set-cookie'], 'soc_rt', '/api/auth');
   });
 
   it('marks production auth cookies Secure', async () => {

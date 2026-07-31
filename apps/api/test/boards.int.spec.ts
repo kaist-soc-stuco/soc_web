@@ -258,6 +258,50 @@ describe('board PostgreSQL protocol', () => {
     const parent = await comment(first);
     await expect(pool.query("INSERT INTO comments (article_id,parent_comment_id,author_user_id,body,status,deleted_at,purge_after) VALUES ($1,$2,$3,'bad','DELETED',$4,$5)", [second, parent, actorId, now, now])).rejects.toMatchObject({ code: '23503' });
   });
+  it('serializes versioned board mutations, advances tokens beyond frozen and backward clocks, and audits only winners', async () => {
+    const created = await boardsRepository.create({
+      actorUserId: actorId, correlationId: 'board-version-create', now,
+      changedFieldNames: 'record',
+      values: { code: 'versioned-board', titleKr: '원본', titleEn: 'Original', descriptionKr: '설명', descriptionEn: 'Description', readPermission: 'PUBLIC', writePermission: 'AUTHENTICATED', commentPermission: 'AUTHENTICATED', commentsAllowed: true, secretArticlesAllowed: false, reactionsAllowed: true, displayOrder: 901, isHidden: false, showOnHome: false },
+    });
+    const first = await boardsRepository.patch(created.id, { actorUserId: actorId, correlationId: 'board-version-first', now, expectedUpdatedAt: created.updatedAt.toISOString(), values: { titleEn: 'First' }, changedFieldNames: 'title' });
+    expect(first).not.toBe('stale');
+    expect(first).not.toBeNull();
+    const firstBoard = first as Exclude<typeof first, 'stale' | null>;
+    expect(firstBoard.updatedAt.getTime()).toBeGreaterThan(created.updatedAt.getTime());
+
+    const stale = await boardsRepository.patch(created.id, { actorUserId: actorId, correlationId: 'board-version-stale', now: new Date(now.getTime() - 60_000), expectedUpdatedAt: created.updatedAt.toISOString(), values: { titleEn: 'Stale' }, changedFieldNames: 'title' });
+    expect(stale).toBe('stale');
+    expect((await pool.query('SELECT title_en, updated_at FROM boards WHERE id = $1', [created.id])).rows).toEqual([{ title_en: 'First', updated_at: firstBoard.updatedAt }]);
+    expect((await pool.query("SELECT count(*) FROM permission_audit_log WHERE correlation_id = 'board-version-stale'")).rows[0]!.count).toBe('0');
+
+    const second = await boardsRepository.patch(created.id, { actorUserId: actorId, correlationId: 'board-version-second', now, expectedUpdatedAt: firstBoard.updatedAt.toISOString(), values: { titleEn: 'Second' }, changedFieldNames: 'title' });
+    expect(second).not.toBe('stale');
+    expect(second).not.toBeNull();
+    const secondBoard = second as Exclude<typeof second, 'stale' | null>;
+    expect(secondBoard.updatedAt.getTime()).toBe(firstBoard.updatedAt.getTime() + 1);
+
+    const backward = await boardsRepository.patch(created.id, { actorUserId: actorId, correlationId: 'board-version-backward', now: new Date(now.getTime() - 60_000), expectedUpdatedAt: secondBoard.updatedAt.toISOString(), values: { titleEn: 'Backward' }, changedFieldNames: 'title' });
+    expect(backward).not.toBe('stale');
+    expect(backward).not.toBeNull();
+    const backwardBoard = backward as Exclude<typeof backward, 'stale' | null>;
+    expect(backwardBoard.updatedAt.getTime()).toBe(secondBoard.updatedAt.getTime() + 1);
+
+    expect(await boardsRepository.delete(created.id, actorId, 'board-version-stale-delete', secondBoard.updatedAt.toISOString())).toBe('stale');
+    expect((await pool.query("SELECT count(*) FROM permission_audit_log WHERE correlation_id = 'board-version-stale-delete'")).rows[0]!.count).toBe('0');
+    expect(await boardsRepository.delete(created.id, actorId, 'board-version-delete', backwardBoard.updatedAt.toISOString())).toBe('deleted');
+  });
+  it('blocks board deletion when any physical article remains, including soft-deleted articles', async () => {
+    const board = await boardsRepository.create({
+      actorUserId: actorId, correlationId: 'board-physical-article-create', now,
+      changedFieldNames: 'record',
+      values: { code: 'article-guard-board', titleKr: '가드', titleEn: 'Guard', descriptionKr: '설명', descriptionEn: 'Description', readPermission: 'PUBLIC', writePermission: 'AUTHENTICATED', commentPermission: 'AUTHENTICATED', commentsAllowed: true, secretArticlesAllowed: false, reactionsAllowed: true, displayOrder: 902, isHidden: false, showOnHome: false },
+    });
+    const id = await article();
+    await pool.query('UPDATE articles SET board_id = $2 WHERE id = $1', [id, board.id]);
+    expect(await boardsRepository.delete(board.id, actorId, 'board-physical-article-delete', board.updatedAt.toISOString())).toBe('has_articles');
+    expect((await pool.query('SELECT count(*) FROM boards WHERE id = $1', [board.id])).rows[0]!.count).toBe('1');
+  });
 
   it('upserts concurrent reactions to one unique article/user record', async () => {
     const id = await article('PUBLISHED');
@@ -313,13 +357,14 @@ describe('board PostgreSQL protocol', () => {
       })).rejects.toThrow();
       expect((await pool.query("SELECT count(*) FROM boards WHERE code = 'audit-create'")).rows[0]!.count).toBe('0');
 
+      const auditBoardVersion = (await pool.query<{ updated_at: Date }>('SELECT updated_at FROM boards WHERE id = $1', [auditBoardId])).rows[0]!.updated_at.toISOString();
       await expect(boardsRepository.patch(auditBoardId, {
         actorUserId: actorId, correlationId: 'board-patch-audit-failure', now,
-        changedFieldNames: 'title', values: { titleEn: 'Changed' },
+        expectedUpdatedAt: auditBoardVersion, changedFieldNames: 'title', values: { titleEn: 'Changed' },
       })).rejects.toThrow();
       expect((await pool.query('SELECT title_en FROM boards WHERE id = $1', [auditBoardId])).rows).toEqual([{ title_en: 'Audit' }]);
 
-      await expect(boardsRepository.delete(auditBoardId, actorId, 'board-delete-audit-failure')).rejects.toThrow();
+      await expect(boardsRepository.delete(auditBoardId, actorId, 'board-delete-audit-failure', auditBoardVersion)).rejects.toThrow();
       expect((await pool.query('SELECT count(*) FROM boards WHERE id = $1', [auditBoardId])).rows[0]!.count).toBe('1');
 
       await expect(articlesRepository.create('suggestions', actorId, 'article-create-audit-failure', async (lockedBoard) => ({

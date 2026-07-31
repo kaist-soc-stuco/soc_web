@@ -1,0 +1,36 @@
+services:
+  api:
+    env_file:
+      - .docker-test.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: soc_web_docker_test
+      POSTGRES_USER: soc_test
+      POSTGRES_PASSWORD: docker-test-password-20260728
+      DATABASE_URL: postgresql://soc_test:docker-test-password-20260728@postgres:5432/soc_web_docker_test?sslmode=disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+  web:
+    env_file:
+      - .docker-test.env
+  db-migrate:
+    env_file:
+      - .docker-test.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: soc_web_docker_test
+      POSTGRES_USER: soc_test
+      POSTGRES_PASSWORD: docker-test-password-20260728
+      DATABASE_URL: postgresql://soc_test:docker-test-password-20260728@postgres:5432/soc_web_docker_test?sslmode=disable
+    command: ['sh', '-c', 'bash /app/infra/scripts/db-migrate.sh --staged']
+  postgres:
+    environment:
+      POSTGRES_DB: soc_web_docker_test
+      POSTGRES_USER: soc_test
+      POSTGRES_PASSWORD: docker-test-password-20260728
+  redis:
+    ports:
+      - '127.0.0.1:16379:6379'

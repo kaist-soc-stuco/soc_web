@@ -4,6 +4,7 @@ import { BoardApiError, BoardApiProtocolError, boardApi } from '../lib/board-api
 const summary = { id: 'a', boardCode: 'notice', title: { value: '공지', translationUnavailable: false }, status: 'PUBLISHED', scope: 'ALL', isPinned: false, pinnedOrder: null, publishedAt: null, updatedAt: '2026-01-01T00:00:00.000Z' };
 const board = { id: 'b', code: 'notice', title: { value: '공지', translationUnavailable: false }, description: { value: '', translationUnavailable: false }, config: { readPermission: 'PUBLIC', writePermission: 'COMMITTEE', commentPermission: 'AUTHENTICATED', commentsAllowed: true, secretArticlesAllowed: false, reactionsAllowed: true, displayOrder: 1, isHidden: false, showOnHome: true }, updatedAt: '2026-01-01T00:00:00.000Z' };
 
+const adminBoard = { id: 'board-1', code: 'notice', titleKr: '공지', titleEn: 'Notice', descriptionKr: '설명', descriptionEn: 'Description', readPermission: 'PUBLIC', writePermission: 'AUTHENTICATED', commentPermission: 'AUTHENTICATED', commentsAllowed: true, secretArticlesAllowed: false, reactionsAllowed: true, displayOrder: 1, isHidden: false, showOnHome: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' };
 afterEach(() => vi.restoreAllMocks());
 describe('boardApi', () => {
   it('uses credentialed requests and typed board/article endpoints', async () => {
@@ -20,4 +21,34 @@ describe('boardApi', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ locale: 'ko', items: [] }), { status: 200 }));
     await expect(boardApi.get('notice')).rejects.toBeInstanceOf(BoardApiProtocolError);
   });
+  it('strictly decodes administrative responses and sends versioned mutation bodies', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [adminBoard] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(adminBoard), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(boardApi.adminList()).resolves.toEqual({ items: [adminBoard] });
+    await expect(boardApi.adminPatch('board-1', { expectedUpdatedAt: adminBoard.updatedAt, titleKr: '새 공지' })).resolves.toEqual(adminBoard);
+    await expect(boardApi.adminDelete('board-1', { expectedUpdatedAt: adminBoard.updatedAt })).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/admin/boards/board-1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ expectedUpdatedAt: adminBoard.updatedAt, titleKr: '새 공지' }) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/admin/boards/board-1', expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ expectedUpdatedAt: adminBoard.updatedAt }) }));
+  });
+
+  it('rejects permissive-looking admin payloads and preserves canonical mutation errors', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ ...adminBoard, unexpected: true }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: 'stale_board', message: 'stale', requestId: 'r' }), { status: 409 }));
+    await expect(boardApi.adminList()).rejects.toBeInstanceOf(BoardApiProtocolError);
+    await expect(boardApi.adminPatch('board-1', { expectedUpdatedAt: adminBoard.updatedAt })).rejects.toMatchObject({ status: 409, code: 'stale_board', message: 'stale' });
+  });
 });
+  it('rejects malformed public config and accepts nullable localized content', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ locale: 'ko', items: [{ ...board, config: { ...board.config, commentsAllowed: 'true' } }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ locale: 'en', items: [{ ...board, title: { value: null, translationUnavailable: true }, description: { value: null, translationUnavailable: true } }] }), { status: 200 }));
+    await expect(boardApi.list()).rejects.toBeInstanceOf(BoardApiProtocolError);
+    await expect(boardApi.list()).resolves.toEqual({
+      locale: 'en',
+      items: [{ ...board, title: { value: null, translationUnavailable: true }, description: { value: null, translationUnavailable: true } }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });

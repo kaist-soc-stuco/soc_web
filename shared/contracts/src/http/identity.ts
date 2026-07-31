@@ -109,6 +109,21 @@ export interface PermissionChangeRequestResponse {
   activatedAt: string | null;
   expiresAt: string;
 }
+export interface PermissionDefinition {
+  key: string;
+  description: string;
+}
+
+export interface PermissionDefinitionListResponse {
+  items: PermissionDefinition[];
+}
+
+export type PermissionRequestQueueStage = "REQUESTED" | "APPROVAL" | "ACTIVATION";
+
+export interface PermissionRequestQueueListResponse {
+  items: PermissionChangeRequestResponse[];
+  nextCursor: string | null;
+}
 
 export interface FeeSelfResponse {
   feeStatus: FeeStatus;
