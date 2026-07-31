@@ -29,6 +29,19 @@ async function probe(path, options = {}) {
 const health = await probe("/health");
 if (!health.ok) fail(`/health returned HTTP ${health.status}`);
 
+const expectedSecurityHeaders = new Map([
+  ["content-security-policy", "frame-ancestors 'none'"],
+  ["permissions-policy", "camera=()"],
+  ["referrer-policy", "strict-origin-when-cross-origin"],
+  ["strict-transport-security", "max-age=31536000"],
+  ["x-content-type-options", "nosniff"],
+  ["x-frame-options", "DENY"],
+]);
+for (const [header, expected] of expectedSecurityHeaders) {
+  const actual = health.headers.get(header);
+  if (!actual?.includes(expected)) fail(`${header} security header is missing or invalid`);
+}
+
 const session = await probe("/api/auth/session", { headers: { Origin: publicOrigin } });
 if (session.status === 404) fail("/api/auth/session returned 404; proxy prefix is not reaching the API /api/ routes");
 if (![200, 401].includes(session.status)) {
@@ -45,4 +58,4 @@ if (responseRequestId !== requestId) {
   fail(`X-Request-ID was not propagated (sent ${requestId}, received ${responseRequestId ?? "none"})`);
 }
 
-console.log(JSON.stringify({ baseUrl, checks: ["health", "auth-session-routing", "unsafe-origin-rejection", "request-id-propagation"] }));
+console.log(JSON.stringify({ baseUrl, checks: ["health", "security-headers", "auth-session-routing", "unsafe-origin-rejection", "request-id-propagation"] }));
