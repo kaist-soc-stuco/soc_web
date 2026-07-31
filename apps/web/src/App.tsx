@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { AdminRouteGuard, NotFoundPage } from '@/components/organisms/admin-route-guard';
 
 import { AdminIndexRedirect } from '@/pages/admin-index-redirect';
 import { AdminPage } from '@/pages/admin-page';
@@ -89,22 +90,23 @@ export function App() {
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/admin" element={<AdminPage />}>
           <Route index element={<AdminIndexRedirect />} />
-          <Route path="payments" element={<AdminPaymentsPage />} />
-          <Route path="surveys" element={<AdminSurveysPage />} />
-          <Route path="surveys/:surveyId/edit" element={<AdminSurveyEditPage />} />
-          <Route path="surveys/:surveyId/responses" element={<AdminSurveyOperationsPage />} />
-          <Route path="emails" element={<AdminEmailsPage />} />
-          <Route path="contacts" element={<AdminContactsPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route path="permissions" element={<AdminPermissionsPage />} />
-          <Route path="audit-logs" element={<AdminAuditLogsPage />} />
-          <Route path="boards" element={<AdminBoardsPage />} />
-          <Route path="faqs" element={<AdminFaqsPage />} />
-          <Route path="events" element={<AdminEventsPage />} />
+          <Route path="payments" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FEES_MANAGE' }}><AdminPaymentsPage /></AdminRouteGuard>} />
+          <Route path="surveys" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveysPage /></AdminRouteGuard>} />
+          <Route path="surveys/:surveyId/edit" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveyEditPage /></AdminRouteGuard>} />
+          <Route path="surveys/:surveyId/responses" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveyOperationsPage /></AdminRouteGuard>} />
+          <Route path="emails" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'MAIL_SEND' }}><AdminEmailsPage /></AdminRouteGuard>} />
+          <Route path="contacts" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'CONTACTS_MANAGE' }}><AdminContactsPage /></AdminRouteGuard>} />
+          <Route path="users" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'USERS_MANAGE' }}><AdminUsersPage /></AdminRouteGuard>} />
+          <Route path="permissions" element={<AdminRouteGuard requirement={{ kind: 'WORKFLOW' }}><AdminPermissionsPage /></AdminRouteGuard>} />
+          <Route path="audit-logs" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'PERMISSION_AUDIT' }}><AdminAuditLogsPage /></AdminRouteGuard>} />
+          <Route path="boards" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'BOARD_MANAGE' }}><AdminBoardsPage /></AdminRouteGuard>} />
+          <Route path="faqs" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FAQ_MANAGE' }}><AdminFaqsPage /></AdminRouteGuard>} />
+          <Route path="events" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'EVENT_MANAGE' }}><AdminEventsPage /></AdminRouteGuard>} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<TreeLogin />} />
         <Route path="/login/consent" element={<LoginConsentPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

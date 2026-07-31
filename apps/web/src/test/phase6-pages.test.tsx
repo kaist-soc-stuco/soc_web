@@ -89,19 +89,15 @@ describe('Phase 6 contact, mail, and chat pages', () => {
     expect(screen.queryByText('홍길동')).not.toBeInTheDocument();
   });
 
-  it('sends exact mail preview/send payloads and presents provider-disabled 503 as unavailable, never success', async () => {
-    api.contactApi.mailPreview.mockRejectedValue(new api.ContactApiError(503, 'feature_disabled'));
-    api.contactApi.mailCreate.mockRejectedValue(new api.ContactApiError(503, 'feature_disabled'));
+  it('clearly disables mail composition while the provider is unavailable', () => {
     render(<AdminEmailsPage />);
-    setField('받는 사람', ' contact-1, contact-2 , '); setField('제목', '안내'); setField('내용', '본문');
 
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
-    await waitFor(() => expect(api.contactApi.mailPreview).toHaveBeenCalledWith({ contactIds: ['contact-1', 'contact-2'], subject: '안내', body: '본문' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('이메일 미리보기 기능은 현재 사용할 수 없습니다.');
-    expect(screen.queryByText(/성공/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '보내기' }));
-    await waitFor(() => expect(api.contactApi.mailCreate).toHaveBeenCalledWith({ contactIds: ['contact-1', 'contact-2'], subject: '안내', body: '본문' }));
-    expect(screen.getByRole('status')).toHaveTextContent('이메일 발송 기능은 현재 사용할 수 없습니다.');
+    expect(screen.getByText('현재 사용할 수 없는 기능입니다.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '미리보기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '보내기' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('받는 사람')).not.toBeInTheDocument();
+    expect(api.contactApi.mailPreview).not.toHaveBeenCalled();
+    expect(api.contactApi.mailCreate).not.toHaveBeenCalled();
   });
 
   it('loads the static external chat link without browser storage or a message submission surface', async () => {
