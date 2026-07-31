@@ -81,6 +81,7 @@ export const adminMenu: readonly AdminMenuItem[] = [
   { label: '권한 감사 로그', to: '/admin/audit-logs', access: { kind: 'GLOBAL', permission: 'PERMISSION_AUDIT' } },
   { label: '게시판 관리', to: '/admin/boards', access: { kind: 'GLOBAL', permission: 'BOARD_MANAGE' } },
   { label: 'FAQ 관리', to: '/admin/faqs', access: { kind: 'GLOBAL', permission: 'FAQ_MANAGE' } },
+  { label: '행사 관리', to: '/admin/events', access: { kind: 'GLOBAL', permission: 'EVENT_MANAGE' } },
 ];
 
 export function visibleAdminMenu(grants: readonly EffectivePermissionGrant[]): AdminMenuItem[] {

@@ -13,6 +13,7 @@ import { AdminPermissionsPage } from '@/pages/admin-permissions-page';
 import { AdminAuditLogsPage } from '@/pages/admin-audit-logs-page';
 import { AdminBoardsPage } from '@/pages/admin-boards-page';
 import { AdminFaqsPage } from '@/pages/admin-faqs-page';
+import { AdminEventsPage } from '@/pages/admin-events-page';
 import { AboutPage } from '@/pages/about-page';
 import { HomePage } from '@/pages/home-page';
 import { BoardPage } from '@/pages/board-page';
@@ -97,6 +98,7 @@ export function App() {
           <Route path="audit-logs" element={<AdminAuditLogsPage />} />
           <Route path="boards" element={<AdminBoardsPage />} />
           <Route path="faqs" element={<AdminFaqsPage />} />
+          <Route path="events" element={<AdminEventsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<TreeLogin />} />
