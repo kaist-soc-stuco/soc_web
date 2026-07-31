@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { DRIZZLE_DB, type PostgresDatabase } from '../../infrastructure/postgres/postgres.provider';
 import { articles, contentMatchers, events, surveyAuditLog, surveyChoiceOptions, surveyExports, surveyGuestIdentityHashes, surveyResponseAnswers, surveyResponses, surveyRevisions, surveySections, surveyQuestions, surveys, users } from '../../infrastructure/postgres/postgres.schema';
 type Tx = Parameters<Parameters<PostgresDatabase['transaction']>[0]>[0];
@@ -187,6 +187,32 @@ export class SurveysRepository {
     return row ?? null;
   }
   async answers(responseId: string) { return this.db.select().from(surveyResponseAnswers).where(eq(surveyResponseAnswers.responseId, responseId)); }
+  async responses(surveyId: string) {
+    if (!(await this.survey(surveyId))) return null;
+    return this.db.select().from(surveyResponses)
+      .where(eq(surveyResponses.surveyId, surveyId))
+      .orderBy(desc(surveyResponses.submittedAt), desc(surveyResponses.id));
+  }
+  async response(id: string) {
+    const [row] = await this.db.select().from(surveyResponses).where(eq(surveyResponses.id, id)).limit(1);
+    return row ?? null;
+  }
+  async myResponses(userId: string) {
+    return this.db.select().from(surveyResponses)
+      .where(eq(surveyResponses.campusUserId, userId))
+      .orderBy(desc(surveyResponses.submittedAt), desc(surveyResponses.id));
+  }
+  async exportRows(surveyId: string) {
+    const detail = await this.detail(surveyId);
+    if (!detail) return null;
+    const responses = await this.db.select().from(surveyResponses)
+      .where(eq(surveyResponses.surveyId, surveyId))
+      .orderBy(asc(surveyResponses.submittedAt), asc(surveyResponses.id));
+    const answers = responses.length
+      ? await this.db.select().from(surveyResponseAnswers).where(inArray(surveyResponseAnswers.responseId, responses.map((row) => row.id)))
+      : [];
+    return { detail, responses, answers };
+  }
   async review(
     id: string,
     actor: string,

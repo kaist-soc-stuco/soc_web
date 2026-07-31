@@ -89,6 +89,13 @@ export interface SurveyResponseDto {
   id: string; state: SurveyResponseState; answers: SurveyResponseAnswerDto[]; submittedAt: string | null;
   reviewedAt: string | null; reviewReason: string | null; phonePresent: boolean; maskedPhone: string | null;
 }
+export interface AdminSurveyResponseListItem {
+  id: string; surveyId: string; state: SurveyResponseState; submittedAt: string | null;
+  reviewedAt: string | null; reviewReason: string | null; phonePresent: boolean; maskedPhone: string | null;
+}
+export interface AdminSurveyResponseListResponse { items: AdminSurveyResponseListItem[]; }
+export interface MySurveyResponseListItem { survey: SurveyDto; response: SurveyResponseDto; }
+export interface MySurveyResponsesResponse { items: MySurveyResponseListItem[]; }
 export interface CreateSurveyRequest {
   title: SurveyBilingualText; description?: SurveyBilingualText | null; guestAllowed: boolean; phoneRequired: boolean;
   feeRestriction: "ANY" | "PAID_ONLY"; cap?: number | null; opensAt?: string | null; closesAt?: string | null; editDeadlineAt?: string | null; responseRetentionDays: number;
@@ -165,6 +172,7 @@ export type ReviewSurveyResponseRequest =
   | { state: "REJECTED"; reason: string }
   | { state: "APPROVED" | "WAITLISTED"; reason?: null };
 export interface SurveyAggregateResponse { surveyId: string; responseCount: number | null; suppressed: boolean; questions: Array<{ questionId: string; suppressed: boolean; responseCount: number | null; choices: Array<{ choiceOptionId: string; count: number | null }> }>; }
+export interface SurveyCsvExport { filename: string; csv: string; }
 export interface ExportSurveyRequest { format: "CSV"; }
 export interface ExportSurveyAcceptedResponse { exportId: string; status: "ACCEPTED"; acceptedAt: string; }
 export type ContentMatcherDto = {

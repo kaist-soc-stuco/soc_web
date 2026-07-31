@@ -1,14 +1,16 @@
 import { FormEvent, useEffect, useState } from 'react';
-import type { UserMeResponse } from '@soc/contracts';
+import type { MySurveyResponsesResponse, UserMeResponse } from '@soc/contracts';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { profileApi, ProfileApiError } from '@/lib/profile-api';
+import { surveyApi } from '@/lib/survey-api';
 
 const feeLabel = { PAID: '납부 완료', UNPAID: '미납', UNKNOWN: '확인 중' } as const;
 const value = (input: string | null) => input || '-';
 
 export function MyPage() {
   const [profile, setProfile] = useState<UserMeResponse | null>(null);
+  const [surveyResponses, setSurveyResponses] = useState<MySurveyResponsesResponse['items']>([]);
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [status, setStatus] = useState<'loading' | 'ready' | 'saving' | 'error'>('loading');
@@ -18,6 +20,7 @@ export function MyPage() {
     const controller = new AbortController();
     void profileApi.get(controller.signal).then((loaded) => {
       setProfile(loaded);
+      void surveyApi.mineAll(controller.signal).then((surveys) => setSurveyResponses(surveys.items)).catch(() => undefined);
       setEmail(loaded.userEmail ?? '');
       setMobile(loaded.userMobile ?? '');
       setStatus('ready');
@@ -72,6 +75,19 @@ export function MyPage() {
               <button type="submit" disabled={status === 'saving'} className="mt-5 rounded bg-kaist-darkgreen px-5 py-2 font-bold text-white disabled:opacity-60">{status === 'saving' ? '저장 중...' : '저장'}</button>
               {message ? <p role="status" className="mt-3 text-sm">{message}</p> : null}
             </form>
+            <section className="rounded-lg border border-kaist-grey/25 bg-white p-6 md:col-span-2">
+              <h2 className="text-xl font-extrabold text-kaist-darkgreen">내 설문 응답</h2>
+              {surveyResponses.length === 0 ? <p className="mt-4 text-sm">제출한 설문 응답이 없습니다.</p> : (
+                <ul className="mt-4 divide-y">
+                  {surveyResponses.map(({ survey, response }) => (
+                    <li key={response.id} className="flex items-center justify-between py-3">
+                      <a className="font-semibold underline" href={`/survey/${survey.id}`}>{survey.title.value}</a>
+                      <span className="text-sm">{response.state} · {response.submittedAt ? new Date(response.submittedAt).toLocaleString() : '-'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
         ) : null}
       </main>

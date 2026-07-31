@@ -190,6 +190,30 @@ export class SurveysService {
     return { response: this.response(result.response, result.answers) };
   }
   async mine(actor: string, id: string) { const response = await this.repo.myResponse(id, actor); return { response: response ? this.response(response, await this.repo.answers(response.id)) : null }; }
+  async mineAll(actor: string) {
+    const rows = await this.repo.myResponses(actor);
+    return {
+      items: await Promise.all(rows.map(async (row) => ({
+        survey: this.publicDto((await this.repo.detail(row.surveyId))!, 'ko'),
+        response: this.response(row, await this.repo.answers(row.id)),
+      }))),
+    };
+  }
+  async responses(actor: string, surveyId: string) {
+    await this.reviewPerm(actor);
+    const rows = await this.repo.responses(surveyId);
+    if (!rows) throw new NotFoundException('survey_not_found');
+    return { items: rows.map((row) => {
+      const { answers: _answers, ...item } = this.response(row, []);
+      return { surveyId: row.surveyId, ...item };
+    }) };
+  }
+  async responseDetail(actor: string, responseId: string) {
+    await this.reviewPerm(actor);
+    const row = await this.repo.response(responseId);
+    if (!row) throw new NotFoundException('survey_response_not_found');
+    return this.response(row, await this.repo.answers(row.id));
+  }
   async review(actor: string, id: string, input: unknown, correlationId: string) {
     await this.reviewPerm(actor);
     if (!exact(input, ['state', 'reason']) || !['APPROVED', 'REJECTED', 'WAITLISTED'].includes(String(input.state))) {
@@ -239,7 +263,35 @@ export class SurveysService {
       }),
     };
   }
-  async export(actor: string, id: string, input: unknown, correlationId: string) { await this.reviewPerm(actor); if (!exact(input, ['format']) || input.format !== 'CSV') throw new UnprocessableEntityException('invalid_export'); const result = await this.repo.export(id, actor, correlationId); if (!result) throw new NotFoundException('survey_not_found'); if (result === 'INVALID') throw new UnprocessableEntityException('invalid_export_lifecycle'); return { exportId: result.id, status: 'ACCEPTED', acceptedAt: result.requestedAt.toISOString() }; }
+  async export(actor: string, id: string, input: unknown, correlationId: string) {
+    await this.reviewPerm(actor);
+    if (!exact(input, ['format']) || input.format !== 'CSV') throw new UnprocessableEntityException('invalid_export');
+    const recorded = await this.repo.export(id, actor, correlationId);
+    if (!recorded) throw new NotFoundException('survey_not_found');
+    if (recorded === 'INVALID') throw new UnprocessableEntityException('invalid_export_lifecycle');
+    const data = await this.repo.exportRows(id);
+    if (!data) throw new NotFoundException('survey_not_found');
+    const escape = (raw: unknown) => {
+      let value = raw === null || raw === undefined ? '' : String(raw);
+      if (/^[=+\-@\t\r]/.test(value)) value = `'${value}`;
+      return `"${value.replaceAll('"', '""')}"`;
+    };
+    const questions = data.detail.questions;
+    const byResponse = new Map<string, Map<string, string>>();
+    for (const answer of data.answers) {
+      const rendered = answer.textValue ?? answer.numberValue ?? answer.dateValue
+        ?? (answer.choiceOptionIds ? JSON.parse(answer.choiceOptionIds).join('|') : '');
+      const values = byResponse.get(answer.responseId) ?? new Map<string, string>();
+      values.set(answer.questionId, String(rendered));
+      byResponse.set(answer.responseId, values);
+    }
+    const header = ['response_id', 'state', 'submitted_at', ...questions.map((question) => question.promptKr)];
+    const lines = data.responses.map((row) => [
+      row.id, row.state, row.submittedAt?.toISOString() ?? '',
+      ...questions.map((question) => byResponse.get(row.id)?.get(question.id) ?? ''),
+    ].map(escape).join(','));
+    return { filename: `survey-${id}.csv`, csv: `\uFEFF${[header.map(escape).join(','), ...lines].join('\r\n')}\r\n` };
+  }
   async matcher(actor: string, input: unknown, correlationId: string) { await this.manage(actor); if (!exact(input, ['articleId', 'eventId', 'surveyId']) || !uuid(input.surveyId) || (input.articleId === undefined) === (input.eventId === undefined) || (input.articleId !== undefined && !uuid(input.articleId)) || (input.eventId !== undefined && !uuid(input.eventId))) throw new UnprocessableEntityException('invalid_content_matcher'); const result = await this.repo.matcher({ articleId: input.articleId as string | undefined, eventId: input.eventId as string | undefined, surveyId: input.surveyId, createdByUserId: actor }, correlationId); if (result === 'INVALID') throw new UnprocessableEntityException('invalid_content_matcher'); if (result === 'MISSING') throw new NotFoundException('content_subject_not_found'); if (result === 'DUPLICATE') throw new ConflictException('content_matcher_exists'); return { id: result.id, articleId: result.articleId, eventId: result.eventId, surveyId: result.surveyId, createdAt: result.createdAt.toISOString() }; }
   async deleteMatcher(actor: string, id: string, correlationId: string) { await this.manage(actor); if (!(await this.repo.deleteMatcher(id, actor, correlationId))) throw new NotFoundException('content_matcher_not_found'); }
   async purge(limit: number, correlationId: string) { return this.repo.purgeExpired(limit, correlationId); }

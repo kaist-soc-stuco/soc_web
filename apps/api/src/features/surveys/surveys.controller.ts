@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post, Put, Query, Req, UnauthorizedException, UnprocessableEntityException, UseGuards } from '@nestjs/common';
-import type { Request } from 'express';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post, Put, Query, Req, Res, UnauthorizedException, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AuthGuard, OptionalAuthGuard } from '../../shared/guards';
 import { SurveysService } from './surveys.service';
 
@@ -22,6 +22,7 @@ function correlation(request: SurveyRequest): string { if (typeof request.reques
 export class PublicSurveysController {
   constructor(@Inject(SurveysService) private readonly service: SurveysService) {}
   @Get() list(@Req() request: SurveyRequest, @Query() query: Record<string, unknown>) { return this.service.list(request.user?.id, locale(query)); }
+  @Get('responses/me') mineAll(@Req() request: SurveyRequest) { if (!request.user) throw new UnauthorizedException('authentication_required'); return this.service.mineAll(request.user.id); }
   @Get(':id') get(@Req() request: SurveyRequest, @Param('id') surveyId: string, @Query() query: Record<string, unknown>) { return this.service.get(request.user?.id, id(surveyId), locale(query)); }
   @Post(':id/responses') submit(@Req() request: SurveyRequest, @Param('id') surveyId: string, @Body() body: unknown) { return this.service.submit(request.user?.id, id(surveyId), body, correlation(request)); }
   @Get(':id/responses/me') mine(@Req() request: SurveyRequest, @Param('id') surveyId: string) { if (!request.user) throw new UnauthorizedException('authentication_required'); return this.service.mine(request.user.id, id(surveyId)); }
@@ -36,9 +37,17 @@ export class AdminSurveysController {
   @Post('surveys/:id/publish') publish(@Req() r: SurveyRequest, @Param('id') surveyId: string) { return this.service.publish(r.user!.id, id(surveyId), correlation(r)); }
   @Put('surveys/:id/sections') sections(@Req() r: SurveyRequest, @Param('id') surveyId: string, @Body() b: unknown) { return this.service.sections(r.user!.id, id(surveyId), b, correlation(r)); }
   @Put('sections/:id/questions') questions(@Req() r: SurveyRequest, @Param('id') sectionId: string, @Body() b: unknown) { return this.service.questions(r.user!.id, id(sectionId), b, correlation(r)); }
+  @Get('surveys/:id/responses') responses(@Req() r: SurveyRequest, @Param('id') surveyId: string) { return this.service.responses(r.user!.id, id(surveyId)); }
+  @Get('survey-responses/:id') response(@Req() r: SurveyRequest, @Param('id') responseId: string) { return this.service.responseDetail(r.user!.id, id(responseId)); }
   @Post('survey-responses/:id/review') review(@Req() r: SurveyRequest, @Param('id') responseId: string, @Body() b: unknown) { return this.service.review(r.user!.id, id(responseId), b, correlation(r)); }
   @Get('surveys/:id/aggregate') aggregate(@Req() r: SurveyRequest, @Param('id') surveyId: string) { return this.service.aggregate(r.user!.id, id(surveyId)); }
-  @Post('surveys/:id/export') @HttpCode(HttpStatus.ACCEPTED) export(@Req() r: SurveyRequest, @Param('id') surveyId: string, @Body() b: unknown) { return this.service.export(r.user!.id, id(surveyId), b, correlation(r)); }
+  @Post('surveys/:id/export') async export(@Req() r: SurveyRequest, @Res() response: Response, @Param('id') surveyId: string, @Body() b: unknown) {
+    const result = await this.service.export(r.user!.id, id(surveyId), b, correlation(r));
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.status(HttpStatus.OK).send(result.csv);
+  }
   @Post('content-matchers') matcher(@Req() r: SurveyRequest, @Body() b: unknown) { return this.service.matcher(r.user!.id, b, correlation(r)); }
   @Delete('content-matchers/:id') @HttpCode(HttpStatus.NO_CONTENT) async deleteMatcher(@Req() r: SurveyRequest, @Param('id') matcherId: string) { await this.service.deleteMatcher(r.user!.id, id(matcherId), correlation(r)); }
 }
