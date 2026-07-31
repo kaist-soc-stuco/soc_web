@@ -41,6 +41,7 @@ const pinned = {
   "0013_phase2_pii_contract_gate": ["facf473a42a76e7c2bc4394179a395f359aa7aad54922b3d43a7693f1a4e79d1", "214c7b2061b0e05a7d58f6aa67be6708c7b7fb29ebf6897983ea0b17ac052635"],
   "0014_phase2_permission_transition_cursor": ["de2a7611f15f3d4e81f8a89799aa4c35c6253230e20c6a62a3dfb77472cfc85f", "3c9bfe7caaf0630bbe2932a11f0cd05b27abe547292a77b667490fc9c37fc25f"],
   "0015_board_title_reconciliation": ["0ed063c5dc890ba8516466d449b425590675f10b8f5e45d1a17f1773c825bde1", "36ed981e98e6119de897df3e8aa8c19163ae66e047f5b9ea7191cea3024781c3"],
+  "0016_survey_section_descriptions": ["e52a7f01370efbbe46a32764973a31aa788d256274f91b43755ccd76f393b98b", "36ed981e98e6119de897df3e8aa8c19163ae66e047f5b9ea7191cea3024781c3"],
 };
 const canonicalJournal = {
   version: "7",
@@ -62,6 +63,7 @@ const canonicalJournal = {
     [13, "0013_phase2_pii_contract_gate", 1785175000000, true],
     [14, "0014_phase2_permission_transition_cursor", 1785176000000, true],
     [15, "0015_board_title_reconciliation", 1785177000000, true],
+    [16, "0016_survey_section_descriptions", 1785480800000, true],
   ],
 };
 function fail(message) { throw new Error(`Migration verification failed: ${message}`); }

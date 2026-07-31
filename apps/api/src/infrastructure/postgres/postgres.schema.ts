@@ -609,12 +609,17 @@ export const surveySections = pgTable(
     ordinal: integer("ordinal").notNull(),
     titleKr: text("title_kr").notNull(),
     titleEn: text("title_en").notNull(),
+    descriptionKr: text("description_kr"),
+    descriptionEn: text("description_en"),
   },
   (table) => [
     uniqueIndex("survey_sections_revision_ordinal_unique").on(table.surveyRevisionId, table.ordinal),
     check("survey_sections_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
     check("survey_sections_title_kr_nonblank", sql`btrim(${table.titleKr}) <> ''`),
     check("survey_sections_title_en_nonblank", sql`btrim(${table.titleEn}) <> ''`),
+    check("survey_sections_description_pair", sql`(${table.descriptionKr} IS NULL) = (${table.descriptionEn} IS NULL)`),
+    check("survey_sections_description_kr_nonblank", sql`${table.descriptionKr} IS NULL OR btrim(${table.descriptionKr}) <> ''`),
+    check("survey_sections_description_en_nonblank", sql`${table.descriptionEn} IS NULL OR btrim(${table.descriptionEn}) <> ''`),
   ],
 );
 

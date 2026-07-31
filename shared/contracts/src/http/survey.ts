@@ -55,7 +55,7 @@ export type SurveyQuestionDto =
     dateMax: string | null;
     choices: [];
   });
-export interface SurveySectionDto { id: string; ordinal: number; title: LocalizedContent; questions: SurveyQuestionDto[]; }
+export interface SurveySectionDto { id: string; ordinal: number; title: LocalizedContent; description?: LocalizedContent | null; questions: SurveyQuestionDto[]; }
 export interface SurveyDto {
   id: string;
   revision: number;
@@ -77,10 +77,10 @@ export interface SurveyDto {
 export interface SurveyListQuery { locale?: ContentLocale; }
 export interface SurveyListResponse { locale: ContentLocale; items: SurveyDto[]; }
 export type SurveyResponseAnswerDto =
-  | { questionId: string; textValue: string; numberValue?: never; dateValue?: never; choiceOptionIds?: never }
-  | { questionId: string; textValue?: never; numberValue: number; dateValue?: never; choiceOptionIds?: never }
-  | { questionId: string; textValue?: never; numberValue?: never; dateValue: string; choiceOptionIds?: never }
-  | { questionId: string; textValue?: never; numberValue?: never; dateValue?: never; choiceOptionIds: string[] };
+  | { questionId: string; submittedAt?: string; textValue: string; numberValue?: never; dateValue?: never; choiceOptionIds?: never }
+  | { questionId: string; submittedAt?: string; textValue?: never; numberValue: number; dateValue?: never; choiceOptionIds?: never }
+  | { questionId: string; submittedAt?: string; textValue?: never; numberValue?: never; dateValue: string; choiceOptionIds?: never }
+  | { questionId: string; submittedAt?: string; textValue?: never; numberValue?: never; dateValue?: never; choiceOptionIds: string[] };
 export interface SubmitSurveyResponseRequest { answers: SurveyResponseAnswerDto[]; guestPhone?: string; }
 export type SubmitSurveyResponse =
   | { response: SurveyResponseDto }
@@ -101,7 +101,7 @@ export interface CreateSurveyRequest {
   feeRestriction: "ANY" | "PAID_ONLY"; cap?: number | null; opensAt?: string | null; closesAt?: string | null; editDeadlineAt?: string | null; responseRetentionDays: number;
 }
 export type PatchSurveyRequest = Partial<CreateSurveyRequest>;
-export interface ReplaceSurveySectionsRequest { sections: Array<{ ordinal: number; title: SurveyBilingualText }>; }
+export interface ReplaceSurveySectionsRequest { sections: Array<{ ordinal: number; title: SurveyBilingualText; description?: SurveyBilingualText | null }>; }
 interface SurveyQuestionDefinitionBase {
   ordinal: number;
   prompt: SurveyBilingualText;

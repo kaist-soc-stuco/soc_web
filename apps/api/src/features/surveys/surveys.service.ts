@@ -113,9 +113,10 @@ export class SurveysService {
     }
     if (input.sections.length > MAX_SECTIONS) throw new UnprocessableEntityException('invalid_sections');
     for (const [index, section] of input.sections.entries()) {
-      if (!exact(section, ['ordinal', 'title'])) throw new UnprocessableEntityException('invalid_sections');
+      if (!exact(section, ['ordinal', 'title']) && !exact(section, ['ordinal', 'title', 'description'])) throw new UnprocessableEntityException('invalid_sections');
       const ordinal = section.ordinal;
-      if (typeof ordinal !== 'number' || !Number.isInteger(ordinal) || ordinal !== index || !this.localized(section.title)) {
+      const description = section.description === undefined || section.description === null ? null : this.localized(section.description);
+      if (typeof ordinal !== 'number' || !Number.isInteger(ordinal) || ordinal !== index || !this.localized(section.title) || (section.description !== undefined && section.description !== null && !description)) {
         throw new UnprocessableEntityException('invalid_sections');
       }
     }
@@ -516,6 +517,7 @@ export class SurveysService {
       responseRetentionDays: survey.responseRetentionDays,
       sections: detail.sections.map((section) => ({
         id: section.id, ordinal: section.ordinal, title: localized(section.titleKr, section.titleEn),
+        description: section.descriptionKr == null && section.descriptionEn == null ? null : localized(section.descriptionKr, section.descriptionEn),
         questions: detail.questions.filter((question) => question.sectionId === section.id).map((question) => ({
           id: question.id, ordinal: question.ordinal, type: question.type,
           prompt: localized(question.promptKr, question.promptEn),
@@ -531,7 +533,7 @@ export class SurveysService {
       updatedAt: date(survey.updatedAt),
     };
   }
-  private response(response: Record<string, unknown>, answers: Record<string, unknown>[]) { return { id: response.id, state: response.state, answers: answers.map((answer) => ({ questionId: answer.questionId, textValue: answer.textValue ?? undefined, numberValue: answer.numberValue ?? undefined, dateValue: answer.dateValue ?? undefined, choiceOptionIds: answer.choiceOptionIds ? choiceIds(answer.choiceOptionIds) : undefined })), submittedAt: date(response.submittedAt), reviewedAt: date(response.reviewedAt), reviewReason: response.reviewReason ?? null, phonePresent: !!response.guestPhoneCiphertext, maskedPhone: response.guestPhoneCiphertext ? '***' : null }; }
+  private response(response: Record<string, unknown>, answers: Record<string, unknown>[]) { const submittedAt = date(response.submittedAt); return { id: response.id, state: response.state, answers: answers.map((answer) => ({ questionId: answer.questionId, submittedAt: submittedAt ?? undefined, textValue: answer.textValue ?? undefined, numberValue: answer.numberValue ?? undefined, dateValue: answer.dateValue ?? undefined, choiceOptionIds: answer.choiceOptionIds ? choiceIds(answer.choiceOptionIds) : undefined })), submittedAt, reviewedAt: date(response.reviewedAt), reviewReason: response.reviewReason ?? null, phonePresent: !!response.guestPhoneCiphertext, maskedPhone: response.guestPhoneCiphertext ? '***' : null }; }
 }
 const unique = (values: string[]) => new Set(values).size === values.length;
 const date = (value: unknown) => value instanceof Date ? value.toISOString() : null;
