@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -17,8 +17,9 @@ COPY shared/contracts shared/contracts
 COPY shared/common shared/common
 COPY shared/config shared/config
 RUN pnpm install --no-frozen-lockfile
+RUN pnpm --filter @soc/web build
 
 WORKDIR /app/apps/web
 
 EXPOSE 5173
-CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+CMD ["pnpm", "preview", "--host", "0.0.0.0", "--port", "5173"]
