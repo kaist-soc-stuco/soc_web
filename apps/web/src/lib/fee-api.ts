@@ -1,4 +1,4 @@
-import type { AdminFeeListResponse, AdminFeeListItem, AppErrorResponse, FeeStatus } from '@soc/contracts';
+import type { AdminFeeListResponse, AdminFeeListItem, AdminFeeUpdateResponse, AppErrorResponse, FeeStatus } from '@soc/contracts';
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/+$/, '');
 
@@ -20,10 +20,25 @@ export const isAdminFeeListItem = (value: unknown): value is AdminFeeListItem =>
 export const isAdminFeeListResponse = (value: unknown): value is AdminFeeListResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every(isAdminFeeListItem);
 const decode = <T>(payload: unknown, predicate: (value: unknown) => value is T): T => { if (!predicate(payload)) throw new FeeApiProtocolError(); return payload; };
 const isErrorEnvelope = (value: unknown): value is AppErrorResponse => exact(value, ['code', 'message']) && string(value.code) && string(value.message);
-async function request(path: string, signal?: AbortSignal): Promise<unknown> {
-  const response = await fetch(`${apiBaseUrl}${path}`, { credentials: 'include', signal, headers: { Accept: 'application/json' } });
+async function request(path: string, init: RequestInit = {}): Promise<unknown> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: { Accept: 'application/json', ...init.headers },
+  });
   const payload: unknown = await response.json().catch(() => undefined);
   if (!response.ok) { const envelope = isErrorEnvelope(payload) ? payload : undefined; throw new FeeApiError(response.status, envelope?.code, envelope?.message); }
   return payload;
 }
-export const feeApi = { listCurrent: async (signal?: AbortSignal) => decode(await request('/users/admin/fees', signal), isAdminFeeListResponse) };
+const isAdminFeeUpdateResponse = (value: unknown): value is AdminFeeUpdateResponse =>
+  exact(value, ['userId', 'feeStatus', 'updatedAt']) && string(value.userId) && feeStatus(value.feeStatus) && string(value.updatedAt);
+
+export const feeApi = {
+  listCurrent: async (signal?: AbortSignal) => decode(await request('/users/admin/fees', { signal }), isAdminFeeListResponse),
+  update: async (userId: string, feeStatus: FeeStatus, reasonCode: string) =>
+    decode(await request(`/users/admin/${encodeURIComponent(userId)}/fee`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Request-Id': crypto.randomUUID() },
+      body: JSON.stringify({ feeStatus, reasonCode }),
+    }), isAdminFeeUpdateResponse),
+};

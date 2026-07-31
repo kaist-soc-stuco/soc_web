@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AdminRouteGuard, NotFoundPage } from '@/components/organisms/admin-route-guard';
 
-import { AdminIndexRedirect } from '@/pages/admin-index-redirect';
+import { AdminDashboardPage } from '@/pages/admin-dashboard-page';
 import { AdminPage } from '@/pages/admin-page';
 import { AdminPaymentsPage } from '@/pages/admin-payments-page';
 import { AdminSurveysPage } from '@/pages/admin-surveys-page';
@@ -91,7 +91,7 @@ export function App() {
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/admin" element={<AdminPage />}>
-          <Route index element={<AdminIndexRedirect />} />
+          <Route index element={<AdminDashboardPage />} />
           <Route path="payments" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FEES_MANAGE' }}><AdminPaymentsPage /></AdminRouteGuard>} />
           <Route path="surveys" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveysPage /></AdminRouteGuard>} />
           <Route path="surveys/:surveyId/edit" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveyEditPage /></AdminRouteGuard>} />

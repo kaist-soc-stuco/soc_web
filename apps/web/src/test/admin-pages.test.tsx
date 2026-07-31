@@ -7,7 +7,7 @@ import type { EffectivePermissionGrant } from '@soc/contracts';
 const mocks = vi.hoisted(() => ({
   snapshot: { status: 'ready' as 'idle' | 'loading' | 'ready' | 'error', grants: [] as EffectivePermissionGrant[] },
   api: { listUsers: vi.fn(), getUser: vi.fn(), listDefinitions: vi.fn(), listRequests: vi.fn(), listAudit: vi.fn(), requestGrant: vi.fn(), approveRequest: vi.fn(), activateRequest: vi.fn() },
-  fee: { listCurrent: vi.fn() },
+  fee: { listCurrent: vi.fn(), update: vi.fn() },
   refetchAdminGrants: vi.fn(),
 }));
 vi.mock('@/lib/admin-grants', () => ({ useAdminGrants: () => mocks.snapshot, refetchAdminGrants: mocks.refetchAdminGrants }));
@@ -125,6 +125,19 @@ describe('admin foundation pages', () => {
     expect(screen.getByText('납부')).toBeVisible();
     expect(screen.queryByText('50000')).not.toBeInTheDocument();
     expect(screen.queryByText(/account|bank|invoice/i)).not.toBeInTheDocument();
+  });
+  it('requires a reason and confirms an individual fee status change', async () => {
+    mocks.fee.listCurrent.mockResolvedValue({ items: [{ id: 'user-1', kaistUid: 'uid-1', studentOrEmployeeNumber: null, nameKr: '홍길동', nameEn: null, feeStatus: 'UNPAID', updatedAt: '2026-01-01T00:00:00Z' }] });
+    mocks.fee.update.mockResolvedValue({ userId: 'user-1', feeStatus: 'PAID', updatedAt: '2026-01-02T00:00:00Z' });
+    render(<AdminPaymentsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '상태 변경' }));
+    const confirm = screen.getByRole('button', { name: '변경 확인' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('변경 상태'), { target: { value: 'PAID' } });
+    fireEvent.change(screen.getByLabelText('변경 사유'), { target: { value: 'PAYMENT_CONFIRMED' } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mocks.fee.update).toHaveBeenCalledWith('user-1', 'PAID', 'PAYMENT_CONFIRMED'));
+    expect(await screen.findByText('납부')).toBeVisible();
   });
   it('shows the direct page loading state until grants resolve', () => {
     mocks.snapshot = { status: 'loading', grants: [] };

@@ -16,7 +16,7 @@ export function AdminPage() {
       <div className="flex min-h-[calc(100vh-72px)] flex-col xl:flex-row">
         <aside className="w-full bg-kaist-darkgreen text-white xl:w-[320px] xl:flex-shrink-0">
           <div className="px-6 py-7 xl:py-9">
-            <p className="text-[22px] font-extrabold tracking-tight">마이페이지</p>
+            <p className="text-[22px] font-extrabold tracking-tight">관리자 센터</p>
 
             <nav className="mt-8 flex flex-wrap gap-x-7 gap-y-4 xl:mt-10 xl:block xl:space-y-7" aria-label="관리 메뉴">
               {loading && <p className="text-[16px] font-medium text-kaist-white/90">권한을 확인하는 중입니다.</p>}
