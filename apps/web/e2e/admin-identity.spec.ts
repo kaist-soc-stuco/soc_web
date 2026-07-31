@@ -40,10 +40,11 @@ test('admin identity routes preserve payments and expose no finance route', asyn
   });
 
   await page.goto('/admin');
-  await expect(page.getByRole('link', { name: '과비 납부 관리' })).toHaveAttribute('href', '/admin/payments');
-  await expect(page.getByRole('link', { name: '사용자 관리' })).toHaveAttribute('href', '/admin/users');
-  await expect(page.getByRole('link', { name: '권한 관리' })).toHaveAttribute('href', '/admin/permissions');
-  await expect(page.getByRole('link', { name: '권한 감사 로그' })).toHaveAttribute('href', '/admin/audit-logs');
+  await expect(page.getByRole('heading', { name: '관리자 센터' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '과비 납부 관리', exact: true })).toHaveAttribute('href', '/admin/payments');
+  await expect(page.getByRole('link', { name: '사용자 관리', exact: true })).toHaveAttribute('href', '/admin/users');
+  await expect(page.getByRole('link', { name: '권한 관리', exact: true })).toHaveAttribute('href', '/admin/permissions');
+  await expect(page.getByRole('link', { name: '권한 감사 로그', exact: true })).toHaveAttribute('href', '/admin/audit-logs');
 
   for (const [path, heading] of [
     ['/admin/payments', '과비 납부 관리'],
@@ -88,10 +89,13 @@ test('scoped workflow grants expose only permission queues without user discover
   });
 
   await page.goto('/admin');
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole('heading', { name: '관리자 센터' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '권한 관리', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '사용자 관리', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '과비 납부 관리', exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: '권한 관리', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/permissions$/);
-  await expect(page.getByRole('link', { name: '권한 관리' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '사용자 관리' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '과비 납부 관리' })).toHaveCount(0);
   await expect(page.getByLabel('정확한 대상 사용자 검색')).toBeDisabled();
   await expect(page.getByRole('button', { name: '요청 등록' })).toBeDisabled();
 });

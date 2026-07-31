@@ -1,21 +1,8 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AdminRouteGuard, NotFoundPage } from '@/components/organisms/admin-route-guard';
 
-import { AdminDashboardPage } from '@/pages/admin-dashboard-page';
 import { AdminPage } from '@/pages/admin-page';
-import { AdminPaymentsPage } from '@/pages/admin-payments-page';
-import { AdminSurveysPage } from '@/pages/admin-surveys-page';
-import { AdminSurveyEditPage } from '@/pages/admin-survey-edit-page';
-import { AdminSurveyOperationsPage } from '@/pages/admin-survey-operations-page';
-import { AdminContactsPage } from '@/pages/admin-contacts-page';
-import { AdminEmailsPage } from '@/pages/admin-emails-page';
-import { AdminUsersPage } from '@/pages/admin-users-page';
-import { AdminPermissionsPage } from '@/pages/admin-permissions-page';
-import { AdminAuditLogsPage } from '@/pages/admin-audit-logs-page';
-import { AdminBoardsPage } from '@/pages/admin-boards-page';
-import { AdminFaqsPage } from '@/pages/admin-faqs-page';
-import { AdminEventsPage } from '@/pages/admin-events-page';
 import { AboutPage } from '@/pages/about-page';
 import { HomePage } from '@/pages/home-page';
 import { BoardHubPage } from '@/pages/board-hub-page';
@@ -32,6 +19,20 @@ import { LoginConsentPage } from '@/pages/login-consent-page';
 import { ChatPage } from '@/pages/chat-page';
 import { MyPage } from '@/pages/mypage-page';
 import { getEvent } from '@/lib/event-api';
+
+const AdminDashboardPage = lazy(() => import('@/pages/admin-dashboard-page').then((module) => ({ default: module.AdminDashboardPage })));
+const AdminPaymentsPage = lazy(() => import('@/pages/admin-payments-page').then((module) => ({ default: module.AdminPaymentsPage })));
+const AdminSurveysPage = lazy(() => import('@/pages/admin-surveys-page').then((module) => ({ default: module.AdminSurveysPage })));
+const AdminSurveyEditPage = lazy(() => import('@/pages/admin-survey-edit-page').then((module) => ({ default: module.AdminSurveyEditPage })));
+const AdminSurveyOperationsPage = lazy(() => import('@/pages/admin-survey-operations-page').then((module) => ({ default: module.AdminSurveyOperationsPage })));
+const AdminContactsPage = lazy(() => import('@/pages/admin-contacts-page').then((module) => ({ default: module.AdminContactsPage })));
+const AdminEmailsPage = lazy(() => import('@/pages/admin-emails-page').then((module) => ({ default: module.AdminEmailsPage })));
+const AdminUsersPage = lazy(() => import('@/pages/admin-users-page').then((module) => ({ default: module.AdminUsersPage })));
+const AdminPermissionsPage = lazy(() => import('@/pages/admin-permissions-page').then((module) => ({ default: module.AdminPermissionsPage })));
+const AdminAuditLogsPage = lazy(() => import('@/pages/admin-audit-logs-page').then((module) => ({ default: module.AdminAuditLogsPage })));
+const AdminBoardsPage = lazy(() => import('@/pages/admin-boards-page').then((module) => ({ default: module.AdminBoardsPage })));
+const AdminFaqsPage = lazy(() => import('@/pages/admin-faqs-page').then((module) => ({ default: module.AdminFaqsPage })));
+const AdminEventsPage = lazy(() => import('@/pages/admin-events-page').then((module) => ({ default: module.AdminEventsPage })));
 
 export function LegacyEventSurveyResolver() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -75,7 +76,8 @@ export function LegacyEventSurveyResolver() {
 export function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <Suspense fallback={<p role="status" className="p-8">페이지를 불러오는 중입니다.</p>}>
+        <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:eventId/survey" element={<LegacyEventSurveyResolver />} />
@@ -109,7 +111,8 @@ export function App() {
         <Route path="/login" element={<TreeLogin />} />
         <Route path="/login/consent" element={<LoginConsentPage />} />
         <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
