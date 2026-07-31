@@ -39,6 +39,7 @@ describe('ContactsService', () => {
     expect(masked.items[0]).toMatchObject({ projection: 'MASKED', name: 'A***', email: '***', note: null }); expect(masked.nextCursor).toEqual(expect.any(String));
     repository.list.mockResolvedValue([row]);
     await expect(service.list(actor, { projection: 'FULL' })).resolves.toMatchObject({ items: [expect.objectContaining({ name: 'Ada', email: 'ada@example.test', projection: 'FULL' })] });
+    expect(repository.list).toHaveBeenLastCalledWith(actor, 21, undefined, false, expect.objectContaining({ correlationId: expect.any(String), occurredAt: now }));
   });
 
   it('denies before repository access and maps create, patch, and delete outcomes', async () => {

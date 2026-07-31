@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { AuthModule } from './features/auth/auth.module';
@@ -17,6 +17,7 @@ import { SurveysModule } from './features/surveys/surveys.module';
 import { PostgresModule } from './infrastructure/postgres/postgres.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { validateEnv } from './shared/config/env.validation';
+import { RateLimitMiddleware } from './shared/middleware/rate-limit.middleware';
 import { ClockModule } from './shared/time/clock.module';
 
 @Module({
@@ -47,4 +48,8 @@ import { ClockModule } from './shared/time/clock.module';
     HealthModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RateLimitMiddleware).forRoutes('*');
+  }
+}

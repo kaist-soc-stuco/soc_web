@@ -47,7 +47,7 @@ describe('Phase 6 HTTP contracts', () => {
     await post('/api/admin/contacts').set('x-request-id', 'phase6-1').send({ name: 'Ada' }).expect(201);
     await patch(`/api/admin/contacts/${id}`).set('x-request-id', 'phase6-2').send({ note: 'Hi' }).expect(200);
     await del(`/api/admin/contacts/${id}`).set('x-request-id', 'phase6-3').send({ reasonCode: 'REMOVED' }).expect(204);
-    expect(contacts.list).toHaveBeenCalledWith(actor, { limit: '2', projection: 'FULL' });
+    expect(contacts.list).toHaveBeenCalledWith(actor, { limit: '2', projection: 'FULL' }, expect.any(String));
     expect(contacts.create).toHaveBeenCalledWith(actor, { name: 'Ada' }, 'phase6-1'); expect(contacts.patch).toHaveBeenCalledWith(actor, id, { note: 'Hi' }, 'phase6-2'); expect(contacts.delete).toHaveBeenCalledWith(actor, id, 'REMOVED', 'phase6-3');
     const invalid = await patch('/api/admin/contacts/not-uuid').send({ name: 'Ada' }).expect(422); expect(invalid.body).toEqual({ code: 'invalid_contact_id', message: 'Request failed', requestId: expect.any(String) });
     await get('/api/admin/contacts?unknown=1').expect(422); await post('/api/admin/contacts').send({ name: 'Ada', extra: true }).expect(422);

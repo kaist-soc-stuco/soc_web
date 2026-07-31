@@ -11,11 +11,17 @@ export type ContactCreateValues = Omit<typeof contacts.$inferInsert, 'createdByU
 export class ContactsRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
 
-  list(actorUserId: string, limit: number, cursor?: { createdAt: Date; id: string }, includeDeleted = false): Promise<ContactRow[] | null> {
+  list(actorUserId: string, limit: number, cursor?: { createdAt: Date; id: string }, includeDeleted = false, fullViewAudit?: FullViewAudit): Promise<ContactRow[] | null> {
     return this.db.transaction(async (tx) => {
       if (!await this.authorized(tx, actorUserId)) return null;
       const predicate = cursor ? or(gt(contacts.createdAt, cursor.createdAt), and(eq(contacts.createdAt, cursor.createdAt), gt(contacts.id, cursor.id))) : undefined;
-      return tx.select().from(contacts).where(and(includeDeleted ? undefined : isNull(contacts.deletedAt), predicate)).orderBy(asc(contacts.createdAt), asc(contacts.id)).limit(limit);
+      const rows = await tx.select().from(contacts).where(and(includeDeleted ? undefined : isNull(contacts.deletedAt), predicate)).orderBy(asc(contacts.createdAt), asc(contacts.id)).limit(limit);
+      if (fullViewAudit) {
+        for (const row of rows) {
+          await this.audit(tx, row.id, actorUserId, 'CONTACT_FULL_VIEWED', FIELDS_VIEWED, fullViewAudit.correlationId, 'EXPLICIT_FULL_PROJECTION', fullViewAudit.occurredAt);
+        }
+      }
+      return rows;
     });
   }
 
@@ -74,3 +80,5 @@ export class ContactsRepository {
 }
 
 type AuditInput = { changedFieldNames: string; correlationId: string; reasonCode: string | null; occurredAt: Date };
+type FullViewAudit = { correlationId: string; occurredAt: Date };
+const FIELDS_VIEWED = 'name,email,phone,affiliation,note,kaistUid,year,role';

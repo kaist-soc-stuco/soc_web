@@ -22,11 +22,13 @@ export class ContactsService {
     @Inject(Clock) private readonly clock: Clock,
     @Inject(ConfigService) private readonly config: ConfigService,
   ) {}
-  async list(actor: string, query: Record<string, unknown>) {
+  async list(actor: string, query: Record<string, unknown>, correlationId: string = randomUUID()) {
     await this.require(actor); const limit = query.limit === undefined ? 20 : this.limit(query.limit); const projection = query.projection === undefined ? 'MASKED' : query.projection;
     if (projection !== 'MASKED' && projection !== 'FULL') this.invalid('invalid_contact_projection');
     const includeDeleted = query.includeDeleted === undefined ? false : query.includeDeleted === 'true'; if (query.includeDeleted !== undefined && query.includeDeleted !== 'true' && query.includeDeleted !== 'false') this.invalid('invalid_contact_query');
-    const cursor = query.cursor === undefined ? undefined : this.cursor(query.cursor); const rows = await this.repository.list(actor, limit + 1, cursor, includeDeleted);
+    const cursor = query.cursor === undefined ? undefined : this.cursor(query.cursor);
+    const audit = projection === 'FULL' ? { correlationId: this.correlation(correlationId), occurredAt: this.clock.now() } : undefined;
+    const rows = await this.repository.list(actor, limit + 1, cursor, includeDeleted, audit);
     if (!rows) throw new ForbiddenException('insufficient_permission');
     const items = rows.slice(0, limit).map((row) => this.dto(row, projection)); const last = items.at(-1);
     return { items, nextCursor: rows.length > limit && last ? Buffer.from(JSON.stringify({ createdAt: last.createdAt, id: last.id })).toString('base64url') : null };

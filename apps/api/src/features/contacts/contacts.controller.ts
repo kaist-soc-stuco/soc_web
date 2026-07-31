@@ -14,7 +14,7 @@ const id = (value: string) => { if (!UUID.test(value)) throw new UnprocessableEn
 @UseGuards(AuthGuard)
 export class ContactsController {
   constructor(@Inject(ContactsService) private readonly contacts: ContactsService) {}
-  @Get() list(@Req() request: AuthenticatedRequest, @Query() query: Record<string, unknown>) { object(query, ['cursor', 'limit', 'projection', 'includeDeleted']); return this.contacts.list(request.user.id, query); }
+  @Get() list(@Req() request: AuthenticatedRequest, @Query() query: Record<string, unknown>) { object(query, ['cursor', 'limit', 'projection', 'includeDeleted']); return this.contacts.list(request.user.id, query, correlation(request)); }
   @Post() create(@Req() request: AuthenticatedRequest, @Body() body: unknown) { return this.contacts.create(request.user.id, object(body, ['name', 'email', 'phone', 'affiliation', 'note', 'kaistUid', 'year', 'role', 'retentionDeadlineAt', 'holdUntil']) as CreateContactRequest, correlation(request)); }
   @Patch(':id') patch(@Req() request: AuthenticatedRequest, @Param('id') contactId: string, @Body() body: unknown) { return this.contacts.patch(request.user.id, id(contactId), object(body, ['name', 'email', 'phone', 'affiliation', 'note', 'kaistUid', 'year', 'role', 'retentionDeadlineAt', 'holdUntil']) as PatchContactRequest, correlation(request)); }
   @Delete(':id') @HttpCode(204) async delete(@Req() request: AuthenticatedRequest, @Param('id') contactId: string, @Body() body: unknown): Promise<void> { const value = object(body, ['reasonCode']) as Record<string, unknown>; await this.contacts.delete(request.user.id, id(contactId), value.reasonCode, correlation(request)); }
