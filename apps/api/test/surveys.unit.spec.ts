@@ -32,7 +32,7 @@ const questionDefinitions = [
 
 function setup(grants: readonly string[] = ['SURVEY_MANAGE', 'SURVEY_REVIEW'], hmacConfig: Partial<Record<string, unknown>> = {}) {
   const repository = {
-    listAll: vi.fn(), listPublic: vi.fn(), detail: vi.fn().mockResolvedValue(detail()), create: vi.fn().mockResolvedValue(detail()), patch: vi.fn(), replaceSections: vi.fn(), replaceQuestions: vi.fn(), submit: vi.fn(), myResponse: vi.fn(), answers: vi.fn(), review: vi.fn(), aggregate: vi.fn(), export: vi.fn(), publish: vi.fn(), matcher: vi.fn(), deleteMatcher: vi.fn(), purgeExpired: vi.fn(),
+    listAll: vi.fn(), listPublic: vi.fn(), detail: vi.fn().mockResolvedValue(detail()), create: vi.fn().mockResolvedValue(detail()), patch: vi.fn(), replaceSections: vi.fn(), replaceQuestions: vi.fn(), submit: vi.fn(), myResponse: vi.fn(), myResponses: vi.fn(), responses: vi.fn(), response: vi.fn(), answers: vi.fn(), review: vi.fn(), aggregate: vi.fn(), export: vi.fn(), exportRows: vi.fn(), publish: vi.fn(), matcher: vi.fn(), deleteMatcher: vi.fn(), purgeExpired: vi.fn(),
   };
   const permissions = { hasPermission: vi.fn().mockImplementation(async (_actor: string, permission: string) => grants.includes(permission)) };
   const cipher = { encrypt: vi.fn().mockReturnValue('encrypted-phone') };
@@ -178,7 +178,8 @@ describe('SurveysService', () => {
     await expect(service.review(actorId, responseId, { state: 'APPROVED' }, correlationId)).rejects.toMatchObject({ response: { message: 'invalid_response_transition' } });
     await expect(service.review(actorId, responseId, { state: 'APPROVED' }, correlationId)).resolves.toMatchObject({ state: 'APPROVED', reviewReason: null });
     repository.export.mockResolvedValue({ id: 'export-1', requestedAt: now });
-    await expect(service.export(actorId, surveyId, { format: 'CSV' }, correlationId)).resolves.toEqual({ exportId: 'export-1', status: 'ACCEPTED', acceptedAt: now.toISOString() });
+    repository.exportRows.mockResolvedValue({ detail: detail(), responses: [], answers: [] });
+    await expect(service.export(actorId, surveyId, { format: 'CSV' }, correlationId)).resolves.toEqual({ filename: `survey-${surveyId}.csv`, csv: '\uFEFF"response_id","state","submitted_at"\r\n' });
     await expect(service.export(actorId, surveyId, { format: 'JSON' }, correlationId)).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 });

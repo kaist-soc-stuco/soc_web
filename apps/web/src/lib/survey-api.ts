@@ -1,4 +1,4 @@
-import type { AppErrorResponse, ContentLocale, CreateSurveyRequest, ExportSurveyAcceptedResponse, ExportSurveyRequest, GetMySurveyResponseResponse, LoginSessionResponse, PatchSurveyRequest, PublishSurveyResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
+import type { AdminSurveyResponseListResponse, AppErrorResponse, ContentLocale, CreateSurveyRequest, ExportSurveyRequest, GetMySurveyResponseResponse, LoginSessionResponse, MySurveyResponsesResponse, PatchSurveyRequest, PublishSurveyResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, ReviewSurveyResponseRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
 
 export type RestrictedPattern = { allowed: ReadonlySet<string>; minimum: number; maximum: number };
 export type SubmitSurveyResult = { status: 'ACCEPTED' } | { response: SurveyResponseDto };
@@ -58,6 +58,8 @@ const isList = (value: unknown): value is SurveyListResponse => exact(value, ['l
 const isSession = (value: unknown): value is LoginSessionResponse => object(value) && Object.keys(value).every((key) => ['authenticated', 'canUsePersistentFeatures', 'requiresConsent', 'storageMode', 'userId'].includes(key)) && ['authenticated', 'canUsePersistentFeatures', 'requiresConsent', 'storageMode'].every((key) => key in value) && typeof value.authenticated === 'boolean' && typeof value.canUsePersistentFeatures === 'boolean' && typeof value.requiresConsent === 'boolean' && (value.storageMode === null || value.storageMode === 'temporary' || value.storageMode === 'persisted') && (!('userId' in value) || string(value.userId));
 const isMine = (value: unknown): value is GetMySurveyResponseResponse => exact(value, ['response']) && nullable(value.response, isResponse);
 const isAggregate = (value: unknown): value is SurveyAggregateResponse => exact(value, ['surveyId', 'responseCount', 'suppressed', 'questions']) && string(value.surveyId) && nullable(value.responseCount, (input) => typeof input === 'number') && typeof value.suppressed === 'boolean' && Array.isArray(value.questions) && value.questions.every((question) => exact(question, ['questionId', 'suppressed', 'responseCount', 'choices']) && string(question.questionId) && typeof question.suppressed === 'boolean' && nullable(question.responseCount, (input) => typeof input === 'number') && Array.isArray(question.choices) && question.choices.every((choice) => exact(choice, ['choiceOptionId', 'count']) && string(choice.choiceOptionId) && nullable(choice.count, (input) => typeof input === 'number')));
+const isResponseList = (value: unknown): value is AdminSurveyResponseListResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every((item) => exact(item, ['id', 'surveyId', 'state', 'submittedAt', 'reviewedAt', 'reviewReason', 'phonePresent', 'maskedPhone']) && string(item.id) && string(item.surveyId) && responseState(item.state) && nullable(item.submittedAt, string) && nullable(item.reviewedAt, string) && nullable(item.reviewReason, string) && typeof item.phonePresent === 'boolean' && nullable(item.maskedPhone, string));
+const isMyResponses = (value: unknown): value is MySurveyResponsesResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every((item) => exact(item, ['survey', 'response']) && isSurvey(item.survey) && isResponse(item.response));
 
 export const surveyApi = {
   list: async (signal?: AbortSignal) => decode(await request('/surveys', 'GET', undefined, signal), isList),
@@ -71,6 +73,20 @@ export const surveyApi = {
   publish: async (id: string): Promise<PublishSurveyResponse> => decode(await request(`/admin/surveys/${id}/publish`, 'POST'), (value): value is PublishSurveyResponse => exact(value, ['survey']) && isSurvey(value.survey)),
   submit: async (id: string, input: SubmitSurveyResponseRequest): Promise<SubmitSurveyResult> => decode(await request(`/surveys/${id}/responses`, 'POST', input), (value): value is SubmitSurveyResult => exact(value, ['status']) && value.status === 'ACCEPTED' || exact(value, ['response']) && isResponse(value.response)),
   mine: async (id: string, signal?: AbortSignal) => decode(await request(`/surveys/${id}/responses/me`, 'GET', undefined, signal), isMine),
+  mineAll: async (signal?: AbortSignal) => decode(await request('/surveys/responses/me', 'GET', undefined, signal), isMyResponses),
+  responses: async (id: string, signal?: AbortSignal) => decode(await request(`/admin/surveys/${id}/responses`, 'GET', undefined, signal), isResponseList),
+  response: async (id: string, signal?: AbortSignal) => decode(await request(`/admin/survey-responses/${id}`, 'GET', undefined, signal), isResponse),
+  review: async (id: string, input: ReviewSurveyResponseRequest) => decode(await request(`/admin/survey-responses/${id}/review`, 'POST', input), isResponse),
   aggregate: async (id: string) => decode(await request(`/admin/surveys/${id}/aggregate`), isAggregate),
-  export: async (id: string, input: ExportSurveyRequest): Promise<ExportSurveyAcceptedResponse> => decode(await request(`/admin/surveys/${id}/export`, 'POST', input), (value): value is ExportSurveyAcceptedResponse => exact(value, ['exportId', 'status', 'acceptedAt']) && string(value.exportId) && value.status === 'ACCEPTED' && string(value.acceptedAt)),
+  export: async (id: string, input: ExportSurveyRequest): Promise<void> => {
+    const response = await fetch(`${apiBaseUrl}/admin/surveys/${id}/export`, { method: 'POST', credentials: 'include', headers: { Accept: 'text/csv', 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+    if (!response.ok) throw new SurveyApiError(response.status);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `survey-${id}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
 };

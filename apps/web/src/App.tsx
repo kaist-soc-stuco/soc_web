@@ -6,6 +6,7 @@ import { AdminPage } from '@/pages/admin-page';
 import { AdminPaymentsPage } from '@/pages/admin-payments-page';
 import { AdminSurveysPage } from '@/pages/admin-surveys-page';
 import { AdminSurveyEditPage } from '@/pages/admin-survey-edit-page';
+import { AdminSurveyOperationsPage } from '@/pages/admin-survey-operations-page';
 import { AdminContactsPage } from '@/pages/admin-contacts-page';
 import { AdminEmailsPage } from '@/pages/admin-emails-page';
 import { AdminUsersPage } from '@/pages/admin-users-page';
@@ -91,6 +92,7 @@ export function App() {
           <Route path="payments" element={<AdminPaymentsPage />} />
           <Route path="surveys" element={<AdminSurveysPage />} />
           <Route path="surveys/:surveyId/edit" element={<AdminSurveyEditPage />} />
+          <Route path="surveys/:surveyId/responses" element={<AdminSurveyOperationsPage />} />
           <Route path="emails" element={<AdminEmailsPage />} />
           <Route path="contacts" element={<AdminContactsPage />} />
           <Route path="users" element={<AdminUsersPage />} />
