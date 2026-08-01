@@ -42,7 +42,7 @@ describe('Phase 6 contact, mail, and chat pages', () => {
     render(<AdminContactsPage />);
 
     expect(await screen.findByText('홍길동')).toBeVisible();
-    expect(api.contactApi.list).toHaveBeenCalledWith('MASKED');
+    expect(api.contactApi.list).toHaveBeenCalledWith('MASKED', undefined, undefined);
     expect(screen.getByText('-')).toBeVisible();
     expect(screen.queryByText('ciphertext')).not.toBeInTheDocument();
     expect(screen.getByLabelText('이름')).toBeVisible();
@@ -55,7 +55,7 @@ describe('Phase 6 contact, mail, and chat pages', () => {
     expect(screen.getByLabelText('학년도')).toBeVisible();
 
     fireEvent.change(screen.getByLabelText('연락처 표시 방식'), { target: { value: 'FULL' } });
-    await waitFor(() => expect(api.contactApi.list).toHaveBeenLastCalledWith('FULL'));
+    await waitFor(() => expect(api.contactApi.list).toHaveBeenLastCalledWith('FULL', undefined, undefined));
     expect(screen.getAllByText('비고').length).toBeGreaterThan(1);
 
     setField('이름', ' 새 이름 '); setField('직책', ' 역할 '); setField('이메일', ' email@example.test '); setField('전화번호', ' 010 ');
@@ -69,6 +69,8 @@ describe('Phase 6 contact, mail, and chat pages', () => {
     await waitFor(() => expect(api.contactApi.patch).toHaveBeenCalledWith('contact-1', { name: '홍길동', role: '위원', email: 'hong@example.test', phone: '010-1234-5678', affiliation: 'KAIST', note: '비고', kaistUid: 'hong', year: '2026' }));
 
     fireEvent.click(screen.getByRole('button', { name: '홍길동 삭제' }));
+    expect(screen.getByRole('dialog', { name: '홍길동 연락처 삭제' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 삭제 확인' }));
     await waitFor(() => expect(api.contactApi.remove).toHaveBeenCalledWith('contact-1', { reasonCode: 'ADMIN_REQUEST' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: '홍길동 삭제' })).not.toBeInTheDocument());
   });

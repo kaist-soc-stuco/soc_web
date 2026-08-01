@@ -31,7 +31,7 @@ async function request(path: string, method = 'GET', body?: unknown, signal?: Ab
 const decode = <T>(value: unknown, predicate: (input: unknown) => input is T): T => { if (!predicate(value)) throw new ContactApiProtocolError(); return value; };
 
 export const contactApi = {
-  list: (projection: 'MASKED' | 'FULL' = 'MASKED', signal?: AbortSignal) => request(`/admin/contacts?projection=${projection}`, 'GET', undefined, signal).then((value) => decode(value, isList)),
+  list: (projection: 'MASKED' | 'FULL' = 'MASKED', signal?: AbortSignal, cursor?: string) => request(`/admin/contacts?projection=${projection}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, signal).then((value) => decode(value, isList)),
   create: (input: CreateContactRequest) => request('/admin/contacts', 'POST', input).then((value) => decode(value, isContactResponse).contact),
   patch: (id: string, input: PatchContactRequest) => request(`/admin/contacts/${encodeURIComponent(id)}`, 'PATCH', input).then((value) => decode(value, isContactResponse).contact),
   remove: (id: string, input: DeleteContactRequest) => request(`/admin/contacts/${encodeURIComponent(id)}`, 'DELETE', input),
