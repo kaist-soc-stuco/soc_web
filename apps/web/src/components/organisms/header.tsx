@@ -17,7 +17,7 @@ export function Header({ showLogo = false }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [logoutError, setLogoutError] = useState('');
+  const [logoutError, setLogoutError] = useState(false);
   const navRef = useRef<HTMLElement>(null);
   const [navLeft, setNavLeft] = useState(0);
   const [authenticated, setAuthenticated] = useState(false);
@@ -38,7 +38,7 @@ export function Header({ showLogo = false }: HeaderProps) {
   const logout = async () => {
     if (logoutLoading) return;
     setLogoutLoading(true);
-    setLogoutError('');
+    setLogoutError(false);
     try {
       await createApiClient({ baseUrl: '/api' }).logout();
       setAuthenticated(false);
@@ -46,7 +46,7 @@ export function Header({ showLogo = false }: HeaderProps) {
       navigate('/login?status=success&reason=logged_out', { replace: true });
       setMobileOpen(false);
     } catch {
-      setLogoutError('로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      setLogoutError(true);
     } finally {
       setLogoutLoading(false);
     }
@@ -195,29 +195,29 @@ export function Header({ showLogo = false }: HeaderProps) {
           </label>
           {authenticated ? (
             <>
-              <Link to="/mypage" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">마이페이지</Link>
-              {hasAdminAccess ? <Link to="/admin" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">관리자 센터</Link> : null}
+              <Link to="/mypage" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? '마이페이지' : 'My Page'}</Link>
+              {hasAdminAccess ? <Link to="/admin" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? '관리자 센터' : 'Admin Center'}</Link> : null}
               <button type="button" onClick={() => void logout()} disabled={logoutLoading} className="hidden text-sm font-bold text-kaist-grey hover:text-kaist-darkgreen-main disabled:opacity-50 sm:block">
-                {logoutLoading ? '로그아웃 중' : '로그아웃'}
+                {logoutLoading ? (locale === 'ko' ? '로그아웃 중' : 'Logging out') : (locale === 'ko' ? '로그아웃' : 'Log out')}
               </button>
             </>
-          ) : <Link to="/login" className="text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">로그인</Link>}
-          <button type="button" aria-label="메뉴 열기" aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
-            메뉴
+          ) : <Link to="/login" className="text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">{locale === 'ko' ? '로그인' : 'Log in'}</Link>}
+          <button type="button" aria-label={locale === 'ko' ? '메뉴 열기' : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
+            {locale === 'ko' ? '메뉴' : 'Menu'}
           </button>
         </div>
       </div>
       {mobileOpen ? (
-        <nav aria-label="모바일 메뉴" className="border-t border-kaist-grey/20 bg-white p-4 md:hidden">
+        <nav aria-label={locale === 'ko' ? '모바일 메뉴' : 'Mobile menu'} className="border-t border-kaist-grey/20 bg-white p-4 md:hidden">
           <ul className="space-y-3">
             {navItems.flatMap((item) => item.dropdown).map((item) => <li key={item.to}><Link className="block font-semibold" to={item.to}>{item.label}</Link></li>)}
-            {authenticated ? <li><Link className="block font-semibold" to="/mypage">마이페이지</Link></li> : null}
-            {authenticated && hasAdminAccess ? <li><Link className="block font-semibold" to="/admin">관리자 센터</Link></li> : null}
-            {authenticated ? <li><button type="button" disabled={logoutLoading} onClick={() => void logout()} className="font-semibold text-kaist-darkgreen">{logoutLoading ? '로그아웃 중' : '로그아웃'}</button></li> : null}
+            {authenticated ? <li><Link className="block font-semibold" to="/mypage">{locale === 'ko' ? '마이페이지' : 'My Page'}</Link></li> : null}
+            {authenticated && hasAdminAccess ? <li><Link className="block font-semibold" to="/admin">{locale === 'ko' ? '관리자 센터' : 'Admin Center'}</Link></li> : null}
+            {authenticated ? <li><button type="button" disabled={logoutLoading} onClick={() => void logout()} className="font-semibold text-kaist-darkgreen">{logoutLoading ? (locale === 'ko' ? '로그아웃 중' : 'Logging out') : (locale === 'ko' ? '로그아웃' : 'Log out')}</button></li> : null}
           </ul>
         </nav>
       ) : null}
-      {logoutError ? <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm font-semibold text-red-700">{logoutError}</p> : null}
+      {logoutError ? <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm font-semibold text-red-700">{locale === 'ko' ? '로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.' : 'Could not log out. Please try again shortly.'}</p> : null}
 
       {/* Full Dropdown Menu - DDP Style */}
       <div 
