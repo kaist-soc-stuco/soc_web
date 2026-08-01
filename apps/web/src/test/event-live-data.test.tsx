@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import { EventCarousel } from '@/components/organisms/event-carousel';
 import { EventsPage } from '@/pages/events-page';
+import { surveyApi } from '@/lib/survey-api';
 
 const getEventsMock = vi.hoisted(() => vi.fn());
 const getUpcomingEventsMock = vi.hoisted(() => vi.fn());
@@ -34,6 +35,7 @@ afterEach(() => {
   cleanup();
   getEventsMock.mockReset();
   getUpcomingEventsMock.mockReset();
+  vi.restoreAllMocks();
 });
 
 const eventResponse: EventListResponse = {
@@ -128,6 +130,27 @@ describe('event live data', () => {
 
     expect(await screen.findByText('행사가 없습니다')).toBeVisible();
     expect(screen.queryByText('2026 봄맞이 간식 이벤트')).not.toBeInTheDocument();
+  });
+  it('links survey cards directly to the canonical survey route', async () => {
+    vi.spyOn(surveyApi, 'list').mockResolvedValueOnce({
+      locale: 'ko',
+      items: [{
+        id: 'survey-1',
+        title: { value: '학생 설문', translationUnavailable: false },
+        description: { value: '의견을 남겨 주세요.', translationUnavailable: false },
+        state: 'OPEN',
+        opensAt: null,
+        closesAt: null,
+        allowUpdate: false,
+        anonymous: false,
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+
+    render(<MemoryRouter initialEntries={['/events?type=survey']}><EventsPage /></MemoryRouter>);
+
+    expect(await screen.findByRole('link', { name: /학생 설문/ })).toHaveAttribute('href', '/survey/survey-1');
   });
 
   it('does not retain survey mock cards when an event request is pending', async () => {

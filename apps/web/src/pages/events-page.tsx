@@ -96,7 +96,7 @@ export function EventsPage() {
             summary: survey.description ? localizedText(survey.description) : '',
             date: survey.closesAt ? new Date(survey.closesAt).toLocaleDateString('ko-KR') : '',
             status: survey.state === 'OPEN' ? 'ongoing' : 'upcoming',
-            href: `/events/${survey.id}/survey`,
+            href: `/survey/${encodeURIComponent(survey.id)}`,
           })),
   [activeTab, events, surveys],
   );
