@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Inject, Param, Patch, Query, Req, UseGuards } from "@nestjs/common";
-import type { AdminFeeUpdateRequest, AdminUserListQuery, PatchMeRequest } from "@soc/contracts";
+import type { AdminFeeListQuery, AdminFeeUpdateRequest, AdminUserListQuery, PatchMeRequest } from "@soc/contracts";
 import type { Request } from "express";
 
 import { AuthGuard } from "../../shared/guards";
@@ -40,8 +40,9 @@ export class UsersController {
     return this.usersService.getFeeSelf(request.user.id);
   }
   @Get("admin/fees")
-  async listAdminFees(@Req() request: AuthenticatedRequest) {
-    return this.usersService.listAdminFees(request.user.id);
+  async listAdminFees(@Req() request: AuthenticatedRequest, @Query() query: AdminFeeListQuery) {
+    requireAllowedKeys(query, ["cursor", "limit", "name", "studentOrEmployeeNumber", "feeStatus"], "invalid_fee_query");
+    return this.usersService.listAdminFees(request.user.id, query);
   }
 
   @Get("admin")
@@ -62,12 +63,12 @@ export class UsersController {
     @Param("userId") userId: string,
     @Body() body: AdminFeeUpdateRequest,
   ) {
-    requireAllowedKeys(body, ["feeStatus", "reasonCode"], "invalid_fee_update");
+    requireAllowedKeys(body, ["feeStatus", "reasonCode", "operatorNote"], "invalid_fee_update");
     requireUuid(userId);
     return this.usersService.updateFeeAdmin(
       request.user.id,
       userId,
-      { feeStatus: body.feeStatus, reasonCode: body.reasonCode },
+      { feeStatus: body.feeStatus, reasonCode: body.reasonCode, operatorNote: body.operatorNote },
       request.requestId ?? "",
     );
   }

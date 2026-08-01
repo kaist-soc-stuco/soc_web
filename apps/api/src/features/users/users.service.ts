@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  AdminFeeListQuery,
   AdminFeeListResponse,
   AdminFeeUpdateResponse,
   AdminUserGetResponse,
   AdminUserListResponse,
   FeeSelfResponse,
   FeeStatus,
+  FeeUpdateReasonCode,
   PatchMeRequest,
   UserMeResponse,
   UserProfile,
@@ -21,15 +23,16 @@ const ADMIN_FEES_PERMISSION = "FEES_MANAGE";
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 25;
 
-const REASON_CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
+const FEE_UPDATE_REASONS = new Set<FeeUpdateReasonCode>(["PAYMENT_REVIEWED", "PAYMENT_CONFIRMED", "PAYMENT_NOT_FOUND", "DATA_CORRECTION"]);
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FEE_STATUSES = new Set<FeeStatus>(["UNKNOWN", "UNPAID", "PAID"]);
 const isFeeStatus = (value: unknown): value is FeeStatus => typeof value === "string" && FEE_STATUSES.has(value as FeeStatus);
+const isFeeUpdateReason = (value: unknown): value is FeeUpdateReasonCode => typeof value === "string" && FEE_UPDATE_REASONS.has(value as FeeUpdateReasonCode);
 const auditCorrelationId = (requestId: string) =>
   createHash("sha256").update(requestId, "utf8").digest("hex");
-const auditRequestFingerprint = (input: { actorUserId: string; feeStatus: FeeStatus; reasonCode: string; requestId: string; userId: string }) =>
-  createHash("sha256").update(JSON.stringify([input.requestId, input.actorUserId, input.userId, input.feeStatus, input.reasonCode]), "utf8").digest("hex");
+const auditRequestFingerprint = (input: { actorUserId: string; feeStatus: FeeStatus; operatorNote?: string; reasonCode: FeeUpdateReasonCode; requestId: string; userId: string }) =>
+  createHash("sha256").update(JSON.stringify([input.requestId, input.actorUserId, input.userId, input.feeStatus, input.reasonCode, input.operatorNote ?? null]), "utf8").digest("hex");
 @Injectable()
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
@@ -175,20 +178,25 @@ export class UsersService {
       nextCursor: hasMore ? this.encodeCursor(items.at(-1)!) : null,
     };
   }
-  async listAdminFees(actorUserId: string): Promise<AdminFeeListResponse> {
+  async listAdminFees(actorUserId: string, query: AdminFeeListQuery): Promise<AdminFeeListResponse> {
     await this.requireAdminFees(actorUserId);
-    const rows = await this.usersRepository.listCurrentFees();
+    if (query.feeStatus !== undefined && !FEE_STATUSES.has(query.feeStatus)) throw new BadRequestException("invalid_fee_status");
+    const requestedLimit = Number(query.limit ?? DEFAULT_PAGE_SIZE);
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
+    const rows = await this.usersRepository.list({ ...query, cursor: this.decodeCursor(query.cursor), limit: limit + 1 });
+    const hasMore = rows.length > limit;
+    const items = rows.slice(0, limit);
     return {
-      items: rows.map((user) => ({
+      items: items.map((user) => ({
         feeStatus: user.feeStatus,
         id: user.id,
-        kaistUid: user.kaistUid,
         nameEn: user.nameEn,
         nameKr: user.nameKr,
-        studentOrEmployeeNumber: user.studentOrEmployeeNumber,
         studentOrEmployeeKind: user.studentOrEmployeeKind,
+        studentOrEmployeeNumber: user.studentOrEmployeeNumber,
         updatedAt: user.updatedAt,
       })),
+      nextCursor: hasMore ? this.encodeCursor(items.at(-1)!) : null,
     };
   }
 
@@ -205,13 +213,13 @@ export class UsersService {
     return { feeStatus: (await this.requireUser(userId)).feeStatus };
   }
 
-  async updateFeeAdmin(actorUserId: string, userId: string, input: { feeStatus: unknown; reasonCode: unknown }, requestId: string): Promise<AdminFeeUpdateResponse> {
+  async updateFeeAdmin(actorUserId: string, userId: string, input: { feeStatus: unknown; operatorNote?: unknown; reasonCode: unknown }, requestId: string): Promise<AdminFeeUpdateResponse> {
     await this.requireAdminFees(actorUserId);
     if (
       !input
       || !isFeeStatus(input.feeStatus)
-      || typeof input.reasonCode !== "string"
-      || !REASON_CODE_PATTERN.test(input.reasonCode)
+      || !isFeeUpdateReason(input.reasonCode)
+      || (input.operatorNote !== undefined && (typeof input.operatorNote !== "string" || !input.operatorNote.trim() || input.operatorNote.length > 500))
       || !REQUEST_ID_PATTERN.test(requestId)
     ) throw new ForbiddenException("fee_update_audit_metadata_required");
     const result = await this.usersRepository.updateFeeWithAudit({
@@ -219,7 +227,7 @@ export class UsersService {
       feeStatus: input.feeStatus,
       reasonCode: input.reasonCode,
       requestId: auditCorrelationId(requestId),
-      requestFingerprint: auditRequestFingerprint({ actorUserId, feeStatus: input.feeStatus, reasonCode: input.reasonCode, requestId, userId }),
+      requestFingerprint: auditRequestFingerprint({ actorUserId, feeStatus: input.feeStatus, operatorNote: input.operatorNote as string | undefined, reasonCode: input.reasonCode, requestId, userId }),
       userId,
     });
     if (result === "forbidden") throw new ForbiddenException("insufficient_permission");

@@ -97,7 +97,7 @@ describe('UsersController HTTP boundary', () => {
         updatedAt: '2026-01-02T00:00:00.000Z',
       }],
     });
-    expect(users.listAdminFees).toHaveBeenCalledWith(actorId);
+    expect(users.listAdminFees).toHaveBeenCalledWith(actorId, {});
   });
   it('does not expose fee rows when FEES_MANAGE is denied', async () => {
     users.listAdminFees.mockRejectedValue(new ForbiddenException('insufficient_permission'));
@@ -114,9 +114,9 @@ describe('UsersController HTTP boundary', () => {
     expect(kaistUid.body).toEqual({ code: 'invalid_user_query', message: 'Request failed', requestId: expect.any(String) });
     const detail = await authenticatedGet('/api/users/admin/not-a-uuid').expect(400);
     expect(detail.body).toEqual({ code: 'invalid_user_id', message: 'Request failed', requestId: expect.any(String) });
-    const fee = await authenticatedPatch('/api/users/admin/not-a-uuid/fee').send({ feeStatus: 'PAID', reasonCode: 'PAYMENT' }).expect(400);
+    const fee = await authenticatedPatch('/api/users/admin/not-a-uuid/fee').send({ feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED' }).expect(400);
     expect(fee.body).toEqual({ code: 'invalid_user_id', message: 'Request failed', requestId: expect.any(String) });
-    const feeBody = await authenticatedPatch(`/api/users/admin/${targetId}/fee`).send({ feeStatus: 'PAID', reasonCode: 'PAYMENT', unexpected: true }).expect(400);
+    const feeBody = await authenticatedPatch(`/api/users/admin/${targetId}/fee`).send({ feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED', unexpected: true }).expect(400);
     expect(feeBody.body).toEqual({ code: 'invalid_fee_update', message: 'Request failed', requestId: expect.any(String) });
     expect(users.getAdmin).not.toHaveBeenCalled();
     expect(users.updateFeeAdmin).not.toHaveBeenCalled();
@@ -124,8 +124,8 @@ describe('UsersController HTTP boundary', () => {
 
   it('passes fee audit metadata exactly and redacts forbidden or missing-user details', async () => {
     users.updateFeeAdmin.mockResolvedValue({ userId: targetId, feeStatus: 'PAID', updatedAt: '2026-01-02T00:00:00.000Z' });
-    await authenticatedPatch(`/api/users/admin/${targetId}/fee`).set('x-request-id', 'request-7').send({ feeStatus: 'PAID', reasonCode: 'PAYMENT' }).expect(200);
-    expect(users.updateFeeAdmin).toHaveBeenCalledWith(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT' }, 'request-7');
+    await authenticatedPatch(`/api/users/admin/${targetId}/fee`).set('x-request-id', 'request-7').send({ feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED' }).expect(200);
+    expect(users.updateFeeAdmin).toHaveBeenCalledWith(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED' }, 'request-7');
     users.getAdmin.mockRejectedValueOnce(new ForbiddenException('insufficient_permission'));
     const denied = await authenticatedGet(`/api/users/admin/${targetId}`).expect(403);
     expect(denied.body).toEqual({ code: 'insufficient_permission', message: 'Request failed', requestId: expect.any(String) });

@@ -77,19 +77,19 @@ describe('users fee PostgreSQL transaction', () => {
   });
   it('updates fee and audit atomically, deduplicates a retry, and rejects a changed retry payload', async () => {
     const requestId = 'fee-request-1';
-    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT' }, requestId))
+    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED' }, requestId))
       .resolves.toMatchObject({ userId: targetId, feeStatus: 'PAID' });
-    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT' }, requestId))
+    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED' }, requestId))
       .resolves.toMatchObject({ userId: targetId, feeStatus: 'PAID' });
     expect((await pool.query("SELECT count(*) FROM permission_audit_log WHERE action = 'FEE_STATUS_UPDATED'")).rows[0]!.count).toBe('1');
-    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'UNPAID', reasonCode: 'PAYMENT' }, requestId))
+    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'UNPAID', reasonCode: 'PAYMENT_REVIEWED' }, requestId))
       .rejects.toMatchObject({ response: { message: 'fee_update_idempotency_conflict' } });
     expect((await pool.query('SELECT fee_status FROM users WHERE id = $1', [targetId])).rows[0]!.fee_status).toBe('PAID');
   });
 
   it('rechecks authority in-transaction and rolls back the fee write when audit insertion fails', async () => {
     await pool.query('UPDATE permission_grants SET revoked_at = now() WHERE user_id = $1', [actorId]);
-    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT' }, 'fee-request-2'))
+    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED' }, 'fee-request-2'))
       .rejects.toMatchObject({ response: { message: 'insufficient_permission' } });
     expect((await pool.query('SELECT fee_status FROM users WHERE id = $1', [targetId])).rows[0]!.fee_status).toBe('UNKNOWN');
 

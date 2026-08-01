@@ -11,7 +11,7 @@ const targetId = '22222222-2222-4222-8222-222222222222';
 const user = (id = targetId, overrides = {}) => ({
   createdAt: '2026-01-01T00:00:00.000Z', feeStatus: 'UNPAID' as const, id,
   kaistUid: 'kaist-1', majorMask: 3, nameEn: 'Ada', nameKr: '에이다', privacyConsentAt: null,
-  ssoSubject: 'subject', ssoUserId: 'sso-1', studentOrEmployeeNumber: '20260001',
+  ssoSubject: 'subject', ssoUserId: 'sso-1', studentOrEmployeeKind: 'STUDENT' as const, studentOrEmployeeNumber: '20260001',
   updatedAt: '2026-01-02T00:00:00.000Z', userEmail: 'old@example.test', userMobile: '010-0000-0000', ...overrides,
 });
 const grant = (permission: string, scope: 'GLOBAL' | 'BOARD' = 'GLOBAL') => ({ activatedFrom: '2026-01-01T00:00:00.000Z', expiresAt: null, id: 'grant-1', permission, scope, scopeId: null });
@@ -94,6 +94,19 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
     expect(repo.list).toHaveBeenLastCalledWith({ limit: 101, cursor: undefined });
   });
 
+  it('paginates and filters the least-PII fee roster', async () => {
+    const repo = repository();
+    repo.findEffectiveGrants.mockResolvedValue(new Map([[actorId, [grant('FEES_MANAGE')]]]));
+    repo.list.mockResolvedValue([user(), user(actorId)]);
+    const page = await new UsersService(repo as never).listAdminFees(actorId, { limit: 1, name: '에이다', feeStatus: 'UNPAID' });
+    expect(page.items).toHaveLength(1);
+    expect(page.nextCursor).toEqual(expect.any(String));
+    expect(page.items[0]).toMatchObject({ id: targetId, studentOrEmployeeKind: 'STUDENT', studentOrEmployeeNumber: '20260001' });
+    expect(page.items[0]).not.toHaveProperty('kaistUid');
+    expect(page.items[0]).not.toHaveProperty('userEmail');
+    expect(repo.list).toHaveBeenCalledWith({ cursor: undefined, feeStatus: 'UNPAID', limit: 2, name: '에이다' });
+  });
+
   it('does not reveal missing users or fee status before an authorized lookup', async () => {
     const repo = repository(); repo.findEffectiveGrants.mockResolvedValue(new Map([[actorId, []]]));
     const service = new UsersService(repo as never);
@@ -107,17 +120,17 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
   it('requires grant, valid reason, and correlation before one atomic fee-and-minimized-audit operation', async () => {
     const repo = repository(); repo.findEffectiveGrants.mockResolvedValue(new Map([[actorId, [grant('FEES_MANAGE')]]]));
     const service = new UsersService(repo as never);
-    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: ' ' }, 'corr')).rejects.toMatchObject({ response: expect.objectContaining({ message: 'fee_update_audit_metadata_required' }) });
-    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'INVALID' as never, reasonCode: 'PAYMENT' }, '')).rejects.toMatchObject({ response: expect.objectContaining({ message: 'fee_update_audit_metadata_required' }) });
+    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT' }, 'corr')).rejects.toMatchObject({ response: expect.objectContaining({ message: 'fee_update_audit_metadata_required' }) });
+    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'INVALID' as never, reasonCode: 'PAYMENT_REVIEWED' }, '')).rejects.toMatchObject({ response: expect.objectContaining({ message: 'fee_update_audit_metadata_required' }) });
     expect(repo.updateFeeWithAudit).not.toHaveBeenCalled();
     repo.updateFeeWithAudit.mockResolvedValue(user(targetId, { feeStatus: 'PAID' }));
-    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT' }, 'corr-1')).resolves.toEqual({ userId: targetId, feeStatus: 'PAID', updatedAt: '2026-01-02T00:00:00.000Z' });
+    await expect(service.updateFeeAdmin(actorId, targetId, { feeStatus: 'PAID', reasonCode: 'PAYMENT_REVIEWED', operatorNote: '입금자명 확인' }, 'corr-1')).resolves.toEqual({ userId: targetId, feeStatus: 'PAID', updatedAt: '2026-01-02T00:00:00.000Z' });
     expect(repo.updateFeeWithAudit).toHaveBeenCalledOnce();
     expect(repo.updateFeeWithAudit).toHaveBeenCalledWith({
       actorUserId: actorId,
       userId: targetId,
       feeStatus: 'PAID',
-      reasonCode: 'PAYMENT',
+      reasonCode: 'PAYMENT_REVIEWED',
       requestId: createHash('sha256').update('corr-1', 'utf8').digest('hex'),
       requestFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
     });

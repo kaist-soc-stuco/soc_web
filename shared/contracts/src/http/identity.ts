@@ -131,10 +131,14 @@ export interface FeeSelfResponse {
   feeStatus: FeeStatus;
 }
 
+export type FeeUpdateReasonCode = "PAYMENT_REVIEWED" | "PAYMENT_CONFIRMED" | "PAYMENT_NOT_FOUND" | "DATA_CORRECTION";
+
 export interface AdminFeeUpdateRequest {
   feeStatus: FeeStatus;
-  reasonCode: string;
+  reasonCode: FeeUpdateReasonCode;
+  operatorNote?: string;
 }
+
 
 export interface AdminFeeUpdateResponse {
   userId: string;
@@ -163,9 +167,17 @@ export interface PermissionAuditListResponse {
   items: PermissionAuditEntry[];
   nextCursor: string | null;
 }
+export interface AdminFeeListQuery {
+  cursor?: string;
+  limit?: number;
+  name?: string;
+  studentOrEmployeeNumber?: string;
+  feeStatus?: FeeStatus;
+}
+
 export interface AdminFeeListItem {
   id: string;
-  kaistUid: string | null;
+  studentOrEmployeeKind: StudentOrEmployeeKind | null;
   studentOrEmployeeNumber: string | null;
   nameKr: string | null;
   nameEn: string | null;
@@ -175,4 +187,5 @@ export interface AdminFeeListItem {
 
 export interface AdminFeeListResponse {
   items: AdminFeeListItem[];
+  nextCursor: string | null;
 }
