@@ -5,16 +5,23 @@ export type StorageMode = "temporary" | "persisted";
 export const DEVELOPMENT_ACCOUNT_IDS = ["admin", "user-1", "user-2"] as const;
 export type DevelopmentAccountId = (typeof DEVELOPMENT_ACCOUNT_IDS)[number];
 
+export interface AuthoritativeSsoProfile {
+  kaistUid: string;
+  nameEn: string;
+  nameKr: string;
+  ssoSubject: string;
+  studentOrEmployeeKind: "STUDENT" | "EMPLOYEE";
+  studentOrEmployeeNumber: string;
+  userEmail: string;
+}
+
 export class DevelopmentLoginRequestDto {
   @IsIn(DEVELOPMENT_ACCOUNT_IDS)
   account!: DevelopmentAccountId;
 }
 
-export interface PendingSsoUser {
+export interface PendingSsoUser extends AuthoritativeSsoProfile {
   expiresAt: number;
-  ssoUserId: string;
-  userEmail?: string;
-  userMobile?: string;
 }
 
 export interface TokenClaims {

@@ -14,7 +14,7 @@ import { MyPage } from '@/pages/mypage-page';
 const profile = {
   feeStatus: 'PAID' as const,
   id: 'user-1', kaistUid: 'uid', studentOrEmployeeNumber: '20260001', nameKr: '홍길동', nameEn: 'Gil Dong Hong', majorMask: 1,
-  privacyConsentAt: '2026-01-01T00:00:00.000Z', userEmail: 'old@example.com', userMobile: '010-0000-0000', grants: [],
+  privacyConsentAt: '2026-01-01T00:00:00.000Z', studentOrEmployeeKind: 'STUDENT' as const, userEmail: 'old@kaist.ac.kr', userMobile: '010-0000-0000', grants: [],
 };
 
 beforeEach(() => { getMock.mockReset(); updateMock.mockReset(); });
@@ -26,7 +26,8 @@ describe('mypage', () => {
     render(<MemoryRouter><MyPage /></MemoryRouter>);
     expect(await screen.findByText('홍길동')).toBeTruthy();
     expect(screen.getByText('납부 완료')).toBeTruthy();
-    expect((screen.getByLabelText('이메일') as HTMLInputElement).value).toBe('old@example.com');
+    expect((screen.getByLabelText('KAIST 이메일') as HTMLInputElement).value).toBe('old@kaist.ac.kr');
+    expect((screen.getByLabelText('KAIST 이메일') as HTMLInputElement).readOnly).toBe(true);
     expect(screen.getByText('Gil Dong Hong')).toBeTruthy();
     expect(screen.getByText('전산학부')).toBeTruthy();
     expect(screen.getByText(/동의 완료/)).toBeTruthy();
@@ -34,13 +35,13 @@ describe('mypage', () => {
 
   it('updates only editable contact details', async () => {
     getMock.mockResolvedValue(profile);
-    updateMock.mockResolvedValue({ ...profile, userEmail: 'new@example.com', userMobile: null });
+    updateMock.mockResolvedValue({ ...profile, userMobile: null });
     render(<MemoryRouter><MyPage /></MemoryRouter>);
-    fireEvent.change(await screen.findByLabelText('이메일'), { target: { value: 'new@example.com' } });
+    await screen.findByLabelText('KAIST 이메일');
     fireEvent.change(screen.getByLabelText('전화번호'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(await screen.findByText('연락처를 저장했습니다.')).toBeTruthy();
-    await waitFor(() => expect(updateMock).toHaveBeenCalledWith({ userEmail: 'new@example.com', userMobile: null }));
+    await waitFor(() => expect(updateMock).toHaveBeenCalledWith({ userMobile: null }));
   });
 
   it('shows a safe load error', async () => {

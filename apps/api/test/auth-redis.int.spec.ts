@@ -79,23 +79,29 @@ describe('live Redis authentication transitions', () => {
 
   it('reserves a pending login once, releases failures, and consumes completion', async () => {
     const expiresAt = Date.now() + 60_000;
+    const profile = {
+      kaistUid: 'sso-live',
+      nameEn: 'Live User',
+      nameKr: '라이브 사용자',
+      ssoSubject: 'sso-live',
+      studentOrEmployeeKind: 'STUDENT' as const,
+      studentOrEmployeeNumber: '20260001',
+      userEmail: 'live@kaist.ac.kr',
+    };
     await pendingLogins.save('flow-live', {
+      ...profile,
       expiresAt,
-      ssoUserId: 'sso-live',
-      userEmail: 'live@example.invalid',
     }, 60);
 
     const first = await pendingLogins.reserve('flow-live');
     expect(first?.pending).toEqual({
+      ...profile,
       expiresAt,
-      ssoUserId: 'sso-live',
-      userEmail: 'live@example.invalid',
-      userMobile: undefined,
     });
     await expect(pendingLogins.reserve('flow-live')).resolves.toBeNull();
     await pendingLogins.release('flow-live', first!.reservationToken);
     const second = (await pendingLogins.reserve('flow-live'))!;
-    expect(second.pending).toMatchObject({ ssoUserId: 'sso-live' });
+    expect(second.pending).toMatchObject({ ssoSubject: 'sso-live' });
     await pendingLogins.complete('flow-live', second.reservationToken);
     await expect(pendingLogins.reserve('flow-live')).resolves.toBeNull();
   });

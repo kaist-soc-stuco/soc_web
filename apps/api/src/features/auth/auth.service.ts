@@ -14,7 +14,7 @@ import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
 import { AuthStateRepository } from "./auth-state.repository";
-import type { LoginCallbackResult } from "./auth.types";
+import type { AuthoritativeSsoProfile, LoginCallbackResult } from "./auth.types";
 
 interface SsoConfig {
   clientId: string;
@@ -168,20 +168,23 @@ export class AuthService {
       throw new UnauthorizedException("nonce_mismatch");
     }
 
-    const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
-    const ssoUserId = typeof userInfo.user_id === "string" ? userInfo.user_id.trim() : "";
-    if (!ssoUserId) throw new UnauthorizedException("missing_sso_user_id");
-    const userEmail = typeof userInfo.user_email === "string" && userInfo.user_email.trim() ? userInfo.user_email : undefined;
-    const userMobile = typeof userInfo.user_mbtlnum === "string" && userInfo.user_mbtlnum.trim() ? userInfo.user_mbtlnum : undefined;
-    const existingUser = await this.usersService.findBySsoUserId(ssoUserId);
+    const profile = this.normalizeAuthoritativeProfile(parsedResponse.userInfo);
+    const existingUser = await this.usersService.findBySsoUserId(profile.ssoSubject);
     if (existingUser) {
-      await this.usersService.ensureCanonicalSsoSubject(existingUser.id, ssoUserId);
-      return { kind: "persisted", session: await this.authSessionService.issuePersistedSession(existingUser.id), userId: existingUser.id };
+      let synchronized;
+      try {
+        synchronized = await this.usersService.synchronizeAuthoritativeSsoProfile(profile);
+      } catch {
+        throw new UnauthorizedException("sso_identity_conflict");
+      }
+      const session = await this.authSessionService.issuePersistedSession(synchronized.id);
+      return { kind: "persisted", session, userId: synchronized.id };
     }
 
     const flowToken = randomUUID();
     await this.pendingLoginRepository.save(flowToken, {
-      expiresAt: expiresAtMs(PENDING_LOGIN_TTL_SECONDS), ssoUserId, userEmail, userMobile,
+      ...profile,
+      expiresAt: expiresAtMs(PENDING_LOGIN_TTL_SECONDS),
     }, PENDING_LOGIN_TTL_SECONDS);
     return { kind: "consent_required", flowToken };
   }
@@ -222,6 +225,35 @@ export class AuthService {
     }
 
     return isSsoApiResponse(userInfo) ? userInfo : {};
+  }
+
+  private normalizeAuthoritativeProfile(userInfo: unknown): AuthoritativeSsoProfile {
+    const normalized = this.normalizeUserInfo(userInfo);
+    const required = (key: string): string => {
+      const value = normalized[key];
+      if (typeof value !== "string" || !value.trim()) {
+        throw new UnauthorizedException("invalid_sso_profile");
+      }
+      return value.trim();
+    };
+    const studentNumber = typeof normalized.std_no === "string" ? normalized.std_no.trim() : "";
+    const employeeNumber = typeof normalized.emp_no === "string" ? normalized.emp_no.trim() : "";
+    if (Boolean(studentNumber) === Boolean(employeeNumber)) {
+      throw new UnauthorizedException("invalid_sso_profile");
+    }
+    const userEmail = required("user_email").toLowerCase();
+    if (!/^[^@\s]+@kaist\.ac\.kr$/i.test(userEmail)) {
+      throw new UnauthorizedException("invalid_sso_profile");
+    }
+    return {
+      kaistUid: required("kaist_uid"),
+      nameEn: required("user_eng_nm"),
+      nameKr: required("user_nm"),
+      ssoSubject: required("user_id"),
+      studentOrEmployeeKind: studentNumber ? "STUDENT" : "EMPLOYEE",
+      studentOrEmployeeNumber: studentNumber || employeeNumber,
+      userEmail,
+    };
   }
 
   /** Redis에 저장된 state payload를 안전하게 파싱합니다. */

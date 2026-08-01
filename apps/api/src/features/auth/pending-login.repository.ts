@@ -68,9 +68,7 @@ return redis.call("DEL", KEYS[1])
 `;
 
 interface StoredPendingSsoUser {
-  encryptedSsoUserId?: string;
-  encryptedUserEmail?: string;
-  encryptedUserMobile?: string;
+  encryptedProfile: string;
   expiresAt: number;
   state?: "pending" | "processing";
   reservedAtMs?: number;
@@ -158,15 +156,10 @@ export class PendingLoginRepository {
   }
 
   private serialize(payload: PendingSsoUser): StoredPendingSsoUser {
+    const { expiresAt, ...profile } = payload;
     return {
-      encryptedSsoUserId: this.encrypt(payload.ssoUserId),
-      encryptedUserEmail: payload.userEmail
-        ? this.encrypt(payload.userEmail)
-        : undefined,
-      encryptedUserMobile: payload.userMobile
-        ? this.encrypt(payload.userMobile)
-        : undefined,
-      expiresAt: payload.expiresAt,
+      encryptedProfile: this.encrypt(JSON.stringify(profile)),
+      expiresAt,
       state: "pending",
       reservedAtMs: undefined,
     };
@@ -195,25 +188,25 @@ export class PendingLoginRepository {
       (parsed.reservationToken !== undefined && typeof parsed.reservationToken !== "string") ||
       (parsed.leaseExpiresAtMs !== undefined &&
         (typeof parsed.leaseExpiresAtMs !== "number" || !Number.isFinite(parsed.leaseExpiresAtMs))) ||
-      typeof parsed.encryptedSsoUserId !== "string" ||
-      !parsed.encryptedSsoUserId ||
-      (parsed.encryptedUserEmail !== undefined &&
-        typeof parsed.encryptedUserEmail !== "string") ||
-      (parsed.encryptedUserMobile !== undefined &&
-        typeof parsed.encryptedUserMobile !== "string")
+      typeof parsed.encryptedProfile !== "string" ||
+      !parsed.encryptedProfile
     ) {
       return null;
     }
-    return {
-      expiresAt: parsed.expiresAt,
-      ssoUserId: this.decrypt(parsed.encryptedSsoUserId),
-      userEmail: parsed.encryptedUserEmail
-        ? this.decrypt(parsed.encryptedUserEmail)
-        : undefined,
-      userMobile: parsed.encryptedUserMobile
-        ? this.decrypt(parsed.encryptedUserMobile)
-        : undefined,
-    };
+    try {
+      const profile = JSON.parse(this.decrypt(parsed.encryptedProfile)) as Omit<PendingSsoUser, "expiresAt">;
+      if (
+        !profile ||
+        typeof profile !== "object" ||
+        !["STUDENT", "EMPLOYEE"].includes(profile.studentOrEmployeeKind) ||
+        ["kaistUid", "nameEn", "nameKr", "ssoSubject", "studentOrEmployeeNumber", "userEmail"]
+          .some((key) => typeof profile[key as keyof typeof profile] !== "string" || !profile[key as keyof typeof profile])
+      ) return null;
+      return { ...profile, expiresAt: parsed.expiresAt };
+    } catch (error) {
+      if (error instanceof InternalServerErrorException) throw error;
+      return null;
+    }
   }
 
   async save(pendingLoginToken: string, payload: PendingSsoUser, ttlSeconds: number): Promise<void> {

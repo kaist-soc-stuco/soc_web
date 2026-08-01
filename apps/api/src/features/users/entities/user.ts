@@ -1,4 +1,4 @@
-import type { FeeStatus } from "@soc/contracts";
+import type { FeeStatus, StudentOrEmployeeKind } from "@soc/contracts";
 
 export interface EffectivePermissionGrant {
   activatedFrom: string;
@@ -21,6 +21,7 @@ export interface UserRecord {
   ssoSubject: string | null;
   ssoUserId: string;
   studentOrEmployeeNumber: string | null;
+  studentOrEmployeeKind: StudentOrEmployeeKind | null;
   updatedAt: string;
   userEmail: string | null;
   userMobile: string | null;

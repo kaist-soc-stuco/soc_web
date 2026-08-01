@@ -55,6 +55,7 @@ export const users = pgTable(
     ssoSubject: text("sso_subject"),
     kaistUid: text("kaist_uid"),
     studentOrEmployeeNumber: text("student_or_employee_number"),
+    studentOrEmployeeKind: text("student_or_employee_kind"),
     nameKr: text("name_kr"),
     nameEn: text("name_en"),
     majorMask: integer("major_mask").notNull().default(0),

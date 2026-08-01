@@ -37,14 +37,21 @@ describe('AuthService SSO state consumption', () => {
   it('uses Redis GETDEL before the SSO exchange and consumes state only once', async () => {
     const state = JSON.stringify({ createdAt: new Date().toISOString(), expiresAt: Date.now() + 60_000, nonce: 'nonce-1' });
     const { instance, authState, pending } = makeService(state);
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ nonce: 'nonce-1', userInfo: { user_id: 'sso-user' } }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ nonce: 'nonce-1', userInfo: {
+      emp_no: 'E0001',
+      kaist_uid: 'kaist-uid',
+      user_email: 'sso-user@kaist.ac.kr',
+      user_eng_nm: 'SSO User',
+      user_id: 'sso-user',
+      user_nm: '사용자',
+    } }) });
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, 'transaction-secret')).resolves.toMatchObject({ kind: 'consent_required' });
     expect(authState.compareAndDelete).toHaveBeenCalledWith('auth:sso:state:state-1', expect.any(String));
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(authState.compareAndDelete.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
-    expect(pending.save).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ ssoUserId: 'sso-user' }), 600);
+    expect(pending.save).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ ssoSubject: 'sso-user' }), 600);
 
     authState.compareAndDelete.mockResolvedValueOnce(null);
     await expect(instance.handleLoginCallback({ code: 'code', state: 'state-1' }, 'transaction-secret')).rejects.toBeInstanceOf(UnauthorizedException);

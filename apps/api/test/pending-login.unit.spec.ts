@@ -41,23 +41,30 @@ function repository() {
 }
 
 describe('PendingLoginRepository', () => {
+  const profile = {
+    kaistUid: 'kaist-uid-1',
+    nameEn: 'Test Person',
+    nameKr: '테스트',
+    ssoSubject: 'sso-subject-1',
+    studentOrEmployeeKind: 'STUDENT' as const,
+    studentOrEmployeeNumber: '20260001',
+    userEmail: 'person@kaist.ac.kr',
+  };
   it('encrypts the SSO subject and optional PII at rest and decrypts it on read', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, readStored, redis } = repository();
     const pending = {
+      ...profile,
       expiresAt: now + 60_000,
-      ssoUserId: 'sso-subject-1',
-      userEmail: 'person@example.invalid',
-      userMobile: '010-0000-0000',
     };
 
     await instance.save('flow-token', pending, 60);
 
     const raw = readStored();
     expect(raw).toBeTruthy();
-    expect(raw).not.toContain(pending.ssoUserId);
+    expect(raw).not.toContain(pending.ssoSubject);
     expect(raw).not.toContain(pending.userEmail);
-    expect(raw).not.toContain(pending.userMobile);
+    expect(raw).not.toContain(pending.studentOrEmployeeNumber);
     redis.eval.mockResolvedValueOnce([1, raw]);
     await expect(instance.reserve('flow-token')).resolves.toMatchObject({ pending, reservationToken: expect.any(String) });
   });
@@ -66,15 +73,15 @@ describe('PendingLoginRepository', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, readStored, redis, writeStored } = repository();
     await instance.save('flow-token', {
+      ...profile,
       expiresAt: now + 60_000,
-      ssoUserId: 'sso-subject-1',
     }, 60);
 
-    const parsed = JSON.parse(readStored()!) as { encryptedSsoUserId: string };
-    const [iv, tag, encrypted] = parsed.encryptedSsoUserId.split('.');
+    const parsed = JSON.parse(readStored()!) as { encryptedProfile: string };
+    const [iv, tag, encrypted] = parsed.encryptedProfile.split('.');
     const tamperedTag = Buffer.from(tag, 'base64url');
     tamperedTag[0] ^= 1;
-    parsed.encryptedSsoUserId = `${iv}.${tamperedTag.toString('base64url')}.${encrypted}`;
+    parsed.encryptedProfile = `${iv}.${tamperedTag.toString('base64url')}.${encrypted}`;
     writeStored(JSON.stringify(parsed));
     redis.eval.mockResolvedValueOnce([1, readStored()]);
 
@@ -85,8 +92,8 @@ describe('PendingLoginRepository', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, readStored, redis } = repository();
     const pending = {
+      ...profile,
       expiresAt: now + 60_000,
-      ssoUserId: 'sso-subject-1',
     };
     await instance.save('flow-token', pending, 60);
     redis.eval.mockResolvedValueOnce([1, readStored()]);
@@ -109,7 +116,7 @@ describe('PendingLoginRepository', () => {
   it('does not renew a lease after a competing consent owner takes it', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, readStored, redis } = repository();
-    await instance.save('flow-token', { expiresAt: now + 60_000, ssoUserId: 'sso-subject-1' }, 60);
+    await instance.save('flow-token', { ...profile, expiresAt: now + 60_000 }, 60);
     redis.eval.mockResolvedValueOnce([1, readStored()]);
     const reservation = (await instance.reserve('flow-token'))!;
     redis.eval.mockResolvedValueOnce(0);

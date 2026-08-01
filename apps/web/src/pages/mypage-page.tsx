@@ -23,7 +23,6 @@ const affiliationLabel = (mask: number) => {
 export function MyPage() {
   const [profile, setProfile] = useState<UserMeResponse | null>(null);
   const [surveyResponses, setSurveyResponses] = useState<MySurveyResponsesResponse['items'] | null>(null);
-  const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [status, setStatus] = useState<'loading' | 'ready' | 'saving' | 'error'>('loading');
   const [message, setMessage] = useState('');
@@ -42,7 +41,6 @@ export function MyPage() {
           if (cause instanceof DOMException && cause.name === 'AbortError') return;
           setSurveyError(true);
         });
-      setEmail(loaded.userEmail ?? '');
       setMobile(loaded.userMobile ?? '');
       setStatus('ready');
     }).catch((cause: unknown) => {
@@ -64,9 +62,8 @@ export function MyPage() {
     setStatus('saving');
     setMessage('');
     try {
-      const updated = await profileApi.update({ userEmail: email.trim() || null, userMobile: mobile.trim() || null });
+      const updated = await profileApi.update({ userMobile: mobile.trim() || null });
       setProfile(updated);
-      setEmail(updated.userEmail ?? '');
       setMobile(updated.userMobile ?? '');
       setMessage('연락처를 저장했습니다.');
       setStatus('ready');
@@ -107,8 +104,8 @@ export function MyPage() {
             </section>
             <form onSubmit={submit} className="rounded-lg border border-kaist-grey/25 bg-white p-6">
               <h2 className="text-xl font-extrabold text-kaist-darkgreen">연락처</h2>
-              <label className="mt-5 block text-sm font-semibold" htmlFor="mypage-email">이메일</label>
-              <input id="mypage-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded border border-kaist-grey/40 px-3 py-2" />
+              <label className="mt-5 block text-sm font-semibold" htmlFor="mypage-email">KAIST 이메일</label>
+              <input id="mypage-email" type="email" value={profile.userEmail ?? ''} readOnly aria-readonly="true" className="mt-2 w-full rounded border border-kaist-grey/40 bg-kaist-grey/10 px-3 py-2" />
               <label className="mt-4 block text-sm font-semibold" htmlFor="mypage-mobile">전화번호</label>
               <input id="mypage-mobile" value={mobile} onChange={(event) => setMobile(event.target.value)} className="mt-2 w-full rounded border border-kaist-grey/40 px-3 py-2" />
               <button type="submit" disabled={status === 'saving'} className="mt-5 rounded bg-kaist-darkgreen px-5 py-2 font-bold text-white disabled:opacity-60">{status === 'saving' ? '저장 중...' : '저장'}</button>

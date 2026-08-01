@@ -120,6 +120,13 @@
       "when": 1785480800000,
       "tag": "0016_survey_section_descriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785550000000,
+      "tag": "0017_sso_identity_profile",
+      "breakpoints": true
     }
   ]
 }

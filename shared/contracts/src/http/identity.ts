@@ -1,4 +1,5 @@
 export type FeeStatus = "UNKNOWN" | "UNPAID" | "PAID";
+export type StudentOrEmployeeKind = "STUDENT" | "EMPLOYEE";
 export type PermissionGrantScope = "GLOBAL" | "BOARD" | "EVENT" | "SURVEY";
 export type PermissionChangeAction = "GRANT" | "REVOKE";
 export type PermissionChangeRequestStatus =
@@ -22,6 +23,7 @@ export interface UserProfile {
   id: string;
   kaistUid: string | null;
   studentOrEmployeeNumber: string | null;
+  studentOrEmployeeKind: StudentOrEmployeeKind | null;
   nameKr: string | null;
   nameEn: string | null;
   majorMask: number;
@@ -36,7 +38,6 @@ export interface UserMeResponse extends UserProfile {
 }
 
 export interface PatchMeRequest {
-  userEmail?: string | null;
   userMobile?: string | null;
 }
 
@@ -44,6 +45,7 @@ export interface AdminUserProfile {
   id: string;
   kaistUid: string | null;
   studentOrEmployeeNumber: string | null;
+  studentOrEmployeeKind: StudentOrEmployeeKind | null;
   nameKr: string | null;
   nameEn: string | null;
   majorMask: number;

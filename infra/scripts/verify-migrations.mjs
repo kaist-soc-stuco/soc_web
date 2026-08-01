@@ -42,6 +42,7 @@ const pinned = {
   "0014_phase2_permission_transition_cursor": ["de2a7611f15f3d4e81f8a89799aa4c35c6253230e20c6a62a3dfb77472cfc85f", "3c9bfe7caaf0630bbe2932a11f0cd05b27abe547292a77b667490fc9c37fc25f"],
   "0015_board_title_reconciliation": ["0ed063c5dc890ba8516466d449b425590675f10b8f5e45d1a17f1773c825bde1", "36ed981e98e6119de897df3e8aa8c19163ae66e047f5b9ea7191cea3024781c3"],
   "0016_survey_section_descriptions": ["ca2aea03da1d4c0409fa6eecb45e9fb6a89adfb475731da462165d632bed895f", "36ed981e98e6119de897df3e8aa8c19163ae66e047f5b9ea7191cea3024781c3"],
+  "0017_sso_identity_profile": ["5c6ac280d5ca1275a44da4d493c6192f34983ff5e18a110ad6753dd28797ab33", "36ed981e98e6119de897df3e8aa8c19163ae66e047f5b9ea7191cea3024781c3"],
 };
 const canonicalJournal = {
   version: "7",
@@ -64,6 +65,7 @@ const canonicalJournal = {
     [14, "0014_phase2_permission_transition_cursor", 1785176000000, true],
     [15, "0015_board_title_reconciliation", 1785177000000, true],
     [16, "0016_survey_section_descriptions", 1785480800000, true],
+    [17, "0017_sso_identity_profile", 1785550000000, true],
   ],
 };
 function fail(message) { throw new Error(`Migration verification failed: ${message}`); }

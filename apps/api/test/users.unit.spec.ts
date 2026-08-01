@@ -34,12 +34,12 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
   });
 
   it('patches only mutable contact fields, ignoring immutable and legacy authority input', async () => {
-    const repo = repository(); repo.updateProfile.mockResolvedValue(user(targetId, { userEmail: 'new@example.test', userMobile: null }));
+    const repo = repository(); repo.updateProfile.mockResolvedValue(user(targetId, { userEmail: 'kaist@kaist.ac.kr', userMobile: null }));
     repo.findEffectiveGrants.mockResolvedValue(new Map([[targetId, []]]));
-    const result = await new UsersService(repo as never).patchMe(targetId, { userEmail: 'new@example.test', userMobile: null, id: actorId, feeStatus: 'PAID', permission: 99 } as never);
-    expect(repo.updateProfile).toHaveBeenCalledWith(targetId, { userEmail: 'new@example.test', userMobile: null });
+    const result = await new UsersService(repo as never).patchMe(targetId, { userMobile: null });
+    expect(repo.updateProfile).toHaveBeenCalledWith(targetId, { userMobile: null });
     expect(result).not.toHaveProperty('permission');
-    await expect(new UsersService(repo as never).patchMe(targetId, { userEmail: 'x'.repeat(321) })).rejects.toMatchObject({ response: expect.objectContaining({ message: 'invalid_profile_update' }) });
+    await expect(new UsersService(repo as never).patchMe(targetId, { userMobile: 'x'.repeat(321) })).rejects.toMatchObject({ response: expect.objectContaining({ message: 'invalid_profile_update' }) });
   });
 
   it('uses effective GLOBAL grants only; legacy permission and scoped grants cannot administer users', async () => {

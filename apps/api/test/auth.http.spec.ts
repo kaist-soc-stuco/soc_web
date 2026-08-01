@@ -43,7 +43,7 @@ describe('AuthController HTTP contract', () => {
     issuePersistedSession: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
   };
-  let users: { createFromSsoUser: ReturnType<typeof vi.fn>; findBySsoUserId: ReturnType<typeof vi.fn>; grantAllDevelopmentPermissions: ReturnType<typeof vi.fn> };
+  let users: { synchronizeAuthoritativeSsoProfile: ReturnType<typeof vi.fn>; grantAllDevelopmentPermissions: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     authService = {
@@ -58,8 +58,7 @@ describe('AuthController HTTP contract', () => {
       issuePersistedSession: vi.fn(),
     };
     users = {
-      createFromSsoUser: vi.fn(),
-      findBySsoUserId: vi.fn(),
+      synchronizeAuthoritativeSsoProfile: vi.fn(),
       grantAllDevelopmentPermissions: vi.fn(),
     };
 
@@ -88,8 +87,7 @@ describe('AuthController HTTP contract', () => {
     app = undefined;
   });
   it('creates the development administrator and sets persisted cookies only in development', async () => {
-    users.findBySsoUserId.mockResolvedValue(null);
-    users.createFromSsoUser.mockResolvedValue({ id: 'development-user-id' });
+    users.synchronizeAuthoritativeSsoProfile.mockResolvedValue({ id: 'development-user-id' });
     authSessionService.issuePersistedSession.mockResolvedValue({
       accessToken: 'development-access',
       refreshToken: 'development-refresh',
@@ -101,10 +99,15 @@ describe('AuthController HTTP contract', () => {
       .send({ account: 'admin' })
       .expect(204);
 
-    expect(users.createFromSsoUser).toHaveBeenCalledWith({
+    expect(users.synchronizeAuthoritativeSsoProfile).toHaveBeenCalledWith({
       consentedAt: expect.any(String),
-      ssoUserId: 'development-admin',
-      userEmail: 'development-admin@example.test',
+      kaistUid: 'development-admin',
+      nameEn: 'Development Admin',
+      nameKr: '개발 관리자',
+      ssoSubject: 'development-admin',
+      studentOrEmployeeKind: 'EMPLOYEE',
+      studentOrEmployeeNumber: 'D0000001',
+      userEmail: 'development-admin@kaist.ac.kr',
     });
     expect(users.grantAllDevelopmentPermissions).toHaveBeenCalledWith('development-user-id');
     expect(authSessionService.issuePersistedSession).toHaveBeenCalledWith('development-user-id');
@@ -113,8 +116,7 @@ describe('AuthController HTTP contract', () => {
   });
 
   it('creates a normal development user without granting administrator permissions', async () => {
-    users.findBySsoUserId.mockResolvedValue(null);
-    users.createFromSsoUser.mockResolvedValue({ id: 'development-user-1-id' });
+    users.synchronizeAuthoritativeSsoProfile.mockResolvedValue({ id: 'development-user-1-id' });
     authSessionService.issuePersistedSession.mockResolvedValue({
       accessToken: 'development-access',
       refreshToken: 'development-refresh',
@@ -126,10 +128,15 @@ describe('AuthController HTTP contract', () => {
       .send({ account: 'user-1' })
       .expect(204);
 
-    expect(users.createFromSsoUser).toHaveBeenCalledWith({
+    expect(users.synchronizeAuthoritativeSsoProfile).toHaveBeenCalledWith({
       consentedAt: expect.any(String),
-      ssoUserId: 'development-user-1',
-      userEmail: 'development-user-1@example.test',
+      kaistUid: 'development-user-1',
+      nameEn: 'Development User 1',
+      nameKr: '개발 사용자 1',
+      ssoSubject: 'development-user-1',
+      studentOrEmployeeKind: 'EMPLOYEE',
+      studentOrEmployeeNumber: 'D0000002',
+      userEmail: 'development-user-1@kaist.ac.kr',
     });
     expect(users.grantAllDevelopmentPermissions).not.toHaveBeenCalled();
     expect(authSessionService.issuePersistedSession).toHaveBeenCalledWith('development-user-1-id');
@@ -142,7 +149,7 @@ describe('AuthController HTTP contract', () => {
       .send({ account: 'arbitrary-user' })
       .expect(400);
 
-    expect(users.findBySsoUserId).not.toHaveBeenCalled();
+    expect(users.synchronizeAuthoritativeSsoProfile).not.toHaveBeenCalled();
   });
 
   it('marks production auth cookies Secure', async () => {

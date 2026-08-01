@@ -50,13 +50,13 @@ describe('UsersController HTTP boundary', () => {
 
   it('uses the persisted actor established by AuthGuard for each USER-ME and fee-self route', async () => {
     users.getMe.mockResolvedValue({ id: actorId, userEmail: 'actor@example.test', grants: [] });
-    users.patchMe.mockResolvedValue({ id: actorId, userEmail: 'new@example.test', grants: [] });
+    users.patchMe.mockResolvedValue({ id: actorId, userEmail: 'actor@example.test', userMobile: '010-0000-0000', grants: [] });
     users.getFeeSelf.mockResolvedValue({ feeStatus: 'UNPAID' });
     await authenticatedGet('/api/users/me').expect(200, { id: actorId, userEmail: 'actor@example.test', grants: [] });
-    await authenticatedPatch('/api/users/me').send({ userEmail: 'new@example.test' }).expect(200);
+    await authenticatedPatch('/api/users/me').send({ userMobile: '010-0000-0000' }).expect(200);
     await authenticatedGet('/api/users/me/fee').expect(200, { feeStatus: 'UNPAID' });
     expect(users.getMe).toHaveBeenCalledWith(actorId);
-    expect(users.patchMe).toHaveBeenCalledWith(actorId, { userEmail: 'new@example.test', userMobile: undefined });
+    expect(users.patchMe).toHaveBeenCalledWith(actorId, { userMobile: '010-0000-0000' });
     expect(users.getFeeSelf).toHaveBeenCalledWith(actorId);
     expect(users.findById).toHaveBeenCalledTimes(3);
     expect((users.findById.mock.results[0]?.value)).toBeTruthy();

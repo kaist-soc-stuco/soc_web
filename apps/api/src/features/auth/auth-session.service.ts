@@ -277,9 +277,10 @@ export class AuthSessionService {
     try {
       if (input.consent) {
         await assertOwnership();
-        const user = await this.usersService.upsertConsentedSsoUser({
-          consentedAt: new Date().toISOString(), ssoUserId: pending.ssoUserId,
-          userEmail: pending.userEmail, userMobile: pending.userMobile,
+        const { expiresAt: _expiresAt, ...profile } = pending;
+        const user = await this.usersService.synchronizeAuthoritativeSsoProfile({
+          ...profile,
+          consentedAt: new Date().toISOString(),
         });
         await assertOwnership();
         const result = {

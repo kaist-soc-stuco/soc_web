@@ -29,9 +29,8 @@ export class UsersController {
 
   @Patch("me")
   async patchMe(@Req() request: AuthenticatedRequest, @Body() body: PatchMeRequest) {
-    requireAllowedKeys(body, ["userEmail", "userMobile"], "invalid_profile_update");
+    requireAllowedKeys(body, ["userMobile"], "invalid_profile_update");
     return this.usersService.patchMe(request.user.id, {
-      userEmail: body.userEmail as string | null | undefined,
       userMobile: body.userMobile as string | null | undefined,
     });
   }

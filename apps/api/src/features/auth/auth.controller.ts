@@ -174,17 +174,21 @@ export class AuthController {
     }
 
     const account = {
-      admin: { ssoUserId: "development-admin", userEmail: "development-admin@example.test", administrator: true },
-      "user-1": { ssoUserId: "development-user-1", userEmail: "development-user-1@example.test", administrator: false },
-      "user-2": { ssoUserId: "development-user-2", userEmail: "development-user-2@example.test", administrator: false },
+      admin: { id: "development-admin", number: "D0000001", nameKr: "개발 관리자", nameEn: "Development Admin", administrator: true },
+      "user-1": { id: "development-user-1", number: "D0000002", nameKr: "개발 사용자 1", nameEn: "Development User 1", administrator: false },
+      "user-2": { id: "development-user-2", number: "D0000003", nameKr: "개발 사용자 2", nameEn: "Development User 2", administrator: false },
     }[body.account];
     if (!account) throw new BadRequestException("development_account_invalid");
-    const user = await this.usersService.findBySsoUserId(account.ssoUserId)
-      ?? await this.usersService.createFromSsoUser({
-        consentedAt: new Date().toISOString(),
-        ssoUserId: account.ssoUserId,
-        userEmail: account.userEmail,
-      });
+    const user = await this.usersService.synchronizeAuthoritativeSsoProfile({
+      consentedAt: new Date().toISOString(),
+      kaistUid: account.id,
+      nameEn: account.nameEn,
+      nameKr: account.nameKr,
+      ssoSubject: account.id,
+      studentOrEmployeeKind: "EMPLOYEE",
+      studentOrEmployeeNumber: account.number,
+      userEmail: `${account.id}@kaist.ac.kr`,
+    });
     if (account.administrator) await this.usersService.grantAllDevelopmentPermissions(user.id);
     const session = await this.authSessionService.issuePersistedSession(user.id);
     this.setPersistedCookies(response, session.accessToken, session.refreshToken);

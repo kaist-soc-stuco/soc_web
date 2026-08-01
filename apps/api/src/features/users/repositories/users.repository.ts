@@ -57,6 +57,7 @@ export class UsersRepository {
         PII_FIELDS.studentOrEmployeeNumber,
         row.studentOrEmployeeNumber,
       ),
+      studentOrEmployeeKind: row.studentOrEmployeeKind as UserRecord["studentOrEmployeeKind"],
       updatedAt: row.updatedAt.toISOString(),
       userEmail: this.decryptPii(PII_FIELDS.userEmail, row.userEmail),
       userMobile: this.decryptPii(PII_FIELDS.userMobile, row.userMobile),
@@ -64,7 +65,9 @@ export class UsersRepository {
   }
 
   async findBySsoUserId(ssoUserId: string): Promise<UserRecord | null> {
-    const found = await this.db.query.users.findFirst({ where: eq(users.ssoUserId, ssoUserId) });
+    const found = await this.db.query.users.findFirst({
+      where: or(eq(users.ssoSubject, ssoUserId), eq(users.ssoUserId, ssoUserId)),
+    });
     return found ? this.mapRowToUserRecord(found) : null;
   }
 
@@ -169,6 +172,53 @@ export class UsersRepository {
       userMobile: this.piiCipher.encrypt(PII_FIELDS.userMobile, input.userMobile),
     }).returning();
     return this.mapRowToUserRecord(inserted);
+  }
+
+  async synchronizeAuthoritativeSsoProfile(input: {
+    consentedAt?: string;
+    kaistUid: string;
+    nameEn: string;
+    nameKr: string;
+    ssoSubject: string;
+    studentOrEmployeeKind: UserRecord["studentOrEmployeeKind"];
+    studentOrEmployeeNumber: string;
+    userEmail: string;
+  }): Promise<UserRecord> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${input.ssoSubject}))`);
+      const [bySubject] = await tx.select().from(users).where(
+        or(eq(users.ssoSubject, input.ssoSubject), eq(users.ssoUserId, input.ssoSubject)),
+      ).limit(1);
+      const [byKaistUid] = await tx.select().from(users).where(
+        inArray(users.kaistUid, this.piiCipher.encryptForLookup(PII_FIELDS.kaistUid, input.kaistUid)),
+      ).limit(1);
+      if (byKaistUid && (!bySubject || byKaistUid.id !== bySubject.id)) {
+        throw new Error("sso_identity_conflict");
+      }
+      const values = {
+        privacyConsentAt: input.consentedAt ? new Date(input.consentedAt) : undefined,
+        kaistUid: this.piiCipher.encrypt(PII_FIELDS.kaistUid, input.kaistUid),
+        nameEn: this.piiCipher.encrypt(PII_FIELDS.nameEn, input.nameEn),
+        nameKr: this.piiCipher.encrypt(PII_FIELDS.nameKr, input.nameKr),
+        ssoSubject: input.ssoSubject,
+        studentOrEmployeeKind: input.studentOrEmployeeKind,
+        studentOrEmployeeNumber: this.piiCipher.encrypt(
+          PII_FIELDS.studentOrEmployeeNumber,
+          input.studentOrEmployeeNumber,
+        ),
+        userEmail: this.piiCipher.encrypt(PII_FIELDS.userEmail, input.userEmail),
+        updatedAt: new Date(),
+      };
+      if (bySubject) {
+        const [updated] = await tx.update(users).set(values).where(eq(users.id, bySubject.id)).returning();
+        return this.mapRowToUserRecord(updated);
+      }
+      const [inserted] = await tx.insert(users).values({
+        ...values,
+        ssoUserId: input.ssoSubject,
+      }).returning();
+      return this.mapRowToUserRecord(inserted);
+    });
   }
 
   async upsertConsentedUserBySso(input: { consentedAt: string; ssoUserId: string; userEmail?: string; userMobile?: string }): Promise<UserRecord> {

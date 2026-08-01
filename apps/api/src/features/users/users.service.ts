@@ -44,6 +44,7 @@ export class UsersService {
       nameKr: user.nameKr,
       privacyConsentAt: user.privacyConsentAt,
       studentOrEmployeeNumber: user.studentOrEmployeeNumber,
+      studentOrEmployeeKind: user.studentOrEmployeeKind,
       userEmail: user.userEmail,
       userMobile: user.userMobile,
     };
@@ -57,6 +58,7 @@ export class UsersService {
       nameKr: user.nameKr,
       privacyConsentAt: user.privacyConsentAt,
       studentOrEmployeeNumber: user.studentOrEmployeeNumber,
+      studentOrEmployeeKind: user.studentOrEmployeeKind,
     };
   }
 
@@ -81,6 +83,19 @@ export class UsersService {
 
   async findById(userId: string): Promise<UserRecord | null> {
     return this.usersRepository.findById(userId);
+  }
+
+  async synchronizeAuthoritativeSsoProfile(input: {
+    consentedAt?: string;
+    kaistUid: string;
+    nameEn: string;
+    nameKr: string;
+    ssoSubject: string;
+    studentOrEmployeeKind: "STUDENT" | "EMPLOYEE";
+    studentOrEmployeeNumber: string;
+    userEmail: string;
+  }): Promise<UserRecord> {
+    return this.usersRepository.synchronizeAuthoritativeSsoProfile(input);
   }
   async ensureCanonicalSsoSubject(
     userId: string,
@@ -123,13 +138,12 @@ export class UsersService {
     if (!input || typeof input !== "object") {
       throw new BadRequestException("invalid_profile_update");
     }
-    for (const value of [input.userEmail, input.userMobile]) {
+    for (const value of [input.userMobile]) {
       if (value !== undefined && value !== null && (typeof value !== "string" || value.length > 320)) {
         throw new BadRequestException("invalid_profile_update");
       }
     }
     const updated = await this.usersRepository.updateProfile(userId, {
-      userEmail: input.userEmail,
       userMobile: input.userMobile,
     });
     if (!updated) throw new NotFoundException("user_not_found");
@@ -172,6 +186,7 @@ export class UsersService {
         nameEn: user.nameEn,
         nameKr: user.nameKr,
         studentOrEmployeeNumber: user.studentOrEmployeeNumber,
+        studentOrEmployeeKind: user.studentOrEmployeeKind,
         updatedAt: user.updatedAt,
       })),
     };
