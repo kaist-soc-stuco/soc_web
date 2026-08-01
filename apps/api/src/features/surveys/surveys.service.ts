@@ -293,6 +293,20 @@ export class SurveysService {
     ].map(escape).join(','));
     return { filename: `survey-${id}.csv`, csv: `\uFEFF${[header.map(escape).join(','), ...lines].join('\r\n')}\r\n` };
   }
+  async related(query: Record<string, unknown>) {
+    if (!exact(query, ['articleId', 'eventId', 'surveyId', 'locale'])) throw new UnprocessableEntityException('invalid_content_relation_query');
+    const subject = {
+      articleId: query.articleId as string | undefined,
+      eventId: query.eventId as string | undefined,
+      surveyId: query.surveyId as string | undefined,
+    };
+    if (Object.values(subject).filter((value) => value !== undefined).length !== 1
+      || Object.values(subject).some((value) => value !== undefined && !uuid(value))
+      || (query.locale !== undefined && query.locale !== 'ko' && query.locale !== 'en')) {
+      throw new UnprocessableEntityException('invalid_content_relation_query');
+    }
+    return { items: await this.repo.related(subject, query.locale === 'en' ? 'en' : 'ko') };
+  }
   async listMatchers(actor: string, query: Record<string, unknown>) {
     await this.manage(actor);
     if (!exact(query, ['articleId', 'eventId', 'surveyId'])) throw new UnprocessableEntityException('invalid_content_matcher_query');

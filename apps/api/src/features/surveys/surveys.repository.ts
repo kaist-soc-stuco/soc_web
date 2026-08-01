@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { DRIZZLE_DB, type PostgresDatabase } from '../../infrastructure/postgres/postgres.provider';
-import { articles, contentMatchers, events, surveyAuditLog, surveyChoiceOptions, surveyExports, surveyGuestIdentityHashes, surveyResponseAnswers, surveyResponses, surveyRevisions, surveySections, surveyQuestions, surveys, users } from '../../infrastructure/postgres/postgres.schema';
+import { articles, boards, contentMatchers, events, surveyAuditLog, surveyChoiceOptions, surveyExports, surveyGuestIdentityHashes, surveyResponseAnswers, surveyResponses, surveyRevisions, surveySections, surveyQuestions, surveys, users } from '../../infrastructure/postgres/postgres.schema';
 type Tx = Parameters<Parameters<PostgresDatabase['transaction']>[0]>[0];
 type LocalizedText = { kr: string; en: string };
 type SurveyQuestionInput = {
@@ -308,6 +308,38 @@ export class SurveysRepository {
     return this.db.select().from(contentMatchers)
       .where(filters.length ? and(...filters) : undefined)
       .orderBy(desc(contentMatchers.createdAt), desc(contentMatchers.id));
+  }
+  async related(subject: { articleId?: string; eventId?: string; surveyId?: string }, locale: 'ko' | 'en') {
+    const relations = await this.listMatchers(subject);
+    const cards = await Promise.all(relations.flatMap((relation) => {
+      const pending: Array<Promise<Record<string, unknown> | null>> = [];
+      if (relation.articleId && relation.articleId !== subject.articleId) pending.push(this.db.select({
+        id: articles.id, titleKr: articles.titleKr, titleEn: articles.titleEn, boardCode: boards.code,
+      }).from(articles).innerJoin(boards, eq(articles.boardId, boards.id)).where(and(
+        eq(articles.id, relation.articleId), eq(articles.status, 'PUBLISHED'), eq(articles.scope, 'ALL'),
+      )).limit(1).then(([article]) => article ? {
+        kind: 'ARTICLE', id: article.id, title: locale === 'en' ? article.titleEn : article.titleKr,
+        href: `/board/${article.boardCode}/${article.id}`, relationType: relation.relationType,
+      } : null));
+      if (relation.eventId && relation.eventId !== subject.eventId) pending.push(this.db.select().from(events).where(and(
+        eq(events.id, relation.eventId), eq(events.visibility, 'PUBLIC'),
+      )).limit(1).then(([event]) => event ? {
+        kind: 'EVENT', id: event.id, title: locale === 'en' ? event.titleEn : event.titleKr,
+        href: `/calendar?event=${event.id}`, startsAt: event.startAt.toISOString(), relationType: relation.relationType,
+      } : null));
+      if (relation.surveyId && relation.surveyId !== subject.surveyId) pending.push(this.db.select({
+        id: surveys.id, titleKr: surveyRevisions.titleKr, titleEn: surveyRevisions.titleEn,
+        opensAt: surveys.opensAt, closesAt: surveys.closesAt,
+      }).from(surveys).innerJoin(surveyRevisions, and(
+        eq(surveyRevisions.surveyId, surveys.id), eq(surveyRevisions.revision, surveys.currentRevision),
+      )).where(and(eq(surveys.id, relation.surveyId), inArray(surveys.state, ['SCHEDULED', 'OPEN', 'CLOSED']))).limit(1).then(([survey]) => survey ? {
+        kind: 'SURVEY', id: survey.id, title: locale === 'en' ? survey.titleEn : survey.titleKr,
+        href: `/survey/${survey.id}`, opensAt: survey.opensAt?.toISOString() ?? null,
+        closesAt: survey.closesAt?.toISOString() ?? null, relationType: relation.relationType,
+      } : null));
+      return pending;
+    }));
+    return cards.filter((card): card is Record<string, unknown> => card !== null);
   }
   async matcher(
     input: {

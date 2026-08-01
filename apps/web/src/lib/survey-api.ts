@@ -1,4 +1,4 @@
-import type { AdminSurveyResponseListResponse, AppErrorResponse, ContentLocale, ContentMatcherDto, CreateContentMatcherRequest, CreateSurveyRequest, ExportSurveyRequest, GetMySurveyResponseResponse, ListContentMatchersResponse, LoginSessionResponse, MySurveyResponsesResponse, PatchSurveyRequest, PublishSurveyResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, ReviewSurveyResponseRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
+import type { AdminSurveyResponseListResponse, AppErrorResponse, ContentLocale, ContentMatcherDto, CreateContentMatcherRequest, CreateSurveyRequest, ExportSurveyRequest, GetMySurveyResponseResponse, ListContentMatchersResponse, LoginSessionResponse, MySurveyResponsesResponse, PatchSurveyRequest, PublishSurveyResponse, RelatedContentCard, RelatedContentResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, ReviewSurveyResponseRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
 
 export type RestrictedPattern = { allowed: ReadonlySet<string>; minimum: number; maximum: number };
 export type SubmitSurveyResult = { status: 'ACCEPTED' } | { response: SurveyResponseDto };
@@ -68,6 +68,11 @@ const isMatcher = (value: unknown): value is ContentMatcherDto => exact(value, [
   && relationType(value.relationType) && syncMode(value.syncMode) && string(value.createdByUserId) && string(value.createdAt)
   && string(value.updatedByUserId) && string(value.updatedAt) && nullable(value.synchronizedAt, string);
 const isMatcherList = (value: unknown): value is ListContentMatchersResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every(isMatcher);
+const isRelatedCard = (value: unknown): value is RelatedContentCard => object(value) && string(value.id) && string(value.title) && string(value.href) && relationType(value.relationType)
+  && (value.kind === 'ARTICLE' && exact(value, ['kind', 'id', 'title', 'href', 'relationType'])
+    || value.kind === 'EVENT' && exact(value, ['kind', 'id', 'title', 'href', 'relationType', 'startsAt']) && string(value.startsAt)
+    || value.kind === 'SURVEY' && exact(value, ['kind', 'id', 'title', 'href', 'relationType', 'opensAt', 'closesAt']) && nullable(value.opensAt, string) && nullable(value.closesAt, string));
+const isRelated = (value: unknown): value is RelatedContentResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every(isRelatedCard);
 
 export const surveyApi = {
   list: async (signal?: AbortSignal, selectedLocale?: ContentLocale) => decode(await request(`/surveys${selectedLocale ? `?locale=${selectedLocale}` : ''}`, 'GET', undefined, signal), isList),
@@ -86,6 +91,10 @@ export const surveyApi = {
   response: async (id: string, signal?: AbortSignal) => decode(await request(`/admin/survey-responses/${id}`, 'GET', undefined, signal), isResponse),
   review: async (id: string, input: ReviewSurveyResponseRequest) => decode(await request(`/admin/survey-responses/${id}/review`, 'POST', input), isResponse),
   aggregate: async (id: string) => decode(await request(`/admin/surveys/${id}/aggregate`), isAggregate),
+  related: async (subject: { articleId?: string; eventId?: string; surveyId?: string }, selectedLocale: ContentLocale, signal?: AbortSignal) => {
+    const query = new URLSearchParams([...Object.entries(subject).filter((entry): entry is [string, string] => entry[1] !== undefined), ['locale', selectedLocale]]);
+    return decode(await request(`/surveys/content-relations?${query}`, 'GET', undefined, signal), isRelated);
+  },
   relations: async (subject: { articleId?: string; eventId?: string; surveyId?: string }, signal?: AbortSignal) => {
     const query = new URLSearchParams(Object.entries(subject).filter((entry): entry is [string, string] => entry[1] !== undefined));
     return decode(await request(`/admin/content-matchers?${query}`, 'GET', undefined, signal), isMatcherList);

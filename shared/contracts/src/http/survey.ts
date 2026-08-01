@@ -196,4 +196,9 @@ export type CreateContentMatcherRequest =
   | { articleId: string; eventId?: never; surveyId: string; relationType: "ANNOUNCEMENT"; syncMode?: "NONE" }
   | { articleId?: never; eventId: string; surveyId: string; relationType: "SURVEY_PERIOD"; syncMode?: ContentRelationSyncMode };
 export interface ListContentMatchersResponse { items: ContentMatcherDto[]; }
+export type RelatedContentCard =
+  | { kind: "ARTICLE"; id: string; title: string; href: string; relationType: ContentRelationType }
+  | { kind: "EVENT"; id: string; title: string; href: string; relationType: ContentRelationType; startsAt: string }
+  | { kind: "SURVEY"; id: string; title: string; href: string; relationType: ContentRelationType; opensAt: string | null; closesAt: string | null };
+export interface RelatedContentResponse { items: RelatedContentCard[]; }
 export interface GetMySurveyResponseResponse { response: SurveyResponseDto | null; }

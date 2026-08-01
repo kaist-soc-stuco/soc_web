@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { EventItem } from '@soc/contracts';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
+import { RelatedContentCards } from '@/components/organisms/related-content-cards';
 import { getEvents } from '@/lib/event-api';
 import { localizedText } from '@/lib/localized-content';
 import { surveyApi } from '@/lib/survey-api';
@@ -193,8 +194,8 @@ export function EventsPage() {
       <section className={`${pageContainerClass} bg-[#F7FCFC] pb-16 pt-8`}>
         <div className="grid grid-cols-[repeat(auto-fit,270px)] justify-center gap-x-6 gap-y-[51px] min-[1900px]:justify-between">
           {canRenderCards && currentEvents.map((event) => (
-            <Link
-              key={event.id}
+            <div key={event.id} className="w-[270px]">
+              <Link
               to={event.href}
               className="group flex h-[359px] w-[270px] min-w-0 flex-col overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md"
             >
@@ -223,7 +224,9 @@ export function EventsPage() {
                   {event.date}
                 </div>
               </div>
-            </Link>
+              </Link>
+              <RelatedContentCards subject={activeTab === '행사' ? { eventId: String(event.id) } : { surveyId: String(event.id) }} locale={locale} />
+            </div>
           ))}
         </div>
 

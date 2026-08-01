@@ -27,6 +27,7 @@ const api = vi.hoisted(() => ({
   publish: vi.fn(),
   replaceQuestions: vi.fn(),
   replaceSections: vi.fn(),
+  related: vi.fn(),
   submit: vi.fn(),
 }));
 vi.mock('@/lib/survey-api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/survey-api')>()), SurveyApiError, surveyApi: api }));
@@ -97,6 +98,7 @@ const renderAdminEdit = (id = 'survey-1') => render(
 beforeEach(() => {
   api.session.mockResolvedValue({ authenticated: false });
   api.mine.mockResolvedValue({ response: null });
+  api.related.mockResolvedValue({ items: [] });
 });
 
 afterEach(() => {

@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { SurveyResponseAnswerDto, SurveyResponseState } from '@soc/contracts';
 import { SiteLayout } from '@/components/organisms/site-layout';
+import { RelatedContentCards } from '@/components/organisms/related-content-cards';
+import { useLocale } from '@/lib/locale-store';
 import { matchesRestrictedCharacterPattern, SurveyApiError, surveyApi } from '@/lib/survey-api';
 
 const text = (value: { value: string | null }) => value.value ?? '';
@@ -39,6 +41,7 @@ function errorMessage(error: unknown, guest: boolean): string {
 }
 
 export function EventSurveyPage() {
+  const [locale] = useLocale();
   const { surveyId } = useParams<{ surveyId: string }>();
   const [survey, setSurvey] = useState<Awaited<ReturnType<typeof surveyApi.get>>>();
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -128,6 +131,7 @@ export function EventSurveyPage() {
   const available = !unavailableMessage && !success;
   return <SiteLayout><div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8"><div className="mx-auto w-full px-[12vw]"><h1 className="text-[32px] font-extrabold text-white">설문조사</h1></div></div>
     <main className="mx-auto w-full px-[12vw] py-8"><h2 className="text-[28px] font-extrabold">{text(survey.title)}</h2><p className="mt-2">{survey.description ? text(survey.description) : ''}</p>
+      {surveyId && <RelatedContentCards subject={{ surveyId }} locale={locale} />}
       {unavailableMessage && <p role={session === 'error' ? 'alert' : 'status'} className="mt-4 rounded bg-yellow-50 p-4">{unavailableMessage}</p>}
       <form onSubmit={submit}>{survey.sections.map((section) => <fieldset key={section.id} className="mt-6 rounded-[15px] bg-white p-7 shadow"><legend className="text-xl font-bold">{text(section.title)}</legend>{section.questions.map((question) => { const label = text(question.prompt); const value = answers[question.id]; const helpId = `survey-question-help-${question.id}`; const describedBy = question.helpText ? helpId : undefined; const input = question.type === 'LONG_TEXT' ? <textarea aria-label={label} aria-describedby={describedBy} disabled={!available} required={question.required} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 w-full border p-2" /> : question.type === 'SHORT_TEXT' ? <input aria-label={label} aria-describedby={describedBy} disabled={!available} required={question.required} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 w-full border p-2" /> : question.type === 'NUMBER' ? <input aria-label={label} aria-describedby={describedBy} type="number" disabled={!available} required={question.required} min={question.numberMin ?? undefined} max={question.numberMax ?? undefined} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 border p-2" /> : question.type === 'DATE' ? <input aria-label={label} aria-describedby={describedBy} type="date" disabled={!available} required={question.required} min={question.dateMin ?? undefined} max={question.dateMax ?? undefined} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 border p-2" /> : <fieldset aria-describedby={describedBy} className="mt-2 space-y-2"><legend className="font-semibold">{label}{question.required && ' *'}</legend>{question.choices.map((choice) => { const selected = (value as string[] | undefined) ?? []; return <label key={choice.id} className="block"><input disabled={!available} type={question.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name={question.id} required={question.required && question.type === 'SINGLE_CHOICE'} checked={question.type === 'SINGLE_CHOICE' ? value === choice.id : selected.includes(choice.id)} onChange={() => question.type === 'SINGLE_CHOICE' ? set(question.id, choice.id) : set(question.id, selected.includes(choice.id) ? selected.filter((id) => id !== choice.id) : [...selected, choice.id])} /> {text(choice.value)}</label>; })}</fieldset>; return <div key={question.id} className="mt-6">{!choiceTypes(question.type) && <label className="block font-semibold">{label} {question.required && <span className="text-red-600">*</span>}</label>}{question.helpText && <p id={helpId} className="text-sm text-kaist-grey">{text(question.helpText)}</p>}{input}</div>; })}</fieldset>)}
         {guestPhoneRequired && <label className="mt-6 block">전화번호<input type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!available} className="ml-3 border p-2" /></label>}
