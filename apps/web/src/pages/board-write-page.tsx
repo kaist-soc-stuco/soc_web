@@ -15,7 +15,6 @@ export function BoardWritePage() {
   const grants = useAdminGrants();
   const { category = 'soc-notice' } = useParams<{ category: string }>();
   const navigate = useNavigate();
-  const grants = useAdminGrants();
   const bilingual = grants.status === 'ready' && grants.grants.some((grant) => grant.permission === 'BOARD_MANAGE' && grant.scope === 'GLOBAL');
   const [boardTitle, setBoardTitle] = useState(category);
   const [boardDescription, setBoardDescription] = useState('');
