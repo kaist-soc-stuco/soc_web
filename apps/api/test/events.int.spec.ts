@@ -136,8 +136,8 @@ run('events PostgreSQL protocol (external TEST_DATABASE_URL)', () => {
         );
       }
       await pool.query(
-        `INSERT INTO content_matchers (event_id, survey_id, created_by_user_id)
-         VALUES ($1, $2, $3)`,
+        `INSERT INTO content_matchers (event_id, survey_id, relation_type, created_by_user_id, updated_by_user_id)
+         VALUES ($1, $2, 'SURVEY_PERIOD', $3, $3)`,
         [created.id, surveyId, managerId],
       );
       surveyIds[candidate.name] = surveyId;
@@ -182,7 +182,8 @@ run('events PostgreSQL protocol (external TEST_DATABASE_URL)', () => {
         [surveyId, state, opensAt, closesAt],
       );
       await pool.query(
-        'INSERT INTO content_matchers (event_id, survey_id, created_by_user_id) VALUES ($1, $2, $3)',
+        `INSERT INTO content_matchers (event_id, survey_id, relation_type, created_by_user_id, updated_by_user_id)
+         VALUES ($1, $2, 'SURVEY_PERIOD', $3, $3)`,
         [created.id, surveyId, managerId],
       );
       return surveyId;
