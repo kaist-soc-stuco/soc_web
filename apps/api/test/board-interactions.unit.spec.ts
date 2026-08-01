@@ -203,7 +203,7 @@ describe('InteractionsService', () => {
       uploadHeaders: { Authorization: 'secret' }, contentType: 'image/png', byteSize: 2,
       checksumSha256: null, completedAt: now,
     }]);
-    repository.findArticleDetailReaction.mockResolvedValue({ type: 'DISLIKE' });
+    repository.findArticleDetailReaction.mockResolvedValue(null);
     const detail = await service.detailExtras(otherId, articleId);
     expect(detail).toEqual({
       comments: [expect.objectContaining({ body: null, authorNameKr: '홍길동', canEdit: false, canDelete: false })],

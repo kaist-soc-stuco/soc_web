@@ -134,6 +134,13 @@
       "when": 1785592800000,
       "tag": "0018_content_relationships",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785596400000,
+      "tag": "0019_like_only_reactions",
+      "breakpoints": true
     }
   ]
 }
