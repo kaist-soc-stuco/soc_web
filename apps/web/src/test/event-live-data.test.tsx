@@ -136,16 +136,22 @@ describe('event live data', () => {
       locale: 'ko',
       items: [{
         id: 'survey-1',
+        revision: 1,
+        locale: 'ko',
         title: { value: '학생 설문', translationUnavailable: false },
         description: { value: '의견을 남겨 주세요.', translationUnavailable: false },
         state: 'OPEN',
+        guestAllowed: false,
+        phoneRequired: false,
+        feeRestriction: 'ANY',
+        cap: null,
         opensAt: null,
         closesAt: null,
-        allowUpdate: false,
-        anonymous: false,
+        editDeadlineAt: null,
+        responseRetentionDays: 30,
+        sections: [],
         updatedAt: '2026-08-01T00:00:00.000Z',
       }],
-      nextCursor: null,
     });
 
     render(<MemoryRouter initialEntries={['/events?type=survey']}><EventsPage /></MemoryRouter>);
