@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeeApiError, FeeApiProtocolError, feeApi } from '../lib/fee-api';
 
 afterEach(() => vi.restoreAllMocks());
-const item = { id: 'u1', kaistUid: 'uid', studentOrEmployeeNumber: '20260001', nameKr: '홍길동', nameEn: 'Hong', feeStatus: 'PAID', updatedAt: '2026-07-27T00:00:00.000Z' };
+const item = { id: 'u1', kaistUid: 'uid', studentOrEmployeeKind: 'STUDENT', studentOrEmployeeNumber: '20260001', nameKr: '홍길동', nameEn: 'Hong', feeStatus: 'PAID', updatedAt: '2026-07-27T00:00:00.000Z' };
 describe('feeApi', () => {
   it('loads the credentialed current-fee endpoint', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ items: [item] }), { status: 200 }));
