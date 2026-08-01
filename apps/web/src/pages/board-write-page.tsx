@@ -15,6 +15,8 @@ export function BoardWritePage() {
   const grants = useAdminGrants();
   const { category = 'soc-notice' } = useParams<{ category: string }>();
   const navigate = useNavigate();
+  const grants = useAdminGrants();
+  const bilingual = grants.status === 'ready' && grants.grants.some((grant) => grant.permission === 'BOARD_MANAGE' && grant.scope === 'GLOBAL');
   const [boardTitle, setBoardTitle] = useState(category);
   const [boardDescription, setBoardDescription] = useState('');
   const [titleKr, setTitleKr] = useState('');
@@ -60,14 +62,11 @@ export function BoardWritePage() {
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!boardReady || !canCreate) return;
-    const values = {
-      titleKr: titleKr.trim(),
-      titleEn: titleEn.trim(),
-      bodyKr: bodyKr.trim(),
-      bodyEn: bodyEn.trim(),
-    };
+    const values = bilingual
+      ? { titleKr: titleKr.trim(), titleEn: titleEn.trim(), bodyKr: bodyKr.trim(), bodyEn: bodyEn.trim() }
+      : { title: titleKr.trim(), body: bodyKr.trim() };
     if (Object.values(values).some((value) => !value)) {
-      setError('한국어와 영어 제목 및 본문을 모두 입력해 주세요.');
+      setError(bilingual ? '한국어와 영어 제목 및 본문을 모두 입력해 주세요.' : '제목과 본문을 입력해 주세요.');
       return;
     }
     setPending(true);
@@ -107,15 +106,15 @@ export function BoardWritePage() {
         <section className={`${pageContainerClass} pb-16 py-2`}>
           <div className="border-b-2 border-kaist-darkgreen-main py-5"><h2 className="text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[28px]">게시글 작성</h2><p className="mt-2 text-sm font-semibold tracking-tight text-kaist-grey">{boardTitle} 게시판에 등록할 내용을 입력하세요.</p></div>
           {loading || capabilityLoading ? <p className="py-12 text-center text-kaist-grey">게시판 정보와 작성 권한을 확인하는 중입니다.</p> : !boardReady ? <p role="alert" className="py-12 text-center text-kaist-grey">{error ?? '게시판 정보를 불러오지 못했습니다.'}</p> : !canCreate ? <div role="alert" className="py-12 text-center text-kaist-grey"><p>이 게시판에 글을 작성할 권한이 없습니다.</p><Link to={`/board/${category}`} className="mt-4 inline-block font-bold text-kaist-darkgreen underline">게시판으로 돌아가기</Link></div> : <form onSubmit={submit}>
-            <div className="grid gap-5 py-7 lg:grid-cols-2 lg:py-8">
-              <fieldset className="grid gap-5"><legend className="mb-3 text-lg font-extrabold text-kaist-darkgreen">한국어</legend>
+            <div className={`grid gap-5 py-7 lg:py-8 ${bilingual ? 'lg:grid-cols-2' : ''}`}>
+              <fieldset className="grid gap-5"><legend className="mb-3 text-lg font-extrabold text-kaist-darkgreen">{bilingual ? '한국어' : '게시글'}</legend>
                 <label className="grid gap-3"><span className="text-sm font-extrabold">제목</span><input required value={titleKr} onChange={(event) => setTitleKr(event.target.value)} type="text" className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3" /></label>
                 <label className="grid gap-3"><span className="text-sm font-extrabold">본문</span><textarea required value={bodyKr} onChange={(event) => setBodyKr(event.target.value)} rows={12} className="min-h-[280px] rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-4" /></label>
               </fieldset>
-              <fieldset className="grid gap-5"><legend className="mb-3 text-lg font-extrabold text-kaist-darkgreen">English</legend>
+              {bilingual ? <fieldset className="grid gap-5"><legend className="mb-3 text-lg font-extrabold text-kaist-darkgreen">English</legend>
                 <label className="grid gap-3"><span className="text-sm font-extrabold">Title</span><input required value={titleEn} onChange={(event) => setTitleEn(event.target.value)} type="text" className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3" /></label>
                 <label className="grid gap-3"><span className="text-sm font-extrabold">Body</span><textarea required value={bodyEn} onChange={(event) => setBodyEn(event.target.value)} rows={12} className="min-h-[280px] rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-4" /></label>
-              </fieldset>
+              </fieldset> : null}
             </div>
             <label className="mb-6 grid gap-2"><span className="text-sm font-extrabold text-kaist-darkgreen">첨부파일 (선택)</span><input aria-label="첨부파일" type="file" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /></label>
             {error && <p role="alert" className="mb-4 text-sm font-semibold text-red-600">{error}</p>}

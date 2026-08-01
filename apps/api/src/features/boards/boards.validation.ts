@@ -259,17 +259,14 @@ export function parseDeleteBoardRequest(value: unknown): DeleteBoardRequest {
 }
 
 export function parseCreateArticleRequest(value: unknown): CreateArticleRequest {
-  const input = objectWithAllowedKeys(value, ['titleKr', 'titleEn', 'bodyKr', 'bodyEn', 'scope', 'isPinned', 'pinnedOrder'], 'invalid_article');
+  const input = objectWithAllowedKeys(value, ['title', 'body', 'titleKr', 'titleEn', 'bodyKr', 'bodyEn', 'scope', 'isPinned', 'pinnedOrder'], 'invalid_article');
   const isPinned = input.isPinned === undefined ? false : boolean(input.isPinned, 'invalid_article_pinned');
   const order = input.pinnedOrder === undefined ? null : pinnedOrder(input.pinnedOrder);
   validatePinned(isPinned, order);
-  const result: CreateArticleRequest = {
-    titleKr: text(required(input, 'titleKr', 'invalid_article'), 'invalid_article'),
-    titleEn: text(required(input, 'titleEn', 'invalid_article'), 'invalid_article'),
-    bodyKr: text(required(input, 'bodyKr', 'invalid_article'), 'invalid_article'),
-    bodyEn: text(required(input, 'bodyEn', 'invalid_article'), 'invalid_article'),
-    scope: articleScope(required(input, 'scope', 'invalid_article')),
-  };
+  const result: CreateArticleRequest = { scope: articleScope(required(input, 'scope', 'invalid_article')) };
+  for (const key of ['title', 'body', 'titleKr', 'titleEn', 'bodyKr', 'bodyEn'] as const) {
+    if (key in input) result[key] = text(input[key], 'invalid_article');
+  }
   if (input.isPinned !== undefined) result.isPinned = isPinned;
   if (input.pinnedOrder !== undefined) result.pinnedOrder = order;
   return result;

@@ -54,10 +54,10 @@ export class ArticlesService {
     correlationId = this.correlation(correlationId);
     this.uuid(actorUserId);
     const normalizedBoardCode = parseBoardCode(boardCode);
-    const normalized = this.createInput(input);
     const now = this.clock.now();
     const created = await this.write(() => this.repository.create(normalizedBoardCode, actorUserId, correlationId, async (board) => {
       const manager = await this.isManager(actorUserId);
+      const normalized = this.createInput(input, manager);
       await this.requireBoardRead(actorUserId, board);
       await this.requireBoardWrite(actorUserId, board);
       if ((normalized.isPinned || normalized.pinnedOrder !== null) && !manager) throw new ForbiddenException('insufficient_permission');
@@ -174,16 +174,23 @@ export class ArticlesService {
     return manager;
   }
 
-  private createInput(input: CreateArticleRequest) {
+  private createInput(input: CreateArticleRequest, bilingual: boolean) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new UnprocessableEntityException('invalid_article');
-    const allowed = new Set(['titleKr', 'titleEn', 'bodyKr', 'bodyEn', 'scope', 'isPinned', 'pinnedOrder']);
+    const allowed = new Set(['title', 'body', 'titleKr', 'titleEn', 'bodyKr', 'bodyEn', 'scope', 'isPinned', 'pinnedOrder']);
     if (Object.keys(input).some((key) => !allowed.has(key))) throw new UnprocessableEntityException('invalid_article');
     const scope = input.scope;
     if (!ARTICLE_SCOPES.includes(scope)) throw new UnprocessableEntityException('invalid_article_scope');
     const isPinned = input.isPinned ?? false;
     const pinnedOrder = input.pinnedOrder ?? null;
     this.validatePinned(isPinned, pinnedOrder);
-    return { titleKr: this.text(input.titleKr), titleEn: this.text(input.titleEn), bodyKr: this.text(input.bodyKr), bodyEn: this.text(input.bodyEn), scope, isPinned, pinnedOrder };
+    if (bilingual) {
+      if (input.title !== undefined || input.body !== undefined) throw new UnprocessableEntityException('bilingual_article_required');
+      return { titleKr: this.text(input.titleKr), titleEn: this.text(input.titleEn), bodyKr: this.text(input.bodyKr), bodyEn: this.text(input.bodyEn), scope, isPinned, pinnedOrder };
+    }
+    if (input.titleKr !== undefined || input.titleEn !== undefined || input.bodyKr !== undefined || input.bodyEn !== undefined) throw new UnprocessableEntityException('single_language_article_required');
+    const title = this.text(input.title);
+    const body = this.text(input.body);
+    return { titleKr: title, titleEn: title, bodyKr: body, bodyEn: body, scope, isPinned, pinnedOrder };
   }
 
   private patchInput(input: PatchArticleRequest): Partial<CreateArticleRequest> & { status?: Exclude<ArticleStatus, 'DELETED'> } {

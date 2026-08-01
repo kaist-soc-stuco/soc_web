@@ -13,7 +13,8 @@ const correlationId = 'boards-unit-correlation';
 const board = (overrides = {}) => ({ id: boardId, code: 'notice', titleKr: '공지', titleEn: 'Notice', descriptionKr: '설명', descriptionEn: 'Description', readPermission: 'PUBLIC' as const, writePermission: 'AUTHENTICATED' as const, commentPermission: 'AUTHENTICATED' as const, commentsAllowed: true, secretArticlesAllowed: true, reactionsAllowed: true, displayOrder: 0, isHidden: false, showOnHome: true, createdAt: now, updatedAt: now, ...overrides });
 const article = (overrides = {}) => ({ id: articleId, boardId, authorUserId: actorId, titleKr: '제목', titleEn: 'Title', bodyKr: '본문', bodyEn: 'Body', status: 'DRAFT' as const, scope: 'ALL' as const, isPinned: false, pinnedOrder: null, publishedAt: null, deletedAt: null, purgeAfter: null, createdAt: now, updatedAt: now, ...overrides });
 const createBoard = () => ({ code: ' notice ', titleKr: ' 공지 ', titleEn: ' Notice ', descriptionKr: ' 설명 ', descriptionEn: ' Description ', readPermission: 'PUBLIC' as const, writePermission: 'AUTHENTICATED' as const, commentPermission: 'AUTHENTICATED' as const, commentsAllowed: true, secretArticlesAllowed: true, reactionsAllowed: true, displayOrder: 0, isHidden: false, showOnHome: true });
-const createArticle = () => ({ titleKr: ' 제목 ', titleEn: ' Title ', bodyKr: ' 본문 ', bodyEn: ' Body ', scope: 'ALL' as const, isPinned: false, pinnedOrder: null });
+const createArticle = () => ({ title: ' 제목 ', body: ' 본문 ', scope: 'ALL' as const, isPinned: false, pinnedOrder: null });
+const createOfficialArticle = () => ({ titleKr: ' 제목 ', titleEn: ' Title ', bodyKr: ' 본문 ', bodyEn: ' Body ', scope: 'ALL' as const, isPinned: false, pinnedOrder: null });
 
 function boardSetup(grants: readonly string[] = ['BOARD_MANAGE', 'COMMITTEE_MEMBER']) {
   const repository = { listVisible: vi.fn(), listVisibleHomeWithLatest: vi.fn(), findVisibleByCode: vi.fn(), listAll: vi.fn(), create: vi.fn(), patch: vi.fn(), delete: vi.fn() };
@@ -195,8 +196,9 @@ describe('ArticlesService', () => {
         inserted = true;
         return { article: article(values), board: lockedBoard };
       });
-      if (allowed) await expect(service.create(actorId, 'notice', createArticle(), `write-${permission}`)).resolves.toMatchObject({ status: 'DRAFT' });
-      else await expect(service.create(actorId, 'notice', createArticle(), `write-${permission}`)).rejects.toBeInstanceOf(ForbiddenException);
+      const input = grants.some((grant) => grant === 'BOARD_MANAGE') ? createOfficialArticle() : createArticle();
+      if (allowed) await expect(service.create(actorId, 'notice', input, `write-${permission}`)).resolves.toMatchObject({ status: 'DRAFT' });
+      else await expect(service.create(actorId, 'notice', input, `write-${permission}`)).rejects.toBeInstanceOf(ForbiddenException);
       expect(inserted).toBe(allowed);
       if (expectedKey) expect(permissions.hasPermission).toHaveBeenCalledWith(actorId, expectedKey, 'GLOBAL');
     }

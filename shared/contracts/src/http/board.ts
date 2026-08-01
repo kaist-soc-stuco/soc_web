@@ -129,10 +129,12 @@ export interface ArticleListResponse {
 }
 
 export interface CreateArticleRequest {
-  titleKr: string;
-  titleEn: string;
-  bodyKr: string;
-  bodyEn: string;
+  title?: string;
+  body?: string;
+  titleKr?: string;
+  titleEn?: string;
+  bodyKr?: string;
+  bodyEn?: string;
   scope: ArticleScope;
   isPinned?: boolean;
   pinnedOrder?: number | null;
