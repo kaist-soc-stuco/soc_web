@@ -32,6 +32,7 @@ const currentUser = {
   nameEn: null,
   nameKr: null,
   privacyConsentAt: null,
+  studentOrEmployeeKind: null,
   studentOrEmployeeNumber: null,
   userEmail: null,
   userMobile: null,

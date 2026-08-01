@@ -39,11 +39,13 @@ export class AdminIdentityApiProtocolError extends Error {
 const isGrant = (value: unknown): value is EffectivePermissionGrant => exact(value, ['id', 'permission', 'scope', 'scopeId', 'activatedFrom', 'expiresAt'])
   && string(value.id) && string(value.permission) && scope(value.scope) && nullableString(value.scopeId)
   && string(value.activatedFrom) && nullableString(value.expiresAt);
-const isCurrentUser = (value: unknown): value is UserMeResponse => exact(value, ['feeStatus', 'id', 'kaistUid', 'majorMask', 'nameEn', 'nameKr', 'privacyConsentAt', 'studentOrEmployeeNumber', 'userEmail', 'userMobile', 'grants'])
+const studentOrEmployeeKind = (value: unknown): value is UserMeResponse['studentOrEmployeeKind'] =>
+  value === null || value === 'STUDENT' || value === 'EMPLOYEE';
+const isCurrentUser = (value: unknown): value is UserMeResponse => exact(value, ['feeStatus', 'id', 'kaistUid', 'majorMask', 'nameEn', 'nameKr', 'privacyConsentAt', 'studentOrEmployeeKind', 'studentOrEmployeeNumber', 'userEmail', 'userMobile', 'grants'])
   && (value.feeStatus === 'UNKNOWN' || value.feeStatus === 'UNPAID' || value.feeStatus === 'PAID')
   && string(value.id) && nullableString(value.kaistUid) && typeof value.majorMask === 'number'
   && nullableString(value.nameEn) && nullableString(value.nameKr) && nullableString(value.privacyConsentAt)
-  && nullableString(value.studentOrEmployeeNumber) && nullableString(value.userEmail) && nullableString(value.userMobile)
+  && studentOrEmployeeKind(value.studentOrEmployeeKind) && nullableString(value.studentOrEmployeeNumber) && nullableString(value.userEmail) && nullableString(value.userMobile)
   && Array.isArray(value.grants) && value.grants.every(isGrant);
 const isDefinitionList = (value: unknown): value is PermissionDefinitionListResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every((item) => exact(item, ['key', 'description']) && string(item.key) && string(item.description));
 const isChange = (value: unknown): value is PermissionChangeRequestResponse => exact(value, ['id', 'targetUserId', 'action', 'permission', 'scope', 'scopeId', 'status', 'requestedAt', 'approvedAt', 'activatedAt', 'expiresAt'])
@@ -52,7 +54,7 @@ const isChange = (value: unknown): value is PermissionChangeRequestResponse => e
 const isQueue = (value: unknown): value is PermissionRequestQueueListResponse => exact(value, ['items', 'nextCursor']) && Array.isArray(value.items) && value.items.every(isChange) && nullableString(value.nextCursor);
 const isRequestResponse = (value: unknown): value is PermissionGrantRequestResponse => exact(value, ['id', 'requestHash', 'status', 'requestedAt', 'expiresAt']) && string(value.id) && string(value.requestHash) && value.status === 'PENDING' && string(value.requestedAt) && string(value.expiresAt);
 const isAudit = (value: unknown): value is PermissionAuditListResponse => exact(value, ['items', 'nextCursor']) && Array.isArray(value.items) && value.items.every((item) => exact(item, ['id', 'actorUserId', 'action', 'recordId', 'changedFieldNames', 'correlationId', 'reasonCode', 'occurredAt']) && string(item.id) && nullableString(item.actorUserId) && string(item.action) && string(item.recordId) && Array.isArray(item.changedFieldNames) && item.changedFieldNames.every(string) && string(item.correlationId) && nullableString(item.reasonCode) && string(item.occurredAt)) && nullableString(value.nextCursor);
-const isAdminUser = (value: unknown): value is AdminUserGetResponse => exact(value, ['id', 'kaistUid', 'studentOrEmployeeNumber', 'nameKr', 'nameEn', 'majorMask', 'privacyConsentAt', 'grants']) && string(value.id) && nullableString(value.kaistUid) && nullableString(value.studentOrEmployeeNumber) && nullableString(value.nameKr) && nullableString(value.nameEn) && typeof value.majorMask === 'number' && nullableString(value.privacyConsentAt) && Array.isArray(value.grants) && value.grants.every(isGrant);
+const isAdminUser = (value: unknown): value is AdminUserGetResponse => exact(value, ['id', 'kaistUid', 'studentOrEmployeeKind', 'studentOrEmployeeNumber', 'nameKr', 'nameEn', 'majorMask', 'privacyConsentAt', 'grants']) && string(value.id) && nullableString(value.kaistUid) && studentOrEmployeeKind(value.studentOrEmployeeKind) && nullableString(value.studentOrEmployeeNumber) && nullableString(value.nameKr) && nullableString(value.nameEn) && typeof value.majorMask === 'number' && nullableString(value.privacyConsentAt) && Array.isArray(value.grants) && value.grants.every(isGrant);
 const isAdminUserList = (value: unknown): value is AdminUserListResponse => exact(value, ['items', 'nextCursor']) && Array.isArray(value.items) && value.items.every(isAdminUser) && nullableString(value.nextCursor);
 
 async function request(path: string, init: RequestInit = {}): Promise<unknown> {

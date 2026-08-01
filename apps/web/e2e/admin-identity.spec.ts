@@ -19,6 +19,7 @@ const currentUser = {
   nameEn: null,
   nameKr: null,
   privacyConsentAt: null,
+  studentOrEmployeeKind: null,
   studentOrEmployeeNumber: null,
   userEmail: null,
   userMobile: null,
@@ -30,7 +31,7 @@ test('admin identity routes preserve payments and expose no finance route', asyn
     const { pathname } = new URL(route.request().url());
     let body: unknown;
     if (pathname === '/api/users/me') body = currentUser;
-    else if (pathname === '/api/users/admin') body = { items: [], nextCursor: null };
+    else if (pathname === '/api/users/admin') body = { items: [{ id: 'admin-user', kaistUid: 'uid-1', studentOrEmployeeKind: 'STUDENT', studentOrEmployeeNumber: '20260001', nameKr: '홍길동', nameEn: 'Gil Dong Hong', majorMask: 0, privacyConsentAt: null, grants: [] }], nextCursor: null };
     else if (pathname === '/api/permissions/definitions') body = { items: [{ key: 'USERS_MANAGE', description: 'Manage users' }] };
     else if (pathname === '/api/permissions/requests') body = { items: [], nextCursor: null };
     else if (pathname === '/api/permissions/audit') body = { items: [], nextCursor: null };
@@ -54,6 +55,10 @@ test('admin identity routes preserve payments and expose no finance route', asyn
   ]) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    if (path === '/admin/users') {
+      await expect(page.getByRole('cell', { name: 'uid-1' })).toBeVisible();
+      await expect(page.getByRole('button', { name: '홍길동' })).toBeVisible();
+    }
   }
 
   await page.goto('/admin/finance');

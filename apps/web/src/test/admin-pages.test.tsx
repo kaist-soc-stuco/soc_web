@@ -24,7 +24,7 @@ import { AdminPermissionsPage } from '@/pages/admin-permissions-page';
 import { AdminUsersPage } from '@/pages/admin-users-page';
 
 const grant = (permission: string, scope: 'GLOBAL' | 'BOARD' = 'GLOBAL', scopeId: string | null = null) => ({ id: permission, permission, scope, scopeId, activatedFrom: '2026-01-01T00:00:00Z', expiresAt: null });
-const user = { id: 'user-1', kaistUid: 'uid-1', studentOrEmployeeNumber: '20260001', nameKr: '홍길동', nameEn: null, majorMask: 1, privacyConsentAt: null, grants: [] };
+const user = { id: 'user-1', kaistUid: 'uid-1', studentOrEmployeeKind: 'STUDENT' as const, studentOrEmployeeNumber: '20260001', nameKr: '홍길동', nameEn: null, majorMask: 1, privacyConsentAt: null, grants: [] };
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });

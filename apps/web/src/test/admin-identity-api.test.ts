@@ -12,6 +12,7 @@ const currentUser = {
   nameEn: null,
   nameKr: null,
   privacyConsentAt: null,
+  studentOrEmployeeKind: null,
   studentOrEmployeeNumber: null,
   userEmail: null,
   userMobile: null,
@@ -28,6 +29,8 @@ describe('adminIdentityApi', () => {
     await expect(adminIdentityApi.getCurrentUser()).rejects.toBeInstanceOf(AdminIdentityApiProtocolError);
     fetch.mockResolvedValueOnce(response(currentUser));
     await expect(adminIdentityApi.getCurrentUser()).resolves.toEqual({ grants: [grant] });
+    fetch.mockResolvedValueOnce(response({ ...currentUser, studentOrEmployeeKind: 'INVALID' }));
+    await expect(adminIdentityApi.getCurrentUser()).rejects.toBeInstanceOf(AdminIdentityApiProtocolError);
     expect(fetch).toHaveBeenCalledWith('/api/users/me', expect.objectContaining({ credentials: 'include', headers: { Accept: 'application/json' } }));
 
   });
