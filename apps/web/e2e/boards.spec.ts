@@ -189,7 +189,7 @@ test('anonymous-to-manager authentication refetches the catalog once and reveals
 
   await page.goto('/login');
   await expect(page.getByText('authenticated: false', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '개발용 계정으로 로그인' }).click();
+  await page.getByRole('button', { name: '관리자 계정' }).click();
   await managerCatalogPending;
   expect(mock.catalogRequests()).toBe(2);
   releaseManagerCatalog!();
@@ -215,7 +215,7 @@ test('a delayed prior-actor catalog response cannot repopulate the transitioned 
 
   await page.goto('/login');
   await expect(page.getByText('authenticated: false', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '개발용 계정으로 로그인' }).click();
+  await page.getByRole('button', { name: '관리자 계정' }).click();
   await expect(page.locator('header a[href="/board/manager-reports"]')).toBeVisible();
   expect(mock.catalogRequests()).toBeGreaterThanOrEqual(2);
 
