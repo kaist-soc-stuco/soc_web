@@ -175,15 +175,25 @@ export interface SurveyAggregateResponse { surveyId: string; responseCount: numb
 export interface SurveyCsvExport { filename: string; csv: string; }
 export interface ExportSurveyRequest { format: "CSV"; }
 export interface ExportSurveyAcceptedResponse { exportId: string; status: "ACCEPTED"; acceptedAt: string; }
+export type ContentRelationType = "ANNOUNCEMENT" | "SCHEDULE" | "SURVEY_PERIOD";
+export type ContentRelationSyncMode = "NONE" | "SURVEY_TO_EVENT";
 export type ContentMatcherDto = {
   id: string;
-  surveyId: string;
+  relationType: ContentRelationType;
+  syncMode: ContentRelationSyncMode;
+  createdByUserId: string;
   createdAt: string;
+  updatedByUserId: string;
+  updatedAt: string;
+  synchronizedAt: string | null;
 } & (
-  | { articleId: string; eventId: null }
-  | { articleId: null; eventId: string }
+  | { articleId: string; eventId: string; surveyId: null }
+  | { articleId: string; eventId: null; surveyId: string }
+  | { articleId: null; eventId: string; surveyId: string }
 );
 export type CreateContentMatcherRequest =
-  | { articleId: string; eventId?: never; surveyId: string }
-  | { articleId?: never; eventId: string; surveyId: string };
+  | { articleId: string; eventId: string; surveyId?: never; relationType: "ANNOUNCEMENT" | "SCHEDULE"; syncMode?: "NONE" }
+  | { articleId: string; eventId?: never; surveyId: string; relationType: "ANNOUNCEMENT"; syncMode?: "NONE" }
+  | { articleId?: never; eventId: string; surveyId: string; relationType: "SURVEY_PERIOD"; syncMode?: ContentRelationSyncMode };
+export interface ListContentMatchersResponse { items: ContentMatcherDto[]; }
 export interface GetMySurveyResponseResponse { response: SurveyResponseDto | null; }

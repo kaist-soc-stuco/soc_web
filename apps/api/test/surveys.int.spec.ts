@@ -388,21 +388,27 @@ describe('survey and matcher PostgreSQL protocol', () => {
     const event = await pool.query<{ id: string }>(`INSERT INTO events (title_kr, title_en, description_kr, description_en, start_at, end_at, location, created_by_user_id, updated_by_user_id)
       VALUES ('행사', 'event', '설명', 'description', now(), now() + interval '1 hour', 'room', $1, $1) RETURNING id`, [actorId]);
     const articleId = article.rows[0]!.id; const eventId = event.rows[0]!.id;
-    await expect(pool.query('INSERT INTO content_matchers (created_by_user_id) VALUES ($1)', [actorId])).rejects.toMatchObject({ code: '23502' });
-    await expect(pool.query('INSERT INTO content_matchers (survey_id, created_by_user_id) VALUES ($1, $2)', [d.surveyId, actorId])).rejects.toMatchObject({ code: '23514' });
-    await expect(pool.query('INSERT INTO content_matchers (article_id, event_id, survey_id, created_by_user_id) VALUES ($1, $2, $3, $4)', [articleId, eventId, d.surveyId, actorId])).rejects.toMatchObject({ code: '23514' });
+    await expect(pool.query('INSERT INTO content_matchers (created_by_user_id, updated_by_user_id, relation_type) VALUES ($1, $1, $2)', [actorId, 'ANNOUNCEMENT'])).rejects.toMatchObject({ code: '23514' });
+    await expect(pool.query('INSERT INTO content_matchers (survey_id, created_by_user_id, updated_by_user_id, relation_type) VALUES ($1, $2, $2, $3)', [d.surveyId, actorId, 'SURVEY_PERIOD'])).rejects.toMatchObject({ code: '23514' });
+    await expect(pool.query('INSERT INTO content_matchers (article_id, event_id, survey_id, created_by_user_id, updated_by_user_id, relation_type) VALUES ($1, $2, $3, $4, $4, $5)', [articleId, eventId, d.surveyId, actorId, 'ANNOUNCEMENT'])).rejects.toMatchObject({ code: '23514' });
+    const base = { createdByUserId: actorId, updatedByUserId: actorId, syncMode: 'NONE' as const, synchronizedAt: null };
     const matchers = [];
-    for (const values of [[articleId, undefined], [undefined, eventId]] as const) {
-      const matcher = await repository.matcher({ articleId: values[0], eventId: values[1], surveyId: d.surveyId, createdByUserId: actorId }, 'matcher-create');
-      expect(matcher).toMatchObject({ id: expect.any(String) });
+    for (const relation of [
+      { articleId, surveyId: d.surveyId, relationType: 'ANNOUNCEMENT' as const },
+      { eventId, surveyId: d.surveyId, relationType: 'SURVEY_PERIOD' as const },
+      { articleId, eventId, relationType: 'SCHEDULE' as const },
+    ]) {
+      const matcher = await repository.matcher({ ...base, ...relation }, 'matcher-create');
+      expect(matcher).toMatchObject({ id: expect.any(String), relationType: relation.relationType });
       matchers.push(matcher as { id: string });
     }
-    expect(await repository.matcher({ articleId, surveyId: d.surveyId, createdByUserId: actorId }, 'matcher-duplicate')).toBe('DUPLICATE');
-    expect(await repository.matcher({ articleId: '88888888-8888-4888-8888-888888888888', surveyId: d.surveyId, createdByUserId: actorId }, 'matcher-article-fk')).toBe('MISSING');
-    expect(await repository.matcher({ articleId, surveyId: '99999999-9999-4999-8999-999999999999', createdByUserId: actorId }, 'matcher-survey-fk')).toBe('MISSING');
+    expect(await repository.matcher({ ...base, articleId, surveyId: d.surveyId, relationType: 'ANNOUNCEMENT' }, 'matcher-duplicate')).toBe('DUPLICATE');
+    expect(await repository.matcher({ ...base, articleId: '88888888-8888-4888-8888-888888888888', surveyId: d.surveyId, relationType: 'ANNOUNCEMENT' }, 'matcher-article-fk')).toBe('MISSING');
+    expect(await repository.matcher({ ...base, articleId, surveyId: '99999999-9999-4999-8999-999999999999', relationType: 'ANNOUNCEMENT' }, 'matcher-survey-fk')).toBe('MISSING');
+    expect(await repository.listMatchers({ eventId })).toHaveLength(2);
     const deleted = await repository.deleteMatcher(matchers[0]!.id, actorId, 'matcher-delete');
     expect(deleted?.id).toBe(matchers[0]!.id);
-    expect((await pool.query("SELECT count(*) FROM survey_audit_log WHERE action = 'CONTENT_MATCHER_DELETED' AND changed_field_names = 'article_id,event_id,survey_id'")).rows[0]!.count).toBe('1');
+    expect((await pool.query("SELECT count(*) FROM survey_audit_log WHERE action = 'CONTENT_MATCHER_DELETED' AND changed_field_names = 'article_id,event_id,survey_id,relation_type,sync_mode'")).rows[0]!.count).toBe('1');
   });
   it('keeps audit metadata identifier-only and binds response audits to their survey', async () => {
     const first = await definition();

@@ -299,28 +299,48 @@ export class SurveysRepository {
       return created;
     });
   }
+  async listMatchers(subject: { articleId?: string; eventId?: string; surveyId?: string }) {
+    const filters = [
+      subject.articleId ? eq(contentMatchers.articleId, subject.articleId) : undefined,
+      subject.eventId ? eq(contentMatchers.eventId, subject.eventId) : undefined,
+      subject.surveyId ? eq(contentMatchers.surveyId, subject.surveyId) : undefined,
+    ].filter((filter): filter is Exclude<typeof filter, undefined> => filter !== undefined);
+    return this.db.select().from(contentMatchers)
+      .where(filters.length ? and(...filters) : undefined)
+      .orderBy(desc(contentMatchers.createdAt), desc(contentMatchers.id));
+  }
   async matcher(
-    input: { articleId?: string; eventId?: string; surveyId: string; createdByUserId: string },
+    input: {
+      articleId?: string;
+      eventId?: string;
+      surveyId?: string;
+      relationType: 'ANNOUNCEMENT' | 'SCHEDULE' | 'SURVEY_PERIOD';
+      syncMode: 'NONE' | 'SURVEY_TO_EVENT';
+      createdByUserId: string;
+      updatedByUserId: string;
+      synchronizedAt: Date | null;
+    },
     correlationId: string,
   ) {
     return this.db.transaction(async (tx) => {
-      if (!input.surveyId || (!!input.articleId === !!input.eventId)) return 'INVALID' as const;
-      if (input.articleId && !(await tx.select().from(articles).where(eq(articles.id, input.articleId)).limit(1))[0]) {
-        return 'MISSING' as const;
-      }
-      if (input.eventId && !(await tx.select().from(events).where(eq(events.id, input.eventId)).limit(1))[0]) {
-        return 'MISSING' as const;
-      }
-      if (input.surveyId && !(await tx.select().from(surveys).where(eq(surveys.id, input.surveyId)).limit(1))[0]) {
-        return 'MISSING' as const;
-      }
+      if ([input.articleId, input.eventId, input.surveyId].filter(Boolean).length !== 2) return 'INVALID' as const;
+      if (input.articleId && !(await tx.select().from(articles).where(eq(articles.id, input.articleId)).limit(1))[0]) return 'MISSING' as const;
+      if (input.eventId && !(await tx.select().from(events).where(eq(events.id, input.eventId)).limit(1))[0]) return 'MISSING' as const;
+      if (input.surveyId && !(await tx.select().from(surveys).where(eq(surveys.id, input.surveyId)).limit(1))[0]) return 'MISSING' as const;
       const [created] = await tx.insert(contentMatchers).values(input).onConflictDoNothing().returning();
       if (!created) return 'DUPLICATE' as const;
-      await this.audit(tx, input.surveyId, null, input.createdByUserId, 'CONTENT_MATCHER_CREATED', 'article_id,event_id,survey_id', correlationId);
+      if (input.surveyId) await this.audit(tx, input.surveyId, null, input.createdByUserId, 'CONTENT_MATCHER_CREATED', 'article_id,event_id,survey_id,relation_type,sync_mode', correlationId);
       return created;
     });
   }
-  async deleteMatcher(id: string, actor: string, correlationId: string) { return this.db.transaction(async (tx) => { const [deleted] = await tx.delete(contentMatchers).where(eq(contentMatchers.id, id)).returning(); if (!deleted) return null; if (!deleted.surveyId) throw new Error('survey_matcher_invariant_violation'); await this.audit(tx, deleted.surveyId, null, actor, 'CONTENT_MATCHER_DELETED', 'article_id,event_id,survey_id', correlationId); return deleted; }); }
+  async deleteMatcher(id: string, actor: string, correlationId: string) {
+    return this.db.transaction(async (tx) => {
+      const [deleted] = await tx.delete(contentMatchers).where(eq(contentMatchers.id, id)).returning();
+      if (!deleted) return null;
+      if (deleted.surveyId) await this.audit(tx, deleted.surveyId, null, actor, 'CONTENT_MATCHER_DELETED', 'article_id,event_id,survey_id,relation_type,sync_mode', correlationId);
+      return deleted;
+    });
+  }
   async purgeExpired(limit: number, correlationId: string) {
     return this.db.transaction(async (tx) => {
       const rows = await tx.execute(sql`

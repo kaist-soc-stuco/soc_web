@@ -40,6 +40,8 @@ export const eventVisibilityEnum = pgEnum("event_visibility", [
   "AUTHENTICATED",
   "COMMITTEE",
 ]);
+export const contentRelationTypeEnum = pgEnum("content_relation_type", ["ANNOUNCEMENT", "SCHEDULE", "SURVEY_PERIOD"]);
+export const contentRelationSyncModeEnum = pgEnum("content_relation_sync_mode", ["NONE", "SURVEY_TO_EVENT"]);
 export const surveyStateEnum = pgEnum("survey_state", ["DRAFT", "SCHEDULED", "OPEN", "CLOSED", "ARCHIVED"]);
 export const surveyResponseStateEnum = pgEnum("survey_response_state", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WAITLISTED"]);
 export const surveyQuestionTypeEnum = pgEnum("survey_question_type", ["SHORT_TEXT", "LONG_TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "NUMBER", "DATE"]);
@@ -739,14 +741,32 @@ export const contentMatchers = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     articleId: uuid("article_id").references(() => articles.id, { onDelete: "cascade" }),
     eventId: uuid("event_id").references(() => events.id, { onDelete: "cascade" }),
-    surveyId: uuid("survey_id").notNull().references(() => surveys.id, { onDelete: "cascade" }),
+    surveyId: uuid("survey_id").references(() => surveys.id, { onDelete: "cascade" }),
+    relationType: contentRelationTypeEnum("relation_type").notNull(),
+    syncMode: contentRelationSyncModeEnum("sync_mode").notNull().default("NONE"),
     createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    synchronizedAt: timestamp("synchronized_at", { withTimezone: true }),
   },
   (table) => [
-    check("content_matchers_survey_one_content_target", sql`num_nonnulls(${table.articleId}, ${table.eventId}) = 1`),
+    check("content_matchers_exactly_two_subjects", sql`num_nonnulls(${table.articleId}, ${table.eventId}, ${table.surveyId}) = 2`),
+    check("content_matchers_relation_type_compatible", sql`
+      (${table.relationType} = 'ANNOUNCEMENT' AND ${table.articleId} IS NOT NULL)
+      OR (${table.relationType} = 'SCHEDULE' AND ${table.articleId} IS NOT NULL AND ${table.eventId} IS NOT NULL)
+      OR (${table.relationType} = 'SURVEY_PERIOD' AND ${table.eventId} IS NOT NULL AND ${table.surveyId} IS NOT NULL)
+    `),
+    check("content_matchers_sync_compatible", sql`
+      (${table.syncMode} = 'NONE' AND ${table.synchronizedAt} IS NULL)
+      OR (${table.syncMode} = 'SURVEY_TO_EVENT' AND ${table.relationType} = 'SURVEY_PERIOD' AND ${table.synchronizedAt} IS NOT NULL)
+    `),
+    uniqueIndex("content_matchers_article_event_unique").on(table.articleId, table.eventId).where(sql`${table.surveyId} IS NULL`),
     uniqueIndex("content_matchers_article_survey_unique").on(table.articleId, table.surveyId).where(sql`${table.eventId} IS NULL`),
     uniqueIndex("content_matchers_event_survey_unique").on(table.eventId, table.surveyId).where(sql`${table.articleId} IS NULL`),
+    index("content_matchers_article_idx").on(table.articleId),
+    index("content_matchers_event_idx").on(table.eventId),
+    index("content_matchers_survey_idx").on(table.surveyId),
   ],
 );
 

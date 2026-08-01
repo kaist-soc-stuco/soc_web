@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PiiCipherService } from '../../shared/security/pii-cipher.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { SurveysRepository, parseRestrictedCharacterPattern, surveyState } from './surveys.repository';
-import { surveys } from '../../infrastructure/postgres/postgres.schema';
+import { contentMatchers, surveys } from '../../infrastructure/postgres/postgres.schema';
 import type { ContentLocale } from '@soc/contracts';
 
 const TYPES = new Set(['SHORT_TEXT', 'LONG_TEXT', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'NUMBER', 'DATE']);
@@ -293,8 +293,66 @@ export class SurveysService {
     ].map(escape).join(','));
     return { filename: `survey-${id}.csv`, csv: `\uFEFF${[header.map(escape).join(','), ...lines].join('\r\n')}\r\n` };
   }
-  async matcher(actor: string, input: unknown, correlationId: string) { await this.manage(actor); if (!exact(input, ['articleId', 'eventId', 'surveyId']) || !uuid(input.surveyId) || (input.articleId === undefined) === (input.eventId === undefined) || (input.articleId !== undefined && !uuid(input.articleId)) || (input.eventId !== undefined && !uuid(input.eventId))) throw new UnprocessableEntityException('invalid_content_matcher'); const result = await this.repo.matcher({ articleId: input.articleId as string | undefined, eventId: input.eventId as string | undefined, surveyId: input.surveyId, createdByUserId: actor }, correlationId); if (result === 'INVALID') throw new UnprocessableEntityException('invalid_content_matcher'); if (result === 'MISSING') throw new NotFoundException('content_subject_not_found'); if (result === 'DUPLICATE') throw new ConflictException('content_matcher_exists'); return { id: result.id, articleId: result.articleId, eventId: result.eventId, surveyId: result.surveyId, createdAt: result.createdAt.toISOString() }; }
+  async listMatchers(actor: string, query: Record<string, unknown>) {
+    await this.manage(actor);
+    if (!exact(query, ['articleId', 'eventId', 'surveyId'])) throw new UnprocessableEntityException('invalid_content_matcher_query');
+    const subject = {
+      articleId: query.articleId as string | undefined,
+      eventId: query.eventId as string | undefined,
+      surveyId: query.surveyId as string | undefined,
+    };
+    if (Object.values(subject).some((value) => value !== undefined && !uuid(value))) throw new UnprocessableEntityException('invalid_content_matcher_query');
+    return { items: (await this.repo.listMatchers(subject)).map((row) => this.matcherDto(row)) };
+  }
+  async matcher(actor: string, input: unknown, correlationId: string) {
+    await this.manage(actor);
+    if (!exact(input, ['articleId', 'eventId', 'surveyId', 'relationType', 'syncMode'])) throw new UnprocessableEntityException('invalid_content_matcher');
+    const articleId = input.articleId as string | undefined;
+    const eventId = input.eventId as string | undefined;
+    const surveyId = input.surveyId as string | undefined;
+    const relationType = input.relationType;
+    const syncMode = input.syncMode ?? 'NONE';
+    if ([articleId, eventId, surveyId].filter(Boolean).length !== 2
+      || [articleId, eventId, surveyId].some((value) => value !== undefined && !uuid(value))
+      || !['ANNOUNCEMENT', 'SCHEDULE', 'SURVEY_PERIOD'].includes(relationType as string)
+      || !['NONE', 'SURVEY_TO_EVENT'].includes(syncMode as string)
+      || (relationType === 'ANNOUNCEMENT' && !articleId)
+      || (relationType === 'SCHEDULE' && !(articleId && eventId && !surveyId))
+      || (relationType === 'SURVEY_PERIOD' && !(eventId && surveyId && !articleId))
+      || (syncMode === 'SURVEY_TO_EVENT' && relationType !== 'SURVEY_PERIOD')) {
+      throw new UnprocessableEntityException('invalid_content_matcher');
+    }
+    const result = await this.repo.matcher({
+      articleId,
+      eventId,
+      surveyId,
+      relationType: relationType as 'ANNOUNCEMENT' | 'SCHEDULE' | 'SURVEY_PERIOD',
+      syncMode: syncMode as 'NONE' | 'SURVEY_TO_EVENT',
+      createdByUserId: actor,
+      updatedByUserId: actor,
+      synchronizedAt: syncMode === 'SURVEY_TO_EVENT' ? new Date() : null,
+    }, correlationId);
+    if (result === 'INVALID') throw new UnprocessableEntityException('invalid_content_matcher');
+    if (result === 'MISSING') throw new NotFoundException('content_subject_not_found');
+    if (result === 'DUPLICATE') throw new ConflictException('content_matcher_exists');
+    return this.matcherDto(result);
+  }
   async deleteMatcher(actor: string, id: string, correlationId: string) { await this.manage(actor); if (!(await this.repo.deleteMatcher(id, actor, correlationId))) throw new NotFoundException('content_matcher_not_found'); }
+  private matcherDto(row: typeof contentMatchers.$inferSelect) {
+    return {
+      id: row.id,
+      articleId: row.articleId,
+      eventId: row.eventId,
+      surveyId: row.surveyId,
+      relationType: row.relationType,
+      syncMode: row.syncMode,
+      createdByUserId: row.createdByUserId,
+      createdAt: row.createdAt.toISOString(),
+      updatedByUserId: row.updatedByUserId,
+      updatedAt: row.updatedAt.toISOString(),
+      synchronizedAt: row.synchronizedAt?.toISOString() ?? null,
+    };
+  }
   async purge(limit: number, correlationId: string) { return this.repo.purgeExpired(limit, correlationId); }
   private async admin(id: string) {
     const detail = await this.repo.detail(id);

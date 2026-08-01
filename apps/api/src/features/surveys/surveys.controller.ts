@@ -48,6 +48,7 @@ export class AdminSurveysController {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.status(HttpStatus.OK).send(result.csv);
   }
+  @Get('content-matchers') matchers(@Req() r: SurveyRequest, @Query() query: Record<string, unknown>) { return this.service.listMatchers(r.user!.id, query); }
   @Post('content-matchers') matcher(@Req() r: SurveyRequest, @Body() b: unknown) { return this.service.matcher(r.user!.id, b, correlation(r)); }
   @Delete('content-matchers/:id') @HttpCode(HttpStatus.NO_CONTENT) async deleteMatcher(@Req() r: SurveyRequest, @Param('id') matcherId: string) { await this.service.deleteMatcher(r.user!.id, id(matcherId), correlation(r)); }
 }

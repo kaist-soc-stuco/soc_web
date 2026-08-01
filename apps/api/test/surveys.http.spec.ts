@@ -49,7 +49,10 @@ describe('Survey HTTP boundary', () => {
     } satisfies SurveyAggregateResponse;
     const surveyExport = { filename: 'survey.csv', csv: '' };
     const matcher = {
-      id: matcherId, articleId: surveyId, eventId: null, surveyId, createdAt: '2026-07-27T00:00:00.000Z',
+      id: matcherId, articleId: surveyId, eventId: null, surveyId,
+      relationType: 'ANNOUNCEMENT', syncMode: 'NONE', createdByUserId: surveyId,
+      createdAt: '2026-07-27T00:00:00.000Z', updatedByUserId: surveyId,
+      updatedAt: '2026-07-27T00:00:00.000Z', synchronizedAt: null,
     } satisfies ContentMatcherDto;
     surveys = {
       list: vi.fn().mockResolvedValue({ locale: 'ko', items: [survey] }), get: vi.fn().mockResolvedValue(survey),
@@ -58,6 +61,7 @@ describe('Survey HTTP boundary', () => {
       sections: vi.fn().mockResolvedValue(survey), questions: vi.fn().mockResolvedValue(survey), review: vi.fn().mockResolvedValue(response),
       aggregate: vi.fn().mockResolvedValue(aggregate),
       export: vi.fn().mockResolvedValue(surveyExport),
+      listMatchers: vi.fn().mockResolvedValue({ items: [matcher] }),
       matcher: vi.fn().mockResolvedValue(matcher),
       deleteMatcher: vi.fn().mockResolvedValue(undefined),
     };
@@ -104,7 +108,7 @@ describe('Survey HTTP boundary', () => {
       surveyId, responseCount: 5, suppressed: false,
       questions: [{ questionId: '10000000-0000-4000-8000-000000000006', suppressed: false, responseCount: 5, choices: [{ choiceOptionId: '10000000-0000-4000-8000-000000000007', count: 3 }] }],
     } satisfies SurveyAggregateResponse;
-    const matcher = { id: matcherId, articleId: surveyId, eventId: null, surveyId, createdAt: '2026-07-27T00:00:00.000Z' } satisfies ContentMatcherDto;
+    const matcher = { id: matcherId, articleId: surveyId, eventId: null, surveyId, relationType: 'ANNOUNCEMENT', syncMode: 'NONE', createdByUserId: surveyId, createdAt: '2026-07-27T00:00:00.000Z', updatedByUserId: surveyId, updatedAt: '2026-07-27T00:00:00.000Z', synchronizedAt: null } satisfies ContentMatcherDto;
     const create = {
       title: { kr: '설문', en: 'Survey' }, description: { kr: '설명', en: 'Description' }, guestAllowed: true, phoneRequired: true,
       feeRestriction: 'ANY', cap: null, opensAt: null, closesAt: null, editDeadlineAt: null, responseRetentionDays: 365,
@@ -135,7 +139,8 @@ describe('Survey HTTP boundary', () => {
       { method: 'post', path: `/api/admin/survey-responses/${responseId}/review`, body: { state: 'APPROVED', reason: null }, status: 201, expectedBody: projectedResponse, phoneDerived: true },
       { method: 'get', path: `/api/admin/surveys/${surveyId}/aggregate`, status: 200, expectedBody: aggregate },
       { method: 'post', path: `/api/admin/surveys/${surveyId}/export`, body: { format: 'CSV' }, status: 200, expectedBody: '' },
-      { method: 'post', path: '/api/admin/content-matchers', body: { articleId: surveyId, surveyId }, status: 201, expectedBody: matcher },
+      { method: 'get', path: `/api/admin/content-matchers?surveyId=${surveyId}`, status: 200, expectedBody: { items: [matcher] } },
+      { method: 'post', path: '/api/admin/content-matchers', body: { articleId: surveyId, surveyId, relationType: 'ANNOUNCEMENT' }, status: 201, expectedBody: matcher },
       { method: 'delete', path: `/api/admin/content-matchers/${matcherId}`, status: 204, expectedBody: '' },
     ];
 
@@ -153,11 +158,13 @@ describe('Survey HTTP boundary', () => {
     }).sort();
 
     expect(registry).toEqual([
-      'DELETE /api/admin/content-matchers/:id', 'GET /api/admin/survey-responses/:id',
-      'GET /api/admin/surveys/:id/aggregate', 'GET /api/admin/surveys/:id/responses',
-      'GET /api/surveys', 'GET /api/surveys/:id', 'GET /api/surveys/:id/responses/me',
-      'GET /api/surveys/responses/me', 'PATCH /api/admin/surveys/:id', 'POST /api/admin/content-matchers',
-      'POST /api/admin/survey-responses/:id/review', 'POST /api/admin/surveys', 'POST /api/admin/surveys/:id/export',
+      'DELETE /api/admin/content-matchers/:id', 'GET /api/admin/content-matchers',
+      'GET /api/admin/survey-responses/:id', 'GET /api/admin/surveys/:id/aggregate',
+      'GET /api/admin/surveys/:id/responses', 'GET /api/surveys',
+      'GET /api/surveys/:id', 'GET /api/surveys/:id/responses/me',
+      'GET /api/surveys/responses/me', 'PATCH /api/admin/surveys/:id',
+      'POST /api/admin/content-matchers', 'POST /api/admin/survey-responses/:id/review',
+      'POST /api/admin/surveys', 'POST /api/admin/surveys/:id/export',
       'POST /api/admin/surveys/:id/publish', 'POST /api/surveys/:id/responses',
       'PUT /api/admin/sections/:id/questions', 'PUT /api/admin/surveys/:id/sections',
     ]);
@@ -190,7 +197,7 @@ describe('Survey HTTP boundary', () => {
     expect(surveys.review).toHaveBeenCalledWith(actorId, responseId, { state: 'APPROVED', reason: null }, trace);
     expect(surveys.aggregate).toHaveBeenCalledWith(actorId, surveyId);
     expect(surveys.export).toHaveBeenCalledWith(actorId, surveyId, { format: 'CSV' }, trace);
-    expect(surveys.matcher).toHaveBeenCalledWith(actorId, { articleId: surveyId, surveyId }, trace);
+    expect(surveys.matcher).toHaveBeenCalledWith(actorId, { articleId: surveyId, surveyId, relationType: 'ANNOUNCEMENT' }, trace);
     expect(surveys.deleteMatcher).toHaveBeenCalledWith(actorId, matcherId, trace);
   });
 
