@@ -1,4 +1,4 @@
-import type { AdminSurveyResponseListResponse, AppErrorResponse, ContentLocale, CreateSurveyRequest, ExportSurveyRequest, GetMySurveyResponseResponse, LoginSessionResponse, MySurveyResponsesResponse, PatchSurveyRequest, PublishSurveyResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, ReviewSurveyResponseRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
+import type { AdminSurveyResponseListResponse, AppErrorResponse, ContentLocale, ContentMatcherDto, CreateContentMatcherRequest, CreateSurveyRequest, ExportSurveyRequest, GetMySurveyResponseResponse, ListContentMatchersResponse, LoginSessionResponse, MySurveyResponsesResponse, PatchSurveyRequest, PublishSurveyResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, ReviewSurveyResponseRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
 
 export type RestrictedPattern = { allowed: ReadonlySet<string>; minimum: number; maximum: number };
 export type SubmitSurveyResult = { status: 'ACCEPTED' } | { response: SurveyResponseDto };
@@ -60,6 +60,14 @@ const isMine = (value: unknown): value is GetMySurveyResponseResponse => exact(v
 const isAggregate = (value: unknown): value is SurveyAggregateResponse => exact(value, ['surveyId', 'responseCount', 'suppressed', 'questions']) && string(value.surveyId) && nullable(value.responseCount, (input) => typeof input === 'number') && typeof value.suppressed === 'boolean' && Array.isArray(value.questions) && value.questions.every((question) => exact(question, ['questionId', 'suppressed', 'responseCount', 'choices']) && string(question.questionId) && typeof question.suppressed === 'boolean' && nullable(question.responseCount, (input) => typeof input === 'number') && Array.isArray(question.choices) && question.choices.every((choice) => exact(choice, ['choiceOptionId', 'count']) && string(choice.choiceOptionId) && nullable(choice.count, (input) => typeof input === 'number')));
 const isResponseList = (value: unknown): value is AdminSurveyResponseListResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every((item) => exact(item, ['id', 'surveyId', 'state', 'submittedAt', 'reviewedAt', 'reviewReason', 'phonePresent', 'maskedPhone']) && string(item.id) && string(item.surveyId) && responseState(item.state) && nullable(item.submittedAt, string) && nullable(item.reviewedAt, string) && nullable(item.reviewReason, string) && typeof item.phonePresent === 'boolean' && nullable(item.maskedPhone, string));
 const isMyResponses = (value: unknown): value is MySurveyResponsesResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every((item) => exact(item, ['survey', 'response']) && isSurvey(item.survey) && isResponse(item.response));
+const relationType = enumValue(['ANNOUNCEMENT', 'SCHEDULE', 'SURVEY_PERIOD'] as const);
+const syncMode = enumValue(['NONE', 'SURVEY_TO_EVENT'] as const);
+const isMatcher = (value: unknown): value is ContentMatcherDto => exact(value, ['id', 'articleId', 'eventId', 'surveyId', 'relationType', 'syncMode', 'createdByUserId', 'createdAt', 'updatedByUserId', 'updatedAt', 'synchronizedAt'])
+  && string(value.id) && nullable(value.articleId, string) && nullable(value.eventId, string) && nullable(value.surveyId, string)
+  && [value.articleId, value.eventId, value.surveyId].filter((item) => item !== null).length === 2
+  && relationType(value.relationType) && syncMode(value.syncMode) && string(value.createdByUserId) && string(value.createdAt)
+  && string(value.updatedByUserId) && string(value.updatedAt) && nullable(value.synchronizedAt, string);
+const isMatcherList = (value: unknown): value is ListContentMatchersResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every(isMatcher);
 
 export const surveyApi = {
   list: async (signal?: AbortSignal, selectedLocale?: ContentLocale) => decode(await request(`/surveys${selectedLocale ? `?locale=${selectedLocale}` : ''}`, 'GET', undefined, signal), isList),
@@ -78,6 +86,12 @@ export const surveyApi = {
   response: async (id: string, signal?: AbortSignal) => decode(await request(`/admin/survey-responses/${id}`, 'GET', undefined, signal), isResponse),
   review: async (id: string, input: ReviewSurveyResponseRequest) => decode(await request(`/admin/survey-responses/${id}/review`, 'POST', input), isResponse),
   aggregate: async (id: string) => decode(await request(`/admin/surveys/${id}/aggregate`), isAggregate),
+  relations: async (subject: { articleId?: string; eventId?: string; surveyId?: string }, signal?: AbortSignal) => {
+    const query = new URLSearchParams(Object.entries(subject).filter((entry): entry is [string, string] => entry[1] !== undefined));
+    return decode(await request(`/admin/content-matchers?${query}`, 'GET', undefined, signal), isMatcherList);
+  },
+  createRelation: async (input: CreateContentMatcherRequest) => decode(await request('/admin/content-matchers', 'POST', input), isMatcher),
+  deleteRelation: async (id: string): Promise<void> => { await request(`/admin/content-matchers/${id}`, 'DELETE'); },
   export: async (id: string, input: ExportSurveyRequest): Promise<void> => {
     const response = await fetch(`${apiBaseUrl}/admin/surveys/${id}/export`, { method: 'POST', credentials: 'include', headers: { Accept: 'text/csv', 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     if (!response.ok) throw new SurveyApiError(response.status);

@@ -25,4 +25,31 @@ describe('survey API transport contracts', () => {
       code: undefined,
     }));
   });
+  it('decodes typed relationship metadata and sends survey-period synchronization intent', async () => {
+    const relation = {
+      id: '10000000-0000-4000-8000-000000000001',
+      articleId: null,
+      eventId: '10000000-0000-4000-8000-000000000002',
+      surveyId: '10000000-0000-4000-8000-000000000003',
+      relationType: 'SURVEY_PERIOD',
+      syncMode: 'SURVEY_TO_EVENT',
+      createdByUserId: '10000000-0000-4000-8000-000000000004',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedByUserId: '10000000-0000-4000-8000-000000000004',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+      synchronizedAt: '2026-08-01T00:00:00.000Z',
+    };
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [relation] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(relation), { status: 201 }));
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(surveyApi.relations({ surveyId: relation.surveyId })).resolves.toEqual({ items: [relation] });
+    await expect(surveyApi.createRelation({ eventId: relation.eventId, surveyId: relation.surveyId, relationType: 'SURVEY_PERIOD', syncMode: 'SURVEY_TO_EVENT' })).resolves.toEqual(relation);
+    expect(fetch).toHaveBeenNthCalledWith(1, expect.stringContaining(`/admin/content-matchers?surveyId=${relation.surveyId}`), expect.objectContaining({ method: 'GET' }));
+    expect(fetch).toHaveBeenNthCalledWith(2, expect.stringContaining('/admin/content-matchers'), expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ eventId: relation.eventId, surveyId: relation.surveyId, relationType: 'SURVEY_PERIOD', syncMode: 'SURVEY_TO_EVENT' }),
+    }));
+  });
 });
