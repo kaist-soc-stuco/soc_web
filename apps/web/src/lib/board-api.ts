@@ -1,6 +1,6 @@
 import type {
   AdminBoard, AdminBoardListResponse, AppErrorResponse, Article, ArticleDetailResponse, ArticleListQuery, ArticleListResponse, ArticleReactionResponse, ArticleScope, ArticleSummary,
-  Asset, AssetInitiatedResponse, Board, BoardListQuery, BoardListResponse, Comment, CompleteAssetRequest, ContentLocale, CreateArticleRequest, CreateBoardRequest, CreateCommentRequest, DeleteBoardRequest, InitiateAssetRequest, PutArticleReactionRequest, VersionedPatchBoardRequest,
+  Asset, AssetInitiatedResponse, Board, BoardListQuery, BoardListResponse, Comment, CompleteAssetRequest, ContentLocale, CreateArticleRequest, CreateBoardRequest, CreateCommentRequest, DeleteBoardRequest, InitiateAssetRequest, PatchCommentRequest, PutArticleReactionRequest, VersionedPatchBoardRequest,
 } from '@soc/contracts';
 import { invalidateBoardCatalog } from './board-catalog';
 
@@ -54,12 +54,13 @@ const isArticleList = (v: unknown): v is ArticleListResponse => exact(v, ['local
 const isArticle = (v: unknown): v is Article => exact(v, ['id', 'boardCode', 'title', 'status', 'scope', 'isPinned', 'pinnedOrder', 'publishedAt', 'updatedAt', 'body', 'deletedAt'])
   && isSummary({ id: v.id, boardCode: v.boardCode, title: v.title, status: v.status, scope: v.scope, isPinned: v.isPinned, pinnedOrder: v.pinnedOrder, publishedAt: v.publishedAt, updatedAt: v.updatedAt })
   && localized(v.body) && nullableTimestamp(v.deletedAt);
-const isComment = (v: unknown) => exact(v, ['id', 'articleId', 'parentCommentId', 'body', 'status', 'createdAt', 'updatedAt'])
-  && isString(v.id) && isString(v.articleId) && nullableString(v.parentCommentId) && nullableString(v.body) && commentStatuses.has(String(v.status)) && timestamp(v.createdAt) && timestamp(v.updatedAt);
+const isComment = (v: unknown) => exact(v, ['id', 'articleId', 'parentCommentId', 'authorNameKr', 'body', 'status', 'canEdit', 'canDelete', 'createdAt', 'updatedAt'])
+  && isString(v.id) && isString(v.articleId) && nullableString(v.parentCommentId) && isString(v.authorNameKr) && nullableString(v.body)
+  && commentStatuses.has(String(v.status)) && typeof v.canEdit === 'boolean' && typeof v.canDelete === 'boolean' && timestamp(v.createdAt) && timestamp(v.updatedAt);
 const isAsset = (v: unknown) => exact(v, ['id', 'articleId', 'displayOrder', 'type', 'status', 'contentType', 'byteSize', 'checksumSha256', 'completedAt'])
   && isString(v.id) && isString(v.articleId) && nonnegativeInteger(v.displayOrder) && assetTypes.has(String(v.type)) && assetStatuses.has(String(v.status))
   && isString(v.contentType) && nonnegativeInteger(v.byteSize) && nullableString(v.checksumSha256) && nullableTimestamp(v.completedAt);
-const isDetail = (v: unknown): v is ArticleDetailResponse => exact(v, ['locale', 'article', 'comments', 'assets', 'myReaction']) && locale(v.locale) && isArticle(v.article) && Array.isArray(v.comments) && v.comments.every(isComment) && Array.isArray(v.assets) && v.assets.every(isAsset) && (v.myReaction === null || v.myReaction === 'LIKE' || v.myReaction === 'DISLIKE');
+const isDetail = (v: unknown): v is ArticleDetailResponse => exact(v, ['locale', 'article', 'comments', 'assets', 'myReaction', 'likeCount']) && locale(v.locale) && isArticle(v.article) && Array.isArray(v.comments) && v.comments.every(isComment) && Array.isArray(v.assets) && v.assets.every(isAsset) && (v.myReaction === null || v.myReaction === 'LIKE') && nonnegativeInteger(v.likeCount);
 
 async function request(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<unknown> {
   const response = await fetch(`${apiBaseUrl}${path}`, { method, signal, credentials: 'include', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -84,9 +85,10 @@ export const boardApi = {
   },
   completeAsset: (id: string, input: CompleteAssetRequest = {}) => request(`/assets/${encodeURIComponent(id)}/complete`, 'POST', input).then((v) => decode(v, (x): x is Asset => isAsset(x))),
   createComment: (id: string, input: CreateCommentRequest) => request(`/articles/${encodeURIComponent(id)}/comments`, 'POST', input).then((v) => decode(v, (x): x is Comment => isComment(x))),
+  patchComment: (id: string, input: PatchCommentRequest) => request(`/comments/${encodeURIComponent(id)}`, 'PATCH', input).then((v) => decode(v, (x): x is Comment => isComment(x))),
   deleteComment: (id: string) => request(`/comments/${encodeURIComponent(id)}`, 'DELETE').then((v) => { if (v !== undefined) throw new BoardApiProtocolError(); }),
-  putReaction: (id: string, input: PutArticleReactionRequest) => request(`/articles/${encodeURIComponent(id)}/reaction`, 'PUT', input).then((v) => decode(v, (x): x is ArticleReactionResponse => exact(x, ['type']) && (x.type === 'LIKE' || x.type === 'DISLIKE' || x.type === null))),
-  deleteReaction: (id: string) => request(`/articles/${encodeURIComponent(id)}/reaction`, 'DELETE').then((v) => decode(v, (x): x is ArticleReactionResponse => exact(x, ['type']) && x.type === null)),
+  putReaction: (id: string, input: PutArticleReactionRequest) => request(`/articles/${encodeURIComponent(id)}/reaction`, 'PUT', input).then((v) => decode(v, (x): x is ArticleReactionResponse => exact(x, ['type', 'likeCount']) && x.type === 'LIKE' && nonnegativeInteger(x.likeCount))),
+  deleteReaction: (id: string) => request(`/articles/${encodeURIComponent(id)}/reaction`, 'DELETE').then((v) => decode(v, (x): x is ArticleReactionResponse => exact(x, ['type', 'likeCount']) && x.type === null && nonnegativeInteger(x.likeCount))),
   adminList: (signal?: AbortSignal) => request('/admin/boards', 'GET', undefined, signal).then((v) => decode(v, isAdminList)),
   adminCreate: (input: CreateBoardRequest, signal?: AbortSignal) => request('/admin/boards', 'POST', input, signal).then((v) => {
     const board = decode(v, isAdminBoard);

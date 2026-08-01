@@ -33,6 +33,7 @@ function interactionsSetup(options: { manager?: boolean; committee?: boolean; gr
     findArticleDetailReaction: vi.fn().mockResolvedValue(null),
     putReaction: vi.fn(),
     deleteReaction: vi.fn(),
+    countLikes: vi.fn().mockResolvedValue(1),
   };
   repository.readPublishedArticleComments = vi.fn(async (_articleId: string, validate: (state: ReturnType<typeof article>) => Promise<{ canReadSecretComments: boolean }>) => {
     const access = await validate(article());
@@ -44,6 +45,7 @@ function interactionsSetup(options: { manager?: boolean; committee?: boolean; gr
       comments: await repository.listArticleDetailComments(),
       assets: await repository.listArticleDetailAssets(),
       reaction: await repository.findArticleDetailReaction(),
+      likeCount: 1,
       ...access,
     };
   });
@@ -54,7 +56,8 @@ function interactionsSetup(options: { manager?: boolean; committee?: boolean; gr
   const permissions = { hasPermission: vi.fn().mockImplementation(async (_id, permission) => permissionGrants.has(permission)) };
   const configValue = (key: string, fallback?: number | boolean) => key === 'CONTENT_PURGE_GRACE_DAYS' ? (options.graceDays ?? 30) : (options.assetsEnabled ?? fallback);
   const config = { get: vi.fn().mockImplementation(configValue), getOrThrow: vi.fn().mockImplementation(configValue) };
-  return { repository, permissions, config, service: new InteractionsService(repository as never, permissions as never, { now: () => now } as never, config as never) };
+  const users = { findById: vi.fn().mockResolvedValue({ nameKr: '홍길동' }) };
+  return { repository, permissions, config, service: new InteractionsService(repository as never, permissions as never, { now: () => now } as never, config as never, users as never) };
 }
 
 function purgeSetup(options: { manager?: boolean; configuredBatch?: number } = {}) {
@@ -119,7 +122,7 @@ describe('InteractionsService', () => {
         reactionInserted = true;
         return true;
       });
-      if (allowed) await expect(service.putReaction(actorId, articleId, { type: 'LIKE' }, `reaction-${permission}`)).resolves.toEqual({ type: 'LIKE' });
+      if (allowed) await expect(service.putReaction(actorId, articleId, { type: 'LIKE' }, `reaction-${permission}`)).resolves.toEqual({ type: 'LIKE', likeCount: 1 });
       else await expect(service.putReaction(actorId, articleId, { type: 'LIKE' }, `reaction-${permission}`)).rejects.toMatchObject({ response: { message: 'article_not_found' } });
       expect(reactionInserted).toBe(allowed);
       if (expectedKey) expect(permissions.hasPermission).toHaveBeenCalledWith(actorId, expectedKey, 'GLOBAL');
@@ -203,9 +206,10 @@ describe('InteractionsService', () => {
     repository.findArticleDetailReaction.mockResolvedValue({ type: 'DISLIKE' });
     const detail = await service.detailExtras(otherId, articleId);
     expect(detail).toEqual({
-      comments: [expect.objectContaining({ body: null })],
+      comments: [expect.objectContaining({ body: null, authorNameKr: '홍길동', canEdit: false, canDelete: false })],
       assets: [expect.objectContaining({ id: assetId, completedAt: now.toISOString() })],
-      myReaction: 'DISLIKE',
+      myReaction: null,
+      likeCount: 1,
     });
     expect(JSON.stringify(detail)).not.toMatch(/authorUserId|secret-provider|secret-object-key|uploadUrl|uploadHeaders|Authorization/);
   });

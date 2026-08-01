@@ -12,6 +12,9 @@ export function BoardPostPage() {
   const [board, setBoard] = useState<Board | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [reaction, setReaction] = useState<ReactionType | null>(null);
+  const [likeCount, setLikeCount] = useState(0);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState('');
   const [interactionError, setInteractionError] = useState('');
   const [error, setError] = useState(false);
@@ -26,6 +29,7 @@ export function BoardPostPage() {
     setError(false);
     setComments([]);
     setReaction(null);
+    setLikeCount(0);
     if (!id) {
       setLoading(false);
       return;
@@ -43,6 +47,7 @@ export function BoardPostPage() {
         setArticle(detail.article);
         setComments(detail.comments);
         setReaction(detail.myReaction);
+        setLikeCount(detail.likeCount);
         setBoard(boardResponse.board);
       })
       .catch((cause: unknown) => {
@@ -59,10 +64,29 @@ export function BoardPostPage() {
     if (!id || !commentBody.trim()) return;
     setInteractionError('');
     try {
-      const created = await boardApi.createComment(id, { body: commentBody.trim() });
+      const created = await boardApi.createComment(id, { body: commentBody.trim(), ...(replyTo ? { parentCommentId: replyTo } : {}) });
       setComments((current) => [...current, created]);
       setCommentBody('');
+      setReplyTo(null);
     } catch { setInteractionError('댓글을 등록하지 못했습니다. 로그인과 게시판 권한을 확인해 주세요.'); }
+  };
+  const editComment = async (comment: Comment) => {
+    const body = window.prompt('수정할 댓글을 입력하세요.', comment.body ?? '');
+    if (!body?.trim()) return;
+    setEditingCommentId(comment.id);
+    try {
+      const updated = await boardApi.patchComment(comment.id, { body: body.trim() });
+      setComments((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch { setInteractionError('댓글을 수정하지 못했습니다.'); }
+    finally { setEditingCommentId(null); }
+  };
+  const deleteComment = async (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    try {
+      await boardApi.deleteComment(comment.id);
+      setComments((current) => current.map((item) => item.id === comment.id ? { ...item, body: null, status: 'DELETED', canEdit: false, canDelete: false } : item));
+    } catch { setInteractionError('댓글을 삭제하지 못했습니다.'); }
+    finally { setEditingCommentId(null); }
   };
   const react = async (type: ReactionType) => {
     if (!id) return;
@@ -70,6 +94,7 @@ export function BoardPostPage() {
     try {
       const result = reaction === type ? await boardApi.deleteReaction(id) : await boardApi.putReaction(id, { type });
       setReaction(result.type);
+      setLikeCount(result.likeCount);
     } catch { setInteractionError('반응을 저장하지 못했습니다.'); }
   };
   return (
@@ -90,8 +115,8 @@ export function BoardPostPage() {
               {date && <div className="pt-1 text-sm font-medium text-kaist-grey">{new Date(date).toLocaleDateString('ko-KR')}</div>}
             </div><Link to={`/board/${category}`} className="rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold text-kaist-darkgreen">글 목록</Link></div>
             <div className="py-7 lg:py-8"><div className="whitespace-pre-line text-sm font-medium leading-7 tracking-tight text-kaist-black">{article.body.value}</div></div>
-            {board?.config.reactionsAllowed ? <div className="flex gap-2 border-t py-5"><button aria-pressed={reaction === 'LIKE'} onClick={() => void react('LIKE')} className="rounded border px-4 py-2">좋아요{reaction === 'LIKE' ? ' 취소' : ''}</button><button aria-pressed={reaction === 'DISLIKE'} onClick={() => void react('DISLIKE')} className="rounded border px-4 py-2">싫어요{reaction === 'DISLIKE' ? ' 취소' : ''}</button></div> : null}
-            {board?.config.commentsAllowed ? <section className="border-t py-6"><h3 className="text-xl font-extrabold">댓글</h3><ul className="mt-4 divide-y">{comments.map((comment) => <li key={comment.id} className="py-3 text-sm">{comment.status === 'DELETED' ? '삭제된 댓글입니다.' : comment.status === 'SECRET' ? '비밀 댓글' : comment.body}</li>)}</ul><div className="mt-4 flex gap-2"><textarea aria-label="댓글" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} className="min-h-20 flex-1 rounded border px-3 py-2" /><button disabled={!commentBody.trim()} onClick={() => void addComment()} className="self-end rounded bg-kaist-darkgreen px-5 py-2 font-bold text-white disabled:opacity-50">등록</button></div></section> : null}
+            {board?.config.reactionsAllowed ? <div className="flex gap-2 border-t py-5"><button aria-pressed={reaction === 'LIKE'} onClick={() => void react('LIKE')} className="rounded border px-4 py-2">좋아요 {likeCount}{reaction === 'LIKE' ? ' 취소' : ''}</button></div> : null}
+            {board?.config.commentsAllowed ? <section className="border-t py-6"><h3 className="text-xl font-extrabold">댓글</h3><ul className="mt-4 divide-y">{comments.map((comment) => <li key={comment.id} className={`py-3 text-sm ${comment.parentCommentId ? 'ml-8 border-l pl-4' : ''}`}><div className="mb-1 font-bold">{comment.authorNameKr}</div><div>{comment.status === 'DELETED' ? '삭제된 댓글입니다.' : comment.status === 'SECRET' ? '비밀 댓글' : comment.body}</div>{comment.status !== 'DELETED' ? <div className="mt-2 flex gap-3">{comment.parentCommentId === null ? <button type="button" onClick={() => setReplyTo(comment.id)} className="text-kaist-darkgreen">답글</button> : null}{comment.canEdit ? <button type="button" disabled={editingCommentId === comment.id} onClick={() => void editComment(comment)} className="text-kaist-darkgreen">수정</button> : null}{comment.canDelete ? <button type="button" disabled={editingCommentId === comment.id} onClick={() => void deleteComment(comment)} className="text-red-700">삭제</button> : null}</div> : null}</li>)}</ul>{replyTo ? <div className="mt-3 text-sm">답글 작성 중 <button type="button" onClick={() => setReplyTo(null)} className="underline">취소</button></div> : null}<div className="mt-4 flex gap-2"><textarea aria-label={replyTo ? '답글' : '댓글'} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} className="min-h-20 flex-1 rounded border px-3 py-2" /><button disabled={!commentBody.trim()} onClick={() => void addComment()} className="self-end rounded bg-kaist-darkgreen px-5 py-2 font-bold text-white disabled:opacity-50">등록</button></div></section> : null}
             {interactionError ? <p role="alert" className="pb-4 text-sm text-red-600">{interactionError}</p> : null}
           </>}
         </div>

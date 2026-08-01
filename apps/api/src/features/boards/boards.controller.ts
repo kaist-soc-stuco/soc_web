@@ -82,8 +82,8 @@ export class PublicArticlesController {
     const locale = parseArticleDetailQuery(query).locale ?? 'ko';
     const articleId = parseArticleId(id);
     const article = await this.articles.get(request.user?.id, articleId, locale);
-    const { comments, assets, myReaction } = await this.interactions.detailExtras(request.user?.id, articleId);
-    return { locale, article, comments, assets, myReaction };
+    const { comments, assets, myReaction, likeCount } = await this.interactions.detailExtras(request.user?.id, articleId);
+    return { locale, article, comments, assets, myReaction, likeCount };
   }
 }
 

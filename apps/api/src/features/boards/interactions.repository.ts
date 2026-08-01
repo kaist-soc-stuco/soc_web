@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
 
 import { DRIZZLE_DB, type PostgresDatabase } from '../../infrastructure/postgres/postgres.provider';
 import {
@@ -26,7 +26,7 @@ export class InteractionsRepository {
       const article = await this.lockArticleWithBoard(tx, articleId);
       if (!article) return null;
       const access = await validate(article);
-      const [commentRows, assetRows, reaction] = await Promise.all([
+      const [commentRows, assetRows, reaction, likeCounts] = await Promise.all([
         tx.select({
           id: comments.id,
           articleId: comments.articleId,
@@ -52,10 +52,12 @@ export class InteractionsRepository {
           .orderBy(assets.displayOrder, assets.id),
         userId
           ? tx.select({ type: articleReactions.type }).from(articleReactions)
-            .where(and(eq(articleReactions.articleId, articleId), eq(articleReactions.userId, userId))).limit(1)
+            .where(and(eq(articleReactions.articleId, articleId), eq(articleReactions.userId, userId), eq(articleReactions.type, 'LIKE'))).limit(1)
           : Promise.resolve([]),
+        tx.select({ count: count() }).from(articleReactions)
+          .where(and(eq(articleReactions.articleId, articleId), eq(articleReactions.type, 'LIKE'))),
       ]);
-      return { comments: commentRows, assets: assetRows, reaction: reaction[0] ?? null, ...access };
+      return { comments: commentRows, assets: assetRows, reaction: reaction[0] ?? null, likeCount: likeCounts[0]?.count ?? 0, ...access };
     });
   }
   async readPublishedArticleComments(
@@ -147,7 +149,7 @@ export class InteractionsRepository {
   async putReaction(
     articleId: string,
     userId: string,
-    type: 'LIKE' | 'DISLIKE',
+    type: 'LIKE',
     now: Date,
     correlationId: string,
     validate: (state: { article: typeof articles.$inferSelect; board: typeof boards.$inferSelect }) => Promise<void>,
@@ -180,6 +182,12 @@ export class InteractionsRepository {
       await this.audit(tx, userId, 'REACTION_DELETED', articleId, 'type', correlationId);
       return { kind: 'deleted' as const };
     });
+  }
+
+  countLikes(articleId: string) {
+    return this.db.select({ count: count() }).from(articleReactions)
+      .where(and(eq(articleReactions.articleId, articleId), eq(articleReactions.type, 'LIKE')))
+      .then((rows) => rows[0]?.count ?? 0);
   }
   article(articleId: string) {
     return this.db.select().from(articles).where(eq(articles.id, articleId)).limit(1).then((rows) => rows[0] ?? null);

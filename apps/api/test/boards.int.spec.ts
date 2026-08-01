@@ -49,6 +49,7 @@ describe('board PostgreSQL protocol', () => {
       { hasPermission: async (userId: string, permission: string, scopeType: string) => userId === actorId && scopeType === 'GLOBAL' && ['BOARD_MANAGE', 'COMMITTEE_MEMBER'].includes(permission) } as never,
       { now: () => now } as never,
       { get: (_key: string, fallback?: number) => fallback ?? 30, getOrThrow: () => 30 } as never,
+      { findById: async () => ({ nameKr: '홍길동' }) } as never,
     );
     purgeRepository = new PurgeRepository(db as never);
     purge = new PurgeService(
@@ -303,14 +304,13 @@ describe('board PostgreSQL protocol', () => {
     expect((await pool.query('SELECT count(*) FROM boards WHERE id = $1', [board.id])).rows[0]!.count).toBe('1');
   });
 
-  it('upserts concurrent reactions to one unique article/user record', async () => {
+  it('upserts concurrent likes to one unique article/user record', async () => {
     const id = await article('PUBLISHED');
     await Promise.all(Array.from({ length: 16 }, (_, index) => interactions.putReaction(
-      id, actorId, index % 2 ? 'LIKE' : 'DISLIKE', now, `concurrent-reaction-${index}`, async () => {},
+      id, actorId, 'LIKE', now, `concurrent-reaction-${index}`, async () => {},
     )));
     const rows = await pool.query<{ type: string }>('SELECT type FROM article_reactions WHERE article_id = $1 AND user_id = $2', [id, actorId]);
-    expect(rows.rows).toHaveLength(1);
-    expect(['LIKE', 'DISLIKE']).toContain(rows.rows[0]!.type);
+    expect(rows.rows).toEqual([{ type: 'LIKE' }]);
   });
 
   it('rolls back comment mutation when its transactional audit cannot be written', async () => {

@@ -311,7 +311,7 @@ export function parsePatchCommentRequest(value: unknown): PatchCommentRequest {
 export function parsePutArticleReactionRequest(value: unknown): PutArticleReactionRequest {
   const input = objectWithAllowedKeys(value, ['type'], 'invalid_reaction');
   const type = required(input, 'type', 'invalid_reaction');
-  if (type !== 'LIKE' && type !== 'DISLIKE') fail('invalid_reaction');
+  if (type !== 'LIKE') fail('invalid_reaction');
   return { type };
 }
 

@@ -21,6 +21,7 @@ import type {
 
 import { Clock } from '../../shared/time/clock';
 import { PermissionsService } from '../permissions/permissions.service';
+import { UsersService } from '../users/users.service';
 import { InteractionsRepository } from './interactions.repository';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -33,6 +34,7 @@ export class InteractionsService {
     @Inject(PermissionsService) private readonly permissions: PermissionsService,
     @Inject(Clock) private readonly clock: Clock,
     @Inject(ConfigService) private readonly config: ConfigService,
+    @Inject(UsersService) private readonly users: UsersService,
   ) {}
 
   async createComment(actorUserId: string, articleId: string, input: CreateCommentRequest, correlationId: string): Promise<Comment> {
@@ -52,6 +54,7 @@ export class InteractionsService {
       await this.validateCommentInteraction(actorUserId, article, board);
       if (parentCommentId && (!parent || parent.articleId !== articleId)) throw new UnprocessableEntityException('invalid_parent_comment');
       if (parent?.status === 'DELETED') throw new ConflictException('parent_comment_deleted');
+      if (parent && parent.parentCommentId !== null) throw new UnprocessableEntityException('invalid_parent_comment');
     });
     if (!created) throw new NotFoundException('article_not_found');
     return this.comment(created, actorUserId, false);
@@ -99,12 +102,13 @@ export class InteractionsService {
       return { canReadSecretComments: actorUserId ? await this.isManager(actorUserId) : false };
     });
     if (!result) throw new NotFoundException('article_not_found');
-    return result.comments.map((row) => this.comment(row, actorUserId, result.canReadSecretComments));
+    return Promise.all(result.comments.map((row) => this.comment(row, actorUserId, result.canReadSecretComments)));
   }
   async detailExtras(actorUserId: string | undefined, articleId: string): Promise<{
     comments: Comment[];
     assets: Asset[];
-    myReaction: 'LIKE' | 'DISLIKE' | null;
+    myReaction: 'LIKE' | null;
+    likeCount: number;
   }> {
     this.uuid(articleId, 'invalid_article_id');
     const detail = await this.repository.readArticleDetail(articleId, actorUserId, async ({ article, board }) => {
@@ -113,25 +117,26 @@ export class InteractionsService {
     });
     if (!detail) throw new NotFoundException('article_not_found');
     return {
-      comments: detail.comments.map((row) => this.comment(row, actorUserId, detail.canReadSecretComments)),
+      comments: await Promise.all(detail.comments.map((row) => this.comment(row, actorUserId, detail.canReadSecretComments))),
       assets: detail.assets.map((row) => this.asset(row)),
-      myReaction: detail.reaction?.type ?? null,
+      myReaction: detail.reaction?.type === 'LIKE' ? 'LIKE' : null,
+      likeCount: detail.likeCount,
     };
   }
 
-  async putReaction(actorUserId: string, articleId: string, input: PutArticleReactionRequest, correlationId: string): Promise<{ type: 'LIKE' | 'DISLIKE' }> {
+  async putReaction(actorUserId: string, articleId: string, input: PutArticleReactionRequest, correlationId: string): Promise<{ type: 'LIKE'; likeCount: number }> {
     this.uuid(articleId, 'invalid_article_id');
     this.correlation(correlationId);
     this.exactKeys(input, ['type'], 'invalid_reaction');
-    if (input?.type !== 'LIKE' && input?.type !== 'DISLIKE') throw new UnprocessableEntityException('invalid_reaction');
+    if (input?.type !== 'LIKE') throw new UnprocessableEntityException('invalid_reaction');
     const written = await this.repository.putReaction(articleId, actorUserId, input.type, this.clock.now(), correlationId, async ({ article, board }) => {
       await this.validateReactionInteraction(actorUserId, article, board);
     });
     if (!written) throw new NotFoundException('article_not_found');
-    return { type: input.type };
+    return { type: 'LIKE', likeCount: await this.repository.countLikes(articleId) };
   }
 
-  async deleteReaction(actorUserId: string, articleId: string, correlationId: string): Promise<{ type: null }> {
+  async deleteReaction(actorUserId: string, articleId: string, correlationId: string): Promise<{ type: null; likeCount: number }> {
     this.uuid(articleId, 'invalid_article_id');
     this.correlation(correlationId);
     const result = await this.repository.deleteReaction(articleId, actorUserId, correlationId, async ({ article, board }) => {
@@ -139,7 +144,7 @@ export class InteractionsService {
     });
     if (result.kind === 'article_not_found') throw new NotFoundException('article_not_found');
     if (result.kind === 'reaction_not_found') throw new NotFoundException('reaction_not_found');
-    return { type: null };
+    return { type: null, likeCount: await this.repository.countLikes(articleId) };
   }
 
   async initiateAsset(actorUserId: string, articleId: string, input: InitiateAssetRequest, correlationId?: string): Promise<AssetInitiatedResponse> {
@@ -301,9 +306,22 @@ export class InteractionsService {
   private isManager(userId: string) { return this.permissions.hasPermission(userId, 'BOARD_MANAGE', 'GLOBAL'); }
   private isCommittee(userId: string) { return this.permissions.hasPermission(userId, 'COMMITTEE_MEMBER', 'GLOBAL'); }
 
-  private comment(row: { id: string; articleId: string; parentCommentId: string | null; authorUserId: string; body: string; status: 'PUBLISHED' | 'SECRET' | 'DELETED'; createdAt: Date; updatedAt: Date }, viewerUserId: string | undefined, manager: boolean): Comment {
+  private async comment(row: { id: string; articleId: string; parentCommentId: string | null; authorUserId: string; body: string; status: 'PUBLISHED' | 'SECRET' | 'DELETED'; createdAt: Date; updatedAt: Date }, viewerUserId: string | undefined, manager: boolean): Promise<Comment> {
     const visible = row.status === 'PUBLISHED' || (row.status === 'SECRET' && (manager || row.authorUserId === viewerUserId));
-    return { id: row.id, articleId: row.articleId, parentCommentId: row.parentCommentId, body: visible ? row.body : null, status: row.status, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    const user = await this.users.findById(row.authorUserId);
+    const canMutate = row.status !== 'DELETED' && (manager || row.authorUserId === viewerUserId);
+    return {
+      id: row.id,
+      articleId: row.articleId,
+      parentCommentId: row.parentCommentId,
+      authorNameKr: user?.nameKr?.trim() || '알 수 없음',
+      body: visible ? row.body : null,
+      status: row.status,
+      canEdit: canMutate,
+      canDelete: canMutate,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
   }
 
   private exactKeys(value: unknown, allowed: readonly string[], error: string): asserts value is Record<string, unknown> {

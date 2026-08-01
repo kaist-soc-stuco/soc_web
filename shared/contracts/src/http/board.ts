@@ -4,7 +4,7 @@ export type BoardPermission = "PUBLIC" | "AUTHENTICATED" | "COMMITTEE" | "ADMIN"
 export type ArticleStatus = "DRAFT" | "PUBLISHED" | "DELETED" | "HIDDEN";
 export type ArticleScope = "ALL" | "KAIST" | "SOC" | "AUTHOR_AND_STAFF" | "STAFF";
 export type CommentStatus = "PUBLISHED" | "SECRET" | "DELETED";
-export type ReactionType = "LIKE" | "DISLIKE";
+export type ReactionType = "LIKE";
 export type AssetType = "IMAGE" | "ATTACHMENT" | "IMAGE_THUMBNAIL";
 export type AssetStatus = "INITIATED" | "COMPLETED" | "DELETED";
 
@@ -61,8 +61,11 @@ export interface Comment {
   id: string;
   articleId: string;
   parentCommentId: string | null;
+  authorNameKr: string;
   body: string | null;
   status: CommentStatus;
+  canEdit: boolean;
+  canDelete: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -152,6 +155,7 @@ export interface ArticleDetailResponse {
   comments: Comment[];
   assets: Asset[];
   myReaction: ReactionType | null;
+  likeCount: number;
 }
 
 export interface CreateCommentRequest {
@@ -171,6 +175,7 @@ export interface PutArticleReactionRequest {
 
 export interface ArticleReactionResponse {
   type: ReactionType | null;
+  likeCount: number;
 }
 
 export interface InitiateAssetRequest {
