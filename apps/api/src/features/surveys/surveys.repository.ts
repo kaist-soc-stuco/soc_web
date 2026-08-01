@@ -341,6 +341,31 @@ export class SurveysRepository {
     }));
     return cards.filter((card): card is Record<string, unknown> => card !== null);
   }
+  async materializeEvent(surveyId: string, actor: string, location: string, visibility: 'PUBLIC' | 'AUTHENTICATED' | 'COMMITTEE', correlationId: string) {
+    return this.db.transaction(async (tx) => {
+      const [survey] = await tx.select().from(surveys).where(eq(surveys.id, surveyId)).for('update');
+      if (!survey) return null;
+      if (!survey.opensAt || !survey.closesAt) return 'INVALID' as const;
+      const [revision] = await tx.select().from(surveyRevisions).where(and(
+        eq(surveyRevisions.surveyId, surveyId), eq(surveyRevisions.revision, survey.currentRevision),
+      )).limit(1);
+      if (!revision) throw new Error('survey_revision_invariant_violation');
+      const now = new Date();
+      const [event] = await tx.insert(events).values({
+        titleKr: revision.titleKr, titleEn: revision.titleEn,
+        descriptionKr: revision.descriptionKr ?? revision.titleKr,
+        descriptionEn: revision.descriptionEn ?? revision.titleEn,
+        startAt: survey.opensAt, endAt: survey.closesAt, allDay: false, location, visibility,
+        createdByUserId: actor, updatedByUserId: actor, createdAt: now, updatedAt: now,
+      }).returning();
+      const [relation] = await tx.insert(contentMatchers).values({
+        eventId: event.id, surveyId, relationType: 'SURVEY_PERIOD', syncMode: 'SURVEY_TO_EVENT',
+        createdByUserId: actor, updatedByUserId: actor, synchronizedAt: now, createdAt: now, updatedAt: now,
+      }).returning();
+      await this.audit(tx, surveyId, null, actor, 'SURVEY_EVENT_MATERIALIZED', 'event_id,relation_type,sync_mode', correlationId);
+      return { event, relation };
+    });
+  }
   async matcher(
     input: {
       articleId?: string;

@@ -37,6 +37,7 @@ export class AdminSurveysController {
   @Patch('surveys/:id') patch(@Req() r: SurveyRequest, @Param('id') surveyId: string, @Body() b: unknown) { return this.service.patch(r.user!.id, id(surveyId), b, correlation(r)); }
   @Post('surveys/:id/publish') publish(@Req() r: SurveyRequest, @Param('id') surveyId: string) { return this.service.publish(r.user!.id, id(surveyId), correlation(r)); }
   @Put('surveys/:id/sections') sections(@Req() r: SurveyRequest, @Param('id') surveyId: string, @Body() b: unknown) { return this.service.sections(r.user!.id, id(surveyId), b, correlation(r)); }
+  @Post('surveys/:id/materialize-event') materializeEvent(@Req() r: SurveyRequest, @Param('id') surveyId: string, @Body() b: unknown) { return this.service.materializeEvent(r.user!.id, id(surveyId), b, correlation(r)); }
   @Put('sections/:id/questions') questions(@Req() r: SurveyRequest, @Param('id') sectionId: string, @Body() b: unknown) { return this.service.questions(r.user!.id, id(sectionId), b, correlation(r)); }
   @Get('surveys/:id/responses') responses(@Req() r: SurveyRequest, @Param('id') surveyId: string) { return this.service.responses(r.user!.id, id(surveyId)); }
   @Get('survey-responses/:id') response(@Req() r: SurveyRequest, @Param('id') responseId: string) { return this.service.responseDetail(r.user!.id, id(responseId)); }

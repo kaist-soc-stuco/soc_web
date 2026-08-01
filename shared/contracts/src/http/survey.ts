@@ -201,4 +201,6 @@ export type RelatedContentCard =
   | { kind: "EVENT"; id: string; title: string; href: string; relationType: ContentRelationType; startsAt: string }
   | { kind: "SURVEY"; id: string; title: string; href: string; relationType: ContentRelationType; opensAt: string | null; closesAt: string | null };
 export interface RelatedContentResponse { items: RelatedContentCard[]; }
+export interface MaterializeSurveyEventRequest { location: string; visibility: "PUBLIC" | "AUTHENTICATED" | "COMMITTEE"; }
+export interface MaterializeSurveyEventResponse { eventId: string; relation: ContentMatcherDto; }
 export interface GetMySurveyResponseResponse { response: SurveyResponseDto | null; }

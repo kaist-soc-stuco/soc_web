@@ -1,4 +1,4 @@
-import type { AdminSurveyResponseListResponse, AppErrorResponse, ContentLocale, ContentMatcherDto, CreateContentMatcherRequest, CreateSurveyRequest, ExportSurveyRequest, GetMySurveyResponseResponse, ListContentMatchersResponse, LoginSessionResponse, MySurveyResponsesResponse, PatchSurveyRequest, PublishSurveyResponse, RelatedContentCard, RelatedContentResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, ReviewSurveyResponseRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
+import type { AdminSurveyResponseListResponse, AppErrorResponse, ContentLocale, ContentMatcherDto, CreateContentMatcherRequest, CreateSurveyRequest, ExportSurveyRequest, GetMySurveyResponseResponse, ListContentMatchersResponse, LoginSessionResponse, MaterializeSurveyEventRequest, MaterializeSurveyEventResponse, MySurveyResponsesResponse, PatchSurveyRequest, PublishSurveyResponse, RelatedContentCard, RelatedContentResponse, ReplaceSectionQuestionsRequest, ReplaceSurveySectionsRequest, ReviewSurveyResponseRequest, SubmitSurveyResponseRequest, SurveyAggregateResponse, SurveyDto, SurveyListResponse, SurveyResponseAnswerDto, SurveyResponseDto } from '@soc/contracts';
 
 export type RestrictedPattern = { allowed: ReadonlySet<string>; minimum: number; maximum: number };
 export type SubmitSurveyResult = { status: 'ACCEPTED' } | { response: SurveyResponseDto };
@@ -95,6 +95,7 @@ export const surveyApi = {
     const query = new URLSearchParams([...Object.entries(subject).filter((entry): entry is [string, string] => entry[1] !== undefined), ['locale', selectedLocale]]);
     return decode(await request(`/surveys/content-relations?${query}`, 'GET', undefined, signal), isRelated);
   },
+  materializeEvent: async (surveyId: string, input: MaterializeSurveyEventRequest) => decode(await request(`/admin/surveys/${surveyId}/materialize-event`, 'POST', input), (value): value is MaterializeSurveyEventResponse => exact(value, ['eventId', 'relation']) && string(value.eventId) && isMatcher(value.relation)),
   relations: async (subject: { articleId?: string; eventId?: string; surveyId?: string }, signal?: AbortSignal) => {
     const query = new URLSearchParams(Object.entries(subject).filter((entry): entry is [string, string] => entry[1] !== undefined));
     return decode(await request(`/admin/content-matchers?${query}`, 'GET', undefined, signal), isMatcherList);

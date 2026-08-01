@@ -165,7 +165,8 @@ describe('Survey HTTP boundary', () => {
       'GET /api/surveys/content-relations', 'GET /api/surveys/responses/me', 'PATCH /api/admin/surveys/:id',
       'POST /api/admin/content-matchers', 'POST /api/admin/survey-responses/:id/review',
       'POST /api/admin/surveys', 'POST /api/admin/surveys/:id/export',
-      'POST /api/admin/surveys/:id/publish', 'POST /api/surveys/:id/responses',
+      'POST /api/admin/surveys/:id/materialize-event', 'POST /api/admin/surveys/:id/publish',
+      'POST /api/surveys/:id/responses',
       'PUT /api/admin/sections/:id/questions', 'PUT /api/admin/surveys/:id/sections',
     ]);
 

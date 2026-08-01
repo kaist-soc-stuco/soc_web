@@ -307,6 +307,17 @@ export class SurveysService {
     }
     return { items: await this.repo.related(subject, query.locale === 'en' ? 'en' : 'ko') };
   }
+  async materializeEvent(actor: string, surveyId: string, input: unknown, correlationId: string) {
+    await this.manage(actor);
+    if (!exact(input, ['location', 'visibility']) || typeof input.location !== 'string' || !input.location.trim()
+      || !['PUBLIC', 'AUTHENTICATED', 'COMMITTEE'].includes(input.visibility as string)) {
+      throw new UnprocessableEntityException('invalid_survey_event');
+    }
+    const result = await this.repo.materializeEvent(surveyId, actor, input.location.trim(), input.visibility as 'PUBLIC' | 'AUTHENTICATED' | 'COMMITTEE', correlationId);
+    if (!result) throw new NotFoundException('survey_not_found');
+    if (result === 'INVALID') throw new ConflictException('survey_period_required');
+    return { eventId: result.event.id, relation: this.matcherDto(result.relation) };
+  }
   async listMatchers(actor: string, query: Record<string, unknown>) {
     await this.manage(actor);
     if (!exact(query, ['articleId', 'eventId', 'surveyId'])) throw new UnprocessableEntityException('invalid_content_matcher_query');
