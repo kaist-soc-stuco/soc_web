@@ -54,7 +54,7 @@ async function mockBoards(page: any, manager = true, options: BoardMockOptions =
   let staleOnce = options.staleOnce ?? false;
   let catalogRequests = 0;
   await page.route('**/api/**', async (route: any) => {
-    const request = route.request(); const { pathname } = new URL(request.url());
+    const request = route.request(); const { pathname, searchParams } = new URL(request.url());
     if (pathname === '/api/auth/session') return route.fulfill({ json: { authenticated, canUsePersistentFeatures: authenticated, requiresConsent: false, storageMode: authenticated ? 'persisted' : null, userId: authenticated ? 'user' : undefined } });
     if (pathname === '/api/auth/development/login' && request.method() === 'POST') { authenticated = true; hasManagerGrant = true; return route.fulfill({ status: 204 }); }
     if (pathname === '/api/auth/logout' && request.method() === 'POST') { authenticated = false; hasManagerGrant = false; return route.fulfill({ status: 204 }); }
@@ -62,9 +62,11 @@ async function mockBoards(page: any, manager = true, options: BoardMockOptions =
     if (pathname === '/api/boards') {
       const responseRows = (hasManagerGrant ? [...rows, restricted] : [...rows, board('prior-actor-only', '이전 사용자 전용', 98)])
         .sort((left, right) => left.displayOrder - right.displayOrder || left.id.localeCompare(right.id));
-      catalogRequests += 1;
-      if ((options.delayFirstCatalog && catalogRequests === 1) || catalogRequests === options.delayCatalogRequest) {
-        await new Promise<void>((resolve) => (catalogRequests === 1 ? options.onFirstCatalogPending : options.onCatalogRequestPending)?.(resolve));
+      if (searchParams.get('home') !== 'true') {
+        catalogRequests += 1;
+        if ((options.delayFirstCatalog && catalogRequests === 1) || catalogRequests === options.delayCatalogRequest) {
+          await new Promise<void>((resolve) => (catalogRequests === 1 ? options.onFirstCatalogPending : options.onCatalogRequestPending)?.(resolve));
+        }
       }
       return route.fulfill({ json: { locale: 'ko', items: responseRows.map(publicBoard) } });
     }
