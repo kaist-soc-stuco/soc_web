@@ -4,10 +4,12 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { boardApi } from '@/lib/board-api';
 import { useLocale } from '@/lib/locale-store';
-import type { Board } from '@soc/contracts';
+import type { Board, EventItem, SurveyDto } from '@soc/contracts';
 import { useAuthSession } from '@/lib/auth-session';
 import { useAdminGrants } from '@/lib/admin-grants';
 import { canCreateBoardArticle } from '@/lib/board-capabilities';
+import { adminEventApi } from '@/lib/admin-event-api';
+import { surveyApi } from '@/lib/survey-api';
 
 export function BoardWritePage() {
   const [locale] = useLocale();
@@ -23,6 +25,10 @@ export function BoardWritePage() {
   const [bodyKr, setBodyKr] = useState('');
   const [bodyEn, setBodyEn] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [surveys, setSurveys] = useState<SurveyDto[]>([]);
+  const [eventId, setEventId] = useState('');
+  const [surveyId, setSurveyId] = useState('');
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +63,23 @@ export function BoardWritePage() {
       });
     return () => controller.abort();
   }, [category, locale]);
+  useEffect(() => {
+    if (!bilingual) {
+      setEvents([]);
+      setSurveys([]);
+      setEventId('');
+      setSurveyId('');
+      return;
+    }
+    const controller = new AbortController();
+    Promise.all([adminEventApi.list(), surveyApi.listAdmin(controller.signal)])
+      .then(([eventList, surveyList]) => {
+        setEvents(eventList.items);
+        setSurveys(surveyList.items);
+      })
+      .catch(() => setError('연결 가능한 행사와 설문을 불러오지 못했습니다.'));
+    return () => controller.abort();
+  }, [bilingual]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -84,6 +107,12 @@ export function BoardWritePage() {
         });
         await boardApi.uploadAsset(initiated.uploadUrl, initiated.uploadHeaders, attachment);
         await boardApi.completeAsset(initiated.asset.id);
+      }
+      if (eventId) {
+        await surveyApi.createRelation({ articleId: draft.id, eventId, relationType: 'SCHEDULE', syncMode: 'NONE' });
+      }
+      if (surveyId) {
+        await surveyApi.createRelation({ articleId: draft.id, surveyId, relationType: 'ANNOUNCEMENT', syncMode: 'NONE' });
       }
       const published = await boardApi.publish(draft.id);
       navigate(`/board/${category}/${published.id}`);
@@ -116,6 +145,10 @@ export function BoardWritePage() {
               </fieldset> : null}
             </div>
             <label className="mb-6 grid gap-2"><span className="text-sm font-extrabold text-kaist-darkgreen">첨부파일 (선택)</span><input aria-label="첨부파일" type="file" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /></label>
+            {bilingual ? <div className="mb-6 grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm font-extrabold text-kaist-darkgreen">연결할 행사 (선택)<select aria-label="연결할 행사" value={eventId} onChange={(event) => setEventId(event.target.value)} className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3 font-normal text-kaist-black"><option value="">연결하지 않음</option>{events.map((item) => <option key={item.id} value={item.id}>{item.title.value ?? item.id}</option>)}</select></label>
+              <label className="grid gap-2 text-sm font-extrabold text-kaist-darkgreen">연결할 설문 (선택)<select aria-label="연결할 설문" value={surveyId} onChange={(event) => setSurveyId(event.target.value)} className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3 font-normal text-kaist-black"><option value="">연결하지 않음</option>{surveys.map((item) => <option key={item.id} value={item.id}>{item.title.value ?? item.id}</option>)}</select></label>
+            </div> : null}
             {error && <p role="alert" className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
             <div className="flex flex-wrap justify-end gap-3 border-t border-kaist-grey/20 pt-6"><Link to={`/board/${category}`} className="inline-flex items-center rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold tracking-tight text-kaist-darkgreen">취소</Link><button disabled={pending || !boardReady} type="submit" className="inline-flex items-center rounded-[5px] border border-kaist-darkgreen bg-kaist-darkgreen px-6 py-2 text-sm font-extrabold tracking-tight text-white disabled:opacity-50">{pending ? '등록 중...' : '등록하기'}</button></div>
           </form>}
