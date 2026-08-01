@@ -4,9 +4,15 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { boardApi } from '@/lib/board-api';
 import { useLocale } from '@/lib/locale-store';
+import type { Board } from '@soc/contracts';
+import { useAuthSession } from '@/lib/auth-session';
+import { useAdminGrants } from '@/lib/admin-grants';
+import { canCreateBoardArticle } from '@/lib/board-capabilities';
 
 export function BoardWritePage() {
   const [locale] = useLocale();
+  const auth = useAuthSession();
+  const grants = useAdminGrants();
   const { category = 'soc-notice' } = useParams<{ category: string }>();
   const navigate = useNavigate();
   const [boardTitle, setBoardTitle] = useState(category);
@@ -21,12 +27,16 @@ export function BoardWritePage() {
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
   const [boardReady, setBoardReady] = useState(false);
+  const [board, setBoard] = useState<Board | null>(null);
+  const canCreate = canCreateBoardArticle(board, auth, grants.grants);
+  const capabilityLoading = auth.status !== 'ready' || grants.status === 'idle' || grants.status === 'loading';
 
   useEffect(() => {
     const controller = new AbortController();
     const activeRequest = ++requestId.current;
     setLoading(true);
     setBoardReady(false);
+    setBoard(null);
     setError(null);
     setBoardTitle(category);
     setBoardDescription('');
@@ -36,6 +46,7 @@ export function BoardWritePage() {
         setBoardTitle(board.title.value ?? '');
         setBoardDescription(board.description.value ?? '');
         setBoardReady(true);
+        setBoard(board);
       })
       .catch((cause: unknown) => {
         if (activeRequest === requestId.current && (cause as { name?: string }).name !== 'AbortError') setError('게시판 정보를 불러오지 못했습니다.');
@@ -48,7 +59,7 @@ export function BoardWritePage() {
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!boardReady) return;
+    if (!boardReady || !canCreate) return;
     const values = {
       titleKr: titleKr.trim(),
       titleEn: titleEn.trim(),
@@ -95,7 +106,7 @@ export function BoardWritePage() {
         </div></div>
         <section className={`${pageContainerClass} pb-16 py-2`}>
           <div className="border-b-2 border-kaist-darkgreen-main py-5"><h2 className="text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[28px]">게시글 작성</h2><p className="mt-2 text-sm font-semibold tracking-tight text-kaist-grey">{boardTitle} 게시판에 등록할 내용을 입력하세요.</p></div>
-          {loading ? <p className="py-12 text-center text-kaist-grey">게시판 정보를 불러오는 중입니다.</p> : !boardReady ? <p role="alert" className="py-12 text-center text-kaist-grey">{error ?? '게시판 정보를 불러오지 못했습니다.'}</p> : <form onSubmit={submit}>
+          {loading || capabilityLoading ? <p className="py-12 text-center text-kaist-grey">게시판 정보와 작성 권한을 확인하는 중입니다.</p> : !boardReady ? <p role="alert" className="py-12 text-center text-kaist-grey">{error ?? '게시판 정보를 불러오지 못했습니다.'}</p> : !canCreate ? <div role="alert" className="py-12 text-center text-kaist-grey"><p>이 게시판에 글을 작성할 권한이 없습니다.</p><Link to={`/board/${category}`} className="mt-4 inline-block font-bold text-kaist-darkgreen underline">게시판으로 돌아가기</Link></div> : <form onSubmit={submit}>
             <div className="grid gap-5 py-7 lg:grid-cols-2 lg:py-8">
               <fieldset className="grid gap-5"><legend className="mb-3 text-lg font-extrabold text-kaist-darkgreen">한국어</legend>
                 <label className="grid gap-3"><span className="text-sm font-extrabold">제목</span><input required value={titleKr} onChange={(event) => setTitleKr(event.target.value)} type="text" className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3" /></label>

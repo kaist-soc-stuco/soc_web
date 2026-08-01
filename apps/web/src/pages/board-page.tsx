@@ -5,9 +5,14 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { boardApi } from '@/lib/board-api';
 import type { ArticleSummary, Board } from '@soc/contracts';
 import { useLocale } from '@/lib/locale-store';
+import { useAuthSession } from '@/lib/auth-session';
+import { useAdminGrants } from '@/lib/admin-grants';
+import { canCreateBoardArticle } from '@/lib/board-capabilities';
 
 export function BoardPage() {
   const [locale] = useLocale();
+  const auth = useAuthSession();
+  const grants = useAdminGrants();
   const { category = 'soc-notice' } = useParams<{ category: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -21,6 +26,7 @@ export function BoardPage() {
   const [error, setError] = useState(false);
   const pageContainerClass = 'mx-auto w-full px-[12vw]';
   const requestId = useRef(0);
+  const canCreate = canCreateBoardArticle(board, auth, grants.grants);
 
 
   useEffect(() => {
@@ -188,12 +194,14 @@ export function BoardPage() {
                     </button>
                   </div>
                 )}
-                <Link
-                  to={`/board/${category}/write`}
-                  className="absolute right-0 rounded-[5px] border border-kaist-darkgreen bg-white px-4 py-2 text-xs font-semibold tracking-tight text-kaist-darkgreen transition-colors hover:bg-kaist-darkgreen hover:text-kaist-white"
-                >
-                  글쓰기
-                </Link>
+                {canCreate && (
+                  <Link
+                    to={`/board/${category}/write`}
+                    className="absolute right-0 rounded-[5px] border border-kaist-darkgreen bg-white px-4 py-2 text-xs font-semibold tracking-tight text-kaist-darkgreen transition-colors hover:bg-kaist-darkgreen hover:text-kaist-white"
+                  >
+                    글쓰기
+                  </Link>
+                )}
               </div>
             </div>
           </div>
