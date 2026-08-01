@@ -19,14 +19,14 @@ export const getEvent = (id: string, locale: ContentLocale, signal?: AbortSignal
   const query = new URLSearchParams({ locale });
   return getAbortableApiJson<EventItem>(`/events/${encodeURIComponent(id)}?${query.toString()}`, signal);
 };
-export const getEvents = (fromMs: number, toMs: number): Promise<EventListResponse> => {
+export const getEvents = (fromMs: number, toMs: number, locale: ContentLocale = 'ko', signal?: AbortSignal): Promise<EventListResponse> => {
   const query = new URLSearchParams({
     fromMs: String(fromMs),
     toMs: String(toMs),
-    locale: 'ko',
+    locale,
   });
 
-  return getApiJson<EventListResponse>(`/events?${query.toString()}`);
+  return getAbortableApiJson<EventListResponse>(`/events?${query.toString()}`, signal);
 };
 
 export const getUpcomingEvents = (now = Date.now()): Promise<EventListResponse> => {

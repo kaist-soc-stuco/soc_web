@@ -62,7 +62,7 @@ const isResponseList = (value: unknown): value is AdminSurveyResponseListRespons
 const isMyResponses = (value: unknown): value is MySurveyResponsesResponse => exact(value, ['items']) && Array.isArray(value.items) && value.items.every((item) => exact(item, ['survey', 'response']) && isSurvey(item.survey) && isResponse(item.response));
 
 export const surveyApi = {
-  list: async (signal?: AbortSignal) => decode(await request('/surveys', 'GET', undefined, signal), isList),
+  list: async (signal?: AbortSignal, selectedLocale?: ContentLocale) => decode(await request(`/surveys${selectedLocale ? `?locale=${selectedLocale}` : ''}`, 'GET', undefined, signal), isList),
   listAdmin: async (signal?: AbortSignal) => decode(await request('/surveys', 'GET', undefined, signal), isList),
   session: async (signal?: AbortSignal) => decode(await request('/auth/session', 'GET', undefined, signal), isSession),
   get: async (id: string, selectedLocale?: ContentLocale, signal?: AbortSignal) => decode(await request(`/surveys/${id}${selectedLocale ? `?locale=${selectedLocale}` : ''}`, 'GET', undefined, signal), isSurvey),

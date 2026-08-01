@@ -3,8 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { Header } from '@/components/organisms/header';
 import { boardApi } from '@/lib/board-api';
 import type { Article, Board, Comment, ReactionType } from '@soc/contracts';
+import { useLocale } from '@/lib/locale-store';
 
 export function BoardPostPage() {
+  const [locale] = useLocale();
   const { category = 'soc-notice', id } = useParams<{ category: string; id: string }>();
   const [article, setArticle] = useState<Article | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
@@ -31,7 +33,7 @@ export function BoardPostPage() {
 
     const controller = new AbortController();
     setLoading(true);
-    Promise.all([boardApi.article(id, 'ko', controller.signal), boardApi.get(category, 'ko', controller.signal)])
+    Promise.all([boardApi.article(id, locale, controller.signal), boardApi.get(category, locale, controller.signal)])
       .then(([detail, boardResponse]) => {
         if (activeRequest !== requestId.current) return;
         if (detail.article.boardCode !== category) {
@@ -50,7 +52,7 @@ export function BoardPostPage() {
         if (activeRequest === requestId.current) setLoading(false);
       });
     return () => controller.abort();
-  }, [category, id]);
+  }, [category, id, locale]);
 
   const date = article?.publishedAt ?? article?.updatedAt;
   const addComment = async () => {

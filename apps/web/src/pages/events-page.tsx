@@ -7,6 +7,7 @@ import { getEvents } from '@/lib/event-api';
 import { localizedText } from '@/lib/localized-content';
 import { surveyApi } from '@/lib/survey-api';
 import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { useLocale } from '@/lib/locale-store';
 
 const eventTabs = ['설문조사', '행사'] as const;
 const EVENT_WINDOW_MS = 92 * 24 * 60 * 60 * 1000;
@@ -29,6 +30,7 @@ function formatEventDate(event: EventItem) {
 }
 
 export function EventsPage() {
+  const [locale] = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,7 +55,7 @@ export function EventsPage() {
 
     setEvents([]);
     setEventLoadState('loading');
-    getEvents(fromMs, toMs)
+    getEvents(fromMs, toMs, locale)
       .then((response) => {
         if (!cancelled) {
           setEvents(response.items);
@@ -67,15 +69,15 @@ export function EventsPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab]);
+  }, [activeTab, locale]);
   useEffect(() => {
     if (activeTab !== '설문조사') { setSurveyLoadState('idle'); return; }
     let cancelled = false;
     setSurveys([]);
     setSurveyLoadState('loading');
-    surveyApi.list().then((response) => { if (!cancelled) { setSurveys(response.items.filter((survey) => survey.state === 'OPEN' || survey.state === 'SCHEDULED')); setSurveyLoadState('ready'); } }).catch(() => { if (!cancelled) setSurveyLoadState('error'); });
+    surveyApi.list(undefined, locale).then((response) => { if (!cancelled) { setSurveys(response.items.filter((survey) => survey.state === 'OPEN' || survey.state === 'SCHEDULED')); setSurveyLoadState('ready'); } }).catch(() => { if (!cancelled) setSurveyLoadState('error'); });
     return () => { cancelled = true; };
-  }, [activeTab]);
+  }, [activeTab, locale]);
 
   const cardEvents = useMemo<EventCard[]>(
     () =>
