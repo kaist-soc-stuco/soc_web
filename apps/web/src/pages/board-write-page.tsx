@@ -3,8 +3,10 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { boardApi } from '@/lib/board-api';
+import { useLocale } from '@/lib/locale-store';
 
 export function BoardWritePage() {
+  const [locale] = useLocale();
   const { category = 'soc-notice' } = useParams<{ category: string }>();
   const navigate = useNavigate();
   const [boardTitle, setBoardTitle] = useState(category);
@@ -28,7 +30,7 @@ export function BoardWritePage() {
     setError(null);
     setBoardTitle(category);
     setBoardDescription('');
-    boardApi.get(category, 'ko', controller.signal)
+    boardApi.get(category, locale, controller.signal)
       .then(({ board }) => {
         if (activeRequest !== requestId.current) return;
         setBoardTitle(board.title.value ?? '');
@@ -42,7 +44,7 @@ export function BoardWritePage() {
         if (activeRequest === requestId.current) setLoading(false);
       });
     return () => controller.abort();
-  }, [category]);
+  }, [category, locale]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

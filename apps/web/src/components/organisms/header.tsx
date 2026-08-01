@@ -1,16 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
+import { Globe2 } from 'lucide-react';
 import { Logo } from '@/components/atoms/logo';
 import { invalidateBoardCatalog, loadBoardCatalog, useBoardCatalog } from '@/lib/board-catalog';
 import { getAuthSessionSnapshot, getAuthSessionSummary } from '@/lib/auth-session';
 import { invalidateAdminGrants, useAdminGrants } from '@/lib/admin-grants';
 import { visibleAdminMenu } from '@/lib/static-site-content';
+import { useLocale } from '@/lib/locale-store';
 interface HeaderProps {
   showLogo?: boolean;
 }
 
 export function Header({ showLogo = false }: HeaderProps) {
+  const [locale, setLocale] = useLocale();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -64,26 +67,26 @@ export function Header({ showLogo = false }: HeaderProps) {
   }));
   const navItems = [
     {
-      label: '게시판',
+      label: locale === 'ko' ? '게시판' : 'Boards',
       href: '/board',
       dropdown: boardItems,
     },
     {
-      label: '행사 & 설문조사',
+      label: locale === 'ko' ? '행사 & 설문조사' : 'Events & Surveys',
       href: '/events?type=survey',
       dropdown: [
-        { label: '설문조사', to: '/events?type=survey' },
-        { label: '행사', to: '/events?type=event' },
+        { label: locale === 'ko' ? '설문조사' : 'Surveys', to: '/events?type=survey' },
+        { label: locale === 'ko' ? '행사' : 'Events', to: '/events?type=event' },
       ],
     },
     {
-      label: '소개',
+      label: locale === 'ko' ? '소개' : 'About',
       href: '/about',
       dropdown: [
-        { label: '소개', to: '/about' },
+        { label: locale === 'ko' ? '소개' : 'About', to: '/about' },
         { label: 'FAQ', to: '/faq' },
-        { label: '로드맵', to: '/about/roadmap' },
-        { label: '일정', to: '/calendar' },
+        { label: locale === 'ko' ? '로드맵' : 'Roadmap', to: '/about/roadmap' },
+        { label: locale === 'ko' ? '일정' : 'Calendar', to: '/calendar' },
       ],
     },
   ];
@@ -177,6 +180,19 @@ export function Header({ showLogo = false }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-3 pr-4 md:pr-6">
+          <label className="flex items-center gap-1">
+            <Globe2 aria-hidden="true" className="size-4" />
+            <span className="sr-only">{locale === 'ko' ? '언어' : 'Language'}</span>
+            <select
+              aria-label={locale === 'ko' ? '언어' : 'Language'}
+              value={locale}
+              onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ko')}
+              className="bg-transparent text-sm font-bold"
+            >
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+            </select>
+          </label>
           {authenticated ? (
             <>
               <Link to="/mypage" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">마이페이지</Link>

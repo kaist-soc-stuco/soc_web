@@ -4,8 +4,10 @@ import { Header } from '@/components/organisms/header';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { boardApi } from '@/lib/board-api';
 import type { ArticleSummary, Board } from '@soc/contracts';
+import { useLocale } from '@/lib/locale-store';
 
 export function BoardPage() {
+  const [locale] = useLocale();
   const { category = 'soc-notice' } = useParams<{ category: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -33,8 +35,8 @@ export function BoardPage() {
     setPosts([]);
 
     Promise.all([
-      boardApi.list({ locale: 'ko' }, controller.signal),
-      boardApi.articles(category, { locale: 'ko', limit: 50 }, controller.signal),
+      boardApi.list({ locale }, controller.signal),
+      boardApi.articles(category, { locale, limit: 50 }, controller.signal),
     ]).then(([registry, articleList]) => {
       if (activeRequest !== requestId.current) return;
       const selected = registry.items.find((item) => item.code === category) ?? null;
@@ -52,7 +54,7 @@ export function BoardPage() {
       if (activeRequest === requestId.current) setLoading(false);
     });
     return () => controller.abort();
-  }, [category]);
+  }, [category, locale]);
 
   const currentPosts = posts.filter((post) => (post.title.value ?? '').toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -63,7 +65,7 @@ export function BoardPage() {
     setLoading(true);
     setError(false);
     try {
-      const articleList = await boardApi.articles(category, { locale: 'ko', limit: 50, cursor: cursor || undefined });
+      const articleList = await boardApi.articles(category, { locale, limit: 50, cursor: cursor || undefined });
       setPosts(articleList.items);
       setNextCursor(articleList.nextCursor);
       setCursorHistory((history) => page === history.length + 1 ? [...history, cursor!] : history);
