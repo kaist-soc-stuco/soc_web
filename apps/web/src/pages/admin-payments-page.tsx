@@ -91,11 +91,11 @@ export function AdminPaymentsPage() {
       {error && <p role="alert" className="mb-4 text-red-600">{error}</p>}
       {state === 'ready' && <>
         <label className="mb-4 block text-sm font-bold">사용자 검색
-          <input aria-label="과비 사용자 검색" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름, 학번 또는 KAIST UID" className="mt-2 block w-full max-w-md rounded border px-3 py-2 font-normal" />
+          <input aria-label="과비 사용자 검색" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 학번/사번" className="mt-2 block w-full max-w-md rounded border px-3 py-2 font-normal" />
         </label>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-            <thead><tr className="border-y"><th className="p-3">이름</th><th>학번/KAIST UID</th><th>상태</th><th>수정일</th><th>작업</th></tr></thead>
+            <thead><tr className="border-y"><th className="p-3">이름</th><th>학번/사번</th><th>상태</th><th>수정일</th><th>작업</th></tr></thead>
             <tbody>{items.map((item) => <tr key={item.id} className="border-b">
               <td className="p-3">{item.nameKr ?? item.nameEn ?? '-'}</td>
               <td>{item.studentOrEmployeeNumber ?? '-'}</td>

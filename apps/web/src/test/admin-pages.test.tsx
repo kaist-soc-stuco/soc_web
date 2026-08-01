@@ -121,7 +121,7 @@ describe('admin foundation pages', () => {
   });
 
   it('retains the payment-status listing without rendering finance metadata', async () => {
-    mocks.fee.listCurrent.mockResolvedValue({ items: [{ id: 'user-1', kaistUid: 'uid-1', studentOrEmployeeNumber: null, nameKr: '홍길동', nameEn: null, feeStatus: 'PAID', updatedAt: '2026-01-01T00:00:00Z', amount: 50000 }] });
+    mocks.fee.listCurrent.mockResolvedValue({ items: [{ id: 'user-1', studentOrEmployeeKind: 'STUDENT', studentOrEmployeeNumber: null, nameKr: '홍길동', nameEn: null, feeStatus: 'PAID', updatedAt: '2026-01-01T00:00:00Z', amount: 50000 }], nextCursor: null });
     render(<AdminPaymentsPage />);
     expect(await screen.findByText('홍길동')).toBeVisible();
     expect(screen.getByText('납부')).toBeVisible();
@@ -129,16 +129,16 @@ describe('admin foundation pages', () => {
     expect(screen.queryByText(/account|bank|invoice/i)).not.toBeInTheDocument();
   });
   it('requires a reason and confirms an individual fee status change', async () => {
-    mocks.fee.listCurrent.mockResolvedValue({ items: [{ id: 'user-1', kaistUid: 'uid-1', studentOrEmployeeNumber: null, nameKr: '홍길동', nameEn: null, feeStatus: 'UNPAID', updatedAt: '2026-01-01T00:00:00Z' }] });
+    mocks.fee.listCurrent.mockResolvedValue({ items: [{ id: 'user-1', studentOrEmployeeKind: 'STUDENT', studentOrEmployeeNumber: null, nameKr: '홍길동', nameEn: null, feeStatus: 'UNPAID', updatedAt: '2026-01-01T00:00:00Z' }], nextCursor: null });
     mocks.fee.update.mockResolvedValue({ userId: 'user-1', feeStatus: 'PAID', updatedAt: '2026-01-02T00:00:00Z' });
     render(<AdminPaymentsPage />);
     fireEvent.click(await screen.findByRole('button', { name: '상태 변경' }));
     const confirm = screen.getByRole('button', { name: '변경 확인' });
-    expect(confirm).toBeDisabled();
+    expect(confirm).toBeEnabled();
     fireEvent.change(screen.getByLabelText('변경 상태'), { target: { value: 'PAID' } });
     fireEvent.change(screen.getByLabelText('변경 사유'), { target: { value: 'PAYMENT_CONFIRMED' } });
     fireEvent.click(confirm);
-    await waitFor(() => expect(mocks.fee.update).toHaveBeenCalledWith('user-1', 'PAID', 'PAYMENT_CONFIRMED'));
+    await waitFor(() => expect(mocks.fee.update).toHaveBeenCalledWith('user-1', 'PAID', 'PAYMENT_CONFIRMED', undefined));
     expect(await screen.findByText('납부')).toBeVisible();
   });
   it('shows the direct page loading state until grants resolve', () => {
