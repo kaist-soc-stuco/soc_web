@@ -10,8 +10,11 @@ vi.mock('@/lib/board-catalog', () => ({ useBoardCatalog: () => catalog.current, 
 vi.mock('@/lib/auth-session', () => ({ getAuthSessionSnapshot: vi.fn(() => ({ epoch: 1 })), getAuthSessionSummary: vi.fn(() => Promise.resolve({ authenticated: auth.authenticated })) }));
 vi.mock('@soc/api-client', () => ({ createApiClient: vi.fn(() => ({ logout: auth.logout })) }));
 vi.mock('@/components/atoms/logo', () => ({ Logo: () => <span>logo</span> }));
+vi.mock('@/lib/admin-grants', () => ({ useAdminGrants: () => ({ status: 'ready', grants: ['admin'] }), invalidateAdminGrants: vi.fn() }));
+vi.mock('@/lib/static-site-content', () => ({ visibleAdminMenu: () => [{ to: '/admin' }] }));
 
 import { Header } from '@/components/organisms/header';
+import { setLocale } from '@/lib/locale-store';
 
 const renderHeader = () => render(<MemoryRouter><Header /></MemoryRouter>);
 
@@ -22,6 +25,7 @@ beforeEach(() => {
   catalog.invalidate.mockReset();
   auth.authenticated = false;
   auth.logout.mockReset();
+  setLocale('ko');
 });
 
 describe('Header board catalog navigation', () => {
@@ -64,5 +68,35 @@ describe('Header board catalog navigation', () => {
     fireEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('로그아웃하지 못했습니다.');
     await waitFor(() => expect(screen.getByRole('link', { name: '마이페이지' })).toBeVisible());
+  });
+
+  it('localizes unauthenticated and mobile navigation in English', async () => {
+    setLocale('en');
+    renderHeader();
+
+    expect(await screen.findByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    expect(screen.getByRole('navigation', { name: 'Mobile menu' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: '로그인' })).not.toBeInTheDocument();
+  });
+
+  it('localizes authenticated navigation, loading, and errors in English', async () => {
+    auth.authenticated = true;
+    let rejectLogout!: (reason: unknown) => void;
+    auth.logout.mockReturnValue(new Promise((_, reject) => { rejectLogout = reject; }));
+    setLocale('en');
+    renderHeader();
+
+    expect(await screen.findByRole('link', { name: 'My Page' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Admin Center' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    expect(screen.getAllByRole('link', { name: 'My Page' })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Admin Center' })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Log out' })[0]);
+    expect(await screen.findAllByRole('button', { name: 'Logging out' })).toHaveLength(2);
+    rejectLogout(new Error('offline'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not log out.');
+    expect(screen.queryByText('로그아웃하지 못했습니다.', { exact: false })).not.toBeInTheDocument();
   });
 });
