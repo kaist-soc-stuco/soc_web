@@ -65,9 +65,9 @@ describe('UsersController HTTP boundary', () => {
   it('preserves validated admin route shapes, query values, and safe response profiles', async () => {
     users.listAdmin.mockResolvedValue({ items: [{ id: targetId, nameEn: 'Ada', grants: [] }], nextCursor: null });
     users.getAdmin.mockResolvedValue({ id: targetId, nameEn: 'Ada', grants: [] });
-    const list = await authenticatedGet('/api/users/admin?limit=2&feeStatus=PAID&kaistUid=k1').expect(200);
+    const list = await authenticatedGet('/api/users/admin?limit=2&feeStatus=PAID&name=Ada').expect(200);
     const detail = await authenticatedGet(`/api/users/admin/${targetId}`).expect(200);
-    expect(users.listAdmin).toHaveBeenCalledWith(actorId, { limit: '2', feeStatus: 'PAID', kaistUid: 'k1' });
+    expect(users.listAdmin).toHaveBeenCalledWith(actorId, { limit: '2', feeStatus: 'PAID', name: 'Ada' });
     expect(users.getAdmin).toHaveBeenCalledWith(actorId, targetId);
     expect(list.body).toEqual({ items: [{ id: targetId, nameEn: 'Ada', grants: [] }], nextCursor: null });
     expect(detail.body).toEqual({ id: targetId, nameEn: 'Ada', grants: [] });
@@ -108,8 +108,10 @@ describe('UsersController HTTP boundary', () => {
   it('rejects unknown keys and malformed user IDs before forwarding to the service', async () => {
     const profile = await authenticatedPatch('/api/users/me').send({ userEmail: 'new@example.test', permission: 99 }).expect(400);
     expect(profile.body).toEqual({ code: 'invalid_profile_update', message: 'Request failed', requestId: expect.any(String) });
-    const query = await authenticatedGet('/api/users/admin?unknown=value').expect(400);
-    expect(query.body).toEqual({ code: 'invalid_user_query', message: 'Request failed', requestId: expect.any(String) });
+    const unknown = await authenticatedGet('/api/users/admin?unknown=value').expect(400);
+    expect(unknown.body).toEqual({ code: 'invalid_user_query', message: 'Request failed', requestId: expect.any(String) });
+    const kaistUid = await authenticatedGet('/api/users/admin?kaistUid=forbidden').expect(400);
+    expect(kaistUid.body).toEqual({ code: 'invalid_user_query', message: 'Request failed', requestId: expect.any(String) });
     const detail = await authenticatedGet('/api/users/admin/not-a-uuid').expect(400);
     expect(detail.body).toEqual({ code: 'invalid_user_id', message: 'Request failed', requestId: expect.any(String) });
     const fee = await authenticatedPatch('/api/users/admin/not-a-uuid/fee').send({ feeStatus: 'PAID', reasonCode: 'PAYMENT' }).expect(400);

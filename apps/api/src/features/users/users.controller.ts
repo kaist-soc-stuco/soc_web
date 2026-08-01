@@ -47,7 +47,7 @@ export class UsersController {
 
   @Get("admin")
   async listAdmin(@Req() request: AuthenticatedRequest, @Query() query: AdminUserListQuery) {
-    requireAllowedKeys(query, ["cursor", "limit", "kaistUid", "studentOrEmployeeNumber", "feeStatus"], "invalid_user_query");
+    requireAllowedKeys(query, ["cursor", "limit", "name", "studentOrEmployeeNumber", "feeStatus"], "invalid_user_query");
     return this.usersService.listAdmin(request.user.id, query);
   }
 

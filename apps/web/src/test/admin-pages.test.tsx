@@ -50,14 +50,16 @@ describe('admin foundation pages', () => {
     expect(mocks.api.listRequests).not.toHaveBeenCalled();
   });
 
-  it('loads exact user matches and only renders the retained identity fields and grants', async () => {
+  it('loads the default 25-user page, supports exact name search, and only renders retained identity fields and grants', async () => {
     mocks.snapshot = { status: 'ready', grants: [grant('USERS_MANAGE')] };
     mocks.api.listUsers.mockResolvedValue({ items: [user], nextCursor: null });
     mocks.api.getUser.mockResolvedValue(user);
     render(<AdminUsersPage />);
-    fireEvent.change(screen.getByLabelText('정확한 사용자 검색'), { target: { value: ' uid-1 ' } });
+    await waitFor(() => expect(mocks.api.listUsers).toHaveBeenCalledWith({ cursor: undefined, limit: 25 }));
+    expect(await screen.findByRole('columnheader', { name: 'KAIST UID' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('정확한 사용자 검색'), { target: { value: ' 홍길동 ' } });
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
-    await waitFor(() => expect(mocks.api.listUsers).toHaveBeenCalledWith({ kaistUid: 'uid-1', cursor: undefined, limit: 20 }));
+    await waitFor(() => expect(mocks.api.listUsers).toHaveBeenLastCalledWith({ name: '홍길동', cursor: undefined, limit: 25 }));
     fireEvent.click(await screen.findByRole('button', { name: /홍길동/ }));
     expect(await screen.findByText('유효 권한')).toBeVisible();
     expect(screen.queryByText('majorMask')).not.toBeInTheDocument();
@@ -149,14 +151,16 @@ describe('admin foundation pages', () => {
   it('binds pagination to the submitted query and invalidates its cursor when the input changes', async () => {
     mocks.snapshot = { status: 'ready', grants: [grant('USERS_MANAGE')] };
     mocks.api.listUsers
+      .mockResolvedValueOnce({ items: [], nextCursor: null })
       .mockResolvedValueOnce({ items: [user], nextCursor: 'cursor-1' })
       .mockResolvedValueOnce({ items: [{ ...user, id: 'user-2', nameKr: '임꺽정' }], nextCursor: null });
     render(<AdminUsersPage />);
-    fireEvent.change(screen.getByLabelText('정확한 사용자 검색'), { target: { value: 'uid-1' } });
+    await waitFor(() => expect(mocks.api.listUsers).toHaveBeenCalledWith({ cursor: undefined, limit: 25 }));
+    fireEvent.change(screen.getByLabelText('정확한 사용자 검색'), { target: { value: '홍길동' } });
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
     await screen.findByRole('button', { name: /홍길동/ });
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    await waitFor(() => expect(mocks.api.listUsers).toHaveBeenLastCalledWith({ kaistUid: 'uid-1', cursor: 'cursor-1', limit: 20 }));
+    await waitFor(() => expect(mocks.api.listUsers).toHaveBeenLastCalledWith({ name: '홍길동', cursor: 'cursor-1', limit: 25 }));
     fireEvent.change(screen.getByLabelText('정확한 사용자 검색'), { target: { value: 'uid-2' } });
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /홍길동/ })).not.toBeInTheDocument();
@@ -166,12 +170,16 @@ describe('admin foundation pages', () => {
     mocks.snapshot = { status: 'ready', grants: [grant('USERS_MANAGE')] };
     const first = deferred<{ items: (typeof user)[]; nextCursor: null }>();
     const second = deferred<{ items: (typeof user)[]; nextCursor: null }>();
-    mocks.api.listUsers.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    mocks.api.listUsers
+      .mockResolvedValueOnce({ items: [], nextCursor: null })
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
     render(<AdminUsersPage />);
+    await waitFor(() => expect(mocks.api.listUsers).toHaveBeenCalledTimes(1));
     const input = screen.getByLabelText('정확한 사용자 검색');
-    fireEvent.change(input, { target: { value: 'old-uid' } });
+    fireEvent.change(input, { target: { value: '이전 사용자' } });
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
-    fireEvent.change(input, { target: { value: 'new-uid' } });
+    fireEvent.change(input, { target: { value: '새 사용자' } });
     fireEvent.click(screen.getByRole('button', { name: '조회' }));
     second.resolve({ items: [{ ...user, id: 'new', nameKr: '새 사용자' }], nextCursor: null });
     expect(await screen.findByRole('button', { name: /새 사용자/ })).toBeVisible();

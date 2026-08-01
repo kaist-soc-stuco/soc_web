@@ -144,7 +144,7 @@ export class UsersService {
     await this.requireEffectiveGrant(actorUserId, ADMIN_FEES_PERMISSION);
   }
 
-  async listAdmin(actorUserId: string, query: { cursor?: string; feeStatus?: FeeStatus; kaistUid?: string; limit?: number; studentOrEmployeeNumber?: string }): Promise<AdminUserListResponse> {
+  async listAdmin(actorUserId: string, query: { cursor?: string; feeStatus?: FeeStatus; limit?: number; name?: string; studentOrEmployeeNumber?: string }): Promise<AdminUserListResponse> {
     await this.requireAdminUsers(actorUserId);
     if (query.feeStatus !== undefined) {
       if (!FEE_STATUSES.has(query.feeStatus)) throw new BadRequestException("invalid_fee_status");

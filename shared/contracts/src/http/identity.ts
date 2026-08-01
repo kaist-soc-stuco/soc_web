@@ -53,7 +53,7 @@ export interface AdminUserProfile {
 export interface AdminUserListQuery {
   cursor?: string;
   limit?: number;
-  kaistUid?: string;
+  name?: string;
   studentOrEmployeeNumber?: string;
   feeStatus?: FeeStatus;
 }

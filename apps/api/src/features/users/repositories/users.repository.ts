@@ -88,12 +88,15 @@ export class UsersRepository {
   async list(input: {
     cursor?: UserCursor;
     feeStatus?: UserRecord["feeStatus"];
-    kaistUid?: string;
     limit: number;
+    name?: string;
     studentOrEmployeeNumber?: string;
   }): Promise<UserRecord[]> {
     const predicates: SQL[] = [];
-    if (input.kaistUid) predicates.push(inArray(users.kaistUid, this.piiCipher.encryptForLookup(PII_FIELDS.kaistUid, input.kaistUid)));
+    if (input.name) predicates.push(or(
+      inArray(users.nameKr, this.piiCipher.encryptForLookup(PII_FIELDS.nameKr, input.name)),
+      inArray(users.nameEn, this.piiCipher.encryptForLookup(PII_FIELDS.nameEn, input.name)),
+    )!);
     if (input.studentOrEmployeeNumber) predicates.push(inArray(users.studentOrEmployeeNumber, this.piiCipher.encryptForLookup(PII_FIELDS.studentOrEmployeeNumber, input.studentOrEmployeeNumber)));
     if (input.feeStatus) predicates.push(eq(users.feeStatus, input.feeStatus));
     if (input.cursor) {

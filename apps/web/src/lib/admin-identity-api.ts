@@ -78,7 +78,7 @@ export const adminIdentityApi = {
     const user = decode(await request('/users/me'), isCurrentUser);
     return { grants: user.grants };
   },
-  listUsers: async (values: { cursor?: string; limit?: number; kaistUid?: string; studentOrEmployeeNumber?: string }, signal?: AbortSignal) => decode(await request(`/users/admin${query(values)}`, { signal }), isAdminUserList),
+  listUsers: async (values: { cursor?: string; limit?: number; name?: string; studentOrEmployeeNumber?: string }, signal?: AbortSignal) => decode(await request(`/users/admin${query(values)}`, { signal }), isAdminUserList),
   getUser: async (userId: string, signal?: AbortSignal) => decode(await request(`/users/admin/${encodeURIComponent(userId)}`, { signal }), isAdminUser),
   listDefinitions: async (signal?: AbortSignal) => decode(await request('/permissions/definitions', { signal }), isDefinitionList),
   listRequests: async (values: { stage: 'REQUESTED' | 'APPROVAL' | 'ACTIVATION'; cursor?: string; limit?: number }, signal?: AbortSignal) => decode(await request(`/permissions/requests${query(values)}`, { signal }), isQueue),

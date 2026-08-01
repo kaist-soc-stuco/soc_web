@@ -58,6 +58,21 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
     expect(page.items[0]).not.toHaveProperty('userMobile');
     expect(repo.list).toHaveBeenCalledWith({ limit: 2, cursor: undefined });
   });
+  it('forwards exact Korean or English name and student/employee number filters', async () => {
+    const repo = repository();
+    repo.findEffectiveGrants.mockResolvedValue(new Map([[actorId, [grant('USERS_MANAGE')]]]));
+    repo.list.mockResolvedValue([]);
+    const service = new UsersService(repo as never);
+
+    await service.listAdmin(actorId, { name: '에이다', studentOrEmployeeNumber: '20260001' });
+
+    expect(repo.list).toHaveBeenCalledWith({
+      cursor: undefined,
+      limit: 26,
+      name: '에이다',
+      studentOrEmployeeNumber: '20260001',
+    });
+  });
 
   it('enforces deterministic cursor and page boundaries without leaking unrequested records', async () => {
     const repo = repository(); repo.findEffectiveGrants.mockResolvedValue(new Map([[actorId, [grant('USERS_MANAGE')]], [targetId, []]]));
@@ -143,5 +158,30 @@ describe('UsersRepository fee audit transaction', () => {
       requestFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
     expect(result).toMatchObject({ id: targetId, feeStatus: 'PAID' });
+  });
+});
+
+describe('UsersRepository encrypted discovery filters', () => {
+  it('builds exact lookup candidates for both Korean and English name envelopes', async () => {
+    const limit = vi.fn().mockResolvedValue([]);
+    const db = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            orderBy: vi.fn(() => ({ limit })),
+          })),
+        })),
+      })),
+    };
+    const encryptForLookup = vi.fn((_field: string, value: string) => [`encrypted:${value}`]);
+    const repository = new UsersRepository(db as never, {
+      encryptForLookup,
+    } as never);
+
+    await repository.list({ limit: 26, name: 'Ada' });
+
+    expect(encryptForLookup).toHaveBeenCalledWith('users.name_kr', 'Ada');
+    expect(encryptForLookup).toHaveBeenCalledWith('users.name_en', 'Ada');
+    expect(limit).toHaveBeenCalledWith(26);
   });
 });
