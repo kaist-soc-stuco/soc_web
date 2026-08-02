@@ -18,7 +18,7 @@ const grant = (permission: string, scope: 'GLOBAL' | 'BOARD' = 'GLOBAL') => ({ a
 function repository() {
   return {
     findById: vi.fn(), findEffectiveGrants: vi.fn().mockResolvedValue(new Map()), list: vi.fn(),
-    updateProfile: vi.fn(), updateFeeWithAudit: vi.fn(),
+    updateSelfMobile: vi.fn(), updatePrivacyConsent: vi.fn(), updateFeeWithAudit: vi.fn(),
   };
 }
 
@@ -34,10 +34,10 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
   });
 
   it('patches only mutable contact fields, ignoring immutable and legacy authority input', async () => {
-    const repo = repository(); repo.updateProfile.mockResolvedValue(user(targetId, { userEmail: 'kaist@kaist.ac.kr', userMobile: null }));
+    const repo = repository(); repo.updateSelfMobile.mockResolvedValue(user(targetId, { userEmail: 'kaist@kaist.ac.kr', userMobile: null }));
     repo.findEffectiveGrants.mockResolvedValue(new Map([[targetId, []]]));
     const result = await new UsersService(repo as never).patchMe(targetId, { userMobile: null });
-    expect(repo.updateProfile).toHaveBeenCalledWith(targetId, { userMobile: null });
+    expect(repo.updateSelfMobile).toHaveBeenCalledWith(targetId, null);
     expect(result).not.toHaveProperty('permission');
     await expect(new UsersService(repo as never).patchMe(targetId, { userMobile: 'x'.repeat(321) })).rejects.toMatchObject({ response: expect.objectContaining({ message: 'invalid_profile_update' }) });
   });

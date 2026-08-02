@@ -123,14 +123,10 @@ export class UsersService {
   }
 
   async markConsent(userId: string, consentedAt: string): Promise<void> {
-    const updated = await this.usersRepository.updateProfile(userId, { privacyConsentAt: consentedAt });
+    const updated = await this.usersRepository.updatePrivacyConsent(userId, consentedAt);
     if (!updated) throw new NotFoundException("user_not_found");
   }
 
-  async updateProfileFromSso(userId: string, input: { userEmail?: string; userMobile?: string }): Promise<void> {
-    const updated = await this.usersRepository.updateProfile(userId, input);
-    if (!updated) throw new NotFoundException("user_not_found");
-  }
 
   async getMe(userId: string): Promise<UserMeResponse> {
     const user = await this.requireUser(userId);
@@ -146,9 +142,7 @@ export class UsersService {
         throw new BadRequestException("invalid_profile_update");
       }
     }
-    const updated = await this.usersRepository.updateProfile(userId, {
-      userMobile: input.userMobile,
-    });
+    const updated = await this.usersRepository.updateSelfMobile(userId, input.userMobile);
     if (!updated) throw new NotFoundException("user_not_found");
     return { ...this.profile(updated), grants: (await this.usersRepository.findEffectiveGrants([userId])).get(userId) ?? [] };
   }

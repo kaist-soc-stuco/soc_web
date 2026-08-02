@@ -243,19 +243,19 @@ export class UsersRepository {
     return this.mapRowToUserRecord(upserted);
   }
 
-  async updateProfile(userId: string, input: { privacyConsentAt?: string | null; userEmail?: string | null; userMobile?: string | null }): Promise<UserRecord | null> {
+  async updateSelfMobile(userId: string, userMobile: string | null | undefined): Promise<UserRecord | null> {
     const [updated] = await this.db.update(users).set({
-      privacyConsentAt: input.privacyConsentAt === undefined
+      userMobile: userMobile === undefined
         ? undefined
-        : input.privacyConsentAt
-          ? new Date(input.privacyConsentAt)
-          : null,
-      userEmail: input.userEmail === undefined
-        ? undefined
-        : this.piiCipher.encrypt(PII_FIELDS.userEmail, input.userEmail),
-      userMobile: input.userMobile === undefined
-        ? undefined
-        : this.piiCipher.encrypt(PII_FIELDS.userMobile, input.userMobile),
+        : this.piiCipher.encrypt(PII_FIELDS.userMobile, userMobile),
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId)).returning();
+    return updated ? this.mapRowToUserRecord(updated) : null;
+  }
+
+  async updatePrivacyConsent(userId: string, privacyConsentAt: string | null): Promise<UserRecord | null> {
+    const [updated] = await this.db.update(users).set({
+      privacyConsentAt: privacyConsentAt ? new Date(privacyConsentAt) : null,
       updatedAt: new Date(),
     }).where(eq(users.id, userId)).returning();
     return updated ? this.mapRowToUserRecord(updated) : null;
