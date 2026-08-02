@@ -126,8 +126,8 @@ export type MailGetResult = FeatureDisabledResult;
 export type MailCancelResult = FeatureDisabledResult;
 
 export type ChatPageResponse =
-  | { kind: "EXTERNAL_LINK_NOTICE"; externalUrl: string; notice: string }
-  | { kind: "INTERNAL_CHAT"; notice: string };
+  | { kind: "EXTERNAL_LINK_NOTICE"; externalUrl: string }
+  | { kind: "INTERNAL_CHAT" };
 
 export interface ChatMessageRequest {
   body: string;

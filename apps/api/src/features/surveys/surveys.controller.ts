@@ -22,7 +22,7 @@ function correlation(request: SurveyRequest): string { if (typeof request.reques
 export class PublicSurveysController {
   constructor(@Inject(SurveysService) private readonly service: SurveysService) {}
   @Get() list(@Req() request: SurveyRequest, @Query() query: Record<string, unknown>) { return this.service.list(request.user?.id, locale(query)); }
-  @Get('responses/me') mineAll(@Req() request: SurveyRequest) { if (!request.user) throw new UnauthorizedException('authentication_required'); return this.service.mineAll(request.user.id); }
+  @Get('responses/me') mineAll(@Req() request: SurveyRequest, @Query() query: Record<string, unknown>) { if (!request.user) throw new UnauthorizedException('authentication_required'); return this.service.mineAll(request.user.id, locale(query)); }
   @Get('content-relations') related(@Query() query: Record<string, unknown>) { return this.service.related(query); }
   @Get(':id') get(@Req() request: SurveyRequest, @Param('id') surveyId: string, @Query() query: Record<string, unknown>) { return this.service.get(request.user?.id, id(surveyId), locale(query)); }
   @Post(':id/responses') submit(@Req() request: SurveyRequest, @Param('id') surveyId: string, @Body() body: unknown) { return this.service.submit(request.user?.id, id(surveyId), body, correlation(request)); }

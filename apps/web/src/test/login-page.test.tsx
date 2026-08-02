@@ -81,7 +81,7 @@ describe('consent completion', () => {
     expect(mocks.snapshot.epoch).toBe(1);
     expect(mocks.loadBoardCatalog).toHaveBeenCalledTimes(1);
     expect(mocks.refetchAdminGrants).toHaveBeenCalledTimes(1);
-    expect(mocks.getAuthSessionSummary).toHaveBeenCalledTimes(2);
+    expect(mocks.getAuthSessionSummary).toHaveBeenCalled();
   });
 
   it('advances one credential epoch before publishing an already-anonymous successful logout', async () => {

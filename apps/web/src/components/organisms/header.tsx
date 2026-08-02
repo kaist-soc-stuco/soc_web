@@ -1,3 +1,4 @@
+import { uiText } from "@/lib/i18n/surface-catalog";
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
@@ -9,269 +10,200 @@ import { invalidateAdminGrants, useAdminGrants } from '@/lib/admin-grants';
 import { visibleAdminMenu } from '@/lib/static-site-content';
 import { useLocale } from '@/lib/locale-store';
 interface HeaderProps {
-  showLogo?: boolean;
+    showLogo?: boolean;
 }
-
 export function Header({ showLogo = false }: HeaderProps) {
-  const [locale, setLocale] = useLocale();
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [logoutLoading, setLogoutLoading] = useState(false);
-  const [logoutError, setLogoutError] = useState(false);
-  const navRef = useRef<HTMLElement>(null);
-  const [navLeft, setNavLeft] = useState(0);
-  const [authenticated, setAuthenticated] = useState(false);
-  const boardCatalog = useBoardCatalog();
-  const grants = useAdminGrants();
-  const [boardRetrying, setBoardRetrying] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-  useEffect(() => {
-    let active = true;
-    void getAuthSessionSummary(createApiClient({ baseUrl: '/api' }))
-      .then((session) => { if (active) setAuthenticated(session.authenticated); })
-      .catch(() => undefined);
-    return () => { active = false; };
-  }, [location.key]);
-  useEffect(() => setMobileOpen(false), [location.pathname, location.search]);
-
-  const logout = async () => {
-    if (logoutLoading) return;
-    setLogoutLoading(true);
-    setLogoutError(false);
-    try {
-      await createApiClient({ baseUrl: '/api' }).logout();
-      setAuthenticated(false);
-      invalidateAdminGrants();
-      navigate('/login?status=success&reason=logged_out', { replace: true });
-      setMobileOpen(false);
-    } catch {
-      setLogoutError(true);
-    } finally {
-      setLogoutLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const update = () => {
-      if (navRef.current) setNavLeft(navRef.current.offsetLeft);
+    const [locale, setLocale] = useLocale();
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [logoutLoading, setLogoutLoading] = useState(false);
+    const [logoutError, setLogoutError] = useState(false);
+    const navRef = useRef<HTMLElement>(null);
+    const [navLeft, setNavLeft] = useState(0);
+    const [authenticated, setAuthenticated] = useState(false);
+    const boardCatalog = useBoardCatalog();
+    const grants = useAdminGrants();
+    const [boardRetrying, setBoardRetrying] = useState(false);
+    const location = useLocation();
+    const navigate = useNavigate();
+    useEffect(() => {
+        let active = true;
+        void getAuthSessionSummary(createApiClient({ baseUrl: '/api' }))
+            .then((session) => { if (active)
+            setAuthenticated(session.authenticated); })
+            .catch(() => undefined);
+        return () => { active = false; };
+    }, [location.key]);
+    useEffect(() => setMobileOpen(false), [location.pathname, location.search]);
+    const logout = async () => {
+        if (logoutLoading)
+            return;
+        setLogoutLoading(true);
+        setLogoutError(false);
+        try {
+            await createApiClient({ baseUrl: '/api' }).logout();
+            setAuthenticated(false);
+            invalidateAdminGrants();
+            navigate('/login?status=success&reason=logged_out', { replace: true });
+            setMobileOpen(false);
+        }
+        catch {
+            setLogoutError(true);
+        }
+        finally {
+            setLogoutLoading(false);
+        }
     };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, [showLogo]);
-  
-  const boardItems = (boardCatalog.status === 'ready' ? boardCatalog.items : []).map((board) => ({
-    label: board.title || board.code,
-    to: `/board/${encodeURIComponent(board.code)}`,
-  }));
-  const navItems = [
-    {
-      label: locale === 'ko' ? '게시판' : 'Boards',
-      href: '/board',
-      dropdown: boardItems,
-    },
-    {
-      label: locale === 'ko' ? '행사 & 설문조사' : 'Events & Surveys',
-      href: '/events?type=survey',
-      dropdown: [
-        { label: locale === 'ko' ? '설문조사' : 'Surveys', to: '/events?type=survey' },
-        { label: locale === 'ko' ? '행사' : 'Events', to: '/events?type=event' },
-      ],
-    },
-    {
-      label: locale === 'ko' ? '소개' : 'About',
-      href: '/about',
-      dropdown: [
-        { label: locale === 'ko' ? '소개' : 'About', to: '/about' },
-        { label: 'FAQ', to: '/faq' },
-        { label: locale === 'ko' ? '로드맵' : 'Roadmap', to: '/about/roadmap' },
-        { label: locale === 'ko' ? '일정' : 'Calendar', to: '/calendar' },
-      ],
-    },
-  ];
-  const hasAdminAccess = grants.status === 'ready' && visibleAdminMenu(grants.grants).length > 0;
-  const terminalCatalogError = boardCatalog.status === 'error'
-    && typeof boardCatalog.error === 'object'
-    && boardCatalog.error !== null
-    && 'status' in boardCatalog.error
-    && boardCatalog.error.status === 401;
-  const retryBoardCatalog = async () => {
-    if (boardRetrying) return;
-    setBoardRetrying(true);
-    try {
-      if (!terminalCatalogError) {
-        invalidateBoardCatalog();
-        await loadBoardCatalog();
-        return;
-      }
-      const before = getAuthSessionSnapshot().epoch;
-      await getAuthSessionSummary(createApiClient({ baseUrl: '/api' }));
-      if (getAuthSessionSnapshot().epoch !== before) await loadBoardCatalog();
-    } catch {
-      // The catalog/session stores expose the fail-closed error state.
-    } finally {
-      setBoardRetrying(false);
-    }
-  };
-
-  return (
-    <header 
-      className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative"
-      onMouseLeave={() => setHoveredIndex(null)}
-    >
+    useEffect(() => {
+        const update = () => {
+            if (navRef.current)
+                setNavLeft(navRef.current.offsetLeft);
+        };
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+    }, [showLogo]);
+    const boardItems = (boardCatalog.status === 'ready' ? boardCatalog.items : []).map((board) => ({
+        label: board.title || board.code,
+        to: `/board/${encodeURIComponent(board.code)}`,
+    }));
+    const navItems = [
+        {
+            label: locale === 'ko' ? uiText("components.organisms.header.bd1011dee4") : 'Boards',
+            href: '/board',
+            dropdown: boardItems,
+        },
+        {
+            label: locale === 'ko' ? uiText("components.organisms.header.a6f30d2586") : 'Events & Surveys',
+            href: '/events?type=survey',
+            dropdown: [
+                { label: locale === 'ko' ? uiText("components.organisms.header.e91f6f515d") : 'Surveys', to: '/events?type=survey' },
+                { label: locale === 'ko' ? uiText("components.organisms.header.a6e55f8c8f") : 'Events', to: '/events?type=event' },
+            ],
+        },
+        {
+            label: locale === 'ko' ? uiText("components.organisms.header.fa255f0ccc") : 'About',
+            href: '/about',
+            dropdown: [
+                { label: locale === 'ko' ? uiText("components.organisms.header.fa255f0ccc") : 'About', to: '/about' },
+                { label: 'FAQ', to: '/faq' },
+                { label: locale === 'ko' ? uiText("components.organisms.header.14823c1e8f") : 'Roadmap', to: '/about/roadmap' },
+                { label: locale === 'ko' ? uiText("components.organisms.header.b2cb2d404f") : 'Calendar', to: '/calendar' },
+            ],
+        },
+    ];
+    const hasAdminAccess = grants.status === 'ready' && visibleAdminMenu(grants.grants).length > 0;
+    const terminalCatalogError = boardCatalog.status === 'error'
+        && typeof boardCatalog.error === 'object'
+        && boardCatalog.error !== null
+        && 'status' in boardCatalog.error
+        && boardCatalog.error.status === 401;
+    const retryBoardCatalog = async () => {
+        if (boardRetrying)
+            return;
+        setBoardRetrying(true);
+        try {
+            if (!terminalCatalogError) {
+                invalidateBoardCatalog();
+                await loadBoardCatalog();
+                return;
+            }
+            const before = getAuthSessionSnapshot().epoch;
+            await getAuthSessionSummary(createApiClient({ baseUrl: '/api' }));
+            if (getAuthSessionSnapshot().epoch !== before)
+                await loadBoardCatalog();
+        }
+        catch {
+            // The catalog/session stores expose the fail-closed error state.
+        }
+        finally {
+            setBoardRetrying(false);
+        }
+    };
+    return (<header className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative" onMouseLeave={() => setHoveredIndex(null)}>
       <div className="flex h-13 w-full items-stretch justify-between">
         {/* Left Section: Logo + Navigation */}
         <div className="flex items-stretch">
           {/* Logo Section (conditional) */}
-          {showLogo && (
-            <div className="flex items-center pl-4">
+          {showLogo && (<div className="flex items-center pl-4">
               <Logo />
-            </div>
-          )}
+            </div>)}
           
           {/* Navigation */}
           <nav ref={navRef} className={`hidden md:flex items-stretch ${showLogo ? 'pl-4' : 'pl-4'}`}>
-            {navItems.map((item, index) => (
-              <div
-                key={index}
-                className="relative group"
-                onMouseEnter={() => setHoveredIndex(index)}
-              >
-                {item.href ? (
-                  <Link
-                    to={item.href}
-                    className="relative flex h-full w-52 items-center justify-center text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main"
-                  >
+            {navItems.map((item, index) => (<div key={index} className="relative group" onMouseEnter={() => setHoveredIndex(index)}>
+                {item.href ? (<Link to={item.href} className="relative flex h-full w-52 items-center justify-center text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main">
                     <span className="py-2">{item.label}</span>
-                    <span
-                      className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${
-                        hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'
-                      }`}
-                    />
-                  </Link>
-                ) : index === 0 && boardCatalog.status === 'error' ? (
-                  <button
-                    type="button"
-                    onClick={() => void retryBoardCatalog()}
-                    disabled={boardRetrying}
-                    className="flex h-full w-52 items-center justify-center text-sm font-bold text-red-700 disabled:opacity-50"
-                  >
-                    {boardRetrying ? '세션 확인 중' : '게시판 다시 불러오기'}
-                  </button>
-                ) : (
-                  <span className="flex h-full w-52 items-center justify-center text-sm font-bold text-kaist-grey">
-                    {boardCatalog.status === 'loading' || boardCatalog.status === 'idle' ? '게시판 불러오는 중' : '표시할 게시판 없음'}
-                  </span>
-                )}
-              </div>
-            ))}
+                    <span className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'}`}/>
+                  </Link>) : index === 0 && boardCatalog.status === 'error' ? (<button type="button" onClick={() => void retryBoardCatalog()} disabled={boardRetrying} className="flex h-full w-52 items-center justify-center text-sm font-bold text-red-700 disabled:opacity-50">
+                    {boardRetrying ? uiText("components.organisms.header.bc7013832c") : uiText("components.organisms.header.9b7d32c816")}
+                  </button>) : (<span className="flex h-full w-52 items-center justify-center text-sm font-bold text-kaist-grey">
+                    {boardCatalog.status === 'loading' || boardCatalog.status === 'idle' ? uiText("components.organisms.header.0aa42317a8") : uiText("components.organisms.header.8e5f9adb0d")}
+                  </span>)}
+              </div>))}
           </nav>
-          {boardCatalog.status === 'error' ? (
-            <button type="button" onClick={() => void retryBoardCatalog()} disabled={boardRetrying} className="hidden px-3 text-xs font-bold text-red-700 md:block disabled:opacity-50">
-              {boardRetrying ? '세션 확인 중' : '게시판 다시 불러오기'}
-            </button>
-          ) : null}
+          {boardCatalog.status === 'error' ? (<button type="button" onClick={() => void retryBoardCatalog()} disabled={boardRetrying} className="hidden px-3 text-xs font-bold text-red-700 md:block disabled:opacity-50">
+              {boardRetrying ? uiText("components.organisms.header.bc7013832c") : uiText("components.organisms.header.9b7d32c816")}
+            </button>) : null}
           <div className="sr-only" aria-live="polite">
-            {boardCatalog.status === 'loading' && '게시판 정보를 불러오는 중입니다.'}
-            {boardCatalog.status === 'error' && '게시판 정보를 불러오지 못했습니다.'}
-            {boardCatalog.status === 'ready' && boardItems.length === 0 && '표시할 게시판이 없습니다.'}
+            {boardCatalog.status === 'loading' && uiText("components.organisms.header.28c62a20de")}
+            {boardCatalog.status === 'error' && uiText("components.organisms.header.88812f5baa")}
+            {boardCatalog.status === 'ready' && boardItems.length === 0 && uiText("components.organisms.header.ae15cd0533")}
           </div>
         </div>
 
         <div className="flex items-center gap-3 pr-4 md:pr-6">
           <label className="flex items-center gap-1">
-            <Globe2 aria-hidden="true" className="size-4" />
-            <span className="sr-only">{locale === 'ko' ? '언어' : 'Language'}</span>
-            <select
-              aria-label={locale === 'ko' ? '언어' : 'Language'}
-              value={locale}
-              onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ko')}
-              className="bg-transparent text-sm font-bold"
-            >
-              <option value="ko">한국어</option>
+            <Globe2 aria-hidden="true" className="size-4"/>
+            <span className="sr-only">{locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'}</span>
+            <select aria-label={locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'} value={locale} onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ko')} className="bg-transparent text-sm font-bold">
+              <option value="ko">{uiText("components.organisms.header.6e081b5948")}</option>
               <option value="en">English</option>
             </select>
           </label>
-          {authenticated ? (
-            <>
-              <Link to="/mypage" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? '마이페이지' : 'My Page'}</Link>
-              {hasAdminAccess ? <Link to="/admin" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? '관리자 센터' : 'Admin Center'}</Link> : null}
+          {authenticated ? (<>
+              <Link to="/mypage" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link>
+              {hasAdminAccess ? <Link to="/admin" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link> : null}
               <button type="button" onClick={() => void logout()} disabled={logoutLoading} className="hidden text-sm font-bold text-kaist-grey hover:text-kaist-darkgreen-main disabled:opacity-50 sm:block">
-                {logoutLoading ? (locale === 'ko' ? '로그아웃 중' : 'Logging out') : (locale === 'ko' ? '로그아웃' : 'Log out')}
+                {logoutLoading ? (locale === 'ko' ? uiText("components.organisms.header.d6f05cf050") : 'Logging out') : (locale === 'ko' ? uiText("components.organisms.header.3879f078a4") : 'Log out')}
               </button>
-            </>
-          ) : <Link to="/login" className="text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">{locale === 'ko' ? '로그인' : 'Log in'}</Link>}
-          <button type="button" aria-label={locale === 'ko' ? '메뉴 열기' : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
-            {locale === 'ko' ? '메뉴' : 'Menu'}
+            </>) : <Link to="/login" className="text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">{locale === 'ko' ? uiText("components.organisms.header.e225a6fd75") : 'Log in'}</Link>}
+          <button type="button" aria-label={locale === 'ko' ? uiText("components.organisms.header.195da6209a") : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
+            {locale === 'ko' ? uiText("components.organisms.header.076925c571") : 'Menu'}
           </button>
         </div>
       </div>
-      {mobileOpen ? (
-        <nav aria-label={locale === 'ko' ? '모바일 메뉴' : 'Mobile menu'} className="border-t border-kaist-grey/20 bg-white p-4 md:hidden">
+      {mobileOpen ? (<nav aria-label={locale === 'ko' ? uiText("components.organisms.header.aa3cdfdc30") : 'Mobile menu'} className="border-t border-kaist-grey/20 bg-white p-4 md:hidden">
           <ul className="space-y-3">
             {navItems.flatMap((item) => item.dropdown).map((item) => <li key={item.to}><Link className="block font-semibold" to={item.to}>{item.label}</Link></li>)}
-            {authenticated ? <li><Link className="block font-semibold" to="/mypage">{locale === 'ko' ? '마이페이지' : 'My Page'}</Link></li> : null}
-            {authenticated && hasAdminAccess ? <li><Link className="block font-semibold" to="/admin">{locale === 'ko' ? '관리자 센터' : 'Admin Center'}</Link></li> : null}
-            {authenticated ? <li><button type="button" disabled={logoutLoading} onClick={() => void logout()} className="font-semibold text-kaist-darkgreen">{logoutLoading ? (locale === 'ko' ? '로그아웃 중' : 'Logging out') : (locale === 'ko' ? '로그아웃' : 'Log out')}</button></li> : null}
+            {authenticated ? <li><Link className="block font-semibold" to="/mypage">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link></li> : null}
+            {authenticated && hasAdminAccess ? <li><Link className="block font-semibold" to="/admin">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link></li> : null}
+            {authenticated ? <li><button type="button" disabled={logoutLoading} onClick={() => void logout()} className="font-semibold text-kaist-darkgreen">{logoutLoading ? (locale === 'ko' ? uiText("components.organisms.header.d6f05cf050") : 'Logging out') : (locale === 'ko' ? uiText("components.organisms.header.3879f078a4") : 'Log out')}</button></li> : null}
           </ul>
-        </nav>
-      ) : null}
-      {logoutError ? <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm font-semibold text-red-700">{locale === 'ko' ? '로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.' : 'Could not log out. Please try again shortly.'}</p> : null}
+        </nav>) : null}
+      {logoutError ? <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm font-semibold text-red-700">{locale === 'ko' ? uiText("components.organisms.header.65aae0b7cb") : 'Could not log out. Please try again shortly.'}</p> : null}
 
       {/* Full Dropdown Menu - DDP Style */}
-      <div 
-        className={`absolute left-0 pl-4 w-full bg-kaist-white shadow-lg overflow-hidden transition-all duration-300 ease-out ${
-          hoveredIndex !== null 
-            ? 'max-h-[36rem] opacity-100 translate-y-0' 
-            : 'max-h-0 opacity-0 -translate-y-4'
-        }`}
-        style={{ top: 'calc(100% + 1px)', zIndex: 40 }}
-      >
+      <div className={`absolute left-0 pl-4 w-full bg-kaist-white shadow-lg overflow-hidden transition-all duration-300 ease-out ${hoveredIndex !== null
+            ? 'max-h-[36rem] opacity-100 translate-y-0'
+            : 'max-h-0 opacity-0 -translate-y-4'}`} style={{ top: 'calc(100% + 1px)', zIndex: 40 }}>
         <div className="flex gap-0" style={{ paddingLeft: navLeft }}>
-          {navItems.map((item, index) => (
-            <div
-              key={index}
-              className={`w-52 px-3 ${
-                index === 0 ? '' : ''
-              } ${
-                index < navItems.length - 1 ? 'border-r border-kaist-grey/30' : 'border-r border-kaist-grey/30'
-              }`}
-            >
+          {navItems.map((item, index) => (<div key={index} className={`w-52 px-3 ${index === 0 ? '' : ''} ${index < navItems.length - 1 ? 'border-r border-kaist-grey/30' : 'border-r border-kaist-grey/30'}`}>
               <ul className="space-y-1">
-                {item.dropdown.map((subItem, subIndex) => (
-                  <li 
-                    key={subItem.label}
-                    className={`transition-all duration-200 pb-1 mx-2 ${
-                      hoveredIndex !== null 
-                        ? 'opacity-100 translate-x-0' 
-                        : 'opacity-0 -translate-x-2'
-                    } ${
-                      subIndex < item.dropdown.length - 1 ? 'border-b border-kaist-grey/30' : 'pb-6'
-                    } ${
-                      subIndex === 0 ? 'pt-1' : ''
-                    }` }
-                    style={{
-                      transitionDelay: hoveredIndex !== null ? `${(index * 80) + (subIndex * 40) + 80}ms` : '0ms',
-                    }}
-                    >
-                      <Link
-                      to={subItem.to}
-                      className={`block py-3 text-center text-sm font-semibold tracking-tight transition-all lg:text-sm ${
-                        hoveredIndex === index
-                          ? 'text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1'
-                          : 'text-kaist-grey'
-                      }`}
-                    >
+                {item.dropdown.map((subItem, subIndex) => (<li key={subItem.label} className={`transition-all duration-200 pb-1 mx-2 ${hoveredIndex !== null
+                    ? 'opacity-100 translate-x-0'
+                    : 'opacity-0 -translate-x-2'} ${subIndex < item.dropdown.length - 1 ? 'border-b border-kaist-grey/30' : 'pb-6'} ${subIndex === 0 ? 'pt-1' : ''}`} style={{
+                    transitionDelay: hoveredIndex !== null ? `${(index * 80) + (subIndex * 40) + 80}ms` : '0ms',
+                }}>
+                      <Link to={subItem.to} className={`block py-3 text-center text-sm font-semibold tracking-tight transition-all lg:text-sm ${hoveredIndex === index
+                    ? 'text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1'
+                    : 'text-kaist-grey'}`}>
                       {subItem.label}
                     </Link>
-                  </li>
-                ))}
+                  </li>))}
               </ul>
-            </div>
-          ))}
+            </div>))}
         </div>
       </div>
-    </header>
-  );
+    </header>);
 }

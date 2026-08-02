@@ -95,7 +95,8 @@ export interface AdminSurveyResponseListItem {
 }
 export interface AdminSurveyResponseListResponse { items: AdminSurveyResponseListItem[]; }
 export interface MySurveyResponseListItem { survey: SurveyDto; response: SurveyResponseDto; }
-export interface MySurveyResponsesResponse { items: MySurveyResponseListItem[]; }
+export interface MySurveyResponsesQuery { locale?: ContentLocale; }
+export interface MySurveyResponsesResponse { locale: ContentLocale; items: MySurveyResponseListItem[]; }
 export interface CreateSurveyRequest {
   title: SurveyBilingualText; description?: SurveyBilingualText | null; guestAllowed: boolean; phoneRequired: boolean;
   feeRestriction: "ANY" | "PAID_ONLY"; cap?: number | null; opensAt?: string | null; closesAt?: string | null; editDeadlineAt?: string | null; responseRetentionDays: number;

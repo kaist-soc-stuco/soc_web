@@ -18,7 +18,7 @@ describe('contact API transport contracts', () => {
       .mockResolvedValueOnce(response({ items: [contact()], nextCursor: null, extra: true }))
       .mockResolvedValueOnce(response({ contact: { ...contact(), note: null, ciphertext: 'never expose' } }))
       .mockResolvedValueOnce(response({ ok: false, code: 'feature_disabled' }))
-      .mockResolvedValueOnce(response({ kind: 'EXTERNAL_LINK_NOTICE', externalUrl: 'https://chat.example.test', notice: 7 })));
+      .mockResolvedValueOnce(response({ kind: 'EXTERNAL_LINK_NOTICE', externalUrl: 'https://chat.example.test', unexpected: true })));
 
     await expect(contactApi.list()).rejects.toBeInstanceOf(ContactApiProtocolError);
     await expect(contactApi.create({ name: '홍길동', role: null, email: null, phone: null, affiliation: null, note: null, kaistUid: null, year: null })).rejects.toBeInstanceOf(ContactApiProtocolError);

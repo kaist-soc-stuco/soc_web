@@ -191,11 +191,12 @@ export class SurveysService {
     return { response: this.response(result.response, result.answers) };
   }
   async mine(actor: string, id: string) { const response = await this.repo.myResponse(id, actor); return { response: response ? this.response(response, await this.repo.answers(response.id)) : null }; }
-  async mineAll(actor: string) {
+  async mineAll(actor: string, locale: 'ko' | 'en') {
     const rows = await this.repo.myResponses(actor);
     return {
+      locale,
       items: await Promise.all(rows.map(async (row) => ({
-        survey: this.publicDto((await this.repo.detail(row.surveyId))!, 'ko'),
+        survey: this.publicDto((await this.repo.detail(row.surveyId))!, locale),
         response: this.response(row, await this.repo.answers(row.id)),
       }))),
     };

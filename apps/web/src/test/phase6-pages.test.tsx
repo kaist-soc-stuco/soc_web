@@ -108,10 +108,11 @@ describe('Phase 6 contact, mail, and chat pages', () => {
   it('loads the static external chat link without browser storage or a message submission surface', async () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem');
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
-    api.contactApi.chatPage.mockResolvedValue({ kind: 'EXTERNAL_LINK_NOTICE', externalUrl: 'https://chat.example.test/continue', notice: '외부 채팅을 이용해 주세요.' });
+    api.contactApi.chatPage.mockResolvedValue({ kind: 'EXTERNAL_LINK_NOTICE', externalUrl: 'https://chat.example.test/continue' });
     render(<ChatPage />);
 
     const link = await screen.findByRole('link', { name: 'ChatGPT에서 계속하기' });
+    expect(screen.getByText('채팅 API가 구성되지 않아 이 서버로 메시지를 전송하지 않습니다.')).toBeVisible();
     expect(link).toHaveAttribute('href', 'https://chat.example.test/continue');
     expect(link).toHaveAttribute('target', '_blank');
     expect(screen.queryByLabelText('메시지')).not.toBeInTheDocument();
@@ -121,9 +122,10 @@ describe('Phase 6 contact, mail, and chat pages', () => {
     expect(setItem).not.toHaveBeenCalled();
   });
   it('submits messages when the internal chat provider is configured', async () => {
-    api.contactApi.chatPage.mockResolvedValue({ kind: 'INTERNAL_CHAT', notice: '내부 채팅' });
+    api.contactApi.chatPage.mockResolvedValue({ kind: 'INTERNAL_CHAT' });
     api.contactApi.chatMessage.mockResolvedValue({ ok: true, reply: '응답' });
     render(<ChatPage />);
+    expect(await screen.findByText('메시지는 구성된 학생회 채팅 서비스로 전송됩니다.')).toBeVisible();
     fireEvent.change(await screen.findByLabelText('메시지'), { target: { value: '질문' } });
     fireEvent.click(screen.getByRole('button', { name: '전송' }));
     expect(await screen.findByText('응답')).toBeVisible();

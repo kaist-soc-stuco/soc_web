@@ -10,6 +10,7 @@ vi.mock('@/lib/profile-api', () => ({
 vi.mock('@/lib/board-catalog', () => ({ useBoardCatalog: () => ({ status: 'ready', items: [] }), loadBoardCatalog: vi.fn(), invalidateBoardCatalog: vi.fn() }));
 
 import { MyPage } from '@/pages/mypage-page';
+import { setLocale } from '@/lib/locale-store';
 
 const profile = {
   feeStatus: 'PAID' as const,
@@ -17,7 +18,7 @@ const profile = {
   privacyConsentAt: '2026-01-01T00:00:00.000Z', studentOrEmployeeKind: 'STUDENT' as const, userEmail: 'old@kaist.ac.kr', userMobile: '010-0000-0000', grants: [],
 };
 
-beforeEach(() => { getMock.mockReset(); updateMock.mockReset(); });
+beforeEach(() => { getMock.mockReset(); updateMock.mockReset(); setLocale('ko'); });
 afterEach(cleanup);
 
 describe('mypage', () => {
@@ -56,5 +57,18 @@ describe('mypage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '다시 시도' }));
     expect(await screen.findByText('홍길동')).toBeTruthy();
     expect(getMock).toHaveBeenCalledTimes(2);
+  });
+  it('does not publish a stale profile rejection after the locale changes', async () => {
+    let rejectFirst!: (error: Error) => void;
+    getMock
+      .mockReturnValueOnce(new Promise((_, reject) => { rejectFirst = reject; }))
+      .mockResolvedValueOnce(profile);
+    render(<MemoryRouter><MyPage /></MemoryRouter>);
+
+    setLocale('en');
+    rejectFirst(new Error('offline'));
+
+    expect(await screen.findByText('Gil Dong Hong')).toBeTruthy();
+    expect(screen.queryByText('내 정보를 불러오지 못했습니다.')).toBeNull();
   });
 });

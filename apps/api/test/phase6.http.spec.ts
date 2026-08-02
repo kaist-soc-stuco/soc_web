@@ -81,7 +81,7 @@ describe('Phase 6 HTTP contracts', () => {
   });
 
   it('serves configured chat and authenticates and strictly validates messages', async () => {
-    await request(app.getHttpServer()).get('/api/chat').expect(200, { kind: 'INTERNAL_CHAT', notice: 'Messages are sent to the configured committee chat provider.' });
+    await request(app.getHttpServer()).get('/api/chat').expect(200, { kind: 'INTERNAL_CHAT' });
     await request(app.getHttpServer()).post('/api/chat/messages').send({ body: 'hello' }).expect(401);
     const invalid = await post('/api/chat/messages').send({ body: ' ', extra: true }).expect(422); expect(invalid.body).toMatchObject({ code: 'invalid_chat_message' });
     const sent = await post('/api/chat/messages').send({ body: 'hello' }).expect(201); expect(sent.body).toEqual({ ok: true, reply: 'Committee reply' }); expect(JSON.stringify(sent.body)).not.toContain('hello');

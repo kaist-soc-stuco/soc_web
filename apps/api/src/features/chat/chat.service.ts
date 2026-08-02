@@ -10,8 +10,8 @@ export class ChatService {
 
   page(): ChatPageResponse {
     return this.configuration()
-      ? { kind: 'INTERNAL_CHAT', notice: 'Messages are sent to the configured committee chat provider.' }
-      : { kind: 'EXTERNAL_LINK_NOTICE', externalUrl: 'https://chatgpt.com/', notice: 'Chat API is not configured. Messages are not sent to this server.' };
+      ? { kind: 'INTERNAL_CHAT' }
+      : { kind: 'EXTERNAL_LINK_NOTICE', externalUrl: 'https://chatgpt.com/' };
   }
 
   async send(input: unknown): Promise<{ ok: true; reply: string }> {

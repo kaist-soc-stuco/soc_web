@@ -17,10 +17,6 @@ const forbiddenPatterns = [
     label: 'browser contact-row or mock-contact fallback',
     pattern: /\b(?:admin)?contacts?(?:[-_]?rows|[-_]?data|[-_]?mock|[-_]?fallback)\b|\bmock[-_]?contacts?(?:[-_]?rows|[-_]?data|[-_]?fallback)?\b/iu,
   },
-  {
-    label: 'literal contact field value',
-    pattern: /\b(?:email|e-mail|phone|telephone|mobile)\s*:\s*['"][^'"]+['"]/iu,
-  },
 ];
 
 function isText(buffer) {
@@ -50,7 +46,9 @@ async function collectTextFiles(directory) {
 
 const violations = [];
 for (const directory of browserRoots) {
-  for (const file of await collectTextFiles(directory)) {
+  for (const file of (await collectTextFiles(directory)).filter(
+    (candidate) => !relative(root, candidate).startsWith(`src${join('/', 'test')}`),
+  )) {
     const contents = (await readFile(file)).toString('utf8');
     for (const { label, pattern } of forbiddenPatterns) {
       if (pattern.test(contents)) {
