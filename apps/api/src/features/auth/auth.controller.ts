@@ -179,7 +179,7 @@ export class AuthController {
       "user-2": { id: "development-user-2", number: "D0000003", nameKr: "개발 사용자 2", nameEn: "Development User 2", administrator: false },
     }[body.account];
     if (!account) throw new BadRequestException("development_account_invalid");
-    const user = await this.usersService.synchronizeAuthoritativeSsoProfile({
+    const user = await this.usersService.convergeDevelopmentFixture({
       consentedAt: new Date().toISOString(),
       kaistUid: account.id,
       nameEn: account.nameEn,

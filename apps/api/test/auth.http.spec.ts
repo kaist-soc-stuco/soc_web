@@ -43,7 +43,7 @@ describe('AuthController HTTP contract', () => {
     issuePersistedSession: ReturnType<typeof vi.fn>;
     logout: ReturnType<typeof vi.fn>;
   };
-  let users: { synchronizeAuthoritativeSsoProfile: ReturnType<typeof vi.fn>; grantAllDevelopmentPermissions: ReturnType<typeof vi.fn> };
+  let users: { convergeDevelopmentFixture: ReturnType<typeof vi.fn>; grantAllDevelopmentPermissions: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     authService = {
@@ -58,7 +58,7 @@ describe('AuthController HTTP contract', () => {
       issuePersistedSession: vi.fn(),
     };
     users = {
-      synchronizeAuthoritativeSsoProfile: vi.fn(),
+      convergeDevelopmentFixture: vi.fn(),
       grantAllDevelopmentPermissions: vi.fn(),
     };
 
@@ -87,7 +87,7 @@ describe('AuthController HTTP contract', () => {
     app = undefined;
   });
   it('creates the development administrator and sets persisted cookies only in development', async () => {
-    users.synchronizeAuthoritativeSsoProfile.mockResolvedValue({ id: 'development-user-id' });
+    users.convergeDevelopmentFixture.mockResolvedValue({ id: 'development-user-id' });
     authSessionService.issuePersistedSession.mockResolvedValue({
       accessToken: 'development-access',
       refreshToken: 'development-refresh',
@@ -99,7 +99,7 @@ describe('AuthController HTTP contract', () => {
       .send({ account: 'admin' })
       .expect(204);
 
-    expect(users.synchronizeAuthoritativeSsoProfile).toHaveBeenCalledWith({
+    expect(users.convergeDevelopmentFixture).toHaveBeenCalledWith({
       consentedAt: expect.any(String),
       kaistUid: 'development-admin',
       nameEn: 'Development Admin',
@@ -116,7 +116,7 @@ describe('AuthController HTTP contract', () => {
   });
 
   it('creates a normal development user without granting administrator permissions', async () => {
-    users.synchronizeAuthoritativeSsoProfile.mockResolvedValue({ id: 'development-user-1-id' });
+    users.convergeDevelopmentFixture.mockResolvedValue({ id: 'development-user-1-id' });
     authSessionService.issuePersistedSession.mockResolvedValue({
       accessToken: 'development-access',
       refreshToken: 'development-refresh',
@@ -128,7 +128,7 @@ describe('AuthController HTTP contract', () => {
       .send({ account: 'user-1' })
       .expect(204);
 
-    expect(users.synchronizeAuthoritativeSsoProfile).toHaveBeenCalledWith({
+    expect(users.convergeDevelopmentFixture).toHaveBeenCalledWith({
       consentedAt: expect.any(String),
       kaistUid: 'development-user-1',
       nameEn: 'Development User 1',
@@ -149,7 +149,7 @@ describe('AuthController HTTP contract', () => {
       .send({ account: 'arbitrary-user' })
       .expect(400);
 
-    expect(users.synchronizeAuthoritativeSsoProfile).not.toHaveBeenCalled();
+    expect(users.convergeDevelopmentFixture).not.toHaveBeenCalled();
   });
 
   it('marks production auth cookies Secure', async () => {
