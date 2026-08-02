@@ -73,6 +73,9 @@ export const users = pgTable(
   (table) => [
     uniqueIndex("users_sso_subject_unique").on(table.ssoSubject),
     uniqueIndex("users_kaist_uid_unique").on(table.kaistUid),
+    index("users_student_or_employee_number_idx").on(table.studentOrEmployeeNumber),
+    index("users_name_kr_idx").on(table.nameKr),
+    index("users_name_en_idx").on(table.nameEn),
   ],
 );
 export const userPiiBackfillProgress = pgTable("user_pii_backfill_progress", {
