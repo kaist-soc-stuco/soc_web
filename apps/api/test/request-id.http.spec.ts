@@ -99,11 +99,11 @@ describe('request ID correlation', () => {
     });
     expect(logger).toHaveBeenCalledWith(
       JSON.stringify({
+        code: 'internal_server_error',
+        feature: 'http',
+        outcome: 'error',
+        status: 500,
         requestId,
-        method: 'GET',
-        path: '/request-id/error',
-        exceptionClass: 'Error',
-        stackFrames: ['at handler (/app/handler.ts:1:1)'],
       }),
     );
   });

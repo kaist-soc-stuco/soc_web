@@ -88,8 +88,21 @@ export class UsersService {
     return this.usersRepository.findById(userId);
   }
 
-  async synchronizeAuthoritativeSsoProfile(input: {
-    consentedAt?: string;
+  async synchronizeProductionSsoProfile(input: {
+    expectedUserId: string;
+    kaistUid: string;
+    nameEn: string;
+    nameKr: string;
+    ssoSubject: string;
+    studentOrEmployeeNumber: string;
+    userEmail: string;
+  }): Promise<UserRecord> {
+    const updated = await this.usersRepository.synchronizeProductionSsoProfile(input);
+    if (!updated) throw new ForbiddenException("sso_identity_conflict");
+    return updated;
+  }
+  async insertConsentedSsoProfile(input: {
+    consentedAt: string;
     kaistUid: string;
     nameEn: string;
     nameKr: string;
@@ -98,7 +111,22 @@ export class UsersService {
     studentOrEmployeeNumber: string;
     userEmail: string;
   }): Promise<UserRecord> {
-    return this.usersRepository.synchronizeAuthoritativeSsoProfile(input);
+    return this.usersRepository.insertConsentedSsoProfile(input);
+  }
+  async convergeDevelopmentFixture(input: {
+    consentedAt: string;
+    kaistUid: string;
+    nameEn: string;
+    nameKr: string;
+    ssoSubject: string;
+    studentOrEmployeeKind: "STUDENT" | "EMPLOYEE";
+    studentOrEmployeeNumber: string;
+    userEmail: string;
+  }): Promise<UserRecord> {
+    if (process.env.NODE_ENV !== "development") {
+      throw new ForbiddenException("development_login_disabled");
+    }
+    return this.usersRepository.convergeDevelopmentFixture(input);
   }
   async ensureCanonicalSsoSubject(
     userId: string,
@@ -107,13 +135,6 @@ export class UsersService {
     await this.usersRepository.setCanonicalSsoSubjectIfMissing(userId, ssoSubject);
   }
 
-  async createFromSsoUser(input: { consentedAt?: string; ssoUserId: string; userEmail?: string; userMobile?: string }): Promise<UserRecord> {
-    return this.usersRepository.insert({ privacyConsentAt: input.consentedAt ?? null, ssoUserId: input.ssoUserId, userEmail: input.userEmail ?? null, userMobile: input.userMobile ?? null });
-  }
-
-  async upsertConsentedSsoUser(input: { consentedAt: string; ssoUserId: string; userEmail?: string; userMobile?: string }): Promise<UserRecord> {
-    return this.usersRepository.upsertConsentedUserBySso(input);
-  }
 
   async hasPersistedProfile(userId: string): Promise<boolean> {
     return Boolean((await this.usersRepository.findById(userId))?.privacyConsentAt);
@@ -161,9 +182,28 @@ export class UsersService {
       if (!FEE_STATUSES.has(query.feeStatus)) throw new BadRequestException("invalid_fee_status");
       await this.requireAdminFees(actorUserId);
     }
-    const requestedLimit = Number(query.limit ?? DEFAULT_PAGE_SIZE);
-    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
-    const rows = await this.usersRepository.list({ ...query, cursor: this.decodeCursor(query.cursor), limit: limit + 1 });
+    if (query.name !== undefined && query.studentOrEmployeeNumber !== undefined) {
+      throw new BadRequestException("invalid_user_query");
+    }
+    const normalizeFilter = (value: unknown, maximumBytes: number): string | undefined => {
+      if (value === undefined) return undefined;
+      if (typeof value !== "string") throw new BadRequestException("invalid_user_query");
+      const normalized = value.trim().normalize("NFC");
+      if (!normalized || Buffer.byteLength(normalized, "utf8") > maximumBytes) throw new BadRequestException("invalid_user_query");
+      return normalized;
+    };
+    const name = normalizeFilter(query.name, 100);
+    const studentOrEmployeeNumber = normalizeFilter(query.studentOrEmployeeNumber, 32);
+    const requestedLimit = query.limit === undefined ? DEFAULT_PAGE_SIZE : Number(query.limit);
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > MAX_PAGE_SIZE) throw new BadRequestException("invalid_user_query");
+    const limit = requestedLimit;
+    const rows = await this.usersRepository.list({
+      cursor: this.decodeCursor(query.cursor),
+      limit: limit + 1,
+      ...(query.feeStatus === undefined ? {} : { feeStatus: query.feeStatus }),
+      ...(name === undefined ? {} : { name }),
+      ...(studentOrEmployeeNumber === undefined ? {} : { studentOrEmployeeNumber }),
+    });
     const hasMore = rows.length > limit;
     const items = rows.slice(0, limit);
     const grants = await this.usersRepository.findEffectiveGrants(items.map((user) => user.id));

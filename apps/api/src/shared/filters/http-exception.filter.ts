@@ -16,28 +16,6 @@ const messageForStatus = (status: number): string => {
   return 'Request failed';
 };
 
-const exceptionClass = (exception: unknown): string => {
-  if (exception !== null && typeof exception === 'object') {
-    const name = (exception as { constructor?: { name?: unknown } }).constructor?.name;
-
-    if (typeof name === 'string' && /^[A-Za-z][A-Za-z0-9_$]*$/.test(name)) {
-      return name;
-    }
-  }
-
-  return typeof exception;
-};
-
-const stackFrames = (exception: unknown): string[] => {
-  if (!(exception instanceof Error) || typeof exception.stack !== 'string') {
-    return [];
-  }
-
-  return exception.stack
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('at '));
-};
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -74,11 +52,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (!(exception instanceof HttpException)) {
       this.logger.error(
         JSON.stringify({
+          code,
+          feature: 'http',
+          outcome: 'error',
+          status,
           requestId,
-          method: request.method,
-          path: request.path,
-          exceptionClass: exceptionClass(exception),
-          stackFrames: stackFrames(exception),
         }),
       );
     }

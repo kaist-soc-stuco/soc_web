@@ -278,7 +278,7 @@ export class AuthSessionService {
       if (input.consent) {
         await assertOwnership();
         const { expiresAt: _expiresAt, ...profile } = pending;
-        const user = await this.usersService.synchronizeAuthoritativeSsoProfile({
+        const user = await this.usersService.insertConsentedSsoProfile({
           ...profile,
           consentedAt: new Date().toISOString(),
         });

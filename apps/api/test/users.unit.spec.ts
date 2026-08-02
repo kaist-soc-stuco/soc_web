@@ -18,7 +18,7 @@ const grant = (permission: string, scope: 'GLOBAL' | 'BOARD' = 'GLOBAL') => ({ a
 function repository() {
   return {
     findById: vi.fn(), findEffectiveGrants: vi.fn().mockResolvedValue(new Map()), list: vi.fn(),
-    updateSelfMobile: vi.fn(), updatePrivacyConsent: vi.fn(), updateFeeWithAudit: vi.fn(),
+    synchronizeProductionSsoProfile: vi.fn(), updateSelfMobile: vi.fn(), updatePrivacyConsent: vi.fn(), updateFeeWithAudit: vi.fn(),
   };
 }
 
@@ -31,6 +31,23 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
     expect(result).not.toHaveProperty('ssoSubject');
     expect(result).not.toHaveProperty('ssoUserId');
     expect(result).not.toHaveProperty('permission');
+  });
+  it('fails closed when the conditional production SSO synchronization loses its identity race', async () => {
+    const repo = repository();
+    repo.synchronizeProductionSsoProfile.mockResolvedValue(null);
+    const input = {
+      expectedUserId: targetId,
+      kaistUid: 'uid',
+      nameEn: 'Ada',
+      nameKr: '에이다',
+      ssoSubject: 'subject',
+      studentOrEmployeeNumber: '20260001',
+      userEmail: 'user@example.test',
+    };
+    await expect(new UsersService(repo as never).synchronizeProductionSsoProfile(input)).rejects.toMatchObject({
+      response: expect.objectContaining({ message: 'sso_identity_conflict' }),
+    });
+    expect(repo.synchronizeProductionSsoProfile).toHaveBeenCalledWith(input);
   });
 
   it('patches only mutable contact fields, ignoring immutable and legacy authority input', async () => {
@@ -58,19 +75,20 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
     expect(page.items[0]).not.toHaveProperty('userMobile');
     expect(repo.list).toHaveBeenCalledWith({ limit: 2, cursor: undefined });
   });
-  it('forwards exact Korean or English name and student/employee number filters', async () => {
+  it('forwards one normalized exact name or student/employee number filter', async () => {
     const repo = repository();
     repo.findEffectiveGrants.mockResolvedValue(new Map([[actorId, [grant('USERS_MANAGE')]]]));
     repo.list.mockResolvedValue([]);
     const service = new UsersService(repo as never);
 
-    await service.listAdmin(actorId, { name: '에이다', studentOrEmployeeNumber: '20260001' });
+    await service.listAdmin(actorId, { name: ' 에이다 ' });
+    expect(repo.list).toHaveBeenLastCalledWith({ cursor: undefined, limit: 26, name: '에이다' });
 
-    expect(repo.list).toHaveBeenCalledWith({
-      cursor: undefined,
-      limit: 26,
-      name: '에이다',
-      studentOrEmployeeNumber: '20260001',
+    await service.listAdmin(actorId, { studentOrEmployeeNumber: ' 20260001 ' });
+    expect(repo.list).toHaveBeenLastCalledWith({ cursor: undefined, limit: 26, studentOrEmployeeNumber: '20260001' });
+
+    await expect(service.listAdmin(actorId, { name: '에이다', studentOrEmployeeNumber: '20260001' })).rejects.toMatchObject({
+      response: expect.objectContaining({ message: 'invalid_user_query' }),
     });
   });
 
@@ -90,8 +108,7 @@ describe('UsersService identity, permissions, fees, and audit contracts', () => 
       await expect(service.listAdmin(actorId, { cursor })).rejects.toMatchObject({ response: expect.objectContaining({ message: 'invalid_cursor' }) });
     }
     expect(repo.list).toHaveBeenCalledTimes(1);
-    await service.listAdmin(actorId, { limit: 999 });
-    expect(repo.list).toHaveBeenLastCalledWith({ limit: 101, cursor: undefined });
+    await expect(service.listAdmin(actorId, { limit: 999 })).rejects.toMatchObject({ response: expect.objectContaining({ message: 'invalid_user_query' }) });
   });
 
   it('paginates and filters the least-PII fee roster', async () => {

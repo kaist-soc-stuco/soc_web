@@ -57,12 +57,17 @@ describe('users fee PostgreSQL transaction', () => {
   }, TIMEOUT);
 
   it('stores identity contact values only as encrypted envelopes and decrypts projections', async () => {
-    const created = await repository.insert({
-      privacyConsentAt: null,
-      ssoUserId: 'encrypted-profile',
+    const created = await repository.insertConsentedSsoProfile({
+      consentedAt: '2026-01-01T00:00:00.000Z',
+      kaistUid: 'encrypted-profile',
+      nameEn: 'Test User',
+      nameKr: '테스트 사용자',
+      ssoSubject: 'encrypted-profile',
+      studentOrEmployeeKind: 'STUDENT',
+      studentOrEmployeeNumber: '20260001',
       userEmail: 'person@example.test',
-      userMobile: '010-1234-5678',
     });
+    await repository.updateSelfMobile(created.id, '010-1234-5678');
     const stored = await pool.query<{ user_email: string; user_mobile: string }>(
       'SELECT user_email, user_mobile FROM users WHERE id = $1',
       [created.id],

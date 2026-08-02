@@ -158,23 +158,58 @@ export class UsersRepository {
     `);
   }
 
-  async insert(input: {
-    privacyConsentAt: string | null;
-    ssoUserId: string;
-    userEmail: string | null;
-    userMobile: string | null;
+
+  async synchronizeProductionSsoProfile(input: {
+    expectedUserId: string;
+    kaistUid: string;
+    nameEn: string;
+    nameKr: string;
+    ssoSubject: string;
+    studentOrEmployeeNumber: string;
+    userEmail: string;
+  }): Promise<UserRecord | null> {
+    const [updated] = await this.db.update(users).set({
+      kaistUid: this.piiCipher.encrypt(PII_FIELDS.kaistUid, input.kaistUid),
+      nameEn: this.piiCipher.encrypt(PII_FIELDS.nameEn, input.nameEn),
+      nameKr: this.piiCipher.encrypt(PII_FIELDS.nameKr, input.nameKr),
+      ssoSubject: input.ssoSubject,
+      studentOrEmployeeNumber: this.piiCipher.encrypt(
+        PII_FIELDS.studentOrEmployeeNumber,
+        input.studentOrEmployeeNumber,
+      ),
+      userEmail: this.piiCipher.encrypt(PII_FIELDS.userEmail, input.userEmail),
+      updatedAt: new Date(),
+    }).where(and(
+      eq(users.id, input.expectedUserId),
+      eq(users.ssoUserId, input.ssoSubject),
+      or(isNull(users.ssoSubject), eq(users.ssoSubject, input.ssoSubject)),
+    )).returning();
+    return updated ? this.mapRowToUserRecord(updated) : null;
+  }
+  async insertConsentedSsoProfile(input: {
+    consentedAt: string;
+    kaistUid: string;
+    nameEn: string;
+    nameKr: string;
+    ssoSubject: string;
+    studentOrEmployeeKind: UserRecord["studentOrEmployeeKind"];
+    studentOrEmployeeNumber: string;
+    userEmail: string;
   }): Promise<UserRecord> {
     const [inserted] = await this.db.insert(users).values({
-      privacyConsentAt: input.privacyConsentAt ? new Date(input.privacyConsentAt) : null,
-      ssoSubject: input.ssoUserId,
-      ssoUserId: input.ssoUserId,
+      privacyConsentAt: new Date(input.consentedAt),
+      kaistUid: this.piiCipher.encrypt(PII_FIELDS.kaistUid, input.kaistUid),
+      nameEn: this.piiCipher.encrypt(PII_FIELDS.nameEn, input.nameEn),
+      nameKr: this.piiCipher.encrypt(PII_FIELDS.nameKr, input.nameKr),
+      ssoSubject: input.ssoSubject,
+      ssoUserId: input.ssoSubject,
+      studentOrEmployeeKind: input.studentOrEmployeeKind,
+      studentOrEmployeeNumber: this.piiCipher.encrypt(PII_FIELDS.studentOrEmployeeNumber, input.studentOrEmployeeNumber),
       userEmail: this.piiCipher.encrypt(PII_FIELDS.userEmail, input.userEmail),
-      userMobile: this.piiCipher.encrypt(PII_FIELDS.userMobile, input.userMobile),
     }).returning();
     return this.mapRowToUserRecord(inserted);
   }
-
-  async synchronizeAuthoritativeSsoProfile(input: {
+  async convergeDevelopmentFixture(input: {
     consentedAt?: string;
     kaistUid: string;
     nameEn: string;
@@ -210,7 +245,12 @@ export class UsersRepository {
         updatedAt: new Date(),
       };
       if (bySubject) {
-        const [updated] = await tx.update(users).set(values).where(eq(users.id, bySubject.id)).returning();
+        const [updated] = await tx.update(users).set(values).where(and(
+          eq(users.id, bySubject.id),
+          eq(users.ssoUserId, input.ssoSubject),
+          or(isNull(users.ssoSubject), eq(users.ssoSubject, input.ssoSubject)),
+        )).returning();
+        if (!updated) throw new Error("sso_identity_conflict");
         return this.mapRowToUserRecord(updated);
       }
       const [inserted] = await tx.insert(users).values({
@@ -221,27 +261,6 @@ export class UsersRepository {
     });
   }
 
-  async upsertConsentedUserBySso(input: { consentedAt: string; ssoUserId: string; userEmail?: string; userMobile?: string }): Promise<UserRecord> {
-    const encryptedEmail = this.piiCipher.encrypt(PII_FIELDS.userEmail, input.userEmail ?? null);
-    const encryptedMobile = this.piiCipher.encrypt(PII_FIELDS.userMobile, input.userMobile ?? null);
-    const [upserted] = await this.db.insert(users).values({
-      privacyConsentAt: new Date(input.consentedAt),
-      ssoSubject: input.ssoUserId,
-      ssoUserId: input.ssoUserId,
-      userEmail: encryptedEmail,
-      userMobile: encryptedMobile,
-    }).onConflictDoUpdate({
-      target: users.ssoUserId,
-      set: {
-        ssoSubject: sql`COALESCE(${users.ssoSubject}, excluded.sso_subject)`,
-        userEmail: sql`COALESCE(${users.userEmail}, excluded.user_email)`,
-        userMobile: sql`COALESCE(${users.userMobile}, excluded.user_mobile)`,
-        privacyConsentAt: sql`COALESCE(${users.privacyConsentAt}, excluded.privacy_consent_at)`,
-        updatedAt: sql`NOW()`,
-      },
-    }).returning();
-    return this.mapRowToUserRecord(upserted);
-  }
 
   async updateSelfMobile(userId: string, userMobile: string | null | undefined): Promise<UserRecord | null> {
     const [updated] = await this.db.update(users).set({

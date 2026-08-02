@@ -173,7 +173,15 @@ export class AuthService {
     if (existingUser) {
       let synchronized;
       try {
-        synchronized = await this.usersService.synchronizeAuthoritativeSsoProfile(profile);
+        synchronized = await this.usersService.synchronizeProductionSsoProfile({
+          expectedUserId: existingUser.id,
+          kaistUid: profile.kaistUid,
+          nameEn: profile.nameEn,
+          nameKr: profile.nameKr,
+          ssoSubject: profile.ssoSubject,
+          studentOrEmployeeNumber: profile.studentOrEmployeeNumber,
+          userEmail: profile.userEmail,
+        });
       } catch {
         throw new UnauthorizedException("sso_identity_conflict");
       }

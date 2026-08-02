@@ -53,7 +53,7 @@ function service(session = record()) {
     save: vi.fn(), findBySessionId: vi.fn().mockResolvedValue(session), rotateRefresh: vi.fn().mockResolvedValue('rotated'), revoke: vi.fn(),
   };
   const pending = { reserve: vi.fn(), renew: vi.fn().mockResolvedValue(true), complete: vi.fn(), release: vi.fn() };
-  const users = { synchronizeAuthoritativeSsoProfile: vi.fn() };
+  const users = { insertConsentedSsoProfile: vi.fn() };
   return { instance: new AuthSessionService(configService as never, repository as never, pending as never, users as never), repository, pending, users };
 }
 
@@ -136,7 +136,7 @@ describe('AuthSessionService ES256 sessions', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
     const { instance, pending, users, repository } = service();
     pending.reserve.mockResolvedValueOnce({ pending: { expiresAt: now + 60_000, ssoUserId: 'sso-1', userEmail: 'user@test.invalid' }, reservationToken: 'reservation-1' }).mockResolvedValueOnce(null);
-    users.synchronizeAuthoritativeSsoProfile.mockResolvedValue({ id: 'user-1' });
+    users.insertConsentedSsoProfile.mockResolvedValue({ id: 'user-1' });
     pending.complete.mockResolvedValue(true);
 
     await expect(instance.handleConsentDecision({ consent: true, pendingLoginToken: 'flow-token' })).resolves.toMatchObject({ kind: 'persisted', userId: 'user-1' });
@@ -176,7 +176,7 @@ describe('AuthSessionService ES256 sessions', () => {
       pendingLoginId: 'flow-token',
     }));
     expect(pending.complete).toHaveBeenCalledWith('flow-token', 'reservation-1');
-    expect(users.synchronizeAuthoritativeSsoProfile).not.toHaveBeenCalled();
+    expect(users.insertConsentedSsoProfile).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });
 
@@ -243,7 +243,7 @@ describe('AuthSessionService ES256 sessions', () => {
     releaseRenewal(false);
 
     await expect(decision).rejects.toMatchObject({ message: 'pending_login_ownership_lost' });
-    expect(users.synchronizeAuthoritativeSsoProfile).not.toHaveBeenCalled();
+    expect(users.insertConsentedSsoProfile).not.toHaveBeenCalled();
     expect(repository.save).not.toHaveBeenCalled();
     expect(pending.complete).not.toHaveBeenCalled();
     expect(pending.release).toHaveBeenCalledWith('flow-token', 'consent-owner');
@@ -259,7 +259,7 @@ describe('AuthSessionService ES256 sessions', () => {
       },
       reservationToken: 'reservation-1',
     });
-    users.synchronizeAuthoritativeSsoProfile.mockRejectedValue(new Error('database unavailable'));
+    users.insertConsentedSsoProfile.mockRejectedValue(new Error('database unavailable'));
 
     await expect(instance.handleConsentDecision({
       consent: true,
