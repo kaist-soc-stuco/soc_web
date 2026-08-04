@@ -6,7 +6,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const canonicalMigrationsDir = resolve(scriptDir, "../../apps/api/drizzle");
+const projectRoot = resolve(scriptDir, "../..");
+const canonicalMigrationsDir = resolve(projectRoot, "apps/api/drizzle");
 function migrationRoot() {
   const args = process.argv.slice(2);
   let argumentRoot;
@@ -46,6 +47,10 @@ const pinned = {
   "0018_content_relationships": ["2519d02e7409bcc378666019681b3beb16e745704dc96ff42fb062ff31b6370e", "36ed981e98e6119de897df3e8aa8c19163ae66e047f5b9ea7191cea3024781c3"],
   "0019_like_only_reactions": ["2ad71995205b8725425122dfc4c61453ed552f7963e607819dce7939cba823eb", "525eda7d12bf1e68e098086e9f13a6c83ef28bf2aeaf5b0afd36031ee6f074e1"],
   "0020_admin_user_exact_search": ["9830acdf7729584bb8865d797c120e54a6e686777ec6aa8958e281c798724e3f", "9c1bf837cbda20736a1a4555e31a820dbd538117614ef9e49e7ed6be23502e68"],
+  "0021_survey_definition_version": ["15e35a0c15363c1e2fc06f83b5a9a38e999b286c359a2d853120490b8740c6a0", "7d5d7197ffe5fd10d595c3adab908301d20fd59e8c7eb2b04e59d37bf6c1dc44"],
+  "0022_survey_response_review_queue_index": ["2e6d94ebfe659d30e7722eeac5348fb75e8f1f26b956144e3b1a3fd745b37723", "141e6208b2c84f83da65c22be2c869d24b06ab296b4084bcd0ffcb5a783f2997"],
+  "0023_survey_presentation_blocks": ["95efc3ee396274be0058b0a2a146d5c4367e82b45de3871a1b4b074add0db51d", "ff490292c0205f1bd5e49b05c84f823253e630582b9c5aaa5789e528e84763e6"],
+  "0024_survey_section_items": ["c4129d2dd949ff4cd12eab65872826c853bd8270a6f76890e40e5bad91bbdd7f", "1f7671b69cd10781146eb598c16bdb0c0c93198b4eefccb7c23163272fb439f8"],
 };
 const canonicalJournal = {
   version: "7",
@@ -72,27 +77,148 @@ const canonicalJournal = {
     [18, "0018_content_relationships", 1785592800000, true],
     [19, "0019_like_only_reactions", 1785596400000, true],
     [20, "0020_admin_user_exact_search", 1785685000000, true],
+    [21, "0021_survey_definition_version", 1785688600000, true],
+    [22, "0022_survey_response_review_queue_index", 1785749328339, true],
+    [23, "0023_survey_presentation_blocks", 1785772800000, true],
+    [24, "0024_survey_section_items", 1785859200000, true],
   ],
 };
 function fail(message) { throw new Error(`Migration verification failed: ${message}`); }
 function checksum(content) { return createHash("sha256").update(content).digest("hex"); }
+const requiredMigrationInvocation = [
+  "/bin/bash",
+  "/app/infra/scripts/db-migrate.sh",
+  "--staged",
+  "--maintenance-window",
+  "--rehearsed",
+  "--review-query-explained",
+  "--0024-phase",
+];
+const requiredMigrationApprovals = [
+  "MIGRATION_MAINTENANCE_WINDOW",
+  "MIGRATION_REHEARSAL_COMPLETED",
+  "MIGRATION_RESPONSE_REVIEW_EXPLAIN_VERIFIED",
+  "MIGRATION_0024_CUTOVER_APPROVED",
+];
+const requiredCutoverPhases = ["preflight", "migrate", "reconcile", "smoke", "reopen"];
+
+function composeServiceBlock(compose, service) {
+  const match = compose.match(new RegExp(`^  ${service}:\\n([\\s\\S]*?)(?=^  \\S|$(?![\\s\\S]))`, "m"));
+  if (!match) fail(`production Compose service is missing: ${service}`);
+  return match[1];
+}
+
+function composeList(block, key) {
+  const match = block.match(new RegExp(`^    ${key}:\\n((?:      - .*(?:\\n|$))*)`, "m"));
+  return match ? [...match[1].matchAll(/^      - (.*)$/gm)].map(([, value]) => value) : [];
+}
+
+function composeEnvironment(block) {
+  const match = block.match(/^    environment:\n((?:      [^\n]*\n?)*)/m);
+  if (!match) return new Map();
+  return new Map([...match[1].matchAll(/^      ([A-Z0-9_]+): (.*)$/gm)].map(([, key, value]) => [key, value]));
+}
+
+async function verifyMigrationSafetyContract() {
+  const repositoryRoot = process.env.MIGRATION_VERIFIER_REPOSITORY_ROOT === undefined
+    ? projectRoot
+    : resolve(process.env.MIGRATION_VERIFIER_REPOSITORY_ROOT);
+  const migrationScriptPath = join(repositoryRoot, "infra/scripts/db-migrate.sh");
+  const composePath = join(repositoryRoot, "infra/docker/compose.prod.yml");
+  const runbookPath = join(repositoryRoot, "README.md");
+  if (!existsSync(migrationScriptPath)) fail("migration safety script is missing");
+  if (!existsSync(composePath)) fail("production Compose file is missing");
+  if (!existsSync(runbookPath)) fail("migration safety runbook is missing");
+  const [migrationScript, compose, runbook] = await Promise.all([
+    readFile(migrationScriptPath, "utf8"),
+    readFile(composePath, "utf8"),
+    readFile(runbookPath, "utf8"),
+  ]);
+  for (const required of [
+    "options: '-c lock_timeout=5000 -c statement_timeout=30000'",
+    ...requiredMigrationInvocation.slice(2),
+    ...requiredMigrationApprovals,
+    ...requiredCutoverPhases,
+    "CUTOVER_EVIDENCE_DIR",
+    "require_quiescent_services",
+    "require_no_active_database_clients",
+    "active database readers/writers",
+  ]) if (!migrationScript.includes(required)) fail(`migration safety script is missing required gate: ${required}`);
+  for (const forbidden of [
+    "MIGRATION_0024_QUIESCENCE_DECLARED",
+    "MIGRATION_0024_COMPATIBLE_ARTIFACT_DECLARED",
+    "MIGRATION_0024_BACKUP_RESTORE_VERIFIED",
+    "MIGRATION_0024_RECONCILIATION_VERIFIED",
+    "MIGRATION_0024_SMOKE_VERIFIED",
+    "MIGRATION_0024_REOPEN_APPROVED",
+  ]) if (migrationScript.includes(forbidden)) fail(`migration safety script must not pre-attest future phase work: ${forbidden}`);
+
+  const migrationService = composeServiceBlock(compose, "db-migrate");
+  if (JSON.stringify(composeList(migrationService, "profiles")) !== JSON.stringify(["maintenance"])) {
+    fail("production Compose db-migrate service must be limited to the maintenance profile");
+  }
+  if (JSON.stringify(composeList(migrationService, "command")) !== JSON.stringify(requiredMigrationInvocation)) {
+    fail("production Compose db-migrate command does not satisfy the migration script invocation contract");
+  }
+  const environment = composeEnvironment(migrationService);
+  for (const approval of requiredMigrationApprovals) {
+    if (!environment.get(approval)?.startsWith(`\${${approval}:?Set ${approval}=approved`)) {
+      fail(`production Compose db-migrate service must require ${approval}=approved`);
+    }
+  }
+  if (!environment.get("MIGRATION_0024_PHASE")?.startsWith("${MIGRATION_0024_PHASE:?Set MIGRATION_0024_PHASE")) {
+    fail("production Compose db-migrate service must require an explicit current 0024 phase");
+  }
+  if (environment.get("CUTOVER_EVIDENCE_DIR") !== "/var/lib/0024-cutover" || !migrationService.includes("survey_0024_cutover_evidence:/var/lib/0024-cutover")) {
+    fail("production Compose db-migrate service must persist 0024 phase evidence");
+  }
+  const cleanupService = composeServiceBlock(compose, "survey-image-cleanup");
+  if (JSON.stringify(composeList(cleanupService, "profiles")) !== JSON.stringify(["retention"])) {
+    fail("production Compose survey-image-cleanup service must be limited to the retention profile");
+  }
+  const cleanupEnvironment = composeEnvironment(cleanupService);
+  for (const [key, value] of [
+    ["SURVEY_IMAGE_CLEANUP_ENABLED", "${SURVEY_IMAGE_CLEANUP_ENABLED:-false}"],
+    ["SURVEY_IMAGE_CLEANUP_CADENCE_SECONDS", "${SURVEY_IMAGE_CLEANUP_CADENCE_SECONDS:-900}"],
+    ["SURVEY_IMAGE_CLEANUP_BATCH_SIZE", "${SURVEY_IMAGE_CLEANUP_BATCH_SIZE:-25}"],
+    ["SURVEY_IMAGE_CLEANUP_GRACE_MS", "${SURVEY_IMAGE_CLEANUP_GRACE_MS:-3600000}"],
+  ]) if (cleanupEnvironment.get(key) !== value) fail(`production Compose survey-image-cleanup service must pin ${key}`);
+  for (const required of [
+    "SURVEY_IMAGE_CLEANUP_ALERT_OWNER",
+    "SURVEY_IMAGE_CLEANUP_ALERT_SINK",
+    "survey:images:cleanup",
+    "survey_image_cleanup_backlog_detected",
+    "survey_image_cleanup_failed",
+    "survey_image_cleanup_bounds_must_be_900_25_3600000",
+    'restart: "no"',
+  ]) if (!cleanupService.includes(required)) fail(`production Compose survey-image-cleanup service is missing required ownership or observability contract: ${required}`);
+  const purgeService = composeServiceBlock(compose, "survey-response-purge");
+  if (!purgeService.includes('restart: "no"')) fail("production Compose survey-response-purge service must not restart-loop when retention is disabled");
+
+  for (const required of [
+    "0022_survey_response_review_queue_index",
+    "EXPLAIN (ANALYZE, BUFFERS)",
+    'survey_responses_review_queue_idx',
+    "LIMIT 50 + 1",
+    "MIGRATION_REHEARSAL_COMPLETED=approved",
+    "MIGRATION_RESPONSE_REVIEW_EXPLAIN_VERIFIED=approved",
+    "--review-query-explained",
+    "MIGRATION_0024_PHASE=preflight",
+    "MIGRATION_0024_PHASE=migrate",
+    "MIGRATION_0024_PHASE=reconcile",
+    "MIGRATION_0024_PHASE=smoke",
+    "MIGRATION_0024_PHASE=reopen",
+    "SURVEY_IMAGE_CLEANUP_ENABLED=true",
+    "SURVEY_IMAGE_CLEANUP_ALERT_OWNER",
+    "SURVEY_IMAGE_CLEANUP_ALERT_SINK",
+    "즉시 중단",
+  ]) if (!runbook.includes(required)) fail(`migration safety runbook is missing required instruction: ${required}`);
+}
 if (!existsSync(journalPath)) fail("required immutable journal file is missing");
 let journal;
 try { journal = JSON.parse(await readFile(journalPath, "utf8")); } catch (error) { fail(`journal is not valid JSON: ${error.message}`); }
 if (!Array.isArray(journal.entries) || journal.entries.length === 0) fail("journal must contain at least the immutable baseline entry");
 const canonicalEntries = canonicalJournal.entries;
-const isCanonicalJournal = journal.entries.length === canonicalEntries.length
-  && journal.entries.every((entry, position) => entry.tag === canonicalEntries[position][1]);
-if (isCanonicalJournal) {
-  if (journal.version !== canonicalJournal.version) fail(`immutable journal version mismatch: expected ${canonicalJournal.version}`);
-  if (journal.dialect !== canonicalJournal.dialect) fail(`immutable journal dialect mismatch: expected ${canonicalJournal.dialect}`);
-  journal.entries.forEach((entry, position) => {
-    const [idx, tag, when, breakpoints] = canonicalEntries[position];
-    if (entry.idx !== idx || entry.tag !== tag || entry.when !== when || entry.breakpoints !== breakpoints || entry.version !== canonicalJournal.version) {
-      fail(`immutable journal metadata mismatch: ${tag}`);
-    }
-  });
-}
 const tags = new Set(); const migrationFiles = [];
 for (let position = 0; position < journal.entries.length; position += 1) {
   const entry = journal.entries[position];
@@ -117,6 +243,45 @@ for (let position = 0; position < journal.entries.length; position += 1) {
 if (journal.entries[0]?.idx !== 0 || journal.entries[0]?.tag !== baselineTag) fail(`immutable baseline must remain journal entry 0: ${baselineTag}`);
 const sqlDirectoryEntries = await readdir(migrationsDir, { withFileTypes: true });
 const sqlTags = new Set(sqlDirectoryEntries.filter((entry) => entry.isFile() && entry.name.endsWith(".sql")).map((entry) => entry.name.slice(0, -4)));
+for (const tag of sqlTags) if (!tags.has(tag) && !pinned[tag]) fail(`SQL migration is missing a journal entry: ${tag}`);
+if (journal.entries.length < canonicalEntries.length) {
+  fail(`immutable journal is missing released entries: expected at least ${canonicalEntries.length}, found ${journal.entries.length}`);
+}
 for (const tag of tags) if (!sqlTags.has(tag)) fail(`journal migration is missing its SQL file: ${tag}`);
 for (const tag of sqlTags) if (!tags.has(tag)) fail(`SQL migration is missing a journal entry: ${tag}`);
+canonicalEntries.forEach(([, tag, when, breakpoints], position) => {
+  const entry = journal.entries[position];
+  if (entry?.tag !== tag) fail(`immutable journal released entry mismatch at position ${position}: expected ${tag}`);
+  if (entry.idx !== position || entry.when !== when || entry.breakpoints !== breakpoints || entry.version !== canonicalJournal.version) {
+    fail(`immutable journal metadata mismatch: ${tag}`);
+  }
+});
+if (journal.version !== canonicalJournal.version) fail(`immutable journal version mismatch: expected ${canonicalJournal.version}`);
+if (journal.dialect !== canonicalJournal.dialect) fail(`immutable journal dialect mismatch: expected ${canonicalJournal.dialect}`);
+await verifyMigrationSafetyContract();
+const orderedItemsMigration = await readFile(join(migrationsDir, "0024_survey_section_items.sql"), "utf8");
+for (const required of [
+  'FULL OUTER JOIN "survey_section_items" AS item',
+  'question_section IS DISTINCT FROM NEW."section_id"',
+  'DROP COLUMN "description_kr", DROP COLUMN "description_en"',
+  'DROP TABLE "survey_presentation_blocks"',
+  'CREATE TABLE "survey_image_cleanup_claims"',
+  'survey_image_block_memberships_set_order_unique',
+  'question item section mismatch',
+  'published_survey_definition_immutable',
+  'image membership counter mismatch',
+  'AFTER INSERT OR UPDATE OR DELETE ON "survey_section_description_items"',
+  'AFTER INSERT OR UPDATE OR DELETE ON "survey_image_blocks"',
+  'DESCRIPTION item requires description subtype',
+  'IMAGE_BLOCK item requires image block subtype',
+]) if (!orderedItemsMigration.includes(required)) fail(`0024 ordered-item cutover invariant is missing: ${required}`);
+const orderedSnapshot = JSON.parse(await readFile(join(metadataDir, "0024_snapshot.json"), "utf8"));
+const snapshotSections = orderedSnapshot.tables?.["public.survey_sections"];
+if (!snapshotSections || "description_kr" in snapshotSections.columns || "description_en" in snapshotSections.columns) {
+  fail("0024 snapshot must remove legacy survey section description columns");
+}
+if (orderedSnapshot.tables?.["public.survey_presentation_blocks"]) fail("0024 snapshot must remove legacy presentation blocks");
+for (const table of ["public.survey_section_items", "public.survey_section_description_items", "public.survey_image_blocks", "public.survey_image_block_memberships", "public.survey_image_cleanup_claims"]) {
+  if (!orderedSnapshot.tables?.[table]) fail(`0024 snapshot is missing cutover table: ${table}`);
+}
 console.log(JSON.stringify({ migrationCount: journal.entries.length, checksums: [{ path: "apps/api/drizzle/meta/_journal.json", sha256: checksum(await readFile(journalPath)) }, ...migrationFiles.map(({ path, sha256 }) => ({ path: `apps/api/drizzle/${basename(path)}`, sha256 }))] }));

@@ -114,6 +114,7 @@ test('direct admin routes fail closed when the grants snapshot is unauthenticate
   await page.route('**/api/users/admin*', (route) => route.abort());
 
   await page.goto('/admin/users');
-  await expect(page.getByRole('region', { name: '403' })).toContainText('이 관리 페이지에 접근할 권한이 없습니다.');
-  await expect(page.getByText('관리 메뉴를 불러올 수 없습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '403' })).toContainText('권한을 불러오지 못했습니다.');
+  await expect(page.getByRole('button', { name: '다시 시도' })).toBeVisible();
+  await expect(page.getByText('이 관리 페이지에 접근할 권한이 없습니다.', { exact: true })).toHaveCount(0);
 });

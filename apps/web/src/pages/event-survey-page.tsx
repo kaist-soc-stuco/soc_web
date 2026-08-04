@@ -1,208 +1,130 @@
-import { uiText } from "@/lib/i18n/surface-catalog";
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import type { SurveyResponseAnswerDto, SurveyResponseState } from '@soc/contracts';
+import { useParams } from 'react-router-dom';
+import type { LocalizedContent, SurveyQuestionDto, SurveyResponseAnswerDto, SurveyResponseState } from '@soc/contracts';
 import { SiteLayout } from '@/components/organisms/site-layout';
-import { RelatedContentCards } from '@/components/organisms/related-content-cards';
 import { useLocale } from '@/lib/locale-store';
-import { matchesRestrictedCharacterPattern, SurveyApiError, surveyApi } from '@/lib/survey-api';
-const text = (value: {
-    value: string | null;
-}) => value.value ?? '';
-type SessionState = 'loading' | 'authenticated' | 'guest' | 'error';
-const choiceTypes = (type: string) => type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
-function submissionUnavailableMessage(survey: Awaited<ReturnType<typeof surveyApi.get>>, session: SessionState, existingResponseState: SurveyResponseState | null, now = new Date()): string {
-    if (session === 'loading')
-        return uiText("pages.event-survey-page.c1973f1d4e");
-    if (session === 'error')
-        return uiText("pages.event-survey-page.7701b912de");
-    if (survey.state === 'ARCHIVED')
-        return uiText("pages.event-survey-page.711120c50b");
-    if (existingResponseState !== null) {
-        if (existingResponseState !== 'SUBMITTED' || survey.editDeadlineAt === null || new Date(survey.editDeadlineAt).getTime() <= now.getTime())
-            return uiText("pages.event-survey-page.d062961bf4");
-    }
-    else {
-        if (survey.state === 'CLOSED' || survey.closesAt !== null && new Date(survey.closesAt).getTime() <= now.getTime())
-            return uiText("pages.event-survey-page.0406923853");
-        if (survey.state !== 'OPEN' || survey.opensAt !== null && new Date(survey.opensAt).getTime() > now.getTime())
-            return uiText("pages.event-survey-page.683ee921ab");
-    }
-    if (session === 'guest' && survey.feeRestriction === 'PAID_ONLY')
-        return uiText("pages.event-survey-page.547b2f13c2");
-    return session === 'guest' && !survey.guestAllowed ? uiText("pages.event-survey-page.8d9275eb9d") : '';
+import { surveyApi } from '@/lib/survey-api';
+
+const text = (value: LocalizedContent) => value.value ?? '';
+const choice = (type: string) => type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE';
+type Answer = string | string[];
+
+function responseAnswers(response: Awaited<ReturnType<typeof surveyApi.mine>>['response']): Record<string, Answer> {
+  if (!response) return {};
+  return response.answers.reduce<Record<string, Answer>>((answers, answer) => {
+    if ('textValue' in answer && answer.textValue !== undefined) answers[answer.questionId] = answer.textValue;
+    else if ('numberValue' in answer && answer.numberValue !== undefined) answers[answer.questionId] = String(answer.numberValue);
+    else if ('dateValue' in answer && answer.dateValue !== undefined) answers[answer.questionId] = answer.dateValue;
+    else if ('choiceOptionIds' in answer && answer.choiceOptionIds !== undefined) answers[answer.questionId] = answer.choiceOptionIds;
+    return answers;
+  }, {});
 }
-function errorMessage(error: unknown, guest: boolean): string {
-    if (error instanceof SurveyApiError) {
-        if (guest && error.code === 'duplicate_response')
-            return uiText("pages.event-survey-page.efb9cd7e71");
-        switch (error.code) {
-            case 'survey_cap_reached': return uiText("pages.event-survey-page.53e1087f87");
-            case 'duplicate_response': return uiText("pages.event-survey-page.8d0fc8bdff");
-            case 'paid_only': return uiText("pages.event-survey-page.547b2f13c2");
-            case 'guest_not_allowed': return uiText("pages.event-survey-page.8d9275eb9d");
-            case 'invalid_answers': return uiText("pages.event-survey-page.39c7bfe714");
-            case 'survey_closed': return uiText("pages.event-survey-page.f82cdb5645");
-            case 'unauthorized': return uiText("pages.event-survey-page.5271ee34a5");
-            default: return error.status === 401 || error.status === 403 ? uiText("pages.event-survey-page.11d62e1aaf") : error.status === 422 ? uiText("pages.event-survey-page.8115561e97") : error.message;
-        }
-    }
-    return error instanceof TypeError ? uiText("pages.event-survey-page.883d591e09") : uiText("pages.event-survey-page.69f3e4a855");
-}
+
 export function EventSurveyPage() {
-    const [locale] = useLocale();
-    const { surveyId } = useParams<{
-        surveyId: string;
-    }>();
-    const [survey, setSurvey] = useState<Awaited<ReturnType<typeof surveyApi.get>>>();
-    const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-    const [phone, setPhone] = useState('');
-    const [session, setSession] = useState<SessionState>('loading');
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const submitLock = useRef(false);
-    const routeToken = useRef(0);
-    const [existingResponseState, setExistingResponseState] = useState<SurveyResponseState | null>(null);
-    useEffect(() => {
-        const controller = new AbortController();
-        const token = ++routeToken.current;
-        setSurvey(undefined);
-        setAnswers({});
-        setPhone('');
-        setError('');
-        setSuccess('');
-        setSubmitting(false);
-        setExistingResponseState(null);
-        submitLock.current = false;
-        setSession('loading');
-        if (!surveyId) {
-            setError(uiText("pages.event-survey-page.96d5ce0bb7"));
-            return () => controller.abort();
-        }
-        void surveyApi.get(surveyId, undefined, controller.signal).then((value) => { if (token === routeToken.current)
-            setSurvey(value); }).catch((cause: unknown) => { if (token === routeToken.current && !(cause instanceof DOMException && cause.name === 'AbortError'))
-            setError(uiText("pages.event-survey-page.10ad78f226")); });
-        void surveyApi.session(controller.signal).then(async (value) => {
-            if (token !== routeToken.current)
-                return;
-            if (!value.authenticated) {
-                setSession('guest');
-                return;
-            }
-            const mine = await surveyApi.mine(surveyId, controller.signal);
-            if (token !== routeToken.current)
-                return;
-            if (mine.response) {
-                setExistingResponseState(mine.response.state);
-                const initialAnswers: Record<string, string | string[]> = {};
-                for (const answer of mine.response.answers) {
-                    if ('textValue' in answer && answer.textValue !== undefined)
-                        initialAnswers[answer.questionId] = answer.textValue;
-                    else if ('numberValue' in answer && answer.numberValue !== undefined)
-                        initialAnswers[answer.questionId] = String(answer.numberValue);
-                    else if ('dateValue' in answer && answer.dateValue !== undefined)
-                        initialAnswers[answer.questionId] = answer.dateValue;
-                    else if ('choiceOptionIds' in answer && answer.choiceOptionIds !== undefined)
-                        initialAnswers[answer.questionId] = answer.choiceOptionIds;
-                }
-                setAnswers(initialAnswers);
-            }
-            setSession('authenticated');
-        }).catch((cause: unknown) => { if (token === routeToken.current && !(cause instanceof DOMException && cause.name === 'AbortError'))
-            setSession('error'); });
-        return () => controller.abort();
-    }, [surveyId]);
-    const set = (id: string, value: string | string[]) => setAnswers((old) => ({ ...old, [id]: value }));
-    const guestPhoneRequired = Boolean(survey?.phoneRequired && session === 'guest');
-    const submit = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (!survey || !surveyId || session === 'loading' || session === 'error' || submitLock.current || success)
-            return;
-        const unavailable = submissionUnavailableMessage(survey, session, existingResponseState);
-        if (unavailable) {
-            setError(unavailable);
-            return;
-        }
-        setError('');
-        setSuccess('');
-        if (!event.currentTarget.checkValidity()) {
-            event.currentTarget.reportValidity();
-            return;
-        }
-        const questions = survey.sections.flatMap((section) => section.questions);
-        const missing = questions.find((question) => question.required && (!answers[question.id] || (Array.isArray(answers[question.id]) && !answers[question.id].length)));
-        if (missing || (guestPhoneRequired && !phone.trim())) {
-            setError(missing ? uiText("pages.event-survey-page.9f4e78b803") : uiText("pages.event-survey-page.d7e2e62ff4"));
-            return;
-        }
-        for (const question of questions) {
-            const value = answers[question.id];
-            if ((question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') && typeof value === 'string' && new TextEncoder().encode(value).byteLength > 8192) {
-                setError(uiText("pages.event-survey-page.df4fcc3f88"));
-                return;
-            }
-            if (typeof value === 'string' && question.validationRegex) {
-                const regexMatch = matchesRestrictedCharacterPattern(question.validationRegex, value);
-                if (regexMatch === null) {
-                    setError(uiText("pages.event-survey-page.d9d8a6a0f8"));
-                    return;
-                }
-                if (!regexMatch) {
-                    setError(uiText("pages.event-survey-page.61e860c3bd"));
-                    return;
-                }
-            }
-        }
-        const payload = questions.reduce<SurveyResponseAnswerDto[]>((result, question) => {
-            const value = answers[question.id];
-            if (value === undefined || value === '')
-                return result;
-            if (question.type === 'NUMBER')
-                result.push({ questionId: question.id, numberValue: Number(value) });
-            else if (question.type === 'DATE')
-                result.push({ questionId: question.id, dateValue: value as string });
-            else if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE')
-                result.push({ questionId: question.id, choiceOptionIds: Array.isArray(value) ? value : [value] });
-            else
-                result.push({ questionId: question.id, textValue: value as string });
-            return result;
-        }, []);
-        const token = routeToken.current;
-        submitLock.current = true;
-        setSubmitting(true);
-        try {
-            const result = await surveyApi.submit(surveyId, { answers: payload, ...(guestPhoneRequired ? { guestPhone: phone.trim() } : {}) });
-            if (session === 'guest' ? !('status' in result) || result.status !== 'ACCEPTED' : !('response' in result))
-                throw new Error('Unexpected submission response.');
-            if (token === routeToken.current) {
-                setExistingResponseState(session === 'authenticated' ? 'SUBMITTED' : null);
-                setSuccess(uiText("pages.event-survey-page.c36c2ecaa2"));
-            }
-        }
-        catch (cause) {
-            if (token === routeToken.current) {
-                submitLock.current = false;
-                setError(errorMessage(cause, session === 'guest'));
-            }
-        }
-        finally {
-            if (token === routeToken.current)
-                setSubmitting(false);
-        }
+  const [locale] = useLocale();
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const [survey, setSurvey] = useState<Awaited<ReturnType<typeof surveyApi.get>>>();
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [existingState, setExistingState] = useState<SurveyResponseState | null>(null);
+  const [guest, setGuest] = useState(true);
+  const [lightbox, setLightbox] = useState<string>();
+  const opener = useRef<HTMLElement | null>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const fields = useRef<Record<string, HTMLElement | null>>({});
+
+  useEffect(() => {
+    setSurvey(undefined); setAnswers({}); setPhone(''); setError(''); setInvalid({}); setSubmitted(false); setSubmitting(false); setExistingState(null); setGuest(true);
+  }, [surveyId]);
+  useEffect(() => {
+    if (!surveyId) return;
+    let active = true;
+    void surveyApi.get(surveyId, locale).then((next) => { if (active) setSurvey(next); }).catch(() => active && setError('설문을 불러올 수 없습니다.'));
+    return () => { active = false; };
+  }, [surveyId, locale]);
+  useEffect(() => {
+    if (!surveyId) return;
+    let active = true;
+    void surveyApi.session().then((session) => {
+      if (!active) return;
+      setGuest(!session.authenticated);
+      if (!session.authenticated) return;
+      void surveyApi.mine(surveyId).then((mine) => {
+        if (!active || !mine.response) return;
+        setExistingState(mine.response.state);
+        setAnswers(responseAnswers(mine.response));
+      }).catch(() => undefined);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [surveyId]);
+  useEffect(() => {
+    if (!lightbox) return;
+    closeButton.current?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLightbox(undefined);
+      if (event.key === 'Tab') { event.preventDefault(); closeButton.current?.focus(); }
     };
-    if (error && !survey)
-        return <SiteLayout><p role="alert" className="p-8">{error}</p></SiteLayout>;
-    if (!survey)
-        return <SiteLayout><p role="status" className="p-8">{uiText("pages.event-survey-page.1a117ba3e7")}</p></SiteLayout>;
-    const unavailableMessage = success ? '' : submissionUnavailableMessage(survey, session, existingResponseState);
-    const available = !unavailableMessage && !success;
-    return <SiteLayout><div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8"><div className="mx-auto w-full px-[12vw]"><h1 className="text-[32px] font-extrabold text-white">{uiText("pages.event-survey-page.e91f6f515d")}</h1></div></div>
-    <main className="mx-auto w-full px-[12vw] py-8"><h2 className="text-[28px] font-extrabold">{text(survey.title)}</h2><p className="mt-2">{survey.description ? text(survey.description) : ''}</p>
-      {surveyId && <RelatedContentCards subject={{ surveyId }} locale={locale}/>}
-      {unavailableMessage && <p role={session === 'error' ? 'alert' : 'status'} className="mt-4 rounded bg-yellow-50 p-4">{unavailableMessage}</p>}
-      <form onSubmit={submit}>{survey.sections.map((section) => <fieldset key={section.id} className="mt-6 rounded-[15px] bg-white p-7 shadow"><legend className="text-xl font-bold">{text(section.title)}</legend>{section.questions.map((question) => { const label = text(question.prompt); const value = answers[question.id]; const helpId = `survey-question-help-${question.id}`; const describedBy = question.helpText ? helpId : undefined; const input = question.type === 'LONG_TEXT' ? <textarea aria-label={label} aria-describedby={describedBy} disabled={!available} required={question.required} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 w-full border p-2"/> : question.type === 'SHORT_TEXT' ? <input aria-label={label} aria-describedby={describedBy} disabled={!available} required={question.required} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 w-full border p-2"/> : question.type === 'NUMBER' ? <input aria-label={label} aria-describedby={describedBy} type="number" disabled={!available} required={question.required} min={question.numberMin ?? undefined} max={question.numberMax ?? undefined} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 border p-2"/> : question.type === 'DATE' ? <input aria-label={label} aria-describedby={describedBy} type="date" disabled={!available} required={question.required} min={question.dateMin ?? undefined} max={question.dateMax ?? undefined} value={(value as string) ?? ''} onChange={(e) => set(question.id, e.target.value)} className="mt-2 border p-2"/> : <fieldset aria-describedby={describedBy} className="mt-2 space-y-2"><legend className="font-semibold">{label}{question.required && ' *'}</legend>{question.choices.map((choice) => { const selected = (value as string[] | undefined) ?? []; return <label key={choice.id} className="block"><input disabled={!available} type={question.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name={question.id} required={question.required && question.type === 'SINGLE_CHOICE'} checked={question.type === 'SINGLE_CHOICE' ? value === choice.id : selected.includes(choice.id)} onChange={() => question.type === 'SINGLE_CHOICE' ? set(question.id, choice.id) : set(question.id, selected.includes(choice.id) ? selected.filter((id) => id !== choice.id) : [...selected, choice.id])}/> {text(choice.value)}</label>; })}</fieldset>; return <div key={question.id} className="mt-6">{!choiceTypes(question.type) && <label className="block font-semibold">{label} {question.required && <span className="text-red-600">*</span>}</label>}{question.helpText && <p id={helpId} className="text-sm text-kaist-grey">{text(question.helpText)}</p>}{input}</div>; })}</fieldset>)}
-        {guestPhoneRequired && <label className="mt-6 block">{uiText("pages.event-survey-page.9a1c3aaaca")}<input type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!available} className="ml-3 border p-2"/></label>}
-        {error && <p role="alert" className="mt-4 text-red-600">{error}</p>}{success && <p role="status" className="mt-4 text-green-700">{success}</p>}<div className="mt-8 flex justify-between"><Link to="/events">{uiText("pages.event-survey-page.6bb81d1aad")}</Link>{(available || success) && <button type="submit" disabled={submitting || Boolean(success)} className="rounded bg-kaist-darkgreen-main px-6 py-3 text-white">{success ? uiText("pages.event-survey-page.2349d1875e") : submitting ? uiText("pages.event-survey-page.d6f9987955") : uiText("pages.event-survey-page.54be522c71")}</button>}</div>
-      </form></main></SiteLayout>;
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [lightbox]);
+  useEffect(() => { if (!lightbox) opener.current?.focus(); }, [lightbox]);
+
+  if (!survey) return <SiteLayout><p role="status">{error || '불러오는 중…'}</p></SiteLayout>;
+  const questions = survey.sections.flatMap((section) => section.items.flatMap((item) => item.kind === 'QUESTION' ? [item.question] : []));
+  const now = new Date();
+  const editOpen = existingState === 'SUBMITTED' && survey.editDeadlineAt !== null && new Date(survey.editDeadlineAt) > now;
+  const openForNewResponse = survey.state === 'OPEN' && (!survey.opensAt || new Date(survey.opensAt) <= now) && (!survey.closesAt || new Date(survey.closesAt) > now) && (!guest || survey.guestAllowed);
+  const available = editOpen || existingState === null && openForNewResponse;
+  const set = (id: string, next: Answer) => { setAnswers((old) => ({ ...old, [id]: next })); setInvalid((old) => { const { [id]: _, ...rest } = old; return rest; }); };
+  const validate = () => {
+    const next: Record<string, string> = {};
+    for (const question of questions) {
+      const answer = answers[question.id]; const empty = answer === undefined || answer === '' || Array.isArray(answer) && answer.length === 0;
+      if (question.required && empty) next[question.id] = 'This question is required.';
+      else if (!empty && question.type === 'NUMBER') { const value = Number(answer); if (!Number.isFinite(value) || question.numberMin !== null && value < question.numberMin || question.numberMax !== null && value > question.numberMax) next[question.id] = 'Enter a valid number.'; }
+      else if (!empty && question.type === 'DATE' && (question.dateMin && (answer as string) < question.dateMin || question.dateMax && (answer as string) > question.dateMax)) next[question.id] = 'Enter a valid date.';
+      else if (!empty && question.validationRegex) { try { if (!new RegExp(question.validationRegex).test(Array.isArray(answer) ? answer.join(',') : answer)) next[question.id] = 'Enter a valid response.'; } catch { /* Server-owned invalid patterns must not make the form unusable. */ } }
+    }
+    if (guest && survey.phoneRequired && !phone.trim()) next.phone = 'Phone is required.';
+    setInvalid(next); const first = Object.keys(next)[0]; if (first) { fields.current[first]?.focus(); return false; } return true;
+  };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); if (!surveyId || submitting || submitted || !available || !validate()) return;
+    setSubmitting(true); setError('');
+    const payload = questions.reduce<SurveyResponseAnswerDto[]>((all, question) => {
+      const answer = answers[question.id]; if (answer === undefined || answer === '' || Array.isArray(answer) && !answer.length) return all;
+      if (question.type === 'NUMBER') all.push({ questionId: question.id, numberValue: Number(answer) });
+      else if (question.type === 'DATE') all.push({ questionId: question.id, dateValue: answer as string });
+      else if (choice(question.type)) all.push({ questionId: question.id, choiceOptionIds: Array.isArray(answer) ? answer : [answer] });
+      else all.push({ questionId: question.id, textValue: answer as string }); return all;
+    }, []);
+    try { const result = await surveyApi.submit(surveyId, { answers: payload, ...(guest && survey.phoneRequired ? { guestPhone: phone.trim() } : {}) }); if (guest) setSubmitted(true); else if ('response' in result) setExistingState(result.response.state); }
+    catch { setError('응답을 제출하지 못했습니다.'); } finally { setSubmitting(false); }
+  };
+  const unavailable = !available ? existingState !== null ? 'Response editing is no longer available.' : !guest || survey.guestAllowed ? 'This survey is not currently available.' : 'Sign in to respond to this survey.' : '';
+  return <SiteLayout><main className="mx-auto max-w-3xl p-6"><h1>{text(survey.title)}</h1>{survey.onlyForKoreanSpeaker && locale === 'en' && <p role="status">This survey is available in Korean. Korean content is shown below.</p>}{survey.description && <p>{text(survey.description)}</p>}{submitted ? <p role="status">{locale === 'ko' ? '응답이 제출되었습니다.' : 'Response submitted.'}</p> : unavailable ? <p role="status">{unavailable}</p> : <form onSubmit={submit} noValidate>{survey.sections.map((section) => <section key={section.id} className="mt-6"><h2>{text(section.title)}</h2>{section.items.map((item) => item.kind === 'DESCRIPTION' ? <p key={item.id} className="whitespace-pre-wrap">{text(item.body)}</p> : item.kind === 'IMAGE_BLOCK' ? <ImageCarousel key={item.id} surveyId={survey.id} blockId={item.id} locale={locale} set={item.mode === 'SHARED' ? 'SHARED' : survey.effectiveContentLocale === 'ko' ? 'KO' : 'EN'} onOpen={(src, target) => { opener.current = target; setLightbox(src); }} /> : <Question key={item.id} question={item.question} value={answers[item.question.id]} invalid={invalid[item.question.id]} fieldRef={(node) => { fields.current[item.question.id] = node; }} set={set} />)}</section>)}{guest && survey.phoneRequired && <label>Phone<input ref={(node) => { fields.current.phone = node; }} aria-invalid={Boolean(invalid.phone)} aria-describedby={invalid.phone ? 'phone-error' : undefined} value={phone} onChange={(event) => { setPhone(event.target.value); setInvalid((old) => { const { phone: _, ...rest } = old; return rest; }); }} />{invalid.phone && <span id="phone-error" role="alert">{invalid.phone}</span>}</label>}<button type="submit" disabled={submitting}>{submitting ? 'Submitting…' : 'Submit'}</button>{error && <p role="alert">{error}</p>}</form>}</main>{lightbox && <div role="dialog" aria-modal="true" aria-label="Image preview" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) setLightbox(undefined); }}><div className="h-[90vh] w-[90vw]" data-testid="lightbox-container"><button ref={closeButton} type="button" aria-label="Close image" className="absolute right-4 top-4 text-white" onClick={() => setLightbox(undefined)}>×</button><img src={lightbox} alt="" className="h-full w-full object-contain" /></div></div>}</SiteLayout>;
+}
+
+function Question({ question, value, invalid, fieldRef, set }: { question: SurveyQuestionDto; value: Answer | undefined; invalid?: string; fieldRef: (node: HTMLElement | null) => void; set: (id: string, value: Answer) => void }) {
+  const label = text(question.prompt); const described = invalid ? `${question.id}-error` : undefined;
+  if (choice(question.type)) return <fieldset className="mt-4" aria-invalid={Boolean(invalid)} aria-describedby={described}><legend>{label}</legend>{question.choices.map((option, index) => <label key={option.id}><input ref={index === 0 ? fieldRef : undefined} type={question.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name={question.id} checked={question.type === 'SINGLE_CHOICE' ? value === option.id : Array.isArray(value) && value.includes(option.id)} onChange={() => question.type === 'SINGLE_CHOICE' ? set(question.id, option.id) : set(question.id, Array.isArray(value) && value.includes(option.id) ? value.filter((id) => id !== option.id) : [...(Array.isArray(value) ? value : []), option.id])} />{text(option.value)}</label>)}{invalid && <p id={described} role="alert">{invalid}</p>}</fieldset>;
+  return <label className="mt-4 block">{label}{question.type === 'LONG_TEXT' ? <textarea ref={fieldRef as never} aria-invalid={Boolean(invalid)} aria-describedby={described} value={(value as string) ?? ''} onChange={(event) => set(question.id, event.target.value)} /> : <input ref={fieldRef as never} type={question.type === 'NUMBER' ? 'number' : question.type === 'DATE' ? 'date' : 'text'} min={question.type === 'NUMBER' ? question.numberMin ?? undefined : question.type === 'DATE' ? question.dateMin ?? undefined : undefined} max={question.type === 'NUMBER' ? question.numberMax ?? undefined : question.type === 'DATE' ? question.dateMax ?? undefined : undefined} aria-invalid={Boolean(invalid)} aria-describedby={described} value={(value as string) ?? ''} onChange={(event) => set(question.id, event.target.value)} />} {invalid && <span id={described} role="alert">{invalid}</span>}</label>;
+}
+
+function ImageCarousel({ surveyId, blockId, locale, set, onOpen }: { surveyId: string; blockId: string; locale: 'ko' | 'en'; set: 'SHARED' | 'KO' | 'EN'; onOpen: (src: string, target: HTMLElement) => void }) {
+  const [images, setImages] = useState<Array<{ id: string; src: string }>>([]); const [page, setPage] = useState(0); const [total, setTotal] = useState(0); const [nextCursor, setNextCursor] = useState<string | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const ref = useRef<HTMLDivElement>(null); const token = useRef(0); const loadingCursor = useRef<string | undefined | null>(null); const pendingPage = useRef<number | null>(null);
+  const load = async (cursor?: string) => { if (loadingCursor.current !== null && loadingCursor.current === cursor) return; loadingCursor.current = cursor; const current = ++token.current; setLoading(true); setError(''); try { const result = await surveyApi.publicImageMemberships(surveyId, blockId, { set, locale, limit: 20, ...(cursor ? { cursor } : {}) }); if (current !== token.current) return; setImages((old) => cursor ? [...old, ...result.items.map((item) => ({ id: item.id, src: item.asset.src }))] : result.items.map((item) => ({ id: item.id, src: item.asset.src }))); setTotal(result.membershipCount); setNextCursor(result.nextCursor); } catch { if (current === token.current) setError(locale === 'ko' ? '이미지를 불러오지 못했습니다.' : 'Unable to load images.'); } finally { if (current === token.current) { loadingCursor.current = null; setLoading(false); } } };
+  useEffect(() => { setImages([]); setPage(0); setTotal(0); setNextCursor(null); pendingPage.current = null; void load(); return () => { token.current += 1; loadingCursor.current = null; }; }, [surveyId, blockId, locale, set]);
+  useEffect(() => { const target = pendingPage.current; if (target === null || target >= images.length) return; pendingPage.current = null; ref.current?.children[target]?.scrollIntoView?.({ behavior: 'smooth', inline: 'start', block: 'nearest' }); setPage(target); }, [images]);
+  const visible = () => { const container = ref.current; if (!container) return; const index = Math.round(container.scrollLeft / Math.max(container.clientWidth, 1)); setPage(Math.max(0, Math.min(images.length - 1, index))); if (index >= images.length - 1 && nextCursor) void load(nextCursor); };
+  if (loading && !images.length) return <p role="status">{locale === 'ko' ? '이미지 불러오는 중…' : 'Loading images…'}</p>;
+  if (error && !images.length) return <p role="alert">{error} <button type="button" onClick={() => void load()}>{locale === 'ko' ? '다시 시도' : 'Retry'}</button></p>;
+  if (!images.length) return null;
+  const go = (next: number) => { if (next >= images.length && nextCursor) { pendingPage.current = next; void load(nextCursor); return; } const index = Math.max(0, Math.min(images.length - 1, next)); ref.current?.children[index]?.scrollIntoView?.({ behavior: 'smooth', inline: 'start', block: 'nearest' }); setPage(index); if (index === images.length - 1 && nextCursor) void load(nextCursor); };
+  return <div className="mt-4" onKeyDown={(event) => { if (event.key === 'ArrowLeft') go(page - 1); if (event.key === 'ArrowRight') go(page + 1); }}><div ref={ref} onScroll={visible} className="flex snap-x snap-mandatory overflow-x-auto">{images.map((image, index) => <button key={image.id} type="button" aria-label={locale === 'ko' ? `이미지 ${index + 1} 열기` : `Open image ${index + 1}`} className="w-full shrink-0 snap-center" onClick={(event) => onOpen(image.src, event.currentTarget)}><img src={image.src} alt="" loading="lazy" className="w-full" /></button>)}</div><button type="button" aria-label={locale === 'ko' ? '이전 이미지' : 'Previous image'} disabled={page === 0} onClick={() => go(page - 1)}>←</button><span aria-live="polite">{page + 1} / {total}</span><button type="button" aria-label={locale === 'ko' ? '다음 이미지' : 'Next image'} disabled={page >= total - 1} onClick={() => go(page + 1)}>→</button>{error && <p role="alert">{error} <button type="button" onClick={() => void load(nextCursor ?? undefined)}>{locale === 'ko' ? '다시 시도' : 'Retry'}</button></p>}</div>;
 }

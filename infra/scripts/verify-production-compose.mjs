@@ -4,6 +4,27 @@ const baseUrl = (process.env.COMPOSE_BASE_URL ?? process.env.PRODUCTION_BASE_URL
 const publicOrigin = process.env.COMPOSE_PUBLIC_ORIGIN ?? process.env.PUBLIC_ORIGIN ?? "https://committee.example.test";
 const requestId = process.env.COMPOSE_REQUEST_ID ?? `composition-check-${Date.now()}`;
 const timeoutMs = Number(process.env.COMPOSE_VERIFY_TIMEOUT_MS ?? 5000);
+const surveyResponsePurgeEnabled = process.env.SURVEY_RESPONSE_PURGE_ENABLED === "true";
+const surveyResponsePurgeCadenceSeconds = Number(process.env.SURVEY_RESPONSE_PURGE_CADENCE_SECONDS ?? 900);
+const surveyResponsePurgeAlertOwner = process.env.SURVEY_RESPONSE_PURGE_ALERT_OWNER?.trim();
+const surveyResponsePurgeAlertSink = process.env.SURVEY_RESPONSE_PURGE_ALERT_SINK?.trim();
+if (surveyResponsePurgeEnabled) {
+  if (surveyResponsePurgeCadenceSeconds !== 900) {
+    fail("SURVEY_RESPONSE_PURGE_CADENCE_SECONDS must equal 900 when survey-response retention is enabled");
+  }
+  if (!surveyResponsePurgeAlertOwner || !surveyResponsePurgeAlertSink) {
+    fail("SURVEY_RESPONSE_PURGE_ALERT_OWNER and SURVEY_RESPONSE_PURGE_ALERT_SINK are required when survey-response retention is enabled");
+  }
+  let alertSink;
+  try {
+    alertSink = new URL(surveyResponsePurgeAlertSink);
+  } catch {
+    fail("SURVEY_RESPONSE_PURGE_ALERT_SINK must be an HTTP(S) URL");
+  }
+  if (!["http:", "https:"].includes(alertSink.protocol)) {
+    fail("SURVEY_RESPONSE_PURGE_ALERT_SINK must be an HTTP(S) URL");
+  }
+}
 
 function fail(message) {
   throw new Error(`Production composition verification failed: ${message}`);
@@ -58,4 +79,14 @@ if (responseRequestId !== requestId) {
   fail(`X-Request-ID was not propagated (sent ${requestId}, received ${responseRequestId ?? "none"})`);
 }
 
-console.log(JSON.stringify({ baseUrl, checks: ["health", "security-headers", "auth-session-routing", "unsafe-origin-rejection", "request-id-propagation"] }));
+console.log(JSON.stringify({
+  baseUrl,
+  checks: ["health", "security-headers", "auth-session-routing", "unsafe-origin-rejection", "request-id-propagation", "survey-response-retention-gate"],
+  surveyResponseRetention: surveyResponsePurgeEnabled
+    ? {
+        cadenceSeconds: surveyResponsePurgeCadenceSeconds,
+        alertOwner: surveyResponsePurgeAlertOwner,
+        alertSink: surveyResponsePurgeAlertSink,
+      }
+    : { enabled: false },
+}));

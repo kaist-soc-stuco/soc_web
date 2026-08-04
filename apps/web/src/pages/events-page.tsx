@@ -1,33 +1,34 @@
 import { uiText } from "@/lib/i18n/surface-catalog";
 import { Link, useSearchParams } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EventItem } from '@soc/contracts';
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { RelatedContentCards } from '@/components/organisms/related-content-cards';
 import { getEvents } from '@/lib/event-api';
-import { localizedText } from '@/lib/localized-content';
 import { surveyApi } from '@/lib/survey-api';
 import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useLocale } from '@/lib/locale-store';
-const eventTabs = [uiText("pages.events-page.e91f6f515d"), uiText("pages.events-page.a6e55f8c8f")] as const;
+const localizedText = (content: EventItem['title'], locale: 'ko' | 'en') => content.value ?? (locale === 'ko' ? '번역이 제공되지 않습니다.' : 'Translation unavailable.');
+const eventTabs = [{ id: 'survey', label: () => uiText("pages.events-page.e91f6f515d") }, { id: 'event', label: () => uiText("pages.events-page.a6e55f8c8f") }] as const;
 const EVENT_WINDOW_MS = 92 * 24 * 60 * 60 * 1000;
-type EventTab = (typeof eventTabs)[number];
+type EventTab = (typeof eventTabs)[number]['id'];
 interface EventCard {
     id: string | number;
     title: string;
     summary: string;
+    titleTranslationUnavailable: boolean;
+    summaryTranslationUnavailable: boolean;
     date: string;
     status: 'upcoming' | 'ongoing' | 'completed';
     href: string;
     image?: string;
 }
-function formatEventDate(event: EventItem) {
-    const start = new Date(event.startAtMs);
-    return `${String(start.getFullYear()).slice(-2)}.${String(start.getMonth() + 1).padStart(2, '0')}.${String(start.getDate()).padStart(2, '0')}`;
+function formatEventDate(event: EventItem, locale: 'ko' | 'en') {
+    return new Intl.DateTimeFormat(locale === 'ko' ? 'ko-KR' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(event.startAtMs));
 }
 export function EventsPage() {
     const [locale] = useLocale();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [searchParams] = useSearchParams();
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -35,79 +36,87 @@ export function EventsPage() {
     const [eventLoadState, setEventLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
     const [surveys, setSurveys] = useState<Awaited<ReturnType<typeof surveyApi.list>>['items']>([]);
     const [surveyLoadState, setSurveyLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-    const pageContainerClass = 'mx-auto w-full px-[12vw]';
-    const activeTab: EventTab = searchParams.get('type') === 'event' ? uiText("pages.events-page.a6e55f8c8f") : uiText("pages.events-page.e91f6f515d");
+    const [reloadToken, setReloadToken] = useState(0);
+    const pageContainerClass = 'mx-auto w-full px-4 sm:px-[12vw]';
+    const activeTab: EventTab = searchParams.get('type') === 'event' ? 'event' : 'survey';
+    const retryButtonRef = useRef<HTMLButtonElement>(null);
     useEffect(() => {
-        if (activeTab !== uiText("pages.events-page.a6e55f8c8f")) {
+        if (activeTab !== 'event') {
             setEventLoadState('idle');
             return;
         }
         const now = Date.now();
         const fromMs = now - EVENT_WINDOW_MS / 2;
         const toMs = now + EVENT_WINDOW_MS / 2;
-        let cancelled = false;
+        const controller = new AbortController();
         setEvents([]);
         setEventLoadState('loading');
-        getEvents(fromMs, toMs, locale)
+        getEvents(fromMs, toMs, locale, controller.signal)
             .then((response) => {
-            if (!cancelled) {
+            if (!controller.signal.aborted) {
                 setEvents(response.items);
                 setEventLoadState('ready');
             }
         })
             .catch(() => {
-            if (!cancelled)
+            if (!controller.signal.aborted)
                 setEventLoadState('error');
         });
-        return () => {
-            cancelled = true;
-        };
-    }, [activeTab, locale]);
+        return () => controller.abort();
+    }, [activeTab, locale, reloadToken]);
     useEffect(() => {
-        if (activeTab !== uiText("pages.events-page.e91f6f515d")) {
+        if (activeTab !== 'survey') {
             setSurveyLoadState('idle');
             return;
         }
-        let cancelled = false;
+        const controller = new AbortController();
         setSurveys([]);
         setSurveyLoadState('loading');
-        surveyApi.list(undefined, locale).then((response) => { if (!cancelled) {
-            setSurveys(response.items.filter((survey) => survey.state === 'OPEN' || survey.state === 'SCHEDULED'));
-            setSurveyLoadState('ready');
-        } }).catch(() => { if (!cancelled)
-            setSurveyLoadState('error'); });
-        return () => { cancelled = true; };
-    }, [activeTab, locale]);
-    const cardEvents = useMemo<EventCard[]>(() => activeTab === uiText("pages.events-page.a6e55f8c8f")
+        surveyApi.list(controller.signal, locale).then((response) => {
+            if (!controller.signal.aborted) {
+                setSurveys(response.items.filter((survey) => survey.state === 'OPEN' || survey.state === 'SCHEDULED'));
+                setSurveyLoadState('ready');
+            }
+        }).catch(() => {
+            if (!controller.signal.aborted)
+                setSurveyLoadState('error');
+        });
+        return () => controller.abort();
+    }, [activeTab, locale, reloadToken]);
+    const cardEvents = useMemo<EventCard[]>(() => activeTab === 'event'
         ? events.map((event) => ({
             id: event.id,
-            title: localizedText(event.title),
-            summary: localizedText(event.description),
-            date: formatEventDate(event),
+            title: localizedText(event.title, locale),
+            summary: localizedText(event.description, locale),
+            titleTranslationUnavailable: event.title.translationUnavailable,
+            summaryTranslationUnavailable: event.description.translationUnavailable,
+            date: formatEventDate(event, locale),
             status: event.startAtMs > Date.now() ? 'upcoming' : event.endAtMs > Date.now() ? 'ongoing' : 'completed',
-            href: '/calendar',
+            href: event.surveyId ? `/events/${encodeURIComponent(event.id)}/survey` : `/calendar?eventId=${encodeURIComponent(event.id)}`,
         }))
         : surveys.map((survey) => ({
             id: survey.id,
-            title: localizedText(survey.title),
-            summary: survey.description ? localizedText(survey.description) : '',
-            date: survey.closesAt ? new Date(survey.closesAt).toLocaleDateString('ko-KR') : '',
+            title: localizedText(survey.title, locale),
+            summary: survey.description ? localizedText(survey.description, locale) : '',
+            titleTranslationUnavailable: survey.title.translationUnavailable,
+            summaryTranslationUnavailable: Boolean(survey.description?.translationUnavailable),
+            date: survey.closesAt ? new Intl.DateTimeFormat(locale === 'ko' ? 'ko-KR' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(survey.closesAt)) : '',
             status: survey.state === 'OPEN' ? 'ongoing' : 'upcoming',
             href: `/survey/${encodeURIComponent(survey.id)}`,
-        })), [activeTab, events, surveys]);
+        })), [activeTab, events, surveys, locale]);
     const filteredEvents = cardEvents.filter((event) => event.title.toLowerCase().includes(searchQuery.toLowerCase()));
     const cardsPerPage = 10;
     const totalPages = Math.max(1, Math.ceil(filteredEvents.length / cardsPerPage));
     const currentEvents = filteredEvents.slice((currentPage - 1) * cardsPerPage, currentPage * cardsPerPage);
-    const eventIsLoading = activeTab === uiText("pages.events-page.a6e55f8c8f") && (eventLoadState === 'idle' || eventLoadState === 'loading');
-    const eventHasError = activeTab === uiText("pages.events-page.a6e55f8c8f") && eventLoadState === 'error';
-    const surveyIsLoading = activeTab === uiText("pages.events-page.e91f6f515d") && (surveyLoadState === 'idle' || surveyLoadState === 'loading');
-    const surveyHasError = activeTab === uiText("pages.events-page.e91f6f515d") && surveyLoadState === 'error';
-    const canRenderCards = activeTab === uiText("pages.events-page.a6e55f8c8f") ? eventLoadState === 'ready' : surveyLoadState === 'ready';
-    const handleTabChange = (tab: EventTab) => {
-        setSearchParams({ type: tab === uiText("pages.events-page.a6e55f8c8f") ? 'event' : 'survey' });
-        setCurrentPage(1);
-    };
+    const eventIsLoading = activeTab === 'event' && (eventLoadState === 'idle' || eventLoadState === 'loading');
+    const eventHasError = activeTab === 'event' && eventLoadState === 'error';
+    const surveyIsLoading = activeTab === 'survey' && (surveyLoadState === 'idle' || surveyLoadState === 'loading');
+    const surveyHasError = activeTab === 'survey' && surveyLoadState === 'error';
+    useEffect(() => {
+        if (eventHasError || surveyHasError)
+            requestAnimationFrame(() => retryButtonRef.current?.focus());
+    }, [eventHasError, surveyHasError]);
+    const canRenderCards = activeTab === 'event' ? eventLoadState === 'ready' : surveyLoadState === 'ready';
     const handleSearchChange = (value: string) => {
         setSearchQuery(value);
         setCurrentPage(1);
@@ -134,29 +143,29 @@ export function EventsPage() {
       </div>
 
       <div className="border-b border-kaist-grey/30 bg-[#F7FCFC]">
-          <div className={`${pageContainerClass} flex flex-wrap items-end justify-between gap-8`}>
-          <div className="flex flex-wrap items-stretch gap-5 sm:gap-8 lg:gap-10">
-            {eventTabs.map((tab, index) => (<button key={tab} type="button" className="group relative" onClick={() => handleTabChange(tab)} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}>
-                <span className={`relative flex h-full items-center justify-center text-lg font-extrabold tracking-tight transition-colors ${activeTab === tab ? 'text-kaist-darkgreen' : 'text-kaist-greygreen hover:text-kaist-darkgreen'}`}>
-                  <span className="py-3">{tab}</span>
-                  <span className={`absolute bottom-0 left-0 right-0 h-1.5 origin-center bg-kaist-darkgreen transition-transform duration-200 ${activeTab === tab ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'}`}/>
+          <div className={`${pageContainerClass} flex flex-col gap-3 py-2 sm:flex-row sm:items-end sm:justify-between`}>
+          <div className="flex flex-wrap items-stretch gap-2 sm:gap-8 lg:gap-10">
+            {eventTabs.map((tab, index) => (<Link key={tab.id} to={{ search: `?type=${tab.id}` }} className="group relative min-h-11" onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} aria-current={activeTab === tab.id ? 'page' : undefined}>
+                <span className={`relative flex h-full items-center justify-center text-lg font-extrabold tracking-tight transition-colors ${activeTab === tab.id ? 'text-kaist-darkgreen' : 'text-kaist-greygreen hover:text-kaist-darkgreen'}`}>
+                  <span className="py-3">{tab.label()}</span>
+                  <span className={`absolute bottom-0 left-0 right-0 h-1.5 origin-center bg-kaist-darkgreen transition-transform duration-200 ${activeTab === tab.id ? 'scale-x-150' : hoveredIndex === index ? 'scale-x-150' : 'scale-x-0'}`}/>
                 </span>
-              </button>))}
+              </Link>))}
           </div>
 
-          <div className="mb-2.5 flex items-center gap-2 border-b border-kaist-darkgreen/40">
+          <div className="flex min-h-11 items-center gap-2 border-b border-kaist-darkgreen/40">
             <span className="text-base font-semibold text-[#9AA69F]">{uiText("pages.events-page.078b3a1b0a")}</span>
-            <span className="mb-2 text-base text-kaist-darkgreen">⌄</span>
-            <input type="text" value={searchQuery} onChange={(event) => handleSearchChange(event.target.value)} className="w-20 bg-transparent text-sm focus:outline-none" aria-label={uiText("pages.events-page.b8306f829b")}/>
-            <Search className="h-4 w-4 text-kaist-darkgreen"/>
+            <span className="text-base text-kaist-darkgreen">⌄</span>
+            <input type="text" value={searchQuery} onChange={(event) => handleSearchChange(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm focus:outline-none" aria-label={uiText("pages.events-page.b8306f829b")}/>
+            <Search className="h-4 w-4 shrink-0 text-kaist-darkgreen"/>
           </div>
         </div>
-      </div>
+        </div>
 
       <section className={`${pageContainerClass} bg-[#F7FCFC] pb-16 pt-8`}>
-        <div className="grid grid-cols-[repeat(auto-fit,270px)] justify-center gap-x-6 gap-y-[51px] min-[1900px]:justify-between">
-          {canRenderCards && currentEvents.map((event) => (<div key={event.id} className="w-[270px]">
-              <Link to={event.href} className="group flex h-[359px] w-[270px] min-w-0 flex-col overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md">
+        <div className="grid grid-cols-[minmax(0,270px)] justify-center gap-x-6 gap-y-[51px] min-[1900px]:justify-between sm:grid-cols-[repeat(auto-fit,270px)]">
+          {canRenderCards && currentEvents.map((event) => (<div key={event.id} className="w-full max-w-[270px]">
+              <Link to={event.href} className="group flex h-[359px] w-full min-w-0 flex-col overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.22),1px_2px_4px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-md">
               <div className="relative h-[60.2%] min-h-[168px] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
                 {event.image ? (<div className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${event.image})` }}/>) : null}
                 <span className="absolute left-4 top-4 rounded-full bg-kaist-darkgreen px-3 py-1 text-[10px] font-semibold tracking-tight text-kaist-white lg:text-xs">
@@ -169,6 +178,7 @@ export function EventsPage() {
                 <h2 className="line-clamp-2 text-lg font-extrabold tracking-tight text-kaist-black lg:text-2xl">
                   {event.title}
                 </h2>
+                {(event.titleTranslationUnavailable || event.summaryTranslationUnavailable) && <p className="text-xs text-kaist-grey">{locale === 'ko' ? '일부 번역이 제공되지 않습니다.' : 'Some translations are unavailable.'}</p>}
                 <p className="mt-2 line-clamp-2 text-xs font-semibold leading-normal tracking-tight text-kaist-grey">
                   {event.summary}
                 </p>
@@ -178,11 +188,11 @@ export function EventsPage() {
                 </div>
               </div>
               </Link>
-              <RelatedContentCards subject={activeTab === uiText("pages.events-page.a6e55f8c8f") ? { eventId: String(event.id) } : { surveyId: String(event.id) }} locale={locale}/>
+              <RelatedContentCards subject={activeTab === 'event' ? { eventId: String(event.id) } : { surveyId: String(event.id) }} locale={locale}/>
             </div>))}
         </div>
 
-        {eventIsLoading || surveyIsLoading ? (<div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">{activeTab === uiText("pages.events-page.a6e55f8c8f") ? uiText("surface.events.loadingEvent") : uiText("surface.events.loadingSurvey")}</p></div>) : eventHasError || surveyHasError ? (<div className="py-20 text-center text-kaist-grey"><p role="alert" className="text-base font-semibold">{activeTab === uiText("pages.events-page.a6e55f8c8f") ? uiText("surface.events.errorEvent") : uiText("surface.events.errorSurvey")}</p></div>) : currentEvents.length === 0 ? (<div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">{activeTab === uiText("pages.events-page.a6e55f8c8f") ? uiText("surface.events.emptyEvent") : uiText("surface.events.emptySurvey")}</p></div>) : null}
+        {eventIsLoading || surveyIsLoading ? (<div className="py-20 text-center text-kaist-grey" role="status"><p className="text-base font-semibold">{activeTab === 'event' ? uiText("surface.events.loadingEvent") : uiText("surface.events.loadingSurvey")}</p></div>) : eventHasError || surveyHasError ? (<div className="py-20 text-center text-kaist-grey"><p role="alert" className="text-base font-semibold">{activeTab === 'event' ? uiText("surface.events.errorEvent") : uiText("surface.events.errorSurvey")}</p><button ref={retryButtonRef} type="button" className="mt-4 min-h-11 px-2 underline" onClick={() => setReloadToken((value) => value + 1)}>{locale === 'ko' ? '다시 시도' : 'Retry'}</button></div>) : currentEvents.length === 0 ? (<div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">{activeTab === 'event' ? uiText("surface.events.emptyEvent") : uiText("surface.events.emptySurvey")}</p></div>) : null}
 
         <div className="mt-8 flex items-center justify-center gap-2 text-[12px] font-medium tracking-tight text-kaist-black">
           <button type="button" onClick={() => handlePageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className={`p-1 transition-colors ${currentPage === 1 ? 'cursor-not-allowed text-kaist-grey/30' : 'text-kaist-darkgreen hover:bg-kaist-grey/10'}`} aria-label={uiText("pages.events-page.b5f6e8aed4")}>

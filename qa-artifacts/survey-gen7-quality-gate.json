@@ -1,0 +1,62 @@
+{
+  "architectReview": {
+    "architectureStatus": "CLEAR",
+    "productStatus": "CLEAR",
+    "codeStatus": "CLEAR",
+    "recommendation": "APPROVE",
+    "evidence": "agent://71-SurveyArchitectGen7 approved all 28 survey issues and the bounded, frozen, lifecycle-safe streaming export at sourceHash sha256:9fe5feff86a3ac0570bae4d0957f9d87603ec17820de5102a3c6a433251add0a.",
+    "commands": ["agent://71-SurveyArchitectGen7"],
+    "blockers": []
+  },
+  "executorQa": {
+    "status": "passed",
+    "e2eStatus": "passed",
+    "redTeamStatus": "passed",
+    "evidence": "Generation-7 Chromium QA passed public locale/privacy/validation, 320px header geometry, stale admin review, dirty navigation, and PUBLIC materialization adversarial flows.",
+    "e2eCommands": ["pnpm --filter @soc/web exec playwright test e2e/survey-ui.spec.ts --reporter=line"],
+    "redTeamCommands": ["node qa-artifacts/run-survey-browser-qa-gen7.cjs", "pnpm --filter @soc/web exec vitest run src/test/survey-pages.test.tsx --testNamePattern=blocks dirty Link"],
+    "artifactRefs": [
+      {"id":"survey-gen7-transcript","kind":"browser-automation-transcript","path":"qa-artifacts/survey-gen7-browser-transcript.json","description":"Chromium automation transcript for public and admin survey flows"},
+      {"id":"survey-gen7-screenshot","kind":"gui-screenshot","path":"qa-artifacts/survey-gen7-composite-1280.jpg","description":"Composite of two real high-density Chromium screenshots: localized public survey and 320px PUBLIC materialization confirmation"},
+      {"id":"survey-gen7-report","kind":"test-report","path":"qa-artifacts/survey-gen7-final-red-team-report.json","description":"Hash-bound survey red-team report"}
+    ],
+    "contractCoverage": [
+      {"id":"survey-public-contract","contractRef":"PUB-1..8","obligation":"Localized, private, accessible public survey discovery and response UI","status":"covered","surfaceEvidenceRefs":["public-web"],"adversarialCaseRefs":["required-validation","locale-switch"]},
+      {"id":"survey-admin-contract","contractRef":"ADM-1..10","obligation":"Safe, responsive survey authoring with dirty-navigation protection","status":"covered","surfaceEvidenceRefs":["admin-web"],"adversarialCaseRefs":["dirty-navigation"]},
+      {"id":"survey-ops-contract","contractRef":"OPS-1..10","obligation":"Scoped review, pagination, export, and PUBLIC materialization","status":"covered","surfaceEvidenceRefs":["ops-web"],"adversarialCaseRefs":["stale-review","public-materialization"]}
+    ],
+    "surfaceEvidence": [
+      {"id":"public-web","contractRef":"PUB-1..8","surface":"web","invocation":"Chromium 320x700 localized public survey flow","verdict":"passed","artifactRefs":["survey-gen7-transcript","survey-gen7-screenshot"]},
+      {"id":"admin-web","contractRef":"ADM-1..10","surface":"web","invocation":"Chromium dirty authoring and 320x700 administrator flow","verdict":"passed","artifactRefs":["survey-gen7-transcript","survey-gen7-screenshot"]},
+      {"id":"ops-web","contractRef":"OPS-1..10","surface":"web","invocation":"Chromium stale review and PUBLIC materialization flow","verdict":"passed","artifactRefs":["survey-gen7-transcript","survey-gen7-screenshot"]}
+    ],
+    "adversarialCases": [
+      {"id":"required-validation","contractRef":"PUB-1..8","scenario":"Submit an unanswered required choice question","expectedBehavior":"Question receives accessible invalid state and focus without overflow","verdict":"passed","artifactRefs":["survey-gen7-transcript"]},
+      {"id":"locale-switch","contractRef":"PUB-1..8","scenario":"Switch locale during public detail use","expectedBehavior":"Requested locale refetches without stale content or privacy leakage","verdict":"passed","artifactRefs":["survey-gen7-transcript"]},
+      {"id":"dirty-navigation","contractRef":"ADM-1..10","scenario":"Attempt Link, programmatic, history, and unload navigation with dirty editor","expectedBehavior":"Every path blocks until explicit discard","verdict":"passed","artifactRefs":["survey-gen7-report"]},
+      {"id":"stale-review","contractRef":"OPS-1..10","scenario":"Change response scope while an old response is visible","expectedBehavior":"Old action becomes non-actionable and exact tuple is required","verdict":"passed","artifactRefs":["survey-gen7-transcript"]},
+      {"id":"public-materialization","contractRef":"OPS-1..10","scenario":"Create an event from a survey at a narrow viewport","expectedBehavior":"Confirmation discloses PUBLIC and exact location before request","verdict":"passed","artifactRefs":["survey-gen7-screenshot","survey-gen7-transcript"]}
+    ],
+    "blockers": []
+  },
+  "iteration": {
+    "status": "passed",
+    "evidence": "Generation-7 cohort joined clean after all prior blocker generations were fixed and the full verification suite reran.",
+    "fullRerun": true,
+    "rerunCommands": ["pnpm test:web:unit", "pnpm test:api:unit", "pnpm test:api:http", "pnpm test:api:int", "pnpm test:migrations", "pnpm typecheck", "pnpm build", "pnpm --filter @soc/web exec playwright test e2e/survey-ui.spec.ts"],
+    "reviewCohort": {
+      "reviewGeneration": 7,
+      "sourceHash": "sha256:9fe5feff86a3ac0570bae4d0957f9d87603ec17820de5102a3c6a433251add0a",
+      "joined": true,
+      "deltaOnly": true,
+      "priorGenerationSourceHash": "sha256:255a8b4762a6844219f465409fc3f36c1672478bd1aeefc4bac8f8d3f46d2b21",
+      "deltaPaths": ["apps/api/src/features/surveys/surveys.controller.ts"],
+      "lanes": {
+        "cleaner": {"status":"passed","sourceHash":"sha256:9fe5feff86a3ac0570bae4d0957f9d87603ec17820de5102a3c6a433251add0a","evidence":"agent://72-SurveyCleanerGen7: no blocking findings; lifecycle blocker resolved by Node pipeline.","blockers":[]},
+        "architect": {"status":"CLEAR","sourceHash":"sha256:9fe5feff86a3ac0570bae4d0957f9d87603ec17820de5102a3c6a433251add0a","evidence":"agent://71-SurveyArchitectGen7: architecture, product, and code CLEAR; APPROVE.","blockers":[]},
+        "qa": {"status":"passed","sourceHash":"sha256:9fe5feff86a3ac0570bae4d0957f9d87603ec17820de5102a3c6a433251add0a","evidence":"agent://73-SurveyQaGen7: focused Playwright and browser red-team passed with real artifacts.","blockers":[]}
+      }
+    },
+    "blockers": []
+  }
+}

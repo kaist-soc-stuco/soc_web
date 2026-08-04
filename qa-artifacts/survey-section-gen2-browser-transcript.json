@@ -1,0 +1,50 @@
+{
+  "sourceHash": "sha256:2da1e1f1cea6562a1d254eb7a789d3a56982e9c668da7bfcd668b7240c2beea5",
+  "status": "passed",
+  "commands": [
+    "pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4173 --strictPort",
+    "SURVEY_QA_BASE_URL=http://127.0.0.1:4198 node qa-artifacts/survey-section-gen2-playwright.mjs"
+  ],
+  "assertions": {
+    "orderedInsertEditSaveWithoutLocalIds": true,
+    "dirtyImageModeControl": true,
+    "koreanOnlyMirroring": true,
+    "koreanOnlyFallback": true,
+    "imagePaging": true,
+    "keyboardCarousel": true,
+    "lightboxFocusRestoration": true,
+    "accessibleSlideLabel": true
+  },
+  "requests": [
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/admin/surveys/survey-1?locale=ko",
+    "GET /api/admin/surveys/survey-1?locale=en",
+    "GET /api/auth/session",
+    "GET /api/admin/surveys/survey-1?locale=ko",
+    "GET /api/admin/surveys/survey-1?locale=en",
+    "GET /api/admin/surveys/survey-1/image-blocks/image-block-1/memberships?set=SHARED&limit=20",
+    "GET /api/admin/surveys/survey-1/image-blocks/image-block-1/memberships?set=SHARED&limit=20",
+    "PUT /api/admin/surveys/survey-1/definition",
+    "GET /api/admin/surveys/survey-1?locale=ko",
+    "GET /api/admin/surveys/survey-1?locale=en",
+    "POST /api/admin/surveys/survey-1/image-blocks/image-block-1/mode",
+    "GET /api/admin/surveys/survey-1/image-blocks/image-block-1/memberships?set=SHARED&limit=20",
+    "GET /api/admin/surveys/survey-1?locale=ko",
+    "GET /api/admin/surveys/survey-1?locale=en",
+    "GET /api/admin/surveys/survey-1/image-blocks/image-block-1/memberships?set=KO&limit=20",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/boards?locale=ko",
+    "GET /api/surveys/11111111-1111-4111-8111-111111111111/images/22222222-2222-4222-8222-222222222222",
+    "GET /api/surveys/survey-1?locale=en",
+    "GET /api/surveys/11111111-1111-4111-8111-111111111111/images/22222222-2222-4222-8222-222222222222",
+    "GET /api/surveys/11111111-1111-4111-8111-111111111111/images/33333333-3333-4333-8333-333333333333",
+    "GET /api/surveys/11111111-1111-4111-8111-111111111111/images/22222222-2222-4222-8222-222222222222"
+  ]
+}

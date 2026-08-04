@@ -46,6 +46,9 @@ export const surveyStateEnum = pgEnum("survey_state", ["DRAFT", "SCHEDULED", "OP
 export const surveyResponseStateEnum = pgEnum("survey_response_state", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WAITLISTED"]);
 export const surveyQuestionTypeEnum = pgEnum("survey_question_type", ["SHORT_TEXT", "LONG_TEXT", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "NUMBER", "DATE"]);
 export const surveyFeeRestrictionEnum = pgEnum("survey_fee_restriction", ["ANY", "PAID_ONLY"]);
+export const surveySectionItemKindEnum = pgEnum("survey_section_item_kind", ["QUESTION", "DESCRIPTION", "IMAGE_BLOCK"]);
+export const surveyImageBlockModeEnum = pgEnum("survey_image_block_mode", ["SHARED", "LOCALIZED"]);
+export const surveyImageMembershipSetEnum = pgEnum("survey_image_membership_set", ["SHARED", "KO", "EN"]);
 
 export const users = pgTable(
   "users",
@@ -356,7 +359,7 @@ export const commentStatusEnum = pgEnum("comment_status", ["PUBLISHED", "SECRET"
 export const reactionTypeEnum = pgEnum("reaction_type", ["LIKE"]);
 export const assetTypeEnum = pgEnum("asset_type", ["IMAGE", "ATTACHMENT", "IMAGE_THUMBNAIL"]);
 export const assetStatusEnum = pgEnum("asset_status", ["INITIATED", "COMPLETED", "DELETED"]);
-export const assetObjectDeletionStatusEnum = pgEnum("asset_object_deletion_status", ["PENDING", "DELETED", "FAILED"]);
+export const assetObjectDeletionStatusEnum = pgEnum("asset_object_deletion_status", ["PENDING", "CLAIMED", "DELETED", "FAILED"]);
 export const legalHoldStatusEnum = pgEnum("legal_hold_status", ["ACTIVE", "RELEASED"]);
 export const purgeSubjectTypeEnum = pgEnum("purge_subject_type", ["ARTICLE", "COMMENT", "ASSET"]);
 export const purgeActionEnum = pgEnum("purge_action", ["SCHEDULED", "HELD", "PURGED", "CANCELLED"]);
@@ -560,7 +563,9 @@ export const surveys = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     state: surveyStateEnum("state").notNull().default("DRAFT"),
     currentRevision: integer("current_revision").notNull().default(1),
+    definitionVersion: integer("definition_version").notNull().default(1),
     guestAllowed: boolean("guest_allowed").notNull().default(false),
+    onlyForKoreanSpeaker: boolean("only_for_korean_speaker").notNull().default(false),
     phoneRequired: boolean("phone_required").notNull().default(false),
     feeRestriction: surveyFeeRestrictionEnum("fee_restriction").notNull().default("ANY"),
     cap: integer("cap"),
@@ -575,6 +580,7 @@ export const surveys = pgTable(
   },
   (table) => [
     check("surveys_revision_positive", sql`${table.currentRevision} > 0`),
+    check("surveys_definition_version_positive", sql`${table.definitionVersion} > 0`),
     check("surveys_cap_positive", sql`${table.cap} IS NULL OR ${table.cap} > 0`),
     check("surveys_guest_identity_lifecycle", sql`NOT ${table.phoneRequired} OR ${table.guestAllowed}`),
     check("surveys_window_lifecycle", sql`${table.opensAt} IS NULL OR ${table.closesAt} IS NULL OR ${table.opensAt} < ${table.closesAt}`),
@@ -606,6 +612,38 @@ export const surveyRevisions = pgTable(
     check("survey_revisions_description_en_nonblank", sql`${table.descriptionEn} IS NULL OR btrim(${table.descriptionEn}) <> ''`),
   ],
 );
+export const surveyImageAssets = pgTable(
+  "survey_image_assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ownerUserId: uuid("owner_user_id").notNull().references(() => users.id),
+    status: assetStatusEnum("status").notNull().default("INITIATED"),
+    provider: text("provider").notNull(),
+    objectKey: text("object_key").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    checksumSha256: text("checksum_sha256"),
+    objectDeletionStatus: assetObjectDeletionStatusEnum("object_deletion_status").notNull().default("PENDING"),
+    objectDeletionAttempts: integer("object_deletion_attempts").notNull().default(0),
+    lastObjectDeletionErrorCode: text("last_object_deletion_error_code"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    purgeAfter: timestamp("purge_after", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("survey_image_assets_byte_size_positive", sql`${table.byteSize} > 0`),
+    check("survey_image_assets_dimensions_positive", sql`(${table.width} IS NULL AND ${table.height} IS NULL) OR (${table.width} > 0 AND ${table.height} > 0)`),
+    check("survey_image_assets_completed_lifecycle", sql`(${table.status} = 'INITIATED' AND ${table.completedAt} IS NULL) OR (${table.status} = 'COMPLETED' AND ${table.completedAt} IS NOT NULL) OR ${table.status} = 'DELETED'`),
+    check("survey_image_assets_deleted_lifecycle", sql`(${table.status} = 'DELETED') = (${table.deletedAt} IS NOT NULL)`),
+    check("survey_image_assets_purge_lifecycle", sql`(${table.status} = 'DELETED' AND ${table.purgeAfter} IS NOT NULL AND ${table.purgeAfter} >= ${table.deletedAt}) OR (${table.status} <> 'DELETED' AND ${table.purgeAfter} IS NULL)`),
+    check("survey_image_assets_object_deletion_lifecycle", sql`${table.objectDeletionStatus} <> 'DELETED' OR ${table.status} = 'DELETED'`),
+    check("survey_image_assets_deletion_attempts_nonnegative", sql`${table.objectDeletionAttempts} >= 0`),
+    index("survey_image_assets_orphan_cleanup_idx").on(table.status, table.createdAt),
+  ],
+);
 
 export const surveySections = pgTable(
   "survey_sections",
@@ -615,17 +653,12 @@ export const surveySections = pgTable(
     ordinal: integer("ordinal").notNull(),
     titleKr: text("title_kr").notNull(),
     titleEn: text("title_en").notNull(),
-    descriptionKr: text("description_kr"),
-    descriptionEn: text("description_en"),
   },
   (table) => [
     uniqueIndex("survey_sections_revision_ordinal_unique").on(table.surveyRevisionId, table.ordinal),
     check("survey_sections_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
     check("survey_sections_title_kr_nonblank", sql`btrim(${table.titleKr}) <> ''`),
     check("survey_sections_title_en_nonblank", sql`btrim(${table.titleEn}) <> ''`),
-    check("survey_sections_description_pair", sql`(${table.descriptionKr} IS NULL) = (${table.descriptionEn} IS NULL)`),
-    check("survey_sections_description_kr_nonblank", sql`${table.descriptionKr} IS NULL OR btrim(${table.descriptionKr}) <> ''`),
-    check("survey_sections_description_en_nonblank", sql`${table.descriptionEn} IS NULL OR btrim(${table.descriptionEn}) <> ''`),
   ],
 );
 
@@ -676,6 +709,49 @@ export const surveyChoiceOptions = pgTable(
   ],
 );
 
+export const surveySectionItems = pgTable(
+  "survey_section_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sectionId: uuid("section_id").notNull().references(() => surveySections.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    kind: surveySectionItemKindEnum("kind").notNull(),
+    questionId: uuid("question_id").references(() => surveyQuestions.id),
+  },
+  (table) => [
+    uniqueIndex("survey_section_items_section_ordinal_unique").on(table.sectionId, table.ordinal),
+    uniqueIndex("survey_section_items_question_unique").on(table.questionId),
+    index("survey_section_items_section_order_idx").on(table.sectionId, table.ordinal, table.id),
+    check("survey_section_items_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
+    check("survey_section_items_question_shape", sql`(${table.kind} = 'QUESTION') = (${table.questionId} IS NOT NULL)`),
+  ],
+);
+export const surveySectionDescriptionItems = pgTable(
+  "survey_section_description_items",
+  { itemId: uuid("item_id").primaryKey().references(() => surveySectionItems.id, { onDelete: "cascade" }), bodyKr: text("body_kr").notNull(), bodyEn: text("body_en").notNull() },
+  (table) => [check("survey_section_description_items_kr_nonblank", sql`btrim(${table.bodyKr}) <> ''`), check("survey_section_description_items_en_nonblank", sql`btrim(${table.bodyEn}) <> ''`)],
+);
+export const surveyImageBlocks = pgTable(
+  "survey_image_blocks",
+  { itemId: uuid("item_id").primaryKey().references(() => surveySectionItems.id, { onDelete: "cascade" }), mode: surveyImageBlockModeEnum("mode").notNull().default("SHARED"), sharedMembershipCount: integer("shared_membership_count").notNull().default(0), koMembershipCount: integer("ko_membership_count").notNull().default(0), enMembershipCount: integer("en_membership_count").notNull().default(0) },
+  (table) => [check("survey_image_blocks_counts_nonnegative", sql`${table.sharedMembershipCount} >= 0 AND ${table.koMembershipCount} >= 0 AND ${table.enMembershipCount} >= 0`), check("survey_image_blocks_mode_counts", sql`(${table.mode} = 'SHARED' AND ${table.koMembershipCount} = 0 AND ${table.enMembershipCount} = 0) OR (${table.mode} = 'LOCALIZED' AND ${table.sharedMembershipCount} = 0)`)],
+);
+export const surveyImageBlockMemberships = pgTable(
+  "survey_image_block_memberships",
+  { id: uuid("id").defaultRandom().primaryKey(), blockId: uuid("block_id").notNull().references(() => surveyImageBlocks.itemId, { onDelete: "cascade" }), set: surveyImageMembershipSetEnum("set").notNull(), assetId: uuid("asset_id").notNull().references(() => surveyImageAssets.id), orderKey: integer("order_key").notNull() },
+  (table) => [uniqueIndex("survey_image_block_memberships_set_order_unique").on(table.blockId, table.set, table.orderKey), uniqueIndex("survey_image_block_memberships_set_asset_unique").on(table.blockId, table.set, table.assetId), index("survey_image_block_memberships_page_idx").on(table.blockId, table.set, table.orderKey, table.id), index("survey_image_block_memberships_asset_reachability_idx").on(table.assetId, table.blockId)],
+);
+export const surveyImageMembershipMutations = pgTable(
+  "survey_image_membership_mutations",
+  { id: uuid("id").defaultRandom().primaryKey(), surveyId: uuid("survey_id").notNull().references(() => surveys.id, { onDelete: "cascade" }), actorUserId: uuid("actor_user_id").notNull().references(() => users.id), clientMutationId: uuid("client_mutation_id").notNull(), operation: text("operation").notNull(), requestHash: text("request_hash").notNull(), resultJson: text("result_json").notNull(), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow() },
+  (table) => [uniqueIndex("survey_image_membership_mutations_actor_survey_client_unique").on(table.actorUserId, table.surveyId, table.clientMutationId)],
+);
+export const surveyImageCleanupClaims = pgTable(
+  "survey_image_cleanup_claims",
+  { id: uuid("id").defaultRandom().primaryKey(), assetId: uuid("asset_id").notNull().references(() => surveyImageAssets.id, { onDelete: "cascade" }), claimToken: uuid("claim_token").notNull().unique(), claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(), nextRetryAt: timestamp("next_retry_at", { withTimezone: true }), completedAt: timestamp("completed_at", { withTimezone: true }), lastErrorCode: text("last_error_code"), attempts: integer("attempts").notNull().default(0) },
+  (table) => [uniqueIndex("survey_image_cleanup_claims_open_asset_unique").on(table.assetId).where(sql`${table.completedAt} IS NULL`), index("survey_image_cleanup_claims_retry_idx").on(table.nextRetryAt), check("survey_image_cleanup_claims_attempts_nonnegative", sql`${table.attempts} >= 0`)],
+);
+
 export const surveyResponses = pgTable(
   "survey_responses",
   {
@@ -705,6 +781,12 @@ export const surveyResponses = pgTable(
     check("survey_responses_retention_lifecycle", sql`${table.retentionDeadlineAt} >= ${table.createdAt}`),
     uniqueIndex("survey_responses_campus_user_unique").on(table.surveyId, table.campusUserId).where(sql`${table.campusUserId} IS NOT NULL`),
     index("survey_responses_retention_deadline_idx").on(table.retentionDeadlineAt),
+    index("survey_responses_review_queue_idx").on(
+      table.surveyId,
+      table.state,
+      sql`${table.submittedAt} DESC`,
+      sql`${table.id} DESC`,
+    ),
   ],
 );
 

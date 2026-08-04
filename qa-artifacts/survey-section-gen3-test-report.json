@@ -1,0 +1,39 @@
+{
+  "sourceHash": "sha256:666d99afe74537684c9410be32d1c870f8e54d3828b9cf13fa4d94780f1c670b",
+  "status": "passed",
+  "e2eStatus": "passed",
+  "redTeamStatus": "passed",
+  "commands": [
+    "pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4199 --strictPort",
+    "SURVEY_QA_BASE_URL=http://127.0.0.1:4199 node qa-artifacts/survey-section-gen3-playwright.mjs",
+    "pnpm --filter @soc/web test -- src/test/survey-pages.test.tsx",
+    "pnpm --filter @soc/api test:unit -- test/surveys.unit.spec.ts test/survey-image-cleanup.unit.spec.ts",
+    "node --test infra/scripts/verify-migrations.test.mjs"
+  ],
+  "artifactRefs": [
+    { "path": "qa-artifacts/survey-section-gen3-playwright.mjs", "kind": "browser automation source" },
+    { "path": "qa-artifacts/survey-section-gen3-browser-transcript.json", "kind": "browser automation transcript" },
+    { "path": "qa-artifacts/survey-section-gen3-screenshot.png", "kind": "non-uniform live admin screenshot (1280x1833)" },
+    { "path": "qa-artifacts/survey-section-gen3-test-report.json", "kind": "QA test report" }
+  ],
+  "contractCoverage": [
+    { "planContract": "One ordered section spine supports QUESTION/DESCRIPTION/IMAGE_BLOCK with client-local IDs omitted on save.", "implementationEvidence": "Chromium added DESCRIPTION at an interior boundary and asserted PUT order DESCRIPTION,QUESTION,DESCRIPTION,IMAGE_BLOCK,QUESTION with no local-* IDs.", "status": "passed" },
+    { "planContract": "Korean-only policy derives English authoring fields and public EN renders Korean content with a notice.", "implementationEvidence": "Chromium toggled the policy, verified mirrored readonly English description, selected EN publicly, and observed the Korean-only status notice.", "status": "passed" },
+    { "planContract": "Image blocks support localized sets, stale version handling, lazy pages, and accessible carousel/lightbox behavior.", "implementationEvidence": "Chromium issued LOCALIZED mode mutation; intercepted a 409 stale_definition membership page without breaking the editor; public carousel loaded its second page via ArrowRight and verified empty alt, named dialog, Escape, and focus restoration.", "status": "passed" },
+    { "planContract": "Migration cutover enforces identity, discard, topology, cleanup, immutable baseline, and timeout/runbook gates.", "implementationEvidence": "infra/scripts/verify-migrations.test.mjs passed 25 tests, including the 0024 cutover invariant and immutable released-migration checks.", "status": "passed" },
+    { "planContract": "Definition, cleanup, and survey UI behavior have focused regression coverage.", "implementationEvidence": "API unit run passed 252 tests including 25 survey unit and 10 cleanup unit tests; web run passed 179 tests including 8 survey-page tests.", "status": "passed" }
+  ],
+  "surfaceEvidence": [
+    { "surface": "admin survey editor", "artifactRef": "qa-artifacts/survey-section-gen3-screenshot.png", "evidence": "Mixed list visibly contains questions, a description, localized image block, and another question; screenshot is 1280x1833 and non-uniform.", "status": "passed" },
+    { "surface": "admin definition and image APIs", "artifactRef": "qa-artifacts/survey-section-gen3-browser-transcript.json", "evidence": "Recorded PUT definition, POST mode conversion, membership page requests, and a controlled stale 409.", "status": "passed" },
+    { "surface": "public respondent carousel/lightbox", "artifactRef": "qa-artifacts/survey-section-gen3-browser-transcript.json", "evidence": "Recorded EN Korean-only request, cursor=next page request, keyboard navigation, lightbox open/Escape, and focus restoration assertions.", "status": "passed" }
+  ],
+  "adversarialCases": [
+    { "case": "Interior mixed-item insertion attempts local-ID leakage or wrong cross-kind order.", "result": "passed: serialized stable mixed order and omitted local IDs." },
+    { "case": "A stale_definition membership response arrives while the editor is live.", "result": "passed: controlled 409 was exercised; editor continued to usable mixed-list and mode-change state." },
+    { "case": "Korean-only editor/public EN locale tries to expose independent English content.", "result": "passed: English authoring description was readonly/mirrored and public EN showed the Korean-only notice." },
+    { "case": "Localized image mode plus lazy second carousel page and keyboard/lightbox controls.", "result": "passed: LOCALIZED mode POST, cursor next page, ArrowRight, Enter/Escape, empty alt, named dialog, and opener focus restoration all asserted." },
+    { "case": "Released destructive migration or baseline is tampered/reordered or lacks cutover safety gates.", "result": "passed: migration verifier test rejects those variants and accepted current released journal." }
+  ],
+  "blockers": []
+}

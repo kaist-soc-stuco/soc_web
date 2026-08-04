@@ -206,6 +206,43 @@ describe('content configuration validation', () => {
       CONTENT_PURGE_GRACE_DAYS: 30,
     });
   });
+  it('validates survey definition B/P/H limits as canonical ordered bounded integers', () => {
+    expect(validateEnv(validConfig())).toMatchObject({
+      SURVEY_DEFINITION_MAX_BYTES: 262_144,
+      SURVEY_DEFINITION_PARSER_MAX_BYTES: 266_240,
+      SURVEY_DEFINITION_HARD_MAX_BYTES: 1_048_576,
+    });
+    expect(validateEnv({
+      ...validConfig(),
+      SURVEY_DEFINITION_MAX_BYTES: '1024',
+      SURVEY_DEFINITION_PARSER_MAX_BYTES: '2048',
+      SURVEY_DEFINITION_HARD_MAX_BYTES: '4096',
+    })).toMatchObject({
+      SURVEY_DEFINITION_MAX_BYTES: 1024,
+      SURVEY_DEFINITION_PARSER_MAX_BYTES: 2048,
+      SURVEY_DEFINITION_HARD_MAX_BYTES: 4096,
+    });
+  });
+  it.each([
+    ['SURVEY_DEFINITION_MAX_BYTES', '1.5'],
+    ['SURVEY_DEFINITION_PARSER_MAX_BYTES', '0'],
+    ['SURVEY_DEFINITION_HARD_MAX_BYTES', '-1'],
+    ['SURVEY_DEFINITION_MAX_BYTES', '16777217'],
+    ['SURVEY_DEFINITION_PARSER_MAX_BYTES', '16777217'],
+    ['SURVEY_DEFINITION_HARD_MAX_BYTES', '16777217'],
+  ])('rejects a noninteger, nonpositive, or hard-ceiling-exceeding survey definition limit: %s=%s', (name, value) => {
+    expect(() => validateEnv({ ...validConfig(), [name]: value })).toThrow(
+      `Invalid positive integer value for ${name}`,
+    );
+  });
+  it.each([
+    { SURVEY_DEFINITION_MAX_BYTES: '2048', SURVEY_DEFINITION_PARSER_MAX_BYTES: '1024', SURVEY_DEFINITION_HARD_MAX_BYTES: '4096' },
+    { SURVEY_DEFINITION_MAX_BYTES: '1024', SURVEY_DEFINITION_PARSER_MAX_BYTES: '4096', SURVEY_DEFINITION_HARD_MAX_BYTES: '2048' },
+  ])('rejects reversed survey definition B/P/H limits', (limits) => {
+    expect(() => validateEnv({ ...validConfig(), ...limits })).toThrow(
+      'Invalid survey definition byte limits: expected MAX_BYTES <= PARSER_MAX_BYTES <= HARD_MAX_BYTES',
+    );
+  });
   it('accepts an enabled asset provider', () => {
     expect(validateEnv({ ...validConfig(), ASSET_PROVIDER_ENABLED: 'true', ASSET_PROVIDER_URL: 'https://assets.example.test', ASSET_PROVIDER_TOKEN: 'secret' })).toMatchObject({
       ASSET_PROVIDER_ENABLED: true,

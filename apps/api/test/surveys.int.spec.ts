@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -138,6 +138,28 @@ describe('survey and matcher PostgreSQL protocol', () => {
   }
 
 
+  it('decodes and serializes the review queue aggregate timestamp', async () => {
+    const d = await definition();
+    await response(d, users[1]!, 'review-queue');
+
+    const rows = await repository.reviewQueue();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      surveyId: d.surveyId,
+      responseCount: 1,
+    });
+    expect(rows[0]!.latestResponseAt).toBeInstanceOf(Date);
+
+    await expect(service.reviewQueue(actorId, 'ko')).resolves.toEqual({
+      items: [{
+        surveyId: d.surveyId,
+        title: { value: '설문', translationUnavailable: false },
+        state: 'OPEN',
+        responseCount: 1,
+        latestResponseAt: rows[0]!.latestResponseAt!.toISOString(),
+      }],
+    });
+  });
   it('durably locks published revisions while allowing new unlocked revision scaffolding', async () => {
     const d = await definition({ state: 'DRAFT', types: ['SINGLE_CHOICE'] });
     const publishedAt = new Date('2026-07-27T12:00:00.000Z');
@@ -166,6 +188,433 @@ describe('survey and matcher PostgreSQL protocol', () => {
     await expect(pool.query('UPDATE survey_questions SET section_id = $2 WHERE id = $1', [unlockedQuestion.rows[0]!.id, lockedSection.rows[0]!.id])).rejects.toMatchObject({ code: '23514' });
     await expect(pool.query('UPDATE survey_choice_options SET question_id = $2 WHERE id = $1', [unlockedChoice.rows[0]!.id, d.questions.SINGLE_CHOICE])).rejects.toMatchObject({ code: '23514' });
     await expect(pool.query('DELETE FROM survey_choice_options WHERE id = $1', [d.choices.SINGLE_CHOICE![0]!])).rejects.toMatchObject({ code: '23514' });
+  });
+  it('fully replaces draft definitions atomically with CAS, ordered bilingual content, and one audit row', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    const replacement = [{
+      ordinal: 0,
+      title: { kr: '새 섹션', en: 'New section' },
+      items: [
+        { ordinal: 0, kind: 'DESCRIPTION', body: { kr: '한국어 설명', en: 'English description' } },
+        { ordinal: 1, kind: 'QUESTION', question: { ordinal: 0, type: 'SHORT_TEXT', prompt: { kr: '새 질문', en: 'New question' }, helpText: null, required: true, validationRegex: null } },
+      ],
+    }];
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, replacement as never, 'definition-success')).resolves.toBe('UPDATED');
+    expect((await pool.query('SELECT definition_version FROM surveys WHERE id = $1', [d.surveyId])).rows).toEqual([{ definition_version: 2 }]);
+    expect((await pool.query('SELECT title_kr, title_en FROM survey_sections WHERE survey_revision_id = $1', [d.revisionId])).rows)
+      .toEqual([{ title_kr: '새 섹션', title_en: 'New section' }]);
+    expect((await pool.query('SELECT body_kr, body_en FROM survey_section_description_items WHERE item_id IN (SELECT id FROM survey_section_items WHERE section_id IN (SELECT id FROM survey_sections WHERE survey_revision_id = $1))', [d.revisionId])).rows)
+      .toEqual([{ body_kr: '한국어 설명', body_en: 'English description' }]);
+    expect((await pool.query("SELECT count(*) FROM survey_audit_log WHERE survey_id = $1 AND action = 'SURVEY_DEFINITION_REPLACED' AND correlation_id = 'definition-success'", [d.surveyId])).rows[0]!.count).toBe('1');
+
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [], 'definition-stale')).resolves.toBe('STALE');
+    expect((await pool.query('SELECT definition_version FROM surveys WHERE id = $1', [d.surveyId])).rows[0]!.definition_version).toBe(2);
+    expect((await pool.query('SELECT count(*) FROM survey_sections WHERE survey_revision_id = $1', [d.revisionId])).rows[0]!.count).toBe('1');
+    expect((await pool.query("SELECT count(*) FROM survey_audit_log WHERE survey_id = $1 AND action = 'SURVEY_DEFINITION_REPLACED'", [d.surveyId])).rows[0]!.count).toBe('1');
+
+  });
+  it('preserves question and answer identity while round-tripping mixed ordered section items', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    const section = (await pool.query<{ id: string }>('SELECT id FROM survey_sections WHERE survey_revision_id = $1', [d.revisionId])).rows[0]!;
+    const questionItem = (await pool.query<{ id: string }>("INSERT INTO survey_section_items (section_id, ordinal, kind, question_id) VALUES ($1, 0, 'QUESTION', $2) RETURNING id", [section.id, d.questions.SHORT_TEXT])).rows[0]!;
+    const responseId = await response(d, actorId, 'ordered-identity');
+    await pool.query('INSERT INTO survey_response_answers (response_id, question_id, text_value) VALUES ($1, $2, $3)', [responseId, d.questions.SHORT_TEXT, 'retained answer']);
+
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      id: section.id, ordinal: 0, title: { kr: '순서', en: 'Order' }, items: [
+        { ordinal: 0, kind: 'DESCRIPTION', body: { kr: '설명', en: 'Description' } },
+        { id: questionItem.id, ordinal: 1, kind: 'QUESTION', question: { id: d.questions.SHORT_TEXT, ordinal: 0, type: 'SHORT_TEXT', prompt: { kr: '바뀐 질문', en: 'Updated question' }, helpText: null, required: false, validationRegex: '^[A-Za-z ]+$', numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] } },
+        { ordinal: 2, kind: 'IMAGE_BLOCK', mode: 'SHARED' },
+      ],
+    }] as never, 'ordered-identity')).resolves.toBe('UPDATED');
+
+    expect((await pool.query('SELECT question_id FROM survey_response_answers WHERE response_id = $1', [responseId])).rows).toEqual([{ question_id: d.questions.SHORT_TEXT }]);
+    expect((await pool.query('SELECT id, prompt_en FROM survey_questions WHERE id = $1', [d.questions.SHORT_TEXT])).rows).toEqual([{ id: d.questions.SHORT_TEXT, prompt_en: 'Updated question' }]);
+    const detail = await repository.detail(d.surveyId);
+    expect(detail!.items.map((item) => [item.kind, item.ordinal])).toEqual([['DESCRIPTION', 0], ['QUESTION', 1], ['IMAGE_BLOCK', 2]]);
+    expect(detail!.descriptionItems).toHaveLength(1);
+    expect(detail!.imageBlocks).toHaveLength(1);
+  });
+
+  it('reconciles retained choice IDs while preserving response-linked choices', async () => {
+    const d = await definition({ state: 'DRAFT', types: ['SINGLE_CHOICE'] });
+    const section = (await pool.query<{ id: string }>('SELECT id FROM survey_sections WHERE survey_revision_id = $1', [d.revisionId])).rows[0]!;
+    const item = (await pool.query<{ id: string }>("INSERT INTO survey_section_items (section_id, ordinal, kind, question_id) VALUES ($1, 0, 'QUESTION', $2) RETURNING id", [section.id, d.questions.SINGLE_CHOICE])).rows[0]!;
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      id: section.id, ordinal: 0, title: { kr: '선택', en: 'Choice' }, items: [{
+        id: item.id, ordinal: 0, kind: 'QUESTION', question: {
+          id: d.questions.SINGLE_CHOICE, ordinal: 0, type: 'SINGLE_CHOICE', prompt: { kr: '질문', en: 'Question' }, helpText: null, required: false,
+          choices: [
+            { id: d.choices.SINGLE_CHOICE![1], ordinal: 0, value: { kr: '둘', en: 'two updated' } },
+            { id: d.choices.SINGLE_CHOICE![0], ordinal: 1, value: { kr: '하나', en: 'one updated' } },
+            { ordinal: 2, value: { kr: '셋', en: 'three' } },
+          ],
+        },
+      }],
+    }], 'choice-reconcile')).resolves.toBe('UPDATED');
+    expect((await pool.query('SELECT id, ordinal, value_en FROM survey_choice_options WHERE question_id = $1 ORDER BY ordinal', [d.questions.SINGLE_CHOICE])).rows).toMatchObject([
+      { id: d.choices.SINGLE_CHOICE![1], ordinal: 0, value_en: 'two updated' },
+      { id: d.choices.SINGLE_CHOICE![0], ordinal: 1, value_en: 'one updated' },
+      { ordinal: 2, value_en: 'three' },
+    ]);
+    const responseId = await response(d, actorId, 'choice-linked');
+    await pool.query('INSERT INTO survey_response_answers (response_id, question_id, choice_option_ids) VALUES ($1, $2, $3)', [responseId, d.questions.SINGLE_CHOICE, JSON.stringify([d.choices.SINGLE_CHOICE![0]])]);
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 2, [{
+      id: section.id, ordinal: 0, title: { kr: '선택', en: 'Choice' }, items: [{
+        id: item.id, ordinal: 0, kind: 'QUESTION', question: {
+          id: d.questions.SINGLE_CHOICE, ordinal: 0, type: 'SINGLE_CHOICE', prompt: { kr: '질문', en: 'Question' }, helpText: null, required: false,
+          choices: [{ id: d.choices.SINGLE_CHOICE![1], ordinal: 0, value: { kr: '둘', en: 'two' } }],
+        },
+      }],
+    }], 'choice-delete-linked')).resolves.toBe('CHOICE_DELETE_FORBIDDEN');
+  });
+
+  it('enforces deferred ordered-item ownership, subtype, and continuity constraints', async () => {
+    const left = await definition({ state: 'DRAFT' });
+    const right = await definition({ state: 'DRAFT' });
+    const leftSection = (await pool.query<{ id: string }>('SELECT id FROM survey_sections WHERE survey_revision_id = $1', [left.revisionId])).rows[0]!;
+    await expect(pool.query('BEGIN; INSERT INTO survey_section_items (section_id, ordinal, kind, question_id) VALUES ($1, 0, $2, $3); COMMIT', [leftSection.id, 'QUESTION', right.questions.SHORT_TEXT])).rejects.toBeDefined();
+    await expect(pool.query("INSERT INTO survey_section_items (section_id, ordinal, kind) VALUES ($1, 1, 'DESCRIPTION')", [leftSection.id])).rejects.toBeDefined();
+  });
+  it('rejects a QUESTION item that references a question from another section in the same revision', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await pool.query("INSERT INTO survey_sections (survey_revision_id, ordinal, title_kr, title_en) VALUES ($1, 1, '둘', 'Second')", [d.revisionId]);
+    const sections = (await pool.query<{ id: string }>('SELECT id FROM survey_sections WHERE survey_revision_id = $1 ORDER BY ordinal', [d.revisionId])).rows;
+    await expect(pool.query("BEGIN; INSERT INTO survey_section_items (section_id, ordinal, kind, question_id) VALUES ($1, 0, 'QUESTION', $2); SET CONSTRAINTS ALL IMMEDIATE; COMMIT", [sections[1]!.id, d.questions.SHORT_TEXT])).rejects.toBeDefined();
+  });
+  it('rejects ordered item and subtype mutations after publication', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      ordinal: 0, title: { kr: '고정', en: 'Frozen' }, items: [
+        { ordinal: 0, kind: 'DESCRIPTION', body: { kr: '설명', en: 'Description' } },
+        { ordinal: 1, kind: 'QUESTION', question: { id: d.questions.SHORT_TEXT, ordinal: 0, type: 'SHORT_TEXT', prompt: { kr: '질문', en: 'Question' }, helpText: null, required: false, validationRegex: null } },
+      ],
+    }] as never, 'published-ordered-immutability')).resolves.toBe('UPDATED');
+    await expect(repository.publish(d.surveyId, actorId, new Date('2026-01-01T00:00:00.000Z'), 'published-ordered-immutability')).resolves.toMatchObject({ id: d.surveyId });
+    const item = (await pool.query<{ id: string }>("SELECT id FROM survey_section_items WHERE kind = 'DESCRIPTION' AND section_id = (SELECT id FROM survey_sections WHERE survey_revision_id = $1)", [d.revisionId])).rows[0]!;
+    await expect(pool.query('UPDATE survey_section_items SET ordinal = 3 WHERE id = $1', [item.id])).rejects.toMatchObject({ message: 'published_survey_definition_immutable' });
+    await expect(pool.query('UPDATE survey_section_description_items SET body_kr = $2 WHERE item_id = $1', [item.id, '변경'])).rejects.toMatchObject({ message: 'published_survey_definition_immutable' });
+  });
+
+  it('refuses to publish malformed ordered-image topology', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      ordinal: 0, title: { kr: '이미지', en: 'Images' }, items: [
+        { ordinal: 0, kind: 'QUESTION', question: { id: d.questions.SHORT_TEXT, ordinal: 0, type: 'SHORT_TEXT', prompt: { kr: '질문', en: 'Question' }, helpText: null, required: false, validationRegex: null } },
+        { ordinal: 1, kind: 'IMAGE_BLOCK', mode: 'SHARED' },
+      ],
+    }] as never, 'malformed-publish-topology')).resolves.toBe('UPDATED');
+    const block = (await pool.query<{ id: string }>("SELECT id FROM survey_section_items WHERE kind = 'IMAGE_BLOCK' AND section_id = (SELECT id FROM survey_sections WHERE survey_revision_id = $1)", [d.revisionId])).rows[0]!;
+    const client = await pool.connect();
+    try {
+      await client.query('SET session_replication_role = replica');
+      await client.query('UPDATE survey_image_blocks SET shared_membership_count = 1 WHERE item_id = $1', [block.id]);
+    } finally {
+      await client.query('SET session_replication_role = origin');
+      client.release();
+    }
+    await expect(repository.publish(d.surveyId, actorId, new Date('2026-01-01T00:00:00.000Z'), 'malformed-publish-topology')).resolves.toBe('INCOMPLETE_ASSET');
+  });
+  it('enforces image membership mutation, conversion, locale, cursor, and visibility protocols', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      ordinal: 0, title: { kr: '이미지', en: 'Images' }, items: [{ ordinal: 0, kind: 'IMAGE_BLOCK', mode: 'SHARED' }],
+    }] as never, 'image-block')).resolves.toBe('UPDATED');
+    const blockId = (await pool.query<{ id: string }>("SELECT id FROM survey_section_items WHERE section_id = (SELECT id FROM survey_sections WHERE survey_revision_id = $1)", [d.revisionId])).rows[0]!.id;
+    const assets = await Promise.all(['a', 'b'].map(async (suffix) => (await pool.query<{ id: string }>(
+      `INSERT INTO survey_image_assets (owner_user_id, status, provider, object_key, content_type, byte_size, width, height, completed_at)
+       VALUES ($1, 'COMPLETED', 'test', $2, 'image/png', 1, 1, 1, now()) RETURNING id`,
+      [actorId, `ordered-membership-${d.surveyId}-${suffix}`],
+    )).rows[0]!.id));
+    const add = { expectedDefinitionVersion: 2, clientMutationId: '00000000-0000-4000-8000-000000000001', set: 'SHARED', assetId: assets[0], afterMembershipId: null };
+    const [first, replay] = await Promise.all([
+      service.addImageMembership(actorId, d.surveyId, blockId, add, 'membership-add'),
+      service.addImageMembership(actorId, d.surveyId, blockId, add, 'membership-add-replay'),
+    ]);
+    if (!first.membership) throw new Error('expected first membership');
+    expect(replay).toEqual(first);
+    await expect(service.addImageMembership(actorId, d.surveyId, blockId, {
+      ...add,
+      assetId: assets[1],
+    }, 'membership-add-mismatch')).rejects.toThrow('idempotency_mismatch');
+    const second = await service.addImageMembership(actorId, d.surveyId, blockId, { ...add, expectedDefinitionVersion: first.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000002', assetId: assets[1], afterMembershipId: first.membership.id }, 'membership-add-second');
+    if (!second.membership) throw new Error('expected second membership');
+    await expect(service.moveImageMembership(actorId, d.surveyId, blockId, second.membership.id, { expectedDefinitionVersion: first.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000003', afterMembershipId: null }, 'membership-stale')).rejects.toThrow('stale_definition');
+    const moved = await service.moveImageMembership(actorId, d.surveyId, blockId, second.membership.id, { expectedDefinitionVersion: second.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000004', afterMembershipId: null }, 'membership-move');
+    await expect(service.moveImageMembership(actorId, d.surveyId, blockId, second.membership.id, { expectedDefinitionVersion: second.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000004', afterMembershipId: null }, 'membership-move-replay')).resolves.toEqual(moved);
+    const removed = await service.removeImageMembership(actorId, d.surveyId, blockId, first.membership.id, { expectedDefinitionVersion: moved.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000005' }, 'membership-remove');
+    await expect(service.removeImageMembership(actorId, d.surveyId, blockId, first.membership.id, { expectedDefinitionVersion: moved.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000005' }, 'membership-remove-replay')).resolves.toEqual(removed);
+    expect(removed.membershipCount).toBe(1);
+
+    const localized = await service.changeImageBlockMode(actorId, d.surveyId, blockId, { expectedDefinitionVersion: removed.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000006', mode: 'LOCALIZED' }, 'localized');
+    expect(localized.membershipCounts).toEqual({ shared: 0, ko: 1, en: 1 });
+    await expect(service.changeImageBlockMode(actorId, d.surveyId, blockId, {
+      expectedDefinitionVersion: removed.definitionVersion,
+      clientMutationId: '00000000-0000-4000-8000-000000000006',
+      mode: 'LOCALIZED',
+    }, 'localized-replay')).resolves.toEqual(localized);
+    await expect(service.changeImageBlockMode(actorId, d.surveyId, blockId, {
+      expectedDefinitionVersion: removed.definitionVersion,
+      clientMutationId: '00000000-0000-4000-8000-000000000006',
+      mode: 'SHARED',
+      retainSet: 'KO',
+    }, 'localized-mismatch')).rejects.toThrow('idempotency_mismatch');
+    const shared = await service.changeImageBlockMode(actorId, d.surveyId, blockId, { expectedDefinitionVersion: localized.definitionVersion, clientMutationId: '00000000-0000-4000-8000-000000000007', mode: 'SHARED', retainSet: 'KO' }, 'shared');
+    expect(shared.membershipCounts).toEqual({ shared: 1, ko: 0, en: 0 });
+
+    await expect(service.imageMembershipPage(undefined, d.surveyId, blockId, { set: 'SHARED' }, 'en')).rejects.toThrow('survey_not_found');
+    expect((await service.imageMembershipPage(actorId, d.surveyId, blockId, { set: 'SHARED' }, 'en')).items).toHaveLength(1);
+    await pool.query('UPDATE surveys SET only_for_korean_speaker = true WHERE id = $1', [d.surveyId]);
+    const page = await service.imageMembershipPage(actorId, d.surveyId, blockId, { set: 'SHARED', limit: 1 }, 'en');
+    expect(page.effectiveContentLocale).toBe('ko');
+    await expect(service.imageMembershipPage(actorId, d.surveyId, blockId, { set: 'SHARED', cursor: Buffer.from(JSON.stringify({ surveyId: d.surveyId, blockId, set: 'SHARED', definitionVersion: 1, orderKey: 0, id: second.membership.id })).toString('base64url') }, 'ko')).rejects.toThrow('stale_definition');
+  });
+  it('rejects invalid membership neighbors without mutation and rebalances dense successor sets', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      ordinal: 0, title: { kr: '이미지', en: 'Images' }, items: [{ ordinal: 0, kind: 'IMAGE_BLOCK', mode: 'SHARED' }],
+    }] as never, 'dense-image-block')).resolves.toBe('UPDATED');
+    const blockId = (await pool.query<{ id: string }>('SELECT id FROM survey_section_items WHERE section_id = (SELECT id FROM survey_sections WHERE survey_revision_id = $1)', [d.revisionId])).rows[0]!.id;
+    const assets = (await pool.query<{ id: string }>(
+      `INSERT INTO survey_image_assets (owner_user_id, status, provider, object_key, content_type, byte_size, width, height, completed_at)
+       SELECT $1, 'COMPLETED', 'test', $2 || value, 'image/png', 1, 1, 1, now() FROM generate_series(0, 33) AS value RETURNING id`,
+      [actorId, `dense-membership-${d.surveyId}-`],
+    )).rows.map((row) => row.id);
+    const membershipClient = await pool.connect();
+    try {
+      await membershipClient.query('BEGIN');
+      await membershipClient.query(
+        `INSERT INTO survey_image_block_memberships (block_id, set, asset_id, order_key)
+         SELECT $1, 'SHARED', asset_id, order_key FROM unnest($2::uuid[], $3::integer[]) AS membership(asset_id, order_key)`,
+        [blockId, assets.slice(0, 33), Array.from({ length: 33 }, (_, index) => index)],
+      );
+      await membershipClient.query('UPDATE survey_image_blocks SET shared_membership_count = 33 WHERE item_id = $1', [blockId]);
+      await membershipClient.query('COMMIT');
+    } finally {
+      await membershipClient.query('ROLLBACK').catch(() => undefined);
+      membershipClient.release();
+    }
+    const before = await pool.query<{ definition_version: number; count: string }>('SELECT definition_version, (SELECT count(*) FROM survey_image_block_memberships WHERE block_id = $1) AS count FROM surveys WHERE id = $2', [blockId, d.surveyId]);
+    await expect(service.addImageMembership(actorId, d.surveyId, blockId, {
+      expectedDefinitionVersion: 2,
+      clientMutationId: '10000000-0000-4000-8000-000000000001',
+      set: 'SHARED',
+      assetId: assets[33],
+      afterMembershipId: '99999999-9999-4999-8999-999999999999',
+    }, 'invalid-neighbor')).rejects.toThrow('invalid_image_membership_neighbor');
+    await expect(pool.query('SELECT definition_version, (SELECT count(*) FROM survey_image_block_memberships WHERE block_id = $1) AS count FROM surveys WHERE id = $2', [blockId, d.surveyId])).resolves.toEqual(before);
+    await expect(service.addImageMembership(actorId, d.surveyId, blockId, {
+      expectedDefinitionVersion: 2,
+      clientMutationId: '10000000-0000-4000-8000-000000000002',
+      set: 'SHARED',
+      assetId: assets[33],
+      afterMembershipId: (await pool.query<{ id: string }>('SELECT id FROM survey_image_block_memberships WHERE block_id = $1 ORDER BY order_key, id LIMIT 1', [blockId])).rows[0]!.id,
+    }, 'dense-rebalance')).resolves.toMatchObject({ membershipCount: 34 });
+    const ordered = await pool.query<{ order_key: number }>('SELECT order_key FROM survey_image_block_memberships WHERE block_id = $1 ORDER BY order_key, id', [blockId]);
+    expect(new Set(ordered.rows.map((row) => row.order_key)).size).toBe(34);
+  });
+  it('requires a definition version and synchronizes Korean-only localized patches', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await pool.query('UPDATE surveys SET only_for_korean_speaker = true WHERE id = $1', [d.surveyId]);
+    await expect(repository.patch(
+      d.surveyId,
+      actorId,
+      {},
+      { titleKr: '한국어 변경', titleEn: 'English change' },
+      1,
+      'korean-only-mismatch',
+    )).resolves.toBe('INVALID_LOCALIZED_CONTENT');
+    await expect(repository.patch(
+      d.surveyId,
+      actorId,
+      {},
+      { titleKr: '한국어 변경' },
+      undefined,
+      'korean-only-missing-version',
+    )).resolves.toBe('STALE');
+    await expect(repository.patch(
+      d.surveyId,
+      actorId,
+      {},
+      { titleKr: '한국어 변경' },
+      1,
+      'korean-only-sync',
+    )).resolves.toMatchObject({ id: d.surveyId });
+    await expect(pool.query<{ title_kr: string; title_en: string; definition_version: number }>(
+      'SELECT revision.title_kr, revision.title_en, survey.definition_version FROM survey_revisions revision JOIN surveys survey ON survey.id = revision.survey_id WHERE revision.id = $1',
+      [d.revisionId],
+    )).resolves.toMatchObject({ rows: [{ title_kr: '한국어 변경', title_en: '한국어 변경', definition_version: 2 }] });
+  });
+  it('does not expose a foreign image block through the public membership page', async () => {
+    const requested = await definition({ state: 'DRAFT' });
+    const foreign = await definition({ state: 'DRAFT' });
+    const imageBlockDefinition = [{ ordinal: 0, title: { kr: '이미지', en: 'Images' }, items: [
+      { ordinal: 0, kind: 'QUESTION', question: { ordinal: 0, type: 'SHORT_TEXT', prompt: { kr: '질문', en: 'Question' }, helpText: null, required: false, validationRegex: null } },
+      { ordinal: 1, kind: 'IMAGE_BLOCK', mode: 'SHARED' },
+    ] }] as never;
+    await expect(repository.replaceDefinition(requested.surveyId, actorId, 1, imageBlockDefinition, 'requested-image-block')).resolves.toBe('UPDATED');
+    await expect(repository.replaceDefinition(foreign.surveyId, actorId, 1, imageBlockDefinition, 'foreign-image-block')).resolves.toBe('UPDATED');
+    const foreignBlockId = (await pool.query<{ id: string }>("SELECT id FROM survey_section_items WHERE kind = 'IMAGE_BLOCK' AND section_id = (SELECT id FROM survey_sections WHERE survey_revision_id = $1)", [foreign.revisionId])).rows[0]!.id;
+    const assetId = (await pool.query<{ id: string }>(
+      `INSERT INTO survey_image_assets (owner_user_id, status, provider, object_key, content_type, byte_size, width, height, completed_at)
+       VALUES ($1, 'COMPLETED', 'test', $2, 'image/png', 1, 1, 1, now()) RETURNING id`,
+      [actorId, `foreign-public-page-${foreign.surveyId}`],
+    )).rows[0]!.id;
+    const membershipClient = await pool.connect();
+    try {
+      await membershipClient.query('BEGIN');
+      await membershipClient.query("INSERT INTO survey_image_block_memberships (block_id, set, asset_id, order_key) VALUES ($1, 'SHARED', $2, 1024)", [foreignBlockId, assetId]);
+      await membershipClient.query('UPDATE survey_image_blocks SET shared_membership_count = 1 WHERE item_id = $1', [foreignBlockId]);
+      await membershipClient.query('COMMIT');
+    } finally {
+      await membershipClient.query('ROLLBACK').catch(() => undefined);
+      membershipClient.release();
+    }
+    await pool.query("UPDATE survey_revisions SET published_at = now() WHERE id = $1", [requested.revisionId]);
+    await pool.query("UPDATE surveys SET state = 'OPEN' WHERE id = $1", [requested.surveyId]);
+
+    await expect(service.imageMembershipPage(undefined, requested.surveyId, foreignBlockId, { set: 'SHARED' }, 'en')).rejects.toThrow('survey_not_found');
+  });
+  it('converts a high-cardinality image block with one set-based membership operation', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      ordinal: 0, title: { kr: '이미지', en: 'Images' }, items: [{ ordinal: 0, kind: 'IMAGE_BLOCK', mode: 'SHARED' }],
+    }] as never, 'large-mode-conversion')).resolves.toBe('UPDATED');
+    const blockId = (await pool.query<{ id: string }>('SELECT id FROM survey_section_items WHERE section_id = (SELECT id FROM survey_sections WHERE survey_revision_id = $1)', [d.revisionId])).rows[0]!.id;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `WITH assets AS (
+          INSERT INTO survey_image_assets (owner_user_id, status, provider, object_key, content_type, byte_size, width, height, completed_at)
+          SELECT $1, 'COMPLETED', 'test', $2 || '-' || value, 'image/png', 1, 1, 1, now()
+          FROM generate_series(1, 64) AS value
+          RETURNING id
+        )
+        INSERT INTO survey_image_block_memberships (block_id, set, asset_id, order_key)
+        SELECT $3, 'SHARED', id, row_number() OVER () * 1024 FROM assets`,
+        [actorId, `large-mode-${d.surveyId}`, blockId],
+      );
+      await client.query('UPDATE survey_image_blocks SET shared_membership_count = 64 WHERE item_id = $1', [blockId]);
+      await client.query('COMMIT');
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
+    await expect(service.changeImageBlockMode(actorId, d.surveyId, blockId, {
+      expectedDefinitionVersion: 2,
+      clientMutationId: '00000000-0000-4000-8000-000000000099',
+      mode: 'LOCALIZED',
+    }, 'large-mode-conversion')).resolves.toMatchObject({ membershipCounts: { shared: 0, ko: 64, en: 64 } });
+    expect((await pool.query("SELECT set, count(*) FROM survey_image_block_memberships WHERE block_id = $1 GROUP BY set ORDER BY set", [blockId])).rows)
+      .toEqual([{ set: 'KO', count: '64' }, { set: 'EN', count: '64' }]);
+  });
+  it('claims one stale asset across concurrent workers and retries with a rotated token', async () => {
+    const stale = (await pool.query<{ id: string }>(
+      `INSERT INTO survey_image_assets
+        (owner_user_id, status, provider, object_key, content_type, byte_size, width, height, completed_at, created_at)
+       VALUES ($1, 'COMPLETED', 'test', $2, 'image/png', 1, 1, 1, $3, $3)
+       RETURNING id`,
+      [actorId, `cleanup-${randomUUID()}`, new Date('2026-01-01T00:00:00.000Z')],
+    )).rows[0]!;
+    const now = new Date('2026-02-01T00:00:00.000Z');
+    const [left, right] = await Promise.all([
+      repository.claimImageCleanupCandidates(now, 60_000, 1),
+      repository.claimImageCleanupCandidates(now, 60_000, 1),
+    ]);
+    const claim = [...left.claims, ...right.claims];
+    expect(claim).toHaveLength(1);
+    expect(await repository.beginImageCleanupDeletion(stale.id, claim[0]!.claimToken, now)).toMatchObject({ id: stale.id });
+    await expect(repository.completeImageCleanupClaim(stale.id, claim[0]!.claimToken, now, 'provider_unavailable')).resolves.toBe(false);
+
+    const retryAt = new Date(now.getTime() + 2_001);
+    const retry = (await repository.claimImageCleanupCandidates(retryAt, 60_000, 1)).claims;
+    expect(retry).toHaveLength(1);
+    expect(retry[0]!.claimToken).not.toBe(claim[0]!.claimToken);
+    await expect(repository.beginImageCleanupDeletion(stale.id, retry[0]!.claimToken, retryAt)).resolves.toMatchObject({ id: stale.id });
+    await expect(repository.completeImageCleanupClaim(stale.id, retry[0]!.claimToken, retryAt)).resolves.toBe(true);
+    expect((await pool.query('SELECT status, object_deletion_status FROM survey_image_assets WHERE id = $1', [stale.id])).rows)
+      .toEqual([{ status: 'DELETED', object_deletion_status: 'DELETED' }]);
+  });
+  it('skips referenced and not-due cleanup claims before applying the candidate limit', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      ordinal: 0, title: { kr: '이미지', en: 'Images' }, items: [{ ordinal: 0, kind: 'IMAGE_BLOCK', mode: 'SHARED' }],
+    }] as never, 'cleanup-starvation-block')).resolves.toBe('UPDATED');
+    const blockId = (await pool.query<{ id: string }>('SELECT id FROM survey_section_items WHERE section_id = (SELECT id FROM survey_sections WHERE survey_revision_id = $1)', [d.revisionId])).rows[0]!.id;
+    const at = new Date('2026-02-01T00:00:00.000Z');
+    const insert = async (suffix: string) => (await pool.query<{ id: string }>(
+      `INSERT INTO survey_image_assets (owner_user_id, status, provider, object_key, content_type, byte_size, width, height, completed_at, created_at)
+       VALUES ($1, 'COMPLETED', 'test', $2, 'image/png', 1, 1, 1, '2026-01-01', '2026-01-01') RETURNING id`,
+      [actorId, `cleanup-eligibility-${suffix}-${d.surveyId}`],
+    )).rows[0]!.id;
+    const referenced = await insert('referenced');
+    const deferred = await insert('deferred');
+    const due = await insert('due');
+    const membershipClient = await pool.connect();
+    try {
+      await membershipClient.query('BEGIN');
+      await membershipClient.query("INSERT INTO survey_image_block_memberships (block_id, set, asset_id, order_key) VALUES ($1, 'SHARED', $2, 0)", [blockId, referenced]);
+      await membershipClient.query('UPDATE survey_image_blocks SET shared_membership_count = 1 WHERE item_id = $1', [blockId]);
+      await membershipClient.query('COMMIT');
+    } finally {
+      await membershipClient.query('ROLLBACK').catch(() => undefined);
+      membershipClient.release();
+    }
+    await pool.query(
+      "INSERT INTO survey_image_cleanup_claims (asset_id, claim_token, claimed_at, next_retry_at, attempts) VALUES ($1, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', $2, $3, 1)",
+      [deferred, at, new Date(at.getTime() + 60_000)],
+    );
+    const first = await repository.claimImageCleanupCandidates(at, 1_000, 1);
+    expect(first.claims).toHaveLength(1);
+    expect(first.claims[0]!.asset.id).toBe(due);
+    await repository.completeImageCleanupClaim(due, first.claims[0]!.claimToken, at, 'retry');
+    const dueRetry = await repository.claimImageCleanupCandidates(new Date(at.getTime() + 61_000), 1_000, 2);
+    expect(dueRetry.claims.map((claim) => claim.asset.id)).toContain(deferred);
+  });
+
+  it('marks exhausted cleanup claims FAILED and reports them without consuming a claim slot', async () => {
+    const asset = (await pool.query<{ id: string }>(
+      `INSERT INTO survey_image_assets (owner_user_id, status, provider, object_key, content_type, byte_size, width, height, completed_at, created_at)
+       VALUES ($1, 'COMPLETED', 'test', $2, 'image/png', 1, 1, 1, '2026-01-01', '2026-01-01') RETURNING id`,
+      [actorId, `cleanup-exhausted-${randomUUID()}`],
+    )).rows[0]!;
+    await pool.query(
+      "INSERT INTO survey_image_cleanup_claims (asset_id, claim_token, claimed_at, attempts) VALUES ($1, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '2026-01-01', 12)",
+      [asset.id],
+    );
+    const result = await repository.claimImageCleanupCandidates(new Date('2026-02-01T00:00:00.000Z'), 1_000, 1);
+    expect(result.exhaustedAssetIds).toEqual([asset.id]);
+    expect(result.claims).toHaveLength(1);
+    expect(result.claims[0]!.asset.id).not.toBe(asset.id);
+    expect((await pool.query('SELECT object_deletion_status, last_object_deletion_error_code FROM survey_image_assets WHERE id = $1', [asset.id])).rows)
+      .toEqual([{ object_deletion_status: 'FAILED', last_object_deletion_error_code: 'attempts_exhausted' }]);
+  });
+
+  it('rolls back a failed complete replacement without definition or audit mutation', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    const before = await pool.query('SELECT count(*) FROM survey_sections WHERE survey_revision_id = $1', [d.revisionId]);
+    await expect(repository.replaceDefinition(d.surveyId, actorId, 1, [{
+      ordinal: 0, title: { kr: '실패', en: 'Failure' }, items: [{ ordinal: 0, kind: 'QUESTION', question: { ordinal: 0, type: 'INVALID', prompt: { kr: '질문', en: 'Question' }, helpText: null, required: false } }],
+    }] as never, 'definition-rollback')).rejects.toBeDefined();
+    expect((await pool.query('SELECT definition_version FROM surveys WHERE id = $1', [d.surveyId])).rows[0]!.definition_version).toBe(1);
+    expect((await pool.query('SELECT count(*) FROM survey_sections WHERE survey_revision_id = $1', [d.revisionId])).rows).toEqual(before.rows);
+    expect((await pool.query("SELECT count(*) FROM survey_audit_log WHERE correlation_id = 'definition-rollback'")).rows[0]!.count).toBe('0');
+  });
+  it('serializes complete replacement with publication without exposing a partially replaced definition', async () => {
+    const d = await definition({ state: 'DRAFT' });
+    const replacement = [{
+      ordinal: 0, title: { kr: '경합', en: 'Race' },
+      items: [{ ordinal: 0, kind: 'QUESTION', question: { ordinal: 0, type: 'SHORT_TEXT', prompt: { kr: '질문', en: 'Question' }, helpText: null, required: false, validationRegex: null } }],
+    }];
+    const [replaceResult, publishResult] = await Promise.all([
+      repository.replaceDefinition(d.surveyId, actorId, 1, replacement as never, 'definition-publish-race'),
+      repository.publish(d.surveyId, actorId, new Date(), 'definition-publish-race'),
+    ]);
+    expect(['UPDATED', 'IMMUTABLE']).toContain(replaceResult);
+    expect(publishResult).toMatchObject({ id: d.surveyId, state: 'OPEN' });
+    expect((await pool.query('SELECT state, definition_version FROM surveys WHERE id = $1', [d.surveyId])).rows[0]).toMatchObject({ state: 'OPEN' });
+    expect((await pool.query('SELECT count(*) FROM survey_sections WHERE survey_revision_id = $1', [d.revisionId])).rows[0]!.count).toBe('1');
   });
   it('serializes child definition mutations with publication in both lock orders', async () => {
     const childFirst = await definition({ state: 'DRAFT' });
@@ -371,18 +820,63 @@ describe('survey and matcher PostgreSQL protocol', () => {
     expect(JSON.stringify(audit.rows)).not.toMatch(/phone|cipher|hash|answer/i);
     await expect(pool.query("INSERT INTO survey_audit_log (survey_id, action, changed_field_names, correlation_id) VALUES ($1, 'PII_TEST', 'phone=plaintext', 'x')", [d.surveyId])).rejects.toMatchObject({ code: '23514' });
   });
+  it('loads only selected choices for high-cardinality CSV export answers', async () => {
+    const d = await definition({ state: 'DRAFT', types: ['SINGLE_CHOICE'] });
+    const inserted = await pool.query<{ id: string }>(`INSERT INTO survey_choice_options (question_id, ordinal, value_kr, value_en)
+      SELECT $1::uuid, ordinal, 'option-' || ordinal, 'option-' || ordinal FROM generate_series(2, 251) AS ordinal RETURNING id`, [d.questions.SINGLE_CHOICE]);
+    await pool.query('UPDATE survey_revisions SET published_at = now() WHERE id = $1', [d.revisionId]);
+    await pool.query("UPDATE surveys SET state = 'OPEN' WHERE id = $1", [d.surveyId]);
+    const responseId = await response(d, actorId, 'high-cardinality-export');
+    const selectedChoiceId = inserted.rows.at(-1)!.id;
+    await pool.query('INSERT INTO survey_response_answers (response_id, question_id, choice_option_ids) VALUES ($1, $2, $3)', [responseId, d.questions.SINGLE_CHOICE, JSON.stringify([selectedChoiceId])]);
+    const submitted = await pool.query<{ submitted_at: string }>('SELECT submitted_at::text AS submitted_at FROM survey_responses WHERE id = $1', [responseId]);
 
+    const rows = await repository.exportPage(d.surveyId, 100, undefined, { submittedAt: submitted.rows[0]!.submitted_at, responseId });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.choice_id).toBe(selectedChoiceId);
+  });
+
+  it('excludes drafts from review detail, exports, and aggregate revision definitions', async () => {
+    const d = await definition({ types: ['SHORT_TEXT'] });
+    const eligibleId = await response(d, actorId, 'eligible-export');
+    const draftId = await response(d, users[1]!, 'draft-export');
+    await pool.query("UPDATE survey_responses SET state = 'DRAFT', submitted_at = NULL WHERE id = $1", [draftId]);
+
+    await expect(service.responseDetail(actorId, d.surveyId, draftId, 'ko')).rejects.toMatchObject({ status: 404 });
+    await expect(service.review(actorId, d.surveyId, draftId, { expectedSurveyRevisionId: d.revisionId, state: 'APPROVED' }, 'ko', 'draft-review')).rejects.toMatchObject({ status: 404 });
+
+    const exported = await service.export(actorId, d.surveyId, { format: 'CSV', locale: 'en' }, 'draft-export');
+    let csv = '';
+    for await (const chunk of exported.chunks) csv += chunk;
+    expect(csv).toContain(eligibleId);
+    expect(csv).not.toContain(draftId);
+    expect(csv.match(new RegExp(eligibleId, 'g'))).toHaveLength(1);
+    expect(csv.trim().split('\r\n')).toHaveLength(2);
+    expect(csv).toContain('"SUBMITTED"');
+
+    const revision2 = await pool.query<{ id: string }>(`INSERT INTO survey_revisions
+      (survey_id, revision, title_kr, title_en, created_by_user_id) VALUES ($1, 2, 'draft revision', 'draft revision', $2) RETURNING id`, [d.surveyId, actorId]);
+    const aggregate = await service.aggregate(actorId, d.surveyId, 'en');
+    expect(aggregate.revisions.map((revision) => revision.surveyRevisionId)).toEqual([d.revisionId]);
+    expect(aggregate.revisions.map((revision) => revision.surveyRevisionId)).not.toContain(revision2.rows[0]!.id);
+
+    const draftOnly = await definition();
+    const draftOnlyId = await response(draftOnly, users[2]!, 'draft-only');
+    await pool.query("UPDATE survey_responses SET state = 'DRAFT', submitted_at = NULL WHERE id = $1", [draftOnlyId]);
+    await expect(service.aggregate(actorId, draftOnly.surveyId, 'ko')).resolves.toMatchObject({ surveySuppressed: true, revisions: [] });
+  });
   it('aggregates choice cells with five-person suppression and enforces all matcher pairs, FKs, uniqueness, and delete audit', async () => {
     const d = await definition({ types: ['SINGLE_CHOICE'] });
     for (const [index, userId] of users.slice(0, 4).entries()) {
       const id = await response(d, userId, `aggregate-${index}`);
       await pool.query('INSERT INTO survey_response_answers (response_id, question_id, choice_option_ids) VALUES ($1, $2, $3)', [id, d.questions.SINGLE_CHOICE, JSON.stringify([d.choices.SINGLE_CHOICE![index % 2]])]);
     }
-    expect((await service.aggregate(actorId, d.surveyId)).suppressed).toBe(true);
+    expect((await service.aggregate(actorId, d.surveyId, 'ko')).surveySuppressed).toBe(true);
     const fifth = await response(d, users[4]!, 'aggregate-4');
     await pool.query('INSERT INTO survey_response_answers (response_id, question_id, choice_option_ids) VALUES ($1, $2, $3)', [fifth, d.questions.SINGLE_CHOICE, JSON.stringify([d.choices.SINGLE_CHOICE![0]])]);
-    const aggregate = await service.aggregate(actorId, d.surveyId);
-    expect(aggregate).toEqual({ surveyId: d.surveyId, suppressed: false, responseCount: 5, questions: [{ questionId: d.questions.SINGLE_CHOICE, suppressed: false, responseCount: 5, choices: [{ choiceOptionId: d.choices.SINGLE_CHOICE![0], count: 3 }, { choiceOptionId: d.choices.SINGLE_CHOICE![1], count: 2 }] }] });
+    const aggregate = await service.aggregate(actorId, d.surveyId, 'en');
+    expect(aggregate).toEqual({ surveyId: d.surveyId, locale: 'en', surveySuppressed: false, revisions: [{ surveyRevisionId: d.revisionId, revision: 1, suppressed: false, responseCount: 5, questions: [{ questionId: d.questions.SINGLE_CHOICE, prompt: { value: 'SINGLE_CHOICE', translationUnavailable: false }, responseCount: 5, choices: [{ choiceOptionId: d.choices.SINGLE_CHOICE![0], label: { value: 'one', translationUnavailable: false }, count: 3 }, { choiceOptionId: d.choices.SINGLE_CHOICE![1], label: { value: 'two', translationUnavailable: false }, count: 2 }] }] }] });
     const article = await pool.query<{ id: string }>(`INSERT INTO articles (board_id, author_user_id, title_kr, title_en, body_kr, body_en, status, scope, published_at)
       SELECT id, $1, 'survey integration article', 'article', 'body', 'body', 'PUBLISHED', 'ALL', now() FROM boards WHERE code = 'suggestions' RETURNING id`, [actorId]);
     const event = await pool.query<{ id: string }>(`INSERT INTO events (title_kr, title_en, description_kr, description_en, start_at, end_at, location, created_by_user_id, updated_by_user_id)
@@ -554,8 +1048,8 @@ describe('survey and matcher PostgreSQL protocol', () => {
       },
     });
     const exportResult = await repository.export(anonymous.surveyId, actorId, 'future-export');
-    expect(exportResult).toMatchObject({ surveyId: anonymous.surveyId });
-    expect(exportResult && exportResult !== 'INVALID' && exportResult.retentionDeadlineAt.toISOString()).toBe('2099-01-08T00:00:00.000Z');
+    expect(exportResult).toMatchObject({ export: { surveyId: anonymous.surveyId }, upperBoundary: expect.any(Object) });
+    expect(exportResult && exportResult !== 'INVALID' && exportResult.export.retentionDeadlineAt.toISOString()).toBe('2099-01-08T00:00:00.000Z');
     const elapsed = await definition();
     await pool.query("UPDATE surveys SET state = 'CLOSED', closes_at = now() - interval '31 days' WHERE id = $1", [elapsed.surveyId]);
     await expect(repository.export(elapsed.surveyId, actorId, 'elapsed-export')).resolves.toBe('INVALID');
@@ -599,5 +1093,77 @@ describe('survey and matcher PostgreSQL protocol', () => {
       [{ questionId: d.questions.SHORT_TEXT, textValue: 'new answer' }],
       'hmac-rotation',
     )).resolves.toBe('DUPLICATE');
+  });
+  it('keeps revision aggregate provenance and CSV export long-form, safe, and free of guest identity data', async () => {
+    const first = await definition({ types: ['LONG_TEXT', 'MULTIPLE_CHOICE'] });
+    const revision = await pool.query<{ id: string }>(
+      `INSERT INTO survey_revisions (survey_id, revision, title_kr, title_en, created_by_user_id)
+       VALUES ($1, 2, 'second', 'second', $2) RETURNING id`,
+      [first.surveyId, actorId],
+    );
+    const section = await pool.query<{ id: string }>(
+      `INSERT INTO survey_sections (survey_revision_id, ordinal, title_kr, title_en)
+       VALUES ($1, 0, 'second', 'second') RETURNING id`,
+      [revision.rows[0]!.id],
+    );
+    const question = await pool.query<{ id: string }>(
+      `INSERT INTO survey_questions (section_id, ordinal, type, prompt_kr, prompt_en)
+       VALUES ($1, 0, 'LONG_TEXT', '=question', '=question') RETURNING id`,
+      [section.rows[0]!.id],
+    );
+    const second = { surveyId: first.surveyId, revisionId: revision.rows[0]!.id, questions: { LONG_TEXT: question.rows[0]!.id }, choices: {} };
+    const answerSuffixes = ['zero', 'one', 'two', 'three', 'four'];
+    const zeroAnswerResponse = await response(first, null, 'guest-secret-empty');
+    for (const index of [0, 1, 2, 3, 4]) {
+      const firstResponse = await response(first, null, `guest-secret-${index}`);
+      await pool.query(
+        'INSERT INTO survey_response_answers (response_id, question_id, text_value, choice_option_ids) VALUES ($1, $2, $3, NULL), ($1, $4, NULL, $5)',
+        [firstResponse, first.questions.LONG_TEXT, `long answer ${answerSuffixes[index]}`, first.questions.MULTIPLE_CHOICE, JSON.stringify(first.choices.MULTIPLE_CHOICE)],
+      );
+      const secondResponse = await response(second, users[index]!, `second-${index}`);
+      await pool.query('INSERT INTO survey_response_answers (response_id, question_id, text_value) VALUES ($1, $2, $3)', [secondResponse, second.questions.LONG_TEXT, '+formula']);
+    }
+
+    const aggregate = await service.aggregate(actorId, first.surveyId, 'en');
+    expect(aggregate).toMatchObject({
+      surveySuppressed: false,
+      revisions: [
+        { surveyRevisionId: first.revisionId, revision: 1, suppressed: false, responseCount: 6 },
+        { surveyRevisionId: second.revisionId, revision: 2, suppressed: false, responseCount: 5, questions: [{ prompt: { value: '=question', translationUnavailable: false }, responseCount: 5 }] },
+      ],
+    });
+
+    const exported = await service.export(actorId, first.surveyId, { format: 'CSV', locale: 'en' }, 'long-form-export');
+    const chunks: string[] = [];
+    for await (const chunk of exported.chunks) chunks.push(chunk);
+    const csv = chunks.join('');
+    const lines = csv.trimEnd().split('\r\n');
+    expect(lines).toHaveLength(22);
+    const sentinel = lines.find((line) => line.includes(zeroAnswerResponse));
+    expect(sentinel).toBeDefined();
+    const sentinelFields = sentinel!.split(',');
+    expect(sentinelFields).toHaveLength(14);
+    expect(sentinelFields.slice(0, 5)).toEqual([`"${first.surveyId}"`, `"${first.revisionId}"`, '"1"', `"${zeroAnswerResponse}"`, '"SUBMITTED"']);
+    expect(sentinelFields.slice(6)).toEqual(Array(8).fill('""'));
+    expect(csv).toContain(`"'=question"`);
+    expect(csv).toContain(`"'+formula"`);
+    expect(csv).not.toContain('cipher-guest-secret-0');
+    expect(csv).not.toContain('cipher-guest-secret-empty');
+    expect(csv).not.toContain(phoneHash('guest-secret-0'));
+    expect(csv).not.toContain(phoneHash('guest-secret-empty'));
+    for (const field of ['guest_phone', 'guestPhone', 'guestPhoneCiphertext', 'guestPhoneHash']) expect(csv).not.toContain(field);
+
+    await pool.query('BEGIN');
+    try {
+      await pool.query('SET LOCAL enable_seqscan = off');
+      const plan = await pool.query<{ 'QUERY PLAN': unknown }>(
+        `EXPLAIN (FORMAT JSON) SELECT id FROM survey_responses
+         WHERE survey_id = $1 AND state = 'SUBMITTED' ORDER BY submitted_at DESC, id DESC`,
+        [first.surveyId],
+      );
+      expect(JSON.stringify(plan.rows[0]!['QUERY PLAN'])).toContain('survey_responses_review_queue_idx');
+    } finally {
+      await pool.query('ROLLBACK');
+    }
   });
 });

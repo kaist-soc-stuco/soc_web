@@ -121,11 +121,11 @@ export function Header({ showLogo = false }: HeaderProps) {
         }
     };
     return (<header className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative" onMouseLeave={() => setHoveredIndex(null)}>
-      <div className="flex h-13 w-full items-stretch justify-between">
+      <div className="flex min-h-13 w-full flex-wrap items-center justify-between gap-y-1 py-1 md:h-13 md:flex-nowrap md:py-0">
         {/* Left Section: Logo + Navigation */}
-        <div className="flex items-stretch">
+        <div className="flex min-w-0 items-stretch">
           {/* Logo Section (conditional) */}
-          {showLogo && (<div className="flex items-center pl-4">
+          {showLogo && (<div className="flex min-h-11 items-center pl-4">
               <Logo />
             </div>)}
           
@@ -152,33 +152,33 @@ export function Header({ showLogo = false }: HeaderProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 pr-4 md:pr-6">
-          <label className="flex items-center gap-1">
+        <div className="flex min-h-11 w-full items-center justify-end gap-1 px-2 sm:gap-3 sm:px-4 md:w-auto md:pr-6">
+          <label className="flex min-h-11 items-center gap-1">
             <Globe2 aria-hidden="true" className="size-4"/>
             <span className="sr-only">{locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'}</span>
-            <select aria-label={locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'} value={locale} onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ko')} className="bg-transparent text-sm font-bold">
+            <select aria-label={locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'} value={locale} onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ko')} className="min-h-11 bg-transparent px-1 text-sm font-bold">
               <option value="ko">{uiText("components.organisms.header.6e081b5948")}</option>
               <option value="en">English</option>
             </select>
           </label>
           {authenticated ? (<>
-              <Link to="/mypage" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link>
-              {hasAdminAccess ? <Link to="/admin" className="hidden text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:block">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link> : null}
-              <button type="button" onClick={() => void logout()} disabled={logoutLoading} className="hidden text-sm font-bold text-kaist-grey hover:text-kaist-darkgreen-main disabled:opacity-50 sm:block">
+              <Link to="/mypage" className="hidden min-h-11 items-center px-2 text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:flex">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link>
+              {hasAdminAccess ? <Link to="/admin" className="hidden min-h-11 items-center px-2 text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:flex">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link> : null}
+              <button type="button" onClick={() => void logout()} disabled={logoutLoading} className="hidden min-h-11 px-2 text-sm font-bold text-kaist-grey hover:text-kaist-darkgreen-main disabled:opacity-50 sm:block">
                 {logoutLoading ? (locale === 'ko' ? uiText("components.organisms.header.d6f05cf050") : 'Logging out') : (locale === 'ko' ? uiText("components.organisms.header.3879f078a4") : 'Log out')}
               </button>
-            </>) : <Link to="/login" className="text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">{locale === 'ko' ? uiText("components.organisms.header.e225a6fd75") : 'Log in'}</Link>}
-          <button type="button" aria-label={locale === 'ko' ? uiText("components.organisms.header.195da6209a") : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
+            </>) : <Link to="/login" className="inline-flex min-h-11 items-center px-2 text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">{locale === 'ko' ? uiText("components.organisms.header.e225a6fd75") : 'Log in'}</Link>}
+          <button type="button" aria-label={locale === 'ko' ? uiText("components.organisms.header.195da6209a") : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="min-h-11 min-w-11 rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
             {locale === 'ko' ? uiText("components.organisms.header.076925c571") : 'Menu'}
           </button>
         </div>
       </div>
       {mobileOpen ? (<nav aria-label={locale === 'ko' ? uiText("components.organisms.header.aa3cdfdc30") : 'Mobile menu'} className="border-t border-kaist-grey/20 bg-white p-4 md:hidden">
           <ul className="space-y-3">
-            {navItems.flatMap((item) => item.dropdown).map((item) => <li key={item.to}><Link className="block font-semibold" to={item.to}>{item.label}</Link></li>)}
-            {authenticated ? <li><Link className="block font-semibold" to="/mypage">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link></li> : null}
-            {authenticated && hasAdminAccess ? <li><Link className="block font-semibold" to="/admin">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link></li> : null}
-            {authenticated ? <li><button type="button" disabled={logoutLoading} onClick={() => void logout()} className="font-semibold text-kaist-darkgreen">{logoutLoading ? (locale === 'ko' ? uiText("components.organisms.header.d6f05cf050") : 'Logging out') : (locale === 'ko' ? uiText("components.organisms.header.3879f078a4") : 'Log out')}</button></li> : null}
+            {navItems.flatMap((item) => item.dropdown).map((item) => <li key={item.to}><Link className="flex min-h-11 items-center font-semibold" to={item.to}>{item.label}</Link></li>)}
+            {authenticated ? <li><Link className="flex min-h-11 items-center font-semibold" to="/mypage">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link></li> : null}
+            {authenticated && hasAdminAccess ? <li><Link className="flex min-h-11 items-center font-semibold" to="/admin">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link></li> : null}
+            {authenticated ? <li><button type="button" disabled={logoutLoading} onClick={() => void logout()} className="min-h-11 font-semibold text-kaist-darkgreen">{logoutLoading ? (locale === 'ko' ? uiText("components.organisms.header.d6f05cf050") : 'Logging out') : (locale === 'ko' ? uiText("components.organisms.header.3879f078a4") : 'Log out')}</button></li> : null}
           </ul>
         </nav>) : null}
       {logoutError ? <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-center text-sm font-semibold text-red-700">{locale === 'ko' ? uiText("components.organisms.header.65aae0b7cb") : 'Could not log out. Please try again shortly.'}</p> : null}

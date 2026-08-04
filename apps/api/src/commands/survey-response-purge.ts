@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import 'reflect-metadata';
 
+import { sql } from 'drizzle-orm';
+import { DRIZZLE_DB, type PostgresDatabase } from '../infrastructure/postgres/postgres.provider';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
@@ -10,10 +12,16 @@ class InvalidLimitError extends Error {}
 type Diagnostic = { name: string; code?: string };
 type Output = {
   ok: boolean;
+  event: 'survey_response_purge_completed' | 'survey_response_purge_failed';
   error?: string;
   batchSize?: number;
   correlationId: string;
   responsesPurged?: number;
+  backlogMayRemain?: boolean;
+  backlogAgeSeconds?: number | null;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
 };
 
 const parseLimit = (args: string[], env: NodeJS.ProcessEnv): number => {
@@ -47,39 +55,81 @@ const writeOutput = (output: Output): void => {
 };
 
 const main = async (correlationId: string): Promise<void> => {
+  const startedAt = new Date();
   let app: INestApplicationContext | undefined;
   let output: Output;
   let primary: Diagnostic | undefined;
   let close: Diagnostic | undefined;
+  let batchSize: number | undefined;
 
   try {
-    const limit = parseLimit(process.argv.slice(2), process.env);
+    batchSize = parseLimit(process.argv.slice(2), process.env);
     const [{ AppModule }, { SurveysService }] = await Promise.all([
       import('../app.module'),
       import('../features/surveys/surveys.service'),
     ]);
     app = await NestFactory.createApplicationContext(AppModule, { abortOnError: false, logger: false });
-    const responsesPurged = await app.get(SurveysService).purge(limit, correlationId);
-    output = { ok: true, batchSize: limit, correlationId, responsesPurged };
+    const responsesPurged = await app.get(SurveysService).purge(batchSize, correlationId);
+    const backlog = await app.get<PostgresDatabase>(DRIZZLE_DB).execute(sql`
+      SELECT EXTRACT(EPOCH FROM now() - MIN(response.retention_deadline_at))::integer AS age_seconds
+      FROM survey_responses AS response
+      JOIN surveys AS survey ON survey.id = response.survey_id
+      WHERE response.retention_deadline_at <= now()
+        AND (survey.closes_at <= now() OR survey.state IN ('CLOSED', 'ARCHIVED'))
+    `);
+    const rawAgeSeconds = (backlog.rows[0] as { age_seconds: unknown } | undefined)?.age_seconds;
+    const ageSeconds = typeof rawAgeSeconds === 'number' && Number.isSafeInteger(rawAgeSeconds) && rawAgeSeconds >= 0
+      ? rawAgeSeconds
+      : null;
+    output = {
+      ok: true,
+      event: 'survey_response_purge_completed',
+      batchSize,
+      correlationId,
+      responsesPurged,
+      backlogMayRemain: ageSeconds !== null,
+      backlogAgeSeconds: ageSeconds,
+      startedAt: startedAt.toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedAt.getTime(),
+    };
   } catch (error) {
     process.exitCode = 1;
     const invalidLimit = error instanceof InvalidLimitError;
     if (!invalidLimit) primary = diagnostic(error);
-    output = { ok: false, error: invalidLimit ? 'invalid_limit' : 'survey_response_purge_failed', correlationId };
+    output = {
+      ok: false,
+      event: 'survey_response_purge_failed',
+      error: invalidLimit ? 'invalid_limit' : 'survey_response_purge_failed',
+      batchSize,
+      correlationId,
+      startedAt: startedAt.toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedAt.getTime(),
+    };
   } finally {
     try {
       await app?.close();
     } catch (error) {
       process.exitCode = 1;
       close = diagnostic(error);
-      output = { ok: false, error: 'survey_response_purge_failed', correlationId };
+      output = {
+        ok: false,
+        event: 'survey_response_purge_failed',
+        error: 'survey_response_purge_failed',
+        batchSize,
+        correlationId,
+        startedAt: startedAt.toISOString(),
+        completedAt: new Date().toISOString(),
+        durationMs: Date.now() - startedAt.getTime(),
+      };
     }
   }
 
   if (primary || close) {
     process.stderr.write(`${JSON.stringify({ event: 'survey_response_purge_failed', correlationId, primary, close })}\n`);
   } else if (!output!.ok) {
-    process.stderr.write(`${String(output!.error)} correlationId=${correlationId}\n`);
+    process.stderr.write(`${JSON.stringify({ event: 'survey_response_purge_failed', correlationId, error: output!.error })}\n`);
   }
   writeOutput(output!);
 };
@@ -87,9 +137,18 @@ const main = async (correlationId: string): Promise<void> => {
 const correlationId = randomUUID();
 void main(correlationId).catch(() => {
   process.exitCode = 1;
+  const startedAt = new Date();
   try {
     process.stderr.write(`${JSON.stringify({ event: 'survey_response_purge_failed', correlationId, primary: { name: 'UnknownError' } })}\n`);
-    writeOutput({ ok: false, error: 'survey_response_purge_failed', correlationId });
+    writeOutput({
+      ok: false,
+      event: 'survey_response_purge_failed',
+      error: 'survey_response_purge_failed',
+      correlationId,
+      startedAt: startedAt.toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: 0,
+    });
   } catch {
     // The nonzero exit code is authoritative when the output stream is unavailable.
   }

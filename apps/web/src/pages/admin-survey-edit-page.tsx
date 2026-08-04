@@ -1,356 +1,187 @@
-import { uiText, uiFormat } from '@/lib/i18n/surface-catalog';
-import { useEffect, useRef, useState } from 'react';
+import { SurveyDefinitionPreview } from '@/components/organisms/survey-definition-preview';
+import { SurveyApiError, surveyApi } from '@/lib/survey-api';
+import { useDirtyNavigation } from '@/lib/use-dirty-navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { SurveyDto, SurveyQuestionDefinitionInput, SurveyQuestionType } from '@soc/contracts';
-import { parseRestrictedCharacterPattern, SurveyApiError, surveyApi } from '@/lib/survey-api';
+import type { SurveyBilingualText, SurveyDto, SurveyQuestionDefinitionInput, SurveyQuestionType, SurveySectionItemDefinitionInput } from '@soc/contracts';
+
 const types: SurveyQuestionType[] = ['SHORT_TEXT', 'LONG_TEXT', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'NUMBER', 'DATE'];
-const choiceTypes = new Set<SurveyQuestionType>(['SINGLE_CHOICE', 'MULTIPLE_CHOICE']);
-const bilingual = (kr = '', en = '') => ({ kr, en });
-const valueOf = (value: {
-    value: string | null;
-} | null | undefined) => value?.value ?? '';
-const messageFor = (error: unknown) => error instanceof SurveyApiError && error.code === 'survey_not_draft' ? uiText("pages.admin-survey-edit-page.cc16275745") : error instanceof SurveyApiError && error.code === 'invalid_survey_definition' ? uiText("pages.admin-survey-edit-page.d3f992ea29") : error instanceof SurveyApiError && error.status === 401 ? uiText("pages.admin-survey-edit-page.5271ee34a5") : error instanceof TypeError ? uiText("pages.admin-survey-edit-page.883d591e09") : uiText("pages.admin-survey-edit-page.8a91f40cee");
-type Question = SurveyDto['sections'][number]['questions'][number];
-function definition(question: Question, en: Question | undefined, ordinal: number): SurveyQuestionDefinitionInput {
-    const base = {
-        ordinal,
-        prompt: bilingual(valueOf(question.prompt), valueOf(en?.prompt)),
-        helpText: question.helpText || en?.helpText ? bilingual(valueOf(question.helpText), valueOf(en?.helpText)) : null,
-        required: question.required,
-    };
-    if (question.type === 'SHORT_TEXT')
-        return { ...base, type: 'SHORT_TEXT', validationRegex: question.validationRegex };
-    if (question.type === 'LONG_TEXT')
-        return { ...base, type: 'LONG_TEXT', validationRegex: question.validationRegex };
-    if (question.type === 'NUMBER')
-        return { ...base, type: 'NUMBER', numberMin: question.numberMin, numberMax: question.numberMax };
-    if (question.type === 'DATE')
-        return { ...base, type: 'DATE', dateMin: question.dateMin, dateMax: question.dateMax };
-    const choices = question.choices.map((choice, index) => ({
-        ordinal: index,
-        value: bilingual(valueOf(choice.value), valueOf(en?.choices[index]?.value)),
-    }));
-    return question.type === 'SINGLE_CHOICE'
-        ? { ...base, type: 'SINGLE_CHOICE', choices }
-        : { ...base, type: 'MULTIPLE_CHOICE', choices };
-}
-function questionOf(type: SurveyQuestionType, base: Pick<Question, 'id' | 'ordinal' | 'prompt' | 'helpText' | 'required'>): Question {
-    switch (type) {
-        case 'SHORT_TEXT':
-        case 'LONG_TEXT':
-            return { ...base, type, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] };
-        case 'SINGLE_CHOICE':
-        case 'MULTIPLE_CHOICE':
-            return { ...base, type, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] };
-        case 'NUMBER':
-            return { ...base, type, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] };
-        case 'DATE':
-            return { ...base, type, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] };
-    }
-}
-function emptyQuestion(type: SurveyQuestionType, en: boolean): Question {
-    return questionOf(type, { id: '', ordinal: 0, prompt: { value: en ? 'New question' : uiText("pages.admin-survey-edit-page.25c5192a76"), translationUnavailable: false }, helpText: null, required: false });
-}
-function withCommonQuestion(question: Question, patch: Partial<Pick<Question, 'prompt' | 'helpText' | 'required'>>): Question {
-    const base = { id: question.id, ordinal: question.ordinal, prompt: patch.prompt ?? question.prompt, helpText: patch.helpText ?? question.helpText, required: patch.required ?? question.required };
-    switch (question.type) {
-        case 'SHORT_TEXT':
-        case 'LONG_TEXT':
-            return { ...base, type: question.type, validationRegex: question.validationRegex, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] };
-        case 'SINGLE_CHOICE':
-        case 'MULTIPLE_CHOICE':
-            return { ...base, type: question.type, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: question.choices };
-        case 'NUMBER':
-            return { ...base, type: 'NUMBER', validationRegex: null, numberMin: question.numberMin, numberMax: question.numberMax, dateMin: null, dateMax: null, choices: [] };
-        case 'DATE':
-            return { ...base, type: 'DATE', validationRegex: null, numberMin: null, numberMax: null, dateMin: question.dateMin, dateMax: question.dateMax, choices: [] };
-    }
-}
-function withValidation(question: Question, validationRegex: string | null): Question {
-    if (question.type !== 'SHORT_TEXT' && question.type !== 'LONG_TEXT')
-        return question;
-    return { id: question.id, ordinal: question.ordinal, prompt: question.prompt, helpText: question.helpText, type: question.type, required: question.required, validationRegex, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] };
-}
-function withNumberBounds(question: Question, patch: Pick<Question & {
-    type: 'NUMBER';
-}, 'numberMin' | 'numberMax'>): Question {
-    if (question.type !== 'NUMBER')
-        return question;
-    return { id: question.id, ordinal: question.ordinal, prompt: question.prompt, helpText: question.helpText, type: 'NUMBER', required: question.required, validationRegex: null, numberMin: patch.numberMin, numberMax: patch.numberMax, dateMin: null, dateMax: null, choices: [] };
-}
-function withDateBounds(question: Question, patch: Pick<Question & {
-    type: 'DATE';
-}, 'dateMin' | 'dateMax'>): Question {
-    if (question.type !== 'DATE')
-        return question;
-    return { id: question.id, ordinal: question.ordinal, prompt: question.prompt, helpText: question.helpText, type: 'DATE', required: question.required, validationRegex: null, numberMin: null, numberMax: null, dateMin: patch.dateMin, dateMax: patch.dateMax, choices: [] };
-}
-function withChoices(question: Question, choices: Question['choices']): Question {
-    if (question.type !== 'SINGLE_CHOICE' && question.type !== 'MULTIPLE_CHOICE')
-        return question;
-    return { id: question.id, ordinal: question.ordinal, prompt: question.prompt, helpText: question.helpText, type: question.type, required: question.required, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices };
-}
-const validPattern = (value: string | null): boolean => value === null || parseRestrictedCharacterPattern(value) !== null;
-const strictLocalInstant = (value: string): boolean => value === '' || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) && !Number.isNaN(new Date(value).getTime());
-function validDefinition(question: Question, en: Question | undefined): boolean {
-    const koreanHelp = valueOf(question.helpText).trim();
-    const englishHelp = valueOf(en?.helpText).trim();
-    if (!valueOf(question.prompt).trim() || !valueOf(en?.prompt).trim() || !validPattern(question.validationRegex) || Boolean(koreanHelp) !== Boolean(englishHelp))
-        return false;
-    if (question.type === 'NUMBER' && ((question.numberMin !== null && (!Number.isFinite(question.numberMin) || !Number.isInteger(question.numberMin))) || (question.numberMax !== null && (!Number.isFinite(question.numberMax) || !Number.isInteger(question.numberMax))) || (question.numberMin !== null && question.numberMax !== null && question.numberMin > question.numberMax)))
-        return false;
-    if (question.type === 'DATE' && question.dateMin && question.dateMax && question.dateMin > question.dateMax)
-        return false;
-    return !choiceTypes.has(question.type) || question.choices.length > 0 && question.choices.length === (en?.choices.length ?? 0) && question.choices.every((choice, i) => valueOf(choice.value).trim() && valueOf(en?.choices[i]?.value).trim());
-}
-function QuestionEditor({ question, english, editable, update, remove, move, questionIndex, questionCount }: {
-    question: Question;
-    english?: Question;
-    editable: boolean;
-    update: (locale: 'ko' | 'en', value: Question) => void;
-    remove: () => void;
-    move: (offset: number) => void;
-    questionIndex: number;
-    questionCount: number;
-}) {
-    const source = (locale: 'ko' | 'en') => locale === 'ko' ? question : english ?? question;
-    const common = (locale: 'ko' | 'en', patch: Partial<Pick<Question, 'prompt' | 'helpText' | 'required'>>) => update(locale, withCommonQuestion(source(locale), patch));
-    const position = questionIndex + 1;
-    return <div className="mt-3 border p-3"><select aria-label={uiFormat("pages.admin-survey-edit-page.template.22dc100a78", [position])} value={question.type} disabled={!editable} onChange={(e) => { const type = e.target.value as SurveyQuestionType; update('ko', questionOf(type, question)); update('en', questionOf(type, english ?? question)); }}>{types.map((type) => <option key={type}>{type}</option>)}</select><button type="button" aria-label={uiFormat("pages.admin-survey-edit-page.template.3fc5ebb84a", [position])} onClick={() => move(-1)} disabled={!editable || questionIndex === 0}>↑</button><button type="button" aria-label={uiFormat("pages.admin-survey-edit-page.template.1ab92ffe49", [position])} onClick={() => move(1)} disabled={!editable || questionIndex === questionCount - 1}>↓</button><button type="button" aria-label={uiFormat("pages.admin-survey-edit-page.template.aa9447c7b4", [position])} onClick={remove} disabled={!editable}>{uiText("pages.admin-survey-edit-page.850b6d316e")}</button>
-    <label><input type="checkbox" checked={question.required} disabled={!editable} onChange={(e) => common('ko', { required: e.target.checked })}/>{uiText("pages.admin-survey-edit-page.5b4a45c263")}</label><label>{uiText("pages.admin-survey-edit-page.08b859d229")}<input value={valueOf(question.prompt)} disabled={!editable} onChange={(e) => common('ko', { prompt: { ...question.prompt, value: e.target.value } })}/></label><label>Question (English)<input value={valueOf(english?.prompt)} disabled={!editable} onChange={(e) => common('en', { prompt: { ...(english?.prompt ?? question.prompt), value: e.target.value } })}/></label>
-    <label>{uiText("pages.admin-survey-edit-page.f55a3f8a04")}<input value={valueOf(question.helpText)} disabled={!editable} onChange={(e) => common('ko', { helpText: { ...(question.helpText ?? question.prompt), value: e.target.value } })}/></label><label>Help text (English)<input value={valueOf(english?.helpText)} disabled={!editable} onChange={(e) => common('en', { helpText: { ...(english?.helpText ?? question.prompt), value: e.target.value } })}/></label>
-    {(question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') && <label>{uiText("pages.admin-survey-edit-page.fc7e4f6228")}<input value={question.validationRegex ?? ''} disabled={!editable} onChange={(e) => update('ko', withValidation(question, e.target.value || null))}/></label>}{question.type === 'NUMBER' && <><label>{uiText("pages.admin-survey-edit-page.e4f481a862")}<input type="number" value={question.numberMin ?? ''} disabled={!editable} onChange={(e) => update('ko', withNumberBounds(question, { numberMin: e.target.value === '' ? null : Number(e.target.value), numberMax: question.numberMax }))}/></label><label>{uiText("pages.admin-survey-edit-page.eeb8d1ae13")}<input type="number" value={question.numberMax ?? ''} disabled={!editable} onChange={(e) => update('ko', withNumberBounds(question, { numberMin: question.numberMin, numberMax: e.target.value === '' ? null : Number(e.target.value) }))}/></label></>}{question.type === 'DATE' && <><label>{uiText("pages.admin-survey-edit-page.453c56f595")}<input type="date" value={question.dateMin ?? ''} disabled={!editable} onChange={(e) => update('ko', withDateBounds(question, { dateMin: e.target.value || null, dateMax: question.dateMax }))}/></label><label>{uiText("pages.admin-survey-edit-page.cad7c84c3e")}<input type="date" value={question.dateMax ?? ''} disabled={!editable} onChange={(e) => update('ko', withDateBounds(question, { dateMin: question.dateMin, dateMax: e.target.value || null }))}/></label></>}{choiceTypes.has(question.type) && <><label>{uiText("pages.admin-survey-edit-page.7547f8a5e4")}<input value={question.choices.map((c) => valueOf(c.value)).join(',')} disabled={!editable} onChange={(e) => update('ko', withChoices(question, e.target.value.split(',').map((v) => v.trim()).filter(Boolean).map((value, ordinal) => ({ id: question.choices[ordinal]?.id ?? '', ordinal, value: { value, translationUnavailable: false } }))))}/></label><label>Choices (English, comma separated)<input value={(english?.choices ?? []).map((c) => valueOf(c.value)).join(',')} disabled={!editable} onChange={(e) => update('en', withChoices(source('en'), e.target.value.split(',').map((v) => v.trim()).filter(Boolean).map((value, ordinal) => ({ id: english?.choices[ordinal]?.id ?? '', ordinal, value: { value, translationUnavailable: false } }))))}/></label></>}</div>;
-}
+const blank = (): SurveyBilingualText => ({ kr: '', en: '' });
+const value = (input: { value: string | null } | null | undefined) => input?.value ?? '';
+const localId = () => `local-${crypto.randomUUID()}`;
+const persistedId = (id: string | undefined) => id && !id.startsWith('local-') ? id : undefined;
+const itemQuestion = (type: SurveyQuestionType, id = localId()): SurveyQuestionDefinitionInput => type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE'
+  ? { id, ordinal: 0, type, prompt: blank(), required: false, choices: [{ id: localId(), ordinal: 0, value: blank() }] }
+  : type === 'NUMBER' ? { id, ordinal: 0, type, prompt: blank(), required: false, numberMin: null, numberMax: null }
+  : type === 'DATE' ? { id, ordinal: 0, type, prompt: blank(), required: false, dateMin: null, dateMax: null }
+  : { id, ordinal: 0, type, prompt: blank(), required: false, validationRegex: null };
+const localInstant = (input: string) => input === '' || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(input) && !Number.isNaN(new Date(input).getTime());
+
 export function AdminSurveyEditPage() {
-    const { surveyId } = useParams<{
-        surveyId: string;
-    }>();
-    const navigate = useNavigate();
-    const [survey, setSurvey] = useState<SurveyDto>();
-    const [english, setEnglish] = useState<SurveyDto>();
-    const [tab, setTab] = useState<'settings' | 'questions'>('settings');
-    const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
-    const [titleKo, setTitleKo] = useState('');
-    const [titleEn, setTitleEn] = useState('');
-    const [descriptionKo, setDescriptionKo] = useState('');
-    const [descriptionEn, setDescriptionEn] = useState('');
-    const [cap, setCap] = useState('');
-    const [feeRestriction, setFeeRestriction] = useState<'ANY' | 'PAID_ONLY'>('ANY');
-    const [guestAllowed, setGuestAllowed] = useState(false);
-    const [phoneRequired, setPhoneRequired] = useState(false);
-    const [opensAt, setOpensAt] = useState('');
-    const [closesAt, setClosesAt] = useState('');
-    const [editDeadlineAt, setEditDeadlineAt] = useState('');
-    const [retentionDays, setRetentionDays] = useState('365');
-    const isNew = surveyId === 'new';
-    const mutationLock = useRef(false);
-    const sourceToken = useRef(0);
-    const [mutating, setMutating] = useState(false);
-    const [settingsDirty, setSettingsDirty] = useState(false);
-    const [definitionsDirty, setDefinitionsDirty] = useState(false);
-    const dirty = settingsDirty || definitionsDirty;
-    const setDirty = setSettingsDirty;
-    const editable = (isNew || survey?.state === 'DRAFT') && !mutating;
-    const load = async (id: string, signal?: AbortSignal, token = sourceToken.current, preserveSettings = false) => {
-        setStatus('loading');
-        setError('');
-        try {
-            const [ko, en] = await Promise.all([surveyApi.get(id, 'ko', signal), surveyApi.get(id, 'en', signal)]);
-            if (token !== sourceToken.current || id !== surveyId)
-                return;
-            setSurvey(ko);
-            setEnglish(en);
-            if (!preserveSettings) {
-                setTitleKo(valueOf(ko.title));
-                setTitleEn(valueOf(en.title));
-                setDescriptionKo(valueOf(ko.description));
-                setDescriptionEn(valueOf(en.description));
-                setCap(ko.cap?.toString() ?? '');
-                setFeeRestriction(ko.feeRestriction);
-                setGuestAllowed(ko.guestAllowed);
-                setPhoneRequired(ko.phoneRequired);
-                setOpensAt(ko.opensAt?.slice(0, 16) ?? '');
-                setClosesAt(ko.closesAt?.slice(0, 16) ?? '');
-                setEditDeadlineAt(ko.editDeadlineAt?.slice(0, 16) ?? '');
-                setRetentionDays(String(ko.responseRetentionDays));
-                setSettingsDirty(false);
-            }
-            setDefinitionsDirty(false);
-            setStatus('ready');
-        }
-        catch (cause) {
-            if (token === sourceToken.current && !(cause instanceof DOMException && cause.name === 'AbortError')) {
-                setStatus('error');
-                setError(uiText("pages.admin-survey-edit-page.10ad78f226"));
-            }
-        }
-    };
-    useEffect(() => {
-        const controller = new AbortController();
-        const token = ++sourceToken.current;
-        mutationLock.current = false;
-        setSurvey(undefined);
-        setEnglish(undefined);
-        setTab('settings');
-        setError('');
-        setMessage('');
-        setTitleKo('');
-        setTitleEn('');
-        setDescriptionKo('');
-        setDescriptionEn('');
-        setCap('');
-        setFeeRestriction('ANY');
-        setGuestAllowed(false);
-        setPhoneRequired(false);
-        setOpensAt('');
-        setClosesAt('');
-        setEditDeadlineAt('');
-        setRetentionDays('365');
-        setSettingsDirty(false);
-        setDefinitionsDirty(false);
-        if (!isNew && surveyId)
-            void load(surveyId, controller.signal, token);
-        else
-            setStatus('ready');
-        return () => controller.abort();
-    }, [surveyId, isNew]);
-    const settingsValid = Boolean(closesAt) && strictLocalInstant(opensAt) && strictLocalInstant(closesAt) && strictLocalInstant(editDeadlineAt) && (!opensAt || new Date(opensAt).getTime() < new Date(closesAt).getTime()) && (!editDeadlineAt || new Date(editDeadlineAt).getTime() <= new Date(closesAt).getTime()) && (!phoneRequired || guestAllowed) && !(feeRestriction === 'PAID_ONLY' && guestAllowed) && (cap === '' || Number.isInteger(Number(cap)) && Number(cap) > 0) && Number.isInteger(Number(retentionDays)) && Number(retentionDays) >= 1 && Number(retentionDays) <= 3650 && Boolean(descriptionKo.trim()) === Boolean(descriptionEn.trim());
-    const beginMutation = () => {
-        if (mutationLock.current)
-            return false;
-        mutationLock.current = true;
-        setMutating(true);
-        return true;
-    };
-    const finishMutation = (token: number) => {
-        if (token === sourceToken.current) {
-            mutationLock.current = false;
-            setMutating(false);
-        }
-    };
-    const saveSettings = async () => {
-        if (!editable || !settingsValid || !titleKo.trim() || !titleEn.trim() || !beginMutation()) {
-            if (!titleKo.trim() || !titleEn.trim())
-                setError(uiText("pages.admin-survey-edit-page.fca7e82e49"));
-            else if (!settingsValid)
-                setError(uiText("pages.admin-survey-edit-page.f249c005c0"));
-            return;
-        }
-        const token = sourceToken.current;
-        setError('');
-        setMessage('');
-        try {
-            const input = { title: bilingual(titleKo, titleEn), description: descriptionKo.trim() || descriptionEn.trim() ? bilingual(descriptionKo, descriptionEn) : null, guestAllowed, phoneRequired, feeRestriction, cap: cap ? Number(cap) : null, opensAt: opensAt ? new Date(opensAt).toISOString() : null, closesAt: new Date(closesAt).toISOString(), editDeadlineAt: editDeadlineAt ? new Date(editDeadlineAt).toISOString() : null, responseRetentionDays: Number(retentionDays) };
-            const saved = survey ? await surveyApi.patch(survey.id, input) : await surveyApi.create(input);
-            if (token !== sourceToken.current)
-                return;
-            setMessage(uiText("pages.admin-survey-edit-page.62088d6534"));
-            setSettingsDirty(false);
-            if (isNew)
-                navigate(`/admin/surveys/${saved.id}/edit`, { replace: true });
-            else {
-                setSurvey((current) => current ? { ...saved, sections: current.sections } : saved);
-                setEnglish((current) => current ? { ...saved, sections: current.sections } : saved);
-            }
-        }
-        catch (cause) {
-            if (token === sourceToken.current)
-                setError(messageFor(cause));
-        }
-        finally {
-            finishMutation(token);
-        }
-    };
-    const mutate = (setter: typeof setSurvey, fn: (s: SurveyDto) => SurveyDto) => { setDefinitionsDirty(true); setter((current) => current ? fn(current) : current); };
-    const updateQuestion = (sectionIndex: number, questionIndex: number, locale: 'ko' | 'en', value: Question) => mutate(locale === 'ko' ? setSurvey : setEnglish, (s) => ({ ...s, sections: s.sections.map((section, i) => i === sectionIndex ? { ...section, questions: section.questions.map((q, j) => j === questionIndex ? value : q) } : section) }));
-    const reorder = <T,>(items: T[], index: number, offset: number) => {
-        const target = index + offset;
-        if (target < 0 || target >= items.length)
-            return items;
-        const copy = [...items];
-        [copy[index], copy[target]] = [copy[target], copy[index]];
-        return copy.map((item, ordinal) => ({ ...item, ordinal }));
-    };
-    const saveQuestions = async () => {
-        if (!survey || !editable || !survey.sections.every((section, i) => valueOf(section.title).trim() && valueOf(english?.sections[i]?.title).trim() && section.questions.every((q, j) => validDefinition(q, english?.sections[i]?.questions[j]))) || !beginMutation()) {
-            setError(uiText("pages.admin-survey-edit-page.1fbdd7106b"));
-            return;
-        }
-        const token = sourceToken.current;
-        let serverMutated = false;
-        setError('');
-        setMessage('');
-        try {
-            const savedSections = await surveyApi.replaceSections(survey.id, {
-                sections: survey.sections.map((section, ordinal) => ({
-                    ordinal,
-                    title: bilingual(valueOf(section.title), valueOf(english?.sections[ordinal]?.title)),
-                })),
-            });
-            serverMutated = true;
-            for (let i = 0; i < savedSections.sections.length; i++) {
-                if (token !== sourceToken.current)
-                    return;
-                await surveyApi.replaceQuestions(savedSections.sections[i].id, {
-                    questions: survey.sections[i].questions.map((q, ordinal) => definition(q, english?.sections[i]?.questions[ordinal], ordinal)),
-                });
-            }
-            if (token === sourceToken.current) {
-                await load(survey.id, undefined, token, settingsDirty);
-                setMessage(uiText("pages.admin-survey-edit-page.780b54c63a"));
-            }
-        }
-        catch (cause) {
-            if (token === sourceToken.current) {
-                setError(serverMutated ? uiFormat("pages.admin-survey-edit-page.template.9bdb154f21", [messageFor(cause)]) : messageFor(cause));
-            }
-        }
-        finally {
-            finishMutation(token);
-        }
-    };
-    const addSection = () => {
-        for (const [setter, en] of [[setSurvey, false], [setEnglish, true]] as const)
-            mutate(setter, (s) => ({ ...s, sections: [...s.sections, { id: '', ordinal: s.sections.length, title: { value: en ? 'New section' : uiText("pages.admin-survey-edit-page.7096cfb48e"), translationUnavailable: false }, questions: [] }] }));
-    };
-    const publish = async () => {
-        if (!survey || !editable || settingsDirty || definitionsDirty || !beginMutation()) {
-            if (settingsDirty || definitionsDirty)
-                setError(uiText("pages.admin-survey-edit-page.53a69cfafa"));
-            return;
-        }
-        const token = sourceToken.current;
-        const id = survey.id;
-        setError('');
-        setMessage('');
-        try {
-            await surveyApi.publish(id);
-            if (token !== sourceToken.current || id !== surveyId)
-                return;
-            await load(id, undefined, token);
-            if (token === sourceToken.current)
-                setMessage(uiText("pages.admin-survey-edit-page.cf5827e69c"));
-        }
-        catch (cause) {
-            if (token === sourceToken.current)
-                setError(messageFor(cause));
-        }
-        finally {
-            finishMutation(token);
-        }
-    };
-    return <section className="min-h-screen bg-[#F7FCFC]"><header className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-[12vw] py-8 text-white"><h1 className="text-[32px] font-extrabold">{uiText("pages.admin-survey-edit-page.bfa15aa4f4")}</h1></header><nav className="flex gap-4 border-b p-4"><button onClick={() => setTab('settings')}>{uiText("pages.admin-survey-edit-page.c14a567ea9")}</button><button onClick={() => setTab('questions')} disabled={!survey}>{uiText("pages.admin-survey-edit-page.2ab096e7f4")}</button><Link to="/admin/surveys">{uiText("pages.admin-survey-edit-page.b6071ac7eb")}</Link>{survey && <><button onClick={saveQuestions} disabled={!editable}>{uiText("pages.admin-survey-edit-page.abf36de8c0")}</button><button onClick={publish} disabled={!editable || dirty}>{uiText("pages.admin-survey-edit-page.6627c55ead")}</button></>}</nav><main className="p-8">{error && <p role="alert" className="text-red-600">{error}</p>}{message && <p role="status" className="text-green-700">{message}</p>}{status === 'loading' ? <p role="status">{uiText("pages.admin-survey-edit-page.1a117ba3e7")}</p> : tab === 'settings' ? <div className="grid max-w-2xl gap-4"><label>{uiText("pages.admin-survey-edit-page.b8fb134296")}<input value={titleKo} onChange={(e) => { setDirty(true); setTitleKo(e.target.value); }} disabled={!editable}/></label><label>Title (English)<input value={titleEn} onChange={(e) => { setDirty(true); setTitleEn(e.target.value); }} disabled={!editable}/></label><label>{uiText("pages.admin-survey-edit-page.d334abdd70")}<textarea value={descriptionKo} onChange={(e) => { setDirty(true); setDescriptionKo(e.target.value); }} disabled={!editable}/></label><label>Description (English)<textarea value={descriptionEn} onChange={(e) => { setDirty(true); setDescriptionEn(e.target.value); }} disabled={!editable}/></label><label>{uiText("pages.admin-survey-edit-page.6b35572d8d")}<input type="number" min="1" value={cap} onChange={(e) => { setDirty(true); setCap(e.target.value); }} disabled={!editable}/></label><label>{uiText("pages.admin-survey-edit-page.c1ebfbc299")}<select value={feeRestriction} disabled={!editable} onChange={(e) => { setDirty(true); setFeeRestriction(e.target.value as 'ANY' | 'PAID_ONLY'); }}><option value="ANY">{uiText("pages.admin-survey-edit-page.4efeea4126")}</option><option value="PAID_ONLY">{uiText("pages.admin-survey-edit-page.d8e4e6101c")}</option></select></label><label>{uiText("pages.admin-survey-edit-page.170813bd08")}<input type="datetime-local" value={opensAt} onChange={(e) => { setDirty(true); setOpensAt(e.target.value); }} disabled={!editable}/></label><label>{uiText("pages.admin-survey-edit-page.cd1bf7892a")}<input type="datetime-local" value={closesAt} onChange={(e) => { setDirty(true); setClosesAt(e.target.value); }} disabled={!editable}/></label><label>{uiText("pages.admin-survey-edit-page.b4b253441d")}<input type="datetime-local" value={editDeadlineAt} onChange={(e) => { setDirty(true); setEditDeadlineAt(e.target.value); }} disabled={!editable}/></label><label>{uiText("pages.admin-survey-edit-page.fca31c0f94")}<input type="number" min="1" value={retentionDays} onChange={(e) => { setDirty(true); setRetentionDays(e.target.value); }} disabled={!editable}/></label><label><input type="checkbox" checked={guestAllowed} onChange={(e) => {
-                setDirty(true);
-                setGuestAllowed(e.target.checked);
-                if (!e.target.checked)
-                    setPhoneRequired(false);
-            }} disabled={!editable}/>{uiText("pages.admin-survey-edit-page.88234ffdf5")}</label><label><input type="checkbox" checked={phoneRequired} onChange={(e) => { setDirty(true); setPhoneRequired(e.target.checked); }} disabled={!editable || !guestAllowed}/>{uiText("pages.admin-survey-edit-page.8bba2beb68")}</label><button onClick={saveSettings} disabled={!editable || !settingsValid}>{uiText("pages.admin-survey-edit-page.b25827149b")}</button></div> : <div>{survey?.sections.map((section, sectionIndex) => <section key={section.id || sectionIndex} className="mb-6 bg-white p-5"><label>{uiText("pages.admin-survey-edit-page.6869b294e4")}<input value={valueOf(section.title)} disabled={!editable} onChange={(e) => mutate(setSurvey, (s) => ({ ...s, sections: s.sections.map((item, i) => i === sectionIndex ? { ...item, title: { ...item.title, value: e.target.value } } : item) }))}/></label><label>Section (English)<input value={valueOf(english?.sections[sectionIndex]?.title)} disabled={!editable} onChange={(e) => mutate(setEnglish, (s) => ({ ...s, sections: s.sections.map((item, i) => i === sectionIndex ? { ...item, title: { ...item.title, value: e.target.value } } : item) }))}/></label><button type="button" onClick={() => { mutate(setSurvey, (s) => ({ ...s, sections: reorder(s.sections, sectionIndex, -1) })); mutate(setEnglish, (s) => ({ ...s, sections: reorder(s.sections, sectionIndex, -1) })); }} disabled={!editable || sectionIndex === 0} aria-label={uiFormat("pages.admin-survey-edit-page.template.ce53b2f526", [sectionIndex + 1])}>↑</button><button type="button" onClick={() => { mutate(setSurvey, (s) => ({ ...s, sections: reorder(s.sections, sectionIndex, 1) })); mutate(setEnglish, (s) => ({ ...s, sections: reorder(s.sections, sectionIndex, 1) })); }} disabled={!editable || sectionIndex === survey.sections.length - 1} aria-label={uiFormat("pages.admin-survey-edit-page.template.538a3ebc12", [sectionIndex + 1])}>↓</button><button type="button" onClick={() => { mutate(setSurvey, (s) => ({ ...s, sections: s.sections.filter((_, i) => i !== sectionIndex) })); mutate(setEnglish, (s) => ({ ...s, sections: s.sections.filter((_, i) => i !== sectionIndex) })); }} disabled={!editable} aria-label={uiFormat("pages.admin-survey-edit-page.template.ee115f0982", [sectionIndex + 1])}>{uiText("pages.admin-survey-edit-page.6e7c86be9a")}</button>{section.questions.map((question, questionIndex) => <QuestionEditor key={question.id || questionIndex} question={question} english={english?.sections[sectionIndex]?.questions[questionIndex]} editable={editable} questionIndex={questionIndex} questionCount={section.questions.length} update={(locale, value) => updateQuestion(sectionIndex, questionIndex, locale, value)} remove={() => {
-                        for (const setter of [setSurvey, setEnglish])
-                            mutate(setter, (s) => ({ ...s, sections: s.sections.map((item, i) => i === sectionIndex ? { ...item, questions: item.questions.filter((_, j) => j !== questionIndex) } : item) }));
-                    }} move={(offset) => {
-                        for (const setter of [setSurvey, setEnglish])
-                            mutate(setter, (s) => ({ ...s, sections: s.sections.map((item, i) => i === sectionIndex ? { ...item, questions: reorder(item.questions, questionIndex, offset) } : item) }));
-                    }}/>)}{types.map((type) => <button key={type} type="button" aria-label={uiFormat("pages.admin-survey-edit-page.template.668763925e", [sectionIndex + 1, type])} onClick={() => { mutate(setSurvey, (s) => ({ ...s, sections: s.sections.map((item, i) => i === sectionIndex ? { ...item, questions: [...item.questions, emptyQuestion(type, false)] } : item) })); mutate(setEnglish, (s) => ({ ...s, sections: s.sections.map((item, i) => i === sectionIndex ? { ...item, questions: [...item.questions, emptyQuestion(type, true)] } : item) })); }} disabled={!editable}>+ {type}</button>)}</section>)}<button type="button" onClick={addSection} disabled={!editable}>{uiText("pages.admin-survey-edit-page.f7899ca881")}</button></div>}</main></section>;
+  const { surveyId } = useParams<{ surveyId: string }>();
+  const navigate = useNavigate();
+  const isNew = surveyId === 'new';
+  const [survey, setSurvey] = useState<SurveyDto>();
+  const [english, setEnglish] = useState<SurveyDto>();
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState(blank());
+  const [description, setDescription] = useState(blank());
+  const [koreanOnly, setKoreanOnly] = useState(false);
+  const [cap, setCap] = useState('');
+  const [feeRestriction, setFeeRestriction] = useState<'ANY' | 'PAID_ONLY'>('ANY');
+  const [guestAllowed, setGuestAllowed] = useState(false);
+  const [phoneRequired, setPhoneRequired] = useState(false);
+  const [opensAt, setOpensAt] = useState('');
+  const [closesAt, setClosesAt] = useState('');
+  const [editDeadlineAt, setEditDeadlineAt] = useState('');
+  const [retentionDays, setRetentionDays] = useState('365');
+  const [definitionDirty, setDefinitionDirty] = useState(false);
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const navigation = useDirtyNavigation(() => definitionDirty || settingsDirty);
+  const load = async () => {
+    if (!surveyId || isNew) return;
+    try {
+      const [ko, en] = await Promise.all([surveyApi.getAdmin(surveyId, 'ko'), surveyApi.getAdmin(surveyId, 'en')]);
+      setSurvey(ko); setEnglish(en); setTitle({ kr: value(ko.title), en: value(en.title) }); setDescription({ kr: value(ko.description), en: value(en.description) }); setKoreanOnly(Boolean(ko.onlyForKoreanSpeaker)); setCap(ko.cap?.toString() ?? ''); setFeeRestriction(ko.feeRestriction); setGuestAllowed(ko.guestAllowed); setPhoneRequired(ko.phoneRequired); setOpensAt(ko.opensAt?.slice(0, 16) ?? ''); setClosesAt(ko.closesAt?.slice(0, 16) ?? ''); setEditDeadlineAt(ko.editDeadlineAt?.slice(0, 16) ?? ''); setRetentionDays(String(ko.responseRetentionDays)); return ko;
+    } catch { setError('설문을 불러올 수 없습니다.'); }
+  };
+  useEffect(() => { void load(); }, [surveyId]);
+  const editable = (isNew || survey?.state === 'DRAFT') && !saving;
+  const definition = (source: SurveyDto, preserveLocal = false): Array<{ id?: string; ordinal: number; title: SurveyBilingualText; items: SurveySectionItemDefinitionInput[] }> => source.sections.map((section, sectionIndex) => ({
+    ...(persistedId(section.id) ? { id: section.id } : {}), ordinal: sectionIndex, title: { kr: value(section.title), en: value(english?.sections[sectionIndex]?.title) },
+    items: section.items.map((item, ordinal): SurveySectionItemDefinitionInput => item.kind === 'QUESTION' ? { ...((preserveLocal ? item.id : persistedId(item.id)) ? { id: item.id } : {}), ordinal, kind: 'QUESTION', question: preserveLocal ? questionInput(item.question, english?.sections[sectionIndex]?.items[ordinal]?.kind === 'QUESTION' ? english.sections[sectionIndex].items[ordinal].question : undefined) : definitionQuestion(questionInput(item.question, english?.sections[sectionIndex]?.items[ordinal]?.kind === 'QUESTION' ? english.sections[sectionIndex].items[ordinal].question : undefined)) } : item.kind === 'DESCRIPTION' ? { ...((preserveLocal ? item.id : persistedId(item.id)) ? { id: item.id } : {}), ordinal, kind: 'DESCRIPTION', body: { kr: value(item.body), en: value(english?.sections[sectionIndex]?.items[ordinal]?.kind === 'DESCRIPTION' ? english.sections[sectionIndex].items[ordinal].body : undefined) } } : { ...((preserveLocal ? item.id : persistedId(item.id)) ? { id: item.id } : {}), ordinal, kind: 'IMAGE_BLOCK', mode: item.mode })
+  }));
+  const updateItems = (sectionIndex: number, mutate: (items: SurveySectionItemDefinitionInput[]) => SurveySectionItemDefinitionInput[]) => {
+    if (!survey || !english) return;
+    const sections = definition(survey, true); sections[sectionIndex]!.items = mutate(sections[sectionIndex]!.items).map((item, ordinal) => ({ ...item, ordinal })); setDefinitionDirty(true);
+    const apply = (current: SurveyDto, locale: 'ko' | 'en'): SurveyDto => ({ ...current, sections: current.sections.map((section, index) => index !== sectionIndex ? section : ({ ...section, items: sections[index]!.items.map((item) => toDtoItem(item, locale)) } as typeof section)) });
+    setSurvey(apply(survey, 'ko')); setEnglish(apply(english, 'en'));
+  };
+  useEffect(() => { if (navigation.state === 'blocked') { if (window.confirm('저장하지 않은 변경 사항이 있습니다. 이동하면 버려집니다.')) navigation.proceed(); else navigation.reset(); } }, [navigation]);
+  const settingsValid = Boolean(title.kr.trim() && title.en.trim() && closesAt) && localInstant(opensAt) && localInstant(closesAt) && localInstant(editDeadlineAt) && (!opensAt || new Date(opensAt) < new Date(closesAt)) && (!editDeadlineAt || new Date(editDeadlineAt) <= new Date(closesAt)) && (!phoneRequired || guestAllowed) && !(feeRestriction === 'PAID_ONLY' && guestAllowed) && (cap === '' || Number.isInteger(Number(cap)) && Number(cap) > 0) && Number.isInteger(Number(retentionDays)) && Number(retentionDays) >= 1 && Number(retentionDays) <= 3650 && Boolean(description.kr.trim()) === Boolean(description.en.trim());
+  const saveSettings = async () => {
+    if (!editable || !settingsValid) { setError('필수 설정을 확인하세요.'); return; }
+    setSaving(true); setError('');
+    const input = { title, description: description.kr.trim() || description.en.trim() ? description : null, onlyForKoreanSpeaker: koreanOnly, guestAllowed, phoneRequired, feeRestriction, cap: cap ? Number(cap) : null, opensAt: opensAt ? new Date(opensAt).toISOString() : null, closesAt: new Date(closesAt).toISOString(), editDeadlineAt: editDeadlineAt ? new Date(editDeadlineAt).toISOString() : null, responseRetentionDays: Number(retentionDays) };
+    try {
+      const next = isNew ? await surveyApi.create(input) : await surveyApi.patch(surveyId!, { ...input, expectedDefinitionVersion: survey!.definitionVersion } as Parameters<typeof surveyApi.patch>[1]);
+      setSettingsDirty(false);
+      if (isNew) navigate(`/admin/surveys/${next.id}/edit`, { replace: true });
+      else if (definitionDirty) setSurvey((current) => current ? { ...current, definitionVersion: next.definitionVersion, title: next.title, description: next.description, onlyForKoreanSpeaker: next.onlyForKoreanSpeaker } : current);
+      else { setSurvey(next); await load(); }
+    } catch { setError('설정 저장에 실패했습니다.'); }
+    finally { setSaving(false); }
+  };
+  const saveDefinition = async () => {
+    if (!survey || !surveyId) return; setSaving(true); setError('');
+    try { const result = await surveyApi.replaceDefinition(surveyId, { expectedDefinitionVersion: survey.definitionVersion, sections: definition(survey) }); setSurvey({ ...result.survey, title: survey.title, description: survey.description, onlyForKoreanSpeaker: survey.onlyForKoreanSpeaker }); setEnglish((current) => current && { ...current, definitionVersion: result.survey.definitionVersion }); setDefinitionDirty(false); }
+    catch (cause) { setError(cause instanceof SurveyApiError && cause.code === 'stale_definition' ? '다른 변경 사항이 있습니다. 자동으로 다시 불러오지 않았습니다.' : '정의를 저장하지 못했습니다.'); }
+    finally { setSaving(false); }
+  };
+  const addSection = () => { if (!survey || !english) return; const ordinal = survey.sections.length; const section = { id: localId(), ordinal, title: { value: '', translationUnavailable: false }, items: [] }; setSurvey({ ...survey, sections: [...survey.sections, section] }); setEnglish({ ...english, sections: [...english.sections, section] }); setDefinitionDirty(true); };
+  const publish = async () => { if (!survey || !editable || settingsDirty || definitionDirty) { if (settingsDirty || definitionDirty) setError('게시하기 전에 변경 사항을 저장하세요.'); return; } setSaving(true); try { await surveyApi.publish(survey.id); await load(); } catch { setError('게시하지 못했습니다.'); } finally { setSaving(false); } };
+  if (!isNew && !survey) return <main className="p-6">{error || '불러오는 중…'}</main>;
+  return <main className="mx-auto max-w-5xl p-6"><Link to="/admin/surveys">목록</Link><h1 className="mt-4 text-2xl font-bold">설문 편집</h1>{error && <p role="alert">{error}</p>}
+    <section className="mt-6 rounded border p-4"><h2 className="font-bold">설문 설정</h2><label>한국어 제목<input value={title.kr} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setTitle((old) => ({ ...old, kr: e.target.value, ...(koreanOnly ? { en: e.target.value } : {}) })); }}/></label><label>English title<input value={title.en} readOnly={koreanOnly} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setTitle({ ...title, en: e.target.value }); }}/></label><label>설문 설명<textarea value={description.kr} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setDescription((old) => ({ ...old, kr: e.target.value, ...(koreanOnly ? { en: e.target.value } : {}) })); }}/></label><label>Survey description (English)<textarea value={description.en} readOnly={koreanOnly} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setDescription({ ...description, en: e.target.value }); }}/></label><label>응답 정원<input type="number" value={cap} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setCap(e.target.value); }}/></label><label>참가비 제한<select value={feeRestriction} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setFeeRestriction(e.target.value as 'ANY' | 'PAID_ONLY'); }}><option value="ANY">제한 없음</option><option value="PAID_ONLY">유료 회원만</option></select></label><label>응답 시작<input type="datetime-local" value={opensAt} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setOpensAt(e.target.value); }}/></label><label>응답 마감<input type="datetime-local" value={closesAt} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setClosesAt(e.target.value); }}/></label><label>수정 마감<input type="datetime-local" value={editDeadlineAt} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setEditDeadlineAt(e.target.value); }}/></label><label>보관 기간<input type="number" value={retentionDays} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setRetentionDays(e.target.value); }}/></label><label><input type="checkbox" checked={guestAllowed} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setGuestAllowed(e.target.checked); if (!e.target.checked) setPhoneRequired(false); }}/> 게스트 허용</label><label><input type="checkbox" checked={phoneRequired} disabled={!editable || !guestAllowed} onChange={(e) => { setSettingsDirty(true); setPhoneRequired(e.target.checked); }}/> 전화번호 필수</label><label><input type="checkbox" checked={koreanOnly} disabled={!editable} onChange={(e) => { setSettingsDirty(true); setKoreanOnly(e.target.checked); if (e.target.checked) { setTitle((old) => ({ ...old, en: old.kr })); setDescription((old) => ({ ...old, en: old.kr })); if (survey) { setEnglish({ ...survey, title: { ...survey.title }, description: survey.description ? { ...survey.description } : null }); setDefinitionDirty(true); } } }}/> 한국어 사용자 전용</label><button type="button" disabled={!editable || !settingsValid} onClick={() => void saveSettings()}>설정 저장</button></section>
+    {survey && <><section className="mt-6"><button type="button" disabled={!editable} onClick={addSection}>+ 섹션</button><button type="button" disabled={!editable || settingsDirty || definitionDirty} onClick={() => void publish()}>게시</button></section>{survey.sections.map((section, sectionIndex) => <section key={section.id} className="mt-6 rounded border p-4">{definitionDirty && <p role="status">이미지 변경 전에 정의를 저장하세요.</p>}<label>섹션 제목 (한국어)<input value={value(section.title)} disabled={!editable} onChange={(event) => { const next = event.target.value; setDefinitionDirty(true); setSurvey((current) => current && ({ ...current, sections: current.sections.map((candidate, index) => index === sectionIndex ? { ...candidate, title: { ...candidate.title, value: next } } : candidate) })); if (koreanOnly) setEnglish((current) => current && ({ ...current, sections: current.sections.map((candidate, index) => index === sectionIndex ? { ...candidate, title: { ...candidate.title, value: next } } : candidate) })); }}/></label><label>Section title (English)<input value={value(english?.sections[sectionIndex]?.title)} readOnly={koreanOnly} disabled={!editable} onChange={(event) => { setDefinitionDirty(true); setEnglish((current) => current && ({ ...current, sections: current.sections.map((candidate, index) => index === sectionIndex ? { ...candidate, title: { ...candidate.title, value: event.target.value } } : candidate) })); }}/></label><button type="button" disabled={!editable || sectionIndex === 0} onClick={() => { setSurvey({ ...survey, sections: move(survey.sections, sectionIndex, -1).map((item, ordinal) => ({ ...item, ordinal })) }); setEnglish((current) => current && ({ ...current, sections: move(current.sections, sectionIndex, -1).map((item, ordinal) => ({ ...item, ordinal })) })); setDefinitionDirty(true); }}>↑</button><button type="button" disabled={!editable || sectionIndex === survey.sections.length - 1} onClick={() => { setSurvey({ ...survey, sections: move(survey.sections, sectionIndex, 1).map((item, ordinal) => ({ ...item, ordinal })) }); setEnglish((current) => current && ({ ...current, sections: move(current.sections, sectionIndex, 1).map((item, ordinal) => ({ ...item, ordinal })) })); setDefinitionDirty(true); }}>↓</button><button type="button" disabled={!editable} onClick={() => { setSurvey({ ...survey, sections: survey.sections.filter((_, index) => index !== sectionIndex) }); setEnglish((current) => current && ({ ...current, sections: current.sections.filter((_, index) => index !== sectionIndex) })); setDefinitionDirty(true); }}>삭제</button>{section.items.map((item, index) => <div key={item.id}><Insertion onAdd={(kind) => updateItems(sectionIndex, (items) => [...items.slice(0, index), newItem(kind), ...items.slice(index)])}/><ItemEditor item={item} english={english?.sections[sectionIndex]?.items[index]} editable={Boolean(editable)} membershipEditable={Boolean(editable && !definitionDirty)} koreanOnly={koreanOnly} surveyId={survey.id} definitionVersion={survey.definitionVersion} onReload={load} onChange={(next) => updateItems(sectionIndex, (items) => items.map((old, itemIndex) => itemIndex === index ? next : old))} onMove={(offset) => updateItems(sectionIndex, (items) => move(items, index, offset))} onDelete={() => updateItems(sectionIndex, (items) => items.filter((_, itemIndex) => itemIndex !== index))}/></div>)}<Insertion onAdd={(kind) => updateItems(sectionIndex, (items) => [...items, newItem(kind)])}/></section>)}
+    <button type="button" disabled={!editable} onClick={() => void saveDefinition()}>정의 저장</button><SurveyDefinitionPreview survey={survey}/></>}</main>;
+}
+function questionInput(question: SurveyDto['sections'][number]['items'][number] extends never ? never : Extract<SurveyDto['sections'][number]['items'][number], { kind: 'QUESTION' }>['question'], english: Extract<SurveyDto['sections'][number]['items'][number], { kind: 'QUESTION' }>['question'] | undefined): SurveyQuestionDefinitionInput { const base = { id: question.id, ordinal: question.ordinal, prompt: { kr: value(question.prompt), en: value(english?.prompt) }, helpText: question.helpText ? { kr: value(question.helpText), en: value(english?.helpText) } : null, required: question.required }; if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') return { ...base, type: question.type, choices: question.choices.map((choice, index) => ({ id: choice.id, ordinal: index, value: { kr: value(choice.value), en: value(english?.choices[index]?.value) } })) }; if (question.type === 'NUMBER') return { ...base, type: 'NUMBER', numberMin: question.numberMin, numberMax: question.numberMax }; if (question.type === 'DATE') return { ...base, type: 'DATE', dateMin: question.dateMin, dateMax: question.dateMax }; return { ...base, type: question.type, validationRegex: question.validationRegex }; }
+function definitionQuestion(question: SurveyQuestionDefinitionInput): SurveyQuestionDefinitionInput {
+  const id = persistedId(question.id);
+  if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') return { ...question, ...(id ? { id } : { id: undefined }), choices: question.choices.map((choice) => ({ ...choice, ...(persistedId(choice.id) ? { id: choice.id } : { id: undefined }) })) };
+  return { ...question, ...(id ? { id } : { id: undefined }) };
+}
+function toDtoItem(item: SurveySectionItemDefinitionInput, locale: 'ko' | 'en'): SurveyDto['sections'][number]['items'][number] {
+  const localized = (text: SurveyBilingualText) => ({ value: text[locale === 'ko' ? 'kr' : 'en'], translationUnavailable: false });
+  const id = item.id ?? localId();
+  if (item.kind === 'DESCRIPTION') return { id, ordinal: item.ordinal, kind: 'DESCRIPTION', body: localized(item.body) };
+  if (item.kind === 'IMAGE_BLOCK') return { id, ordinal: item.ordinal, kind: 'IMAGE_BLOCK', mode: item.mode, membershipCounts: { shared: 0, ko: 0, en: 0 } };
+  const question = item.question;
+  const base = { id: question.id ?? localId(), ordinal: question.ordinal, prompt: localized(question.prompt), helpText: question.helpText ? localized(question.helpText) : null, required: question.required };
+  if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') return { id, ordinal: item.ordinal, kind: 'QUESTION', question: { ...base, type: question.type, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: question.choices.map((choice) => ({ id: choice.id ?? localId(), ordinal: choice.ordinal, value: localized(choice.value) })) } };
+  if (question.type === 'NUMBER') return { id, ordinal: item.ordinal, kind: 'QUESTION', question: { ...base, type: 'NUMBER', validationRegex: null, numberMin: question.numberMin ?? null, numberMax: question.numberMax ?? null, dateMin: null, dateMax: null, choices: [] } };
+  if (question.type === 'DATE') return { id, ordinal: item.ordinal, kind: 'QUESTION', question: { ...base, type: 'DATE', validationRegex: null, numberMin: null, numberMax: null, dateMin: question.dateMin ?? null, dateMax: question.dateMax ?? null, choices: [] } };
+  return { id, ordinal: item.ordinal, kind: 'QUESTION', question: { ...base, type: question.type, validationRegex: question.validationRegex ?? null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [] } };
+}
+function newItem(kind: 'DESCRIPTION' | 'IMAGE_BLOCK' | 'QUESTION'): SurveySectionItemDefinitionInput { const id = localId(); return kind === 'DESCRIPTION' ? { id, ordinal: 0, kind, body: blank() } : kind === 'IMAGE_BLOCK' ? { id, ordinal: 0, kind, mode: 'SHARED' } : { id, ordinal: 0, kind, question: itemQuestion('SHORT_TEXT') }; }
+function move<T>(items: T[], index: number, offset: number): T[] { const target = index + offset; if (target < 0 || target >= items.length) return items; const next = [...items]; [next[index], next[target]] = [next[target]!, next[index]!]; return next; }
+function Insertion({ onAdd }: { onAdd: (kind: 'DESCRIPTION' | 'IMAGE_BLOCK' | 'QUESTION') => void }) { return <div className="my-2"><button type="button" aria-label="항목 추가" onClick={() => onAdd('QUESTION')}>+</button><button type="button" onClick={() => onAdd('DESCRIPTION')}>설명 추가</button><button type="button" onClick={() => onAdd('IMAGE_BLOCK')}>이미지 추가</button></div>; }
+function ItemEditor({ item, english, editable, membershipEditable, koreanOnly, surveyId, definitionVersion, onReload, onChange, onMove, onDelete }: { item: SurveyDto['sections'][number]['items'][number]; english: SurveyDto['sections'][number]['items'][number] | undefined; editable: boolean; membershipEditable: boolean; koreanOnly: boolean; surveyId: string; definitionVersion: number; onReload: () => Promise<void | SurveyDto>; onChange: (item: SurveySectionItemDefinitionInput) => void; onMove: (offset: number) => void; onDelete: () => void }) { const controls = <><button type="button" disabled={!editable} onClick={() => onMove(-1)}>↑</button><button type="button" disabled={!editable} onClick={() => onMove(1)}>↓</button><button type="button" disabled={!editable} onClick={onDelete}>삭제</button></>; if (item.kind === 'DESCRIPTION') { const en = english?.kind === 'DESCRIPTION' ? value(english.body) : ''; return <div className="rounded bg-slate-50 p-3">{controls}<label>설명 (한국어)<textarea required value={value(item.body)} disabled={!editable} onChange={(e) => onChange({ id: item.id, ordinal: item.ordinal, kind: 'DESCRIPTION', body: { kr: e.target.value, en: koreanOnly ? e.target.value : en } })}/></label><label>Description (English)<textarea required value={koreanOnly ? value(item.body) : en} readOnly={koreanOnly} disabled={!editable} onChange={(e) => onChange({ id: item.id, ordinal: item.ordinal, kind: 'DESCRIPTION', body: { kr: value(item.body), en: e.target.value } })}/></label></div>; } if (item.kind === 'IMAGE_BLOCK') return <ImageBlockEditor item={item} editable={membershipEditable} koreanOnly={koreanOnly} surveyId={surveyId} definitionVersion={definitionVersion} onReload={onReload}>{controls}</ImageBlockEditor>; const q = item.question; const en = english?.kind === 'QUESTION' ? english.question : undefined; const input = questionInput(q, en); const patch = (next: SurveyQuestionDefinitionInput) => onChange({ id: item.id, ordinal: item.ordinal, kind: 'QUESTION', question: next }); const localized = (key: 'prompt' | 'helpText', locale: 'kr' | 'en', nextValue: string) => { const current = key === 'prompt' ? input.prompt : input.helpText ?? blank(); patch({ ...input, [key]: { ...current, [locale]: nextValue, ...(koreanOnly && locale === 'kr' ? { en: nextValue } : {}) } } as SurveyQuestionDefinitionInput); }; const choices = 'choices' in input && input.choices ? input.choices : []; return <div className="rounded bg-slate-50 p-3">{controls}<select value={q.type} disabled={!editable} onChange={(e) => patch(itemQuestion(e.target.value as SurveyQuestionType))}>{types.map((type) => <option key={type}>{type}</option>)}</select><label><input type="checkbox" checked={q.required} disabled={!editable} onChange={(e) => patch({ ...input, required: e.target.checked })}/> 필수</label><label>질문 (한국어)<input value={value(q.prompt)} disabled={!editable} onChange={(e) => localized('prompt', 'kr', e.target.value)}/></label><label>Question (English)<input value={koreanOnly ? value(q.prompt) : value(en?.prompt)} readOnly={koreanOnly} disabled={!editable} onChange={(e) => localized('prompt', 'en', e.target.value)}/></label><label>도움말 (한국어)<input value={value(q.helpText)} disabled={!editable} onChange={(e) => localized('helpText', 'kr', e.target.value)}/></label><label>Help text (English)<input value={koreanOnly ? value(q.helpText) : value(en?.helpText)} readOnly={koreanOnly} disabled={!editable} onChange={(e) => localized('helpText', 'en', e.target.value)}/></label>{(q.type === 'SHORT_TEXT' || q.type === 'LONG_TEXT') && <label>검증 정규식<input value={q.validationRegex ?? ''} disabled={!editable} onChange={(e) => patch({ ...input, validationRegex: e.target.value || null } as SurveyQuestionDefinitionInput)}/></label>}{q.type === 'NUMBER' && <><label>최솟값<input type="number" value={q.numberMin ?? ''} disabled={!editable} onChange={(e) => patch({ ...input, numberMin: e.target.value === '' ? null : Number(e.target.value) } as SurveyQuestionDefinitionInput)}/></label><label>최댓값<input type="number" value={q.numberMax ?? ''} disabled={!editable} onChange={(e) => patch({ ...input, numberMax: e.target.value === '' ? null : Number(e.target.value) } as SurveyQuestionDefinitionInput)}/></label></>}{q.type === 'DATE' && <><label>시작일<input type="date" value={q.dateMin ?? ''} disabled={!editable} onChange={(e) => patch({ ...input, dateMin: e.target.value || null } as SurveyQuestionDefinitionInput)}/></label><label>종료일<input type="date" value={q.dateMax ?? ''} disabled={!editable} onChange={(e) => patch({ ...input, dateMax: e.target.value || null } as SurveyQuestionDefinitionInput)}/></label></>}{choices.map((choice, index) => <div key={index}><input aria-label={`선택지 ${index + 1} 한국어`} value={choice.value.kr} disabled={!editable} onChange={(e) => patch({ ...input, choices: choices.map((candidate, choiceIndex) => choiceIndex === index ? { ...candidate, value: { ...candidate.value, kr: e.target.value, ...(koreanOnly ? { en: e.target.value } : {}) } } : candidate) } as SurveyQuestionDefinitionInput)}/><input aria-label={`Choice ${index + 1} English`} value={koreanOnly ? choice.value.kr : choice.value.en} readOnly={koreanOnly} disabled={!editable} onChange={(e) => patch({ ...input, choices: choices.map((candidate, choiceIndex) => choiceIndex === index ? { ...candidate, value: { ...candidate.value, en: e.target.value } } : candidate) } as SurveyQuestionDefinitionInput)}/><button type="button" disabled={!editable} onClick={() => patch({ ...input, choices: choices.filter((_, choiceIndex) => choiceIndex !== index).map((candidate, ordinal) => ({ ...candidate, ordinal })) } as SurveyQuestionDefinitionInput)}>선택지 삭제</button></div>)}{(q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE') && <button type="button" disabled={!editable} onClick={() => patch({ ...input, choices: [...choices, { ordinal: choices.length, value: blank() }] } as SurveyQuestionDefinitionInput)}>선택지 추가</button>}</div>; }
+function ImageBlockEditor({ item, editable, koreanOnly, surveyId, definitionVersion, onReload, children }: { item: Extract<SurveyDto['sections'][number]['items'][number], { kind: 'IMAGE_BLOCK' }>; editable: boolean; koreanOnly: boolean; surveyId: string; definitionVersion: number; onReload: () => Promise<void | SurveyDto>; children: ReactNode }) {
+  const [set, setSet] = useState<'SHARED' | 'KO' | 'EN'>(item.mode === 'SHARED' ? 'SHARED' : 'KO');
+  const [memberships, setMemberships] = useState<Array<{ id: string; asset: { id: string; src: string } }>>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const version = useRef(definitionVersion);
+  const generation = useRef(0);
+  useEffect(() => { version.current = Math.max(version.current, definitionVersion); }, [definitionVersion]);
+  useEffect(() => { setSet(item.mode === 'SHARED' ? 'SHARED' : 'KO'); }, [item.mode]);
+  const mutation = () => crypto.randomUUID();
+  const page = async (next?: string, current = generation.current) => {
+    try {
+      const result = await surveyApi.imageMemberships(surveyId, item.id, { set, limit: 20, ...(next ? { cursor: next } : {}) });
+      if (current !== generation.current) return;
+      setMemberships((old) => next ? [...old, ...result.items] : result.items);
+      setCursor(result.nextCursor);
+      setError('');
+    } catch {
+      if (current === generation.current) setError('이미지를 불러오지 못했습니다.');
+    }
+  };
+  useEffect(() => {
+    const current = ++generation.current;
+    setMemberships([]); setCursor(null); setError('');
+    if (item.id) void page(undefined, current);
+    return () => { if (generation.current === current) generation.current += 1; };
+  }, [item.id, set]);
+  const run = async (work: () => Promise<{ definitionVersion: number }>) => {
+    setBusy(true); setError('');
+    try {
+      const result = await work();
+      version.current = result.definitionVersion;
+      await onReload();
+      await page();
+    } catch (cause) {
+      if (cause instanceof SurveyApiError && cause.code === 'stale_definition') {
+        const authoritative = await onReload();
+        if (authoritative) version.current = authoritative.definitionVersion;
+        const current = ++generation.current;
+        setMemberships([]); setCursor(null);
+        await page(undefined, current);
+        setError('다른 변경 사항을 불러왔습니다. 다시 수정하세요.');
+      } else setError('이미지 변경을 저장하지 못했습니다.');
+    } finally { setBusy(false); }
+  };
+  const persisted = Boolean(item.id && !item.id.startsWith('local-'));
+  const membershipMutationDisabled = !editable || busy || (koreanOnly && set === 'EN');
+  const activeCount = set === 'SHARED' ? item.membershipCounts.shared : set === 'KO' ? item.membershipCounts.ko : item.membershipCounts.en;
+  return <div className="rounded bg-slate-50 p-3">{children}
+    <label>이미지 모드 <select value={item.mode} disabled={!editable || busy} onChange={(event) => {
+      const mode = event.target.value as 'SHARED' | 'LOCALIZED';
+      if (mode === 'SHARED' && set === 'SHARED') return;
+      const retainSet: 'KO' | 'EN' | undefined = mode === 'SHARED' && set !== 'SHARED' ? set : undefined;
+      void run(() => surveyApi.changeImageBlockMode(surveyId, item.id, { expectedDefinitionVersion: version.current, clientMutationId: mutation(), mode, ...(retainSet ? { retainSet } : {}) }));
+    }}><option value={item.mode}>{item.mode}</option><option value={item.mode === 'SHARED' ? 'LOCALIZED' : 'SHARED'}>{item.mode === 'SHARED' ? 'LOCALIZED' : 'SHARED'}</option></select></label>
+    {item.mode === 'LOCALIZED' && <label>세트 <select value={set} disabled={!editable || busy} onChange={(event) => setSet(event.target.value as 'KO' | 'EN')}><option value="KO">KO</option><option value="EN">EN</option></select></label>}
+    <p>이미지 {activeCount}개</p>
+    {!persisted && <p>이미지 변경 전에 정의를 저장하세요.</p>}
+    <input aria-label="이미지 업로드" type="file" accept="image/*" multiple disabled={membershipMutationDisabled} onChange={(event) => {
+      const files = [...(event.target.files ?? [])];
+      void files.reduce(async (previous, file) => { await previous; await run(async () => {
+        const asset = await surveyApi.uploadSurveyImage(file);
+        return surveyApi.addImageMembership(surveyId, item.id, { expectedDefinitionVersion: version.current, clientMutationId: mutation(), set, assetId: asset.id });
+      }); }, Promise.resolve());
+      event.currentTarget.value = '';
+    }}/>
+    {memberships.map((membership, index) => <div key={membership.id}><img src={membership.asset.src} alt="" className="h-16 w-16 object-cover"/>
+      <button type="button" disabled={membershipMutationDisabled} onClick={() => void run(() => surveyApi.removeImageMembership(surveyId, item.id, membership.id, { expectedDefinitionVersion: version.current, clientMutationId: mutation() }))}>삭제</button>
+      <button type="button" disabled={membershipMutationDisabled || index === 0} onClick={() => void run(() => surveyApi.moveImageMembership(surveyId, item.id, membership.id, { expectedDefinitionVersion: version.current, clientMutationId: mutation(), afterMembershipId: memberships[index - 2]?.id ?? null }))}>↑</button>
+      <button type="button" disabled={membershipMutationDisabled || index === memberships.length - 1} onClick={() => void run(() => surveyApi.moveImageMembership(surveyId, item.id, membership.id, { expectedDefinitionVersion: version.current, clientMutationId: mutation(), afterMembershipId: memberships[index + 1]?.id ?? null }))}>↓</button>
+    </div>)}
+    {cursor && <button type="button" disabled={!editable || busy} onClick={() => void page(cursor)}>더 보기</button>}
+    {error && <p role="alert">{error}</p>}
+  </div>;
 }

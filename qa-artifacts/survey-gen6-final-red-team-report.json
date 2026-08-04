@@ -1,0 +1,96 @@
+{
+  "sourceHash": "sha256:255a8b4762a6844219f465409fc3f36c1672478bd1aeefc4bac8f8d3f46d2b21",
+  "generation": 6,
+  "status": "passed",
+  "commands": [
+    {
+      "command": "pnpm --filter @soc/web exec playwright test e2e/survey-ui.spec.ts --reporter=line",
+      "status": "passed",
+      "evidence": "2 passed (4.5s)"
+    },
+    {
+      "command": "pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4173 --strictPort > /tmp/survey-gen6-vite.log & sleep 3; node qa-artifacts/run-survey-browser-qa-gen6.cjs; status=$?; fuser -k 4173/tcp; exit $status",
+      "status": "passed",
+      "evidence": "Generation-6 Chromium transcript and rendered 320px PUBLIC-confirmation screenshot generated."
+    },
+    {
+      "command": "pnpm --filter @soc/web exec vitest run src/test/survey-pages.test.tsx --testNamePattern=\"blocks dirty Link\"",
+      "status": "passed",
+      "evidence": "1 passed; validates Link, programmatic, history, and beforeunload blocking."
+    }
+  ],
+  "contractCoverage": [
+    {
+      "contract": "320px header geometry and action usability",
+      "status": "passed",
+      "evidence": "Three header actions measured at least 44x44px; public and admin documents fit a 320px viewport."
+    },
+    {
+      "contract": "Public locale, validation, and privacy non-disclosure",
+      "status": "passed",
+      "evidence": "Required radio sets aria-invalid=true; Korean-to-English renders Public survey; public body excludes phone/hash/ciphertext/reviewer terms."
+    },
+    {
+      "contract": "Stale response scope, review confirmation, and PUBLIC materialization",
+      "status": "passed",
+      "evidence": "Stale response is non-actionable until retry; exact rejection payload is sent; cancel is focused; confirmation visibly discloses N1 and PUBLIC; materialization payload exactly matches location N1 and visibility PUBLIC."
+    },
+    {
+      "contract": "Dirty editor navigation",
+      "status": "passed",
+      "evidence": "Focused test passed for Link, programmatic, history, and beforeunload navigation blocking."
+    }
+  ],
+  "surfaceEvidence": [
+    {
+      "surface": "Public survey at 320x700",
+      "artifactRef": "qa-artifacts/survey-gen6-browser-transcript.json",
+      "status": "passed"
+    },
+    {
+      "surface": "Admin PUBLIC-event confirmation at 320x700",
+      "artifactRef": "qa-artifacts/survey-gen6-admin-public-confirmation-320.png",
+      "status": "passed",
+      "note": "Visual evidence is a non-uniform rendered UI and visibly shows N1 and PUBLIC in the confirmation dialog."
+    }
+  ],
+  "adversarialCases": [
+    {
+      "case": "Submit unanswered required public question",
+      "status": "passed",
+      "result": "Question enters invalid state without horizontal overflow."
+    },
+    {
+      "case": "Switch public locale at narrow viewport",
+      "status": "passed",
+      "result": "English localized title renders while 320px layout remains within viewport."
+    },
+    {
+      "case": "Open stale admin response scope",
+      "status": "passed",
+      "result": "Review action is absent until retry loads the current response tuple."
+    },
+    {
+      "case": "Cancel destructive rejection review",
+      "status": "passed",
+      "result": "Cancel control receives focus and no review request is made until confirmed."
+    },
+    {
+      "case": "PUBLIC materialization disclosure and exact payload",
+      "status": "passed",
+      "result": "Confirmation names N1 and PUBLIC; request body is exactly location N1 with visibility PUBLIC."
+    },
+    {
+      "case": "Unsaved editor navigation",
+      "status": "passed",
+      "result": "Link, programmatic, history, and beforeunload attempts block before confirmation."
+    }
+  ],
+  "artifactRefs": [
+    "qa-artifacts/run-survey-browser-qa-gen6.cjs",
+    "qa-artifacts/survey-gen6-browser-transcript.json",
+    "qa-artifacts/survey-gen6-admin-public-confirmation-320.png",
+    "qa-artifacts/survey-gen6-final-red-team-report.json"
+  ],
+  "blockers": []
+}

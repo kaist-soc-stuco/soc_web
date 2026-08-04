@@ -1,0 +1,91 @@
+{
+  "sourceHash": "sha256:da8f3193b40651bb2e5b628fe33452a48315927e31ed58940cb88102cca47451",
+  "generation": 4,
+  "status": "passed",
+  "commands": [
+    {
+      "command": "pnpm --filter @soc/web exec playwright test e2e/survey-ui.spec.ts --reporter=line",
+      "status": "passed",
+      "evidence": "2 passed (4.5s)"
+    },
+    {
+      "command": "node qa-artifacts/run-survey-browser-qa-gen4.cjs",
+      "status": "passed",
+      "evidence": "Chromium transcript and 320px confirmation screenshot generated"
+    },
+    {
+      "command": "pnpm --filter @soc/web exec vitest run src/test/survey-pages.test.tsx --testNamePattern=\"blocks dirty Link\"",
+      "status": "passed",
+      "evidence": "1 passed; validates Link, programmatic, history, and beforeunload blocking"
+    }
+  ],
+  "contractCoverage": [
+    {
+      "contract": "320px header geometry and actions",
+      "status": "passed",
+      "evidence": "Three header actions were present and each measured at least 44x44px; public and admin document widths fit 320px."
+    },
+    {
+      "contract": "Public locale, validation errors, and privacy",
+      "status": "passed",
+      "evidence": "Required radio question exposed aria-invalid=true; Korean-to-English locale switch rendered Public survey and Attend; public body had no phone/hash/ciphertext/reviewer terms."
+    },
+    {
+      "contract": "Admin stale scope, review, and PUBLIC materialization",
+      "status": "passed",
+      "evidence": "Stale detail rendered non-actionable; retry produced exact rejection tuple; cancel control was focused; confirmation disclosed N1 and PUBLIC; exact materialization payload was sent."
+    },
+    {
+      "contract": "Dirty navigation",
+      "status": "passed",
+      "evidence": "Focused browser-like editor test verified Link, programmatic, history, and browser-unload navigation remain blocked until confirmation."
+    }
+  ],
+  "surfaceEvidence": [
+    {
+      "surface": "Public survey at 320x700",
+      "artifactRef": "qa-artifacts/survey-gen4-browser-transcript.json",
+      "status": "passed"
+    },
+    {
+      "surface": "Admin PUBLIC-event confirmation at 320x700",
+      "artifactRef": "qa-artifacts/survey-gen4-admin-public-confirmation-320.png",
+      "status": "passed",
+      "note": "Visual inspection confirms a non-uniform rendered UI with visible N1 and PUBLIC disclosure."
+    }
+  ],
+  "adversarialCases": [
+    {
+      "case": "Submit unanswered required public question",
+      "status": "passed",
+      "result": "Question entered invalid state without navigation overflow."
+    },
+    {
+      "case": "Stale admin response tuple",
+      "status": "passed",
+      "result": "Action button absent until retry loads current tuple."
+    },
+    {
+      "case": "Cancel destructive review confirmation",
+      "status": "passed",
+      "result": "Cancel control receives focus and no review request is sent until confirmed."
+    },
+    {
+      "case": "PUBLIC materialization disclosure and payload",
+      "status": "passed",
+      "result": "Dialog names N1 and PUBLIC; request body exactly equals location N1 with visibility PUBLIC."
+    },
+    {
+      "case": "Unsaved editor navigation",
+      "status": "passed",
+      "result": "Link, programmatic, history, and beforeunload attempts block before user confirmation."
+    }
+  ],
+  "artifactRefs": [
+    "qa-artifacts/run-survey-browser-qa-gen4.cjs",
+    "qa-artifacts/survey-gen4-browser-transcript.json",
+    "qa-artifacts/survey-gen4-admin-public-confirmation-320.png",
+    "qa-artifacts/survey-gen4-final-red-team-report.json"
+  ],
+  "blockers": []
+}

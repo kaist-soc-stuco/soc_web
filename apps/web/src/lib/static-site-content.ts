@@ -1,5 +1,5 @@
 import type { EffectivePermissionGrant } from '@soc/contracts';
-import { hasAdminGrant, type AdminGrantRequirement } from './admin-access';
+import { hasAdminGrant, hasGlobalGrant, type AdminGrantRequirement } from './admin-access';
 
 export const roadmapMilestones = [
   '1학년: 기초 프로그래밍, 자료구조, 수리 기초 다지기',
@@ -85,5 +85,7 @@ export const adminMenu: readonly AdminMenuItem[] = [
 ];
 
 export function visibleAdminMenu(grants: readonly EffectivePermissionGrant[]): AdminMenuItem[] {
-  return adminMenu.filter((item) => hasAdminGrant(grants, item.access));
+  return adminMenu.filter((item) => item.to === '/admin/surveys'
+    ? hasGlobalGrant(grants, 'SURVEY_MANAGE') || hasGlobalGrant(grants, 'SURVEY_REVIEW')
+    : hasAdminGrant(grants, item.access));
 }

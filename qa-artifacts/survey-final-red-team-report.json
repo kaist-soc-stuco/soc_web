@@ -1,0 +1,141 @@
+{
+  "sourceHash": "sha256:c79ce2a107c1d2ded7070b21d0f9589db0ba0cb643d74a4a0d3678166ab7135e",
+  "status": "blocked",
+  "e2eStatus": "passed-with-coverage-gap",
+  "redTeamStatus": "blocked",
+  "commands": [
+    {
+      "command": "python3 - <<'PY' ... git ls-files --modified --others --exclude-standard ... SHA-256(path + NUL + bytes + NUL) ... PY",
+      "result": "passed: sha256:c79ce2a107c1d2ded7070b21d0f9589db0ba0cb643d74a4a0d3678166ab7135e"
+    },
+    {
+      "command": "pnpm exec playwright test e2e/survey-ui.spec.ts",
+      "cwd": "apps/web",
+      "result": "passed: 2 passed (4.3s), Chromium mocked-Vite browser harness"
+    },
+    {
+      "command": "pnpm exec vitest run src/test/admin-survey-operations-page.test.tsx src/test/survey-api.test.ts --config vitest.config.ts",
+      "cwd": "apps/web",
+      "result": "passed: 2 files, 15 tests"
+    },
+    {
+      "command": "pnpm --filter @soc/api test:unit -- surveys.unit.spec.ts",
+      "result": "passed: 18 files, 226 tests"
+    },
+    {
+      "command": "pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4173 --strictPort; node qa-artifacts/run-survey-browser-qa.cjs",
+      "result": "passed: generated bound headless-Chromium transcript and 320px PNG"
+    }
+  ],
+  "contractCoverage": [
+    {
+      "surface": "public locale fetch and privacy non-disclosure",
+      "status": "passed",
+      "evidence": "Bound Chromium transcript records locale=ko then locale=en survey reads, English title/radio rendering, privateTermsAbsent=true, and 320px width measurement."
+    },
+    {
+      "surface": "review response tuple and rejected reason",
+      "status": "passed",
+      "evidence": "Focused Playwright confirms exact {expectedSurveyRevisionId:'revision-1',state:'REJECTED',reason:'No capacity'} POST. Focused operations unit coverage additionally exercises stale-detail non-actionability and rejection reason lengths 0/1/500/501."
+    },
+    {
+      "surface": "PUBLIC materialization and result contract",
+      "status": "passed",
+      "evidence": "Focused Playwright confirms default {location:'N1',visibility:'PUBLIC'} payload and /events/event-1 result link; focused operations unit asserts manager-only materialization and the same payload."
+    },
+    {
+      "surface": "API/package survey contracts",
+      "status": "passed",
+      "evidence": "Focused web transport tests passed 7 tests and API unit suite passed 226 tests. This is mocked/units only, not live API/auth/DB evidence."
+    },
+    {
+      "surface": "dirty navigation",
+      "status": "not-proven",
+      "evidence": "Production hook uses useBlocker and beforeunload, but the focused browser suite has no dirty Link/programmatic/Back-Forward/unload scenario. The approved plan requires that explicit proof."
+    },
+    {
+      "surface": "320px responsive usability",
+      "status": "failed",
+      "evidence": "The fresh non-uniform 320px public screenshot has no horizontal document overflow, but visually shows KAIST/committee branding colliding with the Login control. This is not a usable responsive header/action surface."
+    }
+  ],
+  "surfaceEvidence": [
+    {
+      "kind": "browser-automation-transcript",
+      "path": "qa-artifacts/survey-browser-transcript.json",
+      "status": "passed",
+      "details": "Bound to exact sourceHash; real headless Chromium against Vite with mocked /api/** responses."
+    },
+    {
+      "kind": "browser-screenshot",
+      "path": "qa-artifacts/survey-public-320-en.png",
+      "status": "failed",
+      "details": "Fresh non-uniform 320x700 English public-survey screenshot; visual header collision is reproducible evidence."
+    },
+    {
+      "kind": "typed-test-report",
+      "path": "qa-artifacts/survey-final-red-team-report.json",
+      "status": "blocked",
+      "details": "This exact frozen-source report."
+    }
+  ],
+  "adversarialCases": [
+    {
+      "case": "stale review tuple/detail race",
+      "status": "passed",
+      "evidence": "Focused operations unit test 'replaces filter/cursor URL state and stale detail cannot become actionable'."
+    },
+    {
+      "case": "rejected reason boundaries and exact review tuple",
+      "status": "passed",
+      "evidence": "Operations unit tests 0/1/500/501 reason lengths; Playwright exact REJECTED payload."
+    },
+    {
+      "case": "PUBLIC event confirmation",
+      "status": "passed",
+      "evidence": "Playwright cancel/confirm flow asserts PUBLIC default materialization request and event link."
+    },
+    {
+      "case": "privacy non-disclosure",
+      "status": "passed",
+      "evidence": "Browser transcript and Playwright body scan find no phone/hash/ciphertext/reviewer text."
+    },
+    {
+      "case": "locale refetch",
+      "status": "passed",
+      "evidence": "Transcript records survey locale=ko and locale=en reads and English localized content."
+    },
+    {
+      "case": "dirty navigation",
+      "status": "not-proven",
+      "evidence": "No focused browser case proves Link, programmatic navigation, history traversal, and beforeunload behavior."
+    },
+    {
+      "case": "responsive overflow",
+      "status": "failed",
+      "evidence": "scrollWidth=innerWidth=320 passes the mechanical check, but the screenshot exposes a visual header collision; the acceptance surface is not usable."
+    }
+  ],
+  "artifactRefs": [
+    {
+      "path": "qa-artifacts/survey-browser-transcript.json",
+      "kind": "browser-automation-transcript"
+    },
+    {
+      "path": "qa-artifacts/survey-public-320-en.png",
+      "kind": "browser-screenshot"
+    },
+    {
+      "path": "qa-artifacts/survey-final-red-team-report.json",
+      "kind": "typed-test-report"
+    },
+    {
+      "path": "qa-artifacts/run-survey-browser-qa.cjs",
+      "kind": "browser-evidence-replay-script"
+    }
+  ],
+  "blockers": [
+    "Plan/code mismatch: the 320px public GUI screenshot shows the header branding colliding with the Login control despite no document horizontal overflow; this fails the required usable responsive action surface.",
+    "Plan/code/evidence mismatch: approved acceptance criterion 7 requires dirty Link, programmatic, Back/Forward, and beforeunload proof. The focused Playwright suite contains no dirty-navigation case, so this release criterion is unproven."
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "sourceHash": "sha256:2acecd7be91125f191f2039da3905eac0e54b19db32ea3e87d7a9c3acca4df61",
+  "status": "passed",
+  "scenario": "generation-3 live Chromium mocked survey public/admin adversarial flow",
+  "viewport": {
+    "width": 320,
+    "height": 700
+  },
+  "assertions": {
+    "publicRequiredError": true,
+    "localeEnglish": true,
+    "publicPrivacyNonDisclosure": true,
+    "publicActionGeometry": {
+      "scrollWidth": 320,
+      "innerWidth": 320,
+      "fits": true
+    },
+    "staleDetailNonActionable": true,
+    "reviewCancelFocus": true,
+    "exactRejectedReviewPayload": true,
+    "publicConfirmationDisclosure": true,
+    "adminActionGeometry": {
+      "scrollWidth": 320,
+      "innerWidth": 320,
+      "fits": true
+    },
+    "exactPublicMaterializationPayload": true,
+    "eventLink": true,
+    "adminPrivacyNonDisclosure": true
+  },
+  "requests": [
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=ko",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=en",
+    "GET /api/surveys/survey-1?locale=en",
+    "GET /api/auth/session",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=en",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=en",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=ko",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=ko",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses/response-1?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses/response-1?locale=ko",
+    "POST /api/admin/surveys/survey-1/responses/response-1/review?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "POST /api/admin/surveys/survey-1/materialize-event"
+  ]
+}

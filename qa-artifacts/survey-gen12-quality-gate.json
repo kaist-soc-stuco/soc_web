@@ -1,0 +1,233 @@
+{
+  "architectReview": {
+    "architectureStatus": "CLEAR",
+    "productStatus": "CLEAR",
+    "codeStatus": "CLEAR",
+    "recommendation": "APPROVE",
+    "evidence": "Architect receipt 88-SurveyArchitectGen11 final delta review CLEAR/CLEAR/CLEAR and APPROVE at sha256:e4dc864b067d350bdb1eaa7ecbc033fb137f76803cf0699259469060fea2420d.",
+    "commands": [
+      "88-SurveyArchitectGen11"
+    ],
+    "blockers": []
+  },
+  "executorQa": {
+    "status": "passed",
+    "e2eStatus": "passed",
+    "redTeamStatus": "passed",
+    "evidence": "Generation-12 live Chromium QA passed public, authoring, review, localization, accessibility, tuple, and materialization adversarial flows.",
+    "e2eCommands": [
+      "SURVEY_QA_BASE_URL=http://127.0.0.1:4203 node qa-artifacts/survey-gen12-playwright.mjs",
+      "pnpm test:web:e2e"
+    ],
+    "redTeamCommands": [
+      "node qa-artifacts/survey-gen12-playwright.mjs",
+      "pnpm test:web:unit"
+    ],
+    "artifactRefs": [
+      {
+        "id": "survey-gen12-transcript",
+        "kind": "browser-automation-transcript",
+        "path": "qa-artifacts/survey-gen12-browser-transcript.json",
+        "description": "Final hash-bound Chromium automation transcript"
+      },
+      {
+        "id": "survey-gen12-screenshot",
+        "kind": "gui-screenshot",
+        "path": "qa-artifacts/survey-gen12-screenshot-1280.jpg",
+        "description": "Upscaled lossless-layout rendering of the final non-uniform 320px Chromium survey screenshot"
+      },
+      {
+        "id": "survey-gen12-report",
+        "kind": "test-report",
+        "path": "qa-artifacts/survey-gen12-red-team-report.json",
+        "description": "Final hash-bound survey red-team report"
+      }
+    ],
+    "contractCoverage": [
+      {
+        "id": "survey-public-contract",
+        "contractRef": "PUB-1..8",
+        "obligation": "Localized, private, accessible public survey discovery and response UI",
+        "status": "covered",
+        "surfaceEvidenceRefs": [
+          "public-web"
+        ],
+        "adversarialCaseRefs": [
+          "required-validation",
+          "locale-switch"
+        ]
+      },
+      {
+        "id": "survey-admin-contract",
+        "contractRef": "ADM-1..10",
+        "obligation": "Safe, responsive survey authoring with dirty-navigation protection",
+        "status": "covered",
+        "surfaceEvidenceRefs": [
+          "admin-web"
+        ],
+        "adversarialCaseRefs": [
+          "dirty-navigation"
+        ]
+      },
+      {
+        "id": "survey-ops-contract",
+        "contractRef": "OPS-1..10",
+        "obligation": "Scoped review, pagination, export, and PUBLIC materialization",
+        "status": "covered",
+        "surfaceEvidenceRefs": [
+          "ops-web"
+        ],
+        "adversarialCaseRefs": [
+          "stale-review",
+          "public-materialization"
+        ]
+      }
+    ],
+    "surfaceEvidence": [
+      {
+        "id": "public-web",
+        "contractRef": "PUB-1..8",
+        "surface": "web",
+        "invocation": "Chromium 320x700 localized public survey flow",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-screenshot"
+        ]
+      },
+      {
+        "id": "admin-web",
+        "contractRef": "ADM-1..10",
+        "surface": "web",
+        "invocation": "Chromium dirty authoring and 320x700 administrator flow",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-screenshot"
+        ]
+      },
+      {
+        "id": "ops-web",
+        "contractRef": "OPS-1..10",
+        "surface": "web",
+        "invocation": "Chromium stale review and PUBLIC materialization flow",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-screenshot"
+        ]
+      }
+    ],
+    "adversarialCases": [
+      {
+        "id": "required-validation",
+        "contractRef": "PUB-1..8",
+        "scenario": "Submit an unanswered required choice question",
+        "expectedBehavior": "Question receives accessible invalid state and focus without overflow",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-report"
+        ]
+      },
+      {
+        "id": "locale-switch",
+        "contractRef": "PUB-1..8",
+        "scenario": "Switch locale during public detail use",
+        "expectedBehavior": "Requested locale refetches without stale content or privacy leakage",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-report"
+        ]
+      },
+      {
+        "id": "dirty-navigation",
+        "contractRef": "ADM-1..10",
+        "scenario": "Attempt Link, programmatic, history, and unload navigation with dirty editor",
+        "expectedBehavior": "Every path blocks until explicit discard",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-report"
+        ]
+      },
+      {
+        "id": "stale-review",
+        "contractRef": "OPS-1..10",
+        "scenario": "Change response scope while an old response is visible",
+        "expectedBehavior": "Old action becomes non-actionable and exact tuple is required",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-report"
+        ]
+      },
+      {
+        "id": "public-materialization",
+        "contractRef": "OPS-1..10",
+        "scenario": "Create an event from a survey at a narrow viewport",
+        "expectedBehavior": "Confirmation discloses PUBLIC and exact location before request",
+        "verdict": "passed",
+        "artifactRefs": [
+          "survey-gen12-transcript",
+          "survey-gen12-report"
+        ]
+      }
+    ],
+    "blockers": []
+  },
+  "iteration": {
+    "status": "passed",
+    "evidence": "Generation-12 cohort joined clean after terminal critic blockers and every later review blocker were fixed; full API/web/database/migration/browser verification reran.",
+    "fullRerun": true,
+    "rerunCommands": [
+      "pnpm test:api:unit",
+      "pnpm test:api:http",
+      "pnpm test:web:unit",
+      "pnpm test:api:int",
+      "pnpm test:migrations",
+      "pnpm typecheck",
+      "pnpm build",
+      "pnpm test:web:e2e"
+    ],
+    "reviewCohort": {
+      "reviewGeneration": 12,
+      "sourceHash": "sha256:e4dc864b067d350bdb1eaa7ecbc033fb137f76803cf0699259469060fea2420d",
+      "joined": true,
+      "deltaOnly": true,
+      "priorGenerationSourceHash": "sha256:6e9f7417e8dc3ab23e7a383ac5376273fd7d1fc4b4ef7db8a27ec90fdb5295b7",
+      "deltaPaths": [
+        "apps/web/src/pages/admin-survey-edit-page.tsx",
+        "apps/web/src/test/survey-pages.test.tsx"
+      ],
+      "lanes": {
+        "cleaner": {
+          "status": "passed",
+          "sourceHash": "sha256:e4dc864b067d350bdb1eaa7ecbc033fb137f76803cf0699259469060fea2420d",
+          "evidence": "Cleaner receipt 89-SurveyCleanerGen11 PASSED with zero blocking or advisory findings.",
+          "blockers": []
+        },
+        "architect": {
+          "status": "CLEAR",
+          "sourceHash": "sha256:e4dc864b067d350bdb1eaa7ecbc033fb137f76803cf0699259469060fea2420d",
+          "evidence": "Architect receipt 88-SurveyArchitectGen11 architecture, product, and code CLEAR; APPROVE.",
+          "blockers": []
+        },
+        "qa": {
+          "status": "passed",
+          "sourceHash": "sha256:e4dc864b067d350bdb1eaa7ecbc033fb137f76803cf0699259469060fea2420d",
+          "evidence": "QA receipt 90-SurveyQaGen11 Generation-12 live Chromium e2e and red-team passed.",
+          "blockers": []
+        }
+      }
+    },
+    "blockers": []
+  },
+  "criticReview": {
+    "verdict": "OKAY",
+    "sourceHash": "sha256:e4dc864b067d350bdb1eaa7ecbc033fb137f76803cf0699259469060fea2420d",
+    "evidence": "Terminal critic receipt 91-SurveyTerminalCriticFinal audited all durable deliverables and current verification at the frozen hash; no blockers remain.",
+    "blockers": []
+  }
+}

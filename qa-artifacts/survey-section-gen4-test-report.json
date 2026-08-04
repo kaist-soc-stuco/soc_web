@@ -1,0 +1,41 @@
+{
+  "sourceHash": "sha256:8b9f14f7d8408273b716000a96e1db8961a2cf5c33230b2499ed4daa166085c2",
+  "status": "passed",
+  "e2eStatus": "passed",
+  "redTeamStatus": "passed",
+  "commands": [
+    "pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4199 --strictPort",
+    "SURVEY_QA_BASE_URL=http://127.0.0.1:4199 node qa-artifacts/survey-section-gen4-playwright.mjs",
+    "pnpm --filter @soc/web exec vitest run src/test/survey-pages.test.tsx",
+    "pnpm --filter @soc/api test:unit -- test/surveys.unit.spec.ts test/survey-image-cleanup.unit.spec.ts",
+    "node --test infra/scripts/verify-migrations.test.mjs",
+    "python3 - <<'PY'\nfrom PIL import Image, ImageStat\nim = Image.open('qa-artifacts/survey-section-gen4-screenshot.png').convert('RGB')\nstat = ImageStat.Stat(im)\nassert im.width > 1 and im.height > 1 and any(high > low for low, high in stat.extrema)\nPY"
+  ],
+  "artifactRefs": [
+    { "path": "qa-artifacts/survey-section-gen4-playwright.mjs", "kind": "web browser automation source" },
+    { "path": "qa-artifacts/survey-section-gen4-browser-transcript.json", "kind": "web test-report transcript" },
+    { "path": "qa-artifacts/survey-section-gen4-screenshot.png", "kind": "non-uniform live-surface screenshot PNG (1280x1833)" },
+    { "path": "qa-artifacts/survey-section-gen4-test-report.json", "kind": "web/api test-report" }
+  ],
+  "contractCoverage": [
+    { "planContract": "Mixed section spine preserves stable question references and serializes QUESTION/DESCRIPTION/IMAGE_BLOCK in one order.", "implementationEvidence": "Live Chromium interior insertion asserted serialized order DESCRIPTION,QUESTION,DESCRIPTION,IMAGE_BLOCK,QUESTION and rejected client-local ID leakage.", "status": "passed" },
+    { "planContract": "Draft membership operations are version-aware, paged, and mode conversion supports localized sets.", "implementationEvidence": "Live editor received a controlled stale_definition 409 without surface failure, then issued LOCALIZED mode mutation and loaded bounded membership requests.", "status": "passed" },
+    { "planContract": "Korean-only policy mirrors authoring content and public English requests use Korean content with a notice.", "implementationEvidence": "Live editor verified derived readonly English description; public EN route displayed Korean-only notice and requested cursor-paged Korean membership content.", "status": "passed" },
+    { "planContract": "Public image rendering supports keyboard carousel and accessible lightbox semantics.", "implementationEvidence": "Live browser asserted second-page ArrowRight navigation, empty image alt, named dialog, Escape close, and opener focus restoration.", "status": "passed" },
+    { "planContract": "Cutover migration guards retain identity/topology and cleanup/runbook gates.", "implementationEvidence": "Migration verifier passed 27 tests, including the 0024 executable cutover invariant and released-migration immutability/safety-gate cases.", "status": "passed" },
+    { "planContract": "Definition and asset-cleanup behavior has focused API regression coverage.", "implementationEvidence": "API unit invocation passed 253 tests; relevant survey suite had 26 tests and cleanup suite had 10 tests.", "status": "passed" }
+  ],
+  "surfaceEvidence": [
+    { "surface": "admin survey editor", "artifactRef": "qa-artifacts/survey-section-gen4-screenshot.png", "evidence": "Fresh 1280x1833 screenshot has RGB extrema 0..255 and nonzero variance, showing a non-uniform live admin surface.", "status": "passed" },
+    { "surface": "admin definition and image APIs", "artifactRef": "qa-artifacts/survey-section-gen4-browser-transcript.json", "evidence": "Transcript records definition PUT, image-mode POST, bounded membership requests, and a stale-definition response.", "status": "passed" },
+    { "surface": "public respondent carousel/lightbox", "artifactRef": "qa-artifacts/survey-section-gen4-browser-transcript.json", "evidence": "Transcript records public EN locale request, cursor=next image page, keyboard carousel actions, dialog opening, Escape, and focus restoration assertions.", "status": "passed" }
+  ],
+  "adversarialCases": [
+    { "case": "Interior cross-kind insertion attempts to serialize a local temporary ID or wrong order.", "result": "passed: intercepted definition PUT contained the expected mixed order and no local-* ID." },
+    { "case": "A stale_definition membership page arrives while the editor is active.", "result": "passed: controlled 409 was exercised and the editor continued through save and mode mutation." },
+    { "case": "Korean-only authoring/public EN attempts to expose independently editable English content.", "result": "passed: English description was mirrored readonly and public EN showed the Korean-only notice." },
+    { "case": "Localized image mode attempts lazy-page keyboard/lightbox regressions.", "result": "passed: mode POST, cursor next page, ArrowRight, empty alt, named dialog, Escape, and focus restoration were asserted." },
+    { "case": "Released destructive migration is tampered or lacks cutover/runbook safety gates.", "result": "passed: migration verifier accepted the candidate and rejects those adversarial variants." }
+  ],
+  "blockers": []
+}

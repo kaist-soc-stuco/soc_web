@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "image-verdict",
+  "sourceHash": "sha256:9fe5feff86a3ac0570bae4d0957f9d87603ec17820de5102a3c6a433251add0a",
+  "imagePath": "qa-artifacts/survey-gen7-admin-public-confirmation-640.png",
+  "width": 640,
+  "height": 1876,
+  "status": "passed",
+  "nonUniform": true,
+  "evidence": "Rendered Chromium screenshot contains 3880 distinct RGB colors and visibly shows the responsive administrator survey operations page, modal title, N1 location, PUBLIC visibility disclosure, and separate cancel/confirm controls."
+}

@@ -121,6 +121,27 @@ const asPositiveBoundedInteger = (
 
   return parsed;
 };
+const asOptionalPositiveBoundedInteger = (
+  value: unknown,
+  name: string,
+  maximum: number,
+): number | undefined => value === undefined
+  ? undefined
+  : asPositiveBoundedInteger(value, name, 1, maximum);
+const asOptionalIdentity = (value: unknown, name: string): string | undefined => {
+  if (value === undefined) return undefined;
+  const identity = asString(value, name);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(identity)) {
+    throw new Error(`Invalid identity for ${name}`);
+  }
+  return identity;
+};
+const asOptionalSha256 = (value: unknown, name: string): string | undefined => {
+  if (value === undefined) return undefined;
+  const hash = asString(value, name);
+  if (!/^[a-f0-9]{64}$/i.test(hash)) throw new Error(`Invalid SHA-256 hash for ${name}`);
+  return hash.toLowerCase();
+};
 const asJwtKeys = (config: Record<string, unknown>) => {
   const activeKid = asString(config.AUTH_JWT_ACTIVE_KID, 'AUTH_JWT_ACTIVE_KID');
   const privatePem = asString(
@@ -216,6 +237,7 @@ const asPiiKeys = (config: Record<string, unknown>) => {
 };
 
 export const validateEnv = (config: Record<string, unknown>): Record<string, unknown> => {
+  const nodeEnv = asString(config.NODE_ENV, 'NODE_ENV', 'development');
   const jwtKeys = asJwtKeys(config);
   const piiKeys = asPiiKeys(config);
   const postgresHost = asString(config.POSTGRES_HOST, 'POSTGRES_HOST', 'localhost');
@@ -245,10 +267,54 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
   if (mailEnabled && (!mailUrl || !mailToken || !mailFrom)) throw new Error('Incomplete mail provider configuration');
   if (chatEnabled && (!chatUrl || !chatToken || !chatModel)) throw new Error('Incomplete chat provider configuration');
   if (assetEnabled && (!assetUrl || !assetToken)) throw new Error('Incomplete asset provider configuration');
+  const definitionMaxBytes = nodeEnv === 'production'
+    ? asOptionalPositiveBoundedInteger(config.SURVEY_DEFINITION_MAX_BYTES, 'SURVEY_DEFINITION_MAX_BYTES', 16_777_216)
+    : asPositiveBoundedInteger(config.SURVEY_DEFINITION_MAX_BYTES, 'SURVEY_DEFINITION_MAX_BYTES', 262_144, 16_777_216);
+  const definitionParserMaxBytes = nodeEnv === 'production'
+    ? asOptionalPositiveBoundedInteger(config.SURVEY_DEFINITION_PARSER_MAX_BYTES, 'SURVEY_DEFINITION_PARSER_MAX_BYTES', 16_777_216)
+    : asPositiveBoundedInteger(config.SURVEY_DEFINITION_PARSER_MAX_BYTES, 'SURVEY_DEFINITION_PARSER_MAX_BYTES', 266_240, 16_777_216);
+  const definitionHardMaxBytes = nodeEnv === 'production'
+    ? asOptionalPositiveBoundedInteger(config.SURVEY_DEFINITION_HARD_MAX_BYTES, 'SURVEY_DEFINITION_HARD_MAX_BYTES', 16_777_216)
+    : asPositiveBoundedInteger(config.SURVEY_DEFINITION_HARD_MAX_BYTES, 'SURVEY_DEFINITION_HARD_MAX_BYTES', 1_048_576, 16_777_216);
+  if (
+    definitionMaxBytes !== undefined
+    && definitionParserMaxBytes !== undefined
+    && definitionHardMaxBytes !== undefined
+    && !(definitionMaxBytes <= definitionParserMaxBytes && definitionParserMaxBytes <= definitionHardMaxBytes)
+  ) {
+    throw new Error('Invalid survey definition byte limits: expected MAX_BYTES <= PARSER_MAX_BYTES <= HARD_MAX_BYTES');
+  }
+  const inventoryReportHash = asOptionalSha256(
+    config.SURVEY_DEFINITION_INVENTORY_REPORT_SHA256,
+    'SURVEY_DEFINITION_INVENTORY_REPORT_SHA256',
+  );
+  const inventorySchema = asOptionalIdentity(
+    config.SURVEY_DEFINITION_INVENTORY_SCHEMA,
+    'SURVEY_DEFINITION_INVENTORY_SCHEMA',
+  );
+  const inventorySerializer = asOptionalIdentity(
+    config.SURVEY_DEFINITION_INVENTORY_SERIALIZER,
+    'SURVEY_DEFINITION_INVENTORY_SERIALIZER',
+  );
+  const inventoryApprover = asOptionalIdentity(
+    config.SURVEY_DEFINITION_INVENTORY_APPROVER,
+    'SURVEY_DEFINITION_INVENTORY_APPROVER',
+  );
+  const inventoryReportPayload = config.SURVEY_DEFINITION_INVENTORY_REPORT_JSON === undefined
+    ? undefined
+    : asString(config.SURVEY_DEFINITION_INVENTORY_REPORT_JSON, 'SURVEY_DEFINITION_INVENTORY_REPORT_JSON');
+  const expectedInventoryDatabaseIdentity = asOptionalIdentity(
+    config.SURVEY_DEFINITION_EXPECTED_DATABASE_IDENTITY,
+    'SURVEY_DEFINITION_EXPECTED_DATABASE_IDENTITY',
+  );
+  const expectedInventoryMigrationIdentity = asOptionalSha256(
+    config.SURVEY_DEFINITION_EXPECTED_MIGRATION_IDENTITY,
+    'SURVEY_DEFINITION_EXPECTED_MIGRATION_IDENTITY',
+  );
 
   return {
     ...config,
-    NODE_ENV: asString(config.NODE_ENV, 'NODE_ENV', 'development'),
+    NODE_ENV: nodeEnv,
     API_PORT: asPort(config.API_PORT, 'API_PORT', 3000),
     VITE_SSO_CLIENT_ID: asString(config.VITE_SSO_CLIENT_ID, 'VITE_SSO_CLIENT_ID'),
     VITE_SSO_LOGIN_URL: asString(config.VITE_SSO_LOGIN_URL, 'VITE_SSO_LOGIN_URL'),
@@ -316,5 +382,15 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     REDIS_HOST: redisHost,
     REDIS_PORT: redisPort,
     REDIS_URL: redisUrl,
+    SURVEY_DEFINITION_MAX_BYTES: definitionMaxBytes,
+    SURVEY_DEFINITION_PARSER_MAX_BYTES: definitionParserMaxBytes,
+    SURVEY_DEFINITION_HARD_MAX_BYTES: definitionHardMaxBytes,
+    SURVEY_DEFINITION_INVENTORY_REPORT_SHA256: inventoryReportHash,
+    SURVEY_DEFINITION_INVENTORY_REPORT_JSON: inventoryReportPayload,
+    SURVEY_DEFINITION_INVENTORY_SCHEMA: inventorySchema,
+    SURVEY_DEFINITION_INVENTORY_SERIALIZER: inventorySerializer,
+    SURVEY_DEFINITION_INVENTORY_APPROVER: inventoryApprover,
+    SURVEY_DEFINITION_EXPECTED_DATABASE_IDENTITY: expectedInventoryDatabaseIdentity,
+    SURVEY_DEFINITION_EXPECTED_MIGRATION_IDENTITY: expectedInventoryMigrationIdentity,
   };
 };

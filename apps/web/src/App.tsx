@@ -1,8 +1,10 @@
 import { uiText } from "@/lib/i18n/surface-catalog";
+import { refetchAdminGrants, useAdminGrants } from '@/lib/admin-grants';
 import { useLocale } from '@/lib/locale-store';
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { createBrowserRouter, Navigate, Outlet, useParams } from 'react-router-dom';
 import { AdminRouteGuard, NotFoundPage } from '@/components/organisms/admin-route-guard';
+import { hasGlobalGrant } from '@/lib/admin-access';
 import { getEvent } from '@/lib/event-api';
 const AdminPage = lazy(() => import('@/pages/admin-page').then((module) => ({ default: module.AdminPage })));
 const AboutPage = lazy(() => import('@/pages/about-page').then((module) => ({ default: module.AboutPage })));
@@ -78,45 +80,63 @@ export function LegacyEventSurveyResolver() {
         return <p>{uiText("App.937a5efd07")}</p>;
     return <p>{uiText("App.2f8f15073b")}</p>;
 }
+function SurveyListRoute({ children }: { children: ReactNode }) {
+    const grants = useAdminGrants();
+    if (grants.status === 'idle' || grants.status === 'loading')
+        return <p role="status" className="p-8">{uiText('admin.grants.loading')}</p>;
+    if (grants.status === 'error')
+        return <section aria-labelledby="survey-access-error-title" className="p-8"><h1 id="survey-access-error-title">{uiText('admin.grants.errorTitle')}</h1><p role="alert">{uiText('admin.grants.error')}</p><button type="button" className="mt-3 min-h-11 px-3" onClick={() => void refetchAdminGrants().catch(() => undefined)}>{uiText('admin.retry')}</button></section>;
+    if (!(hasGlobalGrant(grants.grants, 'SURVEY_MANAGE') || hasGlobalGrant(grants.grants, 'SURVEY_REVIEW')))
+        return <section aria-labelledby="forbidden-title" className="p-8"><h1 id="forbidden-title">403</h1><p>{uiText('admin.grants.denied')}</p></section>;
+    return children;
+}
 export function App() {
     useLocale();
-    return (<BrowserRouter>
-      <Suspense fallback={<p role="status" className="p-8">{uiText("App.62efc07b34")}</p>}>
-        <Routes>
-        <Route path="/" element={<HomePage />}/>
-        <Route path="/events" element={<EventsPage />}/>
-        <Route path="/events/:eventId/survey" element={<LegacyEventSurveyResolver />}/>
-        <Route path="/survey/:surveyId" element={<EventSurveyPage />}/>
-        <Route path="/about" element={<AboutPage />}/>
-        <Route path="/about/roadmap" element={<RoadmapPage />}/>
-        <Route path="/faq" element={<FaqPage />}/>
-        <Route path="/calendar" element={<CalendarPage />}/>
-        <Route path="/board" element={<BoardHubPage />}/>
-        <Route path="/board/:category" element={<BoardPage />}/>
-        <Route path="/board/:category/write" element={<BoardWritePage />}/>
-        <Route path="/board/:category/:id" element={<BoardPostPage />}/>
-        <Route path="/chat" element={<ChatPage />}/>
-        <Route path="/mypage" element={<MyPage />}/>
-        <Route path="/admin" element={<AdminPage />}>
-          <Route index element={<AdminDashboardPage />}/>
-          <Route path="payments" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FEES_MANAGE' }}><AdminPaymentsPage /></AdminRouteGuard>}/>
-          <Route path="surveys" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveysPage /></AdminRouteGuard>}/>
-          <Route path="surveys/:surveyId/edit" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveyEditPage /></AdminRouteGuard>}/>
-          <Route path="surveys/:surveyId/responses" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveyOperationsPage /></AdminRouteGuard>}/>
-          <Route path="emails" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'MAIL_SEND' }}><AdminEmailsPage /></AdminRouteGuard>}/>
-          <Route path="contacts" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'CONTACTS_MANAGE' }}><AdminContactsPage /></AdminRouteGuard>}/>
-          <Route path="users" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'USERS_MANAGE' }}><AdminUsersPage /></AdminRouteGuard>}/>
-          <Route path="permissions" element={<AdminRouteGuard requirement={{ kind: 'WORKFLOW' }}><AdminPermissionsPage /></AdminRouteGuard>}/>
-          <Route path="audit-logs" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'PERMISSION_AUDIT' }}><AdminAuditLogsPage /></AdminRouteGuard>}/>
-          <Route path="boards" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'BOARD_MANAGE' }}><AdminBoardsPage /></AdminRouteGuard>}/>
-          <Route path="faqs" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FAQ_MANAGE' }}><AdminFaqsPage /></AdminRouteGuard>}/>
-          <Route path="events" element={<AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'EVENT_MANAGE' }}><AdminEventsPage /></AdminRouteGuard>}/>
-          <Route path="*" element={<NotFoundPage />}/>
-        </Route>
-        <Route path="/login" element={<TreeLogin />}/>
-        <Route path="/login/consent" element={<LoginConsentPage />}/>
-        <Route path="*" element={<NotFoundPage />}/>
-        </Routes>
-      </Suspense>
-    </BrowserRouter>);
+    return <Suspense fallback={<p role="status" className="p-8">{uiText("App.62efc07b34")}</p>}><Outlet /></Suspense>;
 }
+
+export const router = createBrowserRouter([
+    {
+        path: '/',
+        element: <App />,
+        children: [
+            { index: true, element: <HomePage /> },
+            { path: 'events', element: <EventsPage /> },
+            { path: 'events/:eventId/survey', element: <LegacyEventSurveyResolver /> },
+            { path: 'survey/:surveyId', element: <EventSurveyPage /> },
+            { path: 'about', element: <AboutPage /> },
+            { path: 'about/roadmap', element: <RoadmapPage /> },
+            { path: 'faq', element: <FaqPage /> },
+            { path: 'calendar', element: <CalendarPage /> },
+            { path: 'board', element: <BoardHubPage /> },
+            { path: 'board/:category', element: <BoardPage /> },
+            { path: 'board/:category/write', element: <BoardWritePage /> },
+            { path: 'board/:category/:id', element: <BoardPostPage /> },
+            { path: 'chat', element: <ChatPage /> },
+            { path: 'mypage', element: <MyPage /> },
+            {
+                path: 'admin',
+                element: <AdminPage />,
+                children: [
+                    { index: true, element: <AdminDashboardPage /> },
+                    { path: 'payments', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FEES_MANAGE' }}><AdminPaymentsPage /></AdminRouteGuard> },
+                    { path: 'surveys', element: <SurveyListRoute><AdminSurveysPage /></SurveyListRoute> },
+                    { path: 'surveys/:surveyId/edit', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'SURVEY_MANAGE' }}><AdminSurveyEditPage /></AdminRouteGuard> },
+                    { path: 'surveys/:surveyId/responses', element: <SurveyListRoute><AdminSurveyOperationsPage /></SurveyListRoute> },
+                    { path: 'emails', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'MAIL_SEND' }}><AdminEmailsPage /></AdminRouteGuard> },
+                    { path: 'contacts', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'CONTACTS_MANAGE' }}><AdminContactsPage /></AdminRouteGuard> },
+                    { path: 'users', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'USERS_MANAGE' }}><AdminUsersPage /></AdminRouteGuard> },
+                    { path: 'permissions', element: <AdminRouteGuard requirement={{ kind: 'WORKFLOW' }}><AdminPermissionsPage /></AdminRouteGuard> },
+                    { path: 'audit-logs', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'PERMISSION_AUDIT' }}><AdminAuditLogsPage /></AdminRouteGuard> },
+                    { path: 'boards', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'BOARD_MANAGE' }}><AdminBoardsPage /></AdminRouteGuard> },
+                    { path: 'faqs', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FAQ_MANAGE' }}><AdminFaqsPage /></AdminRouteGuard> },
+                    { path: 'events', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'EVENT_MANAGE' }}><AdminEventsPage /></AdminRouteGuard> },
+                    { path: '*', element: <NotFoundPage /> },
+                ],
+            },
+            { path: 'login', element: <TreeLogin /> },
+            { path: 'login/consent', element: <LoginConsentPage /> },
+            { path: '*', element: <NotFoundPage /> },
+        ],
+    },
+]);

@@ -1,0 +1,128 @@
+{
+  "sourceHash": "sha256:a509c4d9c8be12e17a8482fc9a8b233fd27eb70520ebe8371c4277e0cdb859bc",
+  "status": "passed",
+  "e2eStatus": "passed",
+  "redTeamStatus": "passed",
+  "commands": [
+    "pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4190 --strictPort",
+    "SURVEY_QA_BASE_URL=http://127.0.0.1:4190 node qa-artifacts/survey-gen10-playwright.mjs"
+  ],
+  "artifactRefs": [
+    "qa-artifacts/survey-gen10-playwright.mjs",
+    "qa-artifacts/survey-gen10-browser-transcript.json",
+    "qa-artifacts/survey-gen10-screenshot.png",
+    "qa-artifacts/survey-gen10-red-team-report.json"
+  ],
+  "contractCoverage": [
+    {
+      "contract": "publicRequiredFocus",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "publicE164FailClosed",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "publicLocaleRefetch",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "publicPrivacy",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "publicFits320",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "adminGrantDenialNoProtectedCall",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "adminGrantErrorVisible",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "staleTupleProtection",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "reviewOutcomesAndRevision",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "exportProtocolOutcome",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "publicMaterializationConsequence",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "operationsFits320",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "listFitsDesktop",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    },
+    {
+      "contract": "editorFitsDesktop",
+      "status": "passed",
+      "evidence": "live Chromium assertion"
+    }
+  ],
+  "surfaceEvidence": [
+    {
+      "surface": "public survey 320px",
+      "artifactRef": "qa-artifacts/survey-gen10-browser-transcript.json",
+      "status": "passed"
+    },
+    {
+      "surface": "operations PUBLIC confirmation 320px",
+      "artifactRef": "qa-artifacts/survey-gen10-screenshot.png",
+      "status": "passed"
+    },
+    {
+      "surface": "admin list/editor desktop",
+      "artifactRef": "qa-artifacts/survey-gen10-browser-transcript.json",
+      "status": "passed"
+    }
+  ],
+  "adversarialCases": [
+    {
+      "case": "required focus/locale/privacy",
+      "status": "passed"
+    },
+    {
+      "case": "grant denial and error",
+      "status": "passed"
+    },
+    {
+      "case": "stale review tuple",
+      "status": "passed"
+    },
+    {
+      "case": "approve/waitlist/reject confirmations",
+      "status": "passed"
+    },
+    {
+      "case": "PUBLIC materialization",
+      "status": "passed"
+    }
+  ],
+  "blockers": []
+}

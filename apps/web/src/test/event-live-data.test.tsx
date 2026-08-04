@@ -137,7 +137,11 @@ describe('event live data', () => {
       items: [{
         id: 'survey-1',
         revision: 1,
+        definitionVersion: 1,
         locale: 'ko',
+        requestedLocale: 'ko',
+        effectiveContentLocale: 'ko',
+        onlyForKoreanSpeaker: false,
         title: { value: '학생 설문', translationUnavailable: false },
         description: { value: '의견을 남겨 주세요.', translationUnavailable: false },
         state: 'OPEN',
@@ -164,7 +168,7 @@ describe('event live data', () => {
     renderEventsPage();
 
     expect(screen.getByText('행사를 불러오는 중입니다')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '설문조사' }));
+    fireEvent.click(screen.getAllByRole('link', { name: '설문조사' }).find((link) => link.getAttribute('href') === '/events?type=survey')!);
 
     expect(screen.queryByText('2026 봄맞이 간식 이벤트')).not.toBeInTheDocument();
     expect(screen.queryByText('행사를 불러오는 중입니다')).not.toBeInTheDocument();

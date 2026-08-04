@@ -1,0 +1,12 @@
+{
+  "sourceHash": "sha256:7b2bd165d7b6fb6840a2167150bceb2355adc58d1fd7e992b815674e7eb139ec",
+  "status": "blocked",
+  "e2eStatus": "blocked",
+  "redTeamStatus": "blocked",
+  "commands": ["pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4180 --strictPort", "SURVEY_QA_BASE_URL=http://127.0.0.1:4180 node qa-artifacts/survey-gen8-playwright.mjs"],
+  "artifactRefs": ["qa-artifacts/survey-gen8-playwright.mjs", "qa-artifacts/survey-gen8-browser-transcript.json"],
+  "contractCoverage": [{"contract":"PUB locale/refetch/required focus/privacy at 320px","status":"passed","evidence":"Live Chromium completed this section before the blocker."}],
+  "surfaceEvidence": [{"surface":"Public survey at 320px","artifactRef":"qa-artifacts/survey-gen8-browser-transcript.json","status":"passed"}],
+  "adversarialCases": [{"case":"Admin grant ready transition","status":"blocked","result":"/api/users/me was requested, but no protected admin request was made after 3 seconds."}],
+  "blockers": ["Unable to obtain the required joined admin/browser evidence or a non-uniform screenshot because the frozen app did not enter its authorized admin state with the existing contract-shaped mock. Five fresh Vite ports (4175-4180) reproduced the same result."]
+}

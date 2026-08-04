@@ -1,0 +1,226 @@
+{
+  "sourceHash": "sha256:e4dc864b067d350bdb1eaa7ecbc033fb137f76803cf0699259469060fea2420d",
+  "status": "passed",
+  "e2eStatus": "passed",
+  "redTeamStatus": "passed",
+  "generation": 12,
+  "commands": [
+    "pnpm --filter @soc/web exec vite --host 127.0.0.1 --port 4203 --strictPort",
+    "SURVEY_QA_BASE_URL=http://127.0.0.1:4203 node qa-artifacts/survey-gen12-playwright.mjs"
+  ],
+  "assertions": [
+    {
+      "name": "publicRequiredFocus",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "publicE164FailClosed",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "publicLocaleRefetch",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "publicPrivacy",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "publicFits320",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "adminGrantDenialNoProtectedCall",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "adminGrantErrorVisible",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "staleTupleProtection",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "reviewOutcomesAndRevision",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "aggregateRetry",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "adminControlsAtLeast44px",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "exportProtocolOutcome",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "publicMaterializationConsequence",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "operationsFits320",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "editorKoEnTypeNumberPersisted",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "editorTypeNumberEnumPersisted",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "listFitsDesktop",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "name": "editorFitsDesktop",
+      "status": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    }
+  ],
+  "requests": [
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=ko",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=en",
+    "GET /api/surveys/survey-1?locale=en",
+    "GET /api/auth/session",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=en",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=en",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=ko",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=ko",
+    "GET /api/surveys/content-relations?surveyId=survey-1&locale=ko",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/admin/surveys?locale=ko",
+    "GET /api/admin/surveys/review-queue?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/admin/surveys?locale=ko",
+    "GET /api/admin/surveys/review-queue?locale=ko",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses/response-1?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses/response-1?locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "POST /api/admin/surveys/survey-1/export",
+    "POST /api/admin/surveys/survey-1/materialize-event",
+    "POST /api/admin/surveys/survey-1/responses/response-1/review?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses/response-1?locale=ko",
+    "POST /api/admin/surveys/survey-1/responses/response-1/review?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses/response-1?locale=ko",
+    "POST /api/admin/surveys/survey-1/responses/response-1/review?locale=ko",
+    "GET /api/admin/surveys/survey-1/responses?state=SUBMITTED&limit=25&locale=ko",
+    "GET /api/admin/surveys/survey-1/aggregate?locale=ko",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/admin/surveys?locale=ko",
+    "GET /api/admin/surveys/review-queue?locale=ko",
+    "GET /api/auth/session",
+    "GET /api/admin/surveys?locale=ko",
+    "GET /api/admin/surveys/review-queue?locale=ko",
+    "GET /api/users/me",
+    "GET /api/auth/session",
+    "GET /api/auth/session",
+    "GET /api/boards?locale=ko",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/surveys/survey-1?locale=en",
+    "GET /api/auth/session",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/surveys/survey-1?locale=en",
+    "PUT /api/admin/surveys/survey-1/definition",
+    "GET /api/surveys/survey-1?locale=ko",
+    "GET /api/surveys/survey-1?locale=en"
+  ],
+  "schemaVersion": 1,
+  "tool": "Chromium Playwright",
+  "scenario": "generation-12 final survey public/admin adversarial flow",
+  "viewport": {
+    "width": 320,
+    "height": 700
+  },
+  "actions": [
+    {
+      "type": "navigate",
+      "target": "/survey/survey-1",
+      "selector": "body",
+      "result": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "type": "navigate",
+      "target": "/admin/surveys/survey-1/edit",
+      "selector": "body",
+      "result": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "type": "select",
+      "target": "question type NUMBER",
+      "selector": "select",
+      "result": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    },
+    {
+      "type": "navigate",
+      "target": "/admin/surveys/survey-1/responses",
+      "selector": "body",
+      "result": "passed",
+      "timestamp": "2026-08-03T13:23:04.021701Z"
+    }
+  ]
+}

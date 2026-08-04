@@ -1,0 +1,56 @@
+process.chdir(require('node:path').resolve(__dirname, '..'));
+const { chromium } = require('node:module').createRequire(require('node:path').resolve('apps/web/package.json'))('@playwright/test');
+const fs = require('node:fs');
+const SOURCE_HASH = 'sha256:9fe5feff86a3ac0570bae4d0957f9d87603ec17820de5102a3c6a433251add0a';
+const localized = (value) => ({ value, translationUnavailable: false });
+const grants = [{ id: 'survey-manage', permission: 'SURVEY_MANAGE', scope: 'GLOBAL', scopeId: null, activatedFrom: '2026-01-01T00:00:00.000Z', expiresAt: null }, { id: 'survey-review', permission: 'SURVEY_REVIEW', scope: 'GLOBAL', scopeId: null, activatedFrom: '2026-01-01T00:00:00.000Z', expiresAt: null }];
+const user = { id: 'admin-user', kaistUid: null, studentOrEmployeeKind: null, studentOrEmployeeNumber: null, nameKr: null, nameEn: null, userEmail: null, userMobile: null, majorMask: 0, feeStatus: 'UNKNOWN', privacyConsentAt: null, grants };
+const survey = (locale) => ({ id: 'survey-1', revision: 1, definitionVersion: 1, locale, title: localized(locale === 'ko' ? '공개 설문' : 'Public survey'), description: null, state: 'OPEN', guestAllowed: true, phoneRequired: false, feeRestriction: 'ANY', cap: null, opensAt: null, closesAt: null, editDeadlineAt: null, responseRetentionDays: 365, updatedAt: '2026-08-01T00:00:00.000Z', sections: [{ id: 'section-1', ordinal: 0, title: localized(locale === 'ko' ? '질문' : 'Questions'), description: null, questions: [{ id: 'question-1', ordinal: 0, type: 'SINGLE_CHOICE', prompt: localized(locale === 'ko' ? '참여하시겠습니까?' : 'Will you participate?'), helpText: null, required: true, validationRegex: null, numberMin: null, numberMax: null, dateMin: null, dateMax: null, choices: [{ id: 'choice-1', ordinal: 0, value: localized(locale === 'ko' ? '참여' : 'Attend') }, { id: 'choice-2', ordinal: 1, value: localized(locale === 'ko' ? '불참' : 'Decline') }] }] }] });
+const responseItem = { responseId: 'response-1', surveyId: 'survey-1', surveyRevisionId: 'revision-1', revision: 1, state: 'SUBMITTED', submittedAt: '2026-08-01T00:00:00.000Z', reviewedAt: null };
+const responseDetail = { ...responseItem, locale: 'ko', reviewReason: null, answers: [{ questionId: 'question-1', prompt: localized('참여하시겠습니까?'), value: { kind: 'choices', choices: [{ choiceOptionId: 'choice-1', label: localized('참여') }] } }] };
+const staleDetail = { ...responseDetail, responseId: 'stale-response' };
+const assert = (value, message) => { if (!value) throw new Error(message); };
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 320, height: 700 }, deviceScaleFactor: 2 });
+  const requests = []; let reviewBody; let materializeBody; let detailReads = 0;
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url()); requests.push(`${route.request().method()} ${url.pathname}${url.search}`);
+    if (url.pathname === '/api/auth/session') return route.fulfill({ json: { authenticated: false, canUsePersistentFeatures: false, requiresConsent: false, storageMode: null } });
+    if (url.pathname === '/api/users/me') return route.fulfill({ json: user });
+    if (url.pathname === '/api/surveys/survey-1') return route.fulfill({ json: survey(url.searchParams.get('locale') === 'en' ? 'en' : 'ko') });
+    if (url.pathname === '/api/surveys/survey-1/responses/me') return route.fulfill({ json: { response: null } });
+    if (url.pathname === '/api/surveys/content-relations') return route.fulfill({ json: { items: [] } });
+    if (url.pathname === '/api/admin/surveys/survey-1/responses' && route.request().method() === 'GET') return route.fulfill({ json: { surveyId: 'survey-1', locale: 'ko', state: url.searchParams.get('state') ?? 'SUBMITTED', limit: 25, matchingCount: 1, items: [responseItem], nextCursor: null } });
+    if (url.pathname === '/api/admin/surveys/survey-1/aggregate') return route.fulfill({ json: { surveyId: 'survey-1', locale: 'ko', surveySuppressed: false, revisions: [] } });
+    if (url.pathname === '/api/admin/surveys/survey-1/responses/response-1') return route.fulfill({ json: ++detailReads === 1 ? staleDetail : responseDetail });
+    if (url.pathname.endsWith('/review')) { reviewBody = route.request().postDataJSON(); return route.fulfill({ json: { ...responseDetail, state: 'REJECTED', reviewReason: 'No capacity' } }); }
+    if (url.pathname.endsWith('/materialize-event')) { materializeBody = route.request().postDataJSON(); return route.fulfill({ json: { eventId: 'event-1', relation: { id: 'relation-1', eventId: 'event-1', surveyId: 'survey-1', relationType: 'SURVEY_PERIOD', syncMode: 'SURVEY_TO_EVENT' } } }); }
+    return route.fulfill({ json: {} });
+  });
+  await page.goto('http://127.0.0.1:4173/survey/survey-1'); await page.getByRole('heading', { name: '공개 설문' }).waitFor();
+  const headerActions = page.locator('header').locator('select, a[href="/login"], button[aria-expanded]');
+  const headerUsable = await headerActions.evaluateAll((els) => els.length === 3 && els.every((el) => { const r = el.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; }));
+  await page.locator('button[type="submit"]').click(); const publicError = await page.locator('#survey-question-question-1').getAttribute('aria-invalid');
+  await page.getByLabel('언어').selectOption('en'); await page.getByRole('heading', { name: 'Public survey' }).waitFor();
+  const publicBody = await page.locator('body').innerText(); const publicOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  await page.screenshot({ path: 'qa-artifacts/survey-gen7-public-640.png', fullPage: true });
+  assert(headerUsable && publicError === 'true' && publicOverflow && !/phone|hash|ciphertext|reviewer/i.test(publicBody), 'public 320 locale/error/privacy/header geometry check failed');
+  await page.getByLabel('Language').selectOption('ko'); await page.goto('http://127.0.0.1:4173/admin/surveys/survey-1/responses');
+  await page.getByRole('button', { name: '열기', exact: true }).click(); await page.getByRole('alert').waitFor();
+  const staleActionAbsent = await page.getByRole('button', { name: '반려' }).count() === 0; assert(staleActionAbsent, 'stale scope remained actionable');
+  await page.getByRole('button', { name: '다시 시도' }).click(); await page.getByText('참여하시겠습니까?').waitFor();
+  await page.getByRole('textbox', { name: '거절 사유' }).fill('No capacity'); await page.getByRole('button', { name: '반려' }).click();
+  const cancelFocused = await page.getByRole('dialog').getByRole('button', { name: '취소' }).evaluate((el) => el === document.activeElement); await page.getByRole('dialog').getByRole('button', { name: '취소' }).click();
+  await page.getByRole('button', { name: '반려' }).click(); await page.getByRole('dialog').getByRole('button', { name: '확인' }).click(); await page.getByRole('heading', { name: '공개 행사 만들기', exact: true }).waitFor();
+  assert(JSON.stringify(reviewBody) === JSON.stringify({ expectedSurveyRevisionId: 'revision-1', state: 'REJECTED', reason: 'No capacity' }), 'review payload mismatch');
+  await page.getByRole('textbox', { name: '장소' }).fill('N1'); await page.getByRole('button', { name: '공개 행사 만들기' }).click();
+  const dialogText = await page.getByRole('dialog').innerText(); const adminOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  await page.screenshot({ path: 'qa-artifacts/survey-gen7-admin-public-confirmation-640.png', fullPage: true });
+  assert(dialogText.includes('PUBLIC') && dialogText.includes('N1') && adminOverflow, 'PUBLIC confirmation or geometry missing');
+  await page.getByRole('dialog').getByRole('button', { name: '취소' }).click(); await page.getByRole('button', { name: '공개 행사 만들기' }).click(); await page.getByRole('dialog').getByRole('button', { name: '확인' }).click();
+  assert(JSON.stringify(materializeBody) === JSON.stringify({ location: 'N1', visibility: 'PUBLIC' }), 'materialization payload mismatch');
+  const adminBody = await page.locator('body').innerText(); assert(!/phone|hash|ciphertext|reviewer/i.test(adminBody), 'admin privacy leak');
+  const transcript = { sourceHash: SOURCE_HASH, status: 'passed', scenario: 'generation-7 Chromium mocked survey public/admin adversarial flow', viewport: { width: 320, height: 700 }, assertions: { headerActionsUsable: headerUsable, publicRequiredError: publicError === 'true', localeEnglish: true, publicPrivacyNonDisclosure: !/phone|hash|ciphertext|reviewer/i.test(publicBody), publicFits320: publicOverflow, staleDetailNonActionable: staleActionAbsent, reviewCancelFocus: cancelFocused, exactRejectedReviewPayload: true, publicConfirmationDisclosure: dialogText.includes('PUBLIC') && dialogText.includes('N1'), adminFits320: adminOverflow, exactPublicMaterializationPayload: true, adminPrivacyNonDisclosure: !/phone|hash|ciphertext|reviewer/i.test(adminBody) }, requests };
+  fs.writeFileSync('qa-artifacts/survey-gen7-browser-transcript-raw.json', `${JSON.stringify(transcript, null, 2)}\n`); await browser.close();
+})().catch((error) => { console.error(error); process.exitCode = 1; });
