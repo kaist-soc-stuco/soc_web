@@ -140,7 +140,7 @@ export function BoardPage() {
 
               <div className="divide-y divide-kaist-grey/20 border-b border-kaist-grey/20">
                 {loading ? (<div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">{uiText("pages.board-page.f9cce8afe6")}</p></div>) : error ? (<div className="py-20 text-center text-kaist-grey"><p className="text-base font-semibold">{uiText("pages.board-page.dbd1d2a38b")}</p></div>) : currentPosts.length > 0 ? (currentPosts.map((post) => (<Link key={post.id} to={`/board/${post.boardCode}/${post.id}`} className="grid grid-cols-12 gap-4 py-3.5 hover:bg-kaist-grey/5 transition-colors group">
-                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium text-kaist-grey">{post.id}</div>
+                      <div className="col-span-1 grid place-content-center text-center text-sm font-medium text-kaist-grey">{post.publicNo}</div>
                       <div className="col-span-1 text-center"><span className="inline-block px-3 py-1 rounded-full bg-kaist-darkgreen text-kaist-white text-xs font-regular tracking-tight">{board?.title.value ?? post.boardCode}</span></div>
                       <div className="col-span-7 flex items-center pl-8 text-left text-sm font-medium tracking-tight text-kaist-black group-hover:text-kaist-darkgreen truncate">{post.title.value}</div>
                       <div className="col-span-1"/>

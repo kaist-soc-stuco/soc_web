@@ -47,6 +47,14 @@ export class EventsService {
     return this.publicEvent(event, locale, await this.repository.findPublicSurveyIdByEventId(event.id));
   }
 
+  async getAdmin(actorUserId: string, id: string): Promise<AdminEvent> {
+    await this.requireManager(actorUserId);
+    this.uuid(id);
+    const event = await this.repository.findById(id);
+    if (!event) throw new NotFoundException('event_not_found');
+    return this.adminEvent(event);
+  }
+
   async create(actorUserId: string, input: CreateEventRequest): Promise<AdminEvent> {
     await this.requireManager(actorUserId);
     const normalized = this.validateEvent(input);

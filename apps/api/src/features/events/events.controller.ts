@@ -69,6 +69,11 @@ export class AdminEventsController {
     return this.events.create(request.user.id, eventBody(body) as unknown as CreateEventRequest);
   }
 
+  @Get(':id')
+  get(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
+    return this.events.getAdmin(request.user.id, uuid(id));
+  }
+
   @Patch(':id')
   patch(@Req() request: AuthenticatedRequest, @Param('id') id: string, @Body() body: unknown) {
     return this.events.patch(request.user.id, uuid(id), eventBody(body) as PatchEventRequest);

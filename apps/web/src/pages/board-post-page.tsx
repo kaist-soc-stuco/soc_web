@@ -135,7 +135,7 @@ export function BoardPostPage() {
           {!loading && !error && article && <>
             <div className="flex flex-col gap-5 border-b-2 border-kaist-darkgreen-main py-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8"><div className="min-w-0">
               <span className="mb-3 inline-block w-fit rounded-full bg-kaist-darkgreen px-3 py-1 text-xs font-semibold text-kaist-white lg:text-sm">{board?.title.value ?? category}</span>
-              <h2 className="mb-2 text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[28px]">{article.title.value}</h2>
+              <h2 className="mb-2 text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[28px]">{article.title.value}</h2><p className="text-xs font-bold text-kaist-grey">No. {article.publicNo}</p>
               {date && <div className="pt-1 text-sm font-medium text-kaist-grey">{new Date(date).toLocaleDateString('ko-KR')}</div>}
             </div><Link to={`/board/${category}`} className="rounded-[5px] border border-kaist-darkgreen bg-white px-6 py-2 text-sm font-extrabold text-kaist-darkgreen">{uiText("pages.board-post-page.78cffb3bb7")}</Link></div>
             <div className="py-7 lg:py-8"><div className="whitespace-pre-line text-sm font-medium leading-7 tracking-tight text-kaist-black">{article.body.value}</div></div>

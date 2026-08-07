@@ -26,6 +26,7 @@ const commentStatuses = new Set(['PUBLISHED', 'SECRET', 'DELETED']);
 const assetTypes = new Set(['IMAGE', 'ATTACHMENT', 'IMAGE_THUMBNAIL']);
 const assetStatuses = new Set(['INITIATED', 'COMPLETED', 'DELETED']);
 const nonnegativeInteger = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+const positiveInteger = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
 const isConfig = (v: unknown) => exact(v, ['readPermission', 'writePermission', 'commentPermission', 'commentsAllowed', 'secretArticlesAllowed', 'reactionsAllowed', 'displayOrder', 'isHidden', 'showOnHome'])
   && permissions.has(String(v.readPermission)) && permissions.has(String(v.writePermission)) && permissions.has(String(v.commentPermission))
   && typeof v.commentsAllowed === 'boolean' && typeof v.secretArticlesAllowed === 'boolean' && typeof v.reactionsAllowed === 'boolean'
@@ -38,8 +39,8 @@ export class BoardApiProtocolError extends Error {
   constructor() { super('The server returned an invalid JSON response.'); this.name = 'BoardApiProtocolError'; }
 }
 const isAppError = (v: unknown): v is AppErrorResponse => exact(v, ['code', 'message', 'requestId']) && isString(v.code) && isString(v.message) && isString(v.requestId);
-const isSummary = (v: unknown): v is ArticleSummary => exact(v, ['id', 'boardCode', 'title', 'status', 'scope', 'isPinned', 'pinnedOrder', 'publishedAt', 'updatedAt'])
-  && isString(v.id) && isString(v.boardCode) && localized(v.title) && statuses.has(String(v.status)) && scopes.has(v.scope as ArticleScope)
+const isSummary = (v: unknown): v is ArticleSummary => exact(v, ['id', 'publicNo', 'boardCode', 'title', 'status', 'scope', 'isPinned', 'pinnedOrder', 'publishedAt', 'updatedAt'])
+  && isString(v.id) && positiveInteger(v.publicNo) && isString(v.boardCode) && localized(v.title) && statuses.has(String(v.status)) && scopes.has(v.scope as ArticleScope)
   && typeof v.isPinned === 'boolean' && (v.pinnedOrder === null || nonnegativeInteger(v.pinnedOrder)) && nullableTimestamp(v.publishedAt) && timestamp(v.updatedAt);
 const isBoard = (v: unknown): v is Board => exact(v, ['id', 'code', 'title', 'description', 'config', 'updatedAt'])
   && isString(v.id) && isString(v.code) && localized(v.title) && localized(v.description) && isConfig(v.config) && timestamp(v.updatedAt);
@@ -51,8 +52,8 @@ const isList = (v: unknown): v is BoardListResponse => exact(v, ['locale', 'item
 const isAdminBoard = (v: unknown): v is AdminBoard => exact(v, ['id','code','titleKr','titleEn','descriptionKr','descriptionEn','readPermission','writePermission','commentPermission','commentsAllowed','secretArticlesAllowed','reactionsAllowed','displayOrder','isHidden','showOnHome','createdAt','updatedAt']) && isString(v.id) && isString(v.code) && isString(v.titleKr) && isString(v.titleEn) && isString(v.descriptionKr) && isString(v.descriptionEn) && permissions.has(String(v.readPermission)) && permissions.has(String(v.writePermission)) && permissions.has(String(v.commentPermission)) && typeof v.commentsAllowed === 'boolean' && typeof v.secretArticlesAllowed === 'boolean' && typeof v.reactionsAllowed === 'boolean' && nonnegativeInteger(v.displayOrder) && typeof v.isHidden === 'boolean' && typeof v.showOnHome === 'boolean' && timestamp(v.createdAt) && timestamp(v.updatedAt);
 const isAdminList = (v: unknown): v is AdminBoardListResponse => exact(v, ['items']) && Array.isArray(v.items) && v.items.every(isAdminBoard);
 const isArticleList = (v: unknown): v is ArticleListResponse => exact(v, ['locale', 'items', 'nextCursor']) && locale(v.locale) && Array.isArray(v.items) && v.items.every(isSummary) && nullableString(v.nextCursor);
-const isArticle = (v: unknown): v is Article => exact(v, ['id', 'boardCode', 'title', 'status', 'scope', 'isPinned', 'pinnedOrder', 'publishedAt', 'updatedAt', 'body', 'deletedAt'])
-  && isSummary({ id: v.id, boardCode: v.boardCode, title: v.title, status: v.status, scope: v.scope, isPinned: v.isPinned, pinnedOrder: v.pinnedOrder, publishedAt: v.publishedAt, updatedAt: v.updatedAt })
+const isArticle = (v: unknown): v is Article => exact(v, ['id', 'publicNo', 'boardCode', 'title', 'status', 'scope', 'isPinned', 'pinnedOrder', 'publishedAt', 'updatedAt', 'body', 'deletedAt'])
+  && isSummary({ id: v.id, publicNo: v.publicNo, boardCode: v.boardCode, title: v.title, status: v.status, scope: v.scope, isPinned: v.isPinned, pinnedOrder: v.pinnedOrder, publishedAt: v.publishedAt, updatedAt: v.updatedAt })
   && localized(v.body) && nullableTimestamp(v.deletedAt);
 const isComment = (v: unknown) => exact(v, ['id', 'articleId', 'parentCommentId', 'authorNameKr', 'body', 'status', 'canEdit', 'canDelete', 'createdAt', 'updatedAt'])
   && isString(v.id) && isString(v.articleId) && nullableString(v.parentCommentId) && isString(v.authorNameKr) && nullableString(v.body)

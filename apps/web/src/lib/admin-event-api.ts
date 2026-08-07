@@ -21,6 +21,7 @@ async function listEvents(): Promise<EventListResponse> {
 }
 export const adminEventApi = {
   list: listEvents,
+  get: (id: string) => request<AdminEvent>(`/admin/events/${encodeURIComponent(id)}`),
   create: (input: CreateEventRequest) => request<AdminEvent>('/admin/events', 'POST', input),
   patch: (id: string, input: PatchEventRequest) => request<AdminEvent>(`/admin/events/${encodeURIComponent(id)}`, 'PATCH', input),
   delete: (id: string) => request<void>(`/admin/events/${encodeURIComponent(id)}`, 'DELETE'),

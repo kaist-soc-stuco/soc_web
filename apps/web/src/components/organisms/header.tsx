@@ -82,6 +82,14 @@ export function Header({ showLogo = false }: HeaderProps) {
             ],
         },
         {
+            label: locale === 'ko' ? '투표·공약' : 'Votes & Pledges',
+            href: '/votes',
+            dropdown: [
+                { label: locale === 'ko' ? '투표' : 'Votes', to: '/votes' },
+                { label: locale === 'ko' ? '공약 이행 현황판' : 'Pledge status', to: '/pledges' },
+            ],
+        },
+        {
             label: locale === 'ko' ? uiText("components.organisms.header.fa255f0ccc") : 'About',
             href: '/about',
             dropdown: [

@@ -42,6 +42,7 @@ export interface AdminBoard extends BoardConfig {
 
 export interface ArticleSummary {
   id: string;
+  publicNo: number;
   boardCode: string;
   title: LocalizedContent;
   status: ArticleStatus;

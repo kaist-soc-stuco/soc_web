@@ -222,8 +222,8 @@ export class BoardsService {
     };
   }
 
-  private articleSummary(row: { id: string; titleKr: string; titleEn: string; status: 'DRAFT' | 'PUBLISHED' | 'DELETED' | 'HIDDEN'; scope: 'ALL' | 'KAIST' | 'SOC' | 'AUTHOR_AND_STAFF' | 'STAFF'; isPinned: boolean; pinnedOrder: number | null; publishedAt: Date | null; updatedAt: Date }, boardCode: string, locale: ContentLocale): ArticleSummary {
-    return { id: row.id, boardCode, title: this.localized(locale, row.titleKr, row.titleEn), status: row.status, scope: row.scope, isPinned: row.isPinned, pinnedOrder: row.pinnedOrder, publishedAt: row.publishedAt?.toISOString() ?? null, updatedAt: row.updatedAt.toISOString() };
+  private articleSummary(row: { id: string; publicNo: number; titleKr: string; titleEn: string; status: 'DRAFT' | 'PUBLISHED' | 'DELETED' | 'HIDDEN'; scope: 'ALL' | 'KAIST' | 'SOC' | 'AUTHOR_AND_STAFF' | 'STAFF'; isPinned: boolean; pinnedOrder: number | null; publishedAt: Date | null; updatedAt: Date }, boardCode: string, locale: ContentLocale): ArticleSummary {
+    return { id: row.id, publicNo: row.publicNo, boardCode, title: this.localized(locale, row.titleKr, row.titleEn), status: row.status, scope: row.scope, isPinned: row.isPinned, pinnedOrder: row.pinnedOrder, publishedAt: row.publishedAt?.toISOString() ?? null, updatedAt: row.updatedAt.toISOString() };
   }
 
   private adminBoard(row: typeof boards.$inferSelect): AdminBoard {

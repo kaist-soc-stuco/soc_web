@@ -51,6 +51,7 @@ const pinned = {
   "0022_survey_response_review_queue_index": ["2e6d94ebfe659d30e7722eeac5348fb75e8f1f26b956144e3b1a3fd745b37723", "141e6208b2c84f83da65c22be2c869d24b06ab296b4084bcd0ffcb5a783f2997"],
   "0023_survey_presentation_blocks": ["95efc3ee396274be0058b0a2a146d5c4367e82b45de3871a1b4b074add0db51d", "ff490292c0205f1bd5e49b05c84f823253e630582b9c5aaa5789e528e84763e6"],
   "0024_survey_section_items": ["c4129d2dd949ff4cd12eab65872826c853bd8270a6f76890e40e5bad91bbdd7f", "1f7671b69cd10781146eb598c16bdb0c0c93198b4eefccb7c23163272fb439f8"],
+  "0025_governance_and_article_public_no": ["66758b0ed9185f1b2763057f55b76c2925e8a6d3b544ccb175d9f318b8524717", "1f7671b69cd10781146eb598c16bdb0c0c93198b4eefccb7c23163272fb439f8"],
 };
 const canonicalJournal = {
   version: "7",
@@ -81,6 +82,7 @@ const canonicalJournal = {
     [22, "0022_survey_response_review_queue_index", 1785749328339, true],
     [23, "0023_survey_presentation_blocks", 1785772800000, true],
     [24, "0024_survey_section_items", 1785859200000, true],
+    [25, "0025_governance_and_article_public_no", 1786000000000, true],
   ],
 };
 function fail(message) { throw new Error(`Migration verification failed: ${message}`); }
