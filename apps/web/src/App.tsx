@@ -35,6 +35,11 @@ const AdminAuditLogsPage = lazy(() => import('@/pages/admin-audit-logs-page').th
 const AdminBoardsPage = lazy(() => import('@/pages/admin-boards-page').then((module) => ({ default: module.AdminBoardsPage })));
 const AdminFaqsPage = lazy(() => import('@/pages/admin-faqs-page').then((module) => ({ default: module.AdminFaqsPage })));
 const AdminEventsPage = lazy(() => import('@/pages/admin-events-page').then((module) => ({ default: module.AdminEventsPage })));
+const VotesPage = lazy(() => import('@/pages/votes-page').then((module) => ({ default: module.VotesPage })));
+const VoteDetailPage = lazy(() => import('@/pages/vote-detail-page').then((module) => ({ default: module.VoteDetailPage })));
+const PledgesPage = lazy(() => import('@/pages/pledges-page').then((module) => ({ default: module.PledgesPage })));
+const AdminVotesPage = lazy(() => import('@/pages/admin-votes-page').then((module) => ({ default: module.AdminVotesPage })));
+const AdminPledgesPage = lazy(() => import('@/pages/admin-pledges-page').then((module) => ({ default: module.AdminPledgesPage })));
 export function LegacyEventSurveyResolver() {
     const { eventId } = useParams<{
         eventId: string;
@@ -104,6 +109,9 @@ export const router = createBrowserRouter([
             { path: 'events', element: <EventsPage /> },
             { path: 'events/:eventId/survey', element: <LegacyEventSurveyResolver /> },
             { path: 'survey/:surveyId', element: <EventSurveyPage /> },
+            { path: 'votes', element: <VotesPage /> },
+            { path: 'votes/:voteId', element: <VoteDetailPage /> },
+            { path: 'pledges', element: <PledgesPage /> },
             { path: 'about', element: <AboutPage /> },
             { path: 'about/roadmap', element: <RoadmapPage /> },
             { path: 'faq', element: <FaqPage /> },
@@ -131,6 +139,8 @@ export const router = createBrowserRouter([
                     { path: 'boards', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'BOARD_MANAGE' }}><AdminBoardsPage /></AdminRouteGuard> },
                     { path: 'faqs', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'FAQ_MANAGE' }}><AdminFaqsPage /></AdminRouteGuard> },
                     { path: 'events', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'EVENT_MANAGE' }}><AdminEventsPage /></AdminRouteGuard> },
+                    { path: 'votes', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'VOTE_MANAGE' }}><AdminVotesPage /></AdminRouteGuard> },
+                    { path: 'pledges', element: <AdminRouteGuard requirement={{ kind: 'GLOBAL', permission: 'PLEDGE_MANAGE' }}><AdminPledgesPage /></AdminRouteGuard> },
                     { path: '*', element: <NotFoundPage /> },
                 ],
             },

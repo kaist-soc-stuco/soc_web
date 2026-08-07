@@ -14,6 +14,7 @@ import { NotificationsModule } from './features/notifications/notifications.modu
 import { PermissionsModule } from './features/permissions/permissions.module';
 import { UsersModule } from './features/users/users.module';
 import { SurveysModule } from './features/surveys/surveys.module';
+import { GovernanceModule } from './features/governance/governance.module';
 import { PostgresModule } from './infrastructure/postgres/postgres.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { validateEnv } from './shared/config/env.validation';
@@ -42,6 +43,7 @@ import { ClockModule } from './shared/time/clock.module';
     BoardsModule,
     EventsModule,
     SurveysModule,
+    GovernanceModule,
     ContactsModule,
     NotificationsModule,
     ChatModule,

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gt, inArray, lt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm';
 
 import { DRIZZLE_DB, type PostgresDatabase } from '../../infrastructure/postgres/postgres.provider';
 import { articles, boards, permissionAuditLog } from '../../infrastructure/postgres/postgres.schema';
@@ -60,12 +60,16 @@ export class ArticlesRepository {
     boardCode: string,
     actorUserId: string,
     correlationId: string,
-    buildCreate: (board: BoardRow) => Promise<typeof articles.$inferInsert>,
+    buildCreate: (board: BoardRow) => Promise<Omit<typeof articles.$inferInsert, 'publicNo'> & { publicNo?: number }>,
   ): Promise<ArticleWithBoard | null> {
     return this.db.transaction(async (tx) => {
       const [board] = await tx.select().from(boards).where(eq(boards.code, boardCode)).for('update');
       if (!board) return null;
-      const [created] = await tx.insert(articles).values(await buildCreate(board)).returning();
+      const values = await buildCreate(board);
+      const [next] = await tx.select({ max: sql<number>`coalesce(max(${articles.publicNo}), 0)` })
+        .from(articles)
+        .where(eq(articles.boardId, board.id));
+      const [created] = await tx.insert(articles).values({ ...values, publicNo: values.publicNo ?? Number(next?.max ?? 0) + 1 }).returning();
       await this.audit(tx, actorUserId, 'ARTICLE_CREATED', created.id, 'record,title,body,scope,pinned', correlationId);
       return { article: created, board };
     });

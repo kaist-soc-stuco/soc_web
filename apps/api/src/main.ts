@@ -12,9 +12,12 @@ import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
 import { RequestIdMiddleware } from './shared/middleware/request-id.middleware';
 import { securityResponseLogMiddleware } from './shared/middleware/security-response-log.middleware';
 const definitionPath = /^\/api\/admin\/surveys\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/definition\/?$/i;
+const voterRollPath = /^\/api\/admin\/votes\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/voter-roll\/?$/i;
 
 const isDefinitionRequest = (request: express.Request): boolean =>
   request.method === 'PUT' && definitionPath.test(request.path);
+const isVoterRollRequest = (request: express.Request): boolean =>
+  request.method === 'POST' && voterRollPath.test(request.path);
 
 const boundedParser = (parser: express.RequestHandler): express.RequestHandler =>
   (request, response, next) => {
@@ -32,16 +35,19 @@ export const configureSurveyBodyParsers = (
   definitionParserLimit: number,
 ): void => {
   const definitionJson = boundedParser(express.json({ limit: definitionParserLimit }));
+  const voterRollJson = boundedParser(express.json({ limit: '2mb' }));
   const defaultJson = boundedParser(express.json({ limit: '32kb' }));
   const defaultUrlencoded = boundedParser(express.urlencoded({ extended: false, limit: '32kb' }));
 
   app.use((request, response, next) => isDefinitionRequest(request)
     ? definitionJson(request, response, next)
-    : next());
-  app.use((request, response, next) => isDefinitionRequest(request)
+    : isVoterRollRequest(request)
+      ? voterRollJson(request, response, next)
+      : next());
+  app.use((request, response, next) => isDefinitionRequest(request) || isVoterRollRequest(request)
     ? next()
     : defaultJson(request, response, next));
-  app.use((request, response, next) => isDefinitionRequest(request)
+  app.use((request, response, next) => isDefinitionRequest(request) || isVoterRollRequest(request)
     ? next()
     : defaultUrlencoded(request, response, next));
 };

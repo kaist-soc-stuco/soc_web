@@ -956,7 +956,7 @@ export class SurveysRepository {
         eq(events.id, relation.eventId), eq(events.visibility, 'PUBLIC'),
       )).limit(1).then(([event]) => event ? {
         kind: 'EVENT', id: event.id, title: locale === 'en' ? event.titleEn : event.titleKr,
-        href: `/calendar?event=${event.id}`, startsAt: event.startAt.toISOString(), relationType: relation.relationType,
+        href: `/calendar?eventId=${event.id}`, startsAt: event.startAt.toISOString(), relationType: relation.relationType,
       } : null));
       if (relation.surveyId && relation.surveyId !== subject.surveyId) pending.push(this.db.select({
         id: surveys.id, titleKr: surveyRevisions.titleKr, titleEn: surveyRevisions.titleEn,

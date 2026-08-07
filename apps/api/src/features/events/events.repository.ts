@@ -25,6 +25,11 @@ export class EventsRepository {
     )).limit(1);
     return event ?? null;
   }
+
+  async findById(id: string) {
+    const [event] = await this.db.select().from(events).where(eq(events.id, id)).limit(1);
+    return event ?? null;
+  }
   async findPublicSurveyIdByEventId(eventId: string): Promise<string | null> {
     const [match] = await this.db
       .select({ surveyId: surveys.id })

@@ -40,6 +40,17 @@ export const eventVisibilityEnum = pgEnum("event_visibility", [
   "AUTHENTICATED",
   "COMMITTEE",
 ]);
+export const voteStateEnum = pgEnum("vote_state", [
+  "DRAFT",
+  "SCHEDULED",
+  "OPEN",
+  "CLOSED",
+  "DISCARDED",
+  "RESULTS_PUBLISHED",
+  "RESULTS_RETIRED",
+]);
+export const voteVoterIdentityKindEnum = pgEnum("vote_voter_identity_kind", ["SSO_SUBJECT", "STUDENT_NUMBER"]);
+export const pledgeStatusEnum = pgEnum("pledge_status", ["PLANNED", "IN_PROGRESS", "DONE", "BLOCKED"]);
 export const contentRelationTypeEnum = pgEnum("content_relation_type", ["ANNOUNCEMENT", "SCHEDULE", "SURVEY_PERIOD"]);
 export const contentRelationSyncModeEnum = pgEnum("content_relation_sync_mode", ["NONE", "SURVEY_TO_EVENT"]);
 export const surveyStateEnum = pgEnum("survey_state", ["DRAFT", "SCHEDULED", "OPEN", "CLOSED", "ARCHIVED"]);
@@ -313,6 +324,140 @@ export const events = pgTable(
     index("events_visibility_range_idx").on(table.visibility, table.startAt, table.endAt),
   ],
 );
+
+export const votes = pgTable(
+  "votes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+    descriptionKr: text("description_kr").notNull(),
+    descriptionEn: text("description_en").notNull(),
+    state: voteStateEnum("state").notNull().default("DRAFT"),
+    opensAt: timestamp("opens_at", { withTimezone: true }).notNull(),
+    closesAt: timestamp("closes_at", { withTimezone: true }).notNull(),
+    anonymous: boolean("anonymous").notNull().default(true),
+    validTurnoutPercent: integer("valid_turnout_percent").notNull().default(50),
+    resultsPublishedAt: timestamp("results_published_at", { withTimezone: true }),
+    resultsVisibleUntil: timestamp("results_visible_until", { withTimezone: true }),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("votes_title_kr_nonempty", sql`btrim(${table.titleKr}) <> ''`),
+    check("votes_title_en_nonempty", sql`btrim(${table.titleEn}) <> ''`),
+    check("votes_description_kr_nonempty", sql`btrim(${table.descriptionKr}) <> ''`),
+    check("votes_description_en_nonempty", sql`btrim(${table.descriptionEn}) <> ''`),
+    check("votes_window_order", sql`${table.closesAt} > ${table.opensAt}`),
+    check("votes_turnout_percent_bounded", sql`${table.validTurnoutPercent} BETWEEN 1 AND 100`),
+    check("votes_result_window_shape", sql`(${table.resultsPublishedAt} IS NULL) = (${table.resultsVisibleUntil} IS NULL) AND (${table.resultsPublishedAt} IS NULL OR ${table.resultsVisibleUntil} >= ${table.resultsPublishedAt})`),
+    index("votes_public_state_window_idx").on(table.state, table.opensAt, table.closesAt),
+  ],
+);
+
+export const voteCandidates = pgTable(
+  "vote_candidates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    voteId: uuid("vote_id").notNull().references(() => votes.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    nameKr: text("name_kr").notNull(),
+    nameEn: text("name_en").notNull(),
+    descriptionKr: text("description_kr").notNull().default(""),
+    descriptionEn: text("description_en").notNull().default(""),
+    imageUrl: text("image_url"),
+  },
+  (table) => [
+    check("vote_candidates_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
+    check("vote_candidates_name_kr_nonempty", sql`btrim(${table.nameKr}) <> ''`),
+    check("vote_candidates_name_en_nonempty", sql`btrim(${table.nameEn}) <> ''`),
+    uniqueIndex("vote_candidates_vote_ordinal_unique").on(table.voteId, table.ordinal),
+    unique("vote_candidates_vote_id_id_unique").on(table.voteId, table.id),
+  ],
+);
+
+export const voteVoterRolls = pgTable(
+  "vote_voter_rolls",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    voteId: uuid("vote_id").notNull().references(() => votes.id, { onDelete: "cascade" }),
+    identityKind: voteVoterIdentityKindEnum("identity_kind").notNull(),
+    identityHash: text("identity_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("vote_voter_rolls_hash_shape", sql`${table.identityHash} ~ '^[0-9a-f]{64}$'`),
+    uniqueIndex("vote_voter_rolls_vote_identity_unique").on(table.voteId, table.identityKind, table.identityHash),
+    index("vote_voter_rolls_vote_hash_idx").on(table.voteId, table.identityHash),
+  ],
+);
+
+export const voteParticipants = pgTable(
+  "vote_participants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    voteId: uuid("vote_id").notNull().references(() => votes.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    votedAt: timestamp("voted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("vote_participants_vote_user_unique").on(table.voteId, table.userId),
+    index("vote_participants_vote_idx").on(table.voteId, table.votedAt),
+  ],
+);
+
+export const voteBallots = pgTable(
+  "vote_ballots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    voteId: uuid("vote_id").notNull().references(() => votes.id, { onDelete: "cascade" }),
+    candidateId: uuid("candidate_id").notNull().references(() => voteCandidates.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "vote_ballots_vote_candidate_fk",
+      columns: [table.voteId, table.candidateId],
+      foreignColumns: [voteCandidates.voteId, voteCandidates.id],
+    }).onDelete("cascade"),
+    index("vote_ballots_vote_candidate_idx").on(table.voteId, table.candidateId),
+  ],
+);
+
+export const pledges = pgTable(
+  "pledges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ordinal: integer("ordinal").notNull(),
+    titleKr: text("title_kr").notNull(),
+    titleEn: text("title_en").notNull(),
+    descriptionKr: text("description_kr").notNull(),
+    descriptionEn: text("description_en").notNull(),
+    status: pledgeStatusEnum("status").notNull().default("PLANNED"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    progressKr: text("progress_kr").notNull(),
+    progressEn: text("progress_en").notNull(),
+    targetDate: date("target_date"),
+    isPublished: boolean("is_published").notNull().default(true),
+    createdByUserId: uuid("created_by_user_id").notNull().references(() => users.id),
+    updatedByUserId: uuid("updated_by_user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("pledges_ordinal_nonnegative", sql`${table.ordinal} >= 0`),
+    check("pledges_title_kr_nonempty", sql`btrim(${table.titleKr}) <> ''`),
+    check("pledges_title_en_nonempty", sql`btrim(${table.titleEn}) <> ''`),
+    check("pledges_description_kr_nonempty", sql`btrim(${table.descriptionKr}) <> ''`),
+    check("pledges_description_en_nonempty", sql`btrim(${table.descriptionEn}) <> ''`),
+    check("pledges_progress_bounded", sql`${table.progressPercent} BETWEEN 0 AND 100`),
+    uniqueIndex("pledges_ordinal_unique").on(table.ordinal),
+    index("pledges_public_order_idx").on(table.isPublished, table.ordinal),
+  ],
+);
+
 export const authorizationBootstrapState = pgTable("authorization_bootstrap_state", {
   id: uuid("id").defaultRandom().primaryKey(),
   fingerprint: text("fingerprint").notNull().unique(),
@@ -403,6 +548,7 @@ export const articles = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     boardId: uuid("board_id").notNull().references(() => boards.id),
+    publicNo: integer("public_no").notNull(),
     authorUserId: uuid("author_user_id").notNull().references(() => users.id),
     titleKr: text("title_kr").notNull(),
     titleEn: text("title_en").notNull(),
@@ -423,11 +569,13 @@ export const articles = pgTable(
     check("articles_title_en_nonempty", sql`btrim(${table.titleEn}) <> ''`),
     check("articles_body_kr_nonempty", sql`btrim(${table.bodyKr}) <> ''`),
     check("articles_body_en_nonempty", sql`btrim(${table.bodyEn}) <> ''`),
+    check("articles_public_no_positive", sql`${table.publicNo} > 0`),
     check("articles_pinned_order_nonnegative", sql`${table.pinnedOrder} IS NULL OR ${table.pinnedOrder} >= 0`),
     check("articles_pinned_state", sql`${table.isPinned} = (${table.pinnedOrder} IS NOT NULL)`),
     check("articles_deleted_at_status", sql`(${table.status} = 'DELETED') = (${table.deletedAt} IS NOT NULL)`),
     check("articles_purge_lifecycle", sql`(${table.status} = 'DELETED' AND ${table.deletedAt} IS NOT NULL AND ${table.purgeAfter} IS NOT NULL AND ${table.purgeAfter} >= ${table.deletedAt}) OR (${table.status} <> 'DELETED' AND ${table.deletedAt} IS NULL AND ${table.purgeAfter} IS NULL)`),
     check("articles_published_at_lifecycle", sql`(${table.status} <> 'PUBLISHED' OR ${table.publishedAt} IS NOT NULL) AND (${table.status} <> 'DRAFT' OR ${table.publishedAt} IS NULL)`),
+    uniqueIndex("articles_board_public_no_unique").on(table.boardId, table.publicNo),
     index("articles_board_list_idx").on(table.boardId, table.status, table.publishedAt),
     index("articles_purge_idx").on(table.status, table.purgeAfter),
   ],

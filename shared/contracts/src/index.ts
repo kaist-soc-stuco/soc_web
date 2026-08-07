@@ -6,6 +6,7 @@ export * from "./http/event";
 export * from "./http/board";
 export * from "./http/survey";
 export * from "./http/contact";
+export * from "./http/governance";
 export * from "./errors/app-error";
 export * from "./security-baseline";
 export * from "./release-manifest";

@@ -231,7 +231,7 @@ export class ArticlesService {
   }
 
   private articleSummary(article: ArticleRow, boardCode: string, locale: ContentLocale) {
-    return { id: article.id, boardCode, title: this.localized(article.titleKr, article.titleEn, locale), status: article.status, scope: article.scope, isPinned: article.isPinned, pinnedOrder: article.pinnedOrder, publishedAt: article.publishedAt?.toISOString() ?? null, updatedAt: article.updatedAt.toISOString() };
+    return { id: article.id, publicNo: article.publicNo, boardCode, title: this.localized(article.titleKr, article.titleEn, locale), status: article.status, scope: article.scope, isPinned: article.isPinned, pinnedOrder: article.pinnedOrder, publishedAt: article.publishedAt?.toISOString() ?? null, updatedAt: article.updatedAt.toISOString() };
   }
 
   private article(article: ArticleRow, boardCode: string, locale: ContentLocale): Article {

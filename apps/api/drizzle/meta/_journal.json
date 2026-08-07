@@ -176,6 +176,13 @@
       "when": 1785859200000,
       "tag": "0024_survey_section_items",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786000000000,
+      "tag": "0025_governance_and_article_public_no",
+      "breakpoints": true
     }
   ]
 }
