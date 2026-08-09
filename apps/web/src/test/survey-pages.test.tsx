@@ -15,6 +15,21 @@ const question = { id: 'item-q-1', ordinal: 0, kind: 'QUESTION' as const, questi
 const survey = (overrides: Partial<SurveyDto> = {}): SurveyDto => ({ id: 'survey-1', revision: 1, definitionVersion: 1, locale: 'en', requestedLocale: 'en', effectiveContentLocale: 'ko', onlyForKoreanSpeaker: true, title: localized('설문'), description: localized('설명'), state: 'DRAFT', guestAllowed: true, phoneRequired: false, feeRestriction: 'ANY', cap: null, opensAt: null, closesAt: null, editDeadlineAt: null, responseRetentionDays: 365, sections: [{ id: 'section-1', ordinal: 0, title: localized('섹션'), items: [question, { id: 'description-1', ordinal: 1, kind: 'DESCRIPTION', body: localized('안내') }, { id: 'images-1', ordinal: 2, kind: 'IMAGE_BLOCK', mode: 'SHARED', membershipCounts: { shared: 2, ko: 0, en: 0 } }] }], updatedAt: null, ...overrides });
 afterEach(() => { cleanup(); vi.clearAllMocks(); api.session.mockResolvedValue({ authenticated: false, canUsePersistentFeatures: false, requiresConsent: false, storageMode: null }); api.mine.mockResolvedValue({ response: null }); });
 describe('survey pages', () => {
+  it('disables definition mutations for a published survey', async () => {
+    const published = survey({ state: 'OPEN' });
+    api.getAdmin.mockResolvedValue(published);
+    api.imageMemberships.mockResolvedValue({ items: [], nextCursor: null, membershipCount: 0, definitionVersion: 1, requestedLocale: 'ko', effectiveContentLocale: 'ko' });
+    render(<MemoryRouter initialEntries={['/admin/surveys/survey-1/edit']}><Routes><Route path="/admin/surveys/:surveyId/edit" element={<AdminSurveyEditPage/>}/></Routes></MemoryRouter>);
+
+    await screen.findByText('설문 편집');
+    expect(screen.getByRole('button', { name: '+ 섹션' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '항목 추가' })[0]).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '설명 추가' })[0]).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '이미지 추가' })[0]).toBeDisabled();
+    expect(screen.getByRole('button', { name: '정의 저장' })).toBeDisabled();
+    expect(api.replaceDefinition).not.toHaveBeenCalled();
+  });
+
   it('inserts mixed items at an ordered boundary', async () => { api.getAdmin.mockResolvedValue(survey()); api.imageMemberships.mockResolvedValue({ items: [], nextCursor: null, membershipCount: 0, definitionVersion: 1, requestedLocale: 'ko', effectiveContentLocale: 'ko' }); render(<MemoryRouter initialEntries={['/admin/surveys/survey-1/edit']}><Routes><Route path="/admin/surveys/:surveyId/edit" element={<AdminSurveyEditPage/>}/></Routes></MemoryRouter>); await screen.findByText('설문 편집'); fireEvent.click(screen.getAllByRole('button', { name: '이미지 추가' })[0]!); expect(await screen.findByRole('status')).toHaveTextContent('이미지 변경 전에 정의를 저장하세요.'); expect(screen.getAllByText(/이미지 모드/)).toHaveLength(2); });
   it('creates a new survey with lifecycle settings before enabling its mixed editor', async () => {
     const created = survey({ id: 'created', sections: [], closesAt: '2026-12-31T23:59:00.000Z' });

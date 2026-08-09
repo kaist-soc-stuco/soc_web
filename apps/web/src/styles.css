@@ -84,3 +84,89 @@
     font-family: 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Roboto Slab', sans-serif;
   }
 }
+
+@layer components {
+  .survey-admin-editor > a {
+    @apply inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-extrabold text-kaist-greygreen transition hover:text-kaist-darkgreen;
+  }
+
+  .survey-admin-editor > h1 {
+    @apply border-b border-kaist-grey/20 pb-5 text-[28px] font-extrabold tracking-tight text-kaist-black sm:text-[32px];
+  }
+
+  .survey-admin-editor > p[role='alert'],
+  .survey-admin-editor p[role='alert'] {
+    @apply mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700;
+  }
+
+  .survey-admin-editor .survey-settings-card,
+  .survey-admin-editor .survey-definition-section {
+    @apply rounded-2xl border-kaist-grey/20 bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,0.05)];
+  }
+
+  .survey-admin-editor .survey-settings-card {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+
+  .survey-admin-editor .survey-settings-card > h2 {
+    @apply col-span-full text-xl font-extrabold text-kaist-black;
+  }
+
+  .survey-admin-editor .survey-settings-card > label:has(input[type='checkbox']) {
+    @apply flex min-h-11 items-center gap-2 rounded-xl border border-kaist-grey/15 px-3 py-2;
+  }
+
+  .survey-admin-editor .survey-settings-card > button {
+    @apply md:col-span-2 md:justify-self-end;
+  }
+
+  .survey-admin-editor label {
+    @apply grid min-w-0 gap-1.5 text-sm font-extrabold text-kaist-black;
+  }
+
+  .survey-admin-editor input:not([type='checkbox']):not([type='file']),
+  .survey-admin-editor select,
+  .survey-admin-editor textarea {
+    @apply min-h-11 min-w-0 w-full rounded-xl border border-kaist-grey/25 bg-white px-3 py-2 text-sm font-medium text-kaist-black outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500;
+  }
+
+  .survey-admin-editor textarea {
+    @apply min-h-24 resize-y;
+  }
+
+  .survey-admin-editor input[type='checkbox'] {
+    @apply h-4 w-4 shrink-0 accent-kaist-darkgreen;
+  }
+
+  .survey-admin-editor input[type='file'] {
+    @apply min-h-11 w-full rounded-xl border border-dashed border-kaist-grey/30 bg-white p-3 text-sm font-semibold text-kaist-grey;
+  }
+
+  .survey-admin-editor button {
+    @apply mx-1 my-1 inline-flex min-h-11 items-center justify-center rounded-xl border border-kaist-grey/25 bg-white px-3 py-2 text-sm font-extrabold text-kaist-darkgreen transition hover:border-kaist-darkgreen/30 hover:bg-kaist-lightgreen2/10 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen/20 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .survey-admin-editor .survey-editor-actions {
+    @apply flex flex-wrap justify-end gap-2 rounded-2xl border border-kaist-grey/20 bg-white p-3;
+  }
+
+  .survey-admin-editor .survey-definition-section > p[role='status'] {
+    @apply mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900;
+  }
+
+  .survey-admin-editor .survey-definition-section > label {
+    @apply mb-3;
+  }
+
+  .survey-admin-editor .rounded.bg-slate-50.p-3 {
+    @apply mt-3 space-y-3 rounded-xl border border-kaist-grey/15 bg-slate-50/70 p-4;
+  }
+
+  .survey-admin-editor .rounded.bg-slate-50.p-3 > div {
+    @apply grid gap-2 sm:grid-cols-[80px_minmax(0,1fr)_auto];
+  }
+
+  .survey-admin-editor img.h-16.w-16 {
+    @apply h-20 w-20 rounded-lg border border-kaist-grey/20 object-cover;
+  }
+}

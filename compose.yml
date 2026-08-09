@@ -74,7 +74,8 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./infra/docker/postgres/seed-development-user.sql:/seed-development-user.sql:ro
-    command: ['psql', '-v', 'ON_ERROR_STOP=1', '-f', '/seed-development-user.sql']
+      - ./infra/docker/postgres/seed-development-content.sql:/seed-development-content.sql:ro
+    command: ['sh', '-c', 'psql -v ON_ERROR_STOP=1 -f /seed-development-user.sql && psql -v ON_ERROR_STOP=1 -f /seed-development-content.sql']
 
   redis:
     image: redis:7-alpine

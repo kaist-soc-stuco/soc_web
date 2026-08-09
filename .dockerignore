@@ -3,6 +3,8 @@
 node_modules
 apps/*/node_modules
 packages/*/node_modules
+shared/*/node_modules
+**/node_modules.codex-deps-backup-*
 apps/*/dist
 packages/*/dist
 dist

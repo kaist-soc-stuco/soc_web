@@ -73,12 +73,16 @@ node "$SCRIPT_DIR/verify-migrations.mjs"
 CUTOVER_STAGE_DIR="$(mktemp -d "$ROOT_DIR/apps/api/.migration-cutover.XXXXXX")"
 
 cp -R "$ROOT_DIR/apps/api/drizzle" "$CUTOVER_STAGE_DIR/drizzle"
-rm -f "$CUTOVER_STAGE_DIR/drizzle/0024_survey_section_items.sql" "$CUTOVER_STAGE_DIR/drizzle/meta/0024_snapshot.json"
+rm -f \
+  "$CUTOVER_STAGE_DIR/drizzle/0024_survey_section_items.sql" \
+  "$CUTOVER_STAGE_DIR/drizzle/0025_governance_and_article_public_no.sql" \
+  "$CUTOVER_STAGE_DIR/drizzle/meta/0024_snapshot.json" \
+  "$CUTOVER_STAGE_DIR/drizzle/meta/0025_snapshot.json"
 node --eval '
 const fs = require("node:fs");
 const path = process.argv[1];
 const journal = JSON.parse(fs.readFileSync(path, "utf8"));
-journal.entries = journal.entries.filter((entry) => entry.tag !== "0024_survey_section_items");
+journal.entries = journal.entries.filter((entry) => entry.idx < 24);
 fs.writeFileSync(path, JSON.stringify(journal));
 ' "$CUTOVER_STAGE_DIR/drizzle/meta/_journal.json"
 cat > "$CUTOVER_STAGE_DIR/drizzle.config.ts" <<EOF

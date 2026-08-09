@@ -1,10 +1,12 @@
 import { uiText } from "@/lib/i18n/surface-catalog";
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, MapPin, Search } from 'lucide-react';
 import { SiteLayout } from '@/components/organisms/site-layout';
 import type { EventItem } from '@soc/contracts';
-import { getEvents } from '@/lib/event-api';
+import { getEvent, getEvents } from '@/lib/event-api';
 import { localizedText } from '@/lib/localized-content';
+import { formatScheduleDate, formatScheduleTime } from '@/lib/schedule-date';
 type CalendarCategory = '전체' | '학사' | '행사' | '학생회' | '복지' | '연구';
 interface CalendarEvent {
     id: string;
@@ -20,7 +22,7 @@ const calendarCategories: CalendarCategory[] = ['전체', '학사', '행사', '�
 function formatTime(event: EventItem) {
     if (event.allDay)
         return uiText("pages.calendar-page.9174d99398");
-    return new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(event.startAtMs);
+    return formatScheduleTime(event.startAtMs);
 }
 function previousDateKey(dateKey: string) {
     const date = new Date(`${dateKey}T00:00:00Z`);
@@ -73,13 +75,26 @@ function getMonthDays(viewDate: Date) {
     });
 }
 export function CalendarPage() {
-    const pageContainerClass = 'mx-auto w-full px-[12vw]';
+    const pageContainerClass = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8';
     const [viewDate, setViewDate] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
     const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
     const [activeCategory, setActiveCategory] = useState<CalendarCategory>('전체');
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchParams] = useSearchParams();
+    const requestedEventId = searchParams.get('eventId');
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+    useEffect(() => {
+        if (!requestedEventId)
+            return;
+        const controller = new AbortController();
+        void getEvent(requestedEventId, 'ko', controller.signal).then((event) => {
+            const target = event.allDay && event.allDayStartDate ? new Date(`${event.allDayStartDate}T00:00:00`) : new Date(event.startAtMs);
+            setViewDate(new Date(target.getFullYear(), target.getMonth(), 1));
+            setSelectedDate(toDateKey(target));
+        }).catch(() => undefined);
+        return () => controller.abort();
+    }, [requestedEventId]);
     useEffect(() => {
         const fromMs = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getTime();
         const toMs = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1).getTime();
@@ -204,7 +219,7 @@ export function CalendarPage() {
               <section className="rounded-[8px] border border-kaist-grey/25 bg-white p-5">
                 <div className="flex items-center gap-3">
                   <CalendarDays className="h-5 w-5 text-kaist-darkgreen"/>
-                  <h2 className="text-[18px] font-extrabold tracking-tight text-kaist-black">{selectedDate}</h2>
+                  <h2 className="text-[18px] font-extrabold tracking-tight text-kaist-black">{formatScheduleDate(selectedDate)}</h2>
                 </div>
 
                 <div className="mt-5 space-y-4">
@@ -231,7 +246,7 @@ export function CalendarPage() {
                 <div className="mt-5 space-y-3">
                   {upcomingEvents.map((event) => (<button key={event.id} type="button" onClick={() => setSelectedDate(event.date)} className="block w-full rounded-[8px] border border-kaist-grey/15 px-4 py-3 text-left transition hover:bg-kaist-grey/5">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-[13px] font-extrabold text-kaist-darkgreen">{event.date.slice(5).replace('-', '/')}</span>
+                        <span className="text-[13px] font-extrabold text-kaist-darkgreen">{formatScheduleDate(event.date)}</span>
                         <span className={`rounded-full px-2 py-1 text-[11px] font-extrabold ${categoryStyles[event.category]}`}>{event.category}</span>
                       </div>
                       <p className="mt-2 text-[14px] font-extrabold tracking-tight text-kaist-black">{event.title}</p>

@@ -5,7 +5,7 @@ RUN apk add --no-cache bash
 
 RUN corepack enable
 
-COPY package.json pnpm-workspace.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY shared/common/package.json shared/common/package.json
 COPY shared/contracts/package.json shared/contracts/package.json
@@ -17,7 +17,7 @@ COPY shared/common shared/common
 COPY shared/contracts shared/contracts
 COPY infra/scripts infra/scripts
 COPY shared/config shared/config
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 WORKDIR /app/apps/api
 

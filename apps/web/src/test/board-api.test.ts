@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BoardApiError, BoardApiProtocolError, boardApi } from '../lib/board-api';
 
-const summary = { id: 'a', boardCode: 'notice', title: { value: '공지', translationUnavailable: false }, status: 'PUBLISHED', scope: 'ALL', isPinned: false, pinnedOrder: null, publishedAt: null, updatedAt: '2026-01-01T00:00:00.000Z' };
+const summary = { id: 'a', publicNo: 1, boardCode: 'notice', title: { value: '공지', translationUnavailable: false }, status: 'PUBLISHED', scope: 'ALL', isPinned: false, pinnedOrder: null, publishedAt: null, updatedAt: '2026-01-01T00:00:00.000Z' };
 const board = { id: 'b', code: 'notice', title: { value: '공지', translationUnavailable: false }, description: { value: '', translationUnavailable: false }, config: { readPermission: 'PUBLIC', writePermission: 'COMMITTEE', commentPermission: 'AUTHENTICATED', commentsAllowed: true, secretArticlesAllowed: false, reactionsAllowed: true, displayOrder: 1, isHidden: false, showOnHome: true }, updatedAt: '2026-01-01T00:00:00.000Z' };
 
 const adminBoard = { id: 'board-1', code: 'notice', titleKr: '공지', titleEn: 'Notice', descriptionKr: '설명', descriptionEn: 'Description', readPermission: 'PUBLIC', writePermission: 'AUTHENTICATED', commentPermission: 'AUTHENTICATED', commentsAllowed: true, secretArticlesAllowed: false, reactionsAllowed: true, displayOrder: 1, isHidden: false, showOnHome: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z' };

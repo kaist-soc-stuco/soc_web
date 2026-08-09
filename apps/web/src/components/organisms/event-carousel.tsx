@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getUpcomingEvents } from '@/lib/event-api';
 import { localizedText } from '@/lib/localized-content';
-const EVENT_IMAGE_PLACEHOLDER = 'linear-gradient(135deg, rgb(20 109 74) 0%, rgb(91 147 196) 100%)';
+import { formatScheduleDate, formatScheduleDateTime } from '@/lib/schedule-date';
+const DEFAULT_EVENT_IMAGE = '/hero_background2.jpeg';
 interface EventCardProps {
     id: string;
     title: string;
@@ -15,17 +16,9 @@ interface EventCardProps {
 }
 const formatEventDate = (event: EventItem): string => {
     if (event.allDay && event.allDayStartDate) {
-        return new Intl.DateTimeFormat('ko-KR', {
-            day: 'numeric',
-            month: 'long',
-        }).format(new Date(`${event.allDayStartDate}T00:00:00`));
+        return formatScheduleDate(event.allDayStartDate);
     }
-    return new Intl.DateTimeFormat('ko-KR', {
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        month: 'long',
-    }).format(new Date(event.startAtMs));
+    return formatScheduleDateTime(event.startAtMs);
 };
 const toEventCard = (event: EventItem, now: number): EventCardProps => ({
     id: event.id,
@@ -34,10 +27,11 @@ const toEventCard = (event: EventItem, now: number): EventCardProps => ({
     status: event.startAtMs <= now && now < event.endAtMs ? 'ongoing' : 'upcoming',
     summary: localizedText(event.description),
 });
-function EventCard({ title, date, status, summary }: EventCardProps) {
-    return (<Link to="/calendar" className="group flex aspect-[270/359] h-auto max-h-full min-h-[240px] w-full min-w-0 flex-col self-center overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.18),1px_2px_4px_rgba(0,0,0,0.14)] transition hover:-translate-y-0.5 hover:shadow-md md:min-h-[260px] lg:min-h-0">
-      <div className="relative h-[60.2%] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
-        <div className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105" style={{ backgroundImage: EVENT_IMAGE_PLACEHOLDER }}/>
+function EventCard({ id, title, date, status, summary }: EventCardProps) {
+    return (<Link to={`/calendar?eventId=${encodeURIComponent(id)}`} className="group flex aspect-[270/359] h-auto max-h-full min-h-[240px] w-full min-w-0 flex-col self-center overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.18),1px_2px_4px_rgba(0,0,0,0.14)] transition hover:-translate-y-0.5 hover:shadow-md md:min-h-[260px] lg:min-h-0">
+      <div className="relative h-[52%] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
+        <img src={DEFAULT_EVENT_IMAGE} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"/>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"/>
         <span className="absolute left-3 top-3 rounded-full bg-kaist-darkgreen px-2.5 py-1 text-[10px] font-semibold tracking-tight text-kaist-white">
           {status === 'ongoing' ? uiText("components.organisms.event-carousel.0dae9079ff") : uiText("components.organisms.event-carousel.7ba9542c96")}
         </span>
@@ -45,7 +39,7 @@ function EventCard({ title, date, status, summary }: EventCardProps) {
 
       <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2.5">
         <span className="mb-1 text-[10px] font-bold tracking-tight text-[#5b93c4]">{uiText("components.organisms.event-carousel.bff20dc3bb")}</span>
-        <h3 className="truncate text-base font-extrabold tracking-tight text-kaist-black lg:text-xl">
+        <h3 className="line-clamp-2 text-base font-extrabold leading-snug tracking-tight text-kaist-black lg:text-lg">
           {title}
         </h3>
         <p className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-normal tracking-tight text-kaist-grey">

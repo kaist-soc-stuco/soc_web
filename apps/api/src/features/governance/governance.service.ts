@@ -192,6 +192,12 @@ export class GovernanceService {
     return this.adminPledge(updated);
   }
 
+  async deletePledge(actorUserId: string, id: string): Promise<void> {
+    await this.require(actorUserId, 'PLEDGE_MANAGE');
+    this.uuid(id);
+    if (!(await this.repository.deletePledge(id, actorUserId))) throw new NotFoundException('pledge_not_found');
+  }
+
   private async summary(bundle: VoteBundle, locale: ContentLocale, actorUserId: string | undefined, identity: { hashes: string[] } | null, state: VoteState) {
     const stats = await this.repository.stats(bundle.vote.id);
     let participation: VoteParticipationState = 'NOT_AUTHENTICATED';

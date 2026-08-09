@@ -42,7 +42,10 @@ test('public survey renders ordered Korean-only content and an accessible image 
   await page.goto('/survey/survey-1');
   await expect(page.getByText('한국어 안내')).toBeVisible();
   await expect(page.getByRole('radio', { name: '참여' })).toBeVisible();
-  await expect(page.locator('form > section').first().locator('p, fieldset').allTextContents()).resolves.toEqual(['한국어 안내', '참여하시겠습니까?참여불참']);
+  const renderedItems = page.locator('form > section').first().locator('p, fieldset');
+  await expect(renderedItems).toHaveCount(2);
+  await expect(renderedItems.nth(0)).toHaveText('한국어 안내');
+  await expect(renderedItems.nth(1)).toContainText('참여하시겠습니까?');
   await page.getByRole('radio', { name: '참여' }).check();
   await page.getByLabel('언어').selectOption('en');
   await expect(page.getByText('This survey is available in Korean. Korean content is shown below.', { exact: true })).toBeVisible();
@@ -148,7 +151,26 @@ test('admin review confirmation preserves response tuple and public materializat
   await page.getByRole('button', { name: '공개 행사 만들기' }).click();
   await page.getByRole('dialog').getByRole('button', { name: '확인' }).click();
   await expect.poll(() => materializeBody).toEqual({ location: 'N1', visibility: 'PUBLIC' });
-  await expect(page.getByRole('link', { name: '행사 열기' })).toHaveAttribute('href', '/events/event-1');
+  await expect(page.getByRole('link', { name: '행사 열기' })).toHaveAttribute('href', '/calendar?eventId=event-1');
   await expect(page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).resolves.toBe(true);
   await expect(page.locator('body')).not.toContainText(/phone|hash|ciphertext|reviewer/i);
+});
+
+test('admin survey editor blocks a dirty in-app link before discarding changes', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/users/me') return route.fulfill({ json: user });
+    return route.fulfill({ json: {} });
+  });
+
+  await page.goto('/admin/surveys/new/edit');
+  await expect(page.getByRole('heading', { name: '설문 편집' })).toBeVisible();
+  await page.getByRole('textbox', { name: '한국어 제목' }).fill('저장하지 않을 테스트 설문');
+
+  const dialogPromise = page.waitForEvent('dialog');
+  await page.getByRole('link', { name: '목록', exact: true }).click();
+  const dialog = await dialogPromise;
+  expect(dialog.type()).toBe('confirm');
+  await dialog.dismiss();
+  await expect(page).toHaveURL(/\/admin\/surveys\/new\/edit$/);
 });

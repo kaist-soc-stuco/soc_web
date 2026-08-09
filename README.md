@@ -6,6 +6,7 @@ KAIST SoC 웹 모노레포입니다.
 - API: NestJS
 - Data: PostgreSQL 16, Redis 7
 - Local runtime: Docker Compose + nginx
+- UI 표기 규칙: [`docs/ui-conventions.md`](docs/ui-conventions.md)
 
 ## 요구 사항
 

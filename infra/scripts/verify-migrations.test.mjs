@@ -41,6 +41,7 @@ const releasedTags = [
   "0022_survey_response_review_queue_index",
   "0023_survey_presentation_blocks",
   "0024_survey_section_items",
+  "0025_governance_and_article_public_no",
 ];
 
 async function releasedFixture(t) {

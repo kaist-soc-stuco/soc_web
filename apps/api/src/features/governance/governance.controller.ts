@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import type { CastVoteRequest, CreatePledgeRequest, CreateVoteRequest, ImportVoteVoterRollRequest, PatchPledgeRequest, PatchVoteRequest } from '@soc/contracts';
 
@@ -19,41 +19,46 @@ function id(value: string): string {
   return value;
 }
 
+function locale(value: Record<string, unknown>, code: string): string | undefined {
+  if (value.locale !== undefined && value.locale !== 'ko' && value.locale !== 'en') throw new UnprocessableEntityException(code);
+  return value.locale as string | undefined;
+}
+
 @Controller('votes')
 @UseGuards(OptionalAuthGuard)
 export class PublicVotesController {
-  constructor(private readonly governance: GovernanceService) {}
+  constructor(@Inject(GovernanceService) private readonly governance: GovernanceService) {}
 
   @Get()
   list(@Req() request: OptionalRequest, @Query() query: Record<string, unknown>) {
     const value = objectBody(query, ['locale'], 'invalid_vote_query');
-    return this.governance.listVotes(request.user?.id, value.locale);
+    return this.governance.listVotes(request.user?.id, locale(value, 'invalid_vote_query'));
   }
 
   @Get(':id')
   get(@Req() request: OptionalRequest, @Param('id') voteId: string, @Query() query: Record<string, unknown>) {
     const value = objectBody(query, ['locale'], 'invalid_vote_query');
-    return this.governance.getVote(request.user?.id, id(voteId), value.locale);
+    return this.governance.getVote(request.user?.id, id(voteId), locale(value, 'invalid_vote_query'));
   }
 }
 
 @Controller('votes')
 @UseGuards(AuthGuard)
 export class VoteBallotsController {
-  constructor(private readonly governance: GovernanceService) {}
+  constructor(@Inject(GovernanceService) private readonly governance: GovernanceService) {}
 
   @Post(':id/ballots')
   @HttpCode(201)
   cast(@Req() request: AuthenticatedRequest, @Param('id') voteId: string, @Body() body: unknown) {
     const value = objectBody(body, ['candidateId'], 'invalid_vote');
-    return this.governance.castVote(request.user.id, id(voteId), (value as unknown as CastVoteRequest).candidateId);
+    return this.governance.castVote(request.user.id, id(voteId), id((value as unknown as CastVoteRequest).candidateId));
   }
 }
 
 @Controller('admin')
 @UseGuards(AuthGuard)
 export class AdminGovernanceController {
-  constructor(private readonly governance: GovernanceService) {}
+  constructor(@Inject(GovernanceService) private readonly governance: GovernanceService) {}
 
   @Get('votes')
   listVotes(@Req() request: AuthenticatedRequest) { return this.governance.listAdminVotes(request.user.id); }
@@ -99,22 +104,28 @@ export class AdminGovernanceController {
     const value = objectBody(body, ['ordinal', 'titleKr', 'titleEn', 'descriptionKr', 'descriptionEn', 'status', 'progressPercent', 'progressKr', 'progressEn', 'targetDate', 'isPublished'], 'invalid_pledge');
     return this.governance.patchPledge(request.user.id, id(pledgeId), value as unknown as PatchPledgeRequest);
   }
+
+  @Delete('pledges/:id')
+  @HttpCode(204)
+  async deletePledge(@Req() request: AuthenticatedRequest, @Param('id') pledgeId: string): Promise<void> {
+    await this.governance.deletePledge(request.user.id, id(pledgeId));
+  }
 }
 
 @Controller('pledges')
 @UseGuards(OptionalAuthGuard)
 export class PublicPledgesController {
-  constructor(private readonly governance: GovernanceService) {}
+  constructor(@Inject(GovernanceService) private readonly governance: GovernanceService) {}
 
   @Get()
   list(@Query() query: Record<string, unknown>) {
     const value = objectBody(query, ['locale'], 'invalid_pledge_query');
-    return this.governance.listPledges(value.locale);
+    return this.governance.listPledges(locale(value, 'invalid_pledge_query'));
   }
 
   @Get(':id')
   get(@Param('id') pledgeId: string, @Query() query: Record<string, unknown>) {
     const value = objectBody(query, ['locale'], 'invalid_pledge_query');
-    return this.governance.getPledge(id(pledgeId), value.locale);
+    return this.governance.getPledge(id(pledgeId), locale(value, 'invalid_pledge_query'));
   }
 }

@@ -877,8 +877,8 @@ describe('survey and matcher PostgreSQL protocol', () => {
     await pool.query('INSERT INTO survey_response_answers (response_id, question_id, choice_option_ids) VALUES ($1, $2, $3)', [fifth, d.questions.SINGLE_CHOICE, JSON.stringify([d.choices.SINGLE_CHOICE![0]])]);
     const aggregate = await service.aggregate(actorId, d.surveyId, 'en');
     expect(aggregate).toEqual({ surveyId: d.surveyId, locale: 'en', surveySuppressed: false, revisions: [{ surveyRevisionId: d.revisionId, revision: 1, suppressed: false, responseCount: 5, questions: [{ questionId: d.questions.SINGLE_CHOICE, prompt: { value: 'SINGLE_CHOICE', translationUnavailable: false }, responseCount: 5, choices: [{ choiceOptionId: d.choices.SINGLE_CHOICE![0], label: { value: 'one', translationUnavailable: false }, count: 3 }, { choiceOptionId: d.choices.SINGLE_CHOICE![1], label: { value: 'two', translationUnavailable: false }, count: 2 }] }] }] });
-    const article = await pool.query<{ id: string }>(`INSERT INTO articles (board_id, author_user_id, title_kr, title_en, body_kr, body_en, status, scope, published_at)
-      SELECT id, $1, 'survey integration article', 'article', 'body', 'body', 'PUBLISHED', 'ALL', now() FROM boards WHERE code = 'suggestions' RETURNING id`, [actorId]);
+    const article = await pool.query<{ id: string }>(`INSERT INTO articles (board_id, public_no, author_user_id, title_kr, title_en, body_kr, body_en, status, scope, published_at)
+      SELECT id, 1, $1, 'survey integration article', 'article', 'body', 'body', 'PUBLISHED', 'ALL', now() FROM boards WHERE code = 'suggestions' RETURNING id`, [actorId]);
     const event = await pool.query<{ id: string }>(`INSERT INTO events (title_kr, title_en, description_kr, description_en, start_at, end_at, location, created_by_user_id, updated_by_user_id)
       VALUES ('행사', 'event', '설명', 'description', now(), now() + interval '1 hour', 'room', $1, $1) RETURNING id`, [actorId]);
     const articleId = article.rows[0]!.id; const eventId = event.rows[0]!.id;

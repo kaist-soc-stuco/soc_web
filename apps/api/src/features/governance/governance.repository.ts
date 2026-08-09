@@ -240,6 +240,16 @@ export class GovernanceRepository {
     });
   }
 
+  async deletePledge(id: string, actorUserId: string): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [current] = await tx.select({ id: pledges.id }).from(pledges).where(eq(pledges.id, id)).for('update');
+      if (!current) return false;
+      await tx.delete(pledges).where(eq(pledges.id, id));
+      await this.audit(tx, actorUserId, 'PLEDGE_DELETED', id, 'record', id);
+      return true;
+    });
+  }
+
   private async withCandidates(rows: VoteRow[]): Promise<VoteBundle[]> {
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.id);

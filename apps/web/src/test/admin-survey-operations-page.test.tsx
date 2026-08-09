@@ -94,7 +94,7 @@ describe('AdminSurveyOperationsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '공개 행사 만들기' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '확인' }));
     await waitFor(() => expect(api.materializeEvent).toHaveBeenCalledWith('survey-1', { location: 'N1', visibility: 'PUBLIC' }));
-    expect(screen.getByRole('link', { name: '행사 열기' })).toHaveAttribute('href', '/events/event-1');
+    expect(screen.getByRole('link', { name: '행사 열기' })).toHaveAttribute('href', '/calendar?eventId=event-1');
   });
   it.each([
     ['승인', 'APPROVED', '사유 없음'],

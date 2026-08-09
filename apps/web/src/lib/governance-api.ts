@@ -41,4 +41,5 @@ export const pledgeApi = {
   adminList: () => request<AdminPledgeListResponse>('/admin/pledges'),
   create: (input: CreatePledgeRequest) => request<AdminPledge>('/admin/pledges', 'POST', input),
   patch: (id: string, input: PatchPledgeRequest) => request<AdminPledge>(`/admin/pledges/${encodeURIComponent(id)}`, 'PATCH', input),
+  remove: (id: string) => request<void>(`/admin/pledges/${encodeURIComponent(id)}`, 'DELETE'),
 };

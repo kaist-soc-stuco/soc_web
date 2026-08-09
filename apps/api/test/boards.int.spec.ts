@@ -73,12 +73,14 @@ describe('board PostgreSQL protocol', () => {
 
   async function article(status: 'PUBLISHED' | 'DELETED' = 'DELETED', purgeAfter = new Date(now.getTime() - 1_000)) {
     const result = await pool.query<{ id: string }>(`INSERT INTO articles
-      (board_id, author_user_id, title_kr, title_en, body_kr, body_en, status, scope, deleted_at, purge_after, published_at)
-      SELECT id, $1, '제목', 'title', '본문', 'body', $2::article_status, 'ALL',
+      (board_id, public_no, author_user_id, title_kr, title_en, body_kr, body_en, status, scope, deleted_at, purge_after, published_at)
+      SELECT board.id,
+        COALESCE((SELECT MAX(existing.public_no) + 1 FROM articles existing WHERE existing.board_id = board.id), 1),
+        $1, '제목', 'title', '본문', 'body', $2::article_status, 'ALL',
         CASE WHEN $2 = 'DELETED' THEN $3::timestamptz ELSE NULL::timestamptz END,
         CASE WHEN $2 = 'DELETED' THEN $4::timestamptz ELSE NULL::timestamptz END,
         CASE WHEN $2 = 'PUBLISHED' THEN $5::timestamptz ELSE NULL::timestamptz END
-      FROM boards WHERE code = 'suggestions' RETURNING id`, [
+      FROM boards board WHERE board.code = 'suggestions' RETURNING id`, [
         actorId,
         status,
         new Date(Math.min(now.getTime(), purgeAfter.getTime() - 1_000)),
