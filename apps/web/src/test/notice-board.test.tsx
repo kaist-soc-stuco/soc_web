@@ -21,7 +21,7 @@ describe('NoticeBoard', () => {
     expect(screen.getByRole('status')).toHaveTextContent('불러오는 중');
     expect(await screen.findByRole('link', { name: /고정.*중요 공지/ })).toHaveAttribute('href', '/board/notice/article-1');
     expect(screen.getByText('2026. 8. 1.')).toBeVisible();
-    expect(list).toHaveBeenCalledWith({ home: true, latestLimit: 1, locale: 'ko' }, expect.any(AbortSignal));
+    expect(list).toHaveBeenCalledWith({ home: true, latestLimit: 5, locale: 'ko' }, expect.any(AbortSignal));
   });
 
   it('shows explicit empty and error states', async () => {

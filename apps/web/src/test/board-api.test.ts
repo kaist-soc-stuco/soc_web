@@ -10,8 +10,8 @@ afterEach(() => vi.restoreAllMocks());
 describe('boardApi', () => {
   it('uses credentialed requests and typed board/article endpoints', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ locale: 'ko', items: [{ ...board, latestArticles: [summary] }] }), { status: 200 }));
-    await boardApi.list({ home: true, latestLimit: 1, locale: 'ko' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/boards?home=true&latestLimit=1&locale=ko', expect.objectContaining({ credentials: 'include', method: 'GET' }));
+    await boardApi.list({ home: true, latestLimit: 5, locale: 'ko' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/boards?home=true&latestLimit=5&locale=ko', expect.objectContaining({ credentials: 'include', method: 'GET' }));
   });
   it('maps canonical API errors', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ code: 'board_not_found', message: 'missing', requestId: 'r' }), { status: 404 }));

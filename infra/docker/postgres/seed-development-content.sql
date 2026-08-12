@@ -140,6 +140,79 @@ ON CONFLICT (id) DO UPDATE SET
   purge_after = NULL,
   updated_at = NOW();
 
+INSERT INTO articles (
+  id, board_id, public_no, author_user_id, title_kr, title_en, body_kr, body_en,
+  status, scope, is_pinned, pinned_order, published_at
+)
+SELECT
+  fixture.id, board.id, fixture.public_no, admin.id, fixture.title_kr, fixture.title_en,
+  fixture.body_kr, fixture.body_en, 'PUBLISHED', 'ALL', false, NULL, fixture.published_at
+FROM (VALUES
+  ('a1111111-1111-4111-8111-111111111115'::uuid, 'soc-notice', 3, '[Mock] Homepage notice layout QA', '[Mock] Homepage notice layout QA', '[Mock] Extra notice for checking multi-row homepage lists.', '[Mock] Extra notice for checking multi-row homepage lists.', TIMESTAMPTZ '2026-08-08 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111116'::uuid, 'soc-notice', 4, '[Mock] Scholarship application reminder', '[Mock] Scholarship application reminder', '[Mock] Extra notice for spacing and date alignment.', '[Mock] Extra notice for spacing and date alignment.', TIMESTAMPTZ '2026-08-09 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111117'::uuid, 'soc-notice', 5, '[Mock] Lab tour registration open', '[Mock] Lab tour registration open', '[Mock] Extra notice for list density checks.', '[Mock] Extra notice for list density checks.', TIMESTAMPTZ '2026-08-10 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111118'::uuid, 'soc-events', 2, '[Mock] Coffee chat signup', '[Mock] Coffee chat signup', '[Mock] Extra event-board article for tab switching.', '[Mock] Extra event-board article for tab switching.', TIMESTAMPTZ '2026-08-08 12:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111119'::uuid, 'soc-events', 3, '[Mock] Seminar volunteer call', '[Mock] Seminar volunteer call', '[Mock] Extra event-board article for list rendering.', '[Mock] Extra event-board article for list rendering.', TIMESTAMPTZ '2026-08-09 12:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111a'::uuid, 'suggestions', 1, '[Mock] Q&A board sample question', '[Mock] Q&A board sample question', '[Mock] Extra suggestion-board article for empty-state avoidance.', '[Mock] Extra suggestion-board article for empty-state avoidance.', TIMESTAMPTZ '2026-08-08 15:00:00+09')
+) AS fixture(id, code, public_no, title_kr, title_en, body_kr, body_en, published_at)
+JOIN boards AS board ON board.code = fixture.code
+JOIN users AS admin ON admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  board_id = EXCLUDED.board_id,
+  public_no = EXCLUDED.public_no,
+  author_user_id = EXCLUDED.author_user_id,
+  title_kr = EXCLUDED.title_kr,
+  title_en = EXCLUDED.title_en,
+  body_kr = EXCLUDED.body_kr,
+  body_en = EXCLUDED.body_en,
+  status = 'PUBLISHED',
+  scope = 'ALL',
+  is_pinned = false,
+  pinned_order = NULL,
+  published_at = EXCLUDED.published_at,
+  deleted_at = NULL,
+  purge_after = NULL,
+  updated_at = NOW();
+
+-- Notice board pagination fixtures: 15 public notices make the page controls visible with a 10-row list.
+INSERT INTO articles (
+  id, board_id, public_no, author_user_id, title_kr, title_en, body_kr, body_en,
+  status, scope, is_pinned, pinned_order, published_at
+)
+SELECT
+  fixture.id, board.id, fixture.public_no, admin.id, fixture.title_kr, fixture.title_en,
+  fixture.body_kr, fixture.body_en, 'PUBLISHED', 'ALL', false, NULL, fixture.published_at
+FROM (VALUES
+  ('a1111111-1111-4111-8111-11111111111b'::uuid, 'soc-notice', 6, '[Mock] 공지 게시판 페이지네이션 QA 06', '[Mock] Notice pagination QA 06', '[Mock] 공지 게시판 두 번째 페이지 이동을 확인하기 위한 테스트 게시글입니다.', '[Mock] Test notice for checking the second page of the notice board.', TIMESTAMPTZ '2026-08-11 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111c'::uuid, 'soc-notice', 7, '[Mock] 공지 게시판 페이지네이션 QA 07', '[Mock] Notice pagination QA 07', '[Mock] 공지 게시판 행 간격과 번호 표시를 확인합니다.', '[Mock] Test notice for row spacing and public number rendering.', TIMESTAMPTZ '2026-08-12 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111d'::uuid, 'soc-notice', 8, '[Mock] 공지 게시판 페이지네이션 QA 08', '[Mock] Notice pagination QA 08', '[Mock] 공지 게시판 목록 hover 상태를 확인합니다.', '[Mock] Test notice for list hover state rendering.', TIMESTAMPTZ '2026-08-13 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111e'::uuid, 'soc-notice', 9, '[Mock] 공지 게시판 페이지네이션 QA 09', '[Mock] Notice pagination QA 09', '[Mock] 공지 게시판 날짜 정렬을 확인합니다.', '[Mock] Test notice for date alignment.', TIMESTAMPTZ '2026-08-14 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111f'::uuid, 'soc-notice', 10, '[Mock] 공지 게시판 페이지네이션 QA 10', '[Mock] Notice pagination QA 10', '[Mock] 첫 페이지 마지막 행의 표시 상태를 확인합니다.', '[Mock] Test notice for the final row of the first page.', TIMESTAMPTZ '2026-08-15 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111120'::uuid, 'soc-notice', 11, '[Mock] 공지 게시판 페이지네이션 QA 11', '[Mock] Notice pagination QA 11', '[Mock] 두 번째 페이지 첫 행의 표시 상태를 확인합니다.', '[Mock] Test notice for the first row of the second page.', TIMESTAMPTZ '2026-08-16 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111121'::uuid, 'soc-notice', 12, '[Mock] 공지 게시판 페이지네이션 QA 12', '[Mock] Notice pagination QA 12', '[Mock] 페이지 이동 후 리스트 폭을 확인합니다.', '[Mock] Test notice for list width after pagination.', TIMESTAMPTZ '2026-08-17 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111122'::uuid, 'soc-notice', 13, '[Mock] 공지 게시판 페이지네이션 QA 13', '[Mock] Notice pagination QA 13', '[Mock] 페이지 이동 후 탭 위치를 확인합니다.', '[Mock] Test notice for tab position after pagination.', TIMESTAMPTZ '2026-08-18 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111123'::uuid, 'soc-notice', 14, '[Mock] 공지 게시판 페이지네이션 QA 14', '[Mock] Notice pagination QA 14', '[Mock] 페이지 이동 후 검색 영역 위치를 확인합니다.', '[Mock] Test notice for search position after pagination.', TIMESTAMPTZ '2026-08-19 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111124'::uuid, 'soc-notice', 15, '[Mock] 공지 게시판 페이지네이션 QA 15', '[Mock] Notice pagination QA 15', '[Mock] 두 번째 페이지 마지막 행의 표시 상태를 확인합니다.', '[Mock] Test notice for the final row of the second page.', TIMESTAMPTZ '2026-08-20 09:00:00+09')
+) AS fixture(id, code, public_no, title_kr, title_en, body_kr, body_en, published_at)
+JOIN boards AS board ON board.code = fixture.code
+JOIN users AS admin ON admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  board_id = EXCLUDED.board_id,
+  public_no = EXCLUDED.public_no,
+  author_user_id = EXCLUDED.author_user_id,
+  title_kr = EXCLUDED.title_kr,
+  title_en = EXCLUDED.title_en,
+  body_kr = EXCLUDED.body_kr,
+  body_en = EXCLUDED.body_en,
+  status = 'PUBLISHED',
+  scope = 'ALL',
+  is_pinned = false,
+  pinned_order = NULL,
+  published_at = EXCLUDED.published_at,
+  deleted_at = NULL,
+  purge_after = NULL,
+  updated_at = NOW();
+
 INSERT INTO events (
   id,
   title_kr,

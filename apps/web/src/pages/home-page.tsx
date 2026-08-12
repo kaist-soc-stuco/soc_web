@@ -6,7 +6,7 @@ import { Calendar } from '@/components/organisms/calendar';
 
 export function HomePage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-kaist-white lg:h-dvh lg:overflow-hidden">
+    <div className="flex min-h-dvh flex-col bg-kaist-white">
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <section className="h-[42dvh] min-h-[360px] lg:hidden">
           <Hero />
@@ -18,16 +18,16 @@ export function HomePage() {
         </aside>
 
         {/* Right Side - Main Content */}
-        <div className="flex w-full min-w-0 flex-col lg:h-dvh lg:basis-[65.625%]">
+        <div className="flex w-full min-w-0 flex-col lg:min-h-dvh lg:basis-[65.625%]">
           <Header />
-          <main className="flex flex-1 min-h-0 flex-col overflow-y-auto lg:overflow-hidden">
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {/* Event Carousel */}
-            <div className="min-h-[320px] flex-none lg:min-h-0 lg:flex-[1.28]">
+            <div className="min-h-[340px] flex-none lg:min-h-[390px] lg:flex-[1.28]">
               <EventCarousel />
             </div>
             
             {/* Notice & Calendar Side by Side */}
-            <div className="flex flex-1 flex-col gap-5 px-5 pb-6 pt-2 md:px-7 lg:min-h-0 lg:flex-row lg:gap-8 lg:px-11 lg:pb-7">
+            <div className="flex flex-1 flex-col gap-5 px-5 pb-6 pt-2 md:px-7 lg:min-h-[330px] lg:flex-row lg:gap-8 lg:px-11 lg:pb-7">
               <div className="min-h-0 flex-[2]">
                 <NoticeBoard />
               </div>

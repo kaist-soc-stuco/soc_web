@@ -39,10 +39,10 @@ function articleSetup(grants: readonly string[] = [], graceDays = 30) {
 describe('BoardsService', () => {
   it('uses the strict home/latest query and projects unavailable translations', async () => {
     const { repository, service } = boardSetup();
-    repository.listVisibleHomeWithLatest.mockResolvedValue([{ board: board({ titleEn: '', descriptionEn: '' }), latest: article({ status: 'PUBLISHED', publishedAt: now }) }]);
-    await expect(service.list(undefined, { locale: 'en', home: true, latestLimit: 1 })).resolves.toMatchObject({ locale: 'en', items: [{ title: { value: null, translationUnavailable: true }, description: { value: null, translationUnavailable: true }, latestArticles: [{ title: { value: 'Title', translationUnavailable: false } }] }] });
-    expect(repository.listVisibleHomeWithLatest).toHaveBeenCalledWith(now);
-    for (const query of [{ home: false }, { home: true, latestLimit: 2 }, { latestLimit: 1 }, { home: true, extra: true }]) await expect(service.list(undefined, query)).rejects.toMatchObject({ response: { message: 'invalid_board_query' } });
+    repository.listVisibleHomeWithLatest.mockResolvedValue([{ board: board({ titleEn: '', descriptionEn: '' }), latest: [article({ status: 'PUBLISHED', publishedAt: now })] }]);
+    await expect(service.list(undefined, { locale: 'en', home: true, latestLimit: 5 })).resolves.toMatchObject({ locale: 'en', items: [{ title: { value: null, translationUnavailable: true }, description: { value: null, translationUnavailable: true }, latestArticles: [{ title: { value: 'Title', translationUnavailable: false } }] }] });
+    expect(repository.listVisibleHomeWithLatest).toHaveBeenCalledWith(now, 5);
+    for (const query of [{ home: false }, { home: true, latestLimit: 6 }, { latestLimit: 1 }, { home: true, extra: true }]) await expect(service.list(undefined, query)).rejects.toMatchObject({ response: { message: 'invalid_board_query' } });
   });
 
   it('hides inaccessible boards and applies every read permission without disclosing existence', async () => {

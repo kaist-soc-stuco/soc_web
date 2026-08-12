@@ -129,27 +129,27 @@ export function BoardWritePage() {
             setPending(false);
         }
     };
-    const pageContainerClass = 'mx-auto w-full px-[12vw]';
+    const pageContainerClass = 'mx-auto w-full max-w-[1600px] px-6';
     return (<SiteLayout>
       <div className="min-h-[calc(100vh-4.5rem)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8"><div className={pageContainerClass}>
-          <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-white">{boardTitle}{uiText("pages.board-write-page.2a0a7f3922")}</h1>
-          {boardDescription && <p className="text-[20px] font-semibold tracking-tight text-white">{boardDescription}</p>}
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7"><div className={pageContainerClass}>
+          <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-white">{boardTitle}{uiText("pages.board-write-page.2a0a7f3922")}</h1>
+          {boardDescription && <p className="text-[24px] font-semibold tracking-tight text-white">{boardDescription}</p>}
         </div></div>
-        <section className={`${pageContainerClass} pb-16 py-2`}>
-          <div className="border-b-2 border-kaist-darkgreen-main py-5"><h2 className="text-2xl font-extrabold tracking-tight text-kaist-black lg:text-[28px]">{uiText("pages.board-write-page.d22b8577c3")}</h2><p className="mt-2 text-sm font-semibold tracking-tight text-kaist-grey">{boardTitle}{uiText("pages.board-write-page.49f9a5ed3f")}</p></div>
+        <section className={`${pageContainerClass} pb-16 pt-8`}>
+          <div className="border-b-2 border-kaist-darkgreen-main pb-4"><h2 className="text-xl font-extrabold tracking-tight text-kaist-black">{uiText("pages.board-write-page.d22b8577c3")}</h2><p className="mt-2 text-sm font-semibold tracking-tight text-kaist-grey">{boardTitle}{uiText("pages.board-write-page.49f9a5ed3f")}</p></div>
           {loading || capabilityLoading ? <p className="py-12 text-center text-kaist-grey">{uiText("pages.board-write-page.3848b6aec2")}</p> : !boardReady ? <p role="alert" className="py-12 text-center text-kaist-grey">{error ?? uiText("pages.board-write-page.88812f5baa")}</p> : !canCreate ? <div role="alert" className="py-12 text-center text-kaist-grey"><p>{uiText("pages.board-write-page.e091646008")}</p><Link to={`/board/${category}`} className="mt-4 inline-block font-bold text-kaist-darkgreen underline">{uiText("pages.board-write-page.884734e767")}</Link></div> : <form onSubmit={submit}>
-            <div className={`grid gap-5 py-7 lg:py-8 ${bilingual ? 'lg:grid-cols-2' : ''}`}>
+            <div className={`grid gap-8 py-8 ${bilingual ? 'lg:grid-cols-2' : ''}`}>
               <fieldset className="grid gap-5"><legend className="mb-3 text-lg font-extrabold text-kaist-darkgreen">{bilingual ? uiText("pages.board-write-page.6e081b5948") : uiText("pages.board-write-page.847c8582b6")}</legend>
-                <label className="grid gap-3"><span className="text-sm font-extrabold">{uiText("pages.board-write-page.078b3a1b0a")}</span><input required value={titleKr} onChange={(event) => setTitleKr(event.target.value)} type="text" className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3"/></label>
-                <label className="grid gap-3"><span className="text-sm font-extrabold">{uiText("pages.board-write-page.c67b871882")}</span><textarea required value={bodyKr} onChange={(event) => setBodyKr(event.target.value)} rows={12} className="min-h-[280px] rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-4"/></label>
+                <label className="grid gap-3 border-b border-kaist-grey/25 pb-5"><span className="text-sm font-extrabold">{uiText("pages.board-write-page.078b3a1b0a")}</span><input required value={titleKr} onChange={(event) => setTitleKr(event.target.value)} type="text" className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"/></label>
+                <label className="grid gap-3 border-b border-kaist-grey/25 pb-5"><span className="text-sm font-extrabold">{uiText("pages.board-write-page.c67b871882")}</span><textarea required value={bodyKr} onChange={(event) => setBodyKr(event.target.value)} rows={12} className="min-h-[280px] rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-4 text-sm outline-none transition focus:border-kaist-darkgreen"/></label>
               </fieldset>
               {bilingual ? <fieldset className="grid gap-5"><legend className="mb-3 text-lg font-extrabold text-kaist-darkgreen">English</legend>
-                <label className="grid gap-3"><span className="text-sm font-extrabold">Title</span><input required value={titleEn} onChange={(event) => setTitleEn(event.target.value)} type="text" className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3"/></label>
-                <label className="grid gap-3"><span className="text-sm font-extrabold">Body</span><textarea required value={bodyEn} onChange={(event) => setBodyEn(event.target.value)} rows={12} className="min-h-[280px] rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-4"/></label>
+                <label className="grid gap-3 border-b border-kaist-grey/25 pb-5"><span className="text-sm font-extrabold">Title</span><input required value={titleEn} onChange={(event) => setTitleEn(event.target.value)} type="text" className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3 text-sm outline-none transition focus:border-kaist-darkgreen"/></label>
+                <label className="grid gap-3 border-b border-kaist-grey/25 pb-5"><span className="text-sm font-extrabold">Body</span><textarea required value={bodyEn} onChange={(event) => setBodyEn(event.target.value)} rows={12} className="min-h-[280px] rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-4 text-sm outline-none transition focus:border-kaist-darkgreen"/></label>
               </fieldset> : null}
             </div>
-            <label className="mb-6 grid gap-2"><span className="text-sm font-extrabold text-kaist-darkgreen">{uiText("pages.board-write-page.6eeb520855")}</span><input aria-label={uiText("pages.board-write-page.c21935b067")} type="file" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)}/></label>
+            <label className="mb-6 grid gap-2 border-b border-kaist-grey/25 pb-5"><span className="text-sm font-extrabold text-kaist-darkgreen">{uiText("pages.board-write-page.6eeb520855")}</span><input aria-label={uiText("pages.board-write-page.c21935b067")} type="file" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)}/></label>
             {bilingual ? <div className="mb-6 grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-extrabold text-kaist-darkgreen">{uiText("pages.board-write-page.25ad965096")}<select aria-label={uiText("pages.board-write-page.871ea2ad09")} value={eventId} onChange={(event) => setEventId(event.target.value)} className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3 font-normal text-kaist-black"><option value="">{uiText("pages.board-write-page.b894db774d")}</option>{events.map((item) => <option key={item.id} value={item.id}>{item.title.value ?? item.id}</option>)}</select></label>
               <label className="grid gap-2 text-sm font-extrabold text-kaist-darkgreen">{uiText("pages.board-write-page.25bc0b519e")}<select aria-label={uiText("pages.board-write-page.2f5ae22c03")} value={surveyId} onChange={(event) => setSurveyId(event.target.value)} className="rounded-[5px] border border-kaist-grey/30 bg-white px-4 py-3 font-normal text-kaist-black"><option value="">{uiText("pages.board-write-page.b894db774d")}</option>{surveys.map((item) => <option key={item.id} value={item.id}>{item.title.value ?? item.id}</option>)}</select></label>

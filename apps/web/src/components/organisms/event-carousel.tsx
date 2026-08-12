@@ -28,7 +28,7 @@ const toEventCard = (event: EventItem, now: number): EventCardProps => ({
     summary: localizedText(event.description),
 });
 function EventCard({ id, title, date, status, summary }: EventCardProps) {
-    return (<Link to={`/calendar?eventId=${encodeURIComponent(id)}`} className="group flex aspect-[270/359] h-auto max-h-full min-h-[240px] w-full min-w-0 flex-col self-center overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.18),1px_2px_4px_rgba(0,0,0,0.14)] transition hover:-translate-y-0.5 hover:shadow-md md:min-h-[260px] lg:min-h-0">
+    return (<Link to={`/calendar?eventId=${encodeURIComponent(id)}`} className="group flex aspect-[270/359] h-auto max-h-full min-h-[260px] w-full min-w-0 flex-col self-center overflow-hidden rounded-lg bg-kaist-white shadow-[-1px_0_4px_rgba(0,0,0,0.18),1px_2px_4px_rgba(0,0,0,0.14)] transition hover:-translate-y-0.5 hover:shadow-md md:min-h-[300px] lg:min-h-[320px]">
       <div className="relative h-[52%] flex-shrink-0 overflow-hidden rounded-t-md bg-kaist-greygreen/20">
         <img src={DEFAULT_EVENT_IMAGE} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"/>
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"/>
@@ -85,13 +85,13 @@ export function EventCarousel() {
             return;
         const updateItemsPerPage = () => {
             const width = carousel.getBoundingClientRect().width;
-            const minCardWidth = 170;
-            const gap = 20;
-            const sideGutter = width >= 768 ? 8 : 4;
+            const minCardWidth = width >= 1024 ? 230 : 210;
+            const gap = 24;
+            const sideGutter = width >= 768 ? 16 : 8;
             const availableWidth = Math.max(0, width - sideGutter * 2);
             const visibleCards = Math.floor((availableWidth + gap) / (minCardWidth + gap));
             setPageWidth(width);
-            setItemsPerPage(Math.max(1, Math.min(4, visibleCards)));
+            setItemsPerPage(Math.max(1, Math.min(3, visibleCards)));
         };
         updateItemsPerPage();
         const observer = new ResizeObserver(updateItemsPerPage);
@@ -117,14 +117,14 @@ export function EventCarousel() {
         return null;
     }, [events.length, loadState]);
     return (<section className="h-full overflow-hidden bg-kaist-white">
-      <div className="flex h-full w-full flex-col px-5 pt-5 lg:px-10 lg:pt-9">
+      <div className="flex h-full w-full flex-col px-5 pt-5 lg:px-10 lg:pt-8">
         <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           {statusMessage ? (<p className="text-sm font-semibold tracking-tight text-kaist-grey">{statusMessage}</p>) : (<>
               <button type="button" onClick={handlePrevPage} className={`absolute left-0 z-10 text-kaist-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.9)] filter transition-transform hover:scale-110 ${currentPage === 0 ? 'pointer-events-none opacity-0' : ''}`} aria-label="Previous page">
                 <ChevronLeft className="mb-2 ml-1 h-9 w-9 stroke-[2.5] md:h-11 md:w-11"/>
               </button>
 
-              <div ref={carouselRef} className="h-full w-full overflow-hidden py-2">
+              <div ref={carouselRef} className="h-full w-full overflow-hidden py-3">
                 <div className="flex h-full transition-transform duration-500 ease-in-out" style={{
                 gap: pageGap,
                 transform: `translateX(-${currentPage * (pageWidth + pageGap)}px)`,

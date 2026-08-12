@@ -7,7 +7,7 @@ import { getFaqs } from '@/lib/faq-api';
 import { localizedText } from '@/lib/localized-content';
 type FaqCategory = 'all' | string;
 export function FaqPage() {
-    const pageContainerClass = 'mx-auto w-full px-[12vw]';
+    const pageContainerClass = 'mx-auto w-full max-w-[1400px] px-6';
     const [topics, setTopics] = useState<PublicFaqListResponse['topics']>([]);
     const [activeCategory, setActiveCategory] = useState<FaqCategory>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -53,27 +53,27 @@ export function FaqPage() {
     };
     return (<SiteLayout>
       <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7">
           <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">FAQ</h1>
-            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">{uiText("pages.faq-page.91273bdd78")}</p>
+            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">FAQ</h1>
+            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">{uiText("pages.faq-page.91273bdd78")}</p>
           </div>
         </div>
 
-        <section className={`${pageContainerClass} pb-16 pt-8`}>
+        <section className={`${pageContainerClass} pb-16 pt-10`}>
           <div className="w-full">
             <div className="mb-7">
-              <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-kaist-black md:text-[30px]">{uiText("pages.faq-page.8e46ee2f89")}</h2>
+              <h2 className="text-[30px] font-extrabold leading-tight tracking-tight text-kaist-black md:text-[34px]">{uiText("pages.faq-page.8e46ee2f89")}</h2>
 
-              <label className="mt-7 flex items-center gap-3 border-b-2 border-kaist-black/60 pb-3">
-                <Search className="h-5 w-5 text-kaist-greygreen"/>
-                <input type="text" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={uiText("pages.faq-page.5b1fc0ead0")} className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold tracking-tight text-kaist-black placeholder:text-kaist-greygreen focus:outline-none"/>
+              <label className="mt-7 flex items-center gap-3 border-b-2 border-kaist-black/60 pb-4">
+                <Search className="h-6 w-6 text-kaist-greygreen"/>
+                <input type="text" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={uiText("pages.faq-page.5b1fc0ead0")} className="min-w-0 flex-1 bg-transparent text-[18px] font-semibold tracking-tight text-kaist-black placeholder:text-kaist-greygreen focus:outline-none"/>
               </label>
             </div>
 
-            <div className="mb-8 grid grid-cols-2 border border-kaist-grey/25 bg-white sm:grid-cols-3">
+            <div className="mb-8 grid grid-cols-2 overflow-hidden rounded-[8px] border border-kaist-grey/25 bg-white shadow-[0_12px_32px_rgba(57,64,75,0.05)] sm:grid-cols-3">
               {status === 'ready'
-            ? [{ id: 'all', title: uiText("pages.faq-page.934dd25ec5") }, ...categories].map((category) => (<button key={category.id} type="button" onClick={() => handleCategoryChange(category.id)} className={`h-[48px] border-b border-r border-kaist-grey/25 text-[14px] font-extrabold tracking-tight transition last:border-r-0 sm:[&:nth-child(3n)]:border-r-0 ${activeCategory === category.id
+            ? [{ id: 'all', title: uiText("pages.faq-page.934dd25ec5") }, ...categories].map((category) => (<button key={category.id} type="button" onClick={() => handleCategoryChange(category.id)} className={`h-[56px] border-b border-r border-kaist-grey/25 text-[15px] font-extrabold tracking-tight transition last:border-r-0 sm:[&:nth-child(3n)]:border-r-0 ${activeCategory === category.id
                     ? 'bg-kaist-darkgreen-main text-kaist-white'
                     : 'bg-white text-kaist-black hover:bg-kaist-grey/10'}`}>
                       {category.title}
@@ -81,7 +81,7 @@ export function FaqPage() {
             : null}
             </div>
 
-            <div className="overflow-hidden rounded-[8px] border border-kaist-grey/15 bg-white">
+            <div className="overflow-hidden rounded-[8px] border border-kaist-grey/15 bg-white shadow-[0_20px_70px_rgba(57,64,75,0.08)]">
               {status === 'loading' ? (<div className="px-6 py-16 text-center text-kaist-grey">
                   <p className="text-base font-semibold">{uiText("pages.faq-page.2036a2150a")}</p>
                 </div>) : status === 'error' ? (<div className="px-6 py-16 text-center text-kaist-grey">
@@ -90,10 +90,10 @@ export function FaqPage() {
                 </div>) : filteredItems.length > 0 ? (filteredItems.map((item) => {
             const isOpen = openId === item.id;
             return (<article key={item.id} className="border-b border-kaist-grey/15 last:border-b-0">
-                      <button type="button" onClick={() => setOpenId(isOpen ? null : item.id)} className="flex w-full items-start justify-between gap-5 px-6 py-5 text-left transition hover:bg-kaist-grey/5 md:px-7">
+                      <button type="button" onClick={() => setOpenId(isOpen ? null : item.id)} className="flex w-full items-start justify-between gap-5 px-6 py-6 text-left transition hover:bg-kaist-grey/5 md:px-7">
                         <span>
                           <span className="text-[13px] font-extrabold tracking-tight text-kaist-darkgreen-main">#{item.category}</span>
-                          <span className="mt-2 block text-[16px] font-extrabold leading-normal tracking-tight text-kaist-black md:text-[18px]">
+                          <span className="mt-2 block text-[18px] font-extrabold leading-normal tracking-tight text-kaist-black md:text-[20px]">
                             {item.question}
                           </span>
                           <span className="mt-2 block text-[13px] font-semibold tracking-tight text-kaist-greygreen">{item.updatedAt}</span>

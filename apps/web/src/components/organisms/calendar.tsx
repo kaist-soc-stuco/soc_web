@@ -62,23 +62,23 @@ export function Calendar({ clickable = false }: CalendarProps) {
       <div className="flex-1 flex flex-col overflow-hidden border-b border-kaist-grey/30">
         {/* Header */}
         <div className="relative mb-1.5 mt-0.5 flex flex-shrink-0 items-center justify-center">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 lg:pt-1">
             {/* Left Arrow */}
             <button onClick={handlePrevMonth} disabled={!canGoPrev} type="button" aria-label={uiText("components.organisms.calendar.e53eec61dc")} className={`text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${!canGoPrev ? 'opacity-0 pointer-events-none' : ''}`}>
-              <ChevronLeft className="h-4 w-4"/>
+              <ChevronLeft className="h-4 w-4 lg:h-6 lg:w-6"/>
             </button>
 
-            <h3 className="text-sm font-extrabold tracking-tight text-kaist-darkgreen md:text-base">
+            <h3 className="text-sm font-extrabold tracking-tight text-kaist-darkgreen md:text-base lg:text-lg">
               {currentYear}{uiText("components.organisms.calendar.cdb4230f41")}{currentMonth}{uiText("components.organisms.calendar.75448692e0")}</h3>
 
             {/* Right Arrow */}
             <button onClick={handleNextMonth} disabled={!canGoNext} type="button" aria-label={uiText("components.organisms.calendar.4f828d5644")} className={`text-kaist-darkgreen hover:text-kaist-darkgreen-main transition-colors ${!canGoNext ? 'opacity-0 pointer-events-none' : ''}`}>
-              <ChevronRight className="h-4 w-4"/>
+              <ChevronRight className="h-4 w-4 lg:h-6 lg:w-6"/>
             </button>
           </div>
 
           {/* Plus Button (absolute right) */}
-          <Link to="/calendar" onClick={(event) => event.stopPropagation()} className="absolute right-0 text-sm font-bold tracking-tight text-kaist-greygreen transition-colors hover:text-kaist-darkgreen md:text-sm" aria-label={uiText("components.organisms.calendar.6afc317508")}>
+          <Link to="/calendar" onClick={(event) => event.stopPropagation()} className="absolute right-0 text-sm font-bold lg:text-lg lg:pt-2 tracking-tight text-kaist-greygreen transition-colors hover:text-kaist-darkgreen md:text-sm" aria-label={uiText("components.organisms.calendar.6afc317508")}>
             +
           </Link>
         </div>
@@ -87,16 +87,16 @@ export function Calendar({ clickable = false }: CalendarProps) {
         <div className="mt-1 mb-1.5 h-0.5 w-full flex-shrink-0 bg-kaist-grey/30"/>
 
         {/* Weekday Headers */}
-        <div className="mb-2 grid flex-shrink-0 grid-cols-7 gap-x-1.5">
+        <div className="mb-2 grid flex-shrink-0 grid-cols-7 gap-x-1.5 lg:pt-2">
           {[uiText("components.organisms.calendar.06cf3e90de"), uiText("components.organisms.calendar.75448692e0"), uiText("components.organisms.calendar.adb4a28256"), uiText("components.organisms.calendar.c04eb2ef10"), uiText("components.organisms.calendar.5664a634af"), uiText("components.organisms.calendar.cf5632c7ab"), uiText("components.organisms.calendar.b9e40662c7")].map((day, index) => (<div key={index} className="text-center">
-              <span className="text-[11px] font-semibold tracking-tight text-kaist-grey">
+              <span className="text-[11px] lg:text-xs font-semibold tracking-tight text-kaist-grey">
                 {day}
               </span>
             </div>))}
         </div>
 
         {/* Calendar Grid */}
-        <div className="grid flex-1 grid-cols-7 grid-rows-5 gap-x-1.5 gap-y-1 overflow-y-auto">
+        <div className="grid flex-1 grid-cols-7 grid-rows-6 gap-x-1.5 gap-y-0.5 overflow-y-auto lg:pt-2">
           {days.map((item, index) => (<div key={index} className="relative flex h-full flex-col items-center">
               {item.day && (<>
                   <span className={`text-xs tracking-tight ${item.today
@@ -106,7 +106,7 @@ export function Calendar({ clickable = false }: CalendarProps) {
                         : 'font-normal text-kaist-grey/30'}`}>
                     {item.day}
                   </span>
-                  <div className="mt-1 h-3 w-full max-w-[36px]">
+                  <div className="mt-1 h-4 w-full max-w-[40px]">
                     {item.event && (<div className={`h-full rounded-full ${item.event.color} flex items-center justify-center py-1`}>
                         <span className="text-[8px] font-normal tracking-tight text-kaist-white truncate px-1">
                           {item.event.title}

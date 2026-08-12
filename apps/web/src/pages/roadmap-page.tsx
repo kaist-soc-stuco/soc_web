@@ -90,7 +90,7 @@ function getRelationMaps() {
     return { prereqParents, refParents, children };
 }
 export function RoadmapPage() {
-    const pageContainerClass = 'mx-auto w-full px-[12vw]';
+    const pageContainerClass = 'mx-auto w-full max-w-[1800px] px-6';
     const rows = Object.keys(rowLabels).map(Number);
     const [hoverCode, setHoverCode] = useState<string | null>(null);
     const [selectedCode, setSelectedCode] = useState<string | null>(csRoadmapCourses[0]?.code ?? null);
@@ -181,8 +181,8 @@ export function RoadmapPage() {
         return uiText("pages.roadmap-page.8fa2145834");
     };
     const matchesFilters = (course: RoadmapCourse) => {
-        const matchesTrack = trackFilter === uiText("pages.roadmap-page.934dd25ec5") || getTrack(course) === trackFilter;
-        const matchesRow = rowFilter === uiText("pages.roadmap-page.934dd25ec5") || course.row === rowFilter;
+        const matchesTrack = trackFilter === '전체' || getTrack(course) === trackFilter;
+        const matchesRow = rowFilter === '전체' || course.row === rowFilter;
         const matchesSearch = normalizedQuery.length === 0 ||
             `cs${course.code}`.includes(normalizedQuery) ||
             course.name.toLowerCase().includes(normalizedQuery);
@@ -190,22 +190,22 @@ export function RoadmapPage() {
     };
     return (<SiteLayout>
       <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7">
           <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">{uiText("pages.roadmap-page.3113991d60")}</h1>
-            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">{uiText("pages.roadmap-page.27e0fb556c")}</p>
+            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">{uiText("pages.roadmap-page.3113991d60")}</h1>
+            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">{uiText("pages.roadmap-page.27e0fb556c")}</p>
           </div>
         </div>
 
-        <section className={`${pageContainerClass} pb-16 pt-8`}>
-          <div className="mb-5 grid gap-3 rounded-[8px] border border-kaist-grey/25 bg-white p-4">
-            <label className="flex items-center gap-3 border-b border-kaist-grey/25 pb-3">
-              <Search className="h-5 w-5 text-kaist-greygreen"/>
-              <input type="text" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={uiText("pages.roadmap-page.ab26d9da36")} className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold tracking-tight text-kaist-black placeholder:text-kaist-greygreen focus:outline-none"/>
+        <section className={`${pageContainerClass} pb-16 pt-10`}>
+          <div className="mb-6 grid gap-4 rounded-[8px] border border-kaist-grey/20 bg-white p-5 shadow-[0_16px_44px_rgba(57,64,75,0.07)]">
+            <label className="flex items-center gap-3 border-b border-kaist-grey/25 pb-4">
+              <Search className="h-6 w-6 text-kaist-greygreen"/>
+              <input type="text" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={uiText("pages.roadmap-page.ab26d9da36")} className="min-w-0 flex-1 bg-transparent text-[18px] font-semibold tracking-tight text-kaist-black placeholder:text-kaist-greygreen focus:outline-none"/>
             </label>
 
             <div className="flex flex-wrap gap-2">
-              {trackLabels.map((track) => (<button key={track} type="button" onClick={() => setTrackFilter(track)} className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold tracking-tight transition ${trackFilter === track
+              {trackLabels.map((track) => (<button key={track} type="button" onClick={() => setTrackFilter(track)} className={`rounded-full border px-4 py-2 text-[13px] font-extrabold tracking-tight transition ${trackFilter === track
                 ? 'border-kaist-darkgreen bg-kaist-darkgreen text-kaist-white'
                 : 'border-kaist-grey/25 bg-white text-kaist-black hover:bg-kaist-grey/10'}`}>
                   {track}
@@ -213,10 +213,10 @@ export function RoadmapPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setRowFilter('전체')} className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold tracking-tight transition ${rowFilter === '전체'
+              <button type="button" onClick={() => setRowFilter('전체')} className={`rounded-full border px-4 py-2 text-[13px] font-extrabold tracking-tight transition ${rowFilter === '전체'
             ? 'border-kaist-darkgreen-main bg-kaist-darkgreen-main text-kaist-white'
             : 'border-kaist-grey/25 bg-white text-kaist-black hover:bg-kaist-grey/10'}`}>{uiText("pages.roadmap-page.765be374e9")}</button>
-              {rows.map((row) => (<button key={row} type="button" onClick={() => setRowFilter(row)} className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold tracking-tight transition ${rowFilter === row
+              {rows.map((row) => (<button key={row} type="button" onClick={() => setRowFilter(row)} className={`rounded-full border px-4 py-2 text-[13px] font-extrabold tracking-tight transition ${rowFilter === row
                 ? 'border-kaist-darkgreen-main bg-kaist-darkgreen-main text-kaist-white'
                 : 'border-kaist-grey/25 bg-white text-kaist-black hover:bg-kaist-grey/10'}`}>
                   {rowLabels[row]}
@@ -224,7 +224,7 @@ export function RoadmapPage() {
             </div>
           </div>
 
-          <div className="mb-5 flex flex-wrap items-center gap-2.5 text-[12px] font-bold tracking-tight">
+          <div className="mb-6 flex flex-wrap items-center gap-2.5 text-[13px] font-bold tracking-tight">
             <span className="rounded-full border border-kaist-darkgreen bg-white px-3 py-1.5 text-kaist-darkgreen">{uiText("pages.roadmap-page.e9a24d72cc")}</span>
             <span className="rounded-full border border-kaist-grey/25 bg-white px-3 py-1.5 text-kaist-black">{uiText("pages.roadmap-page.d6c80699c8")}</span>
             <span className="rounded-full border border-dashed border-kaist-darkgreen bg-white px-3 py-1.5 text-kaist-darkgreen">{uiText("pages.roadmap-page.7464e4cd55")}</span>
@@ -233,8 +233,8 @@ export function RoadmapPage() {
             <span className="rounded-full bg-kaist-grey/10 px-3 py-1.5 text-kaist-grey">{uiText("pages.roadmap-page.5cc060834b")}</span>
           </div>
 
-          <div className="overflow-x-auto rounded-[8px] border border-kaist-grey/25 bg-white p-4">
-            <div className="min-w-[1220px] space-y-3">
+          <div className="overflow-x-auto rounded-[8px] border border-kaist-grey/20 bg-white p-5 shadow-[0_20px_70px_rgba(57,64,75,0.08)]">
+            <div className="min-w-[1320px] space-y-3">
               {rows.map((row) => {
             const courses = csRoadmapCourses.filter((course) => course.row === row);
             return (<div key={row} className="grid grid-cols-[96px_repeat(9,minmax(0,1fr))] gap-2.5">
@@ -268,7 +268,7 @@ export function RoadmapPage() {
                                     : isRequired
                                         ? 'border-kaist-darkgreen/60 bg-white text-kaist-black'
                                         : 'border-kaist-grey/25 bg-white text-kaist-black';
-                    return (<article key={course.code} onMouseEnter={() => setHoverCode(course.code)} onMouseLeave={() => setHoverCode(null)} className={`relative min-h-[112px] rounded-[8px] border p-2.5 transition ${relationClass} ${isIrregular && !isActive ? 'border-dashed' : ''} ${isDimmedByRelation || !isFiltered ? 'opacity-30' : 'opacity-100'} ${isSelected ? 'ring-2 ring-kaist-darkgreen-main/35' : ''}`}>
+                    return (<article key={course.code} onMouseEnter={() => setHoverCode(course.code)} onMouseLeave={() => setHoverCode(null)} className={`relative min-h-[124px] rounded-[8px] border p-3 transition ${relationClass} ${isIrregular && !isActive ? 'border-dashed' : ''} ${isDimmedByRelation || !isFiltered ? 'opacity-30' : 'opacity-100'} ${isSelected ? 'ring-2 ring-kaist-darkgreen-main/35' : ''}`}>
                           <button type="button" onClick={() => setSelectedCode(course.code)} className="block w-full text-left">
                             <p className={`text-[12px] font-extrabold tracking-tight ${isActive ? 'text-kaist-lightgreen2' : 'text-kaist-darkgreen-main'}`}>
                               CS{course.code}
@@ -277,7 +277,7 @@ export function RoadmapPage() {
                               {isRequired ? (<span className="inline-flex rounded-full bg-kaist-darkgreen px-2 py-0.5 text-[10px] font-extrabold text-kaist-white">{uiText("pages.roadmap-page.5b4a45c263")}</span>) : null}
                               {isIrregular ? (<span className="inline-flex rounded-full border border-kaist-darkgreen px-2 py-0.5 text-[10px] font-extrabold text-kaist-darkgreen">{uiText("pages.roadmap-page.e48f3e9f33")}</span>) : null}
                             </div>
-                            <h2 className="mt-1 text-[14px] font-extrabold leading-5 tracking-tight">{course.name}</h2>
+                            <h2 className="mt-1 text-[15px] font-extrabold leading-5 tracking-tight">{course.name}</h2>
                             <p className="mt-2 text-[11px] font-bold tracking-tight opacity-80">{getTrack(course)}</p>
                           </button>
 
