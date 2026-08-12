@@ -457,7 +457,7 @@ const surfaceCatalog = {
   "pages.board-hub-page.478d00882a": { ko: "게시판을 불러오지 못했습니다.", en: "The bulletin board failed to load." },
   "pages.board-hub-page.491c2f6c70": { ko: "게시판이 없습니다.", en: "There is no bulletin board." },
   "pages.board-hub-page.6c484281b4": { ko: "등록된 글이 없습니다.", en: "There are no registered posts." },
-  "pages.board-hub-page.760ac028ce": { ko: "최근 글", en: "Recent Posts" },
+  "pages.board-hub-page.760ac028ce": { ko: "최신 글", en: "Latest Posts" },
   "pages.board-hub-page.7c8f6585ab": { ko: "게시판을 불러오는 중입니다.", en: "The bulletin board is being loaded." },
   "pages.board-hub-page.bd1011dee4": { ko: "게시판", en: "Boards" },
   "pages.board-page.078b3a1b0a": { ko: "제목", en: "title" },

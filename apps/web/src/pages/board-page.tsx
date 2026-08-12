@@ -120,7 +120,7 @@ export function BoardPage() {
               </div>
               
               <div className="flex items-center">
-                <div className="relative flex items-center gap-2 border-b border-kaist-darkgreen/40 mb-2.5">
+                <div className="relative flex items-center gap-2 border-b border-kaist-darkgreen/40 mb-4">
                   <span className="text-[16px] font-semibold text-[#9AA69F]">{uiText("pages.board-page.078b3a1b0a")}</span>
                   <span className="text-base text-kaist-darkgreen mb-2">⌄</span>
                   <input type="text" placeholder="" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-20 bg-transparent text-sm focus:outline-none"/>
