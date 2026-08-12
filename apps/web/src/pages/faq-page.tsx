@@ -7,7 +7,8 @@ import { getFaqs } from '@/lib/faq-api';
 import { localizedText } from '@/lib/localized-content';
 type FaqCategory = 'all' | string;
 export function FaqPage() {
-    const pageContainerClass = 'mx-auto w-full max-w-[1400px] px-6';
+    const pageContainerClass = 'mx-auto w-full max-w-[1600px]';
+    const headerContainerClass = 'mx-auto max-w-[1600px]';
     const [topics, setTopics] = useState<PublicFaqListResponse['topics']>([]);
     const [activeCategory, setActiveCategory] = useState<FaqCategory>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -53,9 +54,9 @@ export function FaqPage() {
     };
     return (<SiteLayout>
       <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7">
-          <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">FAQ</h1>
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7 lg:py-10">
+          <div className={headerContainerClass}>
+            <h1 className="mb-4 text-[40px] font-extrabold tracking-tight text-kaist-white">FAQ</h1>
             <p className="text-[24px] font-semibold tracking-tight text-kaist-white">{uiText("pages.faq-page.91273bdd78")}</p>
           </div>
         </div>

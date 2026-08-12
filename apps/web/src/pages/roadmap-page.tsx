@@ -91,6 +91,7 @@ function getRelationMaps() {
 }
 export function RoadmapPage() {
     const pageContainerClass = 'mx-auto w-full max-w-[1800px] px-6';
+    const headerContainerClass = 'mx-auto max-w-[1800px] px-6';
     const rows = Object.keys(rowLabels).map(Number);
     const [hoverCode, setHoverCode] = useState<string | null>(null);
     const [selectedCode, setSelectedCode] = useState<string | null>(csRoadmapCourses[0]?.code ?? null);
@@ -190,9 +191,9 @@ export function RoadmapPage() {
     };
     return (<SiteLayout>
       <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7">
-          <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[36px] font-extrabold tracking-tight text-kaist-white">{uiText("pages.roadmap-page.3113991d60")}</h1>
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7 lg:py-10">
+          <div className={headerContainerClass}>
+            <h1 className="mb-4 text-[40px] font-extrabold tracking-tight text-kaist-white">{uiText("pages.roadmap-page.3113991d60")}</h1>
             <p className="text-[24px] font-semibold tracking-tight text-kaist-white">{uiText("pages.roadmap-page.27e0fb556c")}</p>
           </div>
         </div>
