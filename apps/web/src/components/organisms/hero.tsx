@@ -112,7 +112,7 @@ export function Hero() {
           <img 
             src="/logo.png" 
             alt="SOC Logo" 
-            className="h-6 w-auto lg:h-[34px]"
+            className="h-6 w-auto lg:h-[34px] mb-2"
           />
         </div>
       </div>

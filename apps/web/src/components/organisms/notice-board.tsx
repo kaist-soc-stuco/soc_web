@@ -42,7 +42,7 @@ export function NoticeBoard() {
               +
             </Link>) : null}
           </div>
-          {selected && (<div className="flex flex-1 flex-col py-4">
+          {selected && (<div className="flex flex-1 flex-col pb-4">
               {articles.length > 0 ? (<ul className="divide-y divide-kaist-grey/20">
                   {articles.map((article) => (<li key={article.id}>
                       <Link to={`/board/${encodeURIComponent(article.boardCode)}/${encodeURIComponent(article.id)}`} className="flex items-center justify-between gap-4 py-3 hover:text-kaist-darkgreen">

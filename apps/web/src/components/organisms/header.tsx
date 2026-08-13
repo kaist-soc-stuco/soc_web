@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import { Globe2 } from 'lucide-react';
-import { Logo } from '@/components/atoms/logo';
 import { invalidateBoardCatalog, loadBoardCatalog, useBoardCatalog } from '@/lib/board-catalog';
 import { getAuthSessionSnapshot, getAuthSessionSummary } from '@/lib/auth-session';
 import { invalidateAdminGrants, useAdminGrants } from '@/lib/admin-grants';
@@ -129,13 +128,17 @@ export function Header({ showLogo = false }: HeaderProps) {
         }
     };
     return (<header className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative" onMouseLeave={() => setHoveredIndex(null)}>
-      <div className="flex min-h-16 w-full flex-wrap items-center justify-between gap-y-1 py-1 md:h-16 md:flex-nowrap md:items-stretch md:py-0">
+      <div className="flex min-h-14 w-full flex-wrap items-center justify-between gap-y-1 py-1 md:h-14 md:flex-nowrap md:items-stretch md:py-0 lg:h-[68px]">
         {/* Left Section: Logo + Navigation */}
         <div className="flex min-w-0 self-stretch">
           {/* Logo Section (conditional) */}
-          {showLogo && (<div className="flex min-h-11 items-center pl-4">
-              <Logo />
-            </div>)}
+          {showLogo && (<Link to="/" aria-label="KAIST SoC Home" className="relative z-10 flex h-14 items-center justify-start px-5 transition-opacity hover:opacity-90 lg:h-[68px] lg:px-6">
+              <div className="flex items-center gap-2 md:gap-3">
+                <img src="/kaist_logo.png" alt="KAIST Logo" className="h-5 w-auto lg:h-[31px]"/>
+                <div className="h-5 w-px bg-gray-300 lg:h-4"/>
+                <img src="/logo.png" alt="SOC Logo" className="mb-2 h-6 w-auto lg:h-[34px]"/>
+              </div>
+            </Link>)}
           
           {/* Navigation */}
           <nav ref={navRef} className={`hidden h-full md:flex ${showLogo ? 'pl-4' : 'pl-4'}`}>

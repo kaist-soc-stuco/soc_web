@@ -85,13 +85,11 @@ export function EventCarousel() {
             return;
         const updateItemsPerPage = () => {
             const width = carousel.getBoundingClientRect().width;
-            const minCardWidth = width >= 1024 ? 230 : 210;
-            const gap = 24;
             const sideGutter = width >= 768 ? 16 : 8;
             const availableWidth = Math.max(0, width - sideGutter * 2);
-            const visibleCards = Math.floor((availableWidth + gap) / (minCardWidth + gap));
+            const visibleCards = availableWidth >= 760 ? 4 : availableWidth >= 560 ? 3 : availableWidth >= 380 ? 2 : 1;
             setPageWidth(width);
-            setItemsPerPage(Math.max(1, Math.min(3, visibleCards)));
+            setItemsPerPage(visibleCards);
         };
         updateItemsPerPage();
         const observer = new ResizeObserver(updateItemsPerPage);

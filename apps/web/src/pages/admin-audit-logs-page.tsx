@@ -29,11 +29,11 @@ export function AdminAuditLogsPage() {
     else
         setState('denied'); }, [allowed]);
     if (grants.status === 'idle' || grants.status === 'loading')
-        return <section><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-audit-logs-page.96c3f20a36")}</h1><p className="mt-5 text-sm font-semibold">{uiText("pages.admin-audit-logs-page.fd041853ed")}</p></section>;
+        return <section><div><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-audit-logs-page.96c3f20a36")}</h1><p>권한 변경과 주요 관리 작업의 기록을 시간순으로 확인합니다.</p></div><p className="mt-5 text-sm font-semibold">{uiText("pages.admin-audit-logs-page.fd041853ed")}</p></section>;
     if (!allowed)
-        return <section><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-audit-logs-page.96c3f20a36")}</h1><p role="alert" className="mt-5 text-sm font-semibold text-red-700">{uiText("pages.admin-audit-logs-page.850ba530b8")}</p></section>;
+        return <section><div><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-audit-logs-page.96c3f20a36")}</h1><p>권한 변경과 주요 관리 작업의 기록을 시간순으로 확인합니다.</p></div><p role="alert" className="mt-5 text-sm font-semibold text-red-700">{uiText("pages.admin-audit-logs-page.850ba530b8")}</p></section>;
     return <section>
-    <div className="mb-6 border-b border-kaist-grey/25 pb-4"><h1 className="text-[32px] font-extrabold tracking-tight text-kaist-black">{uiText("pages.admin-audit-logs-page.96c3f20a36")}</h1></div>
+    <div className="mb-6 border-b border-kaist-grey/25 pb-4"><h1 className="text-[32px] font-extrabold tracking-tight text-kaist-black">{uiText("pages.admin-audit-logs-page.96c3f20a36")}</h1><p>권한 변경과 주요 관리 작업의 기록을 시간순으로 확인합니다.</p></div>
     {state === 'loading' && <p className="py-8 text-sm font-semibold text-[#39404B]">{uiText("pages.admin-audit-logs-page.994a05703b")}</p>}
     {state === 'denied' && <p role="alert" className="py-8 text-sm font-semibold text-red-700">{uiText("pages.admin-audit-logs-page.850ba530b8")}</p>}
     {state === 'protocol' && <p role="alert" className="py-8 text-sm font-semibold text-red-700">{uiText("pages.admin-audit-logs-page.b7659abe82")}</p>}
