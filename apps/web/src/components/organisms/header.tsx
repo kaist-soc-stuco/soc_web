@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@soc/api-client';
 import { Globe2 } from 'lucide-react';
-import { Logo } from '@/components/atoms/logo';
 import { invalidateBoardCatalog, loadBoardCatalog, useBoardCatalog } from '@/lib/board-catalog';
 import { getAuthSessionSnapshot, getAuthSessionSummary } from '@/lib/auth-session';
 import { invalidateAdminGrants, useAdminGrants } from '@/lib/admin-grants';
@@ -129,23 +128,27 @@ export function Header({ showLogo = false }: HeaderProps) {
         }
     };
     return (<header className="flex-shrink-0 z-50 bg-kaist-white border-b border-kaist-black relative" onMouseLeave={() => setHoveredIndex(null)}>
-      <div className="flex min-h-13 w-full flex-wrap items-center justify-between gap-y-1 py-1 md:h-13 md:flex-nowrap md:py-0">
+      <div className="flex min-h-14 w-full flex-wrap items-center justify-between gap-y-1 py-1 md:h-14 md:flex-nowrap md:items-stretch md:py-0 lg:h-[68px]">
         {/* Left Section: Logo + Navigation */}
-        <div className="flex min-w-0 items-stretch">
+        <div className="flex min-w-0 self-stretch">
           {/* Logo Section (conditional) */}
-          {showLogo && (<div className="flex min-h-11 items-center pl-4">
-              <Logo />
-            </div>)}
+          {showLogo && (<Link to="/" aria-label="KAIST SoC Home" className="relative z-10 flex h-14 items-center justify-start px-5 transition-opacity hover:opacity-90 lg:h-[68px] lg:px-6">
+              <div className="flex items-center gap-2 md:gap-3">
+                <img src="/kaist_logo.png" alt="KAIST Logo" className="h-5 w-auto lg:h-[31px]"/>
+                <div className="h-5 w-px bg-gray-300 lg:h-4"/>
+                <img src="/logo.png" alt="SOC Logo" className="mb-2 h-6 w-auto lg:h-[34px]"/>
+              </div>
+            </Link>)}
           
           {/* Navigation */}
-          <nav ref={navRef} className={`hidden md:flex items-stretch ${showLogo ? 'pl-4' : 'pl-4'}`}>
-            {navItems.map((item, index) => (<div key={index} className="relative group" onMouseEnter={() => setHoveredIndex(index)}>
-                {item.href ? (<Link to={item.href} className="relative flex h-full w-52 items-center justify-center text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main">
-                    <span className="py-2">{item.label}</span>
+          <nav ref={navRef} className={`hidden h-full md:flex ${showLogo ? 'pl-4' : 'pl-4'}`}>
+            {navItems.map((item, index) => (<div key={index} className="group relative h-full" onMouseEnter={() => setHoveredIndex(index)}>
+                {item.href ? (<Link to={item.href} className="relative flex h-full min-w-[9.5rem] items-center justify-center px-3 text-base font-bold tracking-normal text-kaist-black transition-colors hover:text-kaist-darkgreen-main lg:min-w-[11rem] xl:min-w-52">
+                    <span className="py-2 text-center">{item.label}</span>
                     <span className={`absolute bottom-0 left-0 right-0 h-1 bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${hoveredIndex === index ? 'scale-x-100' : 'scale-x-0'}`}/>
-                  </Link>) : index === 0 && boardCatalog.status === 'error' ? (<button type="button" onClick={() => void retryBoardCatalog()} disabled={boardRetrying} className="flex h-full w-52 items-center justify-center text-sm font-bold text-red-700 disabled:opacity-50">
+                  </Link>) : index === 0 && boardCatalog.status === 'error' ? (<button type="button" onClick={() => void retryBoardCatalog()} disabled={boardRetrying} className="flex h-full min-w-[9.5rem] items-center justify-center px-3 text-base font-bold text-red-700 disabled:opacity-50 lg:min-w-[11rem] xl:min-w-52">
                     {boardRetrying ? uiText("components.organisms.header.bc7013832c") : uiText("components.organisms.header.9b7d32c816")}
-                  </button>) : (<span className="flex h-full w-52 items-center justify-center text-sm font-bold text-kaist-grey">
+                  </button>) : (<span className="flex h-full min-w-[9.5rem] items-center justify-center px-3 text-base font-bold text-kaist-grey lg:min-w-[11rem] xl:min-w-52">
                     {boardCatalog.status === 'loading' || boardCatalog.status === 'idle' ? uiText("components.organisms.header.0aa42317a8") : uiText("components.organisms.header.8e5f9adb0d")}
                   </span>)}
               </div>))}
@@ -160,23 +163,23 @@ export function Header({ showLogo = false }: HeaderProps) {
           </div>
         </div>
 
-        <div className="flex min-h-11 w-full items-center justify-end gap-1 px-2 sm:gap-3 sm:px-4 md:w-auto md:pr-6">
-          <label className="flex min-h-11 items-center gap-1">
-            <Globe2 aria-hidden="true" className="size-4"/>
+        <div className="flex min-h-12 w-full items-center justify-end gap-2 px-2 sm:gap-3 sm:px-4 md:w-auto md:pr-6">
+          <label className="flex min-h-12 items-center gap-1.5">
+            <Globe2 aria-hidden="true" className="size-5"/>
             <span className="sr-only">{locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'}</span>
-            <select aria-label={locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'} value={locale} onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ko')} className="min-h-11 bg-transparent px-1 text-sm font-bold">
+            <select aria-label={locale === 'ko' ? uiText("components.organisms.header.1a723e1dbb") : 'Language'} value={locale} onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ko')} className="min-h-12 bg-transparent px-1.5 text-base font-bold">
               <option value="ko">{uiText("components.organisms.header.6e081b5948")}</option>
               <option value="en">English</option>
             </select>
           </label>
           {authenticated ? (<>
-              <Link to="/mypage" className="hidden min-h-11 items-center px-2 text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:flex">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link>
-              {hasAdminAccess ? <Link to="/admin" className="hidden min-h-11 items-center px-2 text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:flex">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link> : null}
-              <button type="button" onClick={() => void logout()} disabled={logoutLoading} className="hidden min-h-11 px-2 text-sm font-bold text-kaist-grey hover:text-kaist-darkgreen-main disabled:opacity-50 sm:block">
+              <Link to="/mypage" className="hidden min-h-12 items-center px-2 text-base font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:flex">{locale === 'ko' ? uiText("components.organisms.header.f5c324e660") : 'My Page'}</Link>
+              {hasAdminAccess ? <Link to="/admin" className="hidden min-h-12 items-center px-2 text-base font-extrabold text-kaist-black hover:text-kaist-darkgreen-main sm:flex">{locale === 'ko' ? uiText("components.organisms.header.04c1f9416a") : 'Admin Center'}</Link> : null}
+              <button type="button" onClick={() => void logout()} disabled={logoutLoading} className="hidden min-h-12 px-2 text-base font-bold text-kaist-grey hover:text-kaist-darkgreen-main disabled:opacity-50 sm:block">
                 {logoutLoading ? (locale === 'ko' ? uiText("components.organisms.header.d6f05cf050") : 'Logging out') : (locale === 'ko' ? uiText("components.organisms.header.3879f078a4") : 'Log out')}
               </button>
-            </>) : <Link to="/login" className="inline-flex min-h-11 items-center px-2 text-sm font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">{locale === 'ko' ? uiText("components.organisms.header.e225a6fd75") : 'Log in'}</Link>}
-          <button type="button" aria-label={locale === 'ko' ? uiText("components.organisms.header.195da6209a") : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="min-h-11 min-w-11 rounded border border-kaist-grey/40 px-3 py-2 text-sm font-bold md:hidden">
+            </>) : <Link to="/login" className="inline-flex min-h-12 items-center px-2 text-base font-extrabold text-kaist-black hover:text-kaist-darkgreen-main">{locale === 'ko' ? uiText("components.organisms.header.e225a6fd75") : 'Log in'}</Link>}
+          <button type="button" aria-label={locale === 'ko' ? uiText("components.organisms.header.195da6209a") : 'Open menu'} aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)} className="min-h-12 min-w-12 rounded border border-kaist-grey/40 px-3 py-2 text-base font-bold md:hidden">
             {locale === 'ko' ? uiText("components.organisms.header.076925c571") : 'Menu'}
           </button>
         </div>
@@ -193,17 +196,17 @@ export function Header({ showLogo = false }: HeaderProps) {
 
       {/* Full Dropdown Menu - DDP Style */}
       <div className={`absolute left-0 pl-4 w-full bg-kaist-white shadow-lg overflow-hidden transition-all duration-300 ease-out ${hoveredIndex !== null
-            ? 'max-h-[36rem] opacity-100 translate-y-0'
+            ? 'max-h-[48rem] opacity-100 translate-y-0'
             : 'max-h-0 opacity-0 -translate-y-4'}`} style={{ top: 'calc(100% + 1px)', zIndex: 40 }}>
-        <div className="flex gap-0" style={{ paddingLeft: navLeft }}>
-          {navItems.map((item, index) => (<div key={index} className={`w-52 px-3 ${index === 0 ? '' : ''} ${index < navItems.length - 1 ? 'border-r border-kaist-grey/30' : 'border-r border-kaist-grey/30'}`}>
-              <ul className="space-y-1">
-                {item.dropdown.map((subItem, subIndex) => (<li key={subItem.label} className={`transition-all duration-200 pb-1 mx-2 ${hoveredIndex !== null
+        <div className="flex items-stretch gap-0" style={{ paddingLeft: navLeft }}>
+          {navItems.map((item, index) => (<div key={index} className={`min-w-[9.5rem] self-stretch px-3 pb-28 lg:min-w-[11rem] lg:pb-36 xl:min-w-52 ${index === 0 ? '' : ''} ${index < navItems.length - 1 ? 'border-r border-kaist-grey/30' : 'border-r border-kaist-grey/30'}`}>
+              <ul className="space-y-1.5">
+                {item.dropdown.map((subItem, subIndex) => (<li key={subItem.label} className={`transition-all duration-200 pb-1.5 mx-2 ${hoveredIndex !== null
                     ? 'opacity-100 translate-x-0'
-                    : 'opacity-0 -translate-x-2'} ${subIndex < item.dropdown.length - 1 ? 'border-b border-kaist-grey/30' : 'pb-6'} ${subIndex === 0 ? 'pt-1' : ''}`} style={{
+                    : 'opacity-0 -translate-x-2'} ${subIndex < item.dropdown.length - 1 ? 'border-b border-kaist-grey/30' : 'pb-7'} ${subIndex === 0 ? 'pt-2' : ''}`} style={{
                     transitionDelay: hoveredIndex !== null ? `${(index * 80) + (subIndex * 40) + 80}ms` : '0ms',
                 }}>
-                      <Link to={subItem.to} className={`block py-3 text-center text-sm font-semibold tracking-tight transition-all lg:text-sm ${hoveredIndex === index
+                      <Link to={subItem.to} className={`block py-3.5 text-center text-base font-semibold tracking-normal transition-all ${hoveredIndex === index
                     ? 'text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1'
                     : 'text-kaist-grey'}`}>
                       {subItem.label}

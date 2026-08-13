@@ -85,7 +85,7 @@ export interface Asset {
 
 export interface BoardListQuery {
   home?: true;
-  latestLimit?: 1;
+  latestLimit?: 1 | 2 | 3 | 4 | 5;
   locale?: ContentLocale;
 }
 

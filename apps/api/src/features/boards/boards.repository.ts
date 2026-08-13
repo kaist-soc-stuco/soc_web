@@ -37,13 +37,13 @@ export class BoardsRepository {
   }
 
 
-  async listVisibleHomeWithLatest(now: Date) {
+  async listVisibleHomeWithLatest(now: Date, latestLimit: number) {
     const visibleBoards = await this.db.select().from(boards)
       .where(and(eq(boards.isHidden, false), eq(boards.showOnHome, true)))
       .orderBy(asc(boards.displayOrder), asc(boards.id));
     if (visibleBoards.length === 0) return [];
 
-    const latestArticles = await this.db.selectDistinctOn([articles.boardId]).from(articles)
+    const latestArticles = await this.db.select().from(articles)
       .where(and(
         inArray(articles.boardId, visibleBoards.map((board) => board.id)),
         eq(articles.status, 'PUBLISHED'),
@@ -53,8 +53,12 @@ export class BoardsRepository {
       ))
       .orderBy(articles.boardId, desc(articles.publishedAt), desc(articles.updatedAt), desc(articles.id));
 
-    const latestByBoardId = new Map(latestArticles.map((article) => [article.boardId, article]));
-    return visibleBoards.map((board) => ({ board, latest: latestByBoardId.get(board.id) ?? null }));
+    const latestByBoardId = new Map<string, typeof latestArticles>();
+    for (const article of latestArticles) {
+      const existing = latestByBoardId.get(article.boardId) ?? [];
+      if (existing.length < latestLimit) latestByBoardId.set(article.boardId, [...existing, article]);
+    }
+    return visibleBoards.map((board) => ({ board, latest: latestByBoardId.get(board.id) ?? [] }));
   }
 
   async findVisibleByCode(code: string) {

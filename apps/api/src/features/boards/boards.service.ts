@@ -49,7 +49,7 @@ export class BoardsService {
   ) {}
 
   async list(actorUserId: string | undefined, query: unknown): Promise<BoardListResponse> {
-    const { locale, home } = this.listQuery(query);
+    const { locale, home, latestLimit } = this.listQuery(query);
     if (!home) {
       const rows = await this.repository.listVisible();
       const capabilities = await this.readCapabilities(actorUserId, rows.map((row) => row.readPermission));
@@ -58,13 +58,13 @@ export class BoardsService {
       return { locale, items };
     }
 
-    const rows = await this.repository.listVisibleHomeWithLatest(this.clock.now());
+    const rows = await this.repository.listVisibleHomeWithLatest(this.clock.now(), latestLimit ?? 1);
     const capabilities = await this.readCapabilities(actorUserId, rows.map(({ board }) => board.readPermission));
     const items: BoardListResponse['items'] = [];
     for (const { board, latest } of rows) {
       if (!this.canRead(board.readPermission, capabilities)) continue;
       const item: Board & { latestArticles?: ArticleSummary[] } = this.board(board, locale);
-      if (latest) item.latestArticles = [this.articleSummary(latest, board.code, locale)];
+      if (latest.length > 0) item.latestArticles = latest.map((article) => this.articleSummary(article, board.code, locale));
       items.push(item);
     }
     return { locale, items };
@@ -138,7 +138,7 @@ export class BoardsService {
     }
   }
 
-  private listQuery(query: unknown): { locale: ContentLocale; home: boolean } {
+  private listQuery(query: unknown): { locale: ContentLocale; home: boolean; latestLimit?: 1 | 2 | 3 | 4 | 5 } {
     if (!query || typeof query !== 'object' || Array.isArray(query)) throw new UnprocessableEntityException('invalid_board_query');
     const source = query as Record<string, unknown>;
     for (const key of Object.keys(source)) if (key !== 'locale' && key !== 'home' && key !== 'latestLimit') {
@@ -146,11 +146,14 @@ export class BoardsService {
     }
     const home = source.home === undefined ? false : source.home === true || source.home === 'true';
     if (source.home !== undefined && !home) throw new UnprocessableEntityException('invalid_board_query');
-    if (source.latestLimit !== undefined && source.latestLimit !== 1 && source.latestLimit !== '1') {
-      throw new UnprocessableEntityException('invalid_board_query');
+    let latestLimit: 1 | 2 | 3 | 4 | 5 | undefined;
+    if (source.latestLimit !== undefined) {
+      const parsedLatestLimit = Number(source.latestLimit);
+      if (!Number.isInteger(parsedLatestLimit) || parsedLatestLimit < 1 || parsedLatestLimit > 5) throw new UnprocessableEntityException('invalid_board_query');
+      latestLimit = parsedLatestLimit as 1 | 2 | 3 | 4 | 5;
     }
     if (!home && source.latestLimit !== undefined) throw new UnprocessableEntityException('invalid_board_query');
-    return { locale: this.locale(source.locale), home };
+    return { locale: this.locale(source.locale), home, latestLimit };
   }
 
   private createValues(input: CreateBoardRequest) {

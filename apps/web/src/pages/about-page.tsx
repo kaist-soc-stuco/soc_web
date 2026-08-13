@@ -1,72 +1,120 @@
-import { uiText } from "@/lib/i18n/surface-catalog";
+import { ArrowRight, BookOpen, HelpCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { PublicFaqListResponse } from '@soc/contracts';
 import { SiteLayout } from '@/components/organisms/site-layout';
 import { getFaqs } from '@/lib/faq-api';
+import { uiText } from '@/lib/i18n/surface-catalog';
 import { localizedText } from '@/lib/localized-content';
+
 export function AboutPage() {
-    const pageContainerClass = 'mx-auto w-full px-[12vw]';
-    const [faqItems, setFaqItems] = useState<PublicFaqListResponse['topics'][number]['items']>([]);
-    const [faqStatus, setFaqStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-    useEffect(() => {
-        getFaqs()
-            .then((response) => {
-            setFaqItems(response.topics.flatMap((topic) => topic.items).slice(0, 3));
-            setFaqStatus('ready');
-        })
-            .catch(() => setFaqStatus('error'));
-    }, []);
-    return (<SiteLayout>
-      <div className="flex min-h-[calc(100vh-72px)] flex-col bg-[#F7FCFC] lg:h-[calc(100vh-72px)] lg:overflow-hidden">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
-          <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">{uiText("pages.about-page.0208160d70")}</h1>
-            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">{uiText("pages.about-page.bb0d85824a")}</p>
+  const pageContainerClass = 'mx-auto w-full max-w-[1600px] px-6';
+  const headerContainerClass = 'mx-auto max-w-[1600px] px-6';
+  const [faqItems, setFaqItems] = useState<PublicFaqListResponse['topics'][number]['items']>([]);
+  const [faqStatus, setFaqStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+
+  useEffect(() => {
+    getFaqs()
+      .then((response) => {
+        setFaqItems(response.topics.flatMap((topic) => topic.items).slice(0, 3));
+        setFaqStatus('ready');
+      })
+      .catch(() => setFaqStatus('error'));
+  }, []);
+
+  return (
+    <SiteLayout>
+      <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7 lg:py-10">
+          <div className={headerContainerClass}>
+            <h1 className="mb-4 text-[40px] font-extrabold tracking-tight text-kaist-white">{uiText('pages.about-page.0208160d70')}</h1>
+            <p className="max-w-4xl text-[24px] font-semibold leading-normal tracking-tight text-kaist-white">
+              KAIST School of Computing의 학부 생활과 학업 정보를 한 곳에서 안내합니다.
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-1 items-center py-7 lg:py-0">
-          <div className={`${pageContainerClass} grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,410px)] lg:gap-8 xl:gap-10`}>
-            <section className="min-h-[500px] rounded-[8px] border border-kaist-grey/25 bg-white px-6 py-7 sm:px-10 lg:min-h-[520px] lg:px-8 lg:py-8 xl:min-h-[540px] xl:px-9">
-              <h2 className="text-[24px] font-extrabold leading-normal tracking-tight text-kaist-darkgreen md:text-[28px] xl:text-[30px]">
-                KAIST SoC(School Of Computing)
-              </h2>
-
-              <div className="mt-8 space-y-8 text-[15px] font-normal leading-[1.9] tracking-tight text-black md:text-[16px] lg:text-[17px] xl:text-[18px]">
-                <p>{uiText("pages.about-page.d90dc4f920")}</p>
-                <p>{uiText("pages.about-page.acc3da09c6")}</p>
-                <p>{uiText("pages.about-page.c831428c37")}</p>
+        <section className={`${pageContainerClass} pb-16 pt-10`}>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.65fr)]">
+            <main className="overflow-hidden rounded-[8px] border border-kaist-grey/20 bg-white shadow-[0_20px_70px_rgba(57,64,75,0.08)]">
+              <div className="border-b border-kaist-grey/20 px-6 py-8 md:px-8 md:py-9">
+                <div className="flex flex-wrap items-center gap-5">
+                  <img src="/kaist_logo.png" alt="KAIST Logo" className="h-[31px] w-auto" />
+                  <div className="h-5 w-px bg-kaist-grey/40" />
+                  <img src="/logo.png" alt="SOC Logo" className="mb-2 h-[34px] w-auto" />
+                </div>
+                <h2 className="mt-6 text-[30px] font-extrabold leading-tight tracking-tight text-kaist-black md:text-[34px]">
+                  KAIST SoC
+                </h2>
+                <p className="mt-2 text-[15px] font-semibold leading-7 text-kaist-grey">
+                  School of Computing
+                </p>
               </div>
-            </section>
 
-            <aside className="flex flex-col gap-6">
-              <section className="rounded-[8px] border border-kaist-grey/25 bg-white px-7 py-5 lg:min-h-[370px]">
-                <div className="mb-3 flex items-start justify-between gap-4">
-                  <h2 className="text-[24px] font-extrabold leading-normal tracking-tight text-kaist-darkgreen md:text-[28px]">FAQ</h2>
-                  <Link to="/faq" className="mt-2 inline-flex items-center justify-center rounded-[5px] border border-kaist-darkgreen px-3 py-1.5 text-[13px] font-extrabold tracking-tight text-kaist-darkgreen transition hover:bg-kaist-darkgreen hover:text-kaist-white">{uiText("pages.about-page.b05f43570a")}</Link>
+              <div>
+                <section className="px-6 py-10 md:px-8 md:py-12">
+                  <div className="max-w-5xl space-y-5 text-[15px] font-semibold leading-8 text-[#3d4a45]">
+                    <p className="text-[20px] font-extrabold leading-8 text-kaist-black">
+                      KAIST SoC(School Of Computing)
+                    </p>
+                    <p>{uiText('pages.about-page.d90dc4f920')}</p>
+                    <p>{uiText('pages.about-page.acc3da09c6')}</p>
+                    <p>{uiText('pages.about-page.c831428c37')}</p>
+                  </div>
+                </section>
+              </div>
+            </main>
+
+            <aside className="grid content-start gap-5">
+              <section className="rounded-[8px] border border-kaist-grey/20 bg-white px-5 py-5 shadow-[0_12px_32px_rgba(57,64,75,0.05)]">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="h-5 w-5 text-kaist-darkgreen" aria-hidden="true" />
+                    <h2 className="text-[18px] font-extrabold tracking-tight text-kaist-black">FAQ</h2>
+                  </div>
+                  <Link to="/faq" className="inline-flex items-center gap-1 text-xs font-extrabold text-kaist-darkgreen">
+                    {uiText('pages.about-page.b05f43570a')}
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Link>
                 </div>
 
-                <div className="divide-y divide-[#d7e2da]">
-                  {faqStatus === 'loading' ? <p className="py-6 text-sm text-kaist-grey">{uiText("pages.about-page.2036a2150a")}</p> : faqStatus === 'error' ? <p role="alert" className="py-6 text-sm text-kaist-grey">{uiText("pages.about-page.8b9c33a6cc")}</p> : faqItems.length === 0 ? <p className="py-6 text-sm text-kaist-grey">{uiText("pages.about-page.54beaf81ff")}</p> : faqItems.map((item, index) => (<Link key={`${item.id}-${index}`} to="/faq" className="block py-4 first:pt-2 last:pb-0">
-                      <p className="text-[15px] font-semibold leading-normal tracking-tight text-kaist-darkgreen-main md:text-[16px]">
-                        Q: {localizedText(item.question)}
-                      </p>
-                      <p className="mt-2 text-[13px] font-normal leading-normal tracking-tight text-kaist-black md:text-[15px]">
-                        A: {localizedText(item.answer)}
-                      </p>
-                    </Link>))}
+                <div className="divide-y divide-kaist-grey/15">
+                  {faqStatus === 'loading' ? (
+                    <p className="py-6 text-sm font-semibold text-kaist-grey">{uiText('pages.about-page.2036a2150a')}</p>
+                  ) : faqStatus === 'error' ? (
+                    <p role="alert" className="py-6 text-sm font-semibold text-kaist-grey">{uiText('pages.about-page.8b9c33a6cc')}</p>
+                  ) : faqItems.length === 0 ? (
+                    <p className="py-6 text-sm font-semibold text-kaist-grey">{uiText('pages.about-page.54beaf81ff')}</p>
+                  ) : (
+                    faqItems.map((item, index) => (
+                      <Link key={`${item.id}-${index}`} to="/faq" className="block py-4 first:pt-0 last:pb-0">
+                        <p className="line-clamp-2 text-[14px] font-extrabold leading-6 tracking-tight text-kaist-black">
+                          {index + 1}. {localizedText(item.question)}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-[12px] font-semibold leading-5 text-kaist-grey">
+                          {localizedText(item.answer)}
+                        </p>
+                      </Link>
+                    ))
+                  )}
                 </div>
               </section>
 
-              <section className="rounded-[8px] border border-kaist-grey/25 bg-white px-7 py-6">
-                <h2 className="mt-1 text-[22px] font-extrabold leading-normal tracking-tight text-kaist-black md:text-[24px]">{uiText("pages.about-page.3113991d60")}</h2>
-                <p className="mt-4 text-[14px] font-semibold leading-[1.75] tracking-tight text-[#8192a3] md:text-[15px]">{uiText("pages.about-page.df95348cf5")}</p>
-                <Link to="/about/roadmap" className="mt-7 inline-flex items-center justify-center rounded-[5px] bg-kaist-darkgreen px-5 py-3 text-[14px] font-extrabold tracking-tight text-kaist-white transition hover:bg-kaist-darkgreen-main">{uiText("pages.about-page.ef6a222828")}</Link>
+              <section className="rounded-[8px] border border-kaist-grey/20 bg-white px-5 py-5 shadow-[0_12px_32px_rgba(57,64,75,0.05)]">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-kaist-darkgreen" aria-hidden="true" />
+                  <h2 className="text-[18px] font-extrabold tracking-tight text-kaist-black">{uiText('pages.about-page.3113991d60')}</h2>
+                </div>
+                <p className="mt-3 text-[13px] font-semibold leading-6 text-kaist-grey">{uiText('pages.about-page.df95348cf5')}</p>
+                <Link to="/about/roadmap" className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-[5px] bg-kaist-darkgreen px-4 text-[13px] font-extrabold text-white transition hover:bg-kaist-darkgreen-main">
+                  {uiText('pages.about-page.ef6a222828')}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
               </section>
             </aside>
           </div>
-        </div>
+        </section>
       </div>
-    </SiteLayout>);
+    </SiteLayout>
+  );
 }

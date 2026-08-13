@@ -81,11 +81,11 @@ export function AdminUsersPage() {
         setState('idle');
     };
     if (grants.status === 'loading' || grants.status === 'idle')
-        return <section><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-users-page.3bad419ced")}</h1><p className="mt-5 text-sm font-semibold">{uiText("pages.admin-users-page.fd041853ed")}</p></section>;
+        return <section><div><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-users-page.3bad419ced")}</h1><p>사용자 계정을 검색하고 상세 정보와 부여된 권한을 확인합니다.</p></div><p className="mt-5 text-sm font-semibold">{uiText("pages.admin-users-page.fd041853ed")}</p></section>;
     if (!allowed)
-        return <section><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-users-page.3bad419ced")}</h1><p role="alert" className="mt-5 text-sm font-semibold text-red-700">{uiText("pages.admin-users-page.a5ead6eadd")}</p></section>;
+        return <section><div><h1 className="text-[32px] font-extrabold text-kaist-black">{uiText("pages.admin-users-page.3bad419ced")}</h1><p>사용자 계정을 검색하고 상세 정보와 부여된 권한을 확인합니다.</p></div><p role="alert" className="mt-5 text-sm font-semibold text-red-700">{uiText("pages.admin-users-page.a5ead6eadd")}</p></section>;
     return <section>
-    <div className="mb-6 border-b border-kaist-grey/25 pb-4"><h1 className="text-[32px] font-extrabold tracking-tight text-kaist-black">{uiText("pages.admin-users-page.3bad419ced")}</h1></div>
+    <div className="mb-6 border-b border-kaist-grey/25 pb-4"><h1 className="text-[32px] font-extrabold tracking-tight text-kaist-black">{uiText("pages.admin-users-page.3bad419ced")}</h1><p>사용자 계정을 검색하고 상세 정보와 부여된 권한을 확인합니다.</p></div>
     <form className="mb-5 flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); void search(); }}>
       <select aria-label={uiText("pages.admin-users-page.1057b1792a")} value={kind} onChange={(event) => { setKind(event.target.value as FilterKind); resetSearch(); }} className="rounded-[5px] border border-kaist-grey/25 bg-white px-3 py-2 text-sm"><option value="name">{uiText("pages.admin-users-page.9aa18e5071")}</option><option value="studentOrEmployeeNumber">{uiText("pages.admin-users-page.53dcbafec1")}</option></select>
       <input aria-label={uiText("pages.admin-users-page.45188d670c")} value={value} onChange={(event) => { setValue(event.target.value); resetSearch(); }} className="min-w-64 rounded-[5px] border border-kaist-grey/25 px-3 py-2 text-sm" placeholder={uiText("pages.admin-users-page.d75ec85e50")}/>

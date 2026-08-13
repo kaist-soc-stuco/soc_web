@@ -112,7 +112,7 @@ export function Hero() {
           <img 
             src="/logo.png" 
             alt="SOC Logo" 
-            className="h-6 w-auto lg:h-[34px]"
+            className="h-6 w-auto lg:h-[34px] mb-2"
           />
         </div>
       </div>
@@ -121,11 +121,11 @@ export function Hero() {
       <div className="absolute inset-0 z-10 flex items-center px-7 md:px-10 lg:px-[14%]">
         <div className="flex max-w-7xl items-start gap-5 lg:gap-6">
           {/* Green Accent Bar */}
-          <div className="mt-4 h-9 w-2.5 bg-kaist-lightgreen2 lg:mt-9 lg:h-[43px] lg:w-[9px]" />
+          <div className="mt-4 h-9 w-2.5 bg-kaist-lightgreen2 lg:ml-15 lg:mt-7 lg:h-[64px] lg:w-[9px]" />
           
           {/* Title */}
           <h1 
-            className="mt-1 max-w-md text-3xl font-black leading-[150%] tracking-normal text-kaist-white md:text-4xl lg:mt-3 lg:max-w-lg lg:text-[58px]"
+            className="mt-1 max-w-md text-3xl font-black leading-[150%] tracking-normal text-kaist-white md:text-4xl lg:mb-2 lg:max-w-lg lg:text-[72px]"
             style={{ fontFamily: "'Roboto Slab', serif" }}
           >
             KAIST

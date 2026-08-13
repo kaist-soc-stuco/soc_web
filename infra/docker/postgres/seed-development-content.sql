@@ -140,6 +140,79 @@ ON CONFLICT (id) DO UPDATE SET
   purge_after = NULL,
   updated_at = NOW();
 
+INSERT INTO articles (
+  id, board_id, public_no, author_user_id, title_kr, title_en, body_kr, body_en,
+  status, scope, is_pinned, pinned_order, published_at
+)
+SELECT
+  fixture.id, board.id, fixture.public_no, admin.id, fixture.title_kr, fixture.title_en,
+  fixture.body_kr, fixture.body_en, 'PUBLISHED', 'ALL', false, NULL, fixture.published_at
+FROM (VALUES
+  ('a1111111-1111-4111-8111-111111111115'::uuid, 'soc-notice', 3, '[Mock] Homepage notice layout QA', '[Mock] Homepage notice layout QA', '[Mock] Extra notice for checking multi-row homepage lists.', '[Mock] Extra notice for checking multi-row homepage lists.', TIMESTAMPTZ '2026-08-08 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111116'::uuid, 'soc-notice', 4, '[Mock] Scholarship application reminder', '[Mock] Scholarship application reminder', '[Mock] Extra notice for spacing and date alignment.', '[Mock] Extra notice for spacing and date alignment.', TIMESTAMPTZ '2026-08-09 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111117'::uuid, 'soc-notice', 5, '[Mock] Lab tour registration open', '[Mock] Lab tour registration open', '[Mock] Extra notice for list density checks.', '[Mock] Extra notice for list density checks.', TIMESTAMPTZ '2026-08-10 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111118'::uuid, 'soc-events', 2, '[Mock] Coffee chat signup', '[Mock] Coffee chat signup', '[Mock] Extra event-board article for tab switching.', '[Mock] Extra event-board article for tab switching.', TIMESTAMPTZ '2026-08-08 12:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111119'::uuid, 'soc-events', 3, '[Mock] Seminar volunteer call', '[Mock] Seminar volunteer call', '[Mock] Extra event-board article for list rendering.', '[Mock] Extra event-board article for list rendering.', TIMESTAMPTZ '2026-08-09 12:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111a'::uuid, 'suggestions', 1, '[Mock] Q&A board sample question', '[Mock] Q&A board sample question', '[Mock] Extra suggestion-board article for empty-state avoidance.', '[Mock] Extra suggestion-board article for empty-state avoidance.', TIMESTAMPTZ '2026-08-08 15:00:00+09')
+) AS fixture(id, code, public_no, title_kr, title_en, body_kr, body_en, published_at)
+JOIN boards AS board ON board.code = fixture.code
+JOIN users AS admin ON admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  board_id = EXCLUDED.board_id,
+  public_no = EXCLUDED.public_no,
+  author_user_id = EXCLUDED.author_user_id,
+  title_kr = EXCLUDED.title_kr,
+  title_en = EXCLUDED.title_en,
+  body_kr = EXCLUDED.body_kr,
+  body_en = EXCLUDED.body_en,
+  status = 'PUBLISHED',
+  scope = 'ALL',
+  is_pinned = false,
+  pinned_order = NULL,
+  published_at = EXCLUDED.published_at,
+  deleted_at = NULL,
+  purge_after = NULL,
+  updated_at = NOW();
+
+-- Notice board pagination fixtures: 15 public notices make the page controls visible with a 10-row list.
+INSERT INTO articles (
+  id, board_id, public_no, author_user_id, title_kr, title_en, body_kr, body_en,
+  status, scope, is_pinned, pinned_order, published_at
+)
+SELECT
+  fixture.id, board.id, fixture.public_no, admin.id, fixture.title_kr, fixture.title_en,
+  fixture.body_kr, fixture.body_en, 'PUBLISHED', 'ALL', false, NULL, fixture.published_at
+FROM (VALUES
+  ('a1111111-1111-4111-8111-11111111111b'::uuid, 'soc-notice', 6, '[Mock] 공지 게시판 페이지네이션 QA 06', '[Mock] Notice pagination QA 06', '[Mock] 공지 게시판 두 번째 페이지 이동을 확인하기 위한 테스트 게시글입니다.', '[Mock] Test notice for checking the second page of the notice board.', TIMESTAMPTZ '2026-08-11 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111c'::uuid, 'soc-notice', 7, '[Mock] 공지 게시판 페이지네이션 QA 07', '[Mock] Notice pagination QA 07', '[Mock] 공지 게시판 행 간격과 번호 표시를 확인합니다.', '[Mock] Test notice for row spacing and public number rendering.', TIMESTAMPTZ '2026-08-12 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111d'::uuid, 'soc-notice', 8, '[Mock] 공지 게시판 페이지네이션 QA 08', '[Mock] Notice pagination QA 08', '[Mock] 공지 게시판 목록 hover 상태를 확인합니다.', '[Mock] Test notice for list hover state rendering.', TIMESTAMPTZ '2026-08-13 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111e'::uuid, 'soc-notice', 9, '[Mock] 공지 게시판 페이지네이션 QA 09', '[Mock] Notice pagination QA 09', '[Mock] 공지 게시판 날짜 정렬을 확인합니다.', '[Mock] Test notice for date alignment.', TIMESTAMPTZ '2026-08-14 09:00:00+09'),
+  ('a1111111-1111-4111-8111-11111111111f'::uuid, 'soc-notice', 10, '[Mock] 공지 게시판 페이지네이션 QA 10', '[Mock] Notice pagination QA 10', '[Mock] 첫 페이지 마지막 행의 표시 상태를 확인합니다.', '[Mock] Test notice for the final row of the first page.', TIMESTAMPTZ '2026-08-15 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111120'::uuid, 'soc-notice', 11, '[Mock] 공지 게시판 페이지네이션 QA 11', '[Mock] Notice pagination QA 11', '[Mock] 두 번째 페이지 첫 행의 표시 상태를 확인합니다.', '[Mock] Test notice for the first row of the second page.', TIMESTAMPTZ '2026-08-16 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111121'::uuid, 'soc-notice', 12, '[Mock] 공지 게시판 페이지네이션 QA 12', '[Mock] Notice pagination QA 12', '[Mock] 페이지 이동 후 리스트 폭을 확인합니다.', '[Mock] Test notice for list width after pagination.', TIMESTAMPTZ '2026-08-17 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111122'::uuid, 'soc-notice', 13, '[Mock] 공지 게시판 페이지네이션 QA 13', '[Mock] Notice pagination QA 13', '[Mock] 페이지 이동 후 탭 위치를 확인합니다.', '[Mock] Test notice for tab position after pagination.', TIMESTAMPTZ '2026-08-18 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111123'::uuid, 'soc-notice', 14, '[Mock] 공지 게시판 페이지네이션 QA 14', '[Mock] Notice pagination QA 14', '[Mock] 페이지 이동 후 검색 영역 위치를 확인합니다.', '[Mock] Test notice for search position after pagination.', TIMESTAMPTZ '2026-08-19 09:00:00+09'),
+  ('a1111111-1111-4111-8111-111111111124'::uuid, 'soc-notice', 15, '[Mock] 공지 게시판 페이지네이션 QA 15', '[Mock] Notice pagination QA 15', '[Mock] 두 번째 페이지 마지막 행의 표시 상태를 확인합니다.', '[Mock] Test notice for the final row of the second page.', TIMESTAMPTZ '2026-08-20 09:00:00+09')
+) AS fixture(id, code, public_no, title_kr, title_en, body_kr, body_en, published_at)
+JOIN boards AS board ON board.code = fixture.code
+JOIN users AS admin ON admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  board_id = EXCLUDED.board_id,
+  public_no = EXCLUDED.public_no,
+  author_user_id = EXCLUDED.author_user_id,
+  title_kr = EXCLUDED.title_kr,
+  title_en = EXCLUDED.title_en,
+  body_kr = EXCLUDED.body_kr,
+  body_en = EXCLUDED.body_en,
+  status = 'PUBLISHED',
+  scope = 'ALL',
+  is_pinned = false,
+  pinned_order = NULL,
+  published_at = EXCLUDED.published_at,
+  deleted_at = NULL,
+  purge_after = NULL,
+  updated_at = NOW();
+
 INSERT INTO events (
   id,
   title_kr,
@@ -208,6 +281,45 @@ ON CONFLICT (id) DO UPDATE SET
   description_en = EXCLUDED.description_en,
   start_at = EXCLUDED.start_at,
   end_at = EXCLUDED.end_at,
+  location = EXCLUDED.location,
+  visibility = 'PUBLIC',
+  updated_by_user_id = EXCLUDED.updated_by_user_id,
+  updated_at = NOW();
+
+-- Additional event cards for pagination QA.
+INSERT INTO events (
+  id, title_kr, title_en, description_kr, description_en, start_at, end_at,
+  all_day, all_day_start_date, all_day_end_date, location, visibility,
+  created_by_user_id, updated_by_user_id
+)
+SELECT
+  ('b2222222-2222-4222-8222-' || lpad((222222222226 + n)::text, 12, '0'))::uuid,
+  '[Mock] 카드 페이지네이션 행사 ' || lpad(n::text, 2, '0'),
+  '[Mock] Card pagination event ' || lpad(n::text, 2, '0'),
+  '행사 카드 목록의 5열 2행 페이지네이션을 확인하기 위한 테스트 행사입니다.',
+  'A test event for checking the 5 by 2 card pagination layout.',
+  TIMESTAMPTZ '2026-08-21 12:00:00+09' + (n || ' days')::interval,
+  TIMESTAMPTZ '2026-08-21 13:30:00+09' + (n || ' days')::interval,
+  false,
+  NULL,
+  NULL,
+  'N5 ' || (100 + n)::text,
+  'PUBLIC',
+  admin.id,
+  admin.id
+FROM generate_series(1, 12) AS series(n)
+CROSS JOIN users AS admin
+WHERE admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  title_kr = EXCLUDED.title_kr,
+  title_en = EXCLUDED.title_en,
+  description_kr = EXCLUDED.description_kr,
+  description_en = EXCLUDED.description_en,
+  start_at = EXCLUDED.start_at,
+  end_at = EXCLUDED.end_at,
+  all_day = false,
+  all_day_start_date = NULL,
+  all_day_end_date = NULL,
   location = EXCLUDED.location,
   visibility = 'PUBLIC',
   updated_by_user_id = EXCLUDED.updated_by_user_id,
@@ -589,6 +701,95 @@ SET published_at = TIMESTAMPTZ '2026-08-07 12:00:00+09'
 WHERE id = 'f6666666-6666-4666-8666-666666666667'
   AND published_at IS NULL;
 
+-- Additional survey cards for pagination QA.
+INSERT INTO surveys (
+  id, state, current_revision, definition_version, guest_allowed, only_for_korean_speaker,
+  phone_required, fee_restriction, cap, opens_at, closes_at, edit_deadline_at,
+  response_retention_days, created_by_user_id, updated_by_user_id
+)
+SELECT
+  ('f7777777-7777-4777-8777-' || lpad((777777777700 + n)::text, 12, '0'))::uuid,
+  CASE WHEN n % 3 = 0 THEN 'SCHEDULED'::survey_state ELSE 'OPEN'::survey_state END,
+  1,
+  1,
+  true,
+  false,
+  false,
+  'ANY',
+  NULL,
+  TIMESTAMPTZ '2026-08-01 00:00:00+09' + (n || ' days')::interval,
+  TIMESTAMPTZ '2026-12-31 23:59:59+09',
+  TIMESTAMPTZ '2026-12-31 23:59:59+09',
+  30,
+  admin.id,
+  admin.id
+FROM generate_series(1, 12) AS series(n)
+CROSS JOIN users AS admin
+WHERE admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  state = EXCLUDED.state,
+  opens_at = EXCLUDED.opens_at,
+  closes_at = EXCLUDED.closes_at,
+  edit_deadline_at = EXCLUDED.edit_deadline_at,
+  updated_by_user_id = EXCLUDED.updated_by_user_id,
+  updated_at = NOW();
+
+INSERT INTO survey_revisions (id, survey_id, revision, title_kr, title_en, description_kr, description_en, created_by_user_id, published_at)
+SELECT
+  ('f7777777-7777-4777-8777-' || lpad((777777777800 + n)::text, 12, '0'))::uuid,
+  ('f7777777-7777-4777-8777-' || lpad((777777777700 + n)::text, 12, '0'))::uuid,
+  1,
+  '[Mock] 카드 페이지네이션 설문 ' || lpad(n::text, 2, '0'),
+  '[Mock] Card pagination survey ' || lpad(n::text, 2, '0'),
+  '설문 카드 목록의 5열 2행 페이지네이션을 확인하기 위한 테스트 설문입니다.',
+  'A test survey for checking the 5 by 2 card pagination layout.',
+  admin.id,
+  NULL
+FROM generate_series(1, 12) AS series(n)
+CROSS JOIN users AS admin
+WHERE admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO survey_sections (id, survey_revision_id, ordinal, title_kr, title_en)
+SELECT
+  ('f7777777-7777-4777-8777-' || lpad((777777777900 + n)::text, 12, '0'))::uuid,
+  ('f7777777-7777-4777-8777-' || lpad((777777777800 + n)::text, 12, '0'))::uuid,
+  0,
+  '기본 응답',
+  'Basic response'
+FROM generate_series(1, 12) AS series(n)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO survey_questions (id, section_id, ordinal, type, prompt_kr, prompt_en, required)
+SELECT
+  ('f7777777-7777-4777-8777-' || lpad((777777778000 + n)::text, 12, '0'))::uuid,
+  ('f7777777-7777-4777-8777-' || lpad((777777777900 + n)::text, 12, '0'))::uuid,
+  0,
+  'SHORT_TEXT',
+  '확인용 응답을 입력해 주세요.',
+  'Enter a test response.',
+  false
+FROM generate_series(1, 12) AS series(n)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO survey_section_items (id, section_id, ordinal, kind, question_id)
+SELECT
+  ('f7777777-7777-4777-8777-' || lpad((777777778100 + n)::text, 12, '0'))::uuid,
+  ('f7777777-7777-4777-8777-' || lpad((777777777900 + n)::text, 12, '0'))::uuid,
+  0,
+  'QUESTION',
+  ('f7777777-7777-4777-8777-' || lpad((777777778000 + n)::text, 12, '0'))::uuid
+FROM generate_series(1, 12) AS series(n)
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE survey_revisions
+SET published_at = TIMESTAMPTZ '2026-08-07 12:00:00+09'
+WHERE survey_id IN (
+  SELECT ('f7777777-7777-4777-8777-' || lpad((777777777700 + n)::text, 12, '0'))::uuid
+  FROM generate_series(1, 12) AS series(n)
+)
+  AND published_at IS NULL;
+
 INSERT INTO content_matchers (id, event_id, survey_id, relation_type, sync_mode, created_by_user_id, updated_by_user_id, synchronized_at)
 SELECT 'b2222222-2222-4222-8222-222222222225', event.id, survey.id, 'SURVEY_PERIOD', 'NONE', admin.id, admin.id, NULL
 FROM events AS event
@@ -643,6 +844,66 @@ INSERT INTO vote_ballots (id, vote_id, candidate_id, created_at)
 VALUES ('91111111-1111-4111-8111-111111111115', '91111111-1111-4111-8111-111111111111', '91111111-1111-4111-8111-111111111112', TIMESTAMPTZ '2026-08-05 09:00:00+09')
 ON CONFLICT (id) DO NOTHING;
 
+-- Additional vote cards for pagination QA.
+INSERT INTO votes (
+  id, title_kr, title_en, description_kr, description_en, state, opens_at, closes_at,
+  anonymous, valid_turnout_percent, created_by_user_id, updated_by_user_id
+)
+SELECT
+  ('93333333-3333-4333-8333-' || lpad((333333333300 + n)::text, 12, '0'))::uuid,
+  '[Mock] 카드 페이지네이션 투표 ' || lpad(n::text, 2, '0'),
+  '[Mock] Card pagination vote ' || lpad(n::text, 2, '0'),
+  '투표 카드 목록의 5열 2행 페이지네이션을 확인하기 위한 테스트 투표입니다.',
+  'A test vote for checking the 5 by 2 card pagination layout.',
+  CASE WHEN n % 4 = 0 THEN 'SCHEDULED'::vote_state ELSE 'OPEN'::vote_state END,
+  TIMESTAMPTZ '2026-08-01 00:00:00+09' + (n || ' days')::interval,
+  TIMESTAMPTZ '2026-12-31 23:59:59+09',
+  true,
+  50,
+  admin.id,
+  admin.id
+FROM generate_series(1, 12) AS series(n)
+CROSS JOIN users AS admin
+WHERE admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  title_kr = EXCLUDED.title_kr,
+  title_en = EXCLUDED.title_en,
+  description_kr = EXCLUDED.description_kr,
+  description_en = EXCLUDED.description_en,
+  state = EXCLUDED.state,
+  opens_at = EXCLUDED.opens_at,
+  closes_at = EXCLUDED.closes_at,
+  updated_by_user_id = EXCLUDED.updated_by_user_id,
+  updated_at = NOW();
+
+INSERT INTO vote_candidates (id, vote_id, ordinal, name_kr, name_en, description_kr, description_en, image_url)
+SELECT
+  ('93333333-3333-4333-8333-' || lpad((333333333400 + n)::text, 12, '0'))::uuid,
+  ('93333333-3333-4333-8333-' || lpad((333333333300 + n)::text, 12, '0'))::uuid,
+  0,
+  '찬성',
+  'Approve',
+  '테스트 선택지 A입니다.',
+  'Test candidate A.',
+  NULL
+FROM generate_series(1, 12) AS series(n)
+UNION ALL
+SELECT
+  ('93333333-3333-4333-8333-' || lpad((333333333500 + n)::text, 12, '0'))::uuid,
+  ('93333333-3333-4333-8333-' || lpad((333333333300 + n)::text, 12, '0'))::uuid,
+  1,
+  '반대',
+  'Reject',
+  '테스트 선택지 B입니다.',
+  'Test candidate B.',
+  NULL
+FROM generate_series(1, 12) AS series(n)
+ON CONFLICT (id) DO UPDATE SET
+  name_kr = EXCLUDED.name_kr,
+  name_en = EXCLUDED.name_en,
+  description_kr = EXCLUDED.description_kr,
+  description_en = EXCLUDED.description_en;
+
 INSERT INTO pledges (
   id, ordinal, title_kr, title_en, description_kr, description_en, status,
   progress_percent, progress_kr, progress_en, target_date, is_published,
@@ -660,6 +921,45 @@ FROM (VALUES
   ('92222222-2222-4222-8222-222222222227'::uuid, 6, '학생회 자료 아카이브', 'Archive council materials', '공지와 행사 자료를 오래 찾을 수 있게 합니다.', 'Make notices and event materials discoverable.', 'PLANNED'::pledge_status, 10, '자료 구조를 설계 중입니다.', 'The archive structure is being designed.', DATE '2027-01-31'),
   ('92222222-2222-4222-8222-222222222228'::uuid, 7, '다국어 이용성 개선', 'Improve bilingual access', '주요 기능을 한국어와 영어로 제공합니다.', 'Provide core features in Korean and English.', 'IN_PROGRESS'::pledge_status, 30, '공개 콘텐츠의 영문 필드를 함께 관리합니다.', 'English fields are managed with public content.', DATE '2027-02-28')
 ) AS fixture(id, ordinal, title_kr, title_en, description_kr, description_en, status, progress_percent, progress_kr, progress_en, target_date)
+CROSS JOIN users AS admin
+WHERE admin.sso_user_id = 'development-admin'
+ON CONFLICT (id) DO UPDATE SET
+  ordinal = EXCLUDED.ordinal,
+  title_kr = EXCLUDED.title_kr,
+  title_en = EXCLUDED.title_en,
+  description_kr = EXCLUDED.description_kr,
+  description_en = EXCLUDED.description_en,
+  status = EXCLUDED.status,
+  progress_percent = EXCLUDED.progress_percent,
+  progress_kr = EXCLUDED.progress_kr,
+  progress_en = EXCLUDED.progress_en,
+  target_date = EXCLUDED.target_date,
+  is_published = true,
+  updated_by_user_id = EXCLUDED.updated_by_user_id,
+  updated_at = NOW();
+
+-- Additional pledge cards for pagination QA.
+INSERT INTO pledges (
+  id, ordinal, title_kr, title_en, description_kr, description_en, status,
+  progress_percent, progress_kr, progress_en, target_date, is_published,
+  created_by_user_id, updated_by_user_id
+)
+SELECT
+  ('92222222-2222-4222-8222-' || lpad((222222222228 + n)::text, 12, '0'))::uuid,
+  7 + n,
+  '[Mock] 카드 페이지네이션 공약 ' || lpad(n::text, 2, '0'),
+  '[Mock] Card pagination pledge ' || lpad(n::text, 2, '0'),
+  '공약 카드 목록의 5열 2행 페이지네이션을 확인하기 위한 테스트 공약입니다.',
+  'A test pledge for checking the 5 by 2 card pagination layout.',
+  CASE WHEN n % 3 = 0 THEN 'PLANNED'::pledge_status WHEN n % 3 = 1 THEN 'IN_PROGRESS'::pledge_status ELSE 'DONE'::pledge_status END,
+  LEAST(100, 15 + n * 6),
+  '카드 페이지네이션 확인을 위한 진행 상황입니다.',
+  'Progress text for card pagination QA.',
+  DATE '2027-03-01' + n,
+  true,
+  admin.id,
+  admin.id
+FROM generate_series(1, 8) AS series(n)
 CROSS JOIN users AS admin
 WHERE admin.sso_user_id = 'development-admin'
 ON CONFLICT (id) DO UPDATE SET

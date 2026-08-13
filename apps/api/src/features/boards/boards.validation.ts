@@ -170,11 +170,7 @@ export function parseAssetId(value: unknown): string { return parseUuid(value, '
 export function parseBoardListQuery(value: unknown): BoardListQuery {
   const query = objectWithAllowedKeys(value, ['locale', 'home', 'latestLimit'], 'invalid_board_query');
   const home = booleanQuery(query.home, 'invalid_board_query');
-  let latestLimit: 1 | undefined;
-  if (query.latestLimit !== undefined) {
-    if (query.latestLimit !== '1') fail('invalid_board_query');
-    latestLimit = 1;
-  }
+  const latestLimit = positiveQueryInteger(query.latestLimit, 5, 'invalid_board_query') as BoardListQuery['latestLimit'] | undefined;
   if (latestLimit !== undefined && home !== true) fail('invalid_board_query');
   const result: BoardListQuery = {};
   const parsedLocale = queryLocale(query.locale);

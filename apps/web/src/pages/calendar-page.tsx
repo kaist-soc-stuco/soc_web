@@ -75,7 +75,8 @@ function getMonthDays(viewDate: Date) {
     });
 }
 export function CalendarPage() {
-    const pageContainerClass = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8';
+    const pageContainerClass = 'mx-auto w-full max-w-[1600px]';
+    const headerContainerClass = 'mx-auto max-w-[1600px]';
     const [viewDate, setViewDate] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
     const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
     const [activeCategory, setActiveCategory] = useState<CalendarCategory>('전체');
@@ -140,10 +141,10 @@ export function CalendarPage() {
     };
     return (<SiteLayout>
       <div className="min-h-[calc(100vh-72px)] bg-[#F7FCFC]">
-        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] py-8">
-          <div className={pageContainerClass}>
-            <h1 className="mb-2 text-[32px] font-extrabold tracking-tight text-kaist-white">{uiText("pages.calendar-page.b0fa91262e")}</h1>
-            <p className="text-[20px] font-semibold tracking-tight text-kaist-white">{uiText("pages.calendar-page.53b096a94f")}</p>
+        <div className="bg-[linear-gradient(90deg,#146D4A_40.8%,#C9ECC2_100%)] px-8 py-7 lg:py-10">
+          <div className={headerContainerClass}>
+            <h1 className="mb-4 text-[40px] font-extrabold tracking-tight text-kaist-white">{uiText("pages.calendar-page.b0fa91262e")}</h1>
+            <p className="text-[24px] font-semibold tracking-tight text-kaist-white">{uiText("pages.calendar-page.53b096a94f")}</p>
           </div>
         </div>
 
