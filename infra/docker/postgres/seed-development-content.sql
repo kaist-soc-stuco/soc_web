@@ -758,6 +758,11 @@ SELECT
   '기본 응답',
   'Basic response'
 FROM generate_series(1, 12) AS series(n)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM survey_sections AS existing
+  WHERE existing.id = ('f7777777-7777-4777-8777-' || lpad((777777777900 + n)::text, 12, '0'))::uuid
+)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO survey_questions (id, section_id, ordinal, type, prompt_kr, prompt_en, required)
@@ -770,6 +775,11 @@ SELECT
   'Enter a test response.',
   false
 FROM generate_series(1, 12) AS series(n)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM survey_questions AS existing
+  WHERE existing.id = ('f7777777-7777-4777-8777-' || lpad((777777778000 + n)::text, 12, '0'))::uuid
+)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO survey_section_items (id, section_id, ordinal, kind, question_id)
@@ -780,6 +790,11 @@ SELECT
   'QUESTION',
   ('f7777777-7777-4777-8777-' || lpad((777777778000 + n)::text, 12, '0'))::uuid
 FROM generate_series(1, 12) AS series(n)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM survey_section_items AS existing
+  WHERE existing.id = ('f7777777-7777-4777-8777-' || lpad((777777778100 + n)::text, 12, '0'))::uuid
+)
 ON CONFLICT (id) DO NOTHING;
 
 UPDATE survey_revisions

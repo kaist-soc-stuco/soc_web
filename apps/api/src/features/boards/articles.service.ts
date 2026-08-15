@@ -157,7 +157,7 @@ export class ArticlesService {
     if (!actorUserId) return false;
     if (article.scope === 'KAIST') return true;
     if (article.scope === 'SOC') return this.isCommittee(actorUserId);
-    if (article.scope === 'AUTHOR_AND_STAFF') return article.authorUserId === actorUserId || this.isManager(actorUserId);
+    if (article.scope === 'AUTHOR_AND_STAFF') return article.authorUserId === actorUserId || await this.isManager(actorUserId);
     return this.isManager(actorUserId);
   }
 

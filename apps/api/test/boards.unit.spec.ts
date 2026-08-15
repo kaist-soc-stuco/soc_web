@@ -251,4 +251,16 @@ describe('ArticlesService', () => {
     await expect(service.patch(actorId, articleId, { status: 'PUBLISHED' } as never, correlationId)).rejects.toMatchObject({ response: { message: 'invalid_article_transition' } });
     expect(repository.patch).not.toHaveBeenCalled();
   });
+
+  it('does not expose another author\'s AUTHOR_AND_STAFF article to a regular user', async () => {
+    const { repository, service } = articleSetup();
+    repository.findArticleWithBoardById.mockResolvedValue({
+      article: article({ status: 'PUBLISHED', scope: 'AUTHOR_AND_STAFF', authorUserId: otherId, publishedAt: now }),
+      board: board({ readPermission: 'PUBLIC' }),
+    });
+
+    await expect(service.get(actorId, articleId, 'ko')).rejects.toMatchObject({
+      response: { message: 'article_not_found' },
+    });
+  });
 });
