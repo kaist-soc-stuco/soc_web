@@ -96,6 +96,14 @@ docker compose --profile maintenance run --rm seed-production
 
 `seed-production`은 기본 게시판·권한 정의 뒤에 기존 `pnpm db:seed`에서 사용하던 개발 관리자/사용자, 권한 부여, 게시글·행사·설문·투표·공약 fixture를 순서대로 실행합니다. fixture는 고정된 테스트 행을 idempotent하게 갱신하므로 사이트 검증 서버에서 반복 실행할 수 있습니다. 실제 운영 데이터에 fixture를 섞지 않을 때는 이 명령을 실행하지 말고, 별도의 개발 Compose를 사용합니다.
 
+DB와 Redis를 버려도 되는 사이트 테스트 서버를 처음부터 재구성할 때는 다음 한 명령으로 초기화, migration, mock seed, 전체 서비스 기동을 수행합니다.
+
+```bash
+pnpm db:reset
+```
+
+이 명령은 `docker compose down -v`를 포함하므로 실제 보존 데이터가 있는 환경에서는 실행하지 않습니다. 테스트 서버에서는 production cutover 승인 게이트를 거치지 않는 일반 Drizzle migration을 적용한 뒤, `seed-production` fixture를 넣습니다.
+
 ```bash
 docker compose --env-file .env -f infra/docker/compose.dev.yml up -d --build
 pnpm db:seed:dev

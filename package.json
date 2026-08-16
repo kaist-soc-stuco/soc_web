@@ -8,6 +8,7 @@
     "dev:api": "pnpm --filter @soc/api dev",
     "dev:web": "pnpm --filter @soc/web dev",
     "db:migrate": "bash infra/scripts/db-migrate.sh",
+    "db:reset": "bash infra/scripts/db-reset.sh",
     "db:seed": "bash infra/scripts/db-seed.sh",
     "db:seed:dev": "bash infra/scripts/db-seed-development.sh",
     "verify:production-env": "node infra/scripts/verify-production-env.mjs --env-file .env",
