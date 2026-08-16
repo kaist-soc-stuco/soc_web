@@ -66,13 +66,13 @@ describe('governance pages', () => {
     expect(first).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(first);
     expect(first).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('학사 정보를 한 곳에서 찾기 쉽게 정리합니다.')).toBeVisible();
+    expect(screen.getAllByText('학사 정보를 한 곳에서 찾기 쉽게 정리합니다.').length).toBeGreaterThan(1);
     expect(screen.getByRole('progressbar', { name: '수업·학사 정보 개선 진행률' })).toHaveAttribute('aria-valuenow', '75');
 
     fireEvent.click(second);
     expect(first).toHaveAttribute('aria-expanded', 'false');
     expect(second).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.queryByText('학사 정보를 한 곳에서 찾기 쉽게 정리합니다.')).not.toBeInTheDocument();
+    expect(document.getElementById('pledge-details-pledge-1')).not.toBeInTheDocument();
   });
 
   it('renders public empty and error states without stale pledge rows', async () => {
@@ -135,15 +135,15 @@ describe('governance pages', () => {
     await screen.findByRole('heading', { name: '투표 관리' });
 
     expect(screen.getByRole('button', { name: '개설' })).toBeDisabled();
-    expect(screen.getByRole('status')).toHaveTextContent('선거인명부');
+    expect(screen.getByRole('status')).toHaveTextContent('선거인 명부');
 
     fireEvent.click(screen.getByRole('button', { name: '초안 저장' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('한국어·영어 제목과 두 후보명을 입력하세요.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('한국어/영어 제목과 후보명을 입력하세요.');
     expect(voteApi.create).not.toHaveBeenCalled();
 
     const file = new File(['BAD_KIND,20260001'], 'voters.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('기존 투표 선거인명부 CSV/TSV'), { target: { files: [file] } });
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('선거인명부 형식이 올바르지 않습니다.'));
+    fireEvent.change(screen.getByLabelText('기존 투표 선거인 명부 CSV/TSV'), { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('선거인 명부 형식이 올바르지 않습니다.'));
     expect(voteApi.importVoterRoll).not.toHaveBeenCalled();
   });
 

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @soc/shared build && ts-node-dev --respawn --transpile-only src/main.ts",
+    "dev": "pnpm --filter @soc/shared build && ts-node-dev --respawn --transpile-only src/dev-main.ts",
     "content:purge": "ts-node --transpile-only src/commands/content-purge.ts",
     "survey:purge": "ts-node --transpile-only src/commands/survey-response-purge.ts",
     "survey:images:cleanup": "ts-node --transpile-only src/commands/survey-image-cleanup.ts",

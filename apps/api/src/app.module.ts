@@ -21,6 +21,10 @@ import { validateEnv } from './shared/config/env.validation';
 import { RateLimitMiddleware } from './shared/middleware/rate-limit.middleware';
 import { ClockModule } from './shared/time/clock.module';
 
+const developmentModuleImports = process.env.NODE_ENV === 'development'
+  ? [require('./features/auth/development-auth.module').DevelopmentAuthModule]
+  : [];
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -37,6 +41,7 @@ import { ClockModule } from './shared/time/clock.module';
     RedisModule,
     ClockModule,
     AuthModule,
+    ...developmentModuleImports,
     UsersModule,
     PermissionsModule,
     FaqsModule,

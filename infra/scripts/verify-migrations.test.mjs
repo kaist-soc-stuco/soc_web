@@ -71,7 +71,7 @@ async function safetyContractFixture(t) {
   await mkdir(join(root, "infra", "docker"), { recursive: true });
   await Promise.all([
     cp(join(projectRoot, "infra/scripts/db-migrate.sh"), join(root, "infra/scripts/db-migrate.sh")),
-    cp(join(projectRoot, "infra/docker/compose.prod.yml"), join(root, "infra/docker/compose.prod.yml")),
+    cp(join(projectRoot, "compose.yml"), join(root, "compose.yml")),
     cp(join(projectRoot, "README.md"), join(root, "README.md")),
   ]);
   return root;
@@ -241,7 +241,7 @@ test("rejects reordered released journal entries", async (t) => {
   await expectFailure(root, /immutable journal released entry mismatch at position 1: expected 0001_open_giant_girl/);
 });
 test("reconciles exactly five default board titles without touching timestamps, policy, or customized rows", async () => {
-  const sql = await readFile(join(canonicalMigrationsDir, "0015_board_title_reconciliation.sql"), "utf8");
+  const sql = (await readFile(join(canonicalMigrationsDir, "0015_board_title_reconciliation.sql"), "utf8")).replace(/\r\n/g, "\n");
   const updates = sql.match(/UPDATE "boards"[\s\S]*?;/g) ?? [];
   assert.equal(updates.length, 5);
   assert.deepEqual(
@@ -284,7 +284,7 @@ test("rejects a migration runbook without limit-plus-one EXPLAIN verification", 
 test("rejects a production Compose migration command that omits a required script flag", async (t) => {
   const root = await releasedFixture(t);
   const safetyRoot = await safetyContractFixture(t);
-  const composePath = join(safetyRoot, "infra/docker/compose.prod.yml");
+  const composePath = join(safetyRoot, "compose.yml");
   const compose = await readFile(composePath, "utf8");
   await writeFile(composePath, compose.replace("      - --rehearsed\n", ""));
   await expectFailure(root, /production Compose db-migrate command does not satisfy the migration script invocation contract/, { repositoryRoot: safetyRoot });
@@ -292,15 +292,15 @@ test("rejects a production Compose migration command that omits a required scrip
 test("rejects a production Compose migration service without a required approval gate", async (t) => {
   const root = await releasedFixture(t);
   const safetyRoot = await safetyContractFixture(t);
-  const composePath = join(safetyRoot, "infra/docker/compose.prod.yml");
+  const composePath = join(safetyRoot, "compose.yml");
   const compose = await readFile(composePath, "utf8");
-  await writeFile(composePath, compose.replace("MIGRATION_REHEARSAL_COMPLETED=approved", "MIGRATION_REHEARSAL_COMPLETED=not-approved"));
+  await writeFile(composePath, compose.replace('      MIGRATION_REHEARSAL_COMPLETED: ${MIGRATION_REHEARSAL_COMPLETED:-}\n', '      MIGRATION_REHEARSAL_COMPLETED: not-approved\n'));
   await expectFailure(root, /production Compose db-migrate service must require MIGRATION_REHEARSAL_COMPLETED=approved/, { repositoryRoot: safetyRoot });
 });
 test("rejects a production Compose migration service without an explicit 0024 phase", async (t) => {
   const root = await releasedFixture(t);
   const safetyRoot = await safetyContractFixture(t);
-  const composePath = join(safetyRoot, "infra/docker/compose.prod.yml");
+  const composePath = join(safetyRoot, "compose.yml");
   const compose = await readFile(composePath, "utf8");
   await writeFile(composePath, compose.replace("      MIGRATION_0024_PHASE:", "      # MIGRATION_0024_PHASE:"));
   await expectFailure(root, /production Compose db-migrate service must require an explicit current 0024 phase/, { repositoryRoot: safetyRoot });
@@ -308,7 +308,7 @@ test("rejects a production Compose migration service without an explicit 0024 ph
 test("rejects a production image-cleanup scheduler without bounded grace", async (t) => {
   const root = await releasedFixture(t);
   const safetyRoot = await safetyContractFixture(t);
-  const composePath = join(safetyRoot, "infra/docker/compose.prod.yml");
+  const composePath = join(safetyRoot, "compose.yml");
   const compose = await readFile(composePath, "utf8");
   await writeFile(composePath, compose.replace("${SURVEY_IMAGE_CLEANUP_GRACE_MS:-3600000}", "${SURVEY_IMAGE_CLEANUP_GRACE_MS:-60000}"));
   await expectFailure(root, /production Compose survey-image-cleanup service must pin SURVEY_IMAGE_CLEANUP_GRACE_MS/, { repositoryRoot: safetyRoot });
@@ -316,7 +316,7 @@ test("rejects a production image-cleanup scheduler without bounded grace", async
 test("rejects a retention scheduler that restart-loops while disabled", async (t) => {
   const root = await releasedFixture(t);
   const safetyRoot = await safetyContractFixture(t);
-  const composePath = join(safetyRoot, "infra/docker/compose.prod.yml");
+  const composePath = join(safetyRoot, "compose.yml");
   const compose = await readFile(composePath, "utf8");
   await writeFile(composePath, compose.replaceAll('    restart: "no"\n    command:', "    restart: unless-stopped\n    command:"));
   await expectFailure(root, /survey-image-cleanup service is missing required ownership or observability contract/, { repositoryRoot: safetyRoot });
@@ -324,7 +324,7 @@ test("rejects a retention scheduler that restart-loops while disabled", async (t
 test("rejects a production Compose migration service with a missing approval gate", async (t) => {
   const root = await releasedFixture(t);
   const safetyRoot = await safetyContractFixture(t);
-  const composePath = join(safetyRoot, "infra/docker/compose.prod.yml");
+  const composePath = join(safetyRoot, "compose.yml");
   const compose = await readFile(composePath, "utf8");
   await writeFile(composePath, compose.replace("      MIGRATION_RESPONSE_REVIEW_EXPLAIN_VERIFIED:", "      # MIGRATION_RESPONSE_REVIEW_EXPLAIN_VERIFIED:"));
   await expectFailure(root, /production Compose db-migrate service must require MIGRATION_RESPONSE_REVIEW_EXPLAIN_VERIFIED=approved/, { repositoryRoot: safetyRoot });

@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-CONTAINER_NAME="soc-migrations-test-$(< /proc/sys/kernel/random/uuid)"
+CONTAINER_NAME="soc-migrations-test-$(node --eval 'process.stdout.write(crypto.randomUUID())')"
 POSTGRES_DB="migration_test"
 POSTGRES_USER="migration_test"
 POSTGRES_PASSWORD="migration_test"
@@ -11,6 +11,7 @@ CONTAINER_CREATED=false
 DATABASE_URL="${MIGRATION_TEST_DATABASE_URL:-}"
 PSQL_BIN="${PSQL_BIN:-psql}"
 CUTOVER_STAGE_DIR=""
+CUTOVER_STAGE_NAME=""
 
 cleanup() {
   if [[ -n "$CUTOVER_STAGE_DIR" ]]; then
@@ -71,6 +72,7 @@ fi
 
 node "$SCRIPT_DIR/verify-migrations.mjs"
 CUTOVER_STAGE_DIR="$(mktemp -d "$ROOT_DIR/apps/api/.migration-cutover.XXXXXX")"
+CUTOVER_STAGE_NAME="$(basename "$CUTOVER_STAGE_DIR")"
 
 cp -R "$ROOT_DIR/apps/api/drizzle" "$CUTOVER_STAGE_DIR/drizzle"
 rm -f \
@@ -88,8 +90,8 @@ fs.writeFileSync(path, JSON.stringify(journal));
 cat > "$CUTOVER_STAGE_DIR/drizzle.config.ts" <<EOF
 import { defineConfig } from "drizzle-kit";
 export default defineConfig({
-  schema: "$ROOT_DIR/apps/api/src/infrastructure/postgres/postgres.schema.ts",
-  out: "$CUTOVER_STAGE_DIR/drizzle",
+  schema: "./src/infrastructure/postgres/postgres.schema.ts",
+  out: "./$CUTOVER_STAGE_NAME/drizzle",
   dialect: "postgresql",
   dbCredentials: { url: process.env.DATABASE_URL! },
 });

@@ -25,7 +25,7 @@ describe('AdminContactsPage', () => {
   it('does not render fallback contact data while the live contact request is pending', () => {
     const { container } = render(<AdminContactsPage />);
 
-    expect(screen.getByRole('heading', { name: '집행위 연락망' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '집행위 연락망', level: 1 })).toBeVisible();
     expect(screen.getByText('연락처 정보를 불러오는 중입니다.')).toBeVisible();
     expect(screen.getByLabelText('이메일')).toBeVisible();
     expect(screen.getByLabelText('전화번호')).toBeVisible();

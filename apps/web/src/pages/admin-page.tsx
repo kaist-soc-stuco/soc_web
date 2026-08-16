@@ -170,9 +170,9 @@ export function AdminPage() {
       <div className="grid min-h-screen lg:grid-cols-[384px_minmax(0,1fr)]">
         <aside className="hidden bg-[#006B4A] text-[#F7FCFC] shadow-[8px_0_30px_rgba(0,107,74,0.12)] lg:flex lg:flex-col">
           <Link to="/admin" className="flex h-[85px] items-center gap-5 border-b border-[#F7FCFC]/10 px-7 transition hover:opacity-90">
-            <img src="/kaist_logo.png" alt="KAIST Logo" className="h-[31px] w-auto" />
+            <img src="/kaist_logo.webp" alt="KAIST Logo" className="h-[31px] w-auto" />
             <div className="h-5 w-px bg-[#F7FCFC]/55" />
-            <img src="/logo.png" alt="SOC Logo" className="mb-2 h-[34px] w-auto" />
+            <img src="/logo.webp" alt="SOC Logo" className="mb-2 h-[34px] w-auto" />
           </Link>
 
           <nav className="mt-7 flex-1 overflow-y-auto pb-8" aria-label="관리자 메뉴">
@@ -254,9 +254,9 @@ export function AdminPage() {
               </div>
 
               <Link to="/admin" className="flex items-center gap-3 md:hidden">
-                <img src="/kaist_logo.png" alt="KAIST Logo" className="h-6 w-auto" />
+                <img src="/kaist_logo.webp" alt="KAIST Logo" className="h-6 w-auto" />
                 <div className="h-4 w-px bg-[#98A0AC]/70" />
-                <img src="/logo.png" alt="SOC Logo" className="mb-1 h-7 w-auto" />
+                <img src="/logo.webp" alt="SOC Logo" className="mb-1 h-7 w-auto" />
               </Link>
 
               <Link

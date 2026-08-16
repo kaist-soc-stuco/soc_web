@@ -25,7 +25,7 @@ interface EventCard {
     image: string | null;
     kind: EventTab;
 }
-const DEFAULT_EVENT_IMAGE = '/hero_background2.jpeg';
+const DEFAULT_EVENT_IMAGE = '/hero_background2.webp';
 export function EventsPage() {
     const [locale] = useLocale();
     const [searchParams] = useSearchParams();

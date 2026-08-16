@@ -6,7 +6,7 @@ import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getUpcomingEvents } from '@/lib/event-api';
 import { localizedText } from '@/lib/localized-content';
 import { formatScheduleDate, formatScheduleDateTime } from '@/lib/schedule-date';
-const DEFAULT_EVENT_IMAGE = '/hero_background2.jpeg';
+const DEFAULT_EVENT_IMAGE = '/hero_background2.webp';
 interface EventCardProps {
     id: string;
     title: string;

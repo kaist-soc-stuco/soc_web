@@ -39,9 +39,9 @@ export function AboutPage() {
             <main className="overflow-hidden rounded-[8px] border border-kaist-grey/20 bg-white shadow-[0_20px_70px_rgba(57,64,75,0.08)]">
               <div className="border-b border-kaist-grey/20 px-6 py-8 md:px-8 md:py-9">
                 <div className="flex flex-wrap items-center gap-5">
-                  <img src="/kaist_logo.png" alt="KAIST Logo" className="h-[31px] w-auto" />
+                  <img src="/kaist_logo.webp" alt="KAIST Logo" className="h-[31px] w-auto" />
                   <div className="h-5 w-px bg-kaist-grey/40" />
-                  <img src="/logo.png" alt="SOC Logo" className="mb-2 h-[34px] w-auto" />
+                  <img src="/logo.webp" alt="SOC Logo" className="mb-2 h-[34px] w-auto" />
                 </div>
                 <h2 className="mt-6 text-[30px] font-extrabold leading-tight tracking-tight text-kaist-black md:text-[34px]">
                   KAIST SoC

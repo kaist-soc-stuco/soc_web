@@ -22,7 +22,18 @@ const fullContact = {
   id: 'contact-1', projection: 'FULL' as const, name: '홍길동', role: '위원', email: 'hong@example.test', phone: '010-1234-5678', affiliation: 'KAIST', note: '비고', kaistUid: 'hong', year: '2026',
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null, retentionDeadlineAt: '2027-01-01T00:00:00.000Z', holdUntil: null,
 };
-const maskedContact = { ...fullContact, projection: 'MASKED' as const, note: null };
+const maskedContact = {
+  ...fullContact,
+  projection: 'MASKED' as const,
+  name: '홍***',
+  email: '***',
+  phone: '***',
+  affiliation: '***',
+  note: null,
+  kaistUid: '***',
+  year: '***',
+  role: '***',
+};
 
 const setField = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
@@ -41,9 +52,9 @@ describe('Phase 6 contact, mail, and chat pages', () => {
 
     render(<AdminContactsPage />);
 
-    expect(await screen.findByText('홍길동')).toBeVisible();
+    expect(await screen.findByText('홍***')).toBeVisible();
     expect(api.contactApi.list).toHaveBeenCalledWith('MASKED', undefined, undefined);
-    expect(screen.getByText('-')).toBeVisible();
+    expect(screen.getAllByText('***').length).toBeGreaterThan(1);
     expect(screen.queryByText('ciphertext')).not.toBeInTheDocument();
     expect(screen.getByLabelText('이름')).toBeVisible();
     expect(screen.getByLabelText('직책')).toBeVisible();
@@ -56,7 +67,7 @@ describe('Phase 6 contact, mail, and chat pages', () => {
 
     fireEvent.change(screen.getByLabelText('연락처 표시 방식'), { target: { value: 'FULL' } });
     await waitFor(() => expect(api.contactApi.list).toHaveBeenLastCalledWith('FULL', undefined, undefined));
-    expect(screen.getAllByText('비고').length).toBeGreaterThan(1);
+    expect(screen.getByText('hong@example.test')).toBeVisible();
 
     setField('이름', ' 새 이름 '); setField('직책', ' 역할 '); setField('이메일', ' email@example.test '); setField('전화번호', ' 010 ');
     setField('직장', ' 소속 '); setField('비고', ' 메모 '); setField('KAIST UID', ' uid '); setField('학년도', ' 2027 ');

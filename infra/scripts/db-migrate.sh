@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-$ROOT_DIR/compose.yml}"
 API_DIR="$ROOT_DIR/apps/api"
 
 : "${DATABASE_URL:?DATABASE_URL is required}"
@@ -46,7 +47,7 @@ record_marker() {
 require_quiescent_services() {
   command -v docker >/dev/null || { echo "Refusing 0024 cutover: Docker CLI is required to verify serving containers are stopped." >&2; exit 2; }
   local running
-  running="$(docker compose -f "$ROOT_DIR/infra/docker/compose.prod.yml" ps --status running --services api web nginx 2>/dev/null || true)"
+  running="$(docker compose -f "$COMPOSE_FILE_PATH" ps --status running --services api web nginx 2>/dev/null || true)"
   [[ -z "$running" ]] || { echo "Refusing 0024 cutover while serving containers are active: $running" >&2; exit 2; }
 }
 require_no_active_database_clients() {

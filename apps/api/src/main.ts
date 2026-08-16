@@ -94,7 +94,7 @@ export async function bootstrap(): Promise<void> {
   await app.listen(port);
 
   // eslint-disable-next-line no-console
-  console.log(`API server listening on http://localhost:${port}`);
+  console.log(`API server listening on port ${port}`);
 }
 
 if (require.main === module) void bootstrap();

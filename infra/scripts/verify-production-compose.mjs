@@ -51,7 +51,10 @@ const health = await probe("/health");
 if (!health.ok) fail(`/health returned HTTP ${health.status}`);
 
 const expectedSecurityHeaders = new Map([
-  ["content-security-policy", "frame-ancestors 'none'"],
+  [
+    "content-security-policy",
+    "form-action 'self' https://sso.kaist.ac.kr https://ssodev.kaist.ac.kr",
+  ],
   ["permissions-policy", "camera=()"],
   ["referrer-policy", "strict-origin-when-cross-origin"],
   ["strict-transport-security", "max-age=31536000"],
@@ -69,6 +72,57 @@ if (![200, 401].includes(session.status)) {
   fail(`/api/auth/session returned unexpected HTTP ${session.status}`);
 }
 
+const loginStart = await probe("/api/auth/login/start", {
+  headers: { Accept: "application/json" },
+});
+if (!loginStart.ok) fail(`/api/auth/login/start returned unexpected HTTP ${loginStart.status}`);
+let loginStartPayload;
+try {
+  loginStartPayload = await loginStart.json();
+} catch {
+  fail("/api/auth/login/start did not return JSON");
+}
+if (
+  !loginStartPayload ||
+  typeof loginStartPayload !== "object" ||
+  loginStartPayload.clientId === "local-development"
+) {
+  fail("/api/auth/login/start is using the local-development SSO client id");
+}
+for (const [name, value] of [
+  ["clientId", loginStartPayload?.clientId],
+  ["loginUrl", loginStartPayload?.loginUrl],
+  ["redirectUri", loginStartPayload?.redirectUri],
+  ["nonce", loginStartPayload?.nonce],
+  ["state", loginStartPayload?.state],
+]) {
+  if (typeof value !== "string" || !value.trim()) {
+    fail(`/api/auth/login/start returned an incomplete ${name}`);
+  }
+}
+for (const [name, value] of [
+  ["loginUrl", loginStartPayload.loginUrl],
+  ["redirectUri", loginStartPayload.redirectUri],
+]) {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname)) {
+      fail(`/api/auth/login/start returned a non-public ${name}`);
+    }
+  } catch {
+    fail(`/api/auth/login/start returned an invalid ${name}`);
+  }
+}
+
+const developmentLogin = await probe("/api/auth/development/login", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ account: "admin" }),
+});
+if (developmentLogin.status !== 404) {
+  fail(`/api/auth/development/login is exposed in production with HTTP ${developmentLogin.status}`);
+}
+
 const unsafe = await probe("/api/auth/session", {
   method: "POST",
   headers: { Origin: `${publicOrigin}/unexpected` },
@@ -81,7 +135,7 @@ if (responseRequestId !== requestId) {
 
 console.log(JSON.stringify({
   baseUrl,
-  checks: ["health", "security-headers", "auth-session-routing", "unsafe-origin-rejection", "request-id-propagation", "survey-response-retention-gate"],
+  checks: ["health", "security-headers", "auth-session-routing", "sso-login-start", "development-login-absent", "unsafe-origin-rejection", "request-id-propagation", "survey-response-retention-gate"],
   surveyResponseRetention: surveyResponsePurgeEnabled
     ? {
         cadenceSeconds: surveyResponsePurgeCadenceSeconds,

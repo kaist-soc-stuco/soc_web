@@ -4,6 +4,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     fileParallelism: false,
+    sequence: {
+      concurrent: false,
+    },
     globals: true,
     setupFiles: ['./test/setup.ts'],
     projects: [

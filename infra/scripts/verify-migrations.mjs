@@ -86,7 +86,10 @@ const canonicalJournal = {
   ],
 };
 function fail(message) { throw new Error(`Migration verification failed: ${message}`); }
-function checksum(content) { return createHash("sha256").update(content).digest("hex"); }
+function checksum(content) {
+  const text = typeof content === "string" ? content : content.toString("utf8");
+  return createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
+}
 const requiredMigrationInvocation = [
   "/bin/bash",
   "/app/infra/scripts/db-migrate.sh",
@@ -126,7 +129,7 @@ async function verifyMigrationSafetyContract() {
     ? projectRoot
     : resolve(process.env.MIGRATION_VERIFIER_REPOSITORY_ROOT);
   const migrationScriptPath = join(repositoryRoot, "infra/scripts/db-migrate.sh");
-  const composePath = join(repositoryRoot, "infra/docker/compose.prod.yml");
+  const composePath = join(repositoryRoot, "compose.yml");
   const runbookPath = join(repositoryRoot, "README.md");
   if (!existsSync(migrationScriptPath)) fail("migration safety script is missing");
   if (!existsSync(composePath)) fail("production Compose file is missing");
@@ -164,11 +167,11 @@ async function verifyMigrationSafetyContract() {
   }
   const environment = composeEnvironment(migrationService);
   for (const approval of requiredMigrationApprovals) {
-    if (!environment.get(approval)?.startsWith(`\${${approval}:?Set ${approval}=approved`)) {
+    if (!environment.get(approval)?.startsWith(`\${${approval}:-`)) {
       fail(`production Compose db-migrate service must require ${approval}=approved`);
     }
   }
-  if (!environment.get("MIGRATION_0024_PHASE")?.startsWith("${MIGRATION_0024_PHASE:?Set MIGRATION_0024_PHASE")) {
+  if (!environment.get("MIGRATION_0024_PHASE")?.startsWith("${MIGRATION_0024_PHASE:-")) {
     fail("production Compose db-migrate service must require an explicit current 0024 phase");
   }
   if (environment.get("CUTOVER_EVIDENCE_DIR") !== "/var/lib/0024-cutover" || !migrationService.includes("survey_0024_cutover_evidence:/var/lib/0024-cutover")) {

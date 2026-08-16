@@ -7,11 +7,9 @@ import { Header } from '@/components/organisms/header';
 import { pledgeApi } from '@/lib/governance-api';
 import { useLocale } from '@/lib/locale-store';
 
-const statusLabel: Record<Pledge['status'], string> = {
-  PLANNED: 'Planned',
-  IN_PROGRESS: 'In progress',
-  DONE: 'Done',
-  BLOCKED: 'Blocked',
+const statusLabel: Record<'ko' | 'en', Record<Pledge['status'], string>> = {
+  ko: { PLANNED: '예정', IN_PROGRESS: '진행 중', DONE: '완료', BLOCKED: '보류' },
+  en: { PLANNED: 'Planned', IN_PROGRESS: 'In progress', DONE: 'Done', BLOCKED: 'Blocked' },
 };
 const voteTabs = [
   { label: (locale: 'ko' | 'en') => (locale === 'ko' ? '투표' : 'Votes'), to: '/votes' },
@@ -26,6 +24,21 @@ export function PledgesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const pageContainerClass = 'mx-auto max-w-[1600px]';
+  const copy = locale === 'ko'
+    ? {
+      loading: '공약 현황을 불러오는 중입니다.',
+      error: '공약 현황을 불러오지 못했습니다.',
+      empty: '공개된 공약이 없습니다.',
+      target: '목표일',
+      progress: '진행률',
+    }
+    : {
+      loading: 'Loading pledges.',
+      error: 'Could not load pledges.',
+      empty: 'No public pledges are available.',
+      target: 'Target',
+      progress: 'progress',
+    };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -99,9 +112,9 @@ export function PledgesPage() {
       </div>
 
       <main className="mx-auto w-full max-w-[1600px] pb-10 pt-6">
-        {status === 'loading' ? <p role="status" className="py-20 text-center text-base font-semibold text-kaist-grey">Loading pledges.</p> : null}
-        {status === 'error' ? <p role="alert" className="py-20 text-center text-base font-semibold text-red-700">Could not load pledges.</p> : null}
-        {status === 'ready' && items.length === 0 ? <p className="py-20 text-center text-base font-semibold text-kaist-grey">No public pledges are available.</p> : null}
+        {status === 'loading' ? <p role="status" className="py-20 text-center text-base font-semibold text-kaist-grey">{copy.loading}</p> : null}
+        {status === 'error' ? <p role="alert" className="py-20 text-center text-base font-semibold text-red-700">{copy.error}</p> : null}
+        {status === 'ready' && items.length === 0 ? <p className="py-20 text-center text-base font-semibold text-kaist-grey">{copy.empty}</p> : null}
 
         <div className="grid auto-rows-fr gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-5 xl:gap-x-8 xl:gap-y-6">
           {currentItems.map((item) => {
@@ -119,7 +132,7 @@ export function PledgesPage() {
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-kaist-darkgreen text-xs font-extrabold text-white">{item.ordinal + 1}</span>
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 min-h-[2.625rem] text-[18px] font-extrabold leading-[21px] tracking-tight text-kaist-black">{item.title.value}</span>
-                    <span className="mt-2 block text-[11px] font-bold text-kaist-darkgreen">{statusLabel[item.status]} · {item.progressPercent}%</span>
+                    <span className="mt-2 block text-[11px] font-bold text-kaist-darkgreen">{statusLabel[locale][item.status]} · {item.progressPercent}%</span>
                     <span className="mt-1.5 line-clamp-3 min-h-[3.375rem] text-[11px] font-semibold leading-[18px] text-kaist-grey xl:mt-2">{item.description.value}</span>
                   </span>
                   <span aria-hidden="true" className="mt-auto self-end text-xl font-extrabold text-kaist-grey">{isExpanded ? '-' : '+'}</span>
@@ -127,11 +140,11 @@ export function PledgesPage() {
                 {isExpanded ? (
                   <div id={detailsId} className="border-t border-kaist-grey/20 px-6 pb-6 pt-5">
                     <p className="whitespace-pre-line text-sm font-medium leading-7 text-kaist-black">{item.description.value}</p>
-                    <div className="mt-5 h-3 overflow-hidden rounded bg-kaist-grey/20" role="progressbar" aria-label={(item.title.value ?? 'Pledge') + ' progress'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.progressPercent}>
+                    <div className="mt-5 h-3 overflow-hidden rounded bg-kaist-grey/20" role="progressbar" aria-label={(item.title.value ?? 'Pledge') + ' ' + copy.progress} aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.progressPercent}>
                       <div className="h-full bg-kaist-darkgreen" style={{ width: item.progressPercent + '%' }} />
                     </div>
                     <p className="mt-3 whitespace-pre-line text-sm font-semibold leading-6 text-kaist-grey">{item.progress.value}</p>
-                    {item.targetDate ? <p className="mt-3 text-xs font-bold text-kaist-grey">Target: {item.targetDate}</p> : null}
+                    {item.targetDate ? <p className="mt-3 text-xs font-bold text-kaist-grey">{copy.target}: {item.targetDate}</p> : null}
                   </div>
                 ) : null}
               </article>

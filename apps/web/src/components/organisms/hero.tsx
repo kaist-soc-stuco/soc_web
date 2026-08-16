@@ -25,10 +25,10 @@ export function Hero() {
 
   // 임시 하드코딩된 이미지 
   const originalImages = [
-    '/hero_background_1.jpg',
-    '/hero_background2.jpeg',
-    '/hero_background3.jpeg',
-    '/hero_background4.jpeg',
+    '/hero_background_1.webp',
+    '/hero_background2.webp',
+    '/hero_background3.webp',
+    '/hero_background4.webp',
   ];
 
   // 무한 루프를 위해 첫 번째와 마지막 이미지를 양 끝에 추가
@@ -103,15 +103,15 @@ export function Hero() {
       {/* Logo section */}
       <div className="relative z-10 flex h-14 items-center justify-start px-5 lg:h-[68px] lg:px-6">
         <div className="flex items-center gap-2 md:gap-3">
-          <img 
-            src="/kaist_logo.png" 
-            alt="KAIST Logo" 
+          <img
+            src="/kaist_logo.webp"
+            alt="KAIST Logo"
             className="h-5 w-auto lg:h-[31px]"
           />
           <div className="h-5 w-px bg-gray-300 lg:h-4" />
-          <img 
-            src="/logo.png" 
-            alt="SOC Logo" 
+          <img
+            src="/logo.webp"
+            alt="SOC Logo"
             className="h-6 w-auto lg:h-[34px] mb-2"
           />
         </div>

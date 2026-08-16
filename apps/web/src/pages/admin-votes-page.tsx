@@ -22,9 +22,9 @@ const stateLabel: Record<AdminVote['state'], string> = {
 
 const fieldLabel = {
   titleKr: '제목 (한국어)',
-  titleEn: 'Title (English)',
+  titleEn: '제목 (English)',
   descriptionKr: '설명 (한국어)',
-  descriptionEn: 'Description (English)',
+  descriptionEn: '설명 (English)',
   candidate1: '후보 1',
   candidate2: '후보 2',
 } as const;
@@ -159,7 +159,7 @@ export function AdminVotesPage() {
 
       {error && <p role="alert">{error}</p>}
 
-      <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void create(); }}>
+      <form noValidate className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void create(); }}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div>
             <h2 className="text-xl font-extrabold text-slate-900">새 투표 생성</h2>

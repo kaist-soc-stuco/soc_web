@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TEST_DATABASE_URL: postgresql://soc:soc@127.0.0.1:5432/soc_web_test_ci
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    services:
+      postgres:
+        image: postgres:16.8-alpine
+        env:
+          POSTGRES_DB: soc_web_test_ci
+          POSTGRES_USER: soc
+          POSTGRES_PASSWORD: soc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U soc -d soc_web_test_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7.4.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create local test environment
+        run: node infra/scripts/generate-dev-env.mjs
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Unit and integration tests
+        run: pnpm test
+
+      - name: Migration and environment contract tests
+        run: |
+          pnpm test:migrations
+          node --test infra/scripts/verify-production-env.test.mjs
+
+      - name: Web privacy baseline
+        run: pnpm --filter @soc/web verify:privacy
+
+      - name: Validate production Compose syntax
+        shell: bash
+        env:
+          COMPOSE_ENV_FILE: .env.ci
+        run: |
+          cp .env.example .env.ci
+          docker compose --env-file .env.ci -f compose.yml config --quiet

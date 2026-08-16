@@ -17,12 +17,12 @@ if [[ ! -f "$ENV_FILE_PATH" ]]; then
   exit 1
 fi
 
-# Use the same one-shot service as `docker compose up`. It owns both seed SQL
-# files and waits for the migration service, so manual reseeding cannot target
-# the separate host-development database by accident.
+# Production seed is an explicit maintenance operation. It is never a
+# dependency of the serving API and therefore cannot run during every deploy.
 docker compose \
   --env-file "$ENV_FILE_PATH" \
   -f "$COMPOSE_FILE_PATH" \
-  run --rm db-seed
+  --profile maintenance \
+  run --rm seed-production
 
-echo "Seed completed"
+echo "Production seed completed"

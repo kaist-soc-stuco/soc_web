@@ -72,6 +72,50 @@ const asOrigin = (value: unknown, name: string): string => {
   return origin;
 };
 
+const asSsoUrl = (value: unknown, name: string): string => {
+  const raw = asString(value, name);
+
+  try {
+    const parsed = new URL(raw);
+    const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+    if (parsed.username || parsed.password || (parsed.protocol !== 'https:' && !isLocalhost)) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error(`Invalid URL for ${name}`);
+  }
+
+  return raw.replace(/\/+$/, '');
+};
+
+const validateProductionSsoConfiguration = (config: {
+  clientId: string;
+  loginUrl: string;
+  redirectUri: string;
+  authApiUrl: string;
+  clientSecret: string;
+}): void => {
+  if (config.clientId === 'local-development') {
+    throw new Error('Production SSO configuration cannot use the local-development client id');
+  }
+
+  if (/^(?:replace-with|replace_with|REPLACE_WITH)/i.test(config.clientSecret)) {
+    throw new Error('Production SSO configuration requires an issued client secret');
+  }
+
+  for (const [name, value] of [
+    ['VITE_SSO_LOGIN_URL', config.loginUrl],
+    ['VITE_SSO_REDIRECT_URI', config.redirectUri],
+    ['SSO_AUTH_API_URL', config.authApiUrl],
+  ] as const) {
+    const parsed = new URL(value);
+    const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+    if (parsed.protocol !== 'https:' || isLoopback) {
+      throw new Error(`Production SSO configuration requires an HTTPS public URL for ${name}`);
+    }
+  }
+};
+
 const asPort = (value: unknown, name: string, fallback: number): number => {
   const raw = value === undefined ? String(fallback) : value;
 
@@ -92,8 +136,12 @@ const asBoolean = (value: unknown, name: string, fallback: boolean): boolean => 
   if (value === false || value === 'false') return false;
   throw new Error(`Invalid boolean value for ${name}`);
 };
+const asOptionalString = (value: unknown, name: string): string | undefined => {
+  if (value === undefined || (typeof value === 'string' && value.trim().length === 0)) return undefined;
+  return asString(value, name);
+};
 const asOptionalUrl = (value: unknown, name: string): string | undefined => {
-  if (value === undefined) return undefined;
+  if (value === undefined || (typeof value === 'string' && value.trim().length === 0)) return undefined;
   const raw = asString(value, name);
   try {
     const parsed = new URL(raw);
@@ -127,9 +175,11 @@ const asOptionalPositiveBoundedInteger = (
   maximum: number,
 ): number | undefined => value === undefined
   ? undefined
-  : asPositiveBoundedInteger(value, name, 1, maximum);
+  : typeof value === 'string' && value.trim().length === 0
+    ? undefined
+    : asPositiveBoundedInteger(value, name, 1, maximum);
 const asOptionalIdentity = (value: unknown, name: string): string | undefined => {
-  if (value === undefined) return undefined;
+  if (value === undefined || (typeof value === 'string' && value.trim().length === 0)) return undefined;
   const identity = asString(value, name);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(identity)) {
     throw new Error(`Invalid identity for ${name}`);
@@ -137,7 +187,7 @@ const asOptionalIdentity = (value: unknown, name: string): string | undefined =>
   return identity;
 };
 const asOptionalSha256 = (value: unknown, name: string): string | undefined => {
-  if (value === undefined) return undefined;
+  if (value === undefined || (typeof value === 'string' && value.trim().length === 0)) return undefined;
   const hash = asString(value, name);
   if (!/^[a-f0-9]{64}$/i.test(hash)) throw new Error(`Invalid SHA-256 hash for ${name}`);
   return hash.toLowerCase();
@@ -257,13 +307,13 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
   const chatEnabled = asBoolean(config.CHAT_PROVIDER_ENABLED, 'CHAT_PROVIDER_ENABLED', false);
   const assetEnabled = asBoolean(config.ASSET_PROVIDER_ENABLED, 'ASSET_PROVIDER_ENABLED', false);
   const assetUrl = asOptionalUrl(config.ASSET_PROVIDER_URL, 'ASSET_PROVIDER_URL');
-  const assetToken = config.ASSET_PROVIDER_TOKEN === undefined ? undefined : asString(config.ASSET_PROVIDER_TOKEN, 'ASSET_PROVIDER_TOKEN');
+  const assetToken = asOptionalString(config.ASSET_PROVIDER_TOKEN, 'ASSET_PROVIDER_TOKEN');
   const mailUrl = asOptionalUrl(config.MAIL_PROVIDER_URL, 'MAIL_PROVIDER_URL');
-  const mailToken = config.MAIL_PROVIDER_TOKEN === undefined ? undefined : asString(config.MAIL_PROVIDER_TOKEN, 'MAIL_PROVIDER_TOKEN');
-  const mailFrom = config.MAIL_FROM === undefined ? undefined : asString(config.MAIL_FROM, 'MAIL_FROM');
+  const mailToken = asOptionalString(config.MAIL_PROVIDER_TOKEN, 'MAIL_PROVIDER_TOKEN');
+  const mailFrom = asOptionalString(config.MAIL_FROM, 'MAIL_FROM');
   const chatUrl = asOptionalUrl(config.CHAT_PROVIDER_URL, 'CHAT_PROVIDER_URL');
-  const chatToken = config.CHAT_PROVIDER_TOKEN === undefined ? undefined : asString(config.CHAT_PROVIDER_TOKEN, 'CHAT_PROVIDER_TOKEN');
-  const chatModel = config.CHAT_PROVIDER_MODEL === undefined ? undefined : asString(config.CHAT_PROVIDER_MODEL, 'CHAT_PROVIDER_MODEL');
+  const chatToken = asOptionalString(config.CHAT_PROVIDER_TOKEN, 'CHAT_PROVIDER_TOKEN');
+  const chatModel = asOptionalString(config.CHAT_PROVIDER_MODEL, 'CHAT_PROVIDER_MODEL');
   if (mailEnabled && (!mailUrl || !mailToken || !mailFrom)) throw new Error('Incomplete mail provider configuration');
   if (chatEnabled && (!chatUrl || !chatToken || !chatModel)) throw new Error('Incomplete chat provider configuration');
   if (assetEnabled && (!assetUrl || !assetToken)) throw new Error('Incomplete asset provider configuration');
@@ -300,9 +350,10 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     config.SURVEY_DEFINITION_INVENTORY_APPROVER,
     'SURVEY_DEFINITION_INVENTORY_APPROVER',
   );
-  const inventoryReportPayload = config.SURVEY_DEFINITION_INVENTORY_REPORT_JSON === undefined
-    ? undefined
-    : asString(config.SURVEY_DEFINITION_INVENTORY_REPORT_JSON, 'SURVEY_DEFINITION_INVENTORY_REPORT_JSON');
+  const inventoryReportPayload = asOptionalString(
+    config.SURVEY_DEFINITION_INVENTORY_REPORT_JSON,
+    'SURVEY_DEFINITION_INVENTORY_REPORT_JSON',
+  );
   const expectedInventoryDatabaseIdentity = asOptionalIdentity(
     config.SURVEY_DEFINITION_EXPECTED_DATABASE_IDENTITY,
     'SURVEY_DEFINITION_EXPECTED_DATABASE_IDENTITY',
@@ -311,19 +362,30 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     config.SURVEY_DEFINITION_EXPECTED_MIGRATION_IDENTITY,
     'SURVEY_DEFINITION_EXPECTED_MIGRATION_IDENTITY',
   );
+  const ssoClientId = asString(config.VITE_SSO_CLIENT_ID, 'VITE_SSO_CLIENT_ID');
+  const ssoLoginUrl = asSsoUrl(config.VITE_SSO_LOGIN_URL, 'VITE_SSO_LOGIN_URL');
+  const ssoRedirectUri = asSsoUrl(config.VITE_SSO_REDIRECT_URI, 'VITE_SSO_REDIRECT_URI');
+  const ssoAuthApiUrl = asSsoUrl(config.SSO_AUTH_API_URL, 'SSO_AUTH_API_URL');
+  const ssoClientSecret = asString(config.SSO_CLIENT_SECRET, 'SSO_CLIENT_SECRET');
+  if (nodeEnv === 'production') {
+    validateProductionSsoConfiguration({
+      clientId: ssoClientId,
+      loginUrl: ssoLoginUrl,
+      redirectUri: ssoRedirectUri,
+      authApiUrl: ssoAuthApiUrl,
+      clientSecret: ssoClientSecret,
+    });
+  }
 
   return {
     ...config,
     NODE_ENV: nodeEnv,
     API_PORT: asPort(config.API_PORT, 'API_PORT', 3000),
-    VITE_SSO_CLIENT_ID: asString(config.VITE_SSO_CLIENT_ID, 'VITE_SSO_CLIENT_ID'),
-    VITE_SSO_LOGIN_URL: asString(config.VITE_SSO_LOGIN_URL, 'VITE_SSO_LOGIN_URL'),
-    VITE_SSO_REDIRECT_URI: asString(
-      config.VITE_SSO_REDIRECT_URI,
-      'VITE_SSO_REDIRECT_URI',
-    ),
-    SSO_AUTH_API_URL: asString(config.SSO_AUTH_API_URL, 'SSO_AUTH_API_URL'),
-    SSO_CLIENT_SECRET: asString(config.SSO_CLIENT_SECRET, 'SSO_CLIENT_SECRET'),
+    VITE_SSO_CLIENT_ID: ssoClientId,
+    VITE_SSO_LOGIN_URL: ssoLoginUrl,
+    VITE_SSO_REDIRECT_URI: ssoRedirectUri,
+    SSO_AUTH_API_URL: ssoAuthApiUrl,
+    SSO_CLIENT_SECRET: ssoClientSecret,
     AUTH_JWT_PUBLIC_KEYS_JSON: jwtKeys.publicKeysJson,
     AUTH_JWT_ACTIVE_KID: jwtKeys.activeKid,
     AUTH_JWT_ES256_PRIVATE_KEY: jwtKeys.privatePem,

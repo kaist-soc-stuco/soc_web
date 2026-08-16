@@ -9,13 +9,15 @@
     "dev:web": "pnpm --filter @soc/web dev",
     "db:migrate": "bash infra/scripts/db-migrate.sh",
     "db:seed": "bash infra/scripts/db-seed.sh",
+    "db:seed:dev": "bash infra/scripts/db-seed-development.sh",
+    "verify:production-env": "node infra/scripts/verify-production-env.mjs --env-file .env",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:api:unit": "pnpm --filter @soc/api test:unit",
     "test:api:int": "pnpm --filter @soc/api test:int",
     "test:api:http": "pnpm --filter @soc/api test:http",
-    "test:migrations": "node --test infra/scripts/verify-migrations.test.mjs && bash infra/scripts/test-migrations.sh",
+    "test:migrations": "node infra/scripts/test-migrations.mjs",
     "test:web:unit": "pnpm --filter @soc/web test:unit",
     "test:web:e2e": "pnpm --filter @soc/web test:e2e"
   }

@@ -134,9 +134,9 @@ export function Header({ showLogo = false }: HeaderProps) {
           {/* Logo Section (conditional) */}
           {showLogo && (<Link to="/" aria-label="KAIST SoC Home" className="relative z-10 flex h-14 items-center justify-start px-5 transition-opacity hover:opacity-90 lg:h-[68px] lg:px-6">
               <div className="flex items-center gap-2 md:gap-3">
-                <img src="/kaist_logo.png" alt="KAIST Logo" className="h-5 w-auto lg:h-[31px]"/>
+                <img src="/kaist_logo.webp" alt="KAIST Logo" className="h-5 w-auto lg:h-[31px]"/>
                 <div className="h-5 w-px bg-gray-300 lg:h-4"/>
-                <img src="/logo.png" alt="SOC Logo" className="mb-2 h-6 w-auto lg:h-[34px]"/>
+                <img src="/logo.webp" alt="SOC Logo" className="mb-2 h-6 w-auto lg:h-[34px]"/>
               </div>
             </Link>)}
           

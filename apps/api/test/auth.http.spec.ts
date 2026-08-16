@@ -7,6 +7,7 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthController } from '../src/features/auth/auth.controller';
+import { DevelopmentAuthController } from '../src/features/auth/development-auth.controller';
 import { AuthSessionService } from '../src/features/auth/auth-session.service';
 import { AuthService } from '../src/features/auth/auth.service';
 import { UsersService } from '../src/features/users/users.service';
@@ -63,7 +64,7 @@ describe('AuthController HTTP contract', () => {
     };
 
     const module = await Test.createTestingModule({
-      controllers: [AuthController],
+      controllers: [AuthController, DevelopmentAuthController],
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: AuthSessionService, useValue: authSessionService },

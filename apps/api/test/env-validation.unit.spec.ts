@@ -40,6 +40,24 @@ describe('authentication environment validation', () => {
   it('accepts a matching P-256 active key pair', () => {
     expect(validateEnv(validConfig())).toMatchObject({ AUTH_JWT_ACTIVE_KID: 'active' });
   });
+  it('rejects local SSO settings when the API is configured for production', () => {
+    expect(() => validateEnv({
+      ...validConfig(),
+      NODE_ENV: 'production',
+      VITE_SSO_CLIENT_ID: 'local-development',
+      VITE_SSO_REDIRECT_URI: 'http://localhost:3000/api/auth/login',
+      SSO_CLIENT_SECRET: 'REPLACE_WITH_GENERATED_LOCAL_SECRET',
+    })).toThrow(/Production SSO configuration/);
+  });
+  it('accepts a public HTTPS SSO configuration in production', () => {
+    expect(validateEnv({
+      ...validConfig(),
+      NODE_ENV: 'production',
+      VITE_SSO_CLIENT_ID: 'issued-production-client',
+      VITE_SSO_REDIRECT_URI: 'https://soc.example.test/api/auth/login',
+      SSO_CLIENT_SECRET: 'issued-production-secret',
+    })).toMatchObject({ NODE_ENV: 'production' });
+  });
   it('preserves the validated survey HMAC key and version exactly', () => {
     const config = validConfig();
     expect(validateEnv(config)).toMatchObject({
@@ -204,6 +222,28 @@ describe('content configuration validation', () => {
     expect(validateEnv(validConfig())).toMatchObject({
       ASSET_PROVIDER_ENABLED: false,
       CONTENT_PURGE_GRACE_DAYS: 30,
+    });
+  });
+  it('treats blank disabled provider settings as unset', () => {
+    expect(validateEnv({
+      ...validConfig(),
+      ASSET_PROVIDER_URL: '',
+      ASSET_PROVIDER_TOKEN: '',
+      MAIL_PROVIDER_URL: '',
+      MAIL_PROVIDER_TOKEN: '',
+      MAIL_FROM: '',
+      CHAT_PROVIDER_URL: '',
+      CHAT_PROVIDER_TOKEN: '',
+      CHAT_PROVIDER_MODEL: '',
+    })).toMatchObject({
+      ASSET_PROVIDER_URL: undefined,
+      ASSET_PROVIDER_TOKEN: undefined,
+      MAIL_PROVIDER_URL: undefined,
+      MAIL_PROVIDER_TOKEN: undefined,
+      MAIL_FROM: undefined,
+      CHAT_PROVIDER_URL: undefined,
+      CHAT_PROVIDER_TOKEN: undefined,
+      CHAT_PROVIDER_MODEL: undefined,
     });
   });
   it('validates survey definition B/P/H limits as canonical ordered bounded integers', () => {

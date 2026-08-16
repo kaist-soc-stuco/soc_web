@@ -1,9 +1,0 @@
-{
-  "sourceHash": "sha256:7b2bd165d7b6fb6840a2167150bceb2355adc58d1fd7e992b815674e7eb139ec",
-  "status": "blocked",
-  "e2eStatus": "blocked",
-  "redTeamStatus": "blocked",
-  "command": "SURVEY_QA_BASE_URL=http://127.0.0.1:4180 node qa-artifacts/survey-gen8-playwright.mjs",
-  "liveBrowser": "Playwright Chromium",
-  "blocker": "The live app requested /api/users/me but did not transition to an authorized grant state with the contract-shaped mocked response; no protected admin request followed after 3 seconds. The public 320px locale/refetch/required-focus/privacy assertions passed before this blocker."
-}

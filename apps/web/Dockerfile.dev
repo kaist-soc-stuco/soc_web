@@ -1,6 +1,4 @@
-# syntax=docker/dockerfile:1.7
-
-FROM node:22.14.0-alpine3.21 AS build
+FROM node:22.14.0-alpine3.21
 
 WORKDIR /app
 RUN corepack enable
@@ -11,20 +9,15 @@ COPY shared/api-client/package.json shared/api-client/package.json
 COPY shared/contracts/package.json shared/contracts/package.json
 COPY shared/common/package.json shared/common/package.json
 COPY shared/config/package.json shared/config/package.json
-RUN pnpm install --frozen-lockfile
 
 COPY apps/web apps/web
 COPY shared/api-client shared/api-client
 COPY shared/contracts shared/contracts
 COPY shared/common shared/common
 COPY shared/config shared/config
+RUN pnpm install --frozen-lockfile
 
-ARG VITE_ENABLE_DEVELOPMENT_LOGIN=false
-ENV VITE_ENABLE_DEVELOPMENT_LOGIN=$VITE_ENABLE_DEVELOPMENT_LOGIN
-RUN pnpm --filter @soc/web build
-
-FROM nginx:1.27.5-alpine AS production
-COPY --from=build /app/apps/web/dist /usr/share/nginx/html
-COPY apps/web/nginx.conf /etc/nginx/nginx.conf
-USER nginx
-EXPOSE 8080
+WORKDIR /app/apps/web
+ENV NODE_ENV=development
+EXPOSE 5173
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
