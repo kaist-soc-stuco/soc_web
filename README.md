@@ -15,7 +15,7 @@ KAIST SoC 웹 모노레포입니다.
 
 ## Docker로 로컬 실행
 
-운영 배포의 기본 진입점은 루트 `compose.yml`입니다. 개발 환경은 `infra/docker/compose.dev.yml`로 명시적으로 선택하며 개발용 seed와 로그인은 운영 Compose에 포함되지 않습니다.
+운영/사이트 테스트 배포의 기본 진입점은 루트 `compose.yml`입니다. 개발 환경은 `infra/docker/compose.dev.yml`로 명시적으로 선택합니다. 루트 maintenance seed는 기존 `pnpm db:seed`와 같은 결정적 사이트 테스트 fixture를 포함하지만, 운영 이미지에는 개발 로그인 endpoint가 포함되지 않습니다.
 
 ```bash
 node infra/scripts/generate-dev-env.mjs
@@ -83,18 +83,18 @@ docker compose --env-file .env -f infra/docker/compose.dev.yml down -v
 ```bash
 cp .env.production.example .env
 node infra/scripts/verify-production-env.mjs --env-file .env
-docker compose --env-file .env config --quiet
-docker compose --env-file .env up -d --build
+docker compose config --quiet
+docker compose up -d --build
 ```
 
 일반 배포는 `docker compose up -d --build`만 실행합니다. migration과 production seed는 API의 시작 의존성이 아니며, 승인된 maintenance 작업에서만 별도로 실행합니다.
 
 ```bash
 # 스키마가 아직 최신이 아닌 경우: README의 staged migration 절차를 먼저 완료
-docker compose --env-file .env --profile maintenance run --rm seed-production
+docker compose --profile maintenance run --rm seed-production
 ```
 
-`seed-production.sql`은 기본 게시판과 권한 정의만 idempotent하게 보강합니다. 사용자, 관리자, 권한 부여, 게시글 샘플을 생성하거나 기존 운영 데이터를 삭제·덮어쓰지 않습니다. 개발 fixture가 필요할 때만 다음 개발 Compose를 사용합니다.
+`seed-production`은 기본 게시판·권한 정의 뒤에 기존 `pnpm db:seed`에서 사용하던 개발 관리자/사용자, 권한 부여, 게시글·행사·설문·투표·공약 fixture를 순서대로 실행합니다. fixture는 고정된 테스트 행을 idempotent하게 갱신하므로 사이트 검증 서버에서 반복 실행할 수 있습니다. 실제 운영 데이터에 fixture를 섞지 않을 때는 이 명령을 실행하지 말고, 별도의 개발 Compose를 사용합니다.
 
 ```bash
 docker compose --env-file .env -f infra/docker/compose.dev.yml up -d --build
@@ -103,7 +103,7 @@ pnpm db:seed:dev
 
 ### 최초 운영 관리자 bootstrap
 
-운영 관리자 계정은 개발 seed로 만들지 않습니다. 실제 PassNi SSO로 한 번 로그인한 사용자의 canonical SSO subject를 확인한 뒤, 운영 `.env`에 일시적으로 다음 값을 넣습니다.
+사이트 테스트 seed에는 `development-admin` fixture 계정과 전체 권한이 포함됩니다. 실제 운영 관리자 계정은 fixture 계정에 의존하지 않고, PassNi SSO로 한 번 로그인한 사용자의 canonical SSO subject를 확인한 뒤 운영 `.env`에 일시적으로 다음 값을 넣습니다.
 
 ```dotenv
 AUTHORIZATION_BOOTSTRAP_SSO_SUBJECT=<exact-canonical-sso-subject>
@@ -119,7 +119,7 @@ API는 관리자 설문 집계 요청의 성공, 권한 거부, 처리 오류를
 로그 접근은 프로덕션 Docker 호스트 운영자에게만 허용합니다. request ID로 조회하며 애플리케이션 컨테이너 내부 파일을 직접 수정하지 않습니다.
 
 ```bash
-docker compose --env-file .env logs api
+docker compose logs api
 ```
 
 로그 수집 실패나 회전은 API 응답을 실패시키지 않습니다. 보안 조사 시 같은 request ID의 reverse-proxy 기록과 API 이벤트를 함께 확인합니다.

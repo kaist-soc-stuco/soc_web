@@ -1,10 +1,9 @@
 BEGIN;
 
--- Production seed is deliberately limited to non-personal reference data.
--- It must never create a user, grant permissions to a user, delete rows, or
--- overwrite content managed by an operator. The migration history also
--- contains these inserts for fresh databases; this file makes an explicit,
--- repeatable release step available for existing installations.
+-- The production/test deployment seed is intentionally equivalent to the
+-- historical `pnpm db:seed` flow: reference data is followed by the existing
+-- deterministic site-test user/content fixtures mounted by Compose. The
+-- fixture files are idempotent and update only their fixed test rows.
 
 INSERT INTO permission_definitions (key, description, is_active)
 VALUES
