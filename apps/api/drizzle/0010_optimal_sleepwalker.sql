@@ -1,0 +1,1 @@
+ALTER TABLE "student_fee_status" ADD COLUMN "paid_amount" integer DEFAULT 0 NOT NULL;

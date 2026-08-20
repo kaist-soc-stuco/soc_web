@@ -56,54 +56,56 @@ export function BoardNavigationBar({
   searchQuery,
 }: BoardNavigationBarProps) {
   return (
-    <div className="border-b border-slate-200 bg-white mb-6">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row md:items-stretch md:justify-between gap-2 md:gap-4 select-none">
-        <div className="flex flex-wrap items-stretch gap-6 lg:gap-8">
-          <Link to="/board" className="relative group flex items-center">
+    <div className="mb-5 border-b border-slate-200 bg-white">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 select-none md:flex-row md:items-stretch md:justify-between md:gap-4 lg:px-8">
+        <div className="min-w-0 flex-1 overflow-x-auto">
+          <div className="flex min-w-max flex-nowrap items-stretch gap-5 lg:gap-7">
+            <Link to="/board" className="group relative flex items-center">
             <div
-              className={`relative flex items-center justify-center h-full text-[14px] lg:text-[14.5px] tracking-tight transition-all py-4 cursor-pointer ${
+                className={`relative flex min-h-11 items-center justify-center text-[14px] tracking-tight transition-all cursor-pointer ${
                 !category
                   ? "text-brand-primary font-semibold"
                   : "text-slate-400 hover:text-brand-primary font-medium"
               }`}
             >
-              <span>{lang === "ko" ? "전체" : "All"}</span>
-              <span
-                className={`absolute bottom-0 left-[-0.45rem] right-[-0.45rem] h-[3px] rounded-full bg-brand-primary transition-transform duration-200 origin-center ${
-                  !category ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-                }`}
-              />
+                <span>{lang === "ko" ? "전체" : "All"}</span>
+                <span
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary transition-transform duration-200 origin-center ${
+                    !category ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                  }`}
+                />
             </div>
           </Link>
 
-          {boards.map((board) => {
-            const isActive = category === board.code;
-            return (
-              <Link
-                key={board.code}
-                to={`/board/${board.code}`}
-                className="relative group flex items-center"
-              >
-                <div
-                  className={`relative flex items-center justify-center h-full text-[14px] lg:text-[14.5px] tracking-tight transition-all py-4 cursor-pointer ${
+            {boards.map((board) => {
+              const isActive = category === board.code;
+              return (
+                <Link
+                  key={board.code}
+                  to={`/board/${board.code}`}
+                  className="group relative flex items-center"
+                >
+                  <div
+                    className={`relative flex min-h-11 items-center justify-center text-[14px] tracking-tight transition-all cursor-pointer ${
                     isActive
                       ? "text-brand-primary font-semibold"
                       : "text-slate-400 hover:text-brand-primary font-medium"
-                  }`}
-                >
-                  <span>{getBoardLabelFromMetadata(board, board.code, lang)}</span>
-                  <span
-                    className={`absolute bottom-0 left-[-0.45rem] right-[-0.45rem] h-[3px] rounded-full bg-brand-primary transition-transform duration-200 origin-center ${
-                      isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
                     }`}
-                  />
-                </div>
-              </Link>
-            );
-          })}
+                  >
+                    <span>{getBoardLabelFromMetadata(board, board.code, lang)}</span>
+                    <span
+                      className={`absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary transition-transform duration-200 origin-center ${
+                        isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                      }`}
+                    />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex w-full items-center gap-2 pb-2 pt-0 md:w-auto md:shrink-0 md:self-center md:py-0">
+        <div className="flex w-full items-center gap-2 pb-3 pt-0 md:w-auto md:shrink-0 md:self-center md:py-0">
           <div className="relative min-w-0 flex-1 md:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
@@ -116,14 +118,14 @@ export function BoardNavigationBar({
                 onCurrentPageChange(1);
                 onSearchQueryChange(event.target.value);
               }}
-              className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-[13px] font-medium tracking-tight text-slate-800 shadow-sm transition-colors placeholder:text-slate-400 focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/10 md:w-64"
+              className="h-10 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-[13px] font-medium tracking-tight text-slate-800 transition-colors placeholder:text-slate-400 focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 md:w-64"
             />
           </div>
 
           <div className="relative">
             <button
               onClick={() => onFilterDropdownOpenChange(!isFilterDropdownOpen)}
-              className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-semibold shadow-sm transition-colors cursor-pointer select-none ${
+              className={`flex h-10 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition-colors cursor-pointer select-none ${
                 isFilterDropdownOpen
                   ? "border-brand-primary bg-brand-primary-light text-brand-primary"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -134,7 +136,7 @@ export function BoardNavigationBar({
             </button>
 
             {isFilterDropdownOpen && (
-              <div className="absolute right-0 z-30 mt-2 flex w-72 animate-in select-none flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xl fade-in slide-in-from-top-1 duration-200">
+              <div className="absolute right-0 z-30 mt-2 flex w-72 select-none flex-col gap-2.5 rounded-lg border border-slate-200 bg-white p-3 shadow-elevated">
                 <FilterSegment
                   label={lang === "ko" ? "검색 기준" : "Search By"}
                   options={[
@@ -195,19 +197,19 @@ function FilterSegment({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         {label}
       </span>
-      <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch">
+      <div className="flex items-stretch rounded-md border border-slate-200 bg-slate-50 p-0.5">
         {options.map((option) => {
           const active = value === option.id;
           return (
             <button
               key={option.id}
               onClick={() => onChange(option.id)}
-              className={`flex-1 py-1 px-1 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap ${
+                className={`flex-1 rounded-[4px] px-1 py-1.5 text-center text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 active
-                  ? "bg-white text-brand-primary shadow-xs"
+                  ? "bg-white text-brand-primary"
                   : "text-slate-500 hover:text-slate-800 bg-transparent"
               }`}
             >
@@ -257,22 +259,39 @@ export function BoardArticleTable({
   totalPages,
   writeState,
 }: BoardArticleTableProps) {
+  const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * postsPerPage + 1;
+  const rangeEnd = Math.min(totalCount, currentPage * postsPerPage);
+  const authorLabel = (post: ArticleListItem) =>
+    post.isAnonymous
+      ? lang === "ko"
+        ? "익명"
+        : "Anonymous"
+      : post.author.name;
+
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-8">
-      <div className="bg-white border border-card-border-subtle rounded-2xl shadow-card overflow-hidden">
-        <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-2 bg-white">
-          <div className="text-[14px] font-bold text-slate-800 tracking-tight">
+      <div className="overflow-hidden rounded-lg border border-card-border-subtle bg-white shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 md:px-6">
+          <div className="text-[13px] font-medium tracking-tight text-app-text-muted">
             {lang === "ko" ? (
               <span>
-                총 <strong className="font-black text-brand-primary">{totalCount}</strong>
-                건
+                총 <strong className="font-semibold text-app-text-strong">{totalCount}</strong>건
+                {totalCount > 0 ? (
+                  <span className="ml-2 text-xs text-app-text-muted">
+                    ({rangeStart}–{rangeEnd})
+                  </span>
+                ) : null}
               </span>
             ) : (
               <span>
-                <strong className="font-black text-brand-primary">
+                <strong className="font-semibold text-app-text-strong">
                   {totalCount}
-                </strong>{" "}
-                posts
+                </strong>{" "}posts
+                {totalCount > 0 ? (
+                  <span className="ml-2 text-xs text-app-text-muted">
+                    ({rangeStart}–{rangeEnd})
+                  </span>
+                ) : null}
               </span>
             )}
           </div>
@@ -283,7 +302,7 @@ export function BoardArticleTable({
           />
         </div>
 
-        <div className="grid grid-cols-[3.75rem_minmax(0,1fr)_5.25rem] gap-3 border-b border-slate-200 bg-slate-50/50 px-4 py-3.5 text-[13px] font-bold tracking-tight text-slate-500 md:grid-cols-[8%_1fr_15%_12%_8%] md:gap-4 md:px-6">
+        <div className="hidden grid-cols-[8%_1fr_15%_12%_8%] gap-4 border-b border-slate-200 bg-slate-50/70 px-6 py-3 text-[12px] font-semibold tracking-tight text-app-text-muted md:grid">
           <div className="text-center shrink-0">
             {lang === "ko" ? "말머리" : "Category"}
           </div>
@@ -322,37 +341,38 @@ export function BoardArticleTable({
                   <Link
                     key={post.articleId}
                     to={`/board/${postCategory}/${post.articleId}`}
-                    className="group grid grid-cols-[3.75rem_minmax(0,1fr)_5.25rem] items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50/50 md:grid-cols-[8%_1fr_15%_12%_8%] md:gap-4 md:px-6"
+                    className="group flex min-h-[6.25rem] flex-col gap-2 px-4 py-3.5 transition-colors hover:bg-slate-50/70 md:grid md:min-h-0 md:grid-cols-[8%_1fr_15%_12%_8%] md:items-center md:gap-4 md:px-6 md:py-4"
                   >
-                    <div className="flex justify-center text-center shrink-0">
-                      <span className="inline-flex items-center px-2 py-1 rounded-md text-[10.5px] font-bold tracking-tight bg-brand-primary-light text-brand-primary select-none shrink-0">
+                    <div className="flex justify-start text-left shrink-0 md:justify-center md:text-center">
+                      <span className="inline-flex items-center rounded-md bg-brand-primary-light px-2 py-1 text-[10.5px] font-semibold tracking-tight text-brand-primary select-none shrink-0">
                         {getBoardLabelFromMetadata(postBoard, postCategory, lang)}
                       </span>
                     </div>
-                    <div className="flex min-w-0 items-center gap-2 text-left text-[14px] font-semibold tracking-tight text-slate-800 transition-colors group-hover:text-brand-primary md:pl-2">
+                    <div className="flex min-w-0 items-start gap-2 text-left text-[14px] font-semibold leading-5 tracking-tight text-app-text-strong transition-colors group-hover:text-brand-primary md:items-center md:pl-2">
                       {post.isPinned && (
                         <Pin className="h-3.5 w-3.5 shrink-0 fill-[#E11D48] text-[#E11D48]" />
                       )}
-                      <span className="truncate">
+                      <span className="line-clamp-2 md:truncate">
                         {lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}
                       </span>
                       {isNew && (
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#f03e3e] text-[9px] font-black text-white select-none">
-                          N
+                        <span className="inline-flex shrink-0 items-center rounded-[4px] bg-[#fce8ee] px-1.5 py-0.5 text-[9px] font-semibold text-[#b4234d] select-none">
+                          {lang === "ko" ? "새 글" : "New"}
                         </span>
                       )}
                       {(post.hasAttachment ?? false) && (
                         <Paperclip className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                       )}
                     </div>
-                    <div className="hidden text-center text-[13px] font-medium tracking-tight text-slate-600 shrink-0 md:block">
-                      {post.isAnonymous
-                        ? lang === "ko"
-                          ? "익명"
-                          : "Anonymous"
-                        : post.author.name}
+                    <div className="flex items-center gap-2 text-xs font-medium tracking-tight text-app-text-muted md:hidden">
+                      <span>{authorLabel(post)}</span>
+                      <span aria-hidden="true">·</span>
+                      <time dateTime={post.postedAt}>{formatDate(post.postedAt)}</time>
                     </div>
-                    <div className="text-center text-[13px] font-medium tracking-tight text-slate-400 shrink-0">
+                    <div className="hidden text-center text-[13px] font-medium tracking-tight text-app-text-body shrink-0 md:block">
+                      {authorLabel(post)}
+                    </div>
+                    <div className="hidden text-center text-[13px] font-medium tracking-tight text-app-text-muted shrink-0 md:block">
                       {formatDate(post.postedAt)}
                     </div>
                     <div className="hidden justify-end pr-4 text-[13px] font-medium tabular-nums tracking-tight text-slate-500 md:flex">
@@ -380,7 +400,7 @@ export function BoardArticleTable({
           )}
         </div>
 
-        <div className="border-t border-slate-200 bg-slate-50/20 px-6 py-4 relative flex items-center justify-center select-none">
+        <div className="relative flex flex-col items-center justify-center gap-3 border-t border-slate-200 bg-slate-50/20 px-4 py-4 select-none sm:flex-row sm:px-6">
           <Pagination
             currentPage={currentPage}
             lang={lang}
@@ -389,11 +409,11 @@ export function BoardArticleTable({
             totalPages={totalPages}
           />
           {canWrite && (
-            <div className="absolute right-6">
+            <div className="sm:absolute sm:right-6">
               <Link
                 state={writeState}
                 to="/board/write"
-                className="inline-flex items-center justify-center px-3.5 py-1.5 bg-brand-primary border border-transparent text-white rounded-lg text-[13px] font-bold tracking-tight hover:opacity-90 transition-all shadow-sm"
+                className="inline-flex min-h-9 items-center justify-center rounded-md border border-transparent bg-brand-primary px-3.5 text-[13px] font-semibold tracking-tight text-white transition-colors hover:bg-brand-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
               >
                 {lang === "ko" ? "글쓰기" : "Write"}
               </Link>
@@ -423,8 +443,8 @@ function PostsPerPageSelect({
       }))}
       onChange={(value) => onPostsPerPageChange(Number(value))}
       className="w-36"
-      buttonClassName="h-9 rounded-xl border-slate-200/80 px-3 py-0 text-[13px] font-semibold text-slate-700 shadow-sm focus:ring-brand-primary/10"
-      menuClassName="rounded-xl border-slate-200 shadow-xl"
+      buttonClassName="h-10 rounded-md border-slate-200 px-3 py-0 text-[13px] font-semibold text-slate-700 shadow-none focus:ring-brand-primary/20"
+      menuClassName="rounded-lg border-slate-200 shadow-elevated"
       optionClassName="text-[12px]"
       emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
     />

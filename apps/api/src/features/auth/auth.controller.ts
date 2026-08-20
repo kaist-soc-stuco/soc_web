@@ -1,5 +1,15 @@
-import { Body, Controller, Get, Post, Query, Res } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from "@nestjs/common";
 import { Response } from "express";
+import type { Request } from "express";
 
 import { Cookies } from "../../shared/decorators/cookies.decorator";
 import {
@@ -11,11 +21,19 @@ import {
 import { AuthCookieService } from "./auth-cookie.service";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
+import { OptionalAuthGuard } from "./guards";
 import {
   AUTH_ACCESS_COOKIE_NAME,
   AUTH_REFRESH_COOKIE_NAME,
   AUTH_SESSION_COOKIE_NAME,
 } from "./auth.tokens";
+
+interface ChannelTalkRequest extends Request {
+  user?: {
+    id: string;
+    permission: number;
+  };
+}
 
 @Controller("auth")
 export class AuthController {
@@ -31,6 +49,12 @@ export class AuthController {
   @Get("login/start")
   async startLogin() {
     return this.authService.createLoginStartPayload();
+  }
+
+  @Get("channel-talk")
+  @UseGuards(OptionalAuthGuard)
+  async getChannelTalkConfig(@Req() request: ChannelTalkRequest) {
+    return this.authService.getChannelTalkConfig(request.user?.id);
   }
 
   /**

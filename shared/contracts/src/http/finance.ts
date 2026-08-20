@@ -11,6 +11,7 @@ export interface StudentFeeStatusRecord {
   userId: string;
   status: FeeStatus;
   coverageSemesters: number;
+  paidAmount: number;
   paidAt: string | null;
   verifiedBy: string | null;
   verifiedAt: string | null;
@@ -30,6 +31,8 @@ export interface StudentFeeListResponse {
     stdNo?: string;
     email: string;
     status: FeeStatus;
+    coverageSemesters: number;
+    paidAmount: number;
     paidAt: string | null;
     verifiedAt: string | null;
     note: string | null;
@@ -37,4 +40,11 @@ export interface StudentFeeListResponse {
   total: number;
   page: number;
   pageSize: number;
+  summary: {
+    totalStudents: number;
+    paidStudents: number;
+    unpaidStudents: number;
+    paymentRate: number;
+    paidAmount: number;
+  };
 }

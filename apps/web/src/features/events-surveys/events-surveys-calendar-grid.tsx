@@ -67,7 +67,7 @@ export function EventsSurveysCalendarGrid({
               key={idx}
               type="button"
               onClick={() => onSelectedDateChange(cell.date)}
-              className={`min-h-[75px] p-2 rounded-xl text-left border flex flex-col justify-between items-start transition-all cursor-pointer relative group ${
+              className={`relative flex min-h-[75px] cursor-pointer flex-col items-start justify-between rounded-md border p-2 text-left transition-colors group ${
                 cell.isCurrentMonth
                   ? isSelected
                     ? "bg-brand-primary-light border-brand-primary-border"
@@ -79,7 +79,7 @@ export function EventsSurveysCalendarGrid({
             >
               <div className="flex items-center justify-between w-full select-none">
                 {isToday ? (
-                  <div className="w-4.5 h-4.5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-primary bg-brand-primary-light text-[11px] font-semibold text-brand-primary">
                     {cell.day}
                   </div>
                 ) : (
@@ -142,7 +142,7 @@ export function EventsSurveysCalendarGrid({
               </div>
 
               {cell.isCurrentMonth && dayEvents.length > 0 && (
-                <div className="absolute bottom-full left-1/2 z-30 mb-2 flex w-56 -translate-x-1/2 scale-95 select-none flex-col gap-2 rounded-2xl border border-card-border-subtle bg-white p-3 text-[10px] text-slate-800 opacity-0 shadow-[0_18px_45px_rgba(15,23,42,0.16)] transition-all duration-200 pointer-events-none group-hover:scale-100 group-hover:opacity-100">
+                <div className="absolute bottom-full left-1/2 z-30 mb-2 flex w-56 -translate-x-1/2 select-none flex-col gap-2 rounded-lg border border-card-border-subtle bg-white p-3 text-[10px] text-slate-800 opacity-0 shadow-elevated transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 font-extrabold text-brand-primary">
                     <span>
                       {cell.date.toLocaleDateString(

@@ -47,13 +47,13 @@ export function AdminLayout() {
       : null;
 
   const loadingOverlay = (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-kaist-white">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-kaist-darkgreen/30 border-t-kaist-darkgreen" />
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-primary/20 border-t-brand-primary" />
     </div>
   );
 
   const adminHeader = (
-    <header className="z-50 flex h-14 shrink-0 items-center justify-between border-b border-kaist-grey/20 bg-white px-6 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+    <header className="z-50 flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 md:px-6">
       <div className="flex items-center gap-8">
         <Logo />
         <span className="hidden text-sm font-extrabold text-kaist-black md:inline">
@@ -64,7 +64,7 @@ export function AdminLayout() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="rounded-lg border border-transparent p-2 text-kaist-black transition-colors hover:border-kaist-grey/15 hover:bg-gray-50 hover:text-kaist-darkgreen-main"
+          className="rounded-md border border-transparent p-2 text-app-text-body transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
           title={lang === "ko" ? "알림" : "Notifications"}
         >
           <Bell className="h-4 w-4" />
@@ -77,7 +77,7 @@ export function AdminLayout() {
               aria-expanded={dropdownOpen}
               onClick={() => setDropdownOpen((value) => !value)}
               onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
-              className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-1.5 text-sm font-extrabold text-kaist-black transition-colors hover:border-kaist-grey/15 hover:bg-gray-50"
+              className="flex min-h-10 items-center gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm font-semibold text-app-text-strong transition-colors hover:border-slate-200 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
             >
               <User className="h-4 w-4 text-kaist-greygreen" />
               <span className="max-w-44 truncate">{user.name}</span>
@@ -85,7 +85,7 @@ export function AdminLayout() {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 z-50 mt-1.5 w-40 overflow-hidden rounded-lg border border-kaist-grey/30 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 z-50 mt-1.5 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-elevated">
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"
@@ -106,20 +106,20 @@ export function AdminLayout() {
     <AuthGuard
       requireAnyPermission={ADMIN_ACCESS_PERMISSIONS}
       fallback={
-        <div className="flex min-h-screen flex-col bg-kaist-white">
+        <div className="flex min-h-screen flex-col bg-background">
           {adminHeader}
           <div className="flex flex-1 flex-col md:flex-row">
             <AdminSidebar />
-            <div className="relative flex-1 bg-kaist-white">{loadingOverlay}</div>
+            <div className="relative flex-1 bg-background">{loadingOverlay}</div>
           </div>
         </div>
       }
     >
-      <div className="flex min-h-screen flex-col bg-kaist-white">
+      <div className="flex min-h-screen flex-col bg-background">
         {adminHeader}
         <div className="flex flex-1 flex-col md:flex-row">
           <AdminSidebar />
-          <div className="relative flex-1 bg-kaist-white">
+          <div className="relative flex-1 bg-background">
             {isLoading ? loadingOverlay : <Outlet context={{ session }} />}
           </div>
         </div>

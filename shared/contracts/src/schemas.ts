@@ -225,12 +225,14 @@ export const AssignRoleGroupMemberSchema = z.object({
 
 export const UpdateStudentFeeStatusSchema = z
   .object({
+    paidAmount: z.number().int().min(0).max(100_000_000).optional(),
     status: z.enum(["PAID", "UNPAID"]).optional(),
     coverageSemesters: z.number().int().positive().optional(),
     note: z.string().nullable().optional(),
   })
   .refine(
     (value) =>
+      value.paidAmount !== undefined ||
       value.status !== undefined ||
       value.coverageSemesters !== undefined ||
       value.note !== undefined,
@@ -254,6 +256,11 @@ export const CreateContactSchema = z.object({
 // PATCH keeps the same validation and normalization rules as creation, but
 // only applies them to fields the caller actually supplies.
 export const UpdateContactSchema = CreateContactSchema.partial();
+
+export const BulkImportContactsSchema = z.object({
+  items: z.array(CreateContactSchema).min(1).max(500),
+  replaceExisting: z.boolean().default(false),
+});
 
 // ─── Bulk Email ──────────────────────────────────────────────────────────────
 

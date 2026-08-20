@@ -59,7 +59,7 @@ export function SelectDropdown({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         aria-expanded={isOpen}
-        className={`w-full rounded-xl border border-gray-200 px-4 py-2.5 text-left text-sm font-medium transition-all flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen ${
+        className={`min-h-10 w-full rounded-md border border-gray-200 px-4 py-2.5 text-left text-sm font-medium transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-brand-primary/20 ${
           disabled
             ? "bg-gray-50 text-gray-400 opacity-50 cursor-not-allowed border-gray-200"
             : "bg-white text-gray-700 hover:border-gray-300"
@@ -80,7 +80,7 @@ export function SelectDropdown({
       {isOpen && !disabled && (
         <div
           role="listbox"
-          className={`absolute z-50 mt-2 w-full border border-gray-200 rounded-xl bg-white shadow-lg py-1 animate-in fade-in duration-100 max-h-60 overflow-y-auto ${menuClassName || ""}`}
+          className={`absolute z-50 mt-2 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-elevated ${menuClassName || ""}`}
         >
           {options.length === 0 ? (
             <div className="px-4 py-2.5 text-xs text-kaist-grey/50">

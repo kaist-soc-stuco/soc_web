@@ -1,5 +1,4 @@
-import { Fragment } from "react";
-import { ArrowRight, Clock, ShieldCheck } from "lucide-react";
+import { ArrowRight, CalendarDays, Clock, ShieldCheck } from "lucide-react";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
 
 import {
@@ -23,18 +22,6 @@ const getItemHref = (item: UnifiedItem) => {
     ? `/survey/${item.id}/results`
     : `/survey/${item.id}`;
 };
-
-const EVENT_PLACEHOLDER_CLASS_NAMES = [
-  "bg-[#123524]",
-  "bg-[#173f5f]",
-  "bg-[#24415f]",
-  "bg-[#2b3a2f]",
-] as const;
-
-function resolveEventPlaceholderClassName(id: string) {
-  const hash = Array.from(id).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return EVENT_PLACEHOLDER_CLASS_NAMES[hash % EVENT_PLACEHOLDER_CLASS_NAMES.length];
-}
 
 const getStatusBadge = (item: UnifiedItem, lang: string) => {
   if (item.computedState === "before_open") {
@@ -97,10 +84,10 @@ const getRestrictionMeta = (item: UnifiedItem, lang: string) => {
   const meta: string[] = [];
   if (item.feePayersOnly) {
     meta.push(lang === "ko" ? "과비 납부자" : "Paid members only");
-  } else if (item.kind !== "EVENT" || item.visibilityScope === "MEMBERS") {
-    meta.push(lang === "ko" ? "로그인 회원" : "Signed-in members");
   } else if (item.visibilityScope === "STAFF_ONLY") {
     meta.push(lang === "ko" ? "운영진 전용" : "Staff only");
+  } else if (item.kind !== "EVENT" || item.visibilityScope === "MEMBERS") {
+    meta.push(lang === "ko" ? "로그인 회원" : "Signed-in members");
   } else {
     meta.push(lang === "ko" ? "누구나" : "Everyone");
   }
@@ -121,156 +108,154 @@ export function EventsSurveysGrid({
   lang,
   onNavigate,
 }: EventsSurveysGridProps) {
+  const stateOrder: UnifiedItem["computedState"][] = [
+    "before_open",
+    "open",
+    "closed",
+  ];
+  const groups = stateOrder
+    .map((state) => ({
+      state,
+      items: items.filter((item) => item.computedState === state),
+    }))
+    .filter((group) => group.items.length > 0);
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-      {items.map((item, index) => {
-        const statusInfo = getStatusBadge(item, lang);
-        const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
-        const desc =
-          lang === "ko"
-            ? item.descriptionKo
-            : item.descriptionEn || item.descriptionKo;
-
-        const hasCapacity = item.maxResponses && item.maxResponses > 0;
-        const currentResponses = item.responseCount ?? 0;
-        const fillPercentage = hasCapacity
-          ? Math.min(100, (currentResponses / (item.maxResponses || 1)) * 100)
-          : 0;
-        const closed = isClosedItem(item);
-        const previousItem = items[index - 1];
-        const startsStateSection =
-          index === 0 || previousItem?.computedState !== item.computedState;
-        const sectionCount = items.filter(
-          (entry) => entry.computedState === item.computedState,
-        ).length;
-        const restrictionMeta = getRestrictionMeta(item, lang);
-        const descriptionText =
-          desc ||
-          (lang === "ko"
-            ? "등록된 상세 설명이 없습니다."
-            : "No description provided.");
-        const href = getItemHref(item);
-        const actionLabel = getActionLabel(item, lang);
-
-        return (
-          <Fragment key={item.id}>
-            {startsStateSection ? (
-              <div className="col-span-full pt-1">
-                <h2 className="text-base font-extrabold text-slate-900">
-                  {getSectionLabel(item.computedState, lang)}{" "}
-                  <span className="text-xs font-bold text-slate-400">
-                    ({sectionCount})
-                  </span>
-                </h2>
-              </div>
-            ) : null}
-            <div
-              role="link"
-              tabIndex={0}
-              onClick={() => onNavigate(href)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  onNavigate(href);
-                }
-              }}
-              className={`group flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border bg-white shadow-card transition-all hover:-translate-y-0.5 hover:border-brand-primary-border hover:shadow-card-hover ${
-                closed
-                  ? "border-slate-200 opacity-75 hover:opacity-95"
-                  : "border-gray-200"
-              }`}
+    <div className="space-y-8">
+      {groups.map((group) => (
+        <section key={group.state} aria-labelledby={`events-surveys-${group.state}`}>
+          <div className="mb-3 flex items-center gap-2">
+            <h2
+              id={`events-surveys-${group.state}`}
+              className="text-base font-semibold text-app-text-strong"
             >
-              {item.kind === "EVENT" && (
-                <div className="relative h-36 overflow-hidden">
-                  <div
-                    className={`absolute inset-0 ${resolveEventPlaceholderClassName(item.id)}`}
-                  />
-                  {item.imageUrl ? (
-                    <img
-                      src={item.imageUrl}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                    />
-                  ) : null}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
-                </div>
-              )}
+              {getSectionLabel(group.state, lang)}
+            </h2>
+            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-app-text-muted">
+              {group.items.length}
+            </span>
+          </div>
 
-              <div className="space-y-3 p-3.5">
-                <div className="flex flex-wrap items-center justify-start gap-1.5">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${statusInfo.color}`}
-                  >
-                    {statusInfo.label}
-                  </span>
-                  {item.kind === "EVENT" && item.surveyId && !closed && (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold bg-brand-primary-light text-brand-primary border border-brand-primary/10">
-                      {lang === "ko" ? "신청 가능" : "Application open"}
-                    </span>
-                  )}
-                </div>
+          <div
+            className={`grid grid-cols-1 gap-4 ${
+              group.items.length === 1
+                ? ""
+                : group.items.length === 2
+                  ? "sm:grid-cols-2"
+                  : "sm:grid-cols-2 xl:grid-cols-3"
+            }`}
+          >
+            {group.items.map((item) => {
+              const statusInfo = getStatusBadge(item, lang);
+              const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
+              const desc =
+                lang === "ko"
+                  ? item.descriptionKo
+                  : item.descriptionEn || item.descriptionKo;
+              const hasCapacity = item.maxResponses && item.maxResponses > 0;
+              const currentResponses = item.responseCount ?? 0;
+              const fillPercentage = hasCapacity
+                ? Math.min(100, (currentResponses / (item.maxResponses || 1)) * 100)
+                : 0;
+              const closed = isClosedItem(item);
+              const restrictionMeta = getRestrictionMeta(item, lang);
+              const href = getItemHref(item);
+              const actionLabel = getActionLabel(item, lang);
 
-                <div className="space-y-1.5">
-                  <h3 className="text-[1.05rem] font-extrabold text-kaist-black line-clamp-2 leading-snug">
-                    {title}
-                  </h3>
-                  <p
-                    className={`min-h-[2.25rem] text-[13px] line-clamp-2 leading-snug font-normal ${
-                      desc ? "text-kaist-grey/90" : "text-kaist-grey/55"
-                    }`}
-                  >
-                    {descriptionText}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3 border-t border-gray-100 p-3.5 pt-3">
-                {hasCapacity && (
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-semibold text-kaist-grey/90">
-                      <span>
-                        {lang === "ko" ? "신청 현황" : "Registration Status"}
-                      </span>
-                      <span>
-                        {currentResponses} / {item.maxResponses} (
-                        {Math.round(fillPercentage)}%)
-                      </span>
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onNavigate(href)}
+                  className={`group flex w-full cursor-pointer flex-col justify-between overflow-hidden rounded-lg border bg-white text-left shadow-card transition-colors hover:border-brand-primary-border ${
+                    closed ? "border-slate-200 opacity-75 hover:opacity-100" : "border-gray-200"
+                  }`}
+                >
+                  {item.kind === "EVENT" && (
+                    <div className="relative flex h-28 items-center justify-center overflow-hidden border-b border-slate-100 bg-slate-100">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          aria-hidden="true"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <CalendarDays
+                          aria-hidden="true"
+                          className="h-8 w-8 text-slate-400"
+                        />
+                      )}
                     </div>
-                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-brand-primary/80 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${fillPercentage}%` }}
-                      />
+                  )}
+
+                  <div className="space-y-3 p-4">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center rounded-md border px-2 py-1 text-[11px] font-semibold ${statusInfo.color}`}
+                      >
+                        {statusInfo.label}
+                      </span>
+                      {item.kind === "EVENT" && item.surveyId && !closed && (
+                        <span className="inline-flex items-center rounded-md border border-brand-primary-border bg-brand-primary-light px-2 py-1 text-[11px] font-semibold text-brand-primary">
+                          {lang === "ko" ? "신청 가능" : "Application open"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h3 className="line-clamp-2 text-base font-semibold leading-snug text-app-text-strong">
+                        {title}
+                      </h3>
+                      {desc ? (
+                        <p className="line-clamp-2 text-[13px] font-normal leading-snug text-app-text-body">
+                          {desc}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
-                )}
 
-                <div className="flex items-center gap-1.5 text-[12px] font-semibold text-kaist-grey/85">
-                  <Clock className="w-3.5 h-3.5 shrink-0 text-kaist-greygreen/80" />
-                  <span className="truncate">{getCardPeriodText(item, lang)}</span>
-                </div>
-                <div
-                  className={`flex min-h-[0.875rem] items-center gap-1.5 text-[11px] font-bold ${
-                    restrictionMeta ? "text-kaist-grey/75" : "text-transparent"
-                  }`}
-                  aria-hidden={!restrictionMeta}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-kaist-greygreen/80" />
-                  <span className="truncate">{restrictionMeta || "-"}</span>
-                </div>
-                <div className="flex justify-end items-center pt-1 text-[12px] font-extrabold">
-                  <span className="inline-flex items-center gap-1 text-brand-primary">
-                    {actionLabel && (
-                      <span className="cta-underline">{actionLabel}</span>
+                  <div className="space-y-3 border-t border-slate-100 p-4 pt-3">
+                    {hasCapacity && (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-medium text-app-text-muted">
+                          <span>{lang === "ko" ? "신청 현황" : "Registration Status"}</span>
+                          <span>
+                            {currentResponses} / {item.maxResponses} ({Math.round(fillPercentage)}%)
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-sm bg-slate-100">
+                          <div
+                            className="h-full bg-brand-primary transition-[width] duration-300"
+                            style={{ width: `${fillPercentage}%` }}
+                          />
+                        </div>
+                      </div>
                     )}
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Fragment>
-        );
-      })}
+
+                    <div className="flex items-center gap-1.5 text-[12px] font-medium text-app-text-muted">
+                      <Clock className="h-3.5 w-3.5 shrink-0 text-app-text-muted" />
+                      <span className="truncate">{getCardPeriodText(item, lang)}</span>
+                    </div>
+                    {restrictionMeta ? (
+                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-app-text-muted">
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{restrictionMeta}</span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-end pt-1 text-[12px] font-semibold">
+                      <span className="inline-flex items-center gap-1 text-brand-primary">
+                        {actionLabel ? <span>{actionLabel}</span> : null}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

@@ -81,6 +81,7 @@ export function BoardEditPage() {
             ? "기존 게시글의 내용을 변경하고 다듬습니다."
             : "Modify and refine the content of the article."
         }
+        showDescription={false}
       />
 
       <main className="flex-1 w-full mx-auto pb-20">

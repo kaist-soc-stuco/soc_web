@@ -450,7 +450,7 @@ export function Calendar() {
                   }`}
                 >
                   {item.today ? (
-                    <div className="w-4.5 h-4.5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-primary bg-brand-primary-light text-[11px] font-semibold text-brand-primary">
                       {item.day}
                     </div>
                   ) : (
@@ -491,7 +491,7 @@ export function Calendar() {
                         ))}
                       </div>
                     ) : item.today ? (
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-900 shrink-0 mb-0.5" />
+                      <span className="mb-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary" />
                     ) : (
                       <div className="h-2" />
                     )}
@@ -502,7 +502,7 @@ export function Calendar() {
                     dayEvents.length > 0 &&
                     hoveredDateKey === cellDateKey && (
                       <div
-                        className={`absolute bottom-full mb-2.5 w-56 rounded-2xl border border-card-border-subtle bg-white p-3 text-[10px] text-slate-800 shadow-[0_18px_45px_rgba(15,23,42,0.16)] pointer-events-none z-50 select-none flex flex-col gap-2 ${(() => {
+                        className={`absolute bottom-full z-50 mb-2.5 flex w-56 pointer-events-none select-none flex-col gap-2 rounded-lg border border-card-border-subtle bg-white p-3 text-[10px] text-slate-800 shadow-elevated ${(() => {
                           const column = index % 7;
                           if (column <= 2) return "left-0 translate-x-0";
                           if (column >= 4) return "right-0 translate-x-0";

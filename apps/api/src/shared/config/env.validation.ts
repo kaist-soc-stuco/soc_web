@@ -6,6 +6,15 @@ const asString = (value: unknown, name: string): string => {
   throw new Error(`Missing environment variable: ${name}`);
 };
 
+const asOptionalString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 const asPort = (value: unknown, name: string): number => {
   const raw =
     typeof value === 'string'
@@ -100,6 +109,19 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     SSO_REDIRECT_URI: asString(config.SSO_REDIRECT_URI, 'SSO_REDIRECT_URI'),
     SSO_AUTH_API_URL: asString(config.SSO_AUTH_API_URL, 'SSO_AUTH_API_URL'),
     SSO_CLIENT_SECRET: asString(config.SSO_CLIENT_SECRET, 'SSO_CLIENT_SECRET'),
+    CHANNELTALK_PLUGIN_KEY: asOptionalString(config.CHANNELTALK_PLUGIN_KEY),
+    CHANNELTALK_SECRET_KEY: asOptionalString(config.CHANNELTALK_SECRET_KEY),
+    SMTP_HOST: asOptionalString(config.SMTP_HOST),
+    SMTP_PORT: asOptionalPositiveInt(config.SMTP_PORT, 'SMTP_PORT', 587),
+    SMTP_USER: asOptionalString(config.SMTP_USER),
+    SMTP_PASSWORD: asOptionalString(config.SMTP_PASSWORD),
+    SMTP_SECURE: asOptionalBoolean(config.SMTP_SECURE, 'SMTP_SECURE', false),
+    EMAIL_FROM: asOptionalString(config.EMAIL_FROM),
+    EMAIL_DRY_RUN: asOptionalBoolean(
+      config.EMAIL_DRY_RUN,
+      'EMAIL_DRY_RUN',
+      config.NODE_ENV !== 'production',
+    ),
     AUTH_JWT_SECRET: asString(
       config.AUTH_JWT_SECRET,
       'AUTH_JWT_SECRET'

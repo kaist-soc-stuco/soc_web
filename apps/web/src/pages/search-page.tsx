@@ -35,6 +35,7 @@ export function SearchPage() {
             ? "게시글, 설문조사, 소개 페이지를 한 번에 검색합니다."
             : "Search board posts, surveys, and about pages together."
         }
+        showDescription={false}
       />
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-8 md:px-8">

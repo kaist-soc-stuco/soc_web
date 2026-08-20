@@ -47,7 +47,7 @@ export function AdminSidebar() {
 
   return (
     <>
-      <nav className="flex md:hidden gap-2 overflow-x-auto border-b border-kaist-grey/20 bg-white px-4 py-3">
+      <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-3 md:hidden">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.startsWith(item.to);
@@ -55,10 +55,10 @@ export function AdminSidebar() {
             <Link
               key={item.to}
               to={item.to}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${
+              className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
                 isActive
-                  ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
-                  : "border-kaist-grey/20 text-kaist-black hover:bg-kaist-darkgreen/5"
+                  ? "border-brand-primary bg-brand-primary text-white"
+                  : "border-slate-200 text-app-text-body hover:bg-brand-primary-light"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -68,9 +68,9 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <aside className="hidden md:flex w-56 min-h-full bg-kaist-darkgreen text-white flex-col px-5 py-6">
-        <div className="text-xs font-extrabold tracking-[0.3em] text-white/70">ADMIN</div>
-        <div className="mt-2 text-lg font-black">관리자 메뉴</div>
+      <aside className="hidden min-h-full w-56 flex-col border-r border-slate-200 bg-white px-4 py-6 text-app-text-strong md:flex">
+        <div className="text-xs font-semibold tracking-[0.2em] text-app-text-muted">ADMIN</div>
+        <div className="mt-2 text-lg font-semibold">관리자 메뉴</div>
 
         <nav className="mt-8 flex flex-col gap-1">
           {visibleItems.map((item) => {
@@ -80,10 +80,10 @@ export function AdminSidebar() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                  isActive
-                    ? "bg-white text-kaist-darkgreen"
-                    : "text-white/85 hover:bg-white/10"
+              className={`flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-brand-primary-light font-semibold text-brand-primary"
+                  : "text-app-text-body hover:bg-slate-50 hover:text-brand-primary"
                 }`}
               >
                 <Icon className="h-4 w-4" />

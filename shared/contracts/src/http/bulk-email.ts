@@ -18,8 +18,22 @@ export interface SendBulkEmailResponse {
   success: boolean;
   recipientCount: number;
   emailId: string;
+  deliveryMode: "sent" | "dry_run";
 }
 
 export interface BulkEmailListResponse {
   items: BulkEmailRecord[];
+}
+
+export interface BulkEmailTemplate {
+  id: string;
+  name: string;
+  description: string;
+  subject: string;
+  content: string;
+  recipientType: SendBulkEmailRequest["recipientType"];
+}
+
+export interface BulkEmailTemplateListResponse {
+  items: BulkEmailTemplate[];
 }

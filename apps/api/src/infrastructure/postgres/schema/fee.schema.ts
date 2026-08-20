@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   pgTable,
   smallint,
   text,
@@ -15,6 +16,7 @@ export const studentFeeStatus = pgTable("student_fee_status", {
     .primaryKey()
     .references(() => users.userId),
   coverageSemesters: smallint("coverage_semesters").notNull().default(4),
+  paidAmount: integer("paid_amount").notNull().default(0),
   status: varchar("status", { length: 20 }).notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   verifiedBy: uuid("verified_by")

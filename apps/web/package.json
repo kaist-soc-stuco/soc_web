@@ -11,6 +11,7 @@
     "test": "pnpm --dir ../../shared/contracts build && pnpm --dir ../../shared/common build && pnpm --dir ../../shared/api-client build && tsc -p tsconfig.test.json && node --conditions=production --test test/*.test.js"
   },
   "dependencies": {
+    "@channel.io/channel-web-sdk-loader": "^2.0.2",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-slot": "^1.2.4",
     "@soc/api-client": "workspace:*",

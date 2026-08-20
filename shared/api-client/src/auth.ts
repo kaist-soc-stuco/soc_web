@@ -1,6 +1,7 @@
 import type {
   ConsentDecisionRequest,
   ConsentDecisionResponse,
+  ChannelTalkConfigResponse,
   CurrentUserResponse,
   LoginSessionResponse,
   LoginStartResponse,
@@ -33,6 +34,12 @@ export interface TemporaryAuthRequest {
 export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) => ({
   getLoginStartPayload: async (): Promise<LoginStartResponse> => {
     return requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, {
+      method: "GET",
+    });
+  },
+
+  getChannelTalkConfig: async (): Promise<ChannelTalkConfigResponse> => {
+    return requestJson<ChannelTalkConfigResponse>(`${authBaseUrl}/channel-talk`, {
       method: "GET",
     });
   },

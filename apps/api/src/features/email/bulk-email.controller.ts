@@ -22,6 +22,12 @@ export class BulkEmailController {
     return { items };
   }
 
+  @Get("templates")
+  @RequirePermissions(Permissions.ADMIN)
+  async getTemplates() {
+    return { items: this.bulkEmailService.getTemplates() };
+  }
+
   @Post("send")
   @RequirePermissions(Permissions.ADMIN)
   async sendBulkEmail(

@@ -99,6 +99,7 @@ export function BoardWritePage() {
             ? "새로운 소식을 국문과 영문으로 공유해보세요."
             : "Share news in Korean and English."
         }
+        showDescription={false}
       />
 
       <main className="flex-1 w-full mx-auto pb-20">

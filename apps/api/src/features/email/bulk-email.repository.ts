@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 import { bulkEmails, users } from "../../infrastructure/postgres/postgres.schema";
 import type { BulkEmailRecord } from "@soc/contracts";
-import { msToIso } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 @Injectable()
 export class BulkEmailRepository {
@@ -36,6 +36,36 @@ export class BulkEmailRepository {
       status: r.status,
       sentAt: msToIso(r.sentAt.valueOf()),
     }));
+  }
+
+  async create(input: {
+    subject: string;
+    content: string;
+    senderId: string;
+    recipientCount: number;
+    status: string;
+  }): Promise<string> {
+    const [row] = await this.db
+      .insert(bulkEmails)
+      .values({
+        subject: input.subject,
+        content: input.content,
+        senderId: input.senderId,
+        recipientCount: input.recipientCount,
+        status: input.status,
+        sentAt: nowDate(),
+      })
+      .returning({ id: bulkEmails.id });
+
+    if (!row) throw new Error("bulk_email_record_create_failed");
+    return row.id;
+  }
+
+  async updateStatus(id: string, status: string): Promise<void> {
+    await this.db
+      .update(bulkEmails)
+      .set({ status })
+      .where(eq(bulkEmails.id, id));
   }
 
 }

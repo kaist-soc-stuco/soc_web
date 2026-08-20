@@ -12,7 +12,7 @@ import { AuthGuard } from '@/components/guards/auth-guard';
 import { useCurrentSession } from '@/hooks/use-current-session';
 import { resolveApiBaseUrl } from '@/lib/api';
 import { Permissions } from '@/lib/permissions';
-import { ArrowDown, ChevronDown } from 'lucide-react';
+import { ArrowDown, CheckSquare, ChevronDown, Square } from 'lucide-react';
 
 type FeeSortBy = 'name' | 'studentId' | 'status' | 'paidAt';
 type SortDirection = 'asc' | 'desc';
@@ -30,13 +30,24 @@ export function FeeManagementPage() {
   const [isPageSizeDropdownOpen, setIsPageSizeDropdownOpen] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<FeeSortBy>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const students = feeData?.students ?? [];
   const totalCount = feeData?.total ?? 0;
-  const paidCount = students.filter((student) => student.status === 'PAID').length;
-  const unpaidCount = students.filter((student) => student.status === 'UNPAID').length;
+  const summary = feeData?.summary ?? {
+    totalStudents: 0,
+    paidStudents: 0,
+    unpaidStudents: 0,
+    paymentRate: 0,
+    paidAmount: 0,
+  };
+  const visibleSelectedCount = students.filter((student) =>
+    selectedUserIds.has(student.userId),
+  ).length;
+  const allVisibleSelected = students.length > 0 && visibleSelectedCount === students.length;
 
   useEffect(() => {
     if (sessionLoading) {
@@ -71,6 +82,10 @@ export function FeeManagementPage() {
       setNoteDrafts(
         Object.fromEntries(data.students.map((student) => [student.userId, student.note ?? ''])),
       );
+      setAmountDrafts(
+        Object.fromEntries(data.students.map((student) => [student.userId, String(student.paidAmount ?? 0)])),
+      );
+      setSelectedUserIds(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : '데이터 로딩 실패');
     } finally {
@@ -131,9 +146,14 @@ export function FeeManagementPage() {
       updateStudentRow(userId, {
         note: record.note,
         paidAt: record.paidAt,
+        paidAmount: record.paidAmount,
         status: record.status,
         verifiedAt: record.verifiedAt,
       });
+      setAmountDrafts((prev) => ({
+        ...prev,
+        [userId]: String(record.paidAmount),
+      }));
     } catch (err) {
       if (previousStudent) {
         setFeeData((current) => {
@@ -182,6 +202,63 @@ export function FeeManagementPage() {
       return;
     }
     void saveStudentFeeStatus(userId, { note: note.trim() ? note : null });
+  };
+
+  const handleAmountBlur = (userId: string, amount: string) => {
+    const normalized = amount.trim() === '' ? 0 : Number(amount);
+    if (!Number.isInteger(normalized) || normalized < 0) {
+      setOperationError('납부 금액은 0 이상의 정수로 입력해 주세요.');
+      return;
+    }
+    const currentAmount = feeData?.students.find((student) => student.userId === userId)?.paidAmount ?? 0;
+    if (currentAmount === normalized) return;
+    void saveStudentFeeStatus(userId, { paidAmount: normalized });
+  };
+
+  const toggleSelectedUser = (userId: string) => {
+    setSelectedUserIds((current) => {
+      const next = new Set(current);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedUserIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) {
+        students.forEach((student) => next.delete(student.userId));
+      } else {
+        students.forEach((student) => next.add(student.userId));
+      }
+      return next;
+    });
+  };
+
+  const handleBulkStatusChange = async (status: FeeStatus) => {
+    const targets = students.filter((student) => selectedUserIds.has(student.userId));
+    if (targets.length === 0) return;
+
+    try {
+      setSavingUserId('__bulk__');
+      setOperationError(null);
+      await Promise.all(
+        targets.map((student) =>
+          apiClient.updateStudentFeeStatus(student.userId, {
+            status,
+            note: student.note,
+            paidAmount: Number(amountDrafts[student.userId] ?? student.paidAmount ?? 0),
+          }),
+        ),
+      );
+      setSelectedUserIds(new Set());
+      await loadData();
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : '선택한 학생의 상태 변경에 실패했습니다.');
+    } finally {
+      setSavingUserId(null);
+    }
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -240,9 +317,9 @@ export function FeeManagementPage() {
                 </>
               ) : (
                 <>
-                  <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700">전체 {totalCount}명</span>
-                  <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700">납부 완료 {paidCount}명</span>
-                  <span className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-rose-700">미납부 {unpaidCount}명</span>
+                  <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700">전체 {summary.totalStudents}명</span>
+                  <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700">납부 완료 {summary.paidStudents}명</span>
+                  <span className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-rose-700">미납부 {summary.unpaidStudents}명</span>
                 </>
               )}
             </div>
@@ -275,6 +352,34 @@ export function FeeManagementPage() {
               ))}
             </div>
 
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-slate-400">
+                {visibleSelectedCount > 0 ? `${visibleSelectedCount}명 선택` : '학생을 선택하세요'}
+              </span>
+              <button
+                type="button"
+                disabled={visibleSelectedCount === 0 || savingUserId === '__bulk__'}
+                onClick={() => void handleBulkStatusChange('PAID')}
+                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                선택 납부 처리
+              </button>
+              <button
+                type="button"
+                disabled={visibleSelectedCount === 0 || savingUserId === '__bulk__'}
+                onClick={() => void handleBulkStatusChange('UNPAID')}
+                className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                선택 미납 처리
+              </button>
+            </div>
+
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SummaryCard label="현재 납부율" value={`${summary.paymentRate.toLocaleString('ko-KR')}%`} tone="green" />
+            <SummaryCard label="확인된 납부 금액" value={`${summary.paidAmount.toLocaleString('ko-KR')}원`} tone="blue" />
+            <SummaryCard label="현재 화면 선택" value={`${visibleSelectedCount.toLocaleString('ko-KR')}명`} tone="slate" />
           </div>
 
           {operationError && (
@@ -338,12 +443,22 @@ export function FeeManagementPage() {
           </div>
 
           {loading ? (
-            <TableSkeleton columns={6} rows={8} />
+            <TableSkeleton columns={8} rows={8} />
           ) : students.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full border-collapse text-sm">
                 <thead className="bg-slate-50/50 text-xs font-black text-slate-500">
                   <tr>
+                    <th className="w-12 px-3 py-4 text-center">
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllVisible}
+                        aria-label={allVisibleSelected ? '현재 페이지 선택 해제' : '현재 페이지 전체 선택'}
+                        className="text-slate-400 transition hover:text-kaist-darkgreen"
+                      >
+                        {allVisibleSelected ? <CheckSquare className="mx-auto h-4 w-4" /> : <Square className="mx-auto h-4 w-4" />}
+                      </button>
+                    </th>
                     <th className="px-5 py-4 text-left">
                       <SortableHeader
                         active={sortBy === 'name'}
@@ -377,12 +492,23 @@ export function FeeManagementPage() {
                         onClick={() => handleSortChange('paidAt')}
                       />
                     </th>
+                    <th className="px-5 py-4 text-left">납부 금액</th>
                     <th className="px-5 py-4 text-left">비고</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold">
                   {students.map((student) => (
-                    <tr key={student.userId} className="transition hover:bg-slate-50/60">
+                    <tr key={student.userId} className={`transition hover:bg-slate-50/60 ${selectedUserIds.has(student.userId) ? 'bg-emerald-50/40' : ''}`}>
+                      <td className="px-3 py-4 text-center align-top">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.has(student.userId)}
+                          onChange={() => toggleSelectedUser(student.userId)}
+                          disabled={savingUserId === '__bulk__'}
+                          aria-label={`${student.nameKo} 선택`}
+                          className="h-4 w-4 accent-kaist-darkgreen"
+                        />
+                      </td>
                       <td className="px-5 py-4 align-top">
                         <div className="font-extrabold text-slate-800">{student.nameKo}</div>
                         {student.nameEn && <div className="mt-1 text-xs text-slate-400">{student.nameEn}</div>}
@@ -393,7 +519,7 @@ export function FeeManagementPage() {
                         <button
                           type="button"
                           onClick={() => handleStatusToggle(student.userId, student.status)}
-                          disabled={savingUserId === student.userId}
+                          disabled={savingUserId === student.userId || savingUserId === '__bulk__'}
                           className={getStatusBadgeStyle(student.status, savingUserId === student.userId)}
                           title="클릭하여 상태 변경"
                         >
@@ -402,6 +528,26 @@ export function FeeManagementPage() {
                       </td>
                       <td className="px-5 py-4 align-top text-slate-400">
                         {student.paidAt ? isoToDate(student.paidAt).toLocaleDateString('ko-KR') : '-'}
+                      </td>
+                      <td className="px-5 py-4 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1000"
+                          value={amountDrafts[student.userId] ?? String(student.paidAmount ?? 0)}
+                          onChange={(event) =>
+                            setAmountDrafts((prev) => ({
+                              ...prev,
+                              [student.userId]: event.target.value,
+                            }))
+                          }
+                          onBlur={(event) => handleAmountBlur(student.userId, event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') event.currentTarget.blur();
+                          }}
+                          disabled={savingUserId === student.userId || savingUserId === '__bulk__'}
+                          className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-right text-sm font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        />
                       </td>
                       <td className="px-5 py-4 align-top">
                         <input
@@ -477,5 +623,29 @@ function SortableHeader({
         }`}
       />
     </button>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "blue" | "green" | "slate";
+}) {
+  const toneClass =
+    tone === "green"
+      ? "border-emerald-100 bg-emerald-50/70 text-emerald-800"
+      : tone === "blue"
+        ? "border-sky-100 bg-sky-50/70 text-sky-800"
+        : "border-slate-200 bg-white text-slate-800";
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 ${toneClass}`}>
+      <p className="text-[11px] font-black uppercase tracking-[0.08em] opacity-70">{label}</p>
+      <p className="mt-1 text-lg font-black tracking-tight">{value}</p>
+    </div>
   );
 }
