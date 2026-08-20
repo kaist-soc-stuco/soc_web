@@ -8,6 +8,7 @@ export const BOARD_CODES = [
   "건의사항",
   "연구실",
   "QnA",
+  "공약",
 ] as const;
 
 export type BoardCode = (typeof BOARD_CODES)[number];
@@ -79,6 +80,12 @@ const BOARD_FALLBACK_METADATA: Record<
     descriptionEn: "Ask questions and get answers freely.",
     labelEn: "Q&A",
     titleKo: "QnA",
+  },
+  공약: {
+    descriptionKo: "집행위원회의 약속과 진행 상황을 투명하게 공유합니다.",
+    descriptionEn: "Track the council's pledges and progress transparently.",
+    labelEn: "Pledges",
+    titleKo: "공약",
   },
 };
 

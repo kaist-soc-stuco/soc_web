@@ -19,6 +19,18 @@ export interface LoginStartResponse {
   state: string;
 }
 
+export interface ChannelTalkConfigResponse {
+  enabled: boolean;
+  language: "ko" | "en";
+  pluginKey?: string;
+  memberId?: string;
+  memberHash?: string;
+  profile?: {
+    name: string;
+    email: string;
+  };
+}
+
 export interface LoginSessionResponse {
   authenticated: boolean;
   canUsePersistentFeatures: boolean;

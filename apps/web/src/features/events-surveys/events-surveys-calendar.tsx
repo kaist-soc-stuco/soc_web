@@ -77,10 +77,10 @@ export function EventsSurveysCalendar({
       : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-      <div className="lg:col-span-3 bg-white rounded-3xl border border-kaist-grey/15 p-6 shadow-sm flex flex-col">
-        <div className="flex items-center justify-between pb-4 border-b border-kaist-grey/10 mb-5 select-none">
-          <h3 className="text-lg md:text-xl font-extrabold tracking-tight text-brand-primary whitespace-nowrap">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-4">
+      <div className="flex flex-col rounded-lg border border-card-border-subtle bg-white p-5 lg:col-span-3">
+        <div className="mb-5 flex items-center justify-between border-b border-slate-200 pb-4 select-none">
+          <h3 className="whitespace-nowrap text-lg font-semibold tracking-tight text-app-text-strong md:text-xl">
             {formatMonthTitle(currentYear, currentMonth, lang)}
           </h3>
 
@@ -90,7 +90,7 @@ export function EventsSurveysCalendar({
               onClick={() =>
                 onCurrentDateChange(localDate(currentYear, currentMonth - 1, 1))
               }
-              className="p-1.5 border border-kaist-grey/20 rounded-xl hover:bg-gray-50 text-kaist-black transition-colors cursor-pointer"
+              className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-app-text-body transition-colors hover:bg-slate-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -101,7 +101,7 @@ export function EventsSurveysCalendar({
                 onCurrentDateChange(today);
                 onSelectedDateChange(today);
               }}
-              className="px-3 py-1.5 border border-kaist-grey/20 text-xs font-bold rounded-xl hover:bg-gray-50 text-kaist-black transition-colors cursor-pointer"
+              className="min-h-10 rounded-md border border-slate-200 px-3 text-xs font-semibold text-app-text-body transition-colors hover:bg-slate-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
             >
               {lang === "ko" ? "오늘" : "Today"}
             </button>
@@ -110,7 +110,7 @@ export function EventsSurveysCalendar({
               onClick={() =>
                 onCurrentDateChange(localDate(currentYear, currentMonth + 1, 1))
               }
-              className="p-1.5 border border-kaist-grey/20 rounded-xl hover:bg-gray-50 text-kaist-black transition-colors cursor-pointer"
+              className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-app-text-body transition-colors hover:bg-slate-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

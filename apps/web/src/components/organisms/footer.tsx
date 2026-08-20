@@ -11,7 +11,7 @@ export function Footer() {
   const contactLabel = useLocalizedSiteContent("footer.contact");
 
   return (
-    <footer className="mt-auto border-t border-[#0f7a4d]/10 bg-[#0f7049] py-5 text-white/80">
+    <footer className="mt-auto border-t border-[#004B2B] bg-[#004B2B] py-5 text-white/80">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-4 px-4 md:flex-row md:px-8">
         <div className="space-y-2 text-center md:text-left">
           <h2 className="text-sm font-bold tracking-tight text-white md:text-base">

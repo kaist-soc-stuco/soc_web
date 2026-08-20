@@ -3,7 +3,10 @@ import type {
   AdminUserListResponse,
   AssignRoleGroupMemberRequest,
   AuditLogListResponse,
+  BulkImportContactsRequest,
+  BulkImportContactsResponse,
   BulkEmailListResponse,
+  BulkEmailTemplateListResponse,
   ContactListResponse,
   ContactRecord,
   CreateContactRequest,
@@ -344,6 +347,20 @@ export const createAdminApi = ({
     );
   },
 
+  bulkImportContacts: async (
+    body: BulkImportContactsRequest,
+  ): Promise<BulkImportContactsResponse> => {
+    return requestJson<BulkImportContactsResponse>(
+      `${contactsBaseUrl}/bulk`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   updateContact: async (
     id: string,
     body: UpdateContactRequest,
@@ -386,6 +403,14 @@ export const createAdminApi = ({
   getBulkEmailHistory: async (): Promise<BulkEmailListResponse> => {
     return requestJson<BulkEmailListResponse>(
       `${emailsBaseUrl}/history`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getBulkEmailTemplates: async (): Promise<BulkEmailTemplateListResponse> => {
+    return requestJson<BulkEmailTemplateListResponse>(
+      `${emailsBaseUrl}/templates`,
       { method: "GET" },
       { retryOnUnauthorized: true },
     );

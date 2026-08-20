@@ -1,10 +1,21 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { CreateContactSchema, UpdateContactSchema } from "@soc/contracts";
+import {
+  BulkImportContactsSchema,
+  CreateContactSchema,
+  UpdateContactSchema,
+} from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { ContactsService } from "./contacts.service";
-import type { ContactListResponse, ContactRecord, CreateContactRequest, UpdateContactRequest } from "@soc/contracts";
+import type {
+  BulkImportContactsRequest,
+  BulkImportContactsResponse,
+  ContactListResponse,
+  ContactRecord,
+  CreateContactRequest,
+  UpdateContactRequest,
+} from "@soc/contracts";
 
 @Controller("contacts")
 export class ContactsController {
@@ -22,6 +33,15 @@ export class ContactsController {
     @Body(new ZodValidationPipe(CreateContactSchema)) body: CreateContactRequest,
   ): Promise<ContactRecord> {
     return this.contactsService.create(body);
+  }
+
+  @Post("bulk")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async bulkImportContacts(
+    @Body(new ZodValidationPipe(BulkImportContactsSchema))
+    body: BulkImportContactsRequest,
+  ): Promise<BulkImportContactsResponse> {
+    return this.contactsService.bulkImport(body);
   }
 
   @Patch(":id")

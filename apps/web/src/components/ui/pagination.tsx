@@ -65,10 +65,13 @@ export function Pagination({
 }: PaginationProps) {
   const total = Math.max(1, totalPages || 1);
   const isSmall = size === "sm";
-  const buttonSizeClassName = isSmall ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-xl";
+  const buttonSizeClassName = isSmall ? "h-8 w-8 rounded-md" : "h-9 w-9 rounded-md";
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <nav
+      aria-label={lang === "ko" ? "페이지 탐색" : "Pagination"}
+      className={cn("flex items-center gap-1", className)}
+    >
       <button
         type="button"
         aria-label={lang === "ko" ? "이전 페이지" : "Previous page"}
@@ -79,13 +82,13 @@ export function Pagination({
           "flex items-center justify-center border transition-all",
           currentPage === 1
             ? "cursor-not-allowed border-slate-100 bg-white text-slate-300"
-            : "cursor-pointer border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900",
+            : "cursor-pointer border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900",
         )}
       >
         <ChevronLeft className="h-4 w-4 stroke-[2.5px]" />
       </button>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-0.5">
         {getPaginationItems(currentPage, total).map((item, index) => {
           if (item === "...") {
             return (
@@ -107,11 +110,12 @@ export function Pagination({
               key={item}
               type="button"
               onClick={() => onPageChange(item)}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 buttonSizeClassName,
-                "flex cursor-pointer items-center justify-center text-[13px] font-extrabold tracking-tight transition-all",
+                "flex cursor-pointer items-center justify-center text-[13px] font-semibold tracking-tight transition-colors",
                 isActive
-                  ? "bg-kaist-darkgreen text-white shadow-sm"
+                  ? "bg-brand-primary text-white"
                   : "bg-transparent text-slate-500 hover:text-slate-800",
               )}
             >
@@ -131,11 +135,11 @@ export function Pagination({
           "flex items-center justify-center border transition-all",
           currentPage === total
             ? "cursor-not-allowed border-slate-100 bg-white text-slate-300"
-            : "cursor-pointer border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900",
+            : "cursor-pointer border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900",
         )}
       >
         <ChevronRight className="h-4 w-4 stroke-[2.5px]" />
       </button>
-    </div>
+    </nav>
   );
 }

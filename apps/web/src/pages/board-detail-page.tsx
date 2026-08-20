@@ -80,6 +80,7 @@ export function BoardDetailPage() {
           title={boardTitle}
           description={boardDescription}
           variant="compact"
+          showDescription={false}
         />
         <BoardDetailTabs boards={boards} category={category} lang={lang} />
 

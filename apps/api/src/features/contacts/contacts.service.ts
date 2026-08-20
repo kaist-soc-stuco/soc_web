@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { ContactsRepository } from "./contacts.repository";
-import type { ContactRecord, CreateContactRequest, UpdateContactRequest } from "@soc/contracts";
+import type {
+  BulkImportContactsRequest,
+  BulkImportContactsResponse,
+  ContactRecord,
+  CreateContactRequest,
+  UpdateContactRequest,
+} from "@soc/contracts";
 
 @Injectable()
 export class ContactsService {
@@ -20,6 +26,12 @@ export class ContactsService {
 
   async create(dto: CreateContactRequest): Promise<ContactRecord> {
     return this.contactsRepo.insert(dto);
+  }
+
+  async bulkImport(
+    dto: BulkImportContactsRequest,
+  ): Promise<BulkImportContactsResponse> {
+    return this.contactsRepo.bulkImport(dto);
   }
 
   async update(id: string, dto: UpdateContactRequest): Promise<ContactRecord> {

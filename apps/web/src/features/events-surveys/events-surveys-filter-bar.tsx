@@ -42,8 +42,9 @@ export function EventsSurveysFilterBar({
   visibleCount,
 }: EventsSurveysFilterBarProps) {
   return (
-    <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.015)] md:flex-row md:items-center md:justify-between">
-      <div className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 p-1 shadow-inner shadow-slate-100/60">
+    <div className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
+      <div className="min-w-0 max-w-full overflow-x-auto">
+        <div className="inline-flex min-w-max rounded-md border border-slate-200 bg-slate-50 p-0.5">
         {stateFilters.map((filter) => {
           const active = stateFilter === filter.value;
           return (
@@ -51,9 +52,9 @@ export function EventsSurveysFilterBar({
               key={filter.value}
               type="button"
               onClick={() => onStateFilterChange(filter.value)}
-              className={`rounded-full border px-3.5 py-1.5 text-[12px] font-extrabold transition-all cursor-pointer ${
+              className={`min-h-9 rounded-md border px-3 py-1.5 text-[12px] font-semibold transition-colors cursor-pointer ${
                 active
-                  ? "border-brand-primary/20 bg-brand-primary text-white shadow-sm"
+                  ? "border-brand-primary bg-brand-primary text-white"
                   : "border-transparent bg-transparent text-slate-500 hover:bg-white hover:text-brand-primary"
               }`}
             >
@@ -61,9 +62,10 @@ export function EventsSurveysFilterBar({
             </button>
           );
         })}
+        </div>
       </div>
 
-      <div className="hidden">
+      <div className="text-xs font-medium text-app-text-muted" aria-live="polite">
         {lang === "ko" ? (
           <span>
             전체 <strong className="text-brand-primary">{visibleCount}</strong>
@@ -97,8 +99,8 @@ export function EventsSurveysFilterBar({
           }))}
           onChange={(value) => onSortByChange(value as EventsSurveysSortKey)}
           className="w-40"
-          buttonClassName="h-9 rounded-xl border-slate-200/80 px-3 py-0 text-[13px] font-bold text-slate-700 shadow-sm focus:ring-brand-primary/10"
-          menuClassName="rounded-xl border-slate-200 shadow-xl"
+          buttonClassName="h-10 rounded-md border-slate-200 px-3 py-0 text-[13px] font-semibold text-slate-700 shadow-none focus:ring-brand-primary/20"
+          menuClassName="rounded-lg border-slate-200 shadow-elevated"
           optionClassName="text-[12px]"
           emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
         />

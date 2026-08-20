@@ -15,7 +15,7 @@ export function NotFoundPage() {
         <section className="w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="h-2 bg-gradient-to-r from-kaist-darkgreen to-kaist-lightgreen" />
           <div className="grid gap-10 p-8 md:grid-cols-[12rem_1fr] md:p-12">
-            <div className="flex h-40 items-center justify-center rounded-2xl bg-kaist-lightgreen/10 font-outfit text-6xl font-black tracking-tight text-kaist-darkgreen">
+            <div className="flex h-40 items-center justify-center rounded-2xl bg-kaist-lightgreen/10 text-6xl font-black tracking-tight text-kaist-darkgreen">
               404
             </div>
             <div className="flex flex-col justify-center">

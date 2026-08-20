@@ -56,6 +56,12 @@ cp .env.example .env
 - `ASSET_ORPHAN_CLEANUP_ENABLED`: 미연결 업로드 파일 자동 정리 스케줄러 실행 여부. 기본값 false
 - `ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS`: 연결되지 않은 업로드 파일을 자동 점검하는 주기. 기본값 6
 - `SSO_LOGIN_URL`, `SSO_REDIRECT_URI`, `SSO_CLIENT_ID`, `SSO_AUTH_API_URL`, `SSO_CLIENT_SECRET`: KAIST SSO 연동 설정
+- `CHANNELTALK_PLUGIN_KEY`: Channel Talk 웹 SDK plugin key
+- `CHANNELTALK_SECRET_KEY`: Channel Talk member hash 생성용 secret. 브라우저에 노출하지 않음
+- `EMAIL_DRY_RUN`: 개발 환경에서 메일을 실제 발송하지 않고 처리 기록만 남길지 여부. 기본값 true
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`, `EMAIL_FROM`: 운영 SMTP 발송 설정
+
+관리자 기능에는 연락망 CSV 일괄 업로드, 과비 납부율/납부금액 집계와 행 선택 일괄처리, F26 미납자 메일 템플릿이 포함되어 있습니다. 개발 모드에서 F26 메일을 보내면 드라이런 기록이 생성되고, 운영에서 실제 발송하려면 SMTP 설정과 `EMAIL_DRY_RUN=false`가 필요합니다.
 
 업로드 후 게시글에 연결되지 않은 파일은 관리자 권한으로 `POST /v1/assets/cleanup-orphans`를 호출해 정리할 수 있습니다. 자동 정리는 `ASSET_ORPHAN_CLEANUP_ENABLED=true`인 API 프로세스에서만 실행하세요.
 

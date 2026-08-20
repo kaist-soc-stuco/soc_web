@@ -103,6 +103,12 @@ export class UsersService {
     return this.usersRepository.searchUsers(input.query, input.limit ?? 20);
   }
 
+  async listEmailRecipients(
+    recipientType: "ALL" | "PAID_STUDENTS" | "UNPAID_STUDENTS",
+  ): Promise<Array<{ email: string; nameKo: string }>> {
+    return this.usersRepository.listEmailRecipients(recipientType);
+  }
+
   async listAdminUsers(input: {
     page?: number;
     pageSize?: number;
@@ -148,6 +154,7 @@ export class UsersService {
     input: {
       status?: FeeStatus;
       coverageSemesters?: number;
+      paidAmount?: number;
       note?: string | null;
       verifiedBy?: string;
     },

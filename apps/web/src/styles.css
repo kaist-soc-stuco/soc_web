@@ -2,51 +2,51 @@
 @import 'tw-animate-css';
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.99 0.007 220);
-  --foreground: oklch(0.26 0.03 240);
-  --card: oklch(0.98 0.008 220);
-  --card-foreground: oklch(0.26 0.03 240);
-  --popover: oklch(0.98 0.008 220);
-  --popover-foreground: oklch(0.26 0.03 240);
-  --primary: oklch(0.4173 0.12863 157.503);
-  --primary-foreground: oklch(0.98 0.005 220);
-  --secondary: oklch(0.92 0.02 224);
-  --secondary-foreground: oklch(0.33 0.03 240);
-  --muted: oklch(0.94 0.014 220);
-  --muted-foreground: oklch(0.52 0.03 242);
-  --accent: oklch(0.9 0.03 205);
-  --accent-foreground: oklch(0.28 0.03 240);
-  --destructive: oklch(0.64 0.23 30);
-  --border: oklch(0.86 0.02 230);
-  --input: oklch(0.88 0.02 230);
-  --ring: oklch(0.4173 0.12863 157.503);
+  --radius: 0.5rem;
+  --background: #f6f8f7;
+  --foreground: #17211c;
+  --card: #ffffff;
+  --card-foreground: #17211c;
+  --popover: #ffffff;
+  --popover-foreground: #17211c;
+  --primary: #006e3f;
+  --primary-foreground: #ffffff;
+  --secondary: #eef3ef;
+  --secondary-foreground: #35433b;
+  --muted: #eef3ef;
+  --muted-foreground: #66736c;
+  --accent: #ddefe5;
+  --accent-foreground: #17211c;
+  --destructive: #b4234d;
+  --border: #d9e1dc;
+  --input: #d9e1dc;
+  --ring: #006e3f;
   
   /* KAIST SoC Custom Colors */
-  --kaist-white: oklch(0.99 0.007 220);
-  --kaist-darkgreen: oklch(0.4173 0.12863 157.503);
-  --kaist-darkgreen2: oklch(0.5173 0.12863 157.503);
-  --kaist-darkgreen-main: oklch(0.6173 0.12863 157.503);
-  --kaist-lightgreen: oklch(0.7173 0.12863 157.503);
-  --kaist-lightgreen2: oklch(0.8173 0.12863 157.503);
-  --kaist-greygreen: oklch(0.6435 0.0089 157.503);
-  --kaist-blue: oklch(0.48 0.155 255);
-  --kaist-black: oklch(0.26 0.03 240);
-  --kaist-grey: oklch(0.65 0.03 240);
-  --kaist-brown: oklch(0.6173 0.12863 18.31);
+  --kaist-white: #ffffff;
+  --kaist-darkgreen: #006e3f;
+  --kaist-darkgreen2: #005b34;
+  --kaist-darkgreen-main: #006e3f;
+  --kaist-lightgreen: #ddefe5;
+  --kaist-lightgreen2: #eef7f1;
+  --kaist-greygreen: #66736c;
+  --kaist-blue: #006e3f;
+  --kaist-black: #17211c;
+  --kaist-grey: #66736c;
+  --kaist-brown: #a16207;
 
   /* App interaction tokens */
   --app-primary: var(--kaist-darkgreen);
   --app-accent-secondary: var(--kaist-blue);
-  --app-primary-light: oklch(0.955 0.035 157.503);
-  --app-primary-border: oklch(0.86 0.055 157.503);
-  --app-text-strong: oklch(0.22 0.034 240);
-  --app-text-body: oklch(0.37 0.032 240);
-  --app-text-muted: oklch(0.56 0.028 240);
-  --app-card-border: oklch(0.90 0.012 230);
-  --app-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.035), 0 8px 24px rgba(16, 24, 40, 0.045);
-  --app-shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.05), 0 12px 28px rgba(16, 24, 40, 0.07);
-  --app-shadow-elevated: 0 18px 48px rgba(15, 23, 42, 0.08);
+  --app-primary-light: #ddefe5;
+  --app-primary-border: #b8d9c6;
+  --app-text-strong: #17211c;
+  --app-text-body: #35433b;
+  --app-text-muted: #66736c;
+  --app-card-border: #d9e1dc;
+  --app-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --app-shadow-card-hover: 0 2px 4px rgba(16, 24, 40, 0.06);
+  --app-shadow-elevated: 0 8px 24px rgba(16, 24, 40, 0.1);
 }
 
 @theme inline {
@@ -107,7 +107,7 @@
     @apply bg-background text-foreground antialiased;
     margin: 0;
     min-height: 100vh;
-    font-family: 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Roboto Slab', sans-serif;
+    font-family: 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   }
 }
 
@@ -135,52 +135,46 @@
   }
 
   .page-hero-surface {
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(135deg, var(--kaist-darkgreen) 0%, #002613 100%);
+    border-bottom: 1px solid var(--app-card-border);
+    background: var(--background);
+    color: var(--app-text-strong);
   }
 
-  .page-hero-surface::before {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    content: "";
-    background: radial-gradient(
-      circle at 20% 20%,
-      rgba(113, 185, 141, 0.16),
-      transparent 42%
-    );
+  .page-hero-brand {
+    border-bottom-color: var(--kaist-darkgreen);
+    background: var(--kaist-darkgreen);
+    color: white;
   }
 
   .page-hero-large {
-    padding-block: 2.25rem;
+    padding-block: 1.5rem;
   }
 
   .page-hero-medium {
-    padding-block: 1.65rem;
+    padding-block: 1.15rem;
   }
 
   .page-hero-compact {
-    padding-block: 1.15rem;
+    padding-block: 0.85rem;
   }
 
   @media (min-width: 768px) {
     .page-hero-large {
-      padding-block: 2.75rem;
+      padding-block: 1.85rem;
     }
 
     .page-hero-medium {
-      padding-block: 2rem;
+      padding-block: 1.35rem;
     }
 
     .page-hero-compact {
-      padding-block: 1.35rem;
+      padding-block: 1rem;
     }
   }
 
   .home-bento-card {
     border: 1px solid var(--app-card-border);
-    border-radius: 1.5rem;
+    border-radius: 0.75rem;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: var(--app-shadow-card);
     transition:
@@ -284,6 +278,10 @@
       radial-gradient(circle at 30% 24%, rgba(113, 185, 141, 0.26), transparent 34%),
       linear-gradient(145deg, #103524 0%, #163b47 48%, #27364a 100%);
   }
+
+  .channel-talk-safe-area {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
 }
 
 @keyframes home-loading-shimmer {
@@ -293,6 +291,17 @@
 
   100% {
     background-position: -70% 0, 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

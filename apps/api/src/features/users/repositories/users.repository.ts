@@ -369,6 +369,29 @@ export class UsersRepository {
     return rows.map((row) => this.mapRowToAdminUserRecord(row));
   }
 
+  async listEmailRecipients(
+    recipientType: "ALL" | "PAID_STUDENTS" | "UNPAID_STUDENTS",
+  ): Promise<Array<{ email: string; nameKo: string }>> {
+    const feeFilter =
+      recipientType === "PAID_STUDENTS"
+        ? eq(studentFeeStatus.status, "PAID")
+        : recipientType === "UNPAID_STUDENTS"
+          ? or(
+              eq(studentFeeStatus.status, "UNPAID"),
+              isNull(studentFeeStatus.status),
+            )
+          : undefined;
+
+    const rows = await this.db
+      .select({ email: users.email, nameKo: users.nameKo })
+      .from(users)
+      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
+      .where(and(eq(users.isActive, true), feeFilter))
+      .orderBy(asc(users.nameKo), asc(users.email));
+
+    return rows.filter((row) => row.email.trim().length > 0);
+  }
+
   async listAdminUsers(input: {
     page?: number;
     pageSize?: number;
@@ -489,6 +512,7 @@ export class UsersRepository {
       userId: row.userId,
       status: normalizedStatus,
       coverageSemesters: row.coverageSemesters,
+      paidAmount: row.paidAmount,
       paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
       verifiedBy: row.verifiedBy,
       verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
@@ -502,6 +526,7 @@ export class UsersRepository {
     input: {
       status?: FeeStatus;
       coverageSemesters?: number;
+      paidAmount?: number;
       note?: string | null;
       verifiedBy?: string;
     },
@@ -537,6 +562,7 @@ export class UsersRepository {
       const verifierChanged = statusChanged && input.verifiedBy !== undefined;
       const nextRecord = {
         coverageSemesters: input.coverageSemesters ?? current?.coverageSemesters ?? 4,
+        paidAmount: input.paidAmount ?? current?.paidAmount ?? 0,
         note: input.note !== undefined ? input.note : current?.note ?? null,
         paidAt: statusChanged
           ? nextStatus === "PAID"
@@ -562,6 +588,7 @@ export class UsersRepository {
         .insert(studentFeeStatus)
         .values({
           coverageSemesters: nextRecord.coverageSemesters,
+          paidAmount: nextRecord.paidAmount,
           note: nextRecord.note,
           paidAt: nextRecord.paidAt,
           status: nextRecord.status,
@@ -582,6 +609,7 @@ export class UsersRepository {
       userId: row.userId,
       status: row.status === "PAID" ? "PAID" : "UNPAID",
       coverageSemesters: row.coverageSemesters,
+      paidAmount: row.paidAmount,
       paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
       verifiedBy: row.verifiedBy,
       verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
@@ -609,6 +637,7 @@ export class UsersRepository {
           userId,
           status: "UNPAID",
           coverageSemesters: 4,
+          paidAmount: 0,
           updatedAt: nowDate(),
         })
         .onConflictDoUpdate({
@@ -627,6 +656,7 @@ export class UsersRepository {
       userId: row.userId,
       status: row.status as FeeStatus,
       coverageSemesters: row.coverageSemesters,
+      paidAmount: row.paidAmount,
       paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
       verifiedBy: row.verifiedBy,
       verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
@@ -670,6 +700,8 @@ export class UsersRepository {
         stdNo: users.stdNo,
         email: users.email,
         status: studentFeeStatus.status,
+        coverageSemesters: studentFeeStatus.coverageSemesters,
+        paidAmount: studentFeeStatus.paidAmount,
         paidAt: studentFeeStatus.paidAt,
         verifiedAt: studentFeeStatus.verifiedAt,
         note: studentFeeStatus.note,
@@ -689,24 +721,46 @@ export class UsersRepository {
 
     const total = Number(countResult[0]?.count ?? 0);
 
+    const summaryRows = await this.db
+      .select({
+        totalStudents: sql<number>`COUNT(*)`,
+        paidStudents: sql<number>`COUNT(*) FILTER (WHERE COALESCE(${studentFeeStatus.status}, 'UNPAID') = 'PAID')`,
+        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${studentFeeStatus.status} = 'PAID' THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
+      })
+      .from(users)
+      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId));
+
+    const summaryRow = summaryRows[0];
+    const summaryTotal = Number(summaryRow?.totalStudents ?? 0);
+    const summaryPaid = Number(summaryRow?.paidStudents ?? 0);
+
     return {
       students: rows.map((r) => ({
-        status:
-          r.status === "PAID"
+          status:
+            r.status === "PAID"
             ? r.status
             : "UNPAID",
-        userId: r.userId,
-        nameKo: r.nameKo,
-        nameEn: r.nameEn ?? undefined,
-        stdNo: r.stdNo ?? undefined,
-        email: r.email,
-        paidAt: r.paidAt ? msToIso(r.paidAt.valueOf()) : null,
+          userId: r.userId,
+          nameKo: r.nameKo,
+          nameEn: r.nameEn ?? undefined,
+          stdNo: r.stdNo ?? undefined,
+          email: r.email,
+          coverageSemesters: r.coverageSemesters ?? 4,
+          paidAmount: r.paidAmount ?? 0,
+          paidAt: r.paidAt ? msToIso(r.paidAt.valueOf()) : null,
         verifiedAt: r.verifiedAt ? msToIso(r.verifiedAt.valueOf()) : null,
         note: r.note,
       })),
       total,
       page,
       pageSize,
+      summary: {
+        totalStudents: summaryTotal,
+        paidStudents: summaryPaid,
+        unpaidStudents: Math.max(0, summaryTotal - summaryPaid),
+        paymentRate: summaryTotal > 0 ? Math.round((summaryPaid / summaryTotal) * 1000) / 10 : 0,
+        paidAmount: Number(summaryRow?.paidAmount ?? 0),
+      },
     };
   }
 

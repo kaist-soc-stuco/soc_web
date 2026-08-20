@@ -30,7 +30,7 @@ export function AboutHero() {
     <section className="relative overflow-hidden bg-gradient-to-br from-kaist-darkgreen to-[#002613] px-4 py-16 text-center text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(113,185,141,0.15),transparent)]" />
       <div className="relative z-10 mx-auto max-w-4xl animate-in space-y-4 fade-in slide-in-from-bottom-6 duration-500">
-        <h1 className="font-outfit text-4xl font-black tracking-tight md:text-5xl">
+        <h1 className="text-4xl font-black tracking-tight md:text-5xl">
           KAIST SOC
         </h1>
         <p className="text-lg font-medium tracking-wide text-white/80 md:text-xl">
@@ -264,7 +264,7 @@ function TimelineItem({
   return (
     <div className="relative">
       <div className="absolute -left-[31px] top-1.5 h-4 w-4 rounded-full border-4 border-white bg-kaist-darkgreen shadow-sm" />
-      <span className="font-outfit text-lg font-black text-kaist-darkgreen">
+      <span className="text-lg font-black text-kaist-darkgreen">
         {year}
       </span>
       <h3 className="mt-1 font-bold text-kaist-black">{title}</h3>

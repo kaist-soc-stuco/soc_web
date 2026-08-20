@@ -3,11 +3,13 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
+import type { ChannelTalkConfigResponse } from "@soc/contracts";
 import { nowIso, expiresAtMs } from "@soc/shared";
 
 import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
@@ -72,6 +74,7 @@ const isSsoApiErrorResponse = (
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly startConfig: SsoConfig;
   private readonly callbackConfig: SsoCallbackConfig;
 
@@ -104,6 +107,62 @@ export class AuthService {
       ...config,
       nonce,
       state,
+    };
+  }
+
+  async getChannelTalkConfig(
+    userId?: string,
+  ): Promise<ChannelTalkConfigResponse> {
+    const pluginKey = this.configService
+      .get<string>("CHANNELTALK_PLUGIN_KEY")
+      ?.trim();
+
+    if (!pluginKey) {
+      return { enabled: false, language: "ko" };
+    }
+
+    const baseConfig: ChannelTalkConfigResponse = {
+      enabled: true,
+      language: "ko",
+      pluginKey,
+    };
+
+    if (!userId) {
+      return baseConfig;
+    }
+
+    const user = await this.usersService.findById(userId);
+    const secretKey = this.configService
+      .get<string>("CHANNELTALK_SECRET_KEY")
+      ?.trim();
+
+    if (!user || !secretKey) {
+      return baseConfig;
+    }
+
+    if (!/^[0-9a-f]+$/i.test(secretKey) || secretKey.length % 2 !== 0) {
+      this.logger.warn(
+        "CHANNELTALK_SECRET_KEY is not a valid hexadecimal secret; using anonymous Channel Talk boot.",
+      );
+      return baseConfig;
+    }
+
+    const memberId = user.userId;
+    const memberHash = createHmac(
+      "sha256",
+      Buffer.from(secretKey, "hex"),
+    )
+      .update(memberId)
+      .digest("hex");
+
+    return {
+      ...baseConfig,
+      memberId,
+      memberHash,
+      profile: {
+        email: user.email,
+        name: user.nameKo,
+      },
     };
   }
 

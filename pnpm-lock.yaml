@@ -39,6 +39,9 @@ importers:
       '@soc/shared':
         specifier: workspace:*
         version: link:../../shared/common
+      '@types/nodemailer':
+        specifier: ^8.0.1
+        version: 8.0.1
       cookie:
         specifier: ^1.1.1
         version: 1.1.1
@@ -60,6 +63,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      nodemailer:
+        specifier: ^9.0.5
+        version: 9.0.5
       pg:
         specifier: ^8.16.3
         version: 8.20.0
@@ -112,6 +118,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@channel.io/channel-web-sdk-loader':
+        specifier: ^2.0.2
+        version: 2.0.2
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.75.0(react@19.2.6))
@@ -320,6 +329,9 @@ packages:
 
   '@borewit/text-codec@0.2.2':
     resolution: {integrity: sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ==}
+
+  '@channel.io/channel-web-sdk-loader@2.0.2':
+    resolution: {integrity: sha512-43xRJX+BUjb5vRw5A/LDkgE9syJYTPERf7xo49Fz5MMpA9UtzPWHWyzN2QU1/tTT2uu5tpxapT2BgMx6FfP2qg==}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -1406,6 +1418,9 @@ packages:
   '@types/node@24.12.3':
     resolution: {integrity: sha512-8oljBDGun9cIsZRJR6fkihn0TSXJI0UDOOhncYaERq6M0JMDoPLxyscwruJcb4GKS6dvK/d8xebYBg27h/duaQ==}
 
+  '@types/nodemailer@8.0.1':
+    resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
+
   '@types/pg@8.20.0':
     resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
 
@@ -2375,6 +2390,10 @@ packages:
   node-releases@2.0.38:
     resolution: {integrity: sha512-3qT/88Y3FbH/Kx4szpQQ4HzUbVrHPKTLVpVocKiLfoYvw9XSGOX2FmD2d6DrXbVYyAQTF2HeF6My8jmzx7/CRw==}
 
+  nodemailer@9.0.5:
+    resolution: {integrity: sha512-wvjiKvjczmsN7U/8006JOdXubgBk2XFAbioDMbT+sM7cPs0QrhJTa6KBRX7P5REGGkDcLUz/EarWidb8G8C1jQ==}
+    engines: {node: '>=6.0.0'}
+
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
@@ -3067,6 +3086,8 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@borewit/text-codec@0.2.2': {}
+
+  '@channel.io/channel-web-sdk-loader@2.0.2': {}
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
@@ -3875,6 +3896,10 @@ snapshots:
   '@types/node@24.12.3':
     dependencies:
       undici-types: 7.16.0
+
+  '@types/nodemailer@8.0.1':
+    dependencies:
+      '@types/node': 24.12.3
 
   '@types/pg@8.20.0':
     dependencies:
@@ -4833,6 +4858,8 @@ snapshots:
   negotiator@1.0.0: {}
 
   node-releases@2.0.38: {}
+
+  nodemailer@9.0.5: {}
 
   normalize-path@3.0.0: {}
 

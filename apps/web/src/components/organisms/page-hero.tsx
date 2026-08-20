@@ -1,12 +1,15 @@
 type PageHeroVariant = "large" | "medium" | "compact";
+type PageHeroTone = "neutral" | "brand";
 
 interface PageHeroProps {
   title: string;
-  description: string;
+  description?: string;
   titleClassName?: string;
   descriptionClassName?: string;
   maxWidthClassName?: string;
   variant?: PageHeroVariant;
+  tone?: PageHeroTone;
+  showDescription?: boolean;
 }
 
 const heroVariantClass: Record<PageHeroVariant, string> = {
@@ -34,20 +37,38 @@ export function PageHero({
   descriptionClassName,
   maxWidthClassName = "max-w-7xl",
   variant = "medium",
+  tone = "neutral",
+  showDescription = true,
 }: PageHeroProps) {
   const resolvedTitleClassName = titleClassName ?? titleScaleByVariant[variant];
   const resolvedDescriptionClassName =
     descriptionClassName ?? descriptionScaleByVariant[variant];
 
   return (
-    <section className={`page-hero-surface ${heroVariantClass[variant]} text-white`}>
-      <div className={`${maxWidthClassName} mx-auto relative z-10 flex flex-col items-start gap-2 px-6 md:gap-3 lg:px-8 animate-in fade-in slide-in-from-bottom-4 duration-500`}>
-        <h1 className={`font-bold tracking-tight font-outfit ${resolvedTitleClassName}`}>
+    <section
+      className={`page-hero-surface ${heroVariantClass[variant]} ${
+        tone === "brand" ? "page-hero-brand" : ""
+      }`}
+      aria-labelledby="page-hero-title"
+    >
+      <div
+        className={`${maxWidthClassName} mx-auto flex flex-col items-start gap-1.5 px-5 md:gap-2.5 md:px-8`}
+      >
+        <h1
+          id="page-hero-title"
+          className={`font-semibold tracking-tight ${resolvedTitleClassName}`}
+        >
           {title}
         </h1>
-        <p className={`${resolvedDescriptionClassName} max-w-3xl font-medium leading-relaxed text-white/78`}>
-          {description}
-        </p>
+        {showDescription && description ? (
+          <p
+            className={`${resolvedDescriptionClassName} max-w-3xl font-normal leading-relaxed ${
+              tone === "brand" ? "text-white/80" : "text-app-text-muted"
+            }`}
+          >
+            {description}
+          </p>
+        ) : null}
       </div>
     </section>
   );

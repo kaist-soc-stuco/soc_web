@@ -6,6 +6,7 @@ import {
   BoardNavigationBar,
 } from "@/features/board-list/board-page-sections";
 import { useBoardPageController } from "@/features/board-list/use-board-page-controller";
+import { ChannelTalkInquiryCard } from "@/features/channel-talk/channel-talk-launcher";
 
 export function BoardPage() {
   const {
@@ -43,11 +44,12 @@ export function BoardPage() {
     <div className="min-h-screen flex flex-col bg-[#fafafa]">
       <Header showLogo={true} />
 
-      <main className="flex-1 w-full mx-auto pb-16">
+      <main className="channel-talk-safe-area flex-1 w-full mx-auto">
         <PageHero
           title={boardTitle}
           description={boardDescription}
           variant="medium"
+          showDescription={false}
         />
 
         <BoardNavigationBar
@@ -64,6 +66,10 @@ export function BoardPage() {
           searchCriteria={searchCriteria}
           searchQuery={searchQuery}
         />
+
+        {(category === "QnA" || category === "건의사항") && (
+          <ChannelTalkInquiryCard lang={lang} />
+        )}
 
         <BoardArticleTable
           articles={articles}

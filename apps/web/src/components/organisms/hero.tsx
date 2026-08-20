@@ -34,7 +34,7 @@ export function Hero() {
           />
           <div className="h-4 w-px bg-white/30" />
           <span className="flex flex-col leading-none text-white" aria-label="SOC Student Council">
-            <span className="font-outfit text-xl font-black tracking-[-0.04em]">
+            <span className="text-xl font-black tracking-[-0.04em]">
               SOC
             </span>
             <span className="mt-0.5 text-[7px] font-black uppercase tracking-[0.18em] text-white/70">

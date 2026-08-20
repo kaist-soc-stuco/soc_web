@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 
 import { Footer } from "@/components/organisms/footer";
 import { Header } from "@/components/organisms/header";
@@ -30,6 +31,19 @@ interface RoadmapStage {
   icon: LucideIcon;
   period: LocalizedCopy;
   title: LocalizedCopy;
+}
+
+interface RoadmapTrack {
+  id: string;
+  title: LocalizedCopy;
+  description: LocalizedCopy;
+  color: string;
+  softColor: string;
+  courses: Array<{
+    code: string;
+    name: LocalizedCopy;
+    note: LocalizedCopy;
+  }>;
 }
 
 const ROADMAP_STAGES: RoadmapStage[] = [
@@ -91,6 +105,70 @@ const ROADMAP_STAGES: RoadmapStage[] = [
   },
 ];
 
+const ROADMAP_TRACKS: RoadmapTrack[] = [
+  {
+    id: "data",
+    title: { ko: "데이터 과학", en: "Data Science" },
+    description: { ko: "데이터를 수집·해석하고 의미 있는 결론으로 연결하는 트랙", en: "Turn data into reliable interpretations and decisions." },
+    color: "#ef4444",
+    softColor: "#fff1f2",
+    courses: [
+      { code: "CS101", name: { ko: "프로그래밍 기초", en: "Programming Basics" }, note: { ko: "첫 프로그래밍 언어와 문제 해결", en: "First language and problem solving" } },
+      { code: "CS300", name: { ko: "알고리즘 개론", en: "Intro to Algorithms" }, note: { ko: "자료구조와 효율적인 사고", en: "Data structures and efficient thinking" } },
+      { code: "CS361", name: { ko: "데이터 사이언스 개론", en: "Intro to Data Science" }, note: { ko: "통계·분석·모델링의 연결", en: "Statistics, analysis, and modeling" } },
+      { code: "CS360", name: { ko: "데이터베이스 개론", en: "Intro to Databases" }, note: { ko: "데이터를 안전하게 저장하고 질의하기", en: "Store and query data reliably" } },
+    ],
+  },
+  {
+    id: "software",
+    title: { ko: "소프트웨어디자인", en: "Software Design" },
+    description: { ko: "사용자 문제를 견고한 소프트웨어 구조와 제품으로 구현하는 트랙", en: "Build robust software products around real user problems." },
+    color: "#84cc16",
+    softColor: "#f7fee7",
+    courses: [
+      { code: "CS350", name: { ko: "소프트웨어 공학개론", en: "Software Engineering" }, note: { ko: "협업·테스트·유지보수", en: "Collaboration, testing, and maintenance" } },
+      { code: "CS453", name: { ko: "소프트웨어 테스팅", en: "Software Testing" }, note: { ko: "자동화된 품질 검증", en: "Automated quality checks" } },
+      { code: "CS457", name: { ko: "소프트웨어 요구공학", en: "Software Requirements" }, note: { ko: "문제를 요구사항으로 번역하기", en: "Translate problems into requirements" } },
+    ],
+  },
+  {
+    id: "systems",
+    title: { ko: "시스템·네트워크", en: "Systems & Networks" },
+    description: { ko: "컴퓨터가 실제 환경에서 동작하는 원리와 규모 확장을 탐구하는 트랙", en: "Understand how computers work in real environments and at scale." },
+    color: "#f97316",
+    softColor: "#fff7ed",
+    courses: [
+      { code: "CS211", name: { ko: "디지털시스템 및 실험", en: "Digital Systems" }, note: { ko: "논리회로와 하드웨어 기초", en: "Logic circuits and hardware" } },
+      { code: "CS310", name: { ko: "대칭 컴퓨터 시스템", en: "Computer Systems" }, note: { ko: "운영체제와 시스템 구조", en: "Operating systems and architecture" } },
+      { code: "CS422", name: { ko: "계산이론", en: "Theory of Computation" }, note: { ko: "계산 가능성과 한계", en: "Computability and limits" } },
+    ],
+  },
+  {
+    id: "ai",
+    title: { ko: "인공지능·정보서비스", en: "AI & Information Services" },
+    description: { ko: "학습하는 시스템과 지능형 서비스를 설계하는 트랙", en: "Design learning systems and intelligent information services." },
+    color: "#0284c7",
+    softColor: "#f0f9ff",
+    courses: [
+      { code: "CS270", name: { ko: "지능 로봇 프로그래밍", en: "Intelligent Robot Programming" }, note: { ko: "센서·행동·제어", en: "Sensing, behavior, and control" } },
+      { code: "CS371", name: { ko: "딥러닝 개론", en: "Introduction to Deep Learning" }, note: { ko: "표현 학습과 신경망", en: "Representation learning and neural networks" } },
+      { code: "CS474", name: { ko: "텍스트마이닝", en: "Text Mining" }, note: { ko: "언어 데이터에서 패턴 찾기", en: "Find patterns in language data" } },
+    ],
+  },
+  {
+    id: "interactive",
+    title: { ko: "인터랙티브컴퓨팅", en: "Interactive Computing" },
+    description: { ko: "사람과 컴퓨터가 만나는 경험을 연구하고 구현하는 트랙", en: "Research and build experiences where people meet computers." },
+    color: "#7e22ce",
+    softColor: "#faf5ff",
+    courses: [
+      { code: "CS380", name: { ko: "컴퓨터그래픽스 개론", en: "Computer Graphics" }, note: { ko: "이미지·공간·시각화", en: "Images, space, and visualization" } },
+      { code: "CS486", name: { ko: "웨어러블 사용자 인터페이스", en: "Wearable User Interfaces" }, note: { ko: "몸과 환경을 고려한 인터랙션", en: "Interaction with body and environment" } },
+      { code: "CS473", name: { ko: "소셜컴퓨팅 개론", en: "Social Computing" }, note: { ko: "사람과 커뮤니티를 위한 시스템", en: "Systems for people and communities" } },
+    ],
+  },
+];
+
 const SEMESTER_CHECKLIST: LocalizedCopy[] = [
   {
     ko: "선수과목과 해당 학기 개설 여부를 공식 학사 안내에서 확인하기",
@@ -116,8 +194,10 @@ function copy(value: LocalizedCopy, lang: Language) {
 
 export function RoadmapPage() {
   const { lang } = useLanguage();
+  const [selectedTrackId, setSelectedTrackId] = useState(ROADMAP_TRACKS[0].id);
   const title = useLocalizedSiteContent("about.roadmap.title");
   const description = useLocalizedSiteContent("about.roadmap.description");
+  const selectedTrack = ROADMAP_TRACKS.find((track) => track.id === selectedTrackId) ?? ROADMAP_TRACKS[0];
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50/60">
@@ -173,6 +253,91 @@ export function RoadmapPage() {
           </aside>
         </section>
 
+        <section className="mt-12" aria-labelledby="roadmap-track-title">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div className="max-w-3xl">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-kaist-darkgreen">
+                {lang === "ko" ? "전공 트랙 탐색" : "Explore the tracks"}
+              </p>
+              <h2 id="roadmap-track-title" className="mt-2 text-2xl font-black tracking-tight text-kaist-black md:text-3xl">
+                {lang === "ko" ? "관심 있는 색을 눌러 과목 흐름을 살펴보세요" : "Select a color to explore a course direction"}
+              </h2>
+              <p className="mt-3 text-sm font-medium leading-7 text-slate-600">
+                {lang === "ko"
+                  ? "이미지형 학사 로드맵의 분야 구분을 웹에서 다시 탐색할 수 있도록 구성했습니다. 트랙은 고정된 진로가 아니라 과목을 고르는 관점입니다."
+                  : "This interactive view adapts the field map into the web. A track is a lens for choosing courses, not a fixed career path."}
+              </p>
+            </div>
+            <span className="w-fit rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500">
+              {ROADMAP_TRACKS.length}{lang === "ko" ? "개 분야" : " fields"}
+            </span>
+          </div>
+
+          <div className="mt-7 grid gap-5 lg:grid-cols-[15rem_1fr]">
+            <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible" role="tablist" aria-label={lang === "ko" ? "전공 분야" : "Computing fields"}>
+              {ROADMAP_TRACKS.map((track) => {
+                const isSelected = selectedTrack.id === track.id;
+                return (
+                  <button
+                    key={track.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setSelectedTrackId(track.id)}
+                    className={`flex min-w-[11rem] items-center gap-3 rounded-2xl border px-4 py-3 text-left transition lg:min-w-0 ${
+                      isSelected ? "border-slate-300 bg-white shadow-sm" : "border-transparent bg-slate-100/70 hover:border-slate-200 hover:bg-white"
+                    }`}
+                  >
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: track.color }} aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black text-slate-800">{copy(track.title, lang)}</span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-slate-400">{track.courses.length}{lang === "ko" ? "개 대표 과목" : " sample courses"}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" role="tabpanel" style={{ background: `linear-gradient(135deg, ${selectedTrack.softColor}, #ffffff 62%)` }}>
+              <div className="border-b border-white/80 px-6 py-6 md:px-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: selectedTrack.color }} aria-hidden="true" />
+                      <span className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: selectedTrack.color }}>
+                        {lang === "ko" ? "관심 분야" : "Focus area"}
+                      </span>
+                    </div>
+                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">{copy(selectedTrack.title, lang)}</h3>
+                    <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-600">{copy(selectedTrack.description, lang)}</p>
+                  </div>
+                  <div className="hidden rounded-2xl bg-white/80 px-3 py-2 text-right shadow-sm sm:block">
+                    <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{lang === "ko" ? "탐색 순서" : "Flow"}</span>
+                    <span className="mt-1 block text-sm font-black text-slate-700">기초 → 핵심 → 응용</span>
+                  </div>
+                </div>
+              </div>
+              <ol className="grid gap-3 p-5 md:grid-cols-2 md:p-8">
+                {selectedTrack.courses.map((course, index) => (
+                  <li key={course.code} className="relative rounded-2xl border border-white/90 bg-white/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="rounded-lg px-2.5 py-1 text-xs font-black text-white" style={{ backgroundColor: selectedTrack.color }}>
+                        {course.code}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">{String(index + 1).padStart(2, "0")}</span>
+                    </div>
+                    <h4 className="mt-4 text-base font-black text-slate-800">{copy(course.name, lang)}</h4>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{copy(course.note, lang)}</p>
+                    {index < selectedTrack.courses.length - 1 && (
+                      <span className="absolute -bottom-3 left-1/2 z-10 hidden h-6 w-px bg-slate-200 md:block" aria-hidden="true" />
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </section>
+
         <section className="mt-12" aria-labelledby="roadmap-stages-title">
           <div className="max-w-3xl">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-kaist-darkgreen">
@@ -199,7 +364,7 @@ export function RoadmapPage() {
                       <Icon aria-hidden="true" className="h-5 w-5" />
                     </div>
                     <div>
-                      <span className="font-outfit text-xs font-black uppercase tracking-[0.14em] text-kaist-darkgreen">
+                      <span className="text-xs font-black uppercase tracking-[0.14em] text-kaist-darkgreen">
                         {lang === "ko" ? `${index + 1}단계` : `Stage ${index + 1}`}
                       </span>
                       <p className="mt-1 text-xs font-bold leading-5 text-slate-500">

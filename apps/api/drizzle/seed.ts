@@ -190,6 +190,22 @@ const BOARD_SEEDS: BoardSeed[] = [
     isActive: true,
     sortOrder: 6,
   },
+  {
+    code: "공약",
+    nameKo: "공약",
+    nameEn: "Pledges",
+    descriptionKo: "집행위원회의 약속과 진행 상황을 투명하게 공유합니다",
+    descriptionEn: "Track the council's pledges and progress transparently.",
+    readScope: "PUBLIC",
+    writePermissionId: 2,
+    commentPermissionId: null,
+    managePermissionId: null,
+    allowComment: true,
+    allowSecret: false,
+    allowLike: true,
+    isActive: true,
+    sortOrder: 7,
+  },
 ];
 async function seedPermissions() {
   await db
@@ -662,6 +678,12 @@ async function seedMockData() {
     .where(eq(boards.code, "행사"))
     .limit(1);
 
+  const [pledgeBoard] = await db
+    .select({ boardId: boards.boardId })
+    .from(boards)
+    .where(eq(boards.code, "공약"))
+    .limit(1);
+
   if (!noticeBoard || !eventBoard) {
     console.log("Boards not found, skipping mock data seed");
     return;
@@ -669,6 +691,39 @@ async function seedMockData() {
 
   await cleanupSeedContent();
   const seedAuthor = await upsertSeedAuthor();
+
+  if (pledgeBoard) {
+    await db.insert(articles).values({
+      boardId: pledgeBoard.boardId,
+      authorUserId: seedAuthor.userId,
+      titleKo: "2026 전산학부 학생회 공약과 진행 상황",
+      titleEn: "2026 SOC Student Council Pledges and Progress",
+      contentKo: [
+        "학생회가 약속한 변화를 한 곳에서 확인하고, 진행 상황을 함께 점검해 주세요.",
+        "",
+        "1. 소통: 공지·건의·문의 창구 통합 운영 — 진행 중",
+        "2. 복지: 시험 기간 간식과 학부 생활 지원 확대 — 예정",
+        "3. 학습: 전공 로드맵과 선후배 네트워킹 자료 정리 — 진행 중",
+        "4. 투명성: 회비 사용 내역과 사업 결과 정기 공개 — 예정",
+        "",
+        "공약에 대한 의견은 건의사항 게시판 또는 채널톡으로 남겨 주세요.",
+      ].join("\n"),
+      contentEn: [
+        "Review the council's commitments and follow their progress in one place.",
+        "",
+        "1. Communication: unified notice, feedback, and inquiry channels — In progress",
+        "2. Welfare: expanded exam-period and student-life support — Planned",
+        "3. Learning: degree roadmap and peer networking resources — In progress",
+        "4. Transparency: regular publication of fee use and project outcomes — Planned",
+      ].join("\n"),
+      visibilityScope: "PUBLIC",
+      isPinned: true,
+      pinOrder: 0,
+      viewCount: 58,
+      postedAt: new Date("2026-06-01T09:00:00+09:00"),
+      isAnonymous: false,
+    });
+  }
 
   const detailedNoticeContent = [
     "전산학부 학생회는 학부 여러분의 의견을 반영하고 보다 나은 학부 문화를 만들어가기 위해 열정과 책임감 있는 임원분들을 모집합니다.",

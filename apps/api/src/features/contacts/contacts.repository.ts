@@ -1,8 +1,14 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { eq, asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 import { executiveContacts } from "../../infrastructure/postgres/postgres.schema";
-import type { ContactRecord, CreateContactRequest, UpdateContactRequest } from "@soc/contracts";
+import type {
+  BulkImportContactsRequest,
+  BulkImportContactsResponse,
+  ContactRecord,
+  CreateContactRequest,
+  UpdateContactRequest,
+} from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
 
 @Injectable()
@@ -55,6 +61,49 @@ export class ContactsRepository {
       })
       .returning();
     return this.map(row);
+  }
+
+  async bulkImport(
+    dto: BulkImportContactsRequest,
+  ): Promise<BulkImportContactsResponse> {
+    return this.db.transaction(async (tx) => {
+      let removedCount = 0;
+
+      if (dto.replaceExisting) {
+        const removed = await tx.delete(executiveContacts).returning({
+          id: executiveContacts.id,
+        });
+        removedCount = removed.length;
+      }
+
+      const rows = await tx
+        .insert(executiveContacts)
+        .values(
+          dto.items.map((item, index) => ({
+            nameKo: item.nameKo,
+            nameEn: item.nameEn,
+            roleKo: item.roleKo,
+            roleEn: item.roleEn,
+            email: item.email ?? null,
+            phoneNumber: item.phoneNumber ?? null,
+            sortOrder: item.sortOrder ?? index * 10,
+            updatedAt: nowDate(),
+          })),
+        )
+        .returning();
+
+      return {
+        importedCount: rows.length,
+        removedCount,
+        items: rows
+          .map((row) => this.map(row))
+          .sort(
+            (a, b) =>
+              a.sortOrder - b.sortOrder ||
+              a.createdAt.localeCompare(b.createdAt),
+          ),
+      };
+    });
   }
 
   async update(id: string, dto: UpdateContactRequest): Promise<ContactRecord | null> {

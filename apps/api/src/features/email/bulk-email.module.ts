@@ -5,11 +5,12 @@ import { BulkEmailController } from "./bulk-email.controller";
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
+import { EmailDeliveryService } from "./email-delivery.service";
 
 @Module({
   imports: [AuthModule, UsersModule, PostgresModule],
   controllers: [BulkEmailController],
-  providers: [BulkEmailRepository, BulkEmailService],
+  providers: [BulkEmailRepository, BulkEmailService, EmailDeliveryService],
   exports: [BulkEmailService, BulkEmailRepository],
 })
 export class BulkEmailModule {}

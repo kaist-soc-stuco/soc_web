@@ -25,7 +25,7 @@ export function EventsSurveysDayDetails({
   selectedHoliday,
 }: EventsSurveysDayDetailsProps) {
   return (
-    <div className="lg:col-span-1 bg-white rounded-3xl border border-card-border-subtle p-4.5 shadow-card min-h-[380px] lg:h-[500px] sticky top-24 self-start flex flex-col justify-between">
+    <div className="sticky top-24 flex min-h-[380px] flex-col justify-between rounded-lg border border-card-border-subtle bg-white p-4 shadow-none lg:col-span-1 lg:h-[500px]">
       <div className="flex flex-col min-h-0 flex-1">
         <h3 className="text-base font-extrabold text-kaist-black border-b border-kaist-grey/10 pb-2.5 mb-3.5 flex items-center gap-2 select-none shrink-0">
           <CalendarIcon className="w-4 h-4 text-brand-primary" />
@@ -35,11 +35,11 @@ export function EventsSurveysDayDetails({
         </h3>
 
         <div className="flex flex-col min-h-0 flex-1 space-y-4">
-          <div className="bg-brand-primary-light border border-brand-primary/10 rounded-2xl p-3 flex flex-col items-center gap-1 text-center shadow-card select-none shrink-0">
+          <div className="flex shrink-0 flex-col items-center gap-1 rounded-md border border-brand-primary-border bg-brand-primary-light p-3 text-center select-none">
             <span className="text-[12.5px] font-black text-brand-primary">
               {selectedDateStr}
             </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-brand-primary text-white shadow-card mt-1">
+            <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-brand-primary px-2.5 py-0.5 text-[10.5px] font-semibold text-white">
               <CalendarIcon className="w-3 h-3" />
               <span>
                 {lang === "ko"
@@ -48,7 +48,7 @@ export function EventsSurveysDayDetails({
               </span>
             </span>
             {selectedHoliday && (
-              <span className="mt-1 inline-flex items-center rounded-full border border-red-100 bg-red-50 px-2.5 py-0.5 text-[10.5px] font-extrabold text-red-500">
+                <span className="mt-1 inline-flex items-center rounded-md border border-red-100 bg-red-50 px-2.5 py-0.5 text-[10.5px] font-semibold text-red-500">
                 {getKoreanHolidayName(selectedHoliday.dateName, lang)}
               </span>
             )}
@@ -86,7 +86,7 @@ export function EventsSurveysDayDetails({
                 return (
                   <div
                     key={idx}
-                    className="bg-white border border-card-border-subtle rounded-xl p-3.5 space-y-2 shadow-card hover:shadow-card-hover transition-shadow relative overflow-hidden shrink-0"
+                    className="relative shrink-0 space-y-2 overflow-hidden rounded-md border border-card-border-subtle bg-white p-3.5"
                   >
                     <div
                       className={`absolute top-0 left-0 right-0 h-0.5 ${style.bullet}`}
@@ -94,13 +94,13 @@ export function EventsSurveysDayDetails({
 
                     <div className="flex items-center justify-between select-none">
                       <span
-                        className={`text-[9px] font-black px-2 py-0.2 rounded-full border ${style.bg}`}
+                        className={`rounded-md border px-2 py-0.5 text-[9px] font-semibold ${style.bg}`}
                       >
                         {style.label}
                       </span>
 
                       <span
-                        className={`text-[9px] font-black px-2 py-0.2 rounded-full ${
+                        className={`rounded-md px-2 py-0.5 text-[9px] font-semibold ${
                           isStateOpen
                             ? "bg-brand-primary-light text-brand-primary"
                             : "bg-slate-100 text-slate-500"
@@ -129,7 +129,7 @@ export function EventsSurveysDayDetails({
 
                     <div className="pt-2 border-t border-slate-50 flex items-center justify-between text-[10px] font-semibold text-slate-500 select-none">
                       <div className="flex items-center gap-1 text-slate-400">
-                        <Clock className="w-3 h-3 text-slate-300 animate-pulse" />
+                        <Clock className="w-3 h-3 text-slate-300" />
                         <span>{formattedTime}</span>
                         <span className="text-slate-200">|</span>
                         <span>
