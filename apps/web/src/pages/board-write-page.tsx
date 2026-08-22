@@ -1,15 +1,13 @@
 import { useNavigate } from "react-router-dom";
 
 import { Header } from "@/components/organisms/header";
-import { Footer } from "@/components/organisms/footer";
-import { PageHero } from "@/components/organisms/page-hero";
+import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   getBoardLabelFromMetadata,
   getBoardTitleFromMetadata,
 } from "@/lib/board-metadata";
 import {
   BoardWriteAttachmentList,
-  BoardWriteDraftBanner,
   BoardWriteEditorFields,
   BoardWriteEventFields,
   BoardWriteHeaderControls,
@@ -17,12 +15,12 @@ import {
   BoardWriteFooter,
 } from "@/features/board-write/board-write-form-sections";
 import { useBoardWritePageController } from "@/features/board-write/use-board-write-page-controller";
+import { UiInput } from "@/components/ui/form-control";
 
 export function BoardWritePage() {
   const navigate = useNavigate();
   const {
     ConfirmDialog,
-    activeTab,
     assets,
     allowComment,
     boardByCode,
@@ -30,29 +28,28 @@ export function BoardWritePage() {
     canWriteSelected,
     contentEn,
     contentKo,
-    draftTime,
+    drafts,
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
     eventStartDate,
     fileInputRef,
     handleCategoryChange,
-    handleDiscardDraft,
+    handleDeleteDraft,
     handleRestoreDraft,
     handleSaveDraft,
     handleSubmit,
     handleUploadFiles,
-    hasDraft,
     isAnonymous,
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
+    isSecret,
     isSubmitting,
     lang,
     selectedBoard,
     selectedCategory,
     selectedSurveyId,
-    setActiveTab,
     setAssets,
     setAllowComment,
     setContentEn,
@@ -65,6 +62,7 @@ export function BoardWritePage() {
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
+    setIsSecret,
     setSelectedSurveyId,
     setTitleEn,
     setTitleKo,
@@ -76,11 +74,12 @@ export function BoardWritePage() {
   } = useBoardWritePageController();
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col text-slate-950">
+    <PageShell className="text-slate-950">
       {ConfirmDialog}
-      <Header showLogo />
+      <Header />
 
-      <PageHero
+      <PageHeader
+        className="board-write-page-header"
         title={
           lang === "ko"
             ? `${getBoardTitleFromMetadata(
@@ -94,27 +93,37 @@ export function BoardWritePage() {
                 lang,
               )} - Write Post`
         }
-        description={
-          lang === "ko"
-            ? "새로운 소식을 국문과 영문으로 공유해보세요."
-            : "Share news in Korean and English."
+        breadcrumbs={[
+          { label: lang === "ko" ? "게시판" : "Board", to: "/board" },
+          {
+            label: getBoardLabelFromMetadata(
+              selectedBoard,
+              selectedCategory,
+              lang,
+            ),
+          },
+        ]}
+        actions={
+          <BoardWriteFooter
+            compact
+            draftCount={drafts.length}
+            drafts={drafts}
+            lang={lang}
+            isSubmitting={isSubmitting}
+            canWriteSelected={canWriteSelected}
+            onCancel={() => navigate(-1)}
+            onDeleteDraft={handleDeleteDraft}
+            onRestoreDraft={(draftId) => handleRestoreDraft(draftId)}
+            onSaveDraft={() => handleSaveDraft()}
+            onSubmit={handleSubmit}
+          />
         }
-        showDescription={false}
       />
 
-      <main className="flex-1 w-full mx-auto pb-20">
-        <div className="mx-auto max-w-[1040px] px-6 lg:px-8 pt-4 pb-16 flex flex-col gap-4 w-full">
-          {hasDraft && (
-            <BoardWriteDraftBanner
-              draftTime={draftTime}
-              lang={lang}
-              onDiscard={() => void handleDiscardDraft()}
-              onRestore={handleRestoreDraft}
-            />
-          )}
-
+      <PageMain className="pb-20">
+        <PageContainer className="flex max-w-none flex-col gap-4 pb-16 pt-4">
           {/* Hidden file input for editor uploads */}
-          <input
+          <UiInput
             ref={fileInputRef}
             type="file"
             multiple
@@ -123,27 +132,24 @@ export function BoardWritePage() {
           />
 
           {/* Unified Editor Card Container */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+          <DataViewCard>
             <BoardWriteHeaderControls
-              activeTab={activeTab}
               boardByCode={boardByCode}
               isKoreanOnly={isKoreanOnly}
               lang={lang}
-              onActiveTabChange={setActiveTab}
               onCategoryChange={handleCategoryChange}
               onKoreanOnlyChange={(checked) => {
                 setIsKoreanOnly(checked);
-                if (checked) setActiveTab("ko");
               }}
               selectedCategory={selectedCategory}
               writableBoardCodes={writableBoardCodes}
             />
 
-            <div className="p-6 md:p-8 space-y-6 min-h-[450px]">
+            <div className="min-h-[450px] space-y-6">
               <BoardWriteEditorFields
-                activeTab={activeTab}
                 contentEn={contentEn}
                 contentKo={contentKo}
+                isKoreanOnly={isKoreanOnly}
                 lang={lang}
                 onContentEnChange={setContentEn}
                 onContentKoChange={setContentKo}
@@ -155,41 +161,43 @@ export function BoardWritePage() {
                 uploading={uploading}
               />
 
-              {selectedCategory === "행사" && (
-                <BoardWriteEventFields
-                  activeTab={activeTab}
-                  eventDescriptionKo={eventDescriptionKo}
-                  eventDescriptionEn={eventDescriptionEn}
-                  eventEndDate={eventEndDate}
-                  eventStartDate={eventStartDate}
-                  isEventAlwaysOpen={isEventAlwaysOpen}
-                  lang={lang}
-                  onEventAlwaysOpenChange={(checked) => {
-                    setIsEventAlwaysOpen(checked);
-                    if (checked) {
-                      setEventStartDate("");
-                      setEventEndDate("");
-                    }
-                  }}
-                  onEventDescriptionKoChange={setEventDescriptionKo}
-                  onEventDescriptionEnChange={setEventDescriptionEn}
-                  onEventEndDateChange={setEventEndDate}
-                  onEventStartDateChange={setEventStartDate}
-                />
-              )}
+              <div className="space-y-6 px-6 pb-6 md:px-8">
+                {selectedCategory === "행사" && (
+                  <BoardWriteEventFields
+                    eventDescriptionKo={eventDescriptionKo}
+                    eventDescriptionEn={eventDescriptionEn}
+                    eventEndDate={eventEndDate}
+                    eventStartDate={eventStartDate}
+                    isEventAlwaysOpen={isEventAlwaysOpen}
+                    isKoreanOnly={isKoreanOnly}
+                    lang={lang}
+                    onEventAlwaysOpenChange={(checked) => {
+                      setIsEventAlwaysOpen(checked);
+                      if (checked) {
+                        setEventStartDate("");
+                        setEventEndDate("");
+                      }
+                    }}
+                    onEventDescriptionKoChange={setEventDescriptionKo}
+                    onEventDescriptionEnChange={setEventDescriptionEn}
+                    onEventEndDateChange={setEventEndDate}
+                    onEventStartDateChange={setEventStartDate}
+                  />
+                )}
 
-              <BoardWriteAttachmentList
-                assets={assets}
-                lang={lang}
-                onRemoveAsset={(assetId) =>
-                  setAssets((prev) =>
-                    prev.filter((item) => item.assetId !== assetId),
-                  )
-                }
-                uploading={uploading}
-              />
+                <BoardWriteAttachmentList
+                  assets={assets}
+                  lang={lang}
+                  onRemoveAsset={(assetId) =>
+                    setAssets((prev) =>
+                      prev.filter((item) => item.assetId !== assetId),
+                    )
+                  }
+                  uploading={uploading}
+                />
+              </div>
             </div>
-          </div>
+          </DataViewCard>
 
           <BoardWriteSettings
             allowComment={allowComment}
@@ -201,22 +209,16 @@ export function BoardWritePage() {
             surveys={surveys}
             isAnonymous={isAnonymous}
             isPinned={isPinned}
+            isSecret={isSecret}
+            allowSecret={selectedBoard?.allowSecret ?? false}
             onAnonymousChange={setIsAnonymous}
             onPinnedChange={setIsPinned}
+            onSecretChange={setIsSecret}
           />
 
-          <BoardWriteFooter
-            lang={lang}
-            isSubmitting={isSubmitting}
-            canWriteSelected={canWriteSelected}
-            onCancel={() => navigate(-1)}
-            onSaveDraft={() => handleSaveDraft(false)}
-            onSubmit={handleSubmit}
-          />
-        </div>
-      </main>
+        </PageContainer>
+      </PageMain>
 
-      <Footer />
-    </div>
+    </PageShell>
   );
 }

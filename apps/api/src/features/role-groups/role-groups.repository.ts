@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, notInArray, or, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -21,6 +21,8 @@ import type {
   PermissionRecord,
   RoleGroupRecord,
   RoleGroupMemberRecord,
+  RoleGroupCandidateListResponse,
+  RoleGroupMemberFilterRequest,
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
@@ -31,6 +33,33 @@ export class RoleGroupsRepository {
 
   private normalizePermissionIds(permissionIds: number[]): number[] {
     return [...new Set(permissionIds)].filter((permissionId) => permissionId > 0);
+  }
+
+  private mapAdminUser(row: typeof users.$inferSelect): AdminUserRecord {
+    return {
+      academicStatus: row.academicStatus ?? null,
+      createdAt: msToIso(row.createdAt.valueOf()),
+      departmentEn: row.departmentEn ?? null,
+      departmentKo: row.departmentKo ?? null,
+      primaryMajor: row.primaryMajor ?? null,
+      doubleMajor: row.doubleMajor ?? null,
+      minor: row.minor ?? null,
+      gender: row.gender ?? null,
+      phoneNumber: row.phoneNumber ?? null,
+      privacyConsentAt: row.privacyConsentAt
+        ? msToIso(row.privacyConsentAt.valueOf())
+        : null,
+      email: row.email,
+      identityCode: row.identityCode ?? null,
+      isActive: row.isActive,
+      kaistUid: row.kaistUid,
+      lastLoginAt: row.lastLoginAt ? msToIso(row.lastLoginAt.valueOf()) : null,
+      nameEn: row.nameEn ?? null,
+      nameKo: row.nameKo,
+      stdNo: row.stdNo ?? null,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+      userId: String(row.userId),
+    };
   }
 
   private async setRoleGroupPermissions(
@@ -252,6 +281,74 @@ export class RoleGroupsRepository {
     }));
   }
 
+  async listRoleGroupCandidates(
+    roleGroupId: number,
+    input: RoleGroupMemberFilterRequest,
+  ): Promise<RoleGroupCandidateListResponse> {
+    const page = Math.max(input.page ?? 1, 1);
+    const pageSize = Math.min(Math.max(input.pageSize ?? 20, 1), 100);
+    const offset = (page - 1) * pageSize;
+    const query = input.q?.trim();
+    const conditions = [
+      query
+        ? or(
+            ilike(users.nameKo, `%${query}%`),
+            ilike(users.nameEn, `%${query}%`),
+            ilike(users.stdNo, `%${query}%`),
+            ilike(users.email, `%${query}%`),
+            ilike(users.departmentKo, `%${query}%`),
+          )
+        : undefined,
+      input.department?.trim()
+        ? or(
+            ilike(users.departmentKo, `%${input.department.trim()}%`),
+            ilike(users.departmentEn, `%${input.department.trim()}%`),
+          )
+        : undefined,
+      input.academicStatus?.trim()
+        ? ilike(users.academicStatus, `%${input.academicStatus.trim()}%`)
+        : undefined,
+      input.status === "active"
+        ? eq(users.isActive, true)
+        : input.status === "inactive"
+          ? eq(users.isActive, false)
+          : undefined,
+    ].filter((condition): condition is NonNullable<typeof condition> => Boolean(condition));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [rows, countRows] = await Promise.all([
+      this.db
+        .select({
+          user: users,
+          isMember: sql<boolean>`CASE WHEN ${userRoleGroups.userRoleGroupId} IS NULL THEN false ELSE true END`,
+        })
+        .from(users)
+        .leftJoin(
+          userRoleGroups,
+          and(
+            eq(userRoleGroups.userId, users.userId),
+            eq(userRoleGroups.roleGroupId, roleGroupId),
+            eq(userRoleGroups.isActive, true),
+          ),
+        )
+        .where(whereClause)
+        .orderBy(asc(users.nameKo), asc(users.kaistUid))
+        .limit(pageSize)
+        .offset(offset),
+      this.db.select({ count: sql<number>`COUNT(*)::int` }).from(users).where(whereClause),
+    ]);
+
+    return {
+      items: rows.map((row) => ({
+        ...this.mapAdminUser(row.user),
+        isMember: Boolean(row.isMember),
+      })),
+      page,
+      pageSize,
+      total: Number(countRows[0]?.count ?? 0),
+    };
+  }
+
   async addUserToRoleGroup(
     roleGroupId: number,
     input: AssignRoleGroupMemberRequest & { grantedBy?: string | null },
@@ -286,6 +383,69 @@ export class RoleGroupsRepository {
 
     const members = await this.listRoleGroupMembers(roleGroupId);
     return members.find((member) => member.userId === input.userId) ?? null;
+  }
+
+  async replaceRoleGroupMembers(
+    roleGroupId: number,
+    userIds: string[],
+    grantedBy?: string | null,
+  ): Promise<RoleGroupMemberRecord[] | null> {
+    const uniqueUserIds = [...new Set(userIds)];
+    const valid = await this.db
+      .select({ userId: users.userId })
+      .from(users)
+      .where(
+        uniqueUserIds.length > 0
+          ? inArray(users.userId, uniqueUserIds)
+          : sql`false`,
+      );
+
+    if (valid.length !== uniqueUserIds.length) {
+      return null;
+    }
+
+    const now = nowDate();
+    await this.db.transaction(async (tx) => {
+      const activeMembers = await tx
+        .select({ userId: userRoleGroups.userId })
+        .from(userRoleGroups)
+        .where(
+          and(
+            eq(userRoleGroups.roleGroupId, roleGroupId),
+            eq(userRoleGroups.isActive, true),
+          ),
+        );
+      const activeIds = new Set(activeMembers.map((member) => member.userId));
+
+      const deactivateWhere = [
+        eq(userRoleGroups.roleGroupId, roleGroupId),
+        eq(userRoleGroups.isActive, true),
+        ...(uniqueUserIds.length > 0
+          ? [notInArray(userRoleGroups.userId, uniqueUserIds)]
+          : []),
+      ];
+      await tx
+        .update(userRoleGroups)
+        .set({ isActive: false, validTo: now })
+        .where(and(...deactivateWhere));
+
+      const toInsert = uniqueUserIds.filter((userId) => !activeIds.has(userId));
+      if (toInsert.length > 0) {
+        await tx.insert(userRoleGroups).values(
+          toInsert.map((userId) => ({
+            grantedAt: now,
+            grantedBy: grantedBy ?? null,
+            isActive: true,
+            roleGroupId,
+            userId,
+            validFrom: now,
+            validTo: null,
+          })),
+        );
+      }
+    });
+
+    return this.listRoleGroupMembers(roleGroupId);
   }
 
   async removeUserFromRoleGroup(roleGroupId: number, userId: string): Promise<void> {

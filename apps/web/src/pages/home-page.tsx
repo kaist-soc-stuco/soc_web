@@ -7,30 +7,30 @@ import { Footer } from '@/components/organisms/footer';
 
 export function HomePage() {
   return (
-    <div 
-      className="min-h-screen bg-[#fafafa] flex flex-col select-none lg:h-screen lg:overflow-hidden"
+    <div
+      className="home-page-shell home-viewport-height flex min-h-screen flex-col overflow-x-hidden bg-background lg:overflow-hidden"
     >
-      <div className="flex flex-1 min-h-0">
+      <Header variant="home" />
+      <div className="-mt-[var(--ui-header-height)] flex flex-1 min-h-0">
         {/* Left Hero Image */}
-        <aside className="hidden lg:block lg:w-[30%] h-full border-r border-kaist-grey/15 shrink-0">
+        <aside className="home-hero-column hidden h-full shrink-0 self-stretch lg:block">
           <Hero />
         </aside>
 
         {/* Right Side - Main Content */}
-        <div className="w-full min-w-0 min-h-screen flex flex-col overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8faf9_100%)] lg:w-[70%] lg:h-full lg:min-h-0">
-          <Header />
-          <main className="flex-1 min-w-0 flex flex-col gap-5 overflow-x-hidden overflow-y-auto px-6 py-5 lg:min-h-0 lg:overflow-hidden lg:px-8">
+        <div className="home-main-column flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-[var(--ui-surface-canvas)] pt-[var(--ui-header-height)] lg:h-full lg:min-h-0">
+          <main className="channel-talk-safe-area flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden px-6 py-4 lg:min-h-0 lg:overflow-hidden lg:px-8">
             {/* Event Carousel */}
-            <div className="home-mobile-section min-w-0 min-h-[350px] shrink-0 overflow-hidden md:min-h-[400px]">
+            <div className="home-event-section home-mobile-section min-w-0 shrink-0 overflow-hidden">
               <EventCarousel />
             </div>
             
-            {/* Notice & Calendar Side by Side with elegant margin and generous gaps */}
-            <div className="flex min-w-0 flex-col gap-7 pb-2 lg:flex-1 lg:min-h-0 lg:flex-row">
-              <div className="home-mobile-section min-w-0 lg:flex-[1.6] lg:h-full lg:min-h-0">
+            {/* Board and calendar share the lower bento row equally. */}
+            <div className="flex min-w-0 flex-col items-stretch gap-4 pb-1 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-stretch">
+              <div className="home-mobile-section min-w-0 lg:h-full lg:flex-1 lg:self-stretch">
                 <NoticeBoard />
               </div>
-              <div className="home-mobile-section min-w-0 lg:flex-1 lg:h-full lg:min-h-0">
+              <div className="home-mobile-section min-w-0 lg:flex-1 lg:h-full lg:min-h-0 lg:self-stretch">
                 <Calendar />
               </div>
             </div>
@@ -38,8 +38,7 @@ export function HomePage() {
         </div>
       </div>
       
-      {/* Footer - Full width */}
-      {/*<Footer />*/}
+      <Footer />
     </div>
   );
 }

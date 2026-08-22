@@ -32,7 +32,21 @@ export class AuditLogService {
     sortBy?: "createdAt" | "actor" | "action";
     sortDirection?: "asc" | "desc";
     targetType?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }): Promise<AuditLogListResponse> {
     return this.auditLogRepository.list(input);
+  }
+
+  async export(input: Parameters<AuditLogService["list"]>[0]): Promise<AuditLogListResponse["items"]> {
+    const pageSize = 100;
+    const first = await this.auditLogRepository.list({ ...input, page: 1, pageSize });
+    const items = [...first.items];
+    const pages = Math.ceil(first.total / first.pageSize);
+    for (let page = 2; page <= pages; page += 1) {
+      const next = await this.auditLogRepository.list({ ...input, page, pageSize });
+      items.push(...next.items);
+    }
+    return items;
   }
 }

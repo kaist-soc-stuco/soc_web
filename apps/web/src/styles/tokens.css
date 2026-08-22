@@ -1,0 +1,69 @@
+:root {
+  /* Shared geometry: inputs, selects, buttons and filter controls use these values. */
+  --ui-control-height: 2.5rem;
+  --ui-control-height-compact: 2.25rem;
+  --ui-control-radius: 0.5rem;
+  --ui-control-font-size: 0.875rem;
+  --ui-control-font-weight: 400;
+  --ui-control-line-height: 1.25rem;
+  --ui-segmented-height: 2.5rem;
+  --ui-segmented-item-height: 2rem;
+  --ui-page-tab-height: 2.125rem;
+  --ui-card-radius: 0.75rem;
+  --ui-panel-radius: 1rem;
+  --ui-page-max-width: 88rem;
+  --ui-space-page-x: 1.25rem;
+  --ui-space-page-x-wide: 2rem;
+  --ui-header-height: 4.25rem;
+  --ui-brand-rail-width: 15rem;
+  /* Fixed values prevent scrollbar/route changes from moving the desktop GNB. */
+  --ui-nav-start-offset: 1.5rem;
+  --ui-nav-column-width: 11.5rem;
+  --ui-menu-divider: rgb(229 233 236);
+  --ui-menu-item-text: rgb(52 64 84);
+  --board-col-category: 5.5rem;
+  --board-col-author: 10.5rem;
+  --board-col-date: 7rem;
+  --board-col-views: 5.5rem;
+
+  /* Quiet neutrals keep the interface legible without heavy outlines. */
+  --ui-border-subtle: #e4ebe6;
+  --ui-border-default: #d7e1db;
+  --ui-border-strong: #bdcbc2;
+  --ui-surface-canvas: #f7faf8;
+  --ui-surface-muted: #f2f6f3;
+  --ui-text-strong: #172033;
+  --ui-text-body: #344054;
+  --ui-text-muted: #6f7d75;
+  --ui-brand: #006e3f;
+  --ui-brand-surface: #e5f2ea;
+  --j-color-text-primary: #172033;
+  --j-color-text-secondary: #344054;
+
+  /* A visible, but intentionally softer, keyboard focus ring. */
+  --ui-focus-ring: 0 0 0 3px rgb(0 110 63 / 0.14);
+
+  --ui-motion-fast: 150ms;
+  --ui-motion-press: 100ms;
+  --ui-motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Baseline hierarchy restored after the over-light typography pass. */
+  --ui-weight-body: 400;
+  --ui-weight-label: 400;
+  --ui-weight-heading: 750;
+
+  /* Home typography roles. Keep page-specific hierarchy on the same token
+     scale so card, board, calendar, and hero text do not drift apart. */
+  --home-hero-title-size: clamp(2.125rem, 2.8vw, 2.625rem);
+  --home-event-title-size: 1rem;
+  --home-event-description-size: 0.78125rem;
+  --home-board-title-size: 0.8125rem;
+  --home-calendar-title-size: 0.9375rem;
+  --home-meta-size: 0.8125rem;
+  --home-weight-title: 700;
+  --home-weight-hero: 800;
+  --home-weight-body: 400;
+  --home-weight-meta: 400;
+  /* Keep the home carousel compact and stable across desktop widths. */
+  --home-event-card-height: 25rem;
+  --home-event-card-height-mobile: 17.5rem;
+}

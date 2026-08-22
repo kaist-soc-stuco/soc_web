@@ -15,13 +15,17 @@
     "test": "pnpm --dir ../../shared/common build && pnpm build && node --conditions=production --test --test-concurrency=1 test/*.test.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.862.0",
+    "@aws-sdk/s3-request-presigner": "^3.862.0",
     "@nestjs/common": "^11.1.27",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.27",
     "@nestjs/platform-express": "^11.1.27",
+    "@nestjs/schedule": "6.1.3",
     "@soc/contracts": "workspace:*",
     "@soc/shared": "workspace:*",
     "@types/nodemailer": "^8.0.1",
+    "cheerio": "1.2.0",
     "cookie": "^1.1.1",
     "cookie-parser": "^1.4.7",
     "dayjs": "^1.11.13",
@@ -34,6 +38,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "sanitize-html": "^2.17.6",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -1,8 +1,7 @@
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Header } from "@/components/organisms/header";
-import { Footer } from "@/components/organisms/footer";
-import { PageHero } from "@/components/organisms/page-hero";
+import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   BoardEditHeaderControls,
   BoardWriteAttachmentList,
@@ -13,19 +12,21 @@ import {
 } from "@/features/board-write/board-write-form-sections";
 import { useBoardEditPageController } from "@/features/board-write/use-board-edit-page-controller";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
+import { Button } from "@/components/ui/button";
+import { UiInput } from "@/components/ui/form-control";
 
 export function BoardEditPage() {
   const {
     ConfirmDialog,
-    activeTab,
-    articleId,
     assets,
     allowComment,
+    allowSecret,
     backToArticle,
     canConfigurePostSettings,
     category,
     contentEn,
     contentKo,
+    drafts,
     error,
     eventDescriptionKo,
     eventDescriptionEn,
@@ -33,17 +34,20 @@ export function BoardEditPage() {
     eventStartDate,
     fileInputRef,
     handleSubmit,
+    handleDeleteDraft,
+    handleRestoreDraft,
+    handleSaveDraft,
     handleUploadFiles,
     isAnonymous,
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
+    isSecret,
     isSubmitting,
     lang,
     loading,
     selectedSurveyId,
     setAllowComment,
-    setActiveTab,
     setAssets,
     setContentEn,
     setContentKo,
@@ -55,6 +59,7 @@ export function BoardEditPage() {
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
+    setIsSecret,
     setSelectedSurveyId,
     setTitleEn,
     setTitleKo,
@@ -66,36 +71,41 @@ export function BoardEditPage() {
   const categoryLabel = getBoardLabelFromMetadata(undefined, category, lang);
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col text-slate-950">
+    <PageShell className="text-slate-950">
       {ConfirmDialog}
-      <Header showLogo />
+      <Header />
 
-      <PageHero
+      <PageHeader
+        className="board-write-page-header"
         title={
           lang === "ko"
             ? `${categoryLabel} - 글 수정하기`
             : `${categoryLabel} - Edit Post`
         }
-        description={
-          lang === "ko"
-            ? "기존 게시글의 내용을 변경하고 다듬습니다."
-            : "Modify and refine the content of the article."
+        breadcrumbs={[
+          { label: lang === "ko" ? "게시판" : "Board", to: "/board" },
+          { label: categoryLabel },
+        ]}
+        actions={
+          <BoardWriteFooter
+            compact
+            draftCount={drafts.length}
+            drafts={drafts}
+            lang={lang}
+            isSubmitting={isSubmitting}
+            onCancel={backToArticle}
+            onDeleteDraft={handleDeleteDraft}
+            onRestoreDraft={handleRestoreDraft}
+            onSaveDraft={handleSaveDraft}
+            onSubmit={handleSubmit}
+            submitLabel={lang === "ko" ? "수정 완료" : "Save Changes"}
+            submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}
+          />
         }
-        showDescription={false}
       />
 
-      <main className="flex-1 w-full mx-auto pb-20">
-        <div className="mx-auto max-w-[1040px] px-6 lg:px-8 pt-4 pb-16 flex flex-col gap-4 w-full">
-          <div className="flex items-center select-none mb-1">
-            <button
-              onClick={backToArticle}
-              className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600 text-xs font-bold border-0 bg-transparent cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>{lang === "ko" ? "돌아가기" : "Back to post"}</span>
-            </button>
-          </div>
-
+      <PageMain className="pb-20">
+        <PageContainer className="flex max-w-none flex-col gap-4 pb-16 pt-4">
           {loading ? (
             <div className="bg-white border border-slate-200 rounded-xl p-16 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col items-center justify-center gap-4">
               <Loader2 className="w-10 h-10 text-kaist-darkgreen animate-spin" />
@@ -108,17 +118,17 @@ export function BoardEditPage() {
           ) : error ? (
             <div className="bg-white border border-slate-200 rounded-xl p-12 shadow-[0_10px_35px_rgba(15,23,42,0.05)] text-center space-y-4">
               <p className="text-red-500 text-sm font-bold">{error}</p>
-              <button
+              <Button variant="ghost"
                 onClick={backToArticle}
                 className="px-5 py-2 bg-kaist-darkgreen text-white font-bold rounded-lg text-xs border-0 cursor-pointer shadow-sm hover:opacity-90 transition-all"
               >
                 {lang === "ko" ? "게시글로 돌아가기" : "Back to Article"}
-              </button>
+              </Button>
             </div>
           ) : (
             <>
               {/* Hidden file input for editor uploads */}
-              <input
+              <UiInput
                 ref={fileInputRef}
                 type="file"
                 multiple
@@ -127,24 +137,21 @@ export function BoardEditPage() {
               />
 
               {/* Unified Editor Card Container */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+              <DataViewCard>
                 <BoardEditHeaderControls
-                  activeTab={activeTab}
                   category={category}
                   isKoreanOnly={isKoreanOnly}
                   lang={lang}
-                  onActiveTabChange={setActiveTab}
                   onKoreanOnlyChange={(checked) => {
                     setIsKoreanOnly(checked);
-                    if (checked) setActiveTab("ko");
                   }}
                 />
 
-                <div className="p-6 md:p-8 space-y-6 min-h-[450px]">
+                <div className="min-h-[450px] space-y-6">
                   <BoardWriteEditorFields
-                    activeTab={activeTab}
                     contentEn={contentEn}
                     contentKo={contentKo}
+                    isKoreanOnly={isKoreanOnly}
                     lang={lang}
                     onContentEnChange={setContentEn}
                     onContentKoChange={setContentKo}
@@ -156,41 +163,43 @@ export function BoardEditPage() {
                     uploading={uploading}
                   />
 
-                  {category === "행사" && (
-                    <BoardWriteEventFields
-                      activeTab={activeTab}
-                      eventDescriptionKo={eventDescriptionKo}
-                      eventDescriptionEn={eventDescriptionEn}
-                      eventEndDate={eventEndDate}
-                      eventStartDate={eventStartDate}
-                      isEventAlwaysOpen={isEventAlwaysOpen}
-                      lang={lang}
-                      onEventAlwaysOpenChange={(checked) => {
-                        setIsEventAlwaysOpen(checked);
-                        if (checked) {
-                          setEventStartDate("");
-                          setEventEndDate("");
-                        }
-                      }}
-                      onEventDescriptionKoChange={setEventDescriptionKo}
-                      onEventDescriptionEnChange={setEventDescriptionEn}
-                      onEventEndDateChange={setEventEndDate}
-                      onEventStartDateChange={setEventStartDate}
-                    />
-                  )}
+                  <div className="space-y-6 px-6 pb-6 md:px-8">
+                    {category === "행사" && (
+                      <BoardWriteEventFields
+                        eventDescriptionKo={eventDescriptionKo}
+                        eventDescriptionEn={eventDescriptionEn}
+                        eventEndDate={eventEndDate}
+                        eventStartDate={eventStartDate}
+                        isEventAlwaysOpen={isEventAlwaysOpen}
+                        isKoreanOnly={isKoreanOnly}
+                        lang={lang}
+                        onEventAlwaysOpenChange={(checked) => {
+                          setIsEventAlwaysOpen(checked);
+                          if (checked) {
+                            setEventStartDate("");
+                            setEventEndDate("");
+                          }
+                        }}
+                        onEventDescriptionKoChange={setEventDescriptionKo}
+                        onEventDescriptionEnChange={setEventDescriptionEn}
+                        onEventEndDateChange={setEventEndDate}
+                        onEventStartDateChange={setEventStartDate}
+                      />
+                    )}
 
-                  <BoardWriteAttachmentList
-                    assets={assets}
-                    lang={lang}
-                    onRemoveAsset={(assetId) =>
-                      setAssets((prev) =>
-                        prev.filter((item) => item.assetId !== assetId),
-                      )
-                    }
-                    uploading={uploading}
-                  />
+                    <BoardWriteAttachmentList
+                      assets={assets}
+                      lang={lang}
+                      onRemoveAsset={(assetId) =>
+                        setAssets((prev) =>
+                          prev.filter((item) => item.assetId !== assetId),
+                        )
+                      }
+                      uploading={uploading}
+                    />
+                  </div>
                 </div>
-              </div>
+              </DataViewCard>
 
               <BoardWriteSettings
                 allowComment={allowComment}
@@ -202,8 +211,11 @@ export function BoardEditPage() {
                 surveys={surveys}
                 isAnonymous={isAnonymous}
                 isPinned={isPinned}
+                isSecret={isSecret}
+                allowSecret={allowSecret}
                 onAnonymousChange={setIsAnonymous}
                 onPinnedChange={setIsPinned}
+                onSecretChange={setIsSecret}
                 anonymousLabel={
                   lang === "ko" ? "익명으로 수정" : "Edit Anonymously"
                 }
@@ -212,20 +224,11 @@ export function BoardEditPage() {
                 }
               />
 
-              <BoardWriteFooter
-                lang={lang}
-                isSubmitting={isSubmitting}
-                onCancel={backToArticle}
-                onSubmit={handleSubmit}
-                submitLabel={lang === "ko" ? "수정 완료" : "Save Changes"}
-                submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}
-              />
             </>
           )}
-        </div>
-      </main>
+        </PageContainer>
+      </PageMain>
 
-      <Footer />
-    </div>
+    </PageShell>
   );
 }

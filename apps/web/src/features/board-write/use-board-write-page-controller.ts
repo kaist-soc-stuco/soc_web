@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { SurveyRecord } from "@soc/contracts";
+import type {
+  ArticleDraftRecord,
+  ArticleDraftSaveRequest,
+  SurveyRecord,
+} from "@soc/contracts";
 import {
   hasPermission,
   htmlDatetimeLocalToIso,
   nowMs,
+  isoToHtmlDatetimeLocal,
 } from "@soc/shared";
 
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -24,24 +29,36 @@ type BoardWriteLocationState = {
   initialCategory?: string;
 };
 
-const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항", "QnA"]);
+const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항"]);
+
+const getDraftFingerprint = (payload: Omit<ArticleDraftSaveRequest, "fingerprint" | "draftId" | "expectedVersion">) => {
+  const serialized = JSON.stringify(payload);
+  let hash = 2166136261;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+};
 
 export function useBoardWritePageController() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { category: routeCategory } = useParams<{ category?: string }>();
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const routeInitialCategory = (
     location.state as BoardWriteLocationState | null
   )?.initialCategory;
+  const routeDraftId = new URLSearchParams(location.search).get("draftId");
   const [selectedCategory, setSelectedCategory] = useState<string>(
-    routeInitialCategory ?? "공지",
+    routeCategory ?? routeInitialCategory ?? "공지",
   );
 
-  const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [isSecret, setIsSecret] = useState(false);
   const [allowComment, setAllowComment] = useState(true);
   const [isKoreanOnly, setIsKoreanOnly] = useState(false);
   const [titleKo, setTitleKo] = useState("");
@@ -59,8 +76,10 @@ export function useBoardWritePageController() {
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [hasDraft, setHasDraft] = useState(false);
-  const [draftTime, setDraftTime] = useState<number>(0);
+  const [drafts, setDrafts] = useState<ArticleDraftRecord[]>([]);
+  const [serverDraftId, setServerDraftId] = useState<string | null>(null);
+  const [serverDraftVersion, setServerDraftVersion] = useState<number>();
+  const lastDraftFingerprintRef = useRef<string | null>(null);
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -134,6 +153,12 @@ export function useBoardWritePageController() {
   }, [selectedBoard?.allowComment]);
 
   useEffect(() => {
+    if (!selectedBoard?.allowSecret) {
+      setIsSecret(false);
+    }
+  }, [selectedBoard?.allowSecret]);
+
+  useEffect(() => {
     if (!canUseWriteFeatures || !canConfigurePostSettings) return;
     apiClient
       .listSurveys()
@@ -182,29 +207,78 @@ export function useBoardWritePageController() {
   };
 
   useEffect(() => {
-    const key = `draft_${selectedCategory}`;
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (
-          parsed.titleKo ||
-          parsed.contentKo ||
-          parsed.titleEn ||
-          parsed.contentEn
-        ) {
-          setHasDraft(true);
-          setDraftTime(parsed.updatedAt || 0);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    } else {
-      setHasDraft(false);
-    }
-  }, [selectedCategory]);
+    setServerDraftId(null);
+    setServerDraftVersion(undefined);
+    if (!canUseWriteFeatures || !canWriteSelected) return;
 
-  const handleSaveDraft = (silent = false) => {
+    let cancelled = false;
+    const draftListRequest = apiClient.getArticleDrafts({
+      boardCode: selectedCategory,
+      limit: 20,
+      page: 1,
+    });
+    draftListRequest
+      .then((response) => {
+        if (!cancelled) setDrafts(response.items);
+      })
+      .catch(() => {
+        if (!cancelled) setDrafts([]);
+      });
+
+    if (!routeDraftId) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    apiClient
+      .getArticleDraft(routeDraftId)
+      .then((latest) => {
+        if (cancelled || !latest) return;
+        setTitleKo(latest.titleKo || "");
+        setTitleEn(latest.titleEn || "");
+        setContentKo(latest.contentKo || "");
+        setContentEn(latest.contentEn || "");
+        setIsAnonymous(latest.isAnonymous);
+        setIsPinned(latest.isPinned);
+        setIsSecret(latest.isSecret);
+        setAllowComment(latest.allowComment);
+        setIsKoreanOnly(latest.isKoreanOnly);
+        setIsEventAlwaysOpen(
+          !latest.eventStartDate &&
+            !latest.eventEndDate &&
+            Boolean(latest.eventDescriptionKo),
+        );
+        setEventStartDate(
+          latest.eventStartDate
+            ? isoToHtmlDatetimeLocal(latest.eventStartDate)
+            : "",
+        );
+        setEventEndDate(
+          latest.eventEndDate ? isoToHtmlDatetimeLocal(latest.eventEndDate) : "",
+        );
+        setEventDescriptionKo(latest.eventDescriptionKo || "");
+        setEventDescriptionEn(latest.eventDescriptionEn || "");
+        setSelectedSurveyId(latest.linkedSurveyId || "");
+        setServerDraftId(latest.draftId);
+        setServerDraftVersion(latest.version);
+      })
+      .catch(() => {
+        // Local storage remains a usable fallback when the server draft API is unavailable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    apiClient,
+    canUseWriteFeatures,
+    canWriteSelected,
+    routeDraftId,
+    selectedCategory,
+  ]);
+
+  const handleSaveDraft = async () => {
     const key = `draft_${selectedCategory}`;
     const data = {
       titleKo,
@@ -213,6 +287,7 @@ export function useBoardWritePageController() {
       contentEn,
       isAnonymous,
       isPinned,
+      isSecret,
       allowComment,
       isKoreanOnly,
       isEventAlwaysOpen,
@@ -223,14 +298,98 @@ export function useBoardWritePageController() {
       updatedAt: nowMs(),
     };
     localStorage.setItem(key, JSON.stringify(data));
-    if (!silent) {
-      alert(
-        lang === "ko" ? "임시 저장되었습니다." : "Draft saved successfully.",
-      );
+
+    const draftPayload = {
+      boardCode: selectedCategory,
+      titleKo,
+      titleEn: titleEn || null,
+      contentKo,
+      contentEn: contentEn || null,
+      visibilityScope: "PUBLIC" as const,
+      isPinned,
+      isSecret,
+      isAnonymous,
+      allowComment,
+      isKoreanOnly,
+      assets: assets.map((asset, index) => ({
+        assetId: asset.assetId,
+        usageType: asset.usageType,
+        sortOrder: index,
+      })),
+      eventStartDate:
+        selectedCategory === "행사" && eventStartDate
+          ? htmlDatetimeLocalToIso(eventStartDate)
+          : null,
+      eventEndDate:
+        selectedCategory === "행사" && eventEndDate
+          ? htmlDatetimeLocalToIso(eventEndDate)
+          : null,
+      eventDescriptionKo:
+        selectedCategory === "행사" ? eventDescriptionKo || null : null,
+      eventDescriptionEn:
+        selectedCategory === "행사" ? eventDescriptionEn || null : null,
+      linkedSurveyId: selectedSurveyId || null,
+    } satisfies Omit<
+      ArticleDraftSaveRequest,
+      "draftId" | "expectedVersion" | "fingerprint"
+    >;
+    const fingerprint = getDraftFingerprint(draftPayload);
+
+    if (
+      canUseWriteFeatures &&
+      canWriteSelected &&
+      lastDraftFingerprintRef.current !== fingerprint
+    ) {
+      try {
+        const response = await apiClient.saveArticleDraft({
+          ...draftPayload,
+          draftId: serverDraftId ?? undefined,
+          expectedVersion: serverDraftVersion,
+          fingerprint,
+        });
+        setServerDraftId(response.draftId);
+        setServerDraftVersion(response.version);
+        setDrafts((current) => [
+          response,
+          ...current.filter((draft) => draft.draftId !== response.draftId),
+        ]);
+        lastDraftFingerprintRef.current = fingerprint;
+      } catch (error) {
+        console.error(error);
+      }
     }
   };
 
-  const handleRestoreDraft = () => {
+  const handleRestoreDraft = async (draftId?: string) => {
+    const requestedDraftId = draftId ?? serverDraftId;
+    if (requestedDraftId) {
+      try {
+        const draft = await apiClient.getArticleDraft(requestedDraftId);
+        setTitleKo(draft.titleKo || "");
+        setTitleEn(draft.titleEn || "");
+        setContentKo(draft.contentKo || "");
+        setContentEn(draft.contentEn || "");
+        setIsAnonymous(draft.isAnonymous);
+        setIsPinned(draft.isPinned);
+        setIsSecret(draft.isSecret);
+        setAllowComment(draft.allowComment);
+        setIsKoreanOnly(draft.isKoreanOnly);
+        setIsEventAlwaysOpen(
+          !draft.eventStartDate && !draft.eventEndDate &&
+            Boolean(draft.eventDescriptionKo),
+        );
+        setEventStartDate(draft.eventStartDate ? isoToHtmlDatetimeLocal(draft.eventStartDate) : "");
+        setEventEndDate(draft.eventEndDate ? isoToHtmlDatetimeLocal(draft.eventEndDate) : "");
+        setEventDescriptionKo(draft.eventDescriptionKo || "");
+        setEventDescriptionEn(draft.eventDescriptionEn || "");
+        setSelectedSurveyId(draft.linkedSurveyId || "");
+        setServerDraftVersion(draft.version);
+        return;
+      } catch {
+        // Keep the local browser fallback below available when the API is unavailable.
+      }
+    }
+
     const key = `draft_${selectedCategory}`;
     const raw = localStorage.getItem(key);
     if (!raw) return;
@@ -242,6 +401,7 @@ export function useBoardWritePageController() {
       setContentEn(parsed.contentEn || "");
       setIsAnonymous(parsed.isAnonymous ?? false);
       setIsPinned(parsed.isPinned ?? false);
+      setIsSecret(parsed.isSecret ?? false);
       setAllowComment(parsed.allowComment ?? true);
       setIsKoreanOnly(parsed.isKoreanOnly ?? false);
       setIsEventAlwaysOpen(parsed.isEventAlwaysOpen ?? false);
@@ -251,40 +411,33 @@ export function useBoardWritePageController() {
         parsed.eventDescriptionKo || parsed.eventDescription || "",
       );
       setEventDescriptionEn(parsed.eventDescriptionEn || "");
-      setHasDraft(false);
-      alert(
-        lang === "ko"
-          ? "임시 저장글이 복구되었습니다."
-          : "Draft restored successfully.",
-      );
     } catch (error) {
       console.error(error);
     }
   };
 
-  const handleDiscardDraft = async () => {
+  const handleDeleteDraft = async (draftId: string) => {
     const confirmed = await requestConfirm({
       confirmLabel: lang === "ko" ? "삭제" : "Delete",
       description:
         lang === "ko"
-          ? "브라우저에 저장된 임시 작성 내용이 삭제됩니다."
-          : "The draft saved in this browser will be removed.",
-      title:
-        lang === "ko"
-          ? "임시 저장글을 삭제하시겠습니까?"
-          : "Delete this draft?",
+          ? "선택한 임시저장글을 삭제합니다."
+          : "Delete this saved draft.",
+      title: lang === "ko" ? "임시저장글을 삭제하시겠습니까?" : "Delete saved draft?",
       tone: "danger",
-    });
+      });
     if (!confirmed) return;
 
-    const key = `draft_${selectedCategory}`;
-    localStorage.removeItem(key);
-    setEventStartDate("");
-    setEventEndDate("");
-    setEventDescriptionKo("");
-    setEventDescriptionEn("");
-    setIsEventAlwaysOpen(false);
-    setHasDraft(false);
+    try {
+      await apiClient.deleteArticleDraft(draftId);
+      setDrafts((current) => current.filter((draft) => draft.draftId !== draftId));
+      if (serverDraftId === draftId) {
+        setServerDraftId(null);
+        setServerDraftVersion(undefined);
+      }
+    } catch {
+      // A failed delete is intentionally silent; the draft remains in the list.
+    }
   };
 
   useEffect(() => {
@@ -302,8 +455,8 @@ export function useBoardWritePageController() {
       return;
     }
     const timer = setTimeout(() => {
-      handleSaveDraft(true);
-    }, 10000);
+      void handleSaveDraft();
+    }, 2000);
     return () => clearTimeout(timer);
   }, [
     titleKo,
@@ -312,6 +465,7 @@ export function useBoardWritePageController() {
     contentEn,
     isAnonymous,
     isPinned,
+    isSecret,
     allowComment,
     isKoreanOnly,
     isEventAlwaysOpen,
@@ -319,7 +473,43 @@ export function useBoardWritePageController() {
     eventEndDate,
     eventDescriptionKo,
     eventDescriptionEn,
+    assets,
+    selectedSurveyId,
     selectedCategory,
+  ]);
+
+  useEffect(() => {
+    const saveOnLeave = () => {
+      if (document.visibilityState !== "hidden") return;
+      void handleSaveDraft();
+    };
+    window.addEventListener("pagehide", saveOnLeave);
+    document.addEventListener("visibilitychange", saveOnLeave);
+    return () => {
+      window.removeEventListener("pagehide", saveOnLeave);
+      document.removeEventListener("visibilitychange", saveOnLeave);
+    };
+  }, [
+    titleKo,
+    titleEn,
+    contentKo,
+    contentEn,
+    isAnonymous,
+    isPinned,
+    isSecret,
+    allowComment,
+    isKoreanOnly,
+    isEventAlwaysOpen,
+    eventStartDate,
+    eventEndDate,
+    eventDescriptionKo,
+    eventDescriptionEn,
+    assets,
+    selectedSurveyId,
+    selectedCategory,
+    serverDraftId,
+    serverDraftVersion,
+    apiClient,
   ]);
 
   const handleSubmit = async () => {
@@ -338,7 +528,6 @@ export function useBoardWritePageController() {
           ? "국문 제목과 내용은 필수입니다."
           : "Korean title and content are required.",
       );
-      setActiveTab("ko");
       return;
     }
 
@@ -348,7 +537,6 @@ export function useBoardWritePageController() {
             ? "영문 제목과 내용을 입력하거나 '한국어 콘텐츠만'을 선택해 주세요."
             : "Enter an English title and content, or select 'Korean content only'.",
       );
-      setActiveTab("en");
       return;
     }
 
@@ -377,6 +565,7 @@ export function useBoardWritePageController() {
         visibilityScope: "PUBLIC",
         isAnonymous: canConfigurePostSettings ? isAnonymous : false,
         isPinned: canConfigurePostSettings ? isPinned : false,
+        isSecret: selectedBoard?.allowSecret ? isSecret : false,
         allowComment: selectedBoard?.allowComment === false ? false : allowComment,
         assets: assets.map((asset, index) => ({
           assetId: asset.assetId,
@@ -412,8 +601,8 @@ export function useBoardWritePageController() {
             confirmLabel: lang === "ko" ? "상시로 설정" : "Set always open",
             description:
               lang === "ko"
-                ? "선택한 설문조사의 시작/마감 시각을 비우고 상시 진행으로 설정할까요?"
-                : "Set the linked survey as always open and clear its schedule?",
+                ? "선택한 설문조사의 시작 시각을 비우고 상시 진행으로 설정할까요?"
+                : "Set the linked survey as always open and clear its start time?",
             title:
               lang === "ko"
                 ? "설문 일정도 상시로 맞출까요?"
@@ -424,12 +613,12 @@ export function useBoardWritePageController() {
             confirmLabel: lang === "ko" ? "덮어쓰기" : "Overwrite",
             description:
               lang === "ko"
-                ? "선택한 설문조사의 시작/마감 시각을 행사 일정과 동일하게 맞출까요?"
-                : "Use this event schedule as the linked survey schedule?",
+                ? "설문 시작 시각도 행사 시작 시각과 동일하게 맞출까요?"
+                : "Use the event start as the linked survey start time?",
             title:
               lang === "ko"
-                ? "설문 일정도 행사 일정으로 덮어쓸까요?"
-                : "Overwrite survey schedule?",
+                ? "설문 시작 시각을 행사 시작 시각으로 덮어쓸까요?"
+                : "Overwrite survey start time?",
           });
         }
 
@@ -446,14 +635,12 @@ export function useBoardWritePageController() {
             : overwriteSchedule
               ? htmlDatetimeLocalToIso(eventStartDate)
               : undefined,
-          closeAt: overwriteAlwaysOpen
-            ? null
-            : overwriteSchedule
-              ? htmlDatetimeLocalToIso(eventEndDate)
-              : undefined,
         });
       }
       localStorage.removeItem(`draft_${selectedCategory}`);
+      if (serverDraftId) {
+        await apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
+      }
       alert(
         lang === "ko"
           ? "게시글이 작성되었습니다."
@@ -474,7 +661,6 @@ export function useBoardWritePageController() {
 
   return {
     ConfirmDialog,
-    activeTab,
     assets,
     allowComment,
     boardByCode,
@@ -482,21 +668,21 @@ export function useBoardWritePageController() {
     canWriteSelected,
     contentEn,
     contentKo,
-    draftTime,
+    drafts,
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
     eventStartDate,
     fileInputRef,
     handleCategoryChange,
-    handleDiscardDraft,
+    handleDeleteDraft,
     handleRestoreDraft,
     handleSaveDraft,
     handleSubmit,
     handleUploadFiles,
-    hasDraft,
     isAnonymous,
     isEventAlwaysOpen,
+    isSecret,
     isKoreanOnly,
     isPinned,
     isSubmitting,
@@ -504,7 +690,6 @@ export function useBoardWritePageController() {
     selectedBoard,
     selectedCategory,
     selectedSurveyId,
-    setActiveTab,
     setAssets,
     setContentEn,
     setContentKo,
@@ -517,6 +702,7 @@ export function useBoardWritePageController() {
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
+    setIsSecret,
     setSelectedSurveyId,
     setTitleEn,
     setTitleKo,

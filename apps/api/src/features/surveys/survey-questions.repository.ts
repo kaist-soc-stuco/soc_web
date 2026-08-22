@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
-import { isoToDate, msToIso, nowDate } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 
 import {
   DRIZZLE_DB,
@@ -12,7 +12,8 @@ import { surveyQuestions } from "../../infrastructure/postgres/postgres.schema";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateQuestionDto } from "./dto/create-question.dto";
 import type { UpdateQuestionDto } from "./dto/update-question.dto";
-import type { QuestionType, QuestionOption } from "@soc/contracts";
+import type { QuestionType, QuestionOption, SurveyQuestionConfig } from "@soc/contracts";
+import { sanitizeSurveyRichText } from "./survey-rich-text";
 
 @Injectable()
 export class SurveyQuestionsRepository {
@@ -28,9 +29,9 @@ export class SurveyQuestionsRepository {
       descriptionEn: row.descriptionEn,
       questionType: row.questionType as QuestionType,
       options: row.options as QuestionOption[] | null,
+      config: row.config as SurveyQuestionConfig | null,
       answerRegex: row.answerRegex,
       isRequired: row.isRequired,
-      editDeadlineAt: row.editDeadlineAt ? msToIso(row.editDeadlineAt.valueOf()) : null,
       sortOrder: row.sortOrder,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -72,13 +73,13 @@ export class SurveyQuestionsRepository {
         sectionId,
         titleKo: dto.titleKo,
         titleEn: dto.titleEn ?? null,
-        descriptionKo: dto.descriptionKo ?? null,
-        descriptionEn: dto.descriptionEn ?? null,
+        descriptionKo: sanitizeSurveyRichText(dto.descriptionKo),
+        descriptionEn: sanitizeSurveyRichText(dto.descriptionEn),
         questionType: dto.questionType,
         options: dto.options ?? null,
+        config: dto.config ?? null,
         answerRegex: dto.answerRegex ?? null,
         isRequired: dto.isRequired ?? true,
-        editDeadlineAt: dto.editDeadlineAt ? isoToDate(dto.editDeadlineAt) : null,
         sortOrder: dto.sortOrder ?? 0,
         createdAt: nowDate(),
         updatedAt: nowDate(),
@@ -99,13 +100,17 @@ export class SurveyQuestionsRepository {
 
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;
     if (dto.titleEn !== undefined) set.titleEn = dto.titleEn;
-    if (dto.descriptionKo !== undefined) set.descriptionKo = dto.descriptionKo;
-    if (dto.descriptionEn !== undefined) set.descriptionEn = dto.descriptionEn;
+    if (dto.descriptionKo !== undefined) {
+      set.descriptionKo = sanitizeSurveyRichText(dto.descriptionKo);
+    }
+    if (dto.descriptionEn !== undefined) {
+      set.descriptionEn = sanitizeSurveyRichText(dto.descriptionEn);
+    }
     if (dto.questionType !== undefined) set.questionType = dto.questionType;
     if (dto.options !== undefined) set.options = dto.options;
+    if (dto.config !== undefined) set.config = dto.config;
     if (dto.answerRegex !== undefined) set.answerRegex = dto.answerRegex;
     if (dto.isRequired !== undefined) set.isRequired = dto.isRequired;
-    if (dto.editDeadlineAt !== undefined) set.editDeadlineAt = isoToDate(dto.editDeadlineAt);
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
     set.updatedAt = nowDate();
 

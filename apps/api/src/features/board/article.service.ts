@@ -3,12 +3,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from "@nestjs/common";
 import type {
   ArticleCreateRequest,
   ArticleCreateResponse,
   ArticleDetailResponse,
+  ArticleEngagementKind,
+  ArticleEngagementResponse,
   ArticleListResponse,
   ArticleListItem,
   ArticleUpdateRequest,
@@ -16,7 +17,7 @@ import type {
   ArticleDeleteResponse,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
-import { isoToDate, msToIso, nowMs } from "@soc/shared";
+import { isoToDate, localDate, msToIso, nowDate, nowMs } from "@soc/shared";
 
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
@@ -36,7 +37,7 @@ interface ArticleQueryParams {
   page?: number;
   limit?: number;
   q?: string;
-  period?: "all" | "7days" | "30days";
+  period?: "all" | "today" | "7days" | "30days";
   searchBy?: "title" | "author" | "title_content";
   sortBy?: "latest" | "views";
   sortDirection?: "asc" | "desc";
@@ -49,6 +50,41 @@ interface AuthenticatedUser {
 
 const MAX_CONTENT_LENGTH = 50_000;
 const MAX_PAGE_SIZE = 100;
+const PUBLIC_LEGACY_BOARD_CODES = new Set(["행사", "공약", "QnA"]);
+
+const canReadSecretArticle = (
+  article: Pick<ArticleListItem, "isSecret" | "author">,
+  board: { managePermissionBit: number },
+  currentUser: CurrentUserContext,
+): boolean => {
+  if (!article.isSecret) return true;
+  if (currentUser.user?.id === article.author.userId) return true;
+  return Boolean(
+    currentUser.user &&
+      board.managePermissionBit > 0 &&
+      Permissions.has(currentUser.user.permission, board.managePermissionBit),
+  );
+};
+
+const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
+  ...item,
+  titleKo: "비밀글입니다.",
+  titleEn: "Secret post",
+  author: { userId: "", name: "비밀글" },
+  commentCount: 0,
+  viewCount: 0,
+  likeCount: 0,
+  scrapCount: 0,
+  viewerHasLiked: false,
+  viewerHasScrapped: false,
+  hasAttachment: false,
+  thumbnailStorageKey: undefined,
+  eventStartDate: undefined,
+  eventEndDate: undefined,
+  eventDescriptionKo: undefined,
+  eventDescriptionEn: undefined,
+  surveyId: undefined,
+});
 
 @Injectable()
 export class ArticleService {
@@ -81,13 +117,20 @@ export class ArticleService {
       limit,
       getReadableArticleScopes(currentUser),
       query,
+      currentUser.user?.id,
+    );
+
+    const visibleItems = result.items.map((item) =>
+      canReadSecretArticle(item, board, currentUser)
+        ? item
+        : maskSecretListItem(item),
     );
 
     return {
       page,
       limit,
       total: result.total,
-      items: result.items,
+      items: visibleItems,
     };
   }
 
@@ -95,9 +138,11 @@ export class ArticleService {
     params: ArticleQueryParams,
     currentUser: CurrentUserContext,
   ): Promise<ArticleListResponse> {
-    const readableBoards = (await this.boardRepository.listBoards()).filter(
-      (board) => canReadBoard(board, currentUser),
-    );
+    const readableBoards = (await this.boardRepository.listBoards())
+      .filter((board) => canReadBoard(board, currentUser))
+      // Keep legacy boards addressable through their direct routes, but keep
+      // the public aggregate feed aligned with the current IA.
+      .filter((board) => !PUBLIC_LEGACY_BOARD_CODES.has(board.code));
 
     const page = params.page && params.page > 0 ? params.page : 1;
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
@@ -106,12 +151,20 @@ export class ArticleService {
     const searchBy = params.searchBy ?? "title";
     const sortBy = params.sortBy ?? "latest";
     const sortDirection = params.sortDirection ?? "desc";
+    const now = nowDate();
+    const todayStart = localDate(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).getTime();
     const cutoffDate =
-      params.period === "7days"
-        ? isoToDate(msToIso(nowMs() - 7 * 24 * 60 * 60 * 1000))
-        : params.period === "30days"
-          ? isoToDate(msToIso(nowMs() - 30 * 24 * 60 * 60 * 1000))
-          : undefined;
+      params.period === "today"
+        ? isoToDate(msToIso(todayStart))
+        : params.period === "7days"
+          ? isoToDate(msToIso(nowMs() - 7 * 24 * 60 * 60 * 1000))
+          : params.period === "30days"
+            ? isoToDate(msToIso(nowMs() - 30 * 24 * 60 * 60 * 1000))
+            : undefined;
 
     const result = await this.articleRepository.listByBoardIds(
       readableBoards.map((board) => board.boardId),
@@ -124,14 +177,27 @@ export class ArticleService {
         sortBy,
         sortDirection,
         visibilityScopes: getReadableArticleScopes(currentUser),
+        viewerUserId: currentUser.user?.id,
       },
     );
+
+    const boardById = new Map(
+      readableBoards.map((board) => [board.boardId, board]),
+    );
+    const visibleItems = result.items.map((item) => {
+      const board = boardById.get(item.boardId);
+      return board && canReadSecretArticle(item, board, currentUser)
+        ? item
+        : board
+          ? maskSecretListItem(item)
+          : item;
+    });
 
     return {
       page,
       limit,
       total: result.total,
-      items: result.items,
+      items: visibleItems,
     };
   }
 
@@ -153,15 +219,23 @@ export class ArticleService {
       board.boardId,
       articleId,
       getReadableArticleScopes(currentUser),
+      currentUser.user?.id,
     );
 
     if (!article) {
       throw new NotFoundException("article_not_found");
     }
 
-    if (incrementView) {
-      await this.articleRepository.incrementViewCount(articleId);
-      article.viewCount += 1;
+    if (!canReadSecretArticle(article, board, currentUser)) {
+      throw new ForbiddenException("secret_article_access_denied");
+    }
+
+    if (incrementView && currentUser.user?.id) {
+      const wasRecorded = await this.articleRepository.recordArticleView(
+        articleId,
+        currentUser.user.id,
+      );
+      if (wasRecorded) article.viewCount += 1;
     }
 
     return article;
@@ -202,6 +276,14 @@ export class ArticleService {
 
     if (!board || !board.isActive) {
       throw new NotFoundException("board_not_found");
+    }
+
+    if (board.code === "QnA") {
+      throw new ForbiddenException("qna_replaced_by_channel_talk");
+    }
+
+    if (payload.isSecret && !board.allowSecret) {
+      throw new ForbiddenException("secret_post_not_allowed");
     }
 
     if (
@@ -263,6 +345,14 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
+    if (board.code === "QnA") {
+      throw new ForbiddenException("qna_replaced_by_channel_talk");
+    }
+
+    if (payload.isSecret && !board.allowSecret) {
+      throw new ForbiddenException("secret_post_not_allowed");
+    }
+
     const article = await this.articleRepository.findPermissionInfo(
       board.boardId,
       articleId,
@@ -319,6 +409,62 @@ export class ArticleService {
     }
 
     return this.articleRepository.softDeleteArticle(board.boardId, articleId);
+  }
+
+  async setArticleEngagement(
+    code: string,
+    articleId: string,
+    rawKind: string,
+    active: boolean,
+    user: AuthenticatedUser,
+  ): Promise<ArticleEngagementResponse> {
+    const kind = rawKind.toUpperCase() as ArticleEngagementKind;
+    if (kind !== "LIKE" && kind !== "SCRAP") {
+      throw new BadRequestException("invalid_article_engagement");
+    }
+
+    const board = await this.boardRepository.findByCode(code);
+    if (!board || !board.isActive) {
+      throw new NotFoundException("board_not_found");
+    }
+
+    assertBoardReadable(board, { authenticated: true, user });
+
+    if (kind === "LIKE" && !board.allowLike) {
+      throw new ForbiddenException("like_not_allowed");
+    }
+
+    const article = await this.articleRepository.findDetailById(
+      board.boardId,
+      articleId,
+      getReadableArticleScopes({ authenticated: true, user }),
+      user.id,
+    );
+    if (!article) {
+      throw new NotFoundException("article_not_found");
+    }
+
+    if (!canReadSecretArticle(article, board, { authenticated: true, user })) {
+      throw new ForbiddenException("secret_article_access_denied");
+    }
+
+    await this.articleRepository.setArticleEngagement(
+      articleId,
+      user.id,
+      kind,
+      active,
+    );
+    const summary = await this.articleRepository.getArticleEngagementSummary(
+      articleId,
+      user.id,
+    );
+
+    return {
+      articleId,
+      kind,
+      active: kind === "LIKE" ? summary.viewerHasLiked : summary.viewerHasScrapped,
+      ...summary,
+    };
   }
 
   async searchArticles(

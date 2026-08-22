@@ -3,10 +3,13 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -50,6 +53,7 @@ export const articles = pgTable("article", {
   visibilityScope: varchar("visibility_scope", { length: 20 }).notNull().default("PUBLIC"),
   isPinned: boolean("is_pinned").notNull().default(false),
   pinOrder: integer("pin_order"),
+  isSecret: boolean("is_secret").notNull().default(false),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
   allowComment: boolean("allow_comment").notNull().default(true),
   viewCount: integer("view_count").notNull().default(0),
@@ -74,6 +78,93 @@ export const articles = pgTable("article", {
     table.postedAt,
   ),
 ]);
+
+/** 인증 사용자별 게시글 조회 기록. 복합 PK가 동일 사용자의 재방문 증가를 막는다. */
+export const articleViews = pgTable(
+  "article_view",
+  {
+    articleId: integer("article_id")
+      .notNull()
+      .references(() => articles.articleId, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.userId, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.articleId, table.userId] }),
+    index("article_view_user_idx").on(table.userId, table.createdAt),
+  ],
+);
+
+export const articleEngagements = pgTable(
+  "article_engagement",
+  {
+    articleId: integer("article_id")
+      .notNull()
+      .references(() => articles.articleId, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.userId, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 10 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.articleId, table.userId, table.kind] }),
+    index("article_engagement_user_kind_idx").on(
+      table.userId,
+      table.kind,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const articleDrafts = pgTable(
+  "article_draft",
+  {
+    draftId: uuid("draft_id").defaultRandom().primaryKey(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.userId, { onDelete: "cascade" }),
+    boardId: integer("board_id")
+      .notNull()
+      .references(() => boards.boardId, { onDelete: "restrict" }),
+    targetArticleId: integer("target_article_id").references(
+      () => articles.articleId,
+      { onDelete: "set null" },
+    ),
+    titleKo: varchar("title_ko", { length: 255 }).notNull().default(""),
+    titleEn: varchar("title_en", { length: 255 }),
+    contentKo: text("content_ko").notNull().default(""),
+    contentEn: text("content_en"),
+    fingerprint: varchar("fingerprint", { length: 128 }).notNull(),
+    version: integer("version").notNull().default(1),
+    payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("article_draft_owner_updated_idx").on(
+      table.ownerUserId,
+      table.updatedAt,
+    ),
+    index("article_draft_board_updated_idx").on(
+      table.boardId,
+      table.updatedAt,
+    ),
+  ],
+);
 
 export const assets = pgTable("asset", {
   assetId: serial("asset_id").primaryKey(),
@@ -139,6 +230,62 @@ export const comments = pgTable(
     ),
     index("comment_author_status_created_idx").on(
       table.authorUserId,
+      table.status,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const commentEngagements = pgTable(
+  "comment_engagement",
+  {
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => comments.commentId, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.userId, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 10 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.commentId, table.userId, table.kind] }),
+    index("comment_engagement_user_kind_idx").on(
+      table.userId,
+      table.kind,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const commentReports = pgTable(
+  "comment_report",
+  {
+    reportId: serial("report_id").primaryKey(),
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => comments.commentId, { onDelete: "cascade" }),
+    reporterUserId: uuid("reporter_user_id")
+      .notNull()
+      .references(() => users.userId, { onDelete: "cascade" }),
+    reason: varchar("reason", { length: 500 }),
+    status: varchar("status", { length: 20 }).notNull().default("OPEN"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("comment_report_comment_reporter_idx").on(
+      table.commentId,
+      table.reporterUserId,
+    ),
+    index("comment_report_status_created_idx").on(
       table.status,
       table.createdAt,
     ),

@@ -1,6 +1,5 @@
-import { Footer } from "@/components/organisms/footer";
 import { Header } from "@/components/organisms/header";
-import { PageHero } from "@/components/organisms/page-hero";
+import { PageHeader, PageShell } from "@/components/ui/page-layout";
 import {
   SearchForm,
   SearchResults,
@@ -11,9 +10,11 @@ import { useSearchPageController } from "@/features/search/use-search-page-contr
 export function SearchPage() {
   const {
     aboutResults,
-    articles,
     boardById,
+    boardArticles,
+    calendarEvents,
     error,
+    eventArticles,
     handleSubmit,
     inputValue,
     lang,
@@ -25,18 +26,9 @@ export function SearchPage() {
   } = useSearchPageController();
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50/50">
-      <Header showLogo />
-      <PageHero
-        title={lang === "ko" ? "통합검색" : "Search"}
-        variant="medium"
-        description={
-          lang === "ko"
-            ? "게시글, 설문조사, 소개 페이지를 한 번에 검색합니다."
-            : "Search board posts, surveys, and about pages together."
-        }
-        showDescription={false}
-      />
+    <PageShell>
+      <Header />
+      <PageHeader title={lang === "ko" ? "통합검색" : "Search"} />
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-8 md:px-8">
         <SearchForm
@@ -53,9 +45,11 @@ export function SearchPage() {
         />
         <SearchResults
           aboutResults={aboutResults}
-          articles={articles}
           boardById={boardById}
+          boardArticles={boardArticles}
+          calendarEvents={calendarEvents}
           error={error}
+          eventArticles={eventArticles}
           lang={lang}
           loading={loading}
           query={query}
@@ -64,7 +58,6 @@ export function SearchPage() {
         />
       </main>
 
-      <Footer />
-    </div>
+    </PageShell>
   );
 }

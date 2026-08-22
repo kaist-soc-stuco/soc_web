@@ -7,6 +7,7 @@ import { SurveyMutationPolicy } from "./survey-mutation-policy";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateQuestionDto } from "./dto/create-question.dto";
 import type { UpdateQuestionDto } from "./dto/update-question.dto";
+import { assertQuestionBranchConfiguration } from "./survey-branching";
 
 @Injectable()
 export class SurveyQuestionsService {
@@ -24,7 +25,22 @@ export class SurveyQuestionsService {
     return this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
-      return this.questionsRepo.insert(sectionId, dto, tx);
+      const question = await this.questionsRepo.insert(sectionId, dto, tx);
+      if (
+        typeof (
+          this.sectionsRepo as unknown as {
+            findBySurveyId?: unknown;
+          }
+        ).findBySurveyId === "function"
+      ) {
+        const sections = await this.sectionsRepo.findBySurveyId(surveyId, tx);
+        assertQuestionBranchConfiguration(
+          question,
+          new Set(sections.map((item) => item.id)),
+          sectionId,
+        );
+      }
+      return question;
     });
   }
 
@@ -44,6 +60,20 @@ export class SurveyQuestionsService {
         tx,
       );
       if (!question) throw new NotFoundException("question_not_found");
+      if (
+        typeof (
+          this.sectionsRepo as unknown as {
+            findBySurveyId?: unknown;
+          }
+        ).findBySurveyId === "function"
+      ) {
+        const sections = await this.sectionsRepo.findBySurveyId(surveyId, tx);
+        assertQuestionBranchConfiguration(
+          question,
+          new Set(sections.map((item) => item.id)),
+          sectionId,
+        );
+      }
       return question;
     });
   }

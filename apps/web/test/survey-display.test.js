@@ -74,10 +74,10 @@ test("keeps archived surveys distinct from editable drafts", () => {
   );
 });
 
-test("returns computed open status with deterministic D-day text", () => {
+test("returns a concise computed open status without a duplicate D-day badge", () => {
   assert.deepEqual(
     getSurveyStatusInfo(survey({ closesAt: "2026-06-02T00:00:00.000Z" }), true, NOW),
-    { label: "진행중 · D-3", tone: "open" },
+    { label: "진행중", tone: "open" },
   );
 });
 

@@ -18,6 +18,12 @@ export class EmailDeliveryService {
     recipients: string[];
     subject: string;
     content: string;
+    html?: string;
+    attachments?: Array<{
+      filename: string;
+      content: Buffer;
+      contentType: string;
+    }>;
   }): Promise<{ dryRun: boolean }> {
     const dryRun = this.configService.get<boolean>(
       "EMAIL_DRY_RUN",
@@ -31,18 +37,18 @@ export class EmailDeliveryService {
       return { dryRun: true };
     }
 
-    const host = this.configService.get<string>("SMTP_HOST");
+    const host = this.configService.get<string>("DOORAY_SMTP_HOST");
     const from = this.configService.get<string>("EMAIL_FROM");
     if (!host || !from) {
       throw new ServiceUnavailableException(EMAIL_DELIVERY_NOT_CONFIGURED);
     }
 
-    const user = this.configService.get<string>("SMTP_USER");
-    const password = this.configService.get<string>("SMTP_PASSWORD");
+    const user = this.configService.get<string>("DOORAY_SMTP_USER");
+    const password = this.configService.get<string>("DOORAY_SMTP_PASSWORD");
     const transporter = nodemailer.createTransport({
       host,
-      port: this.configService.get<number>("SMTP_PORT", 587),
-      secure: this.configService.get<boolean>("SMTP_SECURE", false),
+      port: this.configService.get<number>("DOORAY_SMTP_PORT", 587),
+      secure: this.configService.get<boolean>("DOORAY_SMTP_SECURE", false),
       ...(user && password ? { auth: { user, pass: password } } : {}),
     });
 
@@ -51,6 +57,8 @@ export class EmailDeliveryService {
       bcc: input.recipients,
       subject: input.subject,
       text: input.content,
+      ...(input.html ? { html: input.html } : {}),
+      ...(input.attachments?.length ? { attachments: input.attachments } : {}),
     });
 
     return { dryRun: false };

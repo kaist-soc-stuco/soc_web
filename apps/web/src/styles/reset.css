@@ -1,0 +1,91 @@
+@layer base {
+  /* Small, app-owned reset. Keep semantic browser defaults that communicate structure. */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 320px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  figure,
+  blockquote,
+  dl,
+  dd {
+    margin: 0;
+  }
+
+  ul,
+  ol {
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Keep controls usable even when a new call site forgets a utility class.
+     Component utilities still win because this reset lives in Tailwind's base layer. */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    font-size: var(--ui-control-font-size);
+    font-weight: var(--ui-control-font-weight);
+    line-height: var(--ui-control-line-height);
+  }
+
+  /* The page-number field is a text-like control; browser spinner chrome is not part
+     of the pagination affordance and causes a visual mismatch across browsers. */
+  input[type="number"] {
+    appearance: textfield;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  /* Search fields expose the app-owned clear button instead of a second
+     browser-specific cancel affordance. */
+  input[type="search"]::-webkit-search-decoration,
+  input[type="search"]::-webkit-search-cancel-button {
+    appearance: none;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

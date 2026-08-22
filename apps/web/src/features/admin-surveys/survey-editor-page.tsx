@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
@@ -11,7 +12,27 @@ import { z } from "zod";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { htmlDatetimeLocalToIso, isoToDate, isoToHtmlDatetimeLocal } from "@soc/shared";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  type DragEndEvent,
+  type DragStartEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { AuthGuard } from "@/components/guards/auth-guard";
+import { AdminCard, AdminPageHeader, AdminPageShell } from "@/components/ui/admin-page";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
@@ -21,7 +42,15 @@ import {
   type SurveySettingsFormValues,
 } from "@/components/organisms/survey-settings-form";
 import { QuestionEditorModal, QuestionFormState } from "@/components/organisms/question-editor-modal";
-import { GripVertical, Plus, Calendar as CalendarIcon } from "lucide-react";
+import {
+  SectionEditorModal,
+  type SectionFormState,
+} from "@/components/organisms/section-editor-modal";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { UiInput } from "@/components/ui/form-control";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { IconButton } from "@/components/ui/icon-button";
 
 const formatCompactDateTime = (value: string | null) => {
   if (!value) return "";
@@ -43,6 +72,9 @@ const QUESTION_TYPES = [
   { value: "single_choice", label: "단일 선택" },
   { value: "multiple_choice", label: "복수 선택" },
   { value: "dropdown", label: "드롭다운" },
+  { value: "grid_single", label: "객관식 그리드" },
+  { value: "grid_multiple", label: "체크박스 그리드" },
+  { value: "file_upload", label: "파일 업로드" },
   { value: "date", label: "날짜" },
   { value: "time", label: "시간" },
   { value: "datetime", label: "날짜+시간" },
@@ -69,7 +101,6 @@ const SurveySettingsSchema = z.object({
       message: "숫자만 입력하세요.",
     }),
   openAt: z.string(),
-  closeAt: z.string(),
   connectedArticleId: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (!data.isKoreanOnly) {
@@ -90,13 +121,6 @@ const SurveySettingsSchema = z.object({
         path: ["openAt"],
       });
     }
-    if (!data.closeAt?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "마감 시각을 입력해주세요.",
-        path: ["closeAt"],
-      });
-    }
   }
 });
 
@@ -109,13 +133,164 @@ const emptyQuestion = (): QuestionFormState => ({
   options: [],
   answerRegex: "",
   isRequired: true,
-  editDeadlineAt: "",
+  config: null,
 });
 
 const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
 
 const getErrorMessage = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
+
+const QUESTION_ROW_CLASS =
+  "group flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm";
+
+type QuestionRowContentProps = {
+  question: SurveyQuestionRecord;
+  isOngoing: boolean;
+  dragHandle: ReactNode;
+  onEdit: () => void;
+  onDelete: () => void;
+};
+
+function QuestionRowContent({
+  question,
+  isOngoing,
+  dragHandle,
+  onEdit,
+  onDelete,
+}: QuestionRowContentProps) {
+  return (
+    <>
+      <div className="flex min-w-0 items-center gap-3">
+        {!isOngoing && dragHandle}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-medium text-slate-900">
+            {question.titleKo}
+          </span>
+          {question.titleEn && (
+            <span className="hidden truncate text-xs font-semibold text-kaist-grey/60 md:inline">
+              ({question.titleEn})
+            </span>
+          )}
+          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+            {QUESTION_TYPES.find((type) => type.value === question.questionType)?.label}
+          </span>
+          {question.isRequired && (
+            <span className="shrink-0 text-[10px] font-bold text-red-500">*필수</span>
+          )}
+        </div>
+      </div>
+      <div className="ml-2 flex shrink-0 gap-1">
+        <IconButton
+          size="sm"
+          aria-label={`${question.titleKo} ${isOngoing ? "보기" : "편집"}`}
+          onClick={onEdit}
+        >
+          {isOngoing ? <Eye className="size-4" /> : <Pencil className="size-4" />}
+        </IconButton>
+        {!isOngoing && (
+          <IconButton
+            size="sm"
+            aria-label={`${question.titleKo} 삭제`}
+            onClick={onDelete}
+            className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+          >
+            <Trash2 className="size-4" />
+          </IconButton>
+        )}
+      </div>
+    </>
+  );
+}
+
+type SortableQuestionRowProps = {
+  question: SurveyQuestionRecord;
+  isOngoing: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+};
+
+function SortableQuestionRow({
+  question,
+  isOngoing,
+  onEdit,
+  onDelete,
+}: SortableQuestionRowProps) {
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id, disabled: isOngoing });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition ?? "transform 200ms ease",
+  };
+
+  const dragHandle = (
+    <button
+      ref={setActivatorNodeRef}
+      type="button"
+      aria-label={`${question.titleKo} 순서 이동`}
+      {...attributes}
+      {...listeners}
+      className="flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing"
+    >
+      <GripVertical className="size-4" />
+    </button>
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`${QUESTION_ROW_CLASS} transition-[background-color,border-color,box-shadow] duration-100 ${
+        isDragging
+          ? "relative z-0 opacity-0"
+          : "hover:border-slate-300 hover:bg-slate-50/60"
+      }`}
+    >
+      <QuestionRowContent
+        question={question}
+        isOngoing={isOngoing}
+        dragHandle={dragHandle}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    </div>
+  );
+}
+
+function QuestionDragOverlayRow({
+  question,
+  isOngoing,
+  onEdit,
+  onDelete,
+  width,
+}: SortableQuestionRowProps & { width: number | null }) {
+  return (
+    <div
+      style={{ width: width ?? undefined }}
+      className={`${QUESTION_ROW_CLASS} relative z-50 rotate-2 cursor-grabbing border-brand-primary/45 shadow-2xl`}
+    >
+      <QuestionRowContent
+        question={question}
+        isOngoing={isOngoing}
+        dragHandle={
+          <span className="flex size-7 shrink-0 items-center justify-center text-brand-primary">
+            <GripVertical className="size-4" />
+          </span>
+        }
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    </div>
+  );
+}
 
 export function SurveyEditorPage() {
   const navigate = useNavigate();
@@ -142,7 +317,6 @@ export function SurveyEditorPage() {
       isAlwaysOpen: false,
       maxResponseCount: "",
       openAt: "",
-      closeAt: "",
       connectedArticleId: "",
     },
   });
@@ -151,10 +325,6 @@ export function SurveyEditorPage() {
   const isPublished = Boolean(form.watch("isPublished"));
   const [loadedLifecycleStatus, setLoadedLifecycleStatus] = useState<
     SurveyDetailResponse["lifecycleStatus"] | null
-  >(null);
-  const [loadedVersionNumber, setLoadedVersionNumber] = useState(1);
-  const [loadedPreviousVersionId, setLoadedPreviousVersionId] = useState<
-    string | null
   >(null);
   const isArchived = loadedLifecycleStatus === "ARCHIVED";
   const isOngoing = isEdit && (isPublished || isArchived);
@@ -170,10 +340,11 @@ export function SurveyEditorPage() {
   } | null>(null);
 
   const [sections, setSections] = useState<(SurveySectionRecord & { questions: SurveyQuestionRecord[] })[]>([]);
-  const [tab, setTab] = useState<"settings" | "content">("settings");
+  const [tab, setTab] = useState<"settings" | "content" | "delivery">("settings");
 
   const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "creating" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
   const [newSectionTitle, setNewSectionTitle] = useState("");
@@ -185,8 +356,18 @@ export function SurveyEditorPage() {
     questionId?: string;
     initial: QuestionFormState;
   } | null>(null);
+  const [editingSection, setEditingSection] = useState<{
+    sectionId: string;
+    initial: SectionFormState;
+  } | null>(null);
 
-  const dragItem = useRef<{ sectionId: string; index: number } | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
+  const creatingDraftRef = useRef<Promise<string> | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -223,14 +404,11 @@ export function SurveyEditorPage() {
             maxResponseCount:
               detail.maxResponses != null ? String(detail.maxResponses) : "",
             openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
-            closeAt: detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "",
             connectedArticleId: detail.connectedPostId ?? "",
           });
           setSections(detail.sections);
           setLoadedSurveyId(surveyId);
           setLoadedLifecycleStatus(detail.lifecycleStatus);
-          setLoadedVersionNumber(detail.versionNumber);
-          setLoadedPreviousVersionId(detail.previousVersionId);
 
           if (detail.connectedPostId) {
             client.searchArticles(detail.connectedPostId, 1).then(results => {
@@ -246,59 +424,110 @@ export function SurveyEditorPage() {
     })();
   }, [isEdit, surveyId, navigate, form, session, sessionLoading]);
 
-  const handleSaveSettings = async (values: SurveySettingsFormValues) => {
+  const buildSurveyBody = (
+    values: SurveySettingsFormValues,
+    options?: { allowPlaceholder?: boolean; publish?: boolean },
+  ) => {
+    const allowPlaceholder = options?.allowPlaceholder ?? false;
+    const maxResponseCount = values.maxResponseCount?.trim()
+      ? Number(values.maxResponseCount)
+      : undefined;
+
+    return {
+      kind: values.kind,
+      titleKo: values.titleKo.trim() || (allowPlaceholder ? "제목 없는 설문" : ""),
+      titleEn: values.titleEn?.trim() || undefined,
+      descriptionKo: values.descriptionKo?.trim() || undefined,
+      descriptionEn: values.descriptionEn?.trim() || undefined,
+      feeRequirementPolicy: values.feePayersOnly ? "PAID_ONLY" : "NONE",
+      allowMultipleResponses: values.allowMultipleResponses,
+      allowResponseEdit: values.allowMultipleResponses ? false : values.allowResponseEdit,
+      isKoreanOnly: values.isKoreanOnly,
+      isPublished: options?.publish ?? values.isPublished,
+      showOnCalendar: values.showOnCalendar,
+      isAlwaysOpen: values.isAlwaysOpen || (allowPlaceholder && !values.openAt),
+      resultVisibility: values.resultVisibility,
+      maxResponseCount,
+      openAt: values.isAlwaysOpen || (allowPlaceholder && !values.openAt)
+        ? null
+        : values.openAt
+          ? htmlDatetimeLocalToIso(values.openAt)
+          : undefined,
+      connectedArticleId: values.connectedArticleId?.trim() || undefined,
+    };
+  };
+
+  const ensureDraft = async (): Promise<string> => {
+    if (loadedSurveyId) return loadedSurveyId;
+    if (creatingDraftRef.current) return creatingDraftRef.current;
+
+    creatingDraftRef.current = (async () => {
+      setSaveState("creating");
+      setError(null);
+      try {
+        const created = await client.createSurvey(
+          buildSurveyBody(form.getValues(), { allowPlaceholder: true, publish: false }),
+        );
+        const section = await client.createSection(created.id, {
+          titleKo: "기본 섹션",
+          titleEn: form.getValues("isKoreanOnly") ? undefined : "Default section",
+        });
+        const detail = await client.getSurveyDetail(created.id);
+        setLoadedSurveyId(created.id);
+        setLoadedLifecycleStatus(detail.lifecycleStatus);
+        setSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
+        form.setValue("isPublished", false);
+        setSaveState("saved");
+        navigate(`/admin/surveys/${created.id}/edit`, { replace: true });
+        return created.id;
+      } catch (err: unknown) {
+        setSaveState("error");
+        setError(getErrorMessage(err, "초안을 만들지 못했습니다."));
+        throw err;
+      } finally {
+        creatingDraftRef.current = null;
+      }
+    })();
+
+    return creatingDraftRef.current;
+  };
+
+  const handleSaveSettings = async (
+    values: SurveySettingsFormValues,
+    options?: { publish?: boolean },
+  ) => {
     if (isArchived) {
       setError("보관된 설문은 수정하거나 다시 게시할 수 없습니다.");
       return;
     }
     setSaving(true);
+    setSaveState("saving");
     setError(null);
     try {
-      const maxResponseCount = values.maxResponseCount?.trim()
-        ? Number(values.maxResponseCount)
-        : undefined;
-      const body = {
-        kind: values.kind,
-        titleKo: values.titleKo.trim(),
-        titleEn: values.titleEn?.trim() || undefined,
-        descriptionKo: values.descriptionKo?.trim() || undefined,
-        descriptionEn: values.descriptionEn?.trim() || undefined,
-        feeRequirementPolicy: values.feePayersOnly ? "PAID_ONLY" : "NONE",
-        allowMultipleResponses: values.allowMultipleResponses,
-        allowResponseEdit: values.allowMultipleResponses
-          ? false
-          : values.allowResponseEdit,
-        isKoreanOnly: values.isKoreanOnly,
-        isPublished: values.isPublished,
-        showOnCalendar: values.showOnCalendar,
-        isAlwaysOpen: values.isAlwaysOpen,
-        resultVisibility: values.resultVisibility,
-        maxResponseCount,
-        openAt: values.isAlwaysOpen
-          ? null
-          : values.openAt
-            ? htmlDatetimeLocalToIso(values.openAt)
-            : undefined,
-        closeAt: values.isAlwaysOpen
-          ? null
-          : values.closeAt
-            ? htmlDatetimeLocalToIso(values.closeAt)
-            : undefined,
-        connectedArticleId: values.connectedArticleId?.trim() || undefined,
-      };
-      if (isEdit && loadedSurveyId) {
-        await client.updateSurvey(loadedSurveyId, body);
-        navigate("/admin/surveys");
-      } else {
-        await client.createSurvey(body);
-        navigate("/admin/surveys");
-      }
+      const id = loadedSurveyId ?? await ensureDraft();
+      const body = buildSurveyBody(values, { publish: options?.publish });
+      const updated = await client.updateSurvey(id, body);
+      form.setValue("isPublished", updated.isPublished ?? Boolean(options?.publish));
+      setLoadedLifecycleStatus(updated.lifecycleStatus);
+      setSaveState("saved");
     } catch (err: unknown) {
       console.error(err);
+      setSaveState("error");
       setError(getErrorMessage(err, "저장 중 오류가 발생했습니다."));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleTabChange = async (nextTab: "settings" | "content" | "delivery") => {
+    if (nextTab === "content" && !loadedSurveyId) {
+      try {
+        await ensureDraft();
+      } catch {
+        return;
+      }
+    }
+    setTab(nextTab);
   };
 
   const handleAddSection = async () => {
@@ -330,7 +559,6 @@ export function SurveyEditorPage() {
     if (!loadedSurveyId) return;
     const confirmed = await requestConfirm({
       confirmLabel: "삭제",
-      description: "섹션 안의 모든 문항이 함께 삭제됩니다.",
       title: "이 섹션을 삭제하시겠습니까?",
       tone: "danger",
     });
@@ -344,6 +572,37 @@ export function SurveyEditorPage() {
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "섹션 삭제 실패"));
+    }
+  };
+
+  const openEditSection = (section: SurveySectionRecord) => {
+    setEditingSection({
+      sectionId: section.id,
+      initial: {
+        titleKo: section.titleKo,
+        titleEn: section.titleEn ?? "",
+        descriptionKo: section.descriptionKo ?? "",
+        descriptionEn: section.descriptionEn ?? "",
+      },
+    });
+  };
+
+  const handleSaveSection = async (sectionForm: SectionFormState) => {
+    if (!loadedSurveyId || !editingSection) return;
+    setError(null);
+    try {
+      await client.updateSection(loadedSurveyId, editingSection.sectionId, {
+        titleKo: sectionForm.titleKo.trim(),
+        titleEn: sectionForm.titleEn.trim() || undefined,
+        descriptionKo: sectionForm.descriptionKo.trim() || undefined,
+        descriptionEn: sectionForm.descriptionEn.trim() || undefined,
+      });
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
+      setEditingSection(null);
+    } catch (err: unknown) {
+      console.error(err);
+      setError(getErrorMessage(err, "섹션 저장 실패"));
     }
   };
 
@@ -371,7 +630,7 @@ export function SurveyEditorPage() {
         })),
         answerRegex: q.answerRegex ?? "",
         isRequired: q.isRequired ?? true,
-        editDeadlineAt: q.editDeadlineAt ? isoToHtmlDatetimeLocal(q.editDeadlineAt) : "",
+        config: q.config,
       },
     });
   };
@@ -387,9 +646,9 @@ export function SurveyEditorPage() {
       descriptionEn: qForm.descriptionEn.trim() || undefined,
       questionType: qForm.questionType,
       options: qForm.options.length > 0 ? qForm.options : undefined,
+      config: qForm.config ?? undefined,
       answerRegex: qForm.answerRegex.trim() || undefined,
       isRequired: qForm.isRequired,
-      editDeadlineAt: qForm.editDeadlineAt ? htmlDatetimeLocalToIso(qForm.editDeadlineAt) : undefined,
     };
 
     try {
@@ -411,7 +670,6 @@ export function SurveyEditorPage() {
     if (!loadedSurveyId) return;
     const confirmed = await requestConfirm({
       confirmLabel: "삭제",
-      description: "삭제한 문항은 복구할 수 없습니다.",
       title: "이 문항을 삭제하시겠습니까?",
       tone: "danger",
     });
@@ -428,34 +686,72 @@ export function SurveyEditorPage() {
     }
   };
 
-  const handleReorderQuestion = async (sectionId: string, oldIdx: number, newIdx: number) => {
-    if (!loadedSurveyId || oldIdx === newIdx) return;
-    const section = sections.find((s) => s.id === sectionId);
-    if (!section) return;
-
-    const list = [...section.questions];
-    const [moved] = list.splice(oldIdx, 1);
-    list.splice(newIdx, 0, moved);
-
-    const backup = sections;
-    setSections((prev) =>
-      prev.map((s) => (s.id === sectionId ? { ...s, questions: list } : s)),
-    );
+  const persistQuestionOrder = async (
+    sectionId: string,
+    questions: SurveyQuestionRecord[],
+    backup: SurveyQuestionRecord[],
+  ) => {
+    if (!loadedSurveyId) return;
 
     try {
-      // Update sortOrder of all questions in the section to persist the new order
       await Promise.all(
-        list.map((q, idx) =>
+        questions.map((q, idx) =>
           client.updateQuestion(loadedSurveyId, sectionId, q.id, {
             sortOrder: idx,
-          })
-        )
+          }),
+        ),
       );
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "순서 변경 실패"));
-      setSections(backup);
+      setSections((prev) =>
+        prev.map((section) =>
+          section.id === sectionId ? { ...section, questions: backup } : section,
+        ),
+      );
     }
+  };
+
+  const handleQuestionDragStart = ({ active }: DragStartEvent) => {
+    setActiveQuestionId(String(active.id));
+    setActiveDragWidth(active.rect.current.initial?.width ?? null);
+  };
+
+  const handleQuestionDragCancel = () => {
+    setActiveQuestionId(null);
+    setActiveDragWidth(null);
+  };
+
+  const handleQuestionDragEnd = ({ active, over }: DragEndEvent) => {
+    const activeId = String(active.id);
+    const overId = over ? String(over.id) : null;
+    setActiveQuestionId(null);
+    setActiveDragWidth(null);
+
+    if (!overId || activeId === overId) return;
+
+    const sourceSection = sections.find((section) =>
+      section.questions.some((question) => question.id === activeId),
+    );
+    const targetSection = sections.find((section) =>
+      section.questions.some((question) => question.id === overId),
+    );
+    if (!sourceSection || !targetSection || sourceSection.id !== targetSection.id) return;
+
+    const oldIndex = sourceSection.questions.findIndex((question) => question.id === activeId);
+    const newIndex = sourceSection.questions.findIndex((question) => question.id === overId);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+
+    const backup = sourceSection.questions;
+    const nextQuestions = arrayMove(sourceSection.questions, oldIndex, newIndex);
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id === sourceSection.id
+          ? { ...section, questions: nextQuestions }
+          : section,
+      ),
+    );
+    void persistQuestionOrder(sourceSection.id, nextQuestions, backup);
   };
 
   const handleFetchArticles = async () => {
@@ -490,7 +786,7 @@ export function SurveyEditorPage() {
 
   const handleConfirmOverwrite = (yes: boolean) => {
     if (!overwriteTarget) return;
-    const { articleId, title, eventStartDate, eventEndDate } = overwriteTarget;
+    const { articleId, title, eventStartDate } = overwriteTarget;
 
     form.setValue("connectedArticleId", articleId);
     setSelectedArticleTitle(title);
@@ -498,12 +794,15 @@ export function SurveyEditorPage() {
     if (yes) {
       form.setValue("isAlwaysOpen", false);
       form.setValue("openAt", isoToHtmlDatetimeLocal(eventStartDate));
-      form.setValue("closeAt", isoToHtmlDatetimeLocal(eventEndDate));
     }
     
     setOverwriteTarget(null);
     setShowArticleSearch(false);
   };
+
+  const activeQuestion = activeQuestionId
+    ? sections.flatMap((section) => section.questions).find((question) => question.id === activeQuestionId) ?? null
+    : null;
 
   const handleConnectedArticleChange = () => {
     setSelectedArticleTitle(null);
@@ -511,60 +810,94 @@ export function SurveyEditorPage() {
 
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
-      <div className="min-h-screen bg-gradient-to-br from-kaist-white via-[#f4f7f1] to-[#edf4ef] text-kaist-black pb-20">
+      <AdminPageShell>
         {ConfirmDialog}
-        <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-8">
-          
-          {/* Header Banner */}
-          <div className="rounded-3xl bg-gradient-to-r from-kaist-darkgreen to-emerald-950 p-8 md:p-10 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute right-0 bottom-0 translate-y-12 translate-x-12 opacity-10 blur-2xl w-72 h-72 rounded-full bg-kaist-lightgreen" />
-            <div className="relative z-10">
+        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+
+          <AdminPageHeader
+            eyebrow={
               <button
+                type="button"
                 onClick={() => navigate("/admin/surveys")}
-                className="text-xs font-bold text-white/80 hover:text-white transition-colors mb-3 inline-flex items-center gap-1 bg-transparent border-0 cursor-pointer"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 transition-colors hover:text-brand-primary"
               >
-                ← 설문조사 목록으로
+                <ArrowLeft className="size-3.5" /> 설문조사 관리
               </button>
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
-                {isEdit ? "설문조사 편집" : "새 설문조사 작성"}
-              </h1>
-              <p className="mt-2 text-white/80 font-medium text-sm md:text-base">
-                설문의 기본 정보 설정 및 상세 문항 구성을 수정할 수 있습니다.
-              </p>
-            </div>
-          </div>
+            }
+            title={form.watch("titleKo").trim() || (isEdit ? "설문조사 편집" : "새 설문조사")}
+            actions={
+              <>
+                <span className={`mr-1 inline-flex items-center gap-1.5 text-xs font-normal ${saveState === "error" ? "text-rose-600" : "text-slate-500"}`}>
+                  {saveState === "creating" || saveState === "saving" ? (
+                    <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+                  ) : (
+                    <Check className="size-3.5" />
+                  )}
+                  {saveState === "creating"
+                    ? "초안 만드는 중"
+                    : saveState === "saving"
+                      ? "저장 중"
+                      : saveState === "error"
+                        ? "저장 실패"
+                        : saveState === "saved"
+                          ? "저장됨"
+                          : loadedSurveyId
+                            ? "초안"
+                            : "입력 중"}
+                </span>
+                {loadedSurveyId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => window.open(`/survey/${loadedSurveyId}`, "_blank", "noopener,noreferrer")}
+                  >
+                    <Eye className="size-4" /> 미리보기
+                  </Button>
+                ) : null}
+                {!isArchived ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    className="gap-1.5"
+                    onClick={() => void form.handleSubmit((values) => handleSaveSettings(values))()}
+                  >
+                    <Save className="size-4" /> 저장
+                  </Button>
+                ) : null}
+                {!isArchived && !isPublished ? (
+                  <Button
+                    type="button"
+                    disabled={saving}
+                    className="bg-brand-primary text-white hover:bg-brand-primary/90"
+                    onClick={() => void form.handleSubmit((values) => handleSaveSettings(values, { publish: true }))()}
+                  >
+                    게시하기
+                  </Button>
+                ) : null}
+              </>
+            }
+          />
 
           {isArchived && (
-            <div className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 text-sm font-semibold text-violet-800">
-              이 설문은 보관되어 읽기 전용입니다. 새 변경본이 필요하면 목록에서
-              복제하세요. {loadedPreviousVersionId ? "파생 단계" : "원본"} v
-              {loadedVersionNumber}
+            <div className="inline-flex w-fit rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-normal text-violet-800">
+              보관됨 · 읽기 전용
             </div>
           )}
 
-          {/* Tab Navigation */}
-          <div className="flex bg-gray-100/80 p-1.5 rounded-2xl w-full max-w-xs border border-kaist-darkgreen/10 shadow-inner">
-            <button
-              onClick={() => setTab("settings")}
-              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all cursor-pointer ${
-                tab === "settings"
-                  ? "bg-white text-kaist-darkgreen shadow-md shadow-kaist-grey/10 font-extrabold"
-                  : "text-kaist-grey hover:bg-white/50"
-              }`}
-            >
-              설문 설정
-            </button>
-            <button
-              onClick={() => setTab("content")}
-              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all cursor-pointer ${
-                tab === "content"
-                  ? "bg-white text-kaist-darkgreen shadow-md shadow-kaist-grey/10 font-extrabold"
-                  : "text-kaist-grey hover:bg-white/50"
-              }`}
-            >
-              상세 문항
-            </button>
-          </div>
+          <SegmentedControl
+            ariaLabel="설문 편집 단계"
+            role="tablist"
+            className="w-fit"
+            value={tab}
+            onChange={(value) => void handleTabChange(value)}
+            options={[
+              { value: "settings", label: "기본 정보" },
+              { value: "content", label: `문항 구성${sections.length ? ` · ${sections.reduce((count, section) => count + section.questions.length, 0)}` : ""}` },
+              { value: "delivery", label: "배포 설정" },
+            ]}
+          />
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-2xl text-sm font-semibold">
@@ -572,11 +905,10 @@ export function SurveyEditorPage() {
             </div>
           )}
 
-          {tab === "settings" && (
+          {(tab === "settings" || tab === "delivery") && (
             <FormProvider {...form}>
               <SurveySettingsForm
-                saving={saving}
-                isEdit={isEdit}
+                mode={tab === "settings" ? "basic" : "delivery"}
                 isOngoing={isOngoing}
                 isArchived={isArchived}
                 showArticleSearch={showArticleSearch}
@@ -592,7 +924,7 @@ export function SurveyEditorPage() {
           )}
 
           {tab === "content" && (
-            <div className="space-y-6 bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 md:p-8 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
+            <AdminCard className="space-y-5 p-5 md:p-6">
               {!loadedSurveyId && (
                 <div className="bg-gray-50 border border-kaist-grey/10 p-12 rounded-2xl text-center text-sm font-bold text-kaist-grey/60">
                   설정 탭에서 설문을 먼저 저장해주세요.
@@ -601,152 +933,140 @@ export function SurveyEditorPage() {
 
                 {loadedSurveyId && (
                   <>
-                    <div className="space-y-6">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleQuestionDragStart}
+                      onDragCancel={handleQuestionDragCancel}
+                      onDragEnd={handleQuestionDragEnd}
+                    >
+                    <div className="space-y-4">
                       {sections.map((section) => (
                         <div
                           key={section.id}
-                          className="bg-white rounded-2xl border border-kaist-grey/20 overflow-hidden shadow-sm"
+                          className="overflow-hidden rounded-xl border border-slate-200 bg-white"
                         >
                           {/* 섹션 헤더 (국문/영문 제목 지원) */}
-                          <div className="px-6 py-4 border-b border-kaist-grey/10 bg-gray-50/50 flex items-center justify-between">
+                          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-5 py-3">
                             <div className="flex flex-col gap-0.5">
-                              <h3 className="font-bold text-kaist-black text-base">
+                              <h3 className="text-sm font-semibold text-slate-900">
                                 {section.titleKo}
                               </h3>
                               {section.titleEn && (
-                                <span className="text-xs font-semibold text-kaist-grey/70">
+                                <span className="text-xs font-normal text-slate-500">
                                   {section.titleEn}
                                 </span>
                               )}
                             </div>
                             {!isOngoing && (
-                              <button
-                                onClick={() => handleDeleteSection(section.id)}
-                                className="text-kaist-grey hover:text-red-500 text-xs font-bold transition-all bg-gray-100 hover:bg-red-50 px-3.5 py-2 rounded-xl border border-transparent hover:border-red-100 cursor-pointer"
-                              >
-                                섹션 삭제
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <IconButton
+                                  size="sm"
+                                  aria-label={`${section.titleKo} 섹션 편집`}
+                                  onClick={() => openEditSection(section)}
+                                >
+                                  <Pencil className="size-4" />
+                                </IconButton>
+                                <IconButton
+                                  size="sm"
+                                  aria-label={`${section.titleKo} 섹션 삭제`}
+                                  onClick={() => handleDeleteSection(section.id)}
+                                  className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                                >
+                                  <Trash2 className="size-4" />
+                                </IconButton>
+                              </div>
                             )}
                           </div>
 
                           {/* 섹션 질문 목록 */}
-                          <div className="p-6 space-y-3">
+                          <div className="space-y-2 p-4">
                             {section.questions.length === 0 && (
                               <p className="text-kaist-grey/40 text-sm text-center py-6 font-bold">
                                 등록된 질문이 없습니다.
                               </p>
                             )}
 
-                            {section.questions.map((q, idx) => (
-                              <div
-                                key={q.id}
-                                draggable={!isOngoing}
-                                onDragStart={() => {
-                                  if (isOngoing) return;
-                                  dragItem.current = { sectionId: section.id, index: idx };
-                                }}
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={() => {
-                                  if (isOngoing) return;
-                                  if (!dragItem.current) return;
-                                  if (dragItem.current.sectionId !== section.id) return;
-                                  void handleReorderQuestion(section.id, dragItem.current.index, idx);
-                                  dragItem.current = null;
-                                }}
-                                className={`flex items-center justify-between rounded-xl border border-kaist-grey/15 bg-white px-5 py-4 text-sm transition-all group ${
-                                  isOngoing ? "cursor-default" : "cursor-grab active:cursor-grabbing hover:border-kaist-darkgreen/30 hover:shadow-md"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3 min-w-0">
-                                  {!isOngoing && (
-                                    <span className="text-kaist-grey/30 group-hover:text-kaist-grey/80 flex-shrink-0 select-none transition-colors">
-                                      <GripVertical className="w-4 h-4" />
-                                    </span>
-                                  )}
-                                  <div className="min-w-0 flex items-center gap-2">
-                                    <span className="font-bold text-kaist-black truncate text-sm">
-                                      {q.titleKo}
-                                    </span>
-                                    {q.titleEn && (
-                                      <span className="text-xs text-kaist-grey/60 font-semibold hidden md:inline truncate">
-                                        ({q.titleEn})
-                                      </span>
-                                    )}
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-kaist-lightgreen/20 text-kaist-darkgreen shrink-0">
-                                      {QUESTION_TYPES.find((t) => t.value === q.questionType)?.label}
-                                    </span>
-                                    {q.isRequired && (
-                                      <span className="text-[10px] font-bold text-red-500 shrink-0">
-                                        *필수
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex gap-2 flex-shrink-0 ml-2">
-                                  <button
-                                    onClick={() => openEditQuestion(section.id, q)}
-                                    className="px-3.5 py-2 text-xs font-bold text-kaist-black bg-gray-100 hover:bg-kaist-lightgreen/20 rounded-xl transition-all cursor-pointer border-0"
-                                  >
-                                    {isOngoing ? "보기" : "편집"}
-                                  </button>
-                                  {!isOngoing && (
-                                    <button
-                                      onClick={() => handleDeleteQuestion(section.id, q.id)}
-                                      className="px-3.5 py-2 text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all cursor-pointer border-0"
-                                    >
-                                      삭제
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                            <SortableContext
+                              items={section.questions.map((question) => question.id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {section.questions.map((question) => (
+                                <SortableQuestionRow
+                                  key={question.id}
+                                  question={question}
+                                  isOngoing={isOngoing}
+                                  onEdit={() => openEditQuestion(section.id, question)}
+                                  onDelete={() => handleDeleteQuestion(section.id, question.id)}
+                                />
+                              ))}
+                            </SortableContext>
                             {!isOngoing && (
                               <div className="pt-2">
-                                <button
+                                <Button variant="ghost"
                                   onClick={() => openNewQuestion(section.id)}
-                                  className="inline-flex items-center gap-1.5 text-sm font-bold text-kaist-darkgreen bg-kaist-lightgreen/20 hover:bg-kaist-lightgreen/30 px-4.5 py-2.5 rounded-xl transition-all border border-kaist-darkgreen/10 cursor-pointer"
+                                  className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
                                 >
                                   <Plus className="w-4 h-4" />
                                   질문 추가하기
-                                </button>
+                                </Button>
                               </div>
                             )}
                           </div>
                         </div>
                       ))}
                     </div>
+                    {typeof document !== "undefined"
+                      ? createPortal(
+                          <DragOverlay
+                            dropAnimation={{ duration: 200, easing: "ease" }}
+                          >
+                            {activeQuestion ? (
+                              <QuestionDragOverlayRow
+                                question={activeQuestion}
+                                isOngoing={isOngoing}
+                                width={activeDragWidth}
+                                onEdit={() => undefined}
+                                onDelete={() => undefined}
+                              />
+                            ) : null}
+                          </DragOverlay>,
+                          document.body,
+                        )
+                      : null}
+                    </DndContext>
 
                     {/* 새 섹션 추가 영역 */}
                     {!isOngoing && (
-                      <div className="flex flex-col md:flex-row gap-3 bg-gray-50 p-4 rounded-2xl border border-kaist-grey/15">
-                        <input
+                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4 md:flex-row">
+                        <UiInput
                           className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-kaist-black bg-white border border-kaist-grey/10 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen/30 transition-all placeholder:text-kaist-grey/40"
                           placeholder="새로운 섹션 제목 (국문)"
                           value={newSectionTitle}
                           onChange={(e) => setNewSectionTitle(e.target.value)}
                         />
-                        <input
+                        <UiInput
                           className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-kaist-black bg-white border border-kaist-grey/10 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen/30 transition-all placeholder:text-kaist-grey/40 ${
                              isKoreanOnly ? "opacity-35 cursor-not-allowed bg-gray-100" : ""
                            }`}
-                          placeholder={isKoreanOnly ? "한국어 전용 설문입니다 (English disabled)" : "New Section Title (English)"}
+                          placeholder="영문 섹션 제목"
                           value={newSectionTitleEn}
                           disabled={isKoreanOnly}
                           onChange={(e) => setNewSectionTitleEn(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
                         />
-                        <button
+                        <Button variant="ghost"
                           onClick={handleAddSection}
                           disabled={addingSection || !newSectionTitle.trim()}
                           className="px-6 py-2.5 text-sm font-bold text-white bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 rounded-xl transition-all disabled:opacity-50 shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0"
                         >
                           {addingSection ? "추가 중…" : "섹션 추가"}
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </>
                 )}
-              </div>
+              </AdminCard>
             )}
         </main>
 
@@ -755,8 +1075,23 @@ export function SurveyEditorPage() {
             initial={editingQuestion.initial}
             isKoreanOnly={isKoreanOnly}
             isOngoing={isOngoing}
+            currentSectionId={editingQuestion.sectionId}
+            branchTargets={sections.map((section) => ({
+              id: section.id,
+              titleKo: section.titleKo,
+            }))}
             onSave={handleSaveQuestion}
             onCancel={() => setEditingQuestion(null)}
+          />
+        )}
+
+        {editingSection && (
+          <SectionEditorModal
+            initial={editingSection.initial}
+            isKoreanOnly={isKoreanOnly}
+            isOngoing={isOngoing}
+            onSave={handleSaveSection}
+            onCancel={() => setEditingSection(null)}
           />
         )}
 
@@ -766,13 +1101,9 @@ export function SurveyEditorPage() {
               <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center mx-auto text-kaist-darkgreen animate-bounce">
                 <CalendarIcon className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-extrabold text-slate-800 leading-snug">
+              <h3 className="text-base font-semibold text-slate-800 leading-snug">
                 일정 정보 덮어쓰기
               </h3>
-              <p className="text-xs font-semibold text-slate-500 leading-relaxed">
-                선택한 행사 게시글에 등록된 일정이 있습니다.<br />
-                이 일정으로 설문조사의 시작 및 마감 시각을 덮어쓰시겠습니까?
-              </p>
               
               <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4.5 text-left text-xs font-bold text-slate-600 flex flex-col gap-2 shadow-xs">
                 <div className="flex justify-between items-center">
@@ -786,25 +1117,25 @@ export function SurveyEditorPage() {
               </div>
 
               <div className="flex gap-3 mt-2">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => handleConfirmOverwrite(true)}
                   className="flex-1 px-4 py-2.5 bg-kaist-darkgreen text-white font-bold rounded-xl text-xs hover:opacity-95 transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0"
                 >
                   덮어쓰기 (Yes)
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost"
                   type="button"
                   onClick={() => handleConfirmOverwrite(false)}
                   className="flex-1 px-4 py-2.5 bg-slate-200 text-slate-750 font-bold rounded-xl text-xs hover:bg-slate-350 transition-all cursor-pointer border-0"
                 >
                   유지하기 (No)
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         )}
-      </div>
+      </AdminPageShell>
     </AuthGuard>
   );
 }

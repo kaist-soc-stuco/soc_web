@@ -3,50 +3,52 @@ import { Footer } from "@/components/organisms/footer";
 import {
   MyPageActivityPanel,
   MyPageLoadingState,
-  MyPageOverviewPanel,
   MyPageProfilePanel,
   MyPageSidebar,
   MyPageUnavailableState,
 } from "@/features/my-page/my-page-sections";
 import { useMyPageController } from "@/features/my-page/use-my-page-controller";
+import { PageShell } from "@/components/ui/page-layout";
 
 export function MyPage() {
   const {
     activeMenu,
     activeTab,
-    allActivities,
+    activityQuery,
     canUseMyPage,
     currentPage,
     displayName,
+    displayedActivityTab,
+    drafts,
     filteredActivities,
-    handleLogout,
     initialLoading,
     isAdmin,
-    isContentRefreshing,
     lang,
     loadError,
     menuItems,
     session,
+    scraps,
     setActiveMenu,
+    setActivityQuery,
     setActiveTab,
     setCurrentPage,
-    showAllActivities,
-    stats,
     totalPages,
     userInfo,
   } = useMyPageController();
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-slate-950 flex flex-col">
-      <Header showLogo />
+    <PageShell className="text-slate-950">
+      <Header />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 md:px-8 flex gap-8 items-start">
         <MyPageSidebar
           activeMenu={activeMenu}
           lang={lang}
           menuItems={menuItems}
-          onLogout={() => void handleLogout()}
-          onMenuChange={setActiveMenu}
+          onMenuChange={(menu) => {
+            setActiveMenu(menu);
+            setCurrentPage(1);
+          }}
         />
 
         <section className="flex-1 min-w-0">
@@ -65,18 +67,6 @@ export function MyPage() {
                 </div>
               )}
 
-              {activeMenu === "overview" && (
-                <MyPageOverviewPanel
-                  activities={allActivities}
-                  displayName={displayName}
-                  isAdmin={isAdmin}
-                  lang={lang}
-                  onShowAllActivities={showAllActivities}
-                  stats={stats}
-                  userInfo={userInfo}
-                />
-              )}
-
               {activeMenu === "profile" && (
                 <MyPageProfilePanel
                   displayName={displayName}
@@ -90,23 +80,31 @@ export function MyPage() {
                 <MyPageActivityPanel
                   activeTab={activeTab}
                   activities={filteredActivities}
+                  activityQuery={activityQuery}
+                  contentTab={displayedActivityTab}
                   currentPage={currentPage}
+                  drafts={drafts}
+                  scraps={scraps}
                   onPageChange={setCurrentPage}
+                  onQueryChange={(query) => {
+                    setActivityQuery(query);
+                    setCurrentPage(1);
+                  }}
                   onTabChange={(tab) => {
                     setActiveTab(tab);
                     setCurrentPage(1);
                   }}
-                  loading={isContentRefreshing}
                   lang={lang}
                   totalPages={totalPages}
                 />
               )}
+
             </div>
           )}
         </section>
       </main>
 
       <Footer />
-    </div>
+    </PageShell>
   );
 }

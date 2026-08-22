@@ -52,5 +52,5 @@ test("contact identity fields are normalized before persistence", () => {
     roleEn: "  President  ",
   });
 
-  assert.deepEqual(parsed, localizedContact);
+  assert.deepEqual(parsed, { ...localizedContact, privacyConsented: true });
 });

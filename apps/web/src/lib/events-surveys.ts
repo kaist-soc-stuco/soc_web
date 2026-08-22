@@ -4,7 +4,7 @@ import type {
   PublicCalendarEventItem,
   SurveyRecord,
 } from "@soc/contracts";
-import { isoToDate, isoToMs, nowMs } from "@soc/shared";
+import { isoToDate, isoToMs, localDate, nowMs } from "@soc/shared";
 
 export type EventsSurveysTab = "event" | "survey" | "calendar";
 export type EventsSurveysSortKey = "latest" | "deadline";
@@ -34,8 +34,16 @@ export interface UnifiedItem {
   maxResponses?: number | null;
   responseCount?: number;
   visibilityScope?: ArticleListItem["visibilityScope"];
+  isPinned?: boolean;
+  pinOrder?: number | null;
   isAlwaysOpen?: boolean;
   imageUrl?: string | null;
+  articleBoardCode?: string;
+  likeCount?: number;
+  scrapCount?: number;
+  viewerHasLiked?: boolean;
+  viewerHasScrapped?: boolean;
+  allowLike?: boolean;
 }
 
 export interface CalendarEvent {
@@ -50,6 +58,9 @@ export interface CalendarEvent {
   computedState: ComputedSurveyState;
   articleId?: string | null;
   surveyId?: string | null;
+  startAt?: Date;
+  endAt?: Date;
+  location?: string | null;
 }
 
 export const stripCalendarPrefix = (title: string) =>
@@ -123,7 +134,7 @@ export const getPeriodText = (item: UnifiedItem) => {
   const start = formatCompactDateTime(item.opensAt);
   const end = formatCompactDateTime(item.closesAt);
 
-  if (start && end) return `${start} ~ ${end}`;
+  if (start && end) return `${start} ～ ${end}`;
   return start || end || "";
 };
 
@@ -135,7 +146,7 @@ export const getCardPeriodText = (item: UnifiedItem, lang: "ko" | string = "ko")
   const start = formatCardDate(item.opensAt);
   const end = formatCardDate(item.closesAt);
 
-  if (start && end) return `${start} ~ ${end}`;
+  if (start && end) return `${start} ～ ${end}`;
   return start || end || "";
 };
 
@@ -155,13 +166,15 @@ export const buildUnifiedItems = (
     descriptionEn: survey.descriptionEn,
     computedState: survey.computedState,
     opensAt: survey.opensAt,
-    closesAt: survey.closesAt,
+    closesAt: null,
     feePayersOnly: survey.feePayersOnly,
     isKoreanOnly: survey.isKoreanOnly,
     resultVisibility: survey.resultVisibility,
     maxResponses: survey.maxResponses,
     responseCount: survey.responseCount,
     visibilityScope: undefined,
+    isPinned: false,
+    pinOrder: null,
     isAlwaysOpen: survey.isAlwaysOpen,
   }));
 
@@ -184,8 +197,16 @@ export const buildUnifiedItems = (
     maxResponses: null,
     responseCount: 0,
     visibilityScope: event.visibilityScope,
+    isPinned: event.isPinned,
+    pinOrder: event.pinOrder ?? null,
     isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
     imageUrl: event.imageUrl ?? null,
+    articleBoardCode: event.boardCode ?? "행사",
+    likeCount: event.likeCount,
+    scrapCount: event.scrapCount,
+    viewerHasLiked: event.viewerHasLiked,
+    viewerHasScrapped: event.viewerHasScrapped,
+    allowLike: true,
   }));
 
   return [...mappedSurveys, ...mappedEvents];
@@ -218,6 +239,14 @@ export const sortVisibleItems = (
           : item.computedState === stateFilter,
     )
     .sort((a, b) => {
+      if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
+        return a.isPinned ? -1 : 1;
+      }
+      if (a.isPinned && b.isPinned) {
+        const aPinOrder = a.pinOrder ?? Number.MAX_SAFE_INTEGER;
+        const bPinOrder = b.pinOrder ?? Number.MAX_SAFE_INTEGER;
+        if (aPinOrder !== bPinOrder) return aPinOrder - bPinOrder;
+      }
       const stateOrder = { before_open: 0, open: 1, closed: 2 };
       if (a.computedState !== b.computedState) {
         return stateOrder[a.computedState] - stateOrder[b.computedState];
@@ -241,6 +270,29 @@ export const buildCalendarEvents = (
         ? item.descriptionKo || ""
         : item.descriptionEn || item.descriptionKo || "";
 
+    if (item.kind === "EVENT" && (item.opensAt || item.closesAt)) {
+      const startValue = item.opensAt ?? item.closesAt;
+      const endValue = item.closesAt ?? item.opensAt;
+      if (startValue && endValue) {
+        parsed.push({
+          id: item.id,
+          sourceType: "ARTICLE",
+          kind: item.kind,
+          title,
+          description,
+          dateType: "open",
+          rawDate: startValue,
+          date: isoToDate(startValue),
+          startAt: isoToDate(startValue),
+          endAt: isoToDate(endValue),
+          computedState: item.computedState,
+          articleId: item.id,
+          surveyId: item.surveyId,
+        });
+      }
+      return;
+    }
+
     if (item.opensAt) {
       parsed.push({
         id: item.id,
@@ -254,6 +306,7 @@ export const buildCalendarEvents = (
         computedState: item.computedState,
         articleId: item.kind === "EVENT" ? item.id : null,
         surveyId: item.surveyId,
+        startAt: isoToDate(item.opensAt),
       });
     }
 
@@ -270,6 +323,8 @@ export const buildCalendarEvents = (
         computedState: item.computedState,
         articleId: item.kind === "EVENT" ? item.id : null,
         surveyId: item.surveyId,
+        startAt: isoToDate(item.closesAt),
+        endAt: isoToDate(item.closesAt),
       });
     }
   });
@@ -284,8 +339,12 @@ export const buildCalendarEventsFromPublicItems = (
 ): CalendarEvent[] =>
   items.map((item) => {
     const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
-    const prefix =
-      item.dateType === "open"
+    const startAt = isoToDate(item.startAt ?? item.date);
+    const endAt = isoToDate(item.endAt ?? item.date);
+    const isRange = Boolean(item.startAt && item.endAt && item.startAt !== item.endAt);
+    const prefix = isRange
+      ? ""
+      : item.dateType === "open"
         ? lang === "ko"
           ? "[시작]"
           : "[Start]"
@@ -314,5 +373,16 @@ export const buildCalendarEventsFromPublicItems = (
       rawDate: item.date,
       date: isoToDate(item.date),
       computedState,
+      startAt,
+      endAt,
+      location: item.location,
     };
   });
+
+export const isCalendarEventOnDay = (event: CalendarEvent, day: Date): boolean => {
+  const start = event.startAt ?? event.date;
+  const end = event.endAt ?? event.date;
+  const dayStart = localDate(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  const dayEnd = localDate(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime() - 1;
+  return start.getTime() <= dayEnd && end.getTime() >= dayStart;
+};

@@ -1,27 +1,29 @@
 import type { FormEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { ArticleListItem, BoardSummary, SurveyRecord } from "@soc/contracts";
-import { isoToDate } from "@soc/shared";
+import type {
+  ArticleListItem,
+  BoardSummary,
+  PublicCalendarEventItem,
+  SurveyRecord,
+} from "@soc/contracts";
 import {
   ArrowRight,
+  CalendarDays,
   ClipboardList,
   FileText,
   Info,
   Loader2,
-  Search,
 } from "lucide-react";
 
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
+import { formatShortDate } from "@/lib/date-display";
+import { stripRichText } from "@/components/ui/rich-text-content";
 
 import type { AboutSearchItem } from "./search-utils";
+import { PageActionButton, PageSearchField } from "@/components/ui/page-layout";
 
-function formatDate(value: string) {
-  const date = isoToDate(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}.${mm}.${dd}`;
+function formatDate(value: string, lang: string) {
+  return formatShortDate(value, lang);
 }
 
 function getSurveyKindLabel(kind: string, lang: string) {
@@ -52,24 +54,24 @@ export function SearchForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-2xl border border-card-border-subtle bg-white p-4 shadow-card"
+      className="rounded-lg border border-card-border-subtle bg-white p-3"
     >
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative min-w-0 flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={inputValue}
-            onChange={(event) => onInputValueChange(event.target.value)}
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-            placeholder={lang === "ko" ? "검색어를 입력하세요" : "Enter a search term"}
-          />
-        </div>
-        <button
+        <PageSearchField
+          ariaLabel={lang === "ko" ? "통합검색" : "Site search"}
+          className="lg:w-auto lg:flex-1"
+          value={inputValue}
+          onChange={onInputValueChange}
+          onClear={() => onInputValueChange("")}
+          placeholder={lang === "ko" ? "검색어를 입력하세요" : "Enter a search term"}
+        />
+        <PageActionButton
           type="submit"
-          className="h-11 rounded-xl bg-kaist-darkgreen-main px-5 text-sm font-extrabold text-white transition-colors hover:bg-kaist-darkgreen"
+          tone="primary"
+          className="px-5"
         >
           {lang === "ko" ? "검색" : "Search"}
-        </button>
+        </PageActionButton>
       </div>
     </form>
   );
@@ -90,8 +92,8 @@ export function SearchStatus({
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center text-sm font-semibold text-slate-500">
         {lang === "ko"
-          ? "검색어를 입력하면 게시판, 설문, 소개 결과가 함께 표시됩니다."
-          : "Enter a query to search board posts, surveys, and about pages."}
+          ? "검색어를 입력하면 게시판, 행사, 설문·투표, 일정, 소개 결과가 함께 표시됩니다."
+          : "Enter a query to search board posts, events, surveys, calendar, and about pages."}
       </div>
     );
   }
@@ -108,9 +110,11 @@ export function SearchStatus({
 
 export function SearchResults({
   aboutResults,
-  articles,
   boardById,
+  boardArticles,
+  calendarEvents,
   error,
+  eventArticles,
   lang,
   loading,
   query,
@@ -118,9 +122,11 @@ export function SearchResults({
   totalCount,
 }: {
   aboutResults: AboutSearchItem[];
-  articles: ArticleListItem[];
   boardById: Map<number, BoardSummary>;
+  boardArticles: ArticleListItem[];
+  calendarEvents: PublicCalendarEventItem[];
   error: string | null;
+  eventArticles: ArticleListItem[];
   lang: string;
   loading: boolean;
   query: string;
@@ -154,8 +160,10 @@ export function SearchResults({
 
   return (
     <div className="space-y-5">
-      <ArticleResults articles={articles} boardById={boardById} lang={lang} />
+      <ArticleResults articles={boardArticles} boardById={boardById} lang={lang} />
+      <EventResults articles={eventArticles} lang={lang} />
       <SurveyResults lang={lang} surveys={surveys} />
+      <CalendarResults events={calendarEvents} lang={lang} />
       <AboutResults items={aboutResults} lang={lang} />
     </div>
   );
@@ -174,7 +182,7 @@ function SectionShell({
 }) {
   return (
     <section className="rounded-2xl border border-card-border-subtle bg-white p-5 shadow-card">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-950">
+      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-slate-950">
         {icon}
         <span>{title}</span>
         <span className="text-xs font-bold text-slate-400">({count})</span>
@@ -211,14 +219,126 @@ function ArticleResults({
             return (
               <SearchLink key={article.articleId} to={`/board/${boardCode}/${article.articleId}`}>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-extrabold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
+                  <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
                     {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
                   </p>
                   <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
                     <span>{getBoardLabelFromMetadata(board, boardCode, lang)}</span>
                     <span>·</span>
-                    <span>{formatDate(article.postedAt)}</span>
+                    <span>{formatDate(article.postedAt, lang)}</span>
                   </p>
+                </div>
+              </SearchLink>
+            );
+          })}
+        </div>
+      )}
+    </SectionShell>
+  );
+}
+
+function EventResults({
+  articles,
+  lang,
+}: {
+  articles: ArticleListItem[];
+  lang: string;
+}) {
+  return (
+    <SectionShell
+      count={articles.length}
+      icon={<CalendarDays className="h-4 w-4 text-kaist-darkgreen" />}
+      title={lang === "ko" ? "행사" : "Events"}
+    >
+      {articles.length === 0 ? (
+        <p className="py-5 text-sm font-semibold text-slate-400">
+          {lang === "ko" ? "행사 결과가 없습니다." : "No event posts found."}
+        </p>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {articles.map((article) => {
+            const start = formatDate(article.eventStartDate ?? article.postedAt, lang);
+            const end = article.eventEndDate ? formatDate(article.eventEndDate, lang) : "";
+            const period = end && end !== start ? `${start} ～ ${end}` : start;
+            const description = lang === "ko"
+              ? article.eventDescriptionKo
+              : article.eventDescriptionEn || article.eventDescriptionKo;
+
+            return (
+              <SearchLink key={article.articleId} to={`/board/행사/${article.articleId}`}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
+                    {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
+                  </p>
+                  <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <span>{period}</span>
+                    <span>·</span>
+                    <span>{lang === "ko" ? "행사 게시글" : "Event post"}</span>
+                  </p>
+                  {description ? (
+                    <p className="mt-1 line-clamp-1 text-xs font-medium text-slate-500">
+                      {stripRichText(description)}
+                    </p>
+                  ) : null}
+                </div>
+              </SearchLink>
+            );
+          })}
+        </div>
+      )}
+    </SectionShell>
+  );
+}
+
+function CalendarResults({
+  events,
+  lang,
+}: {
+  events: PublicCalendarEventItem[];
+  lang: string;
+}) {
+  return (
+    <SectionShell
+      count={events.length}
+      icon={<CalendarDays className="h-4 w-4 text-kaist-darkgreen" />}
+      title={lang === "ko" ? "일정" : "Calendar"}
+    >
+      {events.length === 0 ? (
+        <p className="py-5 text-sm font-semibold text-slate-400">
+          {lang === "ko" ? "일정 결과가 없습니다." : "No calendar results found."}
+        </p>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {events.map((event) => {
+            const start = event.startAt ?? event.date;
+            const end = event.endAt && event.endAt !== start ? formatDate(event.endAt, lang) : "";
+            const period = end
+              ? `${formatDate(start, lang)} ～ ${end}`
+              : formatDate(start, lang);
+            const href = event.articleId
+              ? `/board/행사/${event.articleId}`
+              : event.surveyId
+                ? `/survey/${event.surveyId}`
+                : `/calendar?selected=${encodeURIComponent(event.date)}`;
+
+            return (
+              <SearchLink key={`${event.sourceType}-${event.id}`} to={href}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
+                    {lang === "ko" ? event.titleKo : event.titleEn || event.titleKo}
+                  </p>
+                  <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <span>{period}</span>
+                    <span>·</span>
+                    <span>
+                      {event.sourceType === "KAIST_ACADEMIC"
+                        ? lang === "ko" ? "KAIST 학사일정" : "KAIST Academic"
+                        : lang === "ko" ? "학생회 일정" : "Council calendar"}
+                    </span>
+                  </p>
+                  {event.location ? (
+                    <p className="mt-1 truncate text-xs font-medium text-slate-500">{event.location}</p>
+                  ) : null}
                 </div>
               </SearchLink>
             );
@@ -259,12 +379,16 @@ function SurveyResults({
                     {getSurveyStateLabel(survey.computedState, lang)}
                   </span>
                 </div>
-                <p className="truncate text-sm font-extrabold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
+                <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
                   {lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo}
                 </p>
                 {(survey.descriptionKo || survey.descriptionEn) && (
                   <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">
-                    {lang === "ko" ? survey.descriptionKo : survey.descriptionEn || survey.descriptionKo}
+                    {stripRichText(
+                      lang === "ko"
+                        ? survey.descriptionKo
+                        : survey.descriptionEn || survey.descriptionKo,
+                    )}
                   </p>
                 )}
               </div>
@@ -298,7 +422,7 @@ function AboutResults({
           {items.map((item) => (
             <SearchLink key={item.id} to={item.href}>
               <div className="min-w-0">
-                <p className="truncate text-sm font-extrabold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
+                <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
                   {lang === "ko" ? item.titleKo : item.titleEn}
                 </p>
                 <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">

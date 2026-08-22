@@ -3,6 +3,7 @@ import type {
   CreateQuestionSchema,
   CreateSectionSchema,
   CreateSurveySchema,
+  QuestionConfigSchema,
   QuestionOptionSchema,
   QuestionTypeSchema,
   SubmitResponseSchema,
@@ -17,6 +18,7 @@ export type ComputedSurveyState = 'before_open' | 'open' | 'closed';
 export type SurveyLifecycleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
 export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
+export type SurveyQuestionConfig = z.infer<typeof QuestionConfigSchema>;
 
 export interface SurveyRecord {
   id: string;
@@ -44,7 +46,6 @@ export interface SurveyRecord {
   maxResponses: number | null;
   isAlwaysOpen: boolean;
   opensAt: string | null;
-  closesAt: string | null;
   createdAt: string;
   updatedAt: string;
   responseCount?: number;
@@ -71,9 +72,9 @@ export interface SurveyQuestionRecord {
   descriptionEn: string | null;
   questionType: QuestionType;
   options: QuestionOption[] | null;
+  config: SurveyQuestionConfig | null;
   answerRegex: string | null;
   isRequired: boolean;
-  editDeadlineAt: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -171,7 +172,6 @@ export interface SurveyAnalyticsResponse {
   computedState: ComputedSurveyState;
   isAlwaysOpen: boolean;
   opensAt: string | null;
-  closesAt: string | null;
   titleKo: string;
   titleEn: string | null;
   totalResponses: number;

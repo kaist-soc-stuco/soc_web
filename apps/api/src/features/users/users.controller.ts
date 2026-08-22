@@ -1,12 +1,25 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Header, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
-import { UpdateStudentFeeStatusSchema } from "@soc/contracts";
+import * as XLSX from "xlsx";
+import {
+  BulkProcessStudentFeePaymentsSchema,
+  BulkUpdateStudentFeeStatusSchema,
+  UpdateStudentFeeStatusSchema,
+  UpdateUserActiveStatusSchema,
+} from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
 import { AuthGuard, RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { UsersService } from "./users.service";
-import type { FeeStatus, UpdateStudentFeeStatusRequest } from "@soc/contracts";
+import type {
+  FeeStatus,
+  FeeMajorCategory,
+  BulkUpdateStudentFeeStatusRequest,
+  BulkProcessStudentFeePaymentsRequest,
+  UpdateStudentFeeStatusRequest,
+  UpdateUserActiveStatusRequest,
+} from "@soc/contracts";
 
 /**
  * 사용자 조회 관련 API 골격입니다.
@@ -32,10 +45,12 @@ export class UsersController {
     @Req() req: AuthenticatedRequest,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("q") query?: string,
   ) {
     return this.usersService.getMyArticles(req.user!.id, {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
+      query,
     });
   }
 
@@ -45,10 +60,12 @@ export class UsersController {
     @Req() req: AuthenticatedRequest,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("q") query?: string,
   ) {
     return this.usersService.getMyComments(req.user!.id, {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
+      query,
     });
   }
 
@@ -58,10 +75,12 @@ export class UsersController {
     @Req() req: AuthenticatedRequest,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("q") query?: string,
   ) {
     return this.usersService.getMySurveyResponses(req.user!.id, {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
+      query,
     });
   }
 
@@ -71,8 +90,23 @@ export class UsersController {
     @Req() req: AuthenticatedRequest,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("q") query?: string,
   ) {
     return this.usersService.getMyActivities(req.user!.id, {
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+      query,
+    });
+  }
+
+  @Get("me/scraps")
+  @UseGuards(AuthGuard)
+  async getMyScraps(
+    @Req() req: AuthenticatedRequest,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.usersService.getMyScraps(req.user!.id, {
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
     });
@@ -86,6 +120,27 @@ export class UsersController {
   async getPersistedProfileStatus(@Param("userId") userId: string) {
     return {
       hasPersistedProfile: await this.usersService.hasPersistedProfile(userId),
+      userId,
+    };
+  }
+
+  @Put(":userId/status")
+  @RequirePermissions(Permissions.ADMIN)
+  async updateUserActiveStatus(
+    @Param("userId") userId: string,
+    @Body(new ZodValidationPipe(UpdateUserActiveStatusSchema))
+    body: UpdateUserActiveStatusRequest,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const updated = await this.usersService.setAccountActive(
+      userId,
+      body.isActive,
+      { actorUserId: req.user?.id, ipAddress: req.ip },
+      "admin_manual",
+    );
+
+    return {
+      isActive: updated?.isActive ?? body.isActive,
       userId,
     };
   }
@@ -141,9 +196,14 @@ export class UsersController {
     @Query("pageSize") pageSize?: string,
     @Query("sortBy") sortBy?: string,
     @Query("sortDirection") sortDirection?: string,
+    @Query("q") query?: string,
+    @Query("paymentYear") paymentYear?: string,
+    @Query("referenceSemester") referenceSemester?: string,
+    @Query("majorCategory") majorCategory?: string,
+    @Query("userIds") userIds?: string,
   ) {
     const feeStatus: FeeStatus | undefined =
-      status === "PAID" || status === "UNPAID" ? status : undefined;
+      status === "PAID" || status === "PARTIAL" || status === "UNPAID" ? status : undefined;
     const feeSortBy =
       sortBy === "studentId" ||
       sortBy === "status" ||
@@ -152,6 +212,11 @@ export class UsersController {
         ? sortBy
         : "name";
     const feeSortDirection = sortDirection === "desc" ? "desc" : "asc";
+    const feeMajorCategory: FeeMajorCategory | undefined =
+      majorCategory === "PRIMARY" || majorCategory === "DOUBLE" || majorCategory === "MINOR"
+        ? majorCategory
+        : undefined;
+    const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
 
     return this.usersService.listStudentsByFeeStatus(
       feeStatus,
@@ -159,7 +224,120 @@ export class UsersController {
       pageSize ? Number(pageSize) : 20,
       feeSortBy,
       feeSortDirection,
+      query,
+      year,
+      feeMajorCategory,
+      referenceSemester,
+      userIds?.split(",").filter(Boolean),
     );
+  }
+
+  @Get("fee-status/stats")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async getStudentFeeStats(@Query("paymentYear") paymentYear?: string) {
+    const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
+    return this.usersService.getStudentFeeStats(year);
+  }
+
+  @Get("fee-status/export.xlsx")
+  @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  @Header("Content-Disposition", 'attachment; filename="student_fee_status.xlsx"')
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async exportStudentFeeStatus(
+    @Query("status") status?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDirection") sortDirection?: string,
+    @Query("q") query?: string,
+    @Query("paymentYear") paymentYear?: string,
+    @Query("referenceSemester") referenceSemester?: string,
+    @Query("majorCategory") majorCategory?: string,
+    @Query("userIds") userIds?: string,
+  ) {
+    const feeStatus: FeeStatus | undefined =
+      status === "PAID" || status === "PARTIAL" || status === "UNPAID" ? status : undefined;
+    const feeSortBy =
+      sortBy === "studentId" || sortBy === "status" || sortBy === "paidAt" || sortBy === "name"
+        ? sortBy
+        : "name";
+    const feeSortDirection = sortDirection === "desc" ? "desc" : "asc";
+    const feeMajorCategory: FeeMajorCategory | undefined =
+      majorCategory === "PRIMARY" || majorCategory === "DOUBLE" || majorCategory === "MINOR"
+        ? majorCategory
+        : undefined;
+    const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
+    const rows = await this.usersService.exportStudentsByFeeStatus(
+      feeStatus,
+      feeSortBy,
+      feeSortDirection,
+      query,
+      year,
+      feeMajorCategory,
+      referenceSemester,
+      userIds?.split(",").filter(Boolean),
+    );
+    const worksheet = XLSX.utils.json_to_sheet(rows.map((row) => ({
+      사용자ID: row.userId,
+      학번: row.stdNo,
+      이름: row.nameKo,
+      이메일: row.email,
+      소속: row.departmentKo,
+      주전공: row.primaryMajor,
+      복수전공: row.doubleMajor,
+      부전공: row.minor,
+      상태: row.status,
+      적용학기수: row.coverageSemesters,
+      적용시작학기: row.coverageStartSemester,
+      실납부액: row.paidAmount,
+      기준금액: row.requiredAmount,
+      납부유형: row.paymentType,
+      결제수단: row.paymentMethod,
+      혜택대상: row.eligible ? "예" : "아니오",
+      납부일: row.paidAt,
+      비고: row.note,
+    })));
+    worksheet["!cols"] = [
+      { wch: 38 }, { wch: 14 }, { wch: 16 }, { wch: 32 }, { wch: 18 },
+      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
+      { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 },
+      { wch: 12 }, { wch: 22 }, { wch: 36 },
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "과비 납부");
+    return Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+  }
+
+  @Post("fee-status/bulk")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async bulkUpdateStudentFeeStatus(
+    @Body(new ZodValidationPipe(BulkUpdateStudentFeeStatusSchema))
+    body: BulkUpdateStudentFeeStatusRequest,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.bulkUpdateStudentFeeStatuses(body, {
+      actorUserId: req.user?.id,
+      ipAddress: req.ip,
+    });
+  }
+
+  @Post("fee-status/payments")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async processStudentFeePayments(
+    @Body(new ZodValidationPipe(BulkProcessStudentFeePaymentsSchema))
+    body: BulkProcessStudentFeePaymentsRequest,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.processStudentFeePayments(body, {
+      actorUserId: req.user?.id,
+      ipAddress: req.ip,
+    });
+  }
+
+  @Get("fee-status/detail/:userId")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async getStudentFeeDetail(@Param("userId") userId: string) {
+    const detail = await this.usersService.getStudentFeeDetail(userId);
+    if (!detail) return { user: null, status: null, history: [] };
+    return detail;
   }
 
   @Get(":userId/fee-status")

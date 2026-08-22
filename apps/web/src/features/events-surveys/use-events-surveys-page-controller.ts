@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
-import type { KoreanHolidayRecord } from "@soc/contracts";
+import type { ArticleEngagementKind, KoreanHolidayRecord } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
 
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import {
@@ -17,6 +18,12 @@ import {
   type UnifiedItem,
 } from "@/lib/events-surveys";
 import { buildCalendarGrid } from "./events-surveys-calendar-utils";
+
+function parseSelectedCalendarDate(value: string | null) {
+  if (!value) return null;
+  const parsed = isoToDate(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 export function useEventsSurveysPageController({
   currentTab,
@@ -34,14 +41,29 @@ export function useEventsSurveysPageController({
   const [sortBy, setSortBy] = useState<EventsSurveysSortKey>("latest");
   const [stateFilter, setStateFilter] =
     useState<EventsSurveysStateFilter>("all");
-  const [currentDate, setCurrentDate] = useState(() => nowDate());
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    if (selectedParam) {
-      const parsed = isoToDate(selectedParam);
-      if (!Number.isNaN(parsed.getTime())) return parsed;
-    }
-    return nowDate();
+  const [currentDate, setCurrentDate] = useState(() => {
+    const selected = parseSelectedCalendarDate(selectedParam);
+    return selected
+      ? localDate(selected.getFullYear(), selected.getMonth(), 1)
+      : nowDate();
   });
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    () => parseSelectedCalendarDate(selectedParam) ?? nowDate(),
+  );
+  const [calendarQuery, setCalendarQuery] = useState("");
+  const [itemQuery, setItemQuery] = useState("");
+  const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
+  const [engagementOverrides, setEngagementOverrides] = useState<
+    Record<string, Partial<UnifiedItem>>
+  >({});
+  const { data: session } = useCurrentSession();
+
+  useEffect(() => {
+    const selected = parseSelectedCalendarDate(selectedParam);
+    if (!selected) return;
+    setSelectedDate(selected);
+    setCurrentDate(localDate(selected.getFullYear(), selected.getMonth(), 1));
+  }, [selectedParam]);
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
@@ -103,11 +125,13 @@ export function useEventsSurveysPageController({
       "calendar-events",
       calendarRangeFrom,
       calendarRangeTo,
+      calendarQuery,
     ],
     queryFn: () =>
       apiClient.getPublicCalendarEvents({
         from: calendarRangeFrom,
         to: calendarRangeTo,
+        q: calendarQuery,
       }),
     enabled: currentTab === "calendar",
     staleTime: 60 * 1000,
@@ -142,18 +166,121 @@ export function useEventsSurveysPageController({
     [calendarEventsQuery.data?.items, lang],
   );
 
-  const unifiedItems = useMemo<UnifiedItem[]>(
-    () => buildUnifiedItems(surveys, events),
-    [surveys, events],
-  );
+  const unifiedItems = useMemo<UnifiedItem[]>(() => {
+    return buildUnifiedItems(surveys, events).map((item) => ({
+      ...item,
+      ...(engagementOverrides[item.id] ?? {}),
+    }));
+  }, [engagementOverrides, events, surveys]);
 
   const filteredItems = useMemo(() => {
     return filterItemsByTab(unifiedItems, currentTab);
   }, [unifiedItems, currentTab]);
 
+  const searchedItems = useMemo(() => {
+    const query = itemQuery.trim().toLocaleLowerCase();
+    if (!query) return filteredItems;
+
+    return filteredItems.filter((item) =>
+      [item.titleKo, item.titleEn, item.descriptionKo, item.descriptionEn]
+        .filter(Boolean)
+        .some((value) => value!.toLocaleLowerCase().includes(query)),
+    );
+  }, [filteredItems, itemQuery]);
+
   const visibleItems = useMemo(() => {
-    return sortVisibleItems(filteredItems, sortBy, stateFilter);
-  }, [filteredItems, stateFilter, sortBy]);
+    return sortVisibleItems(searchedItems, sortBy, stateFilter);
+  }, [searchedItems, stateFilter, sortBy]);
+
+  const stateCounts = useMemo(
+    () => ({
+      all: searchedItems.length,
+      before_open: searchedItems.filter((item) => item.computedState === "before_open").length,
+      open: searchedItems.filter((item) => item.computedState === "open").length,
+      closed: searchedItems.filter((item) => item.computedState === "closed").length,
+    }),
+    [searchedItems],
+  );
+
+  const handleSetEngagement = async (
+    item: UnifiedItem,
+    kind: ArticleEngagementKind,
+    active: boolean,
+  ) => {
+    if (item.kind !== "EVENT") return;
+    if (!session?.canUsePersistentFeatures) {
+      alert(
+        lang === "ko"
+          ? "좋아요와 스크랩은 로그인 후 사용할 수 있습니다."
+          : "Like and scrap are available after signing in.",
+      );
+      return;
+    }
+
+    const isLike = kind === "LIKE";
+    const previous = {
+      ...(isLike
+        ? {
+            likeCount: item.likeCount ?? 0,
+            viewerHasLiked: item.viewerHasLiked ?? false,
+          }
+        : {
+            scrapCount: item.scrapCount ?? 0,
+            viewerHasScrapped: item.viewerHasScrapped ?? false,
+          }),
+    };
+    const key = `${item.id}:${kind}`;
+    setEngagementSubmitting(key);
+    setEngagementOverrides((current) => ({
+      ...current,
+      [item.id]: {
+        ...current[item.id],
+        ...(isLike
+          ? {
+              likeCount: Math.max(0, (item.likeCount ?? 0) + (active ? 1 : -1)),
+              viewerHasLiked: active,
+            }
+          : {
+              scrapCount: Math.max(0, (item.scrapCount ?? 0) + (active ? 1 : -1)),
+              viewerHasScrapped: active,
+            }),
+      },
+    }));
+
+    try {
+      const response = await apiClient.setArticleEngagement(
+        item.articleBoardCode ?? "행사",
+        item.id,
+        kind,
+        active,
+      );
+      setEngagementOverrides((current) => ({
+        ...current,
+        [item.id]: {
+          ...current[item.id],
+          likeCount: response.likeCount,
+          scrapCount: response.scrapCount,
+          viewerHasLiked: response.viewerHasLiked,
+          viewerHasScrapped: response.viewerHasScrapped,
+        },
+      }));
+    } catch {
+      setEngagementOverrides((current) => ({
+        ...current,
+        [item.id]: {
+          ...current[item.id],
+          ...previous,
+        },
+      }));
+      alert(
+        lang === "ko"
+          ? "좋아요 또는 스크랩 처리에 실패했습니다."
+          : "Failed to update like or scrap.",
+      );
+    } finally {
+      setEngagementSubmitting(null);
+    }
+  };
 
   return {
     calendarEvents,
@@ -176,10 +303,17 @@ export function useEventsSurveysPageController({
         ? calendarEventsQuery.isPending
         : listQuery.isPending,
     selectedDate,
+    calendarQuery,
+    engagementSubmitting,
+    handleSetEngagement,
     setCurrentDate,
+    setCalendarQuery,
+    itemQuery,
+    setItemQuery,
     setSelectedDate,
     setSortBy,
     setStateFilter,
+    stateCounts,
     sortBy,
     stateFilter,
     visibleItems,

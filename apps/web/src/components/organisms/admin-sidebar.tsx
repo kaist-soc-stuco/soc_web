@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   ClipboardList,
   ContactRound,
+  LayoutList,
   Mail,
   PanelsTopLeft,
   ScrollText,
@@ -14,14 +15,16 @@ import { Permissions } from "@/lib/permissions";
 import { useCurrentSession } from "@/hooks/use-current-session";
 
 const ADMIN_MENU = [
-  { label: "설문조사 관리", to: "/admin/surveys", bit: Permissions.MANAGE_SURVEY, icon: ClipboardList },
+  { label: "운영 콘텐츠", to: "/admin/content", bit: Permissions.MANAGE_CONTENT, icon: PanelsTopLeft },
   { label: "유저 관리", to: "/admin/users", bit: Permissions.ADMIN, icon: Users },
-  { label: "운영 로그", to: "/admin/audit-logs", bit: Permissions.ADMIN, icon: ScrollText },
-  { label: "사이트 콘텐츠", to: "/admin/content", bit: Permissions.MANAGE_CONTENT, icon: PanelsTopLeft },
-  { label: "집행위연락망 관리", to: "/admin/contacts", bit: Permissions.MANAGE_CONTENT, icon: ContactRound },
-  { label: "이메일 일괄발송", to: "/admin/emails", bit: Permissions.ADMIN, icon: Mail },
   { label: "권한 관리", to: "/admin/permissions", bit: Permissions.ADMIN, icon: ShieldCheck },
   { label: "과비 납부 관리", to: "/admin/finance", bit: Permissions.MANAGE_FINANCE, icon: WalletCards },
+  { label: "설문조사 관리", to: "/admin/surveys", bit: Permissions.MANAGE_SURVEY, icon: ClipboardList },
+  { label: "이메일 일괄 발송", to: "/admin/emails", bit: Permissions.ADMIN, icon: Mail },
+  { label: "연락망", to: "/admin/contacts", bit: Permissions.MANAGE_CONTENT, icon: ContactRound },
+  { label: "운영 로그", to: "/admin/audit-logs", bit: Permissions.ADMIN, icon: ScrollText },
+  // 게시판 관리 기능은 유지하되, 운영 핵심 메뉴 뒤에 배치한다.
+  { label: "게시판 관리", to: "/admin/boards", bit: Permissions.ADMIN, icon: LayoutList },
 ];
 
 export function AdminSidebar() {
@@ -47,7 +50,7 @@ export function AdminSidebar() {
 
   return (
     <>
-      <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+      <nav className="flex min-w-0 gap-1.5 overflow-x-auto border-b border-[#e5eaf0] bg-white px-4 py-2.5 md:hidden">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.startsWith(item.to);
@@ -55,10 +58,10 @@ export function AdminSidebar() {
             <Link
               key={item.to}
               to={item.to}
-              className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-medium transition-colors ${
                 isActive
-                  ? "border-brand-primary bg-brand-primary text-white"
-                  : "border-slate-200 text-app-text-body hover:bg-brand-primary-light"
+                  ? "bg-[#eaf5ef] text-brand-primary"
+                  : "text-app-text-body hover:bg-slate-50"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -68,11 +71,11 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <aside className="hidden min-h-full w-56 flex-col border-r border-slate-200 bg-white px-4 py-6 text-app-text-strong md:flex">
-        <div className="text-xs font-semibold tracking-[0.2em] text-app-text-muted">ADMIN</div>
-        <div className="mt-2 text-lg font-semibold">관리자 메뉴</div>
+      <aside className="hidden min-h-full w-60 shrink-0 flex-col border-r border-[#e5eaf0] bg-white px-3 py-6 text-app-text-strong md:flex">
+        <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Admin</div>
+        <div className="mt-1 px-3 text-base font-semibold tracking-tight text-slate-900">관리자 메뉴</div>
 
-        <nav className="mt-8 flex flex-col gap-1">
+        <nav className="mt-6 flex flex-col gap-0.5">
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.to);
@@ -80,9 +83,9 @@ export function AdminSidebar() {
               <Link
                 key={item.to}
                 to={item.to}
-              className={`flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-brand-primary-light font-semibold text-brand-primary"
+                  ? "bg-[#eaf5ef] font-semibold text-brand-primary"
                   : "text-app-text-body hover:bg-slate-50 hover:text-brand-primary"
                 }`}
               >

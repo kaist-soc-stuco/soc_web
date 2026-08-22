@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   ParseIntPipe,
   Query,
   Req,
@@ -20,6 +21,7 @@ import type {
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   ArticleDeleteResponse,
+  ArticleEngagementResponse,
 } from "@soc/contracts";
 import { ArticleCreateSchema, ArticleUpdateSchema } from "@soc/contracts";
 import { Request, Response } from "express";
@@ -119,5 +121,39 @@ export class ArticleController {
     @Req() request: AuthenticatedRequest,
   ): Promise<ArticleDeleteResponse> {
     return this.articleService.deleteArticle(code, articleId, request.user!);
+  }
+
+  @Put(":articleId/engagements/:kind")
+  @UseGuards(AuthGuard)
+  async activateArticleEngagement(
+    @Param("code") code: string,
+    @Param("articleId") articleId: string,
+    @Param("kind") kind: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ArticleEngagementResponse> {
+    return this.articleService.setArticleEngagement(
+      code,
+      articleId,
+      kind,
+      true,
+      request.user!,
+    );
+  }
+
+  @Delete(":articleId/engagements/:kind")
+  @UseGuards(AuthGuard)
+  async deactivateArticleEngagement(
+    @Param("code") code: string,
+    @Param("articleId") articleId: string,
+    @Param("kind") kind: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ArticleEngagementResponse> {
+    return this.articleService.setArticleEngagement(
+      code,
+      articleId,
+      kind,
+      false,
+      request.user!,
+    );
   }
 }

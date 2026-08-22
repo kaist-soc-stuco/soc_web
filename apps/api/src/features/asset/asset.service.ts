@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -16,6 +18,10 @@ import { BoardRepository } from "../board/repositories/board.repository";
 import { ArticleRepository } from "../board/repositories/article.repository";
 import { canReadBoard, type CurrentUserContext } from "../board/board-access";
 import { getReadableArticleScopes } from "../board/article-access";
+import type {
+  AssetDirectUploadPrepareResponse,
+  AssetUploadResponse,
+} from "@soc/contracts";
 
 type UploadedAssetFile = {
   buffer: Buffer;
@@ -110,6 +116,122 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async prepareDirectUpload(input: {
+    originalFilename: string;
+    mimeType: string;
+    sizeBytes: number;
+    userId: string;
+  }): Promise<AssetDirectUploadPrepareResponse> {
+    if (
+      this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
+      !this.storage.createPresignedUpload
+    ) {
+      throw new ConflictException("asset_direct_upload_unavailable");
+    }
+
+    const preparation = await this.storage.createPresignedUpload({
+      contentType: input.mimeType,
+      originalName: input.originalFilename,
+      sizeBytes: input.sizeBytes,
+    });
+
+    await this.assetRepository.createAsset({
+      storageKey: preparation.storageKey,
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      uploadedBy: input.userId,
+    });
+
+    return preparation;
+  }
+
+  async completeDirectUpload(input: {
+    storageKey: string;
+    userId: string;
+  }): Promise<AssetUploadResponse> {
+    if (
+      this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
+      !this.storage.verifyUpload
+    ) {
+      throw new ConflictException("asset_direct_upload_unavailable");
+    }
+
+    const asset = await this.assetRepository.findOwnedAssetByStorageKey(
+      input.storageKey,
+      input.userId,
+    );
+    if (!asset) {
+      throw new NotFoundException("asset_upload_not_found");
+    }
+
+    let uploadedObject: Awaited<ReturnType<NonNullable<AssetStorageProvider["verifyUpload"]>>>;
+    try {
+      uploadedObject = await this.storage.verifyUpload(input.storageKey);
+    } catch {
+      throw new BadRequestException("asset_upload_incomplete");
+    }
+
+    if (uploadedObject.sizeBytes !== asset.sizeBytes) {
+      throw new BadRequestException("asset_upload_size_mismatch");
+    }
+    if (
+      uploadedObject.contentType &&
+      uploadedObject.contentType.toLowerCase() !== asset.mimeType.toLowerCase()
+    ) {
+      throw new BadRequestException("asset_upload_mime_mismatch");
+    }
+
+    return {
+      assetId: asset.assetId,
+      originalFilename: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: asset.sizeBytes,
+      storageKey: toAssetReference(asset.assetId),
+    };
+  }
+
+  async migrateLocalAssets(limit: number): Promise<{
+    scanned: number;
+    migrated: number;
+    failed: number;
+  }> {
+    if (
+      this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
+      !this.storage.migrateLocalObject
+    ) {
+      throw new ConflictException("asset_s3_provider_not_configured");
+    }
+
+    const candidates = await this.assetRepository.findLocalAssets(limit);
+    let migrated = 0;
+    let failed = 0;
+
+    for (const candidate of candidates) {
+      try {
+        const storageKey = await this.storage.migrateLocalObject({
+          storageKey: candidate.storageKey,
+          originalName: candidate.originalFilename,
+          contentType: candidate.mimeType,
+        });
+        await this.assetRepository.updateStorageKey(
+          candidate.assetId,
+          storageKey,
+        );
+        migrated += 1;
+      } catch (error) {
+        failed += 1;
+        this.logger.warn(
+          `Asset migration failed for ${candidate.assetId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    return { scanned: candidates.length, migrated, failed };
+  }
+
   async getFile(
     assetId: string,
     currentUser: CurrentUserContext,
@@ -178,6 +300,39 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       originalFilename: asset.originalFilename,
       sizeBytes: asset.sizeBytes,
     };
+  }
+
+  /**
+   * Reads an asset that is still owned by the requesting user.
+   *
+   * This deliberately does not use article-link visibility. Admin mail
+   * attachments are uploaded before they are attached to any article, so the
+   * ownership check is the authorization boundary for this workflow.
+   */
+  async getOwnedFile(
+    assetId: string,
+    userId: string,
+  ): Promise<{
+    buffer: Buffer;
+    mimeType: string;
+    originalFilename: string;
+    sizeBytes: number;
+  }> {
+    const asset = await this.assetRepository.findOwnedAssetDetails(assetId, userId);
+    if (!asset) {
+      throw new NotFoundException("asset_not_found");
+    }
+
+    try {
+      return {
+        buffer: await this.storage.read(asset.storageKey),
+        mimeType: asset.mimeType,
+        originalFilename: asset.originalFilename,
+        sizeBytes: asset.sizeBytes,
+      };
+    } catch {
+      throw new NotFoundException("asset_not_found");
+    }
   }
 
   async cleanupUnlinkedAssets(): Promise<{

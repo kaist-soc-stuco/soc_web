@@ -63,31 +63,48 @@ export function buildCalendarGrid(year: number, month: number): CalendarCell[] {
 export function getCalendarEventStyles(
   kind: CalendarEvent["kind"],
   lang: Language,
+  sourceType?: CalendarEvent["sourceType"],
 ) {
+  if (sourceType === "KAIST_ACADEMIC") {
+    return {
+      bg: "bg-slate-200 text-slate-600 hover:bg-slate-300",
+      bullet: "bg-slate-500",
+      label: lang === "ko" ? "KAIST 학사일정" : "KAIST Academic",
+    };
+  }
+
+  if (sourceType === "MANUAL") {
+    return {
+      bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
+      bullet: "bg-brand-primary",
+      label: lang === "ko" ? "직접 등록" : "Manual",
+    };
+  }
+
   switch (kind) {
     case "VOTE":
       return {
-        bg: "bg-purple-100 border-purple-300 font-extrabold text-purple-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
-        bullet: "bg-purple-600",
+        bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
+        bullet: "bg-sky-500",
         label: lang === "ko" ? "투표" : "Vote",
       };
     case "EVENT":
       return {
-        bg: "bg-brand-primary-light border-brand-primary-border font-extrabold text-brand-primary",
+        bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
         bullet: "bg-brand-primary",
         label: lang === "ko" ? "행사" : "Event",
       };
     case "APPLICATION":
       return {
-        bg: "bg-blue-100 border-blue-300 font-extrabold text-blue-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
-        bullet: "bg-blue-600",
+        bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
+        bullet: "bg-sky-500",
         label: lang === "ko" ? "신청" : "Application",
       };
     case "SURVEY":
     default:
       return {
-        bg: "bg-teal-100 border-teal-300 font-extrabold text-teal-950 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
-        bullet: "bg-teal-600",
+        bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
+        bullet: "bg-sky-500",
         label: lang === "ko" ? "설문" : "Survey",
       };
   }
@@ -96,7 +113,14 @@ export function getCalendarEventStyles(
 export function getCompactKindLabel(
   kind: CalendarEvent["kind"],
   lang: Language = "ko",
+  sourceType?: CalendarEvent["sourceType"],
 ) {
+  if (sourceType === "KAIST_ACADEMIC") {
+    return lang === "ko" ? "학사" : "Academic";
+  }
+  if (sourceType === "MANUAL") {
+    return lang === "ko" ? "일정" : "Calendar";
+  }
   if (kind === "VOTE") return lang === "ko" ? "투표" : "Vote";
   if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Apply";
   if (kind === "EVENT") return lang === "ko" ? "행사" : "Event";

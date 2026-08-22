@@ -16,6 +16,7 @@ import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
+import { AuthEligibilityService } from "./auth-eligibility.service";
 
 interface SsoConfig {
   clientId: string;
@@ -83,6 +84,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly authSessionService: AuthSessionService,
     private readonly pendingLoginRepository: PendingLoginRepository,
+    private readonly authEligibilityService: AuthEligibilityService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
     this.startConfig = this.loadStartConfig();
@@ -261,6 +263,18 @@ export class AuthService {
       const stdNo = this.readUserInfoString(userInfo, "std_no");
       const departmentKo = this.readUserInfoString(userInfo, "std_dept_kor_nm");
       const departmentEn = this.readUserInfoString(userInfo, "std_dept_eng_nm");
+      const primaryMajor =
+        this.readUserInfoString(userInfo, "std_major_kor_nm") ??
+        this.readUserInfoString(userInfo, "major_kor");
+      const doubleMajor =
+        this.readUserInfoString(userInfo, "std_double_major_kor_nm") ??
+        this.readUserInfoString(userInfo, "double_major_kor");
+      const minor =
+        this.readUserInfoString(userInfo, "std_minor_kor_nm") ??
+        this.readUserInfoString(userInfo, "minor_kor");
+      const gender =
+        this.readUserInfoString(userInfo, "gender") ??
+        this.readUserInfoString(userInfo, "gender_cd");
       const academicStatus = this.readUserInfoString(userInfo, "std_status_kor");
       const identityCode = this.readUserInfoString(userInfo, "socps_cd");
       const userMobile = this.readUserInfoString(userInfo, "user_mbtlnum");
@@ -269,19 +283,45 @@ export class AuthService {
         return this.buildFrontendRedirect("error", "missing_email");
       }
 
+      const eligibleDepartment =
+        this.authEligibilityService.isEligibleDepartment(
+          departmentKo,
+          departmentEn,
+        );
+
       const existingUser = await this.usersService.findByKaistUid(kaistUid);
 
+      if (!eligibleDepartment) {
+        if (existingUser?.isActive) {
+          await this.usersService.expireAccount(
+            existingUser.userId,
+            "department_not_eligible",
+          );
+        }
+
+        return this.buildFrontendRedirect("error", "department_not_eligible");
+      }
+
       if (existingUser) {
+        if (!existingUser.isActive) {
+          return this.buildFrontendRedirect("error", "account_expired");
+        }
+
         if (nameKo || nameEn || userEmail) {
           await this.usersService.updateProfileFromSso(existingUser.userId, {
             academicStatus,
             departmentEn,
             departmentKo,
+            primaryMajor,
+            doubleMajor,
+            minor,
+            gender,
             email: userEmail,
             identityCode,
             nameEn,
             nameKo,
             stdNo,
+            userMobile,
           });
         }
 
@@ -321,6 +361,10 @@ export class AuthService {
         nameKo,
         ssoSubject,
         stdNo,
+        primaryMajor,
+        doubleMajor,
+        minor,
+        gender,
         userMobile,
       }, PENDING_LOGIN_TTL_SECONDS);
 

@@ -3,37 +3,48 @@ import type {
   ArticleCreateResponse,
   ArticleDeleteResponse,
   ArticleDetailResponse,
+  ArticleDraftListResponse,
+  ArticleDraftRecord,
+  ArticleDraftSaveRequest,
+  ArticleEngagementKind,
+  ArticleEngagementResponse,
   ArticleListItem,
   ArticleListResponse,
   ArticleUpdateRequest,
   ArticleUpdateResponse,
+  AssetDirectUploadPrepareRequest,
+  AssetDirectUploadPrepareResponse,
+  AssetDirectUploadCompleteRequest,
+  AssetUploadResponse,
+  BoardArchiveResponse,
+  BoardCreateRequest,
   BoardListResponse,
+  BoardReorderRequest,
   BoardSummary,
+  BoardUpdateRequest,
   CommentCreateRequest,
   CommentCreateResponse,
+  CommentEngagementKind,
+  CommentEngagementResponse,
   CommentDeleteResponse,
   CommentListResponse,
+  CommentReportRequest,
+  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
 
 import {
+  ApiClientHttpError,
   buildListQuery,
   type ApiClientContext,
   type ListQueryOptions,
 } from "./core.js";
 
-export interface AssetUploadResponse {
-  assetId: string;
-  originalFilename: string;
-  mimeType: string;
-  sizeBytes: number;
-  storageKey: string;
-}
-
 export const createBoardApi = ({
   assetBaseUrl,
   normalizedBaseUrl,
+  putObject,
   requestJson,
 }: ApiClientContext) => ({
   getBoards: async (): Promise<BoardListResponse> => {
@@ -110,19 +121,55 @@ export const createBoardApi = ({
   },
 
   uploadAsset: async (file: File): Promise<AssetUploadResponse> => {
+    const prepareBody: AssetDirectUploadPrepareRequest = {
+      originalFilename: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+    };
+
+    let preparation: AssetDirectUploadPrepareResponse | null = null;
+    try {
+      preparation = await requestJson<AssetDirectUploadPrepareResponse>(
+        `${assetBaseUrl}/presign`,
+        {
+          body: JSON.stringify(prepareBody),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        },
+        { retryOnUnauthorized: true },
+      );
+    } catch (error) {
+      if (!(error instanceof ApiClientHttpError) || error.status !== 409) {
+        throw error;
+      }
+    }
+
+    if (preparation) {
+      await putObject(
+        preparation.uploadUrl,
+        file,
+        preparation.uploadHeaders,
+      );
+      const completeBody: AssetDirectUploadCompleteRequest = {
+        storageKey: preparation.storageKey,
+      };
+      return requestJson<AssetUploadResponse>(
+        `${assetBaseUrl}/complete`,
+        {
+          body: JSON.stringify(completeBody),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        },
+        { retryOnUnauthorized: true },
+      );
+    }
+
     const formData = new FormData();
     formData.set("file", file);
-
-    return requestJson<AssetUploadResponse>(
-      `${assetBaseUrl}/upload`,
-      {
-        body: formData,
-        method: "POST",
-      },
-      {
-        retryOnUnauthorized: true,
-      },
-    );
+    return requestJson<AssetUploadResponse>(`${assetBaseUrl}/upload`, {
+      body: formData,
+      method: "POST",
+    }, { retryOnUnauthorized: true });
   },
 
   createArticle: async (
@@ -169,6 +216,121 @@ export const createBoardApi = ({
       {
         method: "DELETE",
       },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getAdminBoards: async (): Promise<BoardListResponse> => {
+    return requestJson<BoardListResponse>(
+      `${normalizedBaseUrl}/boards/admin`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  reorderBoards: async (input: BoardReorderRequest): Promise<BoardListResponse> => {
+    return requestJson<BoardListResponse>(
+      `${normalizedBaseUrl}/boards/admin/order`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  createBoard: async (input: BoardCreateRequest): Promise<BoardSummary> => {
+    return requestJson<BoardSummary>(
+      `${normalizedBaseUrl}/boards`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateBoard: async (
+    code: string,
+    input: BoardUpdateRequest,
+  ): Promise<BoardSummary> => {
+    return requestJson<BoardSummary>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  archiveBoard: async (code: string): Promise<BoardArchiveResponse> => {
+    return requestJson<BoardArchiveResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}`,
+      { method: "DELETE" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  setArticleEngagement: async (
+    code: string,
+    articleId: string,
+    kind: ArticleEngagementKind,
+    active: boolean,
+  ): Promise<ArticleEngagementResponse> => {
+    return requestJson<ArticleEngagementResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/engagements/${kind.toLowerCase()}`,
+      {
+        method: active ? "PUT" : "DELETE",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getArticleDrafts: async (options?: {
+    boardCode?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<ArticleDraftListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.boardCode) params.set("boardCode", options.boardCode);
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.page) params.set("page", String(options.page));
+    return requestJson<ArticleDraftListResponse>(
+      `${normalizedBaseUrl}/drafts${params.toString() ? `?${params.toString()}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getArticleDraft: async (draftId: string): Promise<ArticleDraftRecord> => {
+    return requestJson<ArticleDraftRecord>(
+      `${normalizedBaseUrl}/drafts/${encodeURIComponent(draftId)}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  saveArticleDraft: async (
+    input: ArticleDraftSaveRequest,
+  ): Promise<ArticleDraftRecord> => {
+    const path = input.draftId
+      ? `/drafts/${encodeURIComponent(input.draftId)}`
+      : "/drafts";
+    return requestJson<ArticleDraftRecord>(`${normalizedBaseUrl}${path}`, {
+      body: JSON.stringify(input),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    }, { retryOnUnauthorized: true });
+  },
+
+  deleteArticleDraft: async (draftId: string): Promise<{ ok: true }> => {
+    return requestJson<{ ok: true }>(
+      `${normalizedBaseUrl}/drafts/${encodeURIComponent(draftId)}`,
+      { method: "DELETE" },
       { retryOnUnauthorized: true },
     );
   },
@@ -235,6 +397,39 @@ export const createBoardApi = ({
       `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}`,
       {
         method: "DELETE",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  setCommentEngagement: async (
+    code: string,
+    articleId: string,
+    commentId: string,
+    kind: CommentEngagementKind,
+    active: boolean,
+  ): Promise<CommentEngagementResponse> => {
+    return requestJson<CommentEngagementResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}/engagements/${kind.toLowerCase()}`,
+      {
+        method: active ? "PUT" : "DELETE",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  reportComment: async (
+    code: string,
+    articleId: string,
+    commentId: string,
+    input: CommentReportRequest = {},
+  ): Promise<CommentReportResponse> => {
+    return requestJson<CommentReportResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}/report`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       },
       { retryOnUnauthorized: true },
     );

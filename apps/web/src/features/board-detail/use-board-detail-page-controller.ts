@@ -1,6 +1,8 @@
 import type {
   ArticleDetailResponse,
+  ArticleEngagementKind,
   BoardSummary,
+  CommentEngagementKind,
   CommentItem,
 } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
@@ -31,7 +33,15 @@ export function useBoardDetailPageController() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [commentActionSubmitting, setCommentActionSubmitting] =
+    useState<string | null>(null);
+  const [engagementSubmitting, setEngagementSubmitting] =
+    useState<ArticleEngagementKind | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const navigate = useNavigate();
@@ -45,16 +55,13 @@ export function useBoardDetailPageController() {
   const catalogBoard = boardByCode.get(category);
 
   const canEdit = useMemo(() => {
-    if (!article || !board) return false;
-    if (!session?.authenticated || !session.userId) return false;
-    if (session.userId === article.author.userId) return true;
-
-    const permission = session.permission ?? 0;
-    return (
-      board.managePermissionBit > 0 &&
-      Permissions.has(permission, board.managePermissionBit)
+    return Boolean(
+      article &&
+        session?.authenticated &&
+        session.userId &&
+        session.userId === article.author.userId,
     );
-  }, [article, board, session]);
+  }, [article, session]);
 
   const canManageComments = useMemo(() => {
     if (!board) return false;
@@ -241,6 +248,231 @@ export function useBoardDetailPageController() {
     }
   };
 
+  const handleCreateReply = async (parentCommentId: string) => {
+    if (!articleId || !replyText.trim() || !canCreateComment) return;
+
+    setReplySubmitting(true);
+    setCommentError(null);
+    try {
+      await apiClient.createComment(category, articleId, {
+        content: replyText.trim(),
+        parentCommentId,
+      });
+      setReplyText("");
+      setReplyTargetId(null);
+      await refreshComments();
+    } catch {
+      setCommentError(
+        lang === "ko"
+          ? "대댓글 작성에 실패했습니다."
+          : "Failed to post the reply.",
+      );
+    } finally {
+      setReplySubmitting(false);
+    }
+  };
+
+  const handleSetArticleEngagement = async (
+    kind: ArticleEngagementKind,
+    active: boolean,
+  ) => {
+    if (!articleId || !article) return;
+
+    if (!session?.canUsePersistentFeatures) {
+      alert(
+        lang === "ko"
+          ? "좋아요와 스크랩은 로그인 후 사용할 수 있습니다."
+          : "Like and scrap are available after signing in.",
+      );
+      return;
+    }
+
+    const previousArticle = article;
+    setEngagementSubmitting(kind);
+    setArticle((current) => {
+      if (!current) return current;
+      const isLike = kind === "LIKE";
+      return {
+        ...current,
+        ...(isLike
+          ? {
+              viewerHasLiked: active,
+              likeCount: Math.max(
+                0,
+                current.likeCount + (active ? 1 : -1),
+              ),
+            }
+          : {
+              viewerHasScrapped: active,
+              scrapCount: Math.max(
+                0,
+                current.scrapCount + (active ? 1 : -1),
+              ),
+            }),
+      };
+    });
+
+    try {
+      const response = await apiClient.setArticleEngagement(
+        category,
+        articleId,
+        kind,
+        active,
+      );
+      setArticle((current) => (current ? { ...current, ...response } : current));
+    } catch {
+      setArticle(previousArticle);
+      alert(
+        lang === "ko"
+          ? "좋아요 또는 스크랩 처리에 실패했습니다."
+          : "Failed to update like or scrap.",
+      );
+    } finally {
+      setEngagementSubmitting(null);
+    }
+  };
+
+  const handleSetCommentEngagement = async (
+    commentId: string,
+    kind: CommentEngagementKind,
+    active: boolean,
+  ) => {
+    if (!articleId) return;
+
+    if (!session?.canUsePersistentFeatures) {
+      alert(
+        lang === "ko"
+          ? "댓글 좋아요는 로그인 후 사용할 수 있습니다."
+          : "Comment likes are available after signing in.",
+      );
+      return;
+    }
+
+    const actionKey = `${commentId}:${kind}`;
+    setCommentActionSubmitting(actionKey);
+    setComments((current) =>
+      current.map((comment) =>
+        comment.commentId === commentId
+          ? {
+              ...comment,
+              likeCount: Math.max(
+                0,
+                comment.likeCount + (active ? 1 : -1),
+              ),
+              viewerHasLiked: active,
+            }
+          : comment,
+      ),
+    );
+
+    try {
+      const response = await apiClient.setCommentEngagement(
+        category,
+        articleId,
+        commentId,
+        kind,
+        active,
+      );
+      setComments((current) =>
+        current.map((comment) =>
+          comment.commentId === commentId
+            ? {
+                ...comment,
+                likeCount: response.likeCount,
+                viewerHasLiked: response.viewerHasLiked,
+                viewerHasReported: response.viewerHasReported,
+              }
+            : comment,
+        ),
+      );
+    } catch {
+      await refreshComments();
+      alert(
+        lang === "ko"
+          ? "댓글 좋아요 처리에 실패했습니다."
+          : "Failed to update the comment like.",
+      );
+    } finally {
+      setCommentActionSubmitting(null);
+    }
+  };
+
+  const handleReportComment = async (commentId: string) => {
+    if (!articleId) return;
+
+    if (!session?.canUsePersistentFeatures) {
+      alert(
+        lang === "ko"
+          ? "댓글 신고는 로그인 후 사용할 수 있습니다."
+          : "Comment reports are available after signing in.",
+      );
+      return;
+    }
+
+    const confirmed = await requestConfirm({
+      confirmLabel: lang === "ko" ? "신고" : "Report",
+      description:
+        lang === "ko"
+          ? "신고된 댓글은 운영진이 검토합니다."
+          : "Reported comments will be reviewed by the moderators.",
+      title: lang === "ko" ? "이 댓글을 신고하시겠습니까?" : "Report this comment?",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setCommentActionSubmitting(`${commentId}:REPORT`);
+    try {
+      const response = await apiClient.reportComment(
+        category,
+        articleId,
+        commentId,
+      );
+      setComments((current) =>
+        current.map((comment) =>
+          comment.commentId === commentId
+            ? { ...comment, viewerHasReported: response.reported }
+            : comment,
+        ),
+      );
+    } catch {
+      setCommentError(
+        lang === "ko"
+          ? "댓글 신고에 실패했습니다."
+          : "Failed to report the comment.",
+      );
+    } finally {
+      setCommentActionSubmitting(null);
+    }
+  };
+
+  const handleShareArticle = async () => {
+    if (!article) return;
+
+    const shareUrl = window.location.href;
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title, url: shareUrl });
+        return;
+      }
+
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareCopied(true);
+        window.setTimeout(() => setShareCopied(false), 1800);
+        return;
+      }
+
+      alert(shareUrl);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      alert(
+        lang === "ko"
+          ? "공유 링크를 복사하지 못했습니다."
+          : "The share link could not be copied.",
+      );
+    }
+  };
+
   const displayBoardLabel = getBoardLabelFromMetadata(
     board ?? catalogBoard,
     category,
@@ -290,20 +522,33 @@ export function useBoardDetailPageController() {
     canManageComments,
     category,
     commentError,
+    commentActionSubmitting,
     commentSubmitting,
     commentText,
     comments,
     commentsLoading,
     content,
     displayBoardLabel,
+    engagementSubmitting,
     handleCreateComment,
+    handleCreateReply,
     handleDeleteArticle,
     handleDeleteComment,
+    handleReportComment,
+    handleSetCommentEngagement,
+    handleSetArticleEngagement,
+    handleShareArticle,
     lang,
     loading,
     posterAsset,
+    replySubmitting,
+    replyTargetId,
+    replyText,
     session,
+    shareCopied,
     setCommentText,
+    setReplyTargetId,
+    setReplyText,
     surveyDescription,
     surveyTitle,
     title,

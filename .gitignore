@@ -54,3 +54,6 @@ lerna-debug.log*
 **/CLAUDE.md
 
 images/
+
+# Local service-account credentials
+secrets/google-calendar-service-account.json

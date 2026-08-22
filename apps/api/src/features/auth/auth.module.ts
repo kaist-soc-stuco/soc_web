@@ -10,6 +10,7 @@ import { AuthSessionRepository } from "./auth-session.repository";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
 import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "./guards";
+import { AuthEligibilityService } from "./auth-eligibility.service";
 
 @Module({
   imports: [PostgresModule, RedisModule, UsersModule],
@@ -18,6 +19,7 @@ import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "./guards";
     AuthGuard,
     OptionalAuthGuard,
     PermissionBitsGuard,
+    AuthEligibilityService,
     AuthCookieService,
     AuthService,
     AuthSessionRepository,
@@ -31,6 +33,7 @@ import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "./guards";
     AuthCookieService,
     AuthSessionRepository,
     AuthSessionService,
+    AuthEligibilityService,
   ],
 })
 export class AuthModule {}

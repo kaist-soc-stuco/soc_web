@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { ArticleListItem } from "@soc/contracts";
-import { hasPermission, isoToMs, nowMs } from "@soc/shared";
+import type { ArticleEngagementKind, ArticleListItem } from "@soc/contracts";
+import { hasPermission, isoToMs } from "@soc/shared";
 
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -16,9 +16,6 @@ import {
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 export type BoardSearchCriteria = "title" | "author" | "title_content";
-export type BoardSortBy = "latest" | "views";
-export type BoardSortDirection = "asc" | "desc";
-export type BoardPeriod = "all" | "7days" | "30days";
 
 function comparePinnedArticles(a: ArticleListItem, b: ArticleListItem) {
   if (a.isPinned !== b.isPinned) {
@@ -43,14 +40,10 @@ export function useBoardPageController() {
   const [totalCount, setTotalCount] = useState(0);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [searchCriteria, setSearchCriteria] =
-    useState<BoardSearchCriteria>("title");
-  const [sortBy, setSortBy] = useState<BoardSortBy>("latest");
-  const [sortDirection, setSortDirection] =
-    useState<BoardSortDirection>("desc");
-  const [period, setPeriod] = useState<BoardPeriod>("all");
-  const [postsPerPage, setPostsPerPage] = useState(10);
+    useState<BoardSearchCriteria>("title_content");
+  const [postsPerPage, setPostsPerPage] = useState(20);
+  const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -70,33 +63,20 @@ export function useBoardPageController() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSortChange = (nextSortBy: BoardSortBy) => {
-    if (sortBy === nextSortBy) {
-      setSortDirection((currentDirection) =>
-        currentDirection === "desc" ? "asc" : "desc",
-      );
-    } else {
-      setSortBy(nextSortBy);
-      setSortDirection("desc");
-    }
-    setCurrentPage(1);
-  };
-
   useEffect(() => {
     let cancelled = false;
     setIsArticleLoading(true);
 
-    const queryParam = searchCriteria === "title" ? searchQuery : "";
+    const queryParam = searchQuery;
     const fetchPromise = category
       ? apiClient.getArticles(category, { page: 1, limit: 100, q: queryParam })
       : apiClient.getAllArticles({
           limit: postsPerPage,
           page: currentPage,
-          period,
           q: searchQuery,
           searchBy: searchCriteria,
-          sortBy,
-          sortDirection,
+          sortBy: "latest",
+          sortDirection: "desc",
         });
 
     fetchPromise
@@ -113,42 +93,17 @@ export function useBoardPageController() {
 
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
-          if (searchCriteria === "author") {
-            items = items.filter((item) => {
-              const authorText = item.isAnonymous
-                ? "익명 anonymous"
-                : item.author.name;
-              return authorText.toLowerCase().includes(query);
-            });
-          } else if (searchCriteria === "title_content") {
-            items = items.filter((item) => {
-              const title = `${item.titleKo} ${item.titleEn ?? ""}`.toLowerCase();
-              return title.includes(query);
-            });
-          }
-        }
-
-        if (period !== "all") {
-          const limitDays = period === "7days" ? 7 : 30;
-          const cutoffMs = nowMs() - limitDays * 24 * 60 * 60 * 1000;
-          items = items.filter((item) => isoToMs(item.postedAt) >= cutoffMs);
-        }
-
-        if (sortBy === "latest") {
-          items.sort((a, b) => {
-            const pinnedOrder = comparePinnedArticles(a, b);
-            if (pinnedOrder !== 0) return pinnedOrder;
-            const diff = isoToMs(b.postedAt) - isoToMs(a.postedAt);
-            return sortDirection === "desc" ? diff : -diff;
-          });
-        } else if (sortBy === "views") {
-          items.sort((a, b) => {
-            const pinnedOrder = comparePinnedArticles(a, b);
-            if (pinnedOrder !== 0) return pinnedOrder;
-            const diff = (b.viewCount || 0) - (a.viewCount || 0);
-            return sortDirection === "desc" ? diff : -diff;
+          items = items.filter((item) => {
+            const title = `${item.titleKo} ${item.titleEn ?? ""}`.toLowerCase();
+            return title.includes(query);
           });
         }
+
+        items.sort((a, b) => {
+          const pinnedOrder = comparePinnedArticles(a, b);
+          if (pinnedOrder !== 0) return pinnedOrder;
+          return isoToMs(b.postedAt) - isoToMs(a.postedAt);
+        });
 
         const total = items.length;
         const startIndex = (currentPage - 1) * postsPerPage;
@@ -177,19 +132,13 @@ export function useBoardPageController() {
     currentPage,
     searchQuery,
     searchCriteria,
-    sortBy,
-    sortDirection,
-    period,
     postsPerPage,
   ]);
 
   useEffect(() => {
     setCurrentPage(1);
     setSearchQuery("");
-    setSearchCriteria("title");
-    setSortBy("latest");
-    setSortDirection("desc");
-    setPeriod("all");
+    setSearchCriteria("title_content");
   }, [category]);
 
   const canUseWriteFeatures = hasPersistedProfile(session ?? null);
@@ -216,6 +165,91 @@ export function useBoardPageController() {
     : writableBoardCodes.length > 0;
   const writeState = category ? { initialCategory: category } : undefined;
 
+  const handleSetEngagement = async (
+    post: ArticleListItem,
+    kind: ArticleEngagementKind,
+    active: boolean,
+  ) => {
+    if (!session?.canUsePersistentFeatures) {
+      alert(
+        lang === "ko"
+          ? "좋아요와 스크랩은 로그인 후 사용할 수 있습니다."
+          : "Like and scrap are available after signing in.",
+      );
+      return;
+    }
+
+    const postCategory = post.boardCode || category || "공지";
+    const isLike = kind === "LIKE";
+    const previous = isLike
+      ? {
+          likeCount: post.likeCount,
+          viewerHasLiked: post.viewerHasLiked,
+        }
+      : {
+          scrapCount: post.scrapCount,
+          viewerHasScrapped: post.viewerHasScrapped,
+        };
+    const submissionKey = `${post.articleId}:${kind}`;
+    setEngagementSubmitting(submissionKey);
+
+    setArticles((current) =>
+      current.map((item) =>
+        item.articleId !== post.articleId
+          ? item
+          : {
+              ...item,
+              ...(isLike
+                ? {
+                    likeCount: Math.max(0, item.likeCount + (active ? 1 : -1)),
+                    viewerHasLiked: active,
+                  }
+                : {
+                    scrapCount: Math.max(0, item.scrapCount + (active ? 1 : -1)),
+                    viewerHasScrapped: active,
+                  }),
+            },
+      ),
+    );
+
+    try {
+      const response = await apiClient.setArticleEngagement(
+        postCategory,
+        post.articleId,
+        kind,
+        active,
+      );
+      setArticles((current) =>
+        current.map((item) =>
+          item.articleId === post.articleId
+            ? {
+                ...item,
+                likeCount: response.likeCount,
+                scrapCount: response.scrapCount,
+                viewerHasLiked: response.viewerHasLiked,
+                viewerHasScrapped: response.viewerHasScrapped,
+              }
+            : item,
+        ),
+      );
+    } catch {
+      setArticles((current) =>
+        current.map((item) =>
+          item.articleId === post.articleId
+            ? { ...item, ...previous }
+            : item,
+        ),
+      );
+      alert(
+        lang === "ko"
+          ? "좋아요 또는 스크랩 처리에 실패했습니다."
+          : "Failed to update like or scrap.",
+      );
+    } finally {
+      setEngagementSubmitting(null);
+    }
+  };
+
   const boardTitle = category
     ? getBoardTitleFromMetadata(currentBoard, category, lang)
     : lang === "ko"
@@ -238,22 +272,17 @@ export function useBoardPageController() {
     category,
     currentPage,
     handlePageChange,
-    handleSortChange,
+    handleSetEngagement,
+    engagementSubmitting,
     isArticleLoading,
-    isFilterDropdownOpen,
     lang,
-    period,
     postsPerPage,
     searchCriteria,
     searchQuery,
     setCurrentPage,
-    setIsFilterDropdownOpen,
-    setPeriod,
     setPostsPerPage,
     setSearchCriteria,
     setSearchQuery,
-    sortBy,
-    sortDirection,
     totalCount,
     totalPages,
     writeState,

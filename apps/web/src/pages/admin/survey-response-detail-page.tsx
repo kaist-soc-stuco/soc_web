@@ -8,9 +8,12 @@ import type {
 import { formatKoreanDateTime } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { AuthGuard } from "@/components/guards/auth-guard";
+import { AdminPageShell } from "@/components/ui/admin-page";
 import { Permissions } from "@/lib/permissions";
 import { ChevronLeft, User, ClipboardCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { AdminPageTitle } from "@/components/ui/page-layout";
 
 function renderAnswerContent(content: Record<string, unknown>): string {
   if ("text" in content) return String(content.text);
@@ -79,23 +82,20 @@ export function SurveyResponseDetailPage() {
 
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
-      <div className="min-h-screen bg-slate-50/50 text-kaist-black pb-20">
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
+      <AdminPageShell>
+        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           
           {/* Compact Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 pb-5 gap-4">
             <div>
-              <button
+              <Button variant="ghost"
                 onClick={() => navigate(`/admin/surveys/${surveyId}/responses`)}
                 className="text-xs font-semibold text-kaist-grey hover:text-kaist-darkgreen transition-colors mb-2 inline-flex items-center gap-1 bg-transparent border-0 cursor-pointer"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 응답 목록으로 돌아가기
-              </button>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900">설문 응답 상세</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                제출자의 답변을 상세히 확인할 수 있습니다.
-              </p>
+              </Button>
+              <AdminPageTitle>설문 응답 상세</AdminPageTitle>
             </div>
           </div>
 
@@ -195,7 +195,7 @@ export function SurveyResponseDetailPage() {
             </div>
           )}
         </main>
-      </div>
+      </AdminPageShell>
     </AuthGuard>
   );
 }

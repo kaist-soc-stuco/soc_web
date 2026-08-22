@@ -15,6 +15,11 @@ export interface UserRecord {
   email: string;
   departmentEn: string | null;
   departmentKo: string | null;
+  primaryMajor: string | null;
+  doubleMajor: string | null;
+  minor: string | null;
+  gender: string | null;
+  phoneNumber: string | null;
   academicStatus: string | null;
   identityCode: string | null;
   privacyConsentAt: string | null;

@@ -2,6 +2,8 @@ import type { z } from "zod";
 import type {
   AssignRoleGroupMemberSchema,
   CreateRoleGroupSchema,
+  ReplaceRoleGroupMembersSchema,
+  RoleGroupMemberFilterSchema,
   UpdateRoleGroupSchema,
 } from "../schemas.js";
 
@@ -24,6 +26,13 @@ export interface AdminUserRecord {
   email: string;
   departmentKo: string | null;
   departmentEn: string | null;
+  primaryMajor?: string | null;
+  doubleMajor?: string | null;
+  minor?: string | null;
+  gender?: string | null;
+  phoneNumber?: string | null;
+  privacyConsentAt?: string | null;
+  feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
   academicStatus: string | null;
   identityCode: string | null;
   isActive: boolean;
@@ -50,6 +59,11 @@ export interface RoleGroupMemberRecord {
   email: string;
   departmentKo: string | null;
   departmentEn: string | null;
+  primaryMajor?: string | null;
+  doubleMajor?: string | null;
+  minor?: string | null;
+  gender?: string | null;
+  phoneNumber?: string | null;
   academicStatus: string | null;
   identityCode: string | null;
   isActive: boolean;
@@ -61,6 +75,17 @@ export interface RoleGroupMemberRecord {
   validFrom: string | null;
   validTo: string | null;
   membershipActive: boolean;
+}
+
+export interface RoleGroupCandidateRecord extends AdminUserRecord {
+  isMember: boolean;
+}
+
+export interface RoleGroupCandidateListResponse {
+  items: RoleGroupCandidateRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export interface RoleGroupRecord {
@@ -81,4 +106,12 @@ export type UpdateRoleGroupRequest = z.infer<typeof UpdateRoleGroupSchema>;
 
 export type AssignRoleGroupMemberRequest = z.infer<
   typeof AssignRoleGroupMemberSchema
+>;
+
+export type RoleGroupMemberFilterRequest = z.infer<
+  typeof RoleGroupMemberFilterSchema
+>;
+
+export type ReplaceRoleGroupMembersRequest = z.infer<
+  typeof ReplaceRoleGroupMembersSchema
 >;

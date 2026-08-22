@@ -1,5 +1,5 @@
-import { SITE_CONTENT_KEYS } from "@soc/contracts";
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { CONTENT_BLOCK_STATUSES, CONTENT_BLOCK_TYPES, SITE_CONTENT_KEYS } from "@soc/contracts";
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 import { users } from "./auth.schema";
 
@@ -22,3 +22,36 @@ export const siteContents = pgTable("site_content", {
     .notNull()
     .defaultNow(),
 });
+
+export const contentBlockTypeEnum = pgEnum("content_block_type", CONTENT_BLOCK_TYPES);
+export const contentBlockStatusEnum = pgEnum("content_block_status", CONTENT_BLOCK_STATUSES);
+
+export const contentBlocks = pgTable(
+  "content_block",
+  {
+    contentBlockId: uuid("content_block_id").defaultRandom().primaryKey(),
+    type: contentBlockTypeEnum("type").notNull(),
+    status: contentBlockStatusEnum("status").notNull().default("DRAFT"),
+    titleKo: varchar("title_ko", { length: 255 }).notNull(),
+    titleEn: varchar("title_en", { length: 255 }).notNull().default(""),
+    bodyKo: text("body_ko"),
+    bodyEn: text("body_en"),
+    linkUrl: varchar("link_url", { length: 2_000 }),
+    imageUrl: varchar("image_url", { length: 2_000 }),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isEnabled: boolean("is_enabled").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
+    publishedBy: uuid("published_by").references(() => users.userId, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("content_block_status_order_idx").on(table.status, table.sortOrder),
+    index("content_block_type_order_idx").on(table.type, table.sortOrder),
+    index("content_block_schedule_idx").on(table.startsAt, table.endsAt),
+  ],
+);

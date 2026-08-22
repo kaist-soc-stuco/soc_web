@@ -6,3 +6,5 @@ export * from "./schema/audit.schema";
 export * from "./schema/contact.schema";
 export * from "./schema/email.schema";
 export * from "./schema/site-content.schema";
+export * from "./schema/calendar.schema";
+export * from "./schema/notification.schema";

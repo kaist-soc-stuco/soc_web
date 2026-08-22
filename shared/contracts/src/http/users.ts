@@ -1,5 +1,7 @@
 import type { ArticleStatus, VisibilityScope, CommentStatus } from "./board.js";
 import type { ResponseStatus } from "./survey.js";
+import type { z } from "zod";
+import type { UpdateUserActiveStatusSchema } from "../schemas.js";
 
 export interface MyPageListMeta {
   page: number;
@@ -73,3 +75,26 @@ export interface MyActivityItem {
 export interface MyActivityListResponse extends MyPageListMeta {
   items: MyActivityItem[];
 }
+
+export interface MyScrapItem {
+  articleId: string;
+  boardId: number;
+  boardCode: string;
+  boardNameKo: string;
+  boardNameEn: string | null;
+  titleKo: string;
+  titleEn: string | null;
+  isPinned: boolean;
+  postedAt: string;
+  scrapUpdatedAt: string;
+  eventStartDate: string | null;
+  eventEndDate: string | null;
+}
+
+export interface MyScrapListResponse extends MyPageListMeta {
+  items: MyScrapItem[];
+}
+
+export type UpdateUserActiveStatusRequest = z.infer<
+  typeof UpdateUserActiveStatusSchema
+>;

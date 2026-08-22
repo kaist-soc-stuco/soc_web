@@ -1,27 +1,142 @@
 import type { KoreanHolidayRecord } from "@soc/contracts";
-import { nowDate } from "@soc/shared";
+import { localDate, msToDate } from "@soc/shared";
 
 import type { Language } from "@/hooks/use-language";
+import { formatShortDate } from "@/lib/date-display";
 import { getKoreanHolidayName } from "@/lib/korean-holidays";
 import {
+  isCalendarEventOnDay,
   stripCalendarPrefix,
   type CalendarEvent,
 } from "@/lib/events-surveys";
 import {
-  getCompactKindLabel,
+  getCalendarEventStyles,
   isSameDay,
   toDateKey,
   type CalendarCell,
 } from "./events-surveys-calendar-utils";
 
-interface EventsSurveysCalendarGridProps {
-  calendarEvents: CalendarEvent[];
-  calendarGrid: CalendarCell[];
-  holidayMap: Map<string, KoreanHolidayRecord>;
-  lang: Language;
-  onSelectedDateChange: (date: Date) => void;
-  selectedDate: Date;
-  weekHeaders: string[];
+const MAX_VISIBLE_EVENTS = 4;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+interface EventRange {
+  end: Date;
+  start: Date;
+}
+
+interface CalendarEventEntry {
+  event: CalendarEvent;
+  eventIndex: number;
+  range: EventRange;
+}
+
+interface WeekLaneLayout {
+  eventLanes: Map<number, number>;
+  laneCount: number;
+}
+
+function dayStamp(date: Date) {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function dateFromDayStamp(stamp: number) {
+  const date = msToDate(stamp);
+  return localDate(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+function getVisibleEventRange(
+  event: CalendarEvent,
+  calendarGrid: CalendarCell[],
+): EventRange | null {
+  const startValue = event.startAt ?? event.date;
+  const endValue = event.endAt ?? event.date;
+  const startStamp = dayStamp(startValue);
+  const endStamp = dayStamp(endValue);
+  const start = Math.min(startStamp, endStamp);
+  const end = Math.max(startStamp, endStamp);
+  const gridStart = dayStamp(calendarGrid[0].date);
+  const gridEnd = dayStamp(calendarGrid[calendarGrid.length - 1].date);
+
+  if (end < gridStart || start > gridEnd) return null;
+
+  return {
+    start: dateFromDayStamp(start),
+    end: dateFromDayStamp(end),
+  };
+}
+
+function buildWeekLaneLayouts(
+  ranges: Array<EventRange | null>,
+  calendarGrid: CalendarCell[],
+): WeekLaneLayout[] {
+  const weekCount = Math.ceil(calendarGrid.length / 7);
+
+  return Array.from({ length: weekCount }, (_, weekIndex) => {
+    const weekStart = dayStamp(calendarGrid[weekIndex * 7].date);
+    const weekEnd = dayStamp(calendarGrid[weekIndex * 7 + 6].date);
+    const entries = ranges
+      .map((range, eventIndex) => {
+        if (!range) return null;
+
+        const start = dayStamp(range.start);
+        const end = dayStamp(range.end);
+        if (end < weekStart || start > weekEnd) return null;
+
+        return { end, eventIndex, start };
+      })
+      .filter(
+        (entry): entry is { end: number; eventIndex: number; start: number } =>
+          entry !== null,
+      )
+      .sort(
+        (first, second) =>
+          first.start - second.start ||
+          first.end - second.end ||
+          first.eventIndex - second.eventIndex,
+      );
+
+    const laneEnds: number[] = [];
+    const eventLanes = new Map<number, number>();
+
+    entries.forEach(({ end, eventIndex, start }) => {
+      const availableLane = laneEnds.findIndex((laneEnd) => laneEnd < start);
+      const laneIndex = availableLane === -1 ? laneEnds.length : availableLane;
+      laneEnds[laneIndex] = end;
+      eventLanes.set(eventIndex, laneIndex);
+    });
+
+    return { eventLanes, laneCount: laneEnds.length };
+  });
+}
+
+function isEventLabelDay(
+  range: EventRange,
+  cell: CalendarCell,
+  calendarGrid: CalendarCell[],
+) {
+  const visibleStart = Math.max(
+    dayStamp(range.start),
+    dayStamp(calendarGrid[0].date),
+  );
+  const visibleEnd = Math.min(
+    dayStamp(range.end),
+    dayStamp(calendarGrid[calendarGrid.length - 1].date),
+  );
+  const centerDay =
+    visibleStart + Math.floor((visibleEnd - visibleStart) / DAY_MS / 2) * DAY_MS;
+
+  return dayStamp(cell.date) === centerDay;
+}
+
+function getDateTextClass(
+  cell: CalendarCell,
+  cellIndex: number,
+  holiday?: KoreanHolidayRecord,
+) {
+  if (!cell.isCurrentMonth) return "text-slate-300";
+  if (holiday?.isHoliday || cellIndex % 7 === 0) return "text-rose-300";
+  if (cellIndex % 7 === 6) return "text-sky-300";
+  return "text-slate-700";
 }
 
 export function EventsSurveysCalendarGrid({
@@ -32,162 +147,192 @@ export function EventsSurveysCalendarGrid({
   onSelectedDateChange,
   selectedDate,
   weekHeaders,
-}: EventsSurveysCalendarGridProps) {
+}: {
+  calendarEvents: CalendarEvent[];
+  calendarGrid: CalendarCell[];
+  holidayMap: Map<string, KoreanHolidayRecord>;
+  lang: Language;
+  onSelectedDateChange: (date: Date) => void;
+  selectedDate: Date;
+  weekHeaders: string[];
+}) {
+  const eventRanges = calendarEvents.map((event) =>
+    getVisibleEventRange(event, calendarGrid),
+  );
+  const weekLaneLayouts = buildWeekLaneLayouts(eventRanges, calendarGrid);
+
   return (
-    <>
-      <div className="grid grid-cols-7 gap-1 text-center mb-2 select-none">
-        {weekHeaders.map((week, idx) => (
-          <div
-            key={idx}
-            className={`text-xs font-extrabold py-1.5 ${
-              idx === 0
-                ? "text-red-500"
-                : idx === 6
-                  ? "text-blue-500"
-                  : "text-kaist-greygreen"
-            }`}
-          >
-            {week}
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7 grid-rows-6 gap-1.5 min-h-[430px]">
-        {calendarGrid.map((cell, idx) => {
-          const dayEvents = calendarEvents.filter((event) =>
-            isSameDay(event.date, cell.date),
-          );
-          const isToday = isSameDay(nowDate(), cell.date);
-          const isSelected = isSameDay(selectedDate, cell.date);
-          const holiday = holidayMap.get(toDateKey(cell.date));
-          const isPublicHoliday = holiday?.isHoliday === true;
-
-          return (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSelectedDateChange(cell.date)}
-              className={`relative flex min-h-[75px] cursor-pointer flex-col items-start justify-between rounded-md border p-2 text-left transition-colors group ${
-                cell.isCurrentMonth
-                  ? isSelected
-                    ? "bg-brand-primary-light border-brand-primary-border"
-                    : "bg-white hover:bg-slate-50/50 border-kaist-grey/10"
-                  : isSelected
-                    ? "bg-brand-primary-light/70 border-brand-primary-border text-kaist-grey/40"
-                    : "bg-slate-50/40 border-transparent text-kaist-grey/40"
+    <div className="min-w-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-visible">
+      <div className="min-w-[560px] lg:min-w-0">
+        <div className="grid grid-cols-7 border-x border-b border-slate-200 text-center text-[11px] font-semibold text-slate-400">
+          {weekHeaders.map((header, index) => (
+            <div
+              className={`py-2 ${
+                index < weekHeaders.length - 1 ? "border-r border-slate-200" : ""
+              } ${index === 0 ? "text-rose-300" : ""} ${
+                index === weekHeaders.length - 1 ? "text-sky-300" : ""
               }`}
+              key={header}
             >
-              <div className="flex items-center justify-between w-full select-none">
-                {isToday ? (
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-primary bg-brand-primary-light text-[11px] font-semibold text-brand-primary">
-                    {cell.day}
-                  </div>
-                ) : (
-                  <span
-                    title={
-                      holiday
-                        ? getKoreanHolidayName(holiday.dateName, lang)
-                        : undefined
-                    }
-                    className={`text-xs leading-none ${
-                      isSelected
-                        ? "text-brand-primary font-extrabold"
-                        : cell.isCurrentMonth
-                          ? cell.date.getDay() === 0 || isPublicHoliday
-                            ? "text-red-500"
-                            : cell.date.getDay() === 6
-                              ? "text-blue-500"
-                              : "text-kaist-black"
-                          : "text-kaist-grey/40 font-bold"
-                    } ${cell.isCurrentMonth && !isSelected ? "font-bold" : ""}`}
-                  >
-                    {cell.day}
-                  </span>
-                )}
-                {holiday && cell.isCurrentMonth && (
-                  <span
-                    className={`truncate text-[9px] font-extrabold ${
-                      holiday.isHoliday ? "text-red-400" : "text-slate-400"
-                    }`}
-                    title={getKoreanHolidayName(holiday.dateName, lang)}
-                  >
-                    {getKoreanHolidayName(holiday.dateName, lang)}
-                  </span>
-                )}
-              </div>
+              {header}
+            </div>
+          ))}
+        </div>
 
-              <div
-                className="mt-2.5 flex w-full items-center gap-1.5 overflow-hidden"
-                aria-label={
-                  lang === "ko"
-                    ? `${dayEvents.length}개 일정`
-                    : `${dayEvents.length} events`
-                }
+        <div className="grid min-h-[720px] grid-cols-7 grid-rows-6 overflow-visible border-x border-slate-200">
+          {calendarGrid.map((cell, cellIndex) => {
+            const holiday = holidayMap.get(toDateKey(cell.date));
+            const selected = isSameDay(cell.date, selectedDate);
+            const weekLaneLayout =
+              weekLaneLayouts[Math.floor(cellIndex / 7)] ?? {
+                eventLanes: new Map<number, number>(),
+                laneCount: 0,
+              };
+            const dayEventEntries = calendarEvents
+              .map((event, eventIndex) => {
+                if (!isCalendarEventOnDay(event, cell.date)) return null;
+                const range = eventRanges[eventIndex];
+                return range ? { event, eventIndex, range } : null;
+              })
+              .filter(
+                (entry): entry is CalendarEventEntry => entry !== null,
+              );
+            const eventByLane = new Map<number, CalendarEventEntry>();
+
+            dayEventEntries.forEach((entry) => {
+              const laneIndex = weekLaneLayout.eventLanes.get(entry.eventIndex);
+              if (laneIndex !== undefined && laneIndex < MAX_VISIBLE_EVENTS) {
+                eventByLane.set(laneIndex, entry);
+              }
+            });
+
+            const visibleLaneCount = Math.min(
+              weekLaneLayout.laneCount,
+              MAX_VISIBLE_EVENTS,
+            );
+            const hiddenEventCount = Math.max(
+              0,
+              dayEventEntries.length - MAX_VISIBLE_EVENTS,
+            );
+            const holidayName = holiday
+              ? getKoreanHolidayName(holiday.dateName, lang)
+              : "";
+
+            return (
+              <button
+                aria-label={`${formatShortDate(cell.date, lang)}${
+                  dayEventEntries.length > 0
+                    ? `, ${dayEventEntries.length} ${
+                        lang === "ko" ? "개 일정" : "events"
+                      }`
+                    : ""
+                }`}
+                aria-pressed={selected}
+                className={`relative z-0 flex min-h-[120px] min-w-0 flex-col overflow-visible p-2 text-left transition-[background-color,z-index] duration-150 hover:z-40 focus-visible:z-50 focus:outline-none focus-visible:ring-0 ${
+                  cellIndex % 7 < 6 ? "border-r border-slate-200" : ""
+                } ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
+                key={toDateKey(cell.date)}
+                onClick={() => onSelectedDateChange(cell.date)}
+                title={holidayName || undefined}
+                type="button"
               >
-                {dayEvents.slice(0, 4).map((event, eventIdx) => {
-                  const isStart = event.dateType === "open";
-                  return (
-                    <span
-                      key={eventIdx}
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${isStart ? "bg-brand-primary" : "bg-red-500"}`}
-                      title={event.title}
-                    />
-                  );
-                })}
-                {dayEvents.length > 4 && (
-                  <span className="text-[8px] font-bold leading-none text-slate-400 select-none">
-                    +{dayEvents.length - 4}
-                  </span>
-                )}
-              </div>
+                <span
+                  className={`shrink-0 text-xs font-semibold ${getDateTextClass(
+                    cell,
+                    cellIndex,
+                    holiday,
+                  )}`}
+                >
+                  {cell.day}
+                </span>
 
-              {cell.isCurrentMonth && dayEvents.length > 0 && (
-                <div className="absolute bottom-full left-1/2 z-30 mb-2 flex w-56 -translate-x-1/2 select-none flex-col gap-2 rounded-lg border border-card-border-subtle bg-white p-3 text-[10px] text-slate-800 opacity-0 shadow-elevated transition-opacity duration-200 pointer-events-none group-hover:opacity-100">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 font-extrabold text-brand-primary">
-                    <span>
-                      {cell.date.toLocaleDateString(
-                        lang === "ko" ? "ko-KR" : "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                        },
-                      )}
-                    </span>
-                    <span>
-                      {lang === "ko"
-                        ? `${dayEvents.length}개 일정`
-                        : `${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}`}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1.5 text-left text-[9px] font-semibold text-slate-700">
-                    {dayEvents.map((event, eventIdx) => {
-                      const isStart = event.dateType === "open";
-                      const titleText = stripCalendarPrefix(event.title);
-
+                <span className="mt-2 flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-visible">
+                  {Array.from({ length: visibleLaneCount }, (_, laneIndex) => {
+                    const entry = eventByLane.get(laneIndex);
+                    if (!entry) {
                       return (
-                        <div
-                          key={eventIdx}
-                          className="flex items-center justify-between gap-2 text-left"
-                        >
-                          <div className="truncate flex items-center gap-1.5 text-left">
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${isStart ? "bg-brand-primary" : "bg-red-500"}`}
-                            />
-                            <span className="truncate text-left">{titleText}</span>
-                          </div>
-                          <span className="shrink-0 select-none rounded-sm bg-brand-primary-light px-1 text-[8px] font-extrabold uppercase text-brand-primary">
-                            {getCompactKindLabel(event.kind, lang)}
-                          </span>
-                        </div>
+                        <span
+                          aria-hidden="true"
+                          className="h-5 shrink-0"
+                          key={`empty-lane-${laneIndex}`}
+                        />
                       );
-                    })}
-                  </div>
-                </div>
-              )}
-            </button>
-          );
-        })}
+                    }
+
+                    const { event, range } = entry;
+                    const eventStyle = getCalendarEventStyles(
+                      event.kind,
+                      lang,
+                      event.sourceType,
+                    );
+                    const isStart = isSameDay(cell.date, range.start);
+                    const isEnd = isSameDay(cell.date, range.end);
+                    const showLabel = isEventLabelDay(
+                      range,
+                      cell,
+                      calendarGrid,
+                    );
+                    const titleText = stripCalendarPrefix(event.title);
+                    const widthClass =
+                      isStart && isEnd
+                        ? "w-full"
+                        : isStart || isEnd
+                          ? "w-[calc(100%+1rem)]"
+                          : "w-[calc(100%+1.5rem)]";
+
+                    return (
+                      <span
+                        className="min-w-0 shrink-0 px-1"
+                        key={`${event.id}-${event.dateType}-${laneIndex}`}
+                      >
+                        <span
+                          className={`group relative z-10 flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[10px] font-semibold leading-4 transition-colors ${
+                            isStart ? "-ml-1" : "-ml-3"
+                          } ${widthClass} ${
+                            isStart ? "rounded-l-md" : "rounded-l-none"
+                          } ${isEnd ? "rounded-r-md" : "rounded-r-none"} ${
+                            eventStyle.bg
+                          }`}
+                          tabIndex={0}
+                        >
+                          {showLabel ? (
+                            <span className="min-w-0 truncate whitespace-nowrap">
+                              {titleText}
+                            </span>
+                          ) : (
+                            <span className="block h-4 w-full" aria-hidden="true" />
+                          )}
+
+                          <span className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 flex -translate-x-1/2 flex-col rounded-lg border border-slate-200 bg-white px-3 py-2 text-left opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100">
+                            <span className="flex max-w-[18rem] items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-slate-800">
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${eventStyle.bullet}`}
+                                aria-hidden="true"
+                              />
+                              <span className="max-w-[16rem] truncate">
+                                {titleText}
+                              </span>
+                            </span>
+                            <span className="mt-1 whitespace-nowrap text-[10px] font-medium text-slate-400">
+                              {formatShortDate(cell.date, lang)}
+                            </span>
+                          </span>
+                        </span>
+                      </span>
+                    );
+                  })}
+
+                  {hiddenEventCount > 0 && cell.isCurrentMonth ? (
+                    <span className="self-end pr-1 text-[10px] font-semibold leading-4 text-slate-400">
+                      +{hiddenEventCount}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </>
+    </div>
   );
 }

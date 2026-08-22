@@ -1,7 +1,12 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
-import type { PublicSiteContentRecord, SiteContentKey } from "@soc/contracts";
+import type {
+  ContentBlockRecord,
+  ContentBlockType,
+  PublicSiteContentRecord,
+  SiteContentKey,
+} from "@soc/contracts";
 
 import { useLanguage, type Language } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -9,7 +14,6 @@ import { resolveLocalizedSiteContentValue } from "@/lib/site-content-value";
 
 export interface SiteContentDefinition {
   group: "home" | "about" | "footer";
-  helpKo: string;
   key: SiteContentKey;
   labelKo: string;
   multiline?: boolean;
@@ -20,7 +24,6 @@ export interface SiteContentDefinition {
 export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   {
     group: "home",
-    helpKo: "홈 첫 화면의 가장 큰 제목입니다.",
     key: "home.hero.title",
     labelKo: "히어로 제목",
     multiline: true,
@@ -29,7 +32,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "home",
-    helpKo: "제목 아래에서 학생회의 역할을 설명합니다.",
     key: "home.hero.description",
     labelKo: "히어로 설명",
     multiline: true,
@@ -38,7 +40,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "home",
-    helpKo: "SOC 소개 페이지로 이동하는 버튼 문구입니다.",
     key: "home.hero.cta",
     labelKo: "히어로 버튼",
     valueKo: "집행위원회 소개 보기",
@@ -46,7 +47,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "about",
-    helpKo: "소개 페이지 상단의 짧은 설명입니다.",
     key: "about.hero.description",
     labelKo: "소개 페이지 설명",
     multiline: true,
@@ -55,7 +55,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "about",
-    helpKo: "소개 탭의 본문 제목입니다.",
     key: "about.intro.title",
     labelKo: "SOC 소개 제목",
     valueKo: "KAIST 전산학부 집행위원회 'SOC'",
@@ -63,7 +62,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "about",
-    helpKo: "SOC의 역할과 운영 목적을 설명하는 본문입니다.",
     key: "about.intro.body",
     labelKo: "SOC 소개 본문",
     multiline: true,
@@ -72,7 +70,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "about",
-    helpKo: "로드맵 페이지 상단 제목입니다.",
     key: "about.roadmap.title",
     labelKo: "로드맵 제목",
     valueKo: "전산학부 생활 로드맵",
@@ -80,7 +77,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "about",
-    helpKo: "로드맵의 성격을 설명하는 상단 문구입니다.",
     key: "about.roadmap.description",
     labelKo: "로드맵 설명",
     multiline: true,
@@ -89,7 +85,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "footer",
-    helpKo: "사이트 하단에 표시하는 운영 주체 문구입니다.",
     key: "footer.description",
     labelKo: "푸터 설명",
     multiline: true,
@@ -98,7 +93,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
   },
   {
     group: "footer",
-    helpKo: "사이트 하단의 이메일 문의 링크 문구입니다.",
     key: "footer.contact",
     labelKo: "문의 링크",
     valueKo: "문의",
@@ -107,6 +101,7 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
 ] as const;
 
 export const SITE_CONTENT_QUERY_KEY = ["site-content"] as const;
+export const PUBLIC_CONTENT_BLOCKS_QUERY_KEY = ["site-content", "public-blocks"] as const;
 
 export function getSiteContentDefinition(key: SiteContentKey) {
   const definition = SITE_CONTENT_DEFINITIONS.find((item) => item.key === key);
@@ -143,4 +138,33 @@ export function useLocalizedSiteContent(key: SiteContentKey) {
   const { data } = useSiteContent();
 
   return resolveSiteContentValue(data?.items, key, lang);
+}
+
+export function usePublicContentBlocks() {
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
+
+  return useQuery({
+    queryKey: PUBLIC_CONTENT_BLOCKS_QUERY_KEY,
+    queryFn: () => apiClient.listPublicContentBlocks(),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function usePublicContentBlocksByType(type: ContentBlockType): ContentBlockRecord[] {
+  const { data } = usePublicContentBlocks();
+  return (data?.items ?? []).filter((block) => block.type === type);
+}
+
+export function resolveContentBlockText(
+  block: ContentBlockRecord,
+  lang: Language,
+): { body: string | null; title: string } {
+  const isEnglish = lang === "en";
+  return {
+    title: (isEnglish ? block.titleEn : block.titleKo).trim() || block.titleKo.trim(),
+    body: ((isEnglish ? block.bodyEn : block.bodyKo) || block.bodyKo)?.trim() || null,
+  };
 }

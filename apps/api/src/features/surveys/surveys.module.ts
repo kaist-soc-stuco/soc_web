@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
+import { AssetModule } from "../asset/asset.module";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -21,7 +22,7 @@ import { SurveyQuestionsController } from "./survey-questions.controller";
 import { SurveyResponsesController } from "./survey-responses.controller";
 
 @Module({
-  imports: [PostgresModule, AuthModule, UsersModule],
+  imports: [PostgresModule, AuthModule, UsersModule, AssetModule],
   controllers: [
     SurveysController,
     SurveySectionsController,

@@ -12,6 +12,7 @@ const ADMIN_ENTRY_ROUTES = [
   { to: "emails", bit: Permissions.ADMIN },
   { to: "permissions", bit: Permissions.ADMIN },
   { to: "finance", bit: Permissions.MANAGE_FINANCE },
+  { to: "boards", bit: Permissions.ADMIN },
 ];
 
 export function AdminIndexPage() {

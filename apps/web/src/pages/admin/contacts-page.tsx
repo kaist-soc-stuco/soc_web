@@ -1,5 +1,5 @@
-import { ContactsPage as AdminContactsFeature } from "@/features/admin-contacts/contacts-page";
+import { ExecutiveDirectoryPage } from "@/features/admin-contacts/ExecutiveDirectoryPage";
 
 export function ContactsPage() {
-  return <AdminContactsFeature />;
+  return <ExecutiveDirectoryPage />;
 }

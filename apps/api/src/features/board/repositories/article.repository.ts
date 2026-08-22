@@ -20,6 +20,7 @@ import type {
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   ArticleDeleteResponse,
+  ArticleEngagementKind,
   VisibilityScope,
 } from "@soc/contracts";
 
@@ -29,6 +30,8 @@ import {
 } from "../../../infrastructure/postgres/postgres.provider";
 import {
   articleAssets,
+  articleEngagements,
+  articleViews,
   articles,
   assets,
   comments,
@@ -47,10 +50,8 @@ const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_o
 
   const now = nowMs();
   const openAt = survey.openAt?.valueOf();
-  const closeAt = survey.closeAt?.valueOf();
 
   if (openAt && openAt > now) return "before_open";
-  if (closeAt && closeAt <= now) return "closed";
   return "open";
 };
 
@@ -66,6 +67,27 @@ const articleThumbnailStorageKey = sql<string | null>`(
   limit 1
 )`;
 
+const articleEngagementCount = (kind: ArticleEngagementKind) => sql<number>`(
+  select count(*)::int
+  from ${articleEngagements}
+  where ${articleEngagements.articleId} = ${articles.articleId}
+    and ${articleEngagements.kind} = ${kind}
+)`;
+
+const viewerHasEngagement = (
+  userId: string | undefined,
+  kind: ArticleEngagementKind,
+) =>
+  userId
+    ? sql<boolean>`exists (
+        select 1
+        from ${articleEngagements}
+        where ${articleEngagements.articleId} = ${articles.articleId}
+          and ${articleEngagements.userId} = ${userId}
+          and ${articleEngagements.kind} = ${kind}
+      )`
+    : sql<boolean>`false`;
+
 @Injectable()
 export class ArticleRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
@@ -76,6 +98,7 @@ export class ArticleRepository {
     limit: number,
     visibilityScopes: VisibilityScope[],
     query?: string,
+    viewerUserId?: string,
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     const offset = (page - 1) * limit;
     const normalizedQuery = query?.trim();
@@ -108,6 +131,7 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
@@ -115,6 +139,10 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         viewCount: articles.viewCount,
+        likeCount: articleEngagementCount("LIKE"),
+        scrapCount: articleEngagementCount("SCRAP"),
+        viewerHasLiked: viewerHasEngagement(viewerUserId, "LIKE"),
+        viewerHasScrapped: viewerHasEngagement(viewerUserId, "SCRAP"),
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -161,6 +189,7 @@ export class ArticleRepository {
           row.visibilityScope as ArticleListItem["visibilityScope"],
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
+        isSecret: row.isSecret,
         isAnonymous: row.isAnonymous,
         allowComment: row.allowComment,
         postedAt: msToIso(row.postedAt.valueOf()),
@@ -171,6 +200,10 @@ export class ArticleRepository {
         },
         commentCount: Number(row.commentCount ?? 0),
         viewCount: row.viewCount,
+        likeCount: Number(row.likeCount ?? 0),
+        scrapCount: Number(row.scrapCount ?? 0),
+        viewerHasLiked: Boolean(row.viewerHasLiked),
+        viewerHasScrapped: Boolean(row.viewerHasScrapped),
         hasAttachment: Boolean(row.hasAttachment),
         thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
         eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
@@ -193,6 +226,7 @@ export class ArticleRepository {
       sortBy: "latest" | "views";
       sortDirection: "asc" | "desc";
       visibilityScopes: VisibilityScope[];
+      viewerUserId?: string;
     },
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     if (boardIds.length === 0) {
@@ -257,6 +291,7 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
@@ -264,6 +299,10 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         viewCount: articles.viewCount,
+        likeCount: articleEngagementCount("LIKE"),
+        scrapCount: articleEngagementCount("SCRAP"),
+        viewerHasLiked: viewerHasEngagement(params.viewerUserId, "LIKE"),
+        viewerHasScrapped: viewerHasEngagement(params.viewerUserId, "SCRAP"),
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -313,6 +352,7 @@ export class ArticleRepository {
           row.visibilityScope as ArticleListItem["visibilityScope"],
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
+        isSecret: row.isSecret,
         isAnonymous: row.isAnonymous,
         allowComment: row.allowComment,
         postedAt: msToIso(row.postedAt.valueOf()),
@@ -323,6 +363,10 @@ export class ArticleRepository {
         },
         commentCount: Number(row.commentCount ?? 0),
         viewCount: row.viewCount,
+        likeCount: Number(row.likeCount ?? 0),
+        scrapCount: Number(row.scrapCount ?? 0),
+        viewerHasLiked: Boolean(row.viewerHasLiked),
+        viewerHasScrapped: Boolean(row.viewerHasScrapped),
         hasAttachment: Boolean(row.hasAttachment),
         thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
         eventStartDate: row.eventStartDate
@@ -343,6 +387,7 @@ export class ArticleRepository {
     query?: string,
     boardIds: number[] = [],
     visibilityScopes: VisibilityScope[] = ["PUBLIC"],
+    viewerUserId?: string,
   ): Promise<ArticleListItem[]> {
     if (boardIds.length === 0) {
       return [];
@@ -374,6 +419,7 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
@@ -381,6 +427,10 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         viewCount: articles.viewCount,
+        likeCount: articleEngagementCount("LIKE"),
+        scrapCount: articleEngagementCount("SCRAP"),
+        viewerHasLiked: viewerHasEngagement(viewerUserId, "LIKE"),
+        viewerHasScrapped: viewerHasEngagement(viewerUserId, "SCRAP"),
         hasAttachment: sql<boolean>`exists (
           select 1
           from ${articleAssets}
@@ -416,6 +466,7 @@ export class ArticleRepository {
         row.visibilityScope as ArticleListItem["visibilityScope"],
       isPinned: row.isPinned,
       pinOrder: row.pinOrder ?? null,
+      isSecret: row.isSecret,
       isAnonymous: row.isAnonymous,
       allowComment: row.allowComment,
       postedAt: msToIso(row.postedAt.valueOf()),
@@ -426,6 +477,10 @@ export class ArticleRepository {
       },
       commentCount: 0, // Not needed for search
       viewCount: row.viewCount,
+      likeCount: Number(row.likeCount ?? 0),
+      scrapCount: Number(row.scrapCount ?? 0),
+      viewerHasLiked: Boolean(row.viewerHasLiked),
+      viewerHasScrapped: Boolean(row.viewerHasScrapped),
       hasAttachment: Boolean(row.hasAttachment),
       thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
       eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
@@ -440,6 +495,7 @@ export class ArticleRepository {
     boardId: number,
     articleId: string,
     visibilityScopes: VisibilityScope[],
+    viewerUserId?: string,
   ): Promise<ArticleDetailResponse | null> {
     const row = await this.db
       .select({
@@ -453,6 +509,7 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
@@ -460,6 +517,10 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         viewCount: articles.viewCount,
+        likeCount: articleEngagementCount("LIKE"),
+        scrapCount: articleEngagementCount("SCRAP"),
+        viewerHasLiked: viewerHasEngagement(viewerUserId, "LIKE"),
+        viewerHasScrapped: viewerHasEngagement(viewerUserId, "SCRAP"),
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -566,6 +627,7 @@ export class ArticleRepository {
         .visibilityScope as ArticleDetailResponse["visibilityScope"],
       isPinned: row[0].isPinned,
       pinOrder: row[0].pinOrder ?? null,
+      isSecret: row[0].isSecret,
       isAnonymous: row[0].isAnonymous,
       allowComment: row[0].allowComment,
       postedAt: msToIso(row[0].postedAt.valueOf()),
@@ -586,6 +648,10 @@ export class ArticleRepository {
       })),
       commentCount: Number(row[0].commentCount ?? 0),
       viewCount: row[0].viewCount,
+      likeCount: Number(row[0].likeCount ?? 0),
+      scrapCount: Number(row[0].scrapCount ?? 0),
+      viewerHasLiked: Boolean(row[0].viewerHasLiked),
+      viewerHasScrapped: Boolean(row[0].viewerHasScrapped),
       eventStartDate: row[0].eventStartDate ? msToIso(row[0].eventStartDate.valueOf()) : undefined,
       eventEndDate: row[0].eventEndDate ? msToIso(row[0].eventEndDate.valueOf()) : undefined,
       eventDescriptionKo: row[0].eventDescriptionKo ?? undefined,
@@ -602,7 +668,6 @@ export class ArticleRepository {
             feeRequirementPolicy: surveyRow[0].feeRequirementPolicy,
             isAlwaysOpen: surveyRow[0].isAlwaysOpen,
             openAt: surveyRow[0].openAt ? msToIso(surveyRow[0].openAt.valueOf()) : undefined,
-            closeAt: surveyRow[0].closeAt ? msToIso(surveyRow[0].closeAt.valueOf()) : undefined,
           }
         : null,
       prevArticle: prevRow[0]
@@ -688,6 +753,7 @@ export class ArticleRepository {
           visibilityScope: input.payload.visibilityScope,
           isPinned: input.payload.isPinned ?? false,
           pinOrder: input.payload.pinOrder ?? null,
+          isSecret: input.payload.isSecret ?? false,
           isAnonymous: input.payload.isAnonymous ?? false,
           allowComment: input.payload.allowComment ?? true,
           postedAt: now,
@@ -794,6 +860,7 @@ export class ArticleRepository {
       visibilityScope?: string;
       isPinned?: boolean;
       pinOrder?: number | null;
+      isSecret?: boolean;
       isAnonymous?: boolean;
       allowComment?: boolean;
       updatedAt: Date;
@@ -831,6 +898,10 @@ export class ArticleRepository {
 
     if (payload.pinOrder !== undefined) {
       updateSet.pinOrder = payload.pinOrder ?? null;
+    }
+
+    if (payload.isSecret !== undefined) {
+      updateSet.isSecret = payload.isSecret;
     }
 
     if (payload.isAnonymous !== undefined) {
@@ -972,5 +1043,86 @@ export class ArticleRepository {
       .update(articles)
       .set({ viewCount: sql`${articles.viewCount} + 1` })
       .where(eq(articles.articleId, Number(articleId)));
+  }
+
+  async recordArticleView(articleId: string, userId: string): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const inserted = await tx
+        .insert(articleViews)
+        .values({
+          articleId: Number(articleId),
+          userId,
+        })
+        .onConflictDoNothing()
+        .returning({ articleId: articleViews.articleId });
+
+      if (inserted.length === 0) return false;
+
+      await tx
+        .update(articles)
+        .set({ viewCount: sql`${articles.viewCount} + 1` })
+        .where(eq(articles.articleId, Number(articleId)));
+
+      return true;
+    });
+  }
+
+  async setArticleEngagement(
+    articleId: string,
+    userId: string,
+    kind: ArticleEngagementKind,
+    active: boolean,
+  ): Promise<void> {
+    const normalizedArticleId = Number(articleId);
+
+    if (active) {
+      await this.db
+        .insert(articleEngagements)
+        .values({
+          articleId: normalizedArticleId,
+          userId,
+          kind,
+        })
+        .onConflictDoNothing();
+      return;
+    }
+
+    await this.db
+      .delete(articleEngagements)
+      .where(
+        and(
+          eq(articleEngagements.articleId, normalizedArticleId),
+          eq(articleEngagements.userId, userId),
+          eq(articleEngagements.kind, kind),
+        ),
+      );
+  }
+
+  async getArticleEngagementSummary(
+    articleId: string,
+    viewerUserId: string,
+  ): Promise<{
+    likeCount: number;
+    scrapCount: number;
+    viewerHasLiked: boolean;
+    viewerHasScrapped: boolean;
+  }> {
+    const rows = await this.db
+      .select({
+        likeCount: articleEngagementCount("LIKE"),
+        scrapCount: articleEngagementCount("SCRAP"),
+        viewerHasLiked: viewerHasEngagement(viewerUserId, "LIKE"),
+        viewerHasScrapped: viewerHasEngagement(viewerUserId, "SCRAP"),
+      })
+      .from(articles)
+      .where(eq(articles.articleId, Number(articleId)))
+      .limit(1);
+
+    return {
+      likeCount: Number(rows[0]?.likeCount ?? 0),
+      scrapCount: Number(rows[0]?.scrapCount ?? 0),
+      viewerHasLiked: Boolean(rows[0]?.viewerHasLiked),
+      viewerHasScrapped: Boolean(rows[0]?.viewerHasScrapped),
+    };
   }
 }

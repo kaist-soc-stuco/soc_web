@@ -1,614 +1,344 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
-import type { SiteContentKey } from "@soc/contracts";
-import { isoToMs, nowMs } from "@soc/shared";
-import {
-  CheckCircle2,
-  FileText,
-  Home,
-  Languages,
-  PanelBottom,
-  RotateCcw,
-  Save,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import type { ContentBlockRecord, ContentBlockStatus, ContentBlockType, CreateContentBlockRequest, UpdateContentBlockRequest } from "@soc/contracts";
+import { htmlDatetimeLocalToIso, isoToDate, isoToHtmlDatetimeLocal } from "@soc/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Archive, ExternalLink, Image, LayoutTemplate, Link2, Megaphone, Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { AdminCard, AdminCardHeader, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle, AdminStickyActionBar, AdminToolbar, AdminToolbarGroup } from "@/components/ui/admin-page";
+import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
+import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  getSiteContentDefinition,
-  SITE_CONTENT_DEFINITIONS,
-  SITE_CONTENT_QUERY_KEY,
-  type SiteContentDefinition,
-} from "@/features/site-content/site-content";
+import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { Modal } from "@/components/ui/modal";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Skeleton } from "@/components/ui/skeleton";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
-const ADMIN_SITE_CONTENT_QUERY_KEY = ["admin", "site-content"] as const;
-const INITIAL_CONTENT_DEFINITION = SITE_CONTENT_DEFINITIONS[0];
+type StatusFilter = "ALL" | ContentBlockStatus;
 
-const GROUPS = [
-  {
-    id: "home" as const,
-    description: "첫 화면의 핵심 메시지와 이동 버튼",
-    icon: Home,
-    label: "홈",
-  },
-  {
-    id: "about" as const,
-    description: "SOC 소개와 생활 로드맵 안내",
-    icon: FileText,
-    label: "소개·로드맵",
-  },
-  {
-    id: "footer" as const,
-    description: "모든 공개 페이지의 하단 정보",
-    icon: PanelBottom,
-    label: "푸터",
-  },
-] as const;
-
-interface Draft {
-  source: string;
-  valueEn: string;
-  valueKo: string;
+interface BlockDraft {
+  bodyEn: string;
+  bodyKo: string;
+  endsAt: string;
+  imageUrl: string;
+  isEnabled: boolean;
+  linkUrl: string;
+  sortOrder: number;
+  startsAt: string;
+  titleEn: string;
+  titleKo: string;
+  type: ContentBlockType;
 }
 
-type ConfirmRequest = ReturnType<typeof useConfirmDialog>["confirm"];
+const CONTENT_BLOCK_QUERY_KEY = ["admin", "content-blocks"] as const;
 
-const DIRTY_HISTORY_MARKER = "socCmsDirtyGuard";
+const typeMeta: Record<ContentBlockType, { label: string }> = {
+  HERO: { label: "메인 히어로" },
+  TOP_BANNER: { label: "상단 띠배너" },
+  POPUP: { label: "팝업" },
+  STATUS_NOTICE: { label: "상태 공지" },
+  QUICK_LINK: { label: "퀵링크" },
+};
 
-function formatUpdatedAt(value: string | null | undefined) {
-  if (!value) return null;
-  const timestamp = isoToMs(value);
-  if (!Number.isFinite(timestamp)) return null;
+const statusMeta: Record<ContentBlockStatus, { label: string; tone: "neutral" | "positive" | "warning" | "info" }> = {
+  DRAFT: { label: "초안", tone: "neutral" },
+  SCHEDULED: { label: "예약", tone: "info" },
+  PUBLISHED: { label: "게시 중", tone: "positive" },
+  ARCHIVED: { label: "보관", tone: "warning" },
+};
 
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
-}
+const emptyDraft = (type: ContentBlockType = "HERO"): BlockDraft => ({
+  bodyEn: "",
+  bodyKo: "",
+  endsAt: "",
+  imageUrl: "",
+  isEnabled: true,
+  linkUrl: "",
+  sortOrder: 0,
+  startsAt: "",
+  titleEn: "",
+  titleKo: "",
+  type,
+});
 
-function useUnsavedContentGuard(
-  isDirty: boolean,
-  requestConfirm: ConfirmRequest,
-) {
-  const navigate = useNavigate();
-  const confirmRef = useRef(requestConfirm);
-  const guardActiveRef = useRef(false);
-  const markerRef = useRef<string | null>(null);
-  const previousDirtyRef = useRef(false);
-  const promptPendingRef = useRef(false);
+const toLocalDateTime = (value: string | null) => {
+  if (!value) return "";
+  return isoToHtmlDatetimeLocal(value);
+};
 
-  useEffect(() => {
-    confirmRef.current = requestConfirm;
-  }, [requestConfirm]);
+const toIsoDateTime = (value: string) => value ? htmlDatetimeLocalToIso(value) : null;
 
-  useEffect(() => {
-    const wasDirty = previousDirtyRef.current;
-    previousDirtyRef.current = isDirty;
+const draftFromBlock = (block: ContentBlockRecord): BlockDraft => ({
+  bodyEn: block.bodyEn ?? "",
+  bodyKo: block.bodyKo ?? "",
+  endsAt: toLocalDateTime(block.endsAt),
+  imageUrl: block.imageUrl ?? "",
+  isEnabled: block.isEnabled,
+  linkUrl: block.linkUrl ?? "",
+  sortOrder: block.sortOrder,
+  startsAt: toLocalDateTime(block.startsAt),
+  titleEn: block.titleEn,
+  titleKo: block.titleKo,
+  type: block.type,
+});
 
-    if (!wasDirty || isDirty || !guardActiveRef.current) return;
+const normalizeDraft = (draft: BlockDraft): CreateContentBlockRequest => ({
+  bodyEn: draft.bodyEn.trim() || null,
+  bodyKo: draft.bodyKo.trim() || null,
+  endsAt: toIsoDateTime(draft.endsAt),
+  imageUrl: draft.imageUrl.trim() || null,
+  isEnabled: draft.isEnabled,
+  linkUrl: draft.linkUrl.trim() || null,
+  sortOrder: draft.sortOrder,
+  startsAt: toIsoDateTime(draft.startsAt),
+  titleEn: draft.titleEn.trim(),
+  titleKo: draft.titleKo.trim(),
+  type: draft.type,
+});
 
-    if (window.history.state?.[DIRTY_HISTORY_MARKER] === markerRef.current) {
-      guardActiveRef.current = false;
-      markerRef.current = null;
-      window.history.back();
-    }
-  }, [isDirty]);
-
-  useEffect(() => {
-    if (!isDirty || guardActiveRef.current) return;
-
-    const marker = `${nowMs()}-${Math.random()}`;
-    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    const currentState =
-      window.history.state && typeof window.history.state === "object"
-        ? window.history.state
-        : {};
-
-    window.history.pushState(
-      { ...currentState, [DIRTY_HISTORY_MARKER]: marker },
-      "",
-      currentUrl,
-    );
-    guardActiveRef.current = true;
-    markerRef.current = marker;
-
-    const confirmDiscard = async () => {
-      if (promptPendingRef.current) return false;
-
-      promptPendingRef.current = true;
-      try {
-        return await confirmRef.current({
-          title: "저장하지 않은 변경 사항을 버릴까요?",
-          description:
-            "이 페이지를 벗어나면 현재 입력한 한·영 문구가 사라집니다.",
-          confirmLabel: "변경 사항 버리기",
-          tone: "danger",
-        });
-      } finally {
-        promptPendingRef.current = false;
-      }
-    };
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = true;
-    };
-
-    const handleDocumentClick = (event: MouseEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        !(event.target instanceof Element)
-      ) {
-        return;
-      }
-
-      const anchor = event.target.closest<HTMLAnchorElement>("a[href]");
-      if (
-        !anchor ||
-        (anchor.target && anchor.target !== "_self") ||
-        anchor.hasAttribute("download")
-      ) {
-        return;
-      }
-
-      const targetUrl = new URL(anchor.href, window.location.href);
-      if (targetUrl.origin !== window.location.origin) return;
-
-      const targetPath = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
-      if (targetPath === currentUrl) return;
-
-      event.preventDefault();
-      void confirmDiscard().then((confirmed) => {
-        if (!confirmed) return;
-
-        guardActiveRef.current = false;
-        markerRef.current = null;
-        navigate(targetPath, { replace: true });
-      });
-    };
-
-    const handlePopState = () => {
-      if (!guardActiveRef.current) return;
-
-      void confirmDiscard().then((confirmed) => {
-        if (confirmed) {
-          guardActiveRef.current = false;
-          markerRef.current = null;
-          window.history.back();
-          return;
-        }
-
-        const restoredState =
-          window.history.state && typeof window.history.state === "object"
-            ? window.history.state
-            : {};
-        window.history.pushState(
-          { ...restoredState, [DIRTY_HISTORY_MARKER]: marker },
-          "",
-          currentUrl,
-        );
-      });
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("popstate", handlePopState);
-    document.addEventListener("click", handleDocumentClick, true);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("popstate", handlePopState);
-      document.removeEventListener("click", handleDocumentClick, true);
-    };
-  }, [isDirty, navigate]);
-}
+const formatDateTime = (value: string | null) => value
+  ? new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(isoToDate(value))
+  : "제한 없음";
 
 export function SiteContentPage() {
-  return (
-    <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}>
-      <SiteContentPageContent />
-    </AuthGuard>
-  );
+  return <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}><SiteContentPageContent /></AuthGuard>;
 }
 
 function SiteContentPageContent() {
-  const apiClient = useMemo(
-    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
-    [],
-  );
+  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
-  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
-  const [selectedKey, setSelectedKey] = useState<SiteContentKey>(
-    INITIAL_CONTENT_DEFINITION.key,
-  );
-  const [draft, setDraft] = useState<Draft>(
-    {
-      source: `${INITIAL_CONTENT_DEFINITION.key}:fallback`,
-      valueKo: INITIAL_CONTENT_DEFINITION.valueKo,
-      valueEn: INITIAL_CONTENT_DEFINITION.valueEn,
-    },
-  );
+  const { confirm, ConfirmDialog } = useConfirmDialog();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [query, setQuery] = useState("");
+  const [draft, setDraft] = useState<BlockDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<
-    { tone: "success" | "error"; text: string } | undefined
-  >();
+  const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<BlockDraft>(emptyDraft());
 
-  const contentQuery = useQuery({
-    queryKey: ADMIN_SITE_CONTENT_QUERY_KEY,
-    queryFn: () => apiClient.getAdminSiteContent(),
+  const blocksQuery = useQuery({
+    queryKey: CONTENT_BLOCK_QUERY_KEY,
+    queryFn: () => apiClient.listAdminContentBlocks(),
   });
-
-  const definition = getSiteContentDefinition(selectedKey);
-  const storedRecord = contentQuery.data?.items.find(
-    (item) => item.key === selectedKey,
-  );
-  const baselineSource = `${selectedKey}:${storedRecord?.updatedAt ?? "fallback"}`;
+  const blocks = blocksQuery.data?.items ?? [];
+  const selectedBlock = blocks.find((block) => block.contentBlockId === selectedId) ?? null;
 
   useEffect(() => {
-    setDraft({
-      source: baselineSource,
-      valueKo: storedRecord?.valueKo ?? definition.valueKo,
-      valueEn: storedRecord?.valueEn ?? definition.valueEn,
-    });
-  }, [baselineSource, definition, storedRecord]);
-
-  const baseline = {
-    valueKo: storedRecord?.valueKo ?? definition.valueKo,
-    valueEn: storedRecord?.valueEn ?? definition.valueEn,
-  };
-  const isDirty =
-    draft.source === baselineSource &&
-    (draft.valueKo !== baseline.valueKo || draft.valueEn !== baseline.valueEn);
-  const canSave =
-    isDirty &&
-    draft.valueKo.trim().length > 0 &&
-    draft.valueEn.trim().length > 0 &&
-    !saving;
-
-  useUnsavedContentGuard(isDirty, requestConfirm);
-
-  const refreshContent = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ADMIN_SITE_CONTENT_QUERY_KEY }),
-      queryClient.invalidateQueries({ queryKey: SITE_CONTENT_QUERY_KEY }),
-    ]);
-  };
-
-  const handleSelect = async (key: SiteContentKey) => {
-    if (key === selectedKey) return;
-
-    if (isDirty) {
-      const confirmed = await requestConfirm({
-        title: "저장하지 않은 변경 사항을 버릴까요?",
-        description:
-          "다른 영역으로 이동하면 현재 입력한 한·영 문구가 사라집니다.",
-        confirmLabel: "변경 사항 버리기",
-        tone: "danger",
-      });
-      if (!confirmed) return;
-    }
-
-    setSelectedKey(key);
-    setMessage(undefined);
-  };
-
-  const handleSave = async () => {
-    if (!canSave) return;
-
-    setSaving(true);
-    setMessage(undefined);
-    try {
-      await apiClient.upsertSiteContent(selectedKey, {
-        valueKo: draft.valueKo.trim(),
-        valueEn: draft.valueEn.trim(),
-      });
-      await refreshContent();
-      setMessage({ tone: "success", text: "공개 사이트 콘텐츠를 저장했습니다." });
-    } catch {
-      setMessage({
-        tone: "error",
-        text: "저장하지 못했습니다. 권한과 입력 내용을 확인해 주세요.",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRestoreFallback = async () => {
-    if (!storedRecord) {
-      setDraft({
-        source: baselineSource,
-        valueKo: definition.valueKo,
-        valueEn: definition.valueEn,
-      });
+    if (!blocks.length) {
+      setSelectedId(null);
       return;
     }
+    if (!selectedId || !blocks.some((block) => block.contentBlockId === selectedId)) setSelectedId(blocks[0].contentBlockId);
+  }, [blocks, selectedId]);
 
-    const confirmed = await requestConfirm({
-      title: "기본 문구로 복원하시겠습니까?",
-      description:
-        "저장된 한·영 문구를 삭제하고 코드에 포함된 검증된 기본 문구를 즉시 공개합니다.",
-      confirmLabel: "기본값으로 복원",
-      tone: "danger",
+  useEffect(() => {
+    if (selectedBlock) setDraft(draftFromBlock(selectedBlock));
+  }, [selectedBlock?.contentBlockId, selectedBlock?.updatedAt]);
+
+  const filteredBlocks = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
+    return blocks.filter((block) => {
+      if (statusFilter !== "ALL" && block.status !== statusFilter) return false;
+      if (!normalizedQuery) return true;
+      return `${block.titleKo} ${block.titleEn} ${typeMeta[block.type].label}`.toLocaleLowerCase("ko-KR").includes(normalizedQuery);
     });
-    if (!confirmed) return;
+  }, [blocks, query, statusFilter]);
 
+  const isDirty = Boolean(selectedBlock && JSON.stringify(normalizeDraft(draft)) !== JSON.stringify(normalizeDraft(draftFromBlock(selectedBlock))));
+
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: CONTENT_BLOCK_QUERY_KEY });
+  };
+
+  const selectBlock = async (block: ContentBlockRecord) => {
+    if (block.contentBlockId === selectedId) return;
+    if (isDirty) {
+      const discard = await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" });
+      if (!discard) return;
+    }
+    setError(null);
+    setSelectedId(block.contentBlockId);
+  };
+
+  const saveBlock = async (): Promise<ContentBlockRecord | null> => {
+    if (!selectedBlock || !draft.titleKo.trim()) return null;
     setSaving(true);
-    setMessage(undefined);
+    setError(null);
     try {
-      await apiClient.deleteSiteContent(selectedKey);
-      await refreshContent();
-      setMessage({ tone: "success", text: "기본 문구로 복원했습니다." });
+      const updated = await apiClient.updateContentBlock(selectedBlock.contentBlockId, normalizeDraft(draft) as UpdateContentBlockRequest);
+      await refresh();
+      setDraft(draftFromBlock(updated));
+      return updated;
     } catch {
-      setMessage({ tone: "error", text: "기본값으로 복원하지 못했습니다." });
+      setError("콘텐츠 변경 사항을 저장하지 못했습니다. 입력값과 노출 기간을 확인해 주세요.");
+      return null;
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="min-h-full bg-slate-50/70 pb-16 text-slate-950">
-      {ConfirmDialog}
-      <main className="mx-auto w-full max-w-[1440px] px-5 py-8 lg:px-10">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-kaist-darkgreen">
-              <Languages aria-hidden="true" className="h-4 w-4" />
-              Public content CMS
-            </div>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-              사이트 콘텐츠
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-500">
-              홈·소개·로드맵·푸터에 노출되는 문구를 관리합니다. 공개 화면의
-              언어 누락을 막기 위해 한국어와 영어를 항상 함께 저장합니다.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
-            <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
-            저장 즉시 공개 화면에 반영
-          </div>
-        </header>
+  const createBlock = async () => {
+    if (!createDraft.titleKo.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await apiClient.createContentBlock(normalizeDraft(createDraft));
+      await refresh();
+      setCreateOpen(false);
+      setCreateDraft(emptyDraft());
+      setSelectedId(created.contentBlockId);
+    } catch {
+      setError("운영 콘텐츠를 만들지 못했습니다. 입력값을 확인해 주세요.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-        {contentQuery.isError && (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-            콘텐츠 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-          </div>
-        )}
+  const publishBlock = async () => {
+    if (!selectedBlock) return;
+    setSaving(true);
+    setError(null);
+    try {
+      if (isDirty) await apiClient.updateContentBlock(selectedBlock.contentBlockId, normalizeDraft(draft));
+      await apiClient.publishContentBlock(selectedBlock.contentBlockId);
+      await refresh();
+    } catch {
+      setError("콘텐츠를 게시하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-        <div className="mt-7 grid gap-6 xl:grid-cols-[21rem_minmax(0,1fr)]">
-          <aside className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:sticky xl:top-6">
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-sm font-black text-slate-800">편집할 영역</h2>
-              <p className="mt-1 text-xs font-medium text-slate-400">
-                기본값은 서버 장애 시에도 안전하게 표시됩니다.
-              </p>
-            </div>
-            <nav className="max-h-[calc(100vh-15rem)] overflow-y-auto p-2" aria-label="사이트 콘텐츠 영역">
-              {GROUPS.map((group) => {
-                const Icon = group.icon;
-                const items = SITE_CONTENT_DEFINITIONS.filter(
-                  (item) => item.group === group.id,
-                );
+  const archiveBlock = async () => {
+    if (!selectedBlock) return;
+    const approved = await confirm({ title: "이 콘텐츠를 보관할까요?", confirmLabel: "보관하기" });
+    if (!approved) return;
+    setSaving(true);
+    try {
+      await apiClient.archiveContentBlock(selectedBlock.contentBlockId);
+      await refresh();
+    } catch {
+      setError("콘텐츠를 보관하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-                return (
-                  <section key={group.id} className="mb-3 last:mb-0">
-                    <div className="flex items-start gap-3 px-3 pb-2 pt-3">
-                      <div className="mt-0.5 rounded-lg bg-kaist-lightgreen/15 p-2 text-kaist-darkgreen">
-                        <Icon aria-hidden="true" className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-black text-slate-700">{group.label}</h3>
-                        <p className="mt-0.5 text-[11px] font-medium leading-4 text-slate-400">
-                          {group.description}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      {items.map((item) => (
-                        <ContentNavigationItem
-                          definition={item}
-                          isSelected={selectedKey === item.key}
-                          isStored={Boolean(
-                            contentQuery.data?.items.some(
-                              (record) => record.key === item.key,
-                            ),
-                          )}
-                          key={item.key}
-                          onSelect={() => void handleSelect(item.key)}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
-            </nav>
-          </aside>
+  const deleteBlock = async () => {
+    if (!selectedBlock) return;
+    const approved = await confirm({ title: `‘${selectedBlock.titleKo}’을 완전히 삭제할까요?`, confirmLabel: "완전히 삭제", tone: "danger" });
+    if (!approved) return;
+    setSaving(true);
+    try {
+      await apiClient.deleteContentBlock(selectedBlock.contentBlockId);
+      setSelectedId(null);
+      await refresh();
+    } catch {
+      setError("콘텐츠를 삭제하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-black text-slate-900">
-                    {definition.labelKo}
-                  </h2>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
-                      storedRecord
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {storedRecord ? "CMS 저장값" : "코드 기본값"}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm font-medium text-slate-500">
-                  {definition.helpKo}
-                </p>
-                <code className="mt-2 inline-block rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-500">
-                  {definition.key}
-                </code>
-              </div>
-              {storedRecord?.updatedAt && (
-                <p className="shrink-0 text-xs font-semibold text-slate-400">
-                  최근 수정 {formatUpdatedAt(storedRecord.updatedAt)}
-                </p>
-              )}
-            </div>
-
-            <div className="grid gap-6 p-6 lg:grid-cols-2 lg:p-8">
-              <LocalizedField
-                definition={definition}
-                language="한국어"
-                onChange={(valueKo) => setDraft((current) => ({ ...current, valueKo }))}
-                value={draft.valueKo}
-              />
-              <LocalizedField
-                definition={definition}
-                language="English"
-                onChange={(valueEn) => setDraft((current) => ({ ...current, valueEn }))}
-                value={draft.valueEn}
-              />
-            </div>
-
-            <div className="border-t border-slate-100 bg-slate-50/70 px-6 py-5 lg:px-8">
-              {message && (
-                <div
-                  className={`mb-4 rounded-xl border px-4 py-3 text-sm font-bold ${
-                    message.tone === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-red-200 bg-red-50 text-red-700"
-                  }`}
-                  role="status"
-                >
-                  {message.text}
-                </div>
-              )}
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  onClick={() => void handleRestoreFallback()}
-                  disabled={saving}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <RotateCcw aria-hidden="true" className="h-4 w-4" />
-                  기본 문구로 복원
-                </button>
-                <div className="flex items-center justify-end gap-3">
-                  {isDirty && (
-                    <span className="text-xs font-bold text-amber-700">
-                      저장하지 않은 변경 사항
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void handleSave()}
-                    disabled={!canSave}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-5 text-sm font-black text-white transition-colors hover:bg-kaist-darkgreen/90 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    <Save aria-hidden="true" className="h-4 w-4" />
-                    {saving ? "저장 중..." : "한·영 문구 저장"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function ContentNavigationItem({
-  definition,
-  isSelected,
-  isStored,
-  onSelect,
-}: {
-  definition: SiteContentDefinition;
-  isSelected: boolean;
-  isStored: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors ${
-        isSelected
-          ? "bg-kaist-darkgreen text-white"
-          : "text-slate-600 hover:bg-slate-50 hover:text-kaist-darkgreen"
-      }`}
-    >
-      <span>{definition.labelKo}</span>
-      <span
-        className={`h-2 w-2 rounded-full ${
-          isStored
-            ? isSelected
-              ? "bg-emerald-300"
-              : "bg-emerald-500"
-            : isSelected
-              ? "bg-white/40"
-              : "bg-slate-200"
-        }`}
-        aria-label={isStored ? "CMS 저장값 사용 중" : "코드 기본값 사용 중"}
+  return <AdminPageShell>
+    {ConfirmDialog}
+    <AdminPageMain>
+      <AdminPageHeader
+        title="운영 콘텐츠"
+        actions={<Button type="button" onClick={() => { setCreateDraft(emptyDraft()); setCreateOpen(true); }}><Plus aria-hidden="true" /> 콘텐츠 만들기</Button>}
       />
-    </button>
-  );
-}
 
-function LocalizedField({
-  definition,
-  language,
-  onChange,
-  value,
-}: {
-  definition: SiteContentDefinition;
-  language: "한국어" | "English";
-  onChange: (value: string) => void;
-  value: string;
-}) {
-  const inputClassName =
-    "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-900 outline-none transition focus:border-kaist-darkgreen focus:ring-4 focus:ring-kaist-darkgreen/10";
+      {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
 
-  return (
-    <label className="block">
-      <span className="flex items-center justify-between gap-3 text-xs font-black text-slate-700">
-        {language}
-        <span className="font-semibold text-slate-400">{value.length.toLocaleString()}자</span>
-      </span>
-      {definition.multiline ? (
-        <textarea
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          rows={definition.key === "about.intro.body" ? 9 : 5}
-          maxLength={20_000}
-          required
-          className={`${inputClassName} resize-y`}
-        />
-      ) : (
-        <input
-          type="text"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          maxLength={20_000}
-          required
-          className={inputClassName}
-        />
-      )}
-      {!value.trim() && (
-        <span className="mt-2 block text-xs font-bold text-red-600">
-          공개 화면의 언어 누락을 막기 위해 필수로 입력해 주세요.
-        </span>
-      )}
-    </label>
-  );
+      <AdminToolbar>
+        <AdminToolbarGroup className="min-w-0 flex-1">
+          <AdminSearchField className="w-full sm:max-w-72" aria-label="운영 콘텐츠 검색" value={query} onValueChange={setQuery} placeholder="제목 또는 유형 검색" />
+        </AdminToolbarGroup>
+        <SegmentedControl ariaLabel="게시 상태" value={statusFilter} onChange={setStatusFilter} className="clean-segmented-control" options={[
+          { value: "ALL", label: `전체 ${blocks.length}` },
+          { value: "DRAFT", label: "초안" },
+          { value: "SCHEDULED", label: "예약" },
+          { value: "PUBLISHED", label: "게시 중" },
+          { value: "ARCHIVED", label: "보관" },
+        ]} />
+      </AdminToolbar>
+
+      <div className="grid min-h-[680px] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <AdminCard className="self-start xl:sticky xl:top-6">
+          <AdminCardHeader><div><AdminSectionTitle>콘텐츠 블록</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
+          <div className="max-h-[680px] overflow-y-auto p-2">
+            {blocksQuery.isLoading ? <div className="grid gap-2">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-lg" />)}</div>
+              : filteredBlocks.length === 0 ? <div className="px-4 py-16 text-center"><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-medium text-slate-600">조건에 맞는 콘텐츠가 없습니다.</p></div>
+              : <div className="grid gap-1">{filteredBlocks.map((block) => {
+                const selected = block.contentBlockId === selectedId;
+                const status = statusMeta[block.status];
+                return <Button key={block.contentBlockId} type="button" variant="ghost" onClick={() => void selectBlock(block)} className={cn("h-auto w-full rounded-lg px-3 py-3 text-left", selected ? "bg-emerald-50" : "hover:bg-slate-50")}>
+                  <span className="mb-1.5 flex items-center justify-between gap-2"><span className={cn("text-xs font-semibold", selected ? "text-brand-primary" : "text-slate-500")}>{typeMeta[block.type].label}</span><AdminStatusBadge tone={status.tone}>{status.label}</AdminStatusBadge></span>
+                  <span className="block truncate text-sm font-semibold text-slate-950">{block.titleKo}</span>
+                  <span className="mt-1 block truncate text-xs font-normal text-slate-500">{block.startsAt ? `${formatDateTime(block.startsAt)}부터` : "상시 노출"}</span>
+                </Button>;
+              })}</div>}
+          </div>
+        </AdminCard>
+
+        {selectedBlock ? <div className="min-w-0 space-y-4">
+          <AdminCard>
+            <AdminCardHeader className="min-h-[72px] px-5 py-4">
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><AdminSectionTitle className="truncate">{selectedBlock.titleKo}</AdminSectionTitle><AdminStatusBadge tone={statusMeta[selectedBlock.status].tone}>{statusMeta[selectedBlock.status].label}</AdminStatusBadge></div></div>
+              <AdminToolbarGroup>
+                {selectedBlock.status !== "ARCHIVED" ? <Button type="button" variant="outline" size="sm" onClick={() => void archiveBlock()} disabled={saving}><Archive aria-hidden="true" /> 보관</Button> : null}
+                <Button type="button" variant="ghost" size="sm" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteBlock()} disabled={saving}><Trash2 aria-hidden="true" /> 삭제</Button>
+              </AdminToolbarGroup>
+            </AdminCardHeader>
+            <div className="grid gap-5 p-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <AdminFormField label="콘텐츠 유형"><AdminSelectDropdown ariaLabel="콘텐츠 유형" className="w-full" value={draft.type} onChange={(value) => setDraft((current) => ({ ...current, type: value as ContentBlockType }))} options={Object.entries(typeMeta).map(([value, meta]) => ({ value, label: meta.label }))} /></AdminFormField>
+                <AdminFormField label="노출 순서"><UiInput type="number" min={0} value={draft.sortOrder} onChange={(event) => setDraft((current) => ({ ...current, sortOrder: Number(event.currentTarget.value) || 0 }))} /></AdminFormField>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AdminFormField label="한국어 제목"><UiInput value={draft.titleKo} onChange={(event) => setDraft((current) => ({ ...current, titleKo: event.currentTarget.value }))} /></AdminFormField>
+                <AdminFormField label="English title"><UiInput value={draft.titleEn} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.currentTarget.value }))} /></AdminFormField>
+                <AdminFormField label="한국어 본문"><UiTextarea className="min-h-32" value={draft.bodyKo} onChange={(event) => setDraft((current) => ({ ...current, bodyKo: event.currentTarget.value }))} /></AdminFormField>
+                <AdminFormField label="English body"><UiTextarea className="min-h-32" value={draft.bodyEn} onChange={(event) => setDraft((current) => ({ ...current, bodyEn: event.currentTarget.value }))} /></AdminFormField>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => setDraft((current) => ({ ...current, linkUrl: event.currentTarget.value }))} placeholder="https://" /></div></AdminFormField>
+                <AdminFormField label="이미지 URL"><div className="relative"><Image aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.imageUrl} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.currentTarget.value }))} placeholder="https://" /></div></AdminFormField>
+                <AdminFormField label="노출 시작"><UiInput type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft((current) => ({ ...current, startsAt: event.currentTarget.value }))} /></AdminFormField>
+                <AdminFormField label="노출 종료"><UiInput type="datetime-local" min={draft.startsAt || undefined} value={draft.endsAt} onChange={(event) => setDraft((current) => ({ ...current, endsAt: event.currentTarget.value }))} /></AdminFormField>
+              </div>
+              <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 rounded-lg border border-slate-200 px-4"><span className="block text-sm font-semibold text-slate-900">노출 허용</span><UiInput type="checkbox" checked={draft.isEnabled} onChange={(event) => setDraft((current) => ({ ...current, isEnabled: event.currentTarget.checked }))} className="size-4 accent-emerald-700" /></label>
+            </div>
+          </AdminCard>
+
+          <AdminCard>
+            <AdminCardHeader><div><AdminSectionTitle>미리보기</AdminSectionTitle><AdminMetaText>한국어 공개 화면 기준</AdminMetaText></div>{draft.linkUrl ? <a href={draft.linkUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-brand-primary hover:underline">링크 열기 <ExternalLink aria-hidden="true" className="size-3.5" /></a> : null}</AdminCardHeader>
+            <div className="p-5"><div className={cn("relative overflow-hidden rounded-xl border border-slate-200 p-6", draft.type === "TOP_BANNER" ? "bg-slate-950 text-white" : "bg-gradient-to-br from-emerald-950 to-slate-900 text-white")}>
+              {draft.imageUrl ? <img src={draft.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" /> : null}
+              <div className="relative max-w-2xl"><span className="mb-3 inline-flex rounded-md bg-white/12 px-2 py-1 text-xs font-semibold">{typeMeta[draft.type].label}</span><h3 className="text-xl font-semibold tracking-tight">{draft.titleKo || "제목을 입력하세요"}</h3>{draft.bodyKo ? <p className="mt-2 whitespace-pre-wrap text-sm font-normal leading-6 text-white/75">{draft.bodyKo}</p> : null}{draft.linkUrl ? <span className="mt-4 inline-flex rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-950">자세히 보기</span> : null}</div>
+            </div></div>
+          </AdminCard>
+
+          <AdminStickyActionBar>
+            <div><p className="text-sm font-medium text-slate-800">{isDirty ? "저장하지 않은 변경 사항이 있습니다." : `마지막 수정 ${formatDateTime(selectedBlock.updatedAt)}`}</p></div>
+            <AdminToolbarGroup><Button type="button" variant="outline" onClick={() => setDraft(draftFromBlock(selectedBlock))} disabled={!isDirty || saving}>되돌리기</Button><Button type="button" variant="outline" onClick={() => void saveBlock()} disabled={!isDirty || saving || !draft.titleKo.trim()}><Save aria-hidden="true" /> 초안 저장</Button><Button type="button" onClick={() => void publishBlock()} disabled={saving || !draft.titleKo.trim()}><Megaphone aria-hidden="true" /> {selectedBlock.status === "PUBLISHED" ? "변경 게시" : "게시"}</Button></AdminToolbarGroup>
+          </AdminStickyActionBar>
+        </div> : <AdminCard className="grid min-h-[420px] place-items-center p-8 text-center"><div><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-9 text-slate-300" /><p className="text-sm font-medium text-slate-700">관리할 콘텐츠를 선택하거나 새로 만드세요.</p></div></AdminCard>}
+      </div>
+    </AdminPageMain>
+
+    <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="운영 콘텐츠 만들기" className="max-w-xl" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createBlock()} disabled={saving || !createDraft.titleKo.trim()}>{saving ? "만드는 중" : "초안 만들기"}</Button></>}>
+      <div className="grid gap-4">
+        <AdminFormField label="콘텐츠 유형"><AdminSelectDropdown ariaLabel="콘텐츠 유형" autoFocus className="w-full" value={createDraft.type} onChange={(value) => setCreateDraft((current) => ({ ...current, type: value as ContentBlockType }))} options={Object.entries(typeMeta).map(([value, meta]) => ({ value, label: meta.label }))} /></AdminFormField>
+        <AdminFormField label="한국어 제목"><UiInput value={createDraft.titleKo} onChange={(event) => setCreateDraft((current) => ({ ...current, titleKo: event.currentTarget.value }))} placeholder="관리 목록에서 구분할 제목" /></AdminFormField>
+        <AdminFormField label="English title"><UiInput value={createDraft.titleEn} onChange={(event) => setCreateDraft((current) => ({ ...current, titleEn: event.currentTarget.value }))} /></AdminFormField>
+      </div>
+    </Modal>
+  </AdminPageShell>;
 }

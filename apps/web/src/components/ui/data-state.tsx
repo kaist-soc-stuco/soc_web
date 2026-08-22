@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { FileText } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -18,12 +19,13 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center text-sm font-bold text-slate-400",
+        "flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center text-sm font-medium text-slate-400",
         minHeightClassName,
         className,
       )}
     >
-      {children ?? message}
+      <FileText aria-hidden="true" className="h-5 w-5 text-slate-300" strokeWidth={1.6} />
+      <span>{children ?? message}</span>
     </div>
   );
 }

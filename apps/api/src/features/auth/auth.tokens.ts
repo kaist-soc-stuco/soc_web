@@ -6,8 +6,8 @@
  * - Caddy/nginx 뒤에서 cookie path, secure, sameSite 정책도 함께 반영하세요.
  */
 
-export const AUTH_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
-export const AUTH_REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const AUTH_ACCESS_TOKEN_TTL_SECONDS = 30 * 60;
+export const AUTH_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const AUTH_TEMPORARY_REFRESH_TTL_SECONDS = 8 * 60 * 60;
 
 export const AUTH_ACCESS_COOKIE_NAME = "soc_access_token";

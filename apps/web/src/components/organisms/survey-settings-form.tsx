@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import { useFormContext, Controller } from "react-hook-form";
 import { Check, Search, X } from "lucide-react";
 import type { ArticleListItem } from "@soc/contracts";
-import { SelectDropdown } from "../atoms/select-dropdown";
+import { RichTextEditor } from "./rich-text-editor";
+import { Button } from "@/components/ui/button";
+import { AdminFormField } from "@/components/ui/admin-page";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { UiInput } from "@/components/ui/form-control";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 export const SURVEY_KINDS = [
   { value: "SURVEY", label: "일반 설문" },
@@ -32,13 +37,11 @@ export interface SurveySettingsFormValues {
   isAlwaysOpen?: boolean;
   maxResponseCount?: string;
   openAt: string;
-  closeAt: string;
   connectedArticleId?: string;
 }
 
 interface SurveySettingsFormProps {
-  saving: boolean;
-  isEdit: boolean;
+  mode?: "all" | "basic" | "delivery";
   isOngoing?: boolean;
   isArchived?: boolean;
   showArticleSearch: boolean;
@@ -52,8 +55,7 @@ interface SurveySettingsFormProps {
 }
 
 export function SurveySettingsForm({
-  saving,
-  isEdit,
+  mode = "all",
   isOngoing = false,
   isArchived = false,
   showArticleSearch,
@@ -93,11 +95,10 @@ export function SurveySettingsForm({
   useEffect(() => {
     if (!isAlwaysOpen) return;
     setValue("openAt", "");
-    setValue("closeAt", "");
   }, [isAlwaysOpen, setValue]);
 
   const inputCls =
-    "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-gray-300 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
+    "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-[#172033] outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60";
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -105,66 +106,31 @@ export function SurveySettingsForm({
         className="m-0 min-w-0 space-y-8 border-0 p-0"
         disabled={isArchived}
       >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+      <div className={mode === "all" ? "grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3" : "grid grid-cols-1"}>
         {/* 좌측 메인 영역 */}
-        <div className="lg:col-span-2 h-full space-y-6 bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 md:p-8 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
+        {mode !== "delivery" ? <div className={`${mode === "all" ? "lg:col-span-2" : ""} h-full space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}>
           {/* 탭 및 Korean Only 옵션 */}
-          <div className="flex items-center justify-between flex-wrap gap-4 border-b border-kaist-grey/10 pb-4">
-            <div className="flex bg-gray-100 p-1.5 rounded-xl w-full max-w-xs border border-kaist-grey/10">
-              <button
-                type="button"
-                onClick={() => setActiveTab("ko")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  activeTab === "ko"
-                    ? "bg-white text-kaist-darkgreen shadow-md shadow-kaist-grey/10"
-                    : "text-kaist-grey hover:bg-white/50"
-                }`}
-              >
-                국문 (Korean)
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("en")}
-                disabled={isKoreanOnly}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  isKoreanOnly
-                    ? "opacity-30 cursor-not-allowed text-kaist-grey/50"
-                    : "hover:bg-white/50 text-kaist-darkgreen"
-                } ${
-                  activeTab === "en"
-                    ? "bg-white text-kaist-darkgreen shadow-md shadow-kaist-grey/10"
-                    : "text-kaist-grey"
-                }`}
-                title={
-                  isKoreanOnly
-                    ? "한국어 사용자 전용 설문이므로 영문을 작성할 수 없습니다."
-                    : ""
-                }
-              >
-                영문 (English)
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <SegmentedControl
+              ariaLabel="설문 언어"
+              role="tablist"
+              value={activeTab}
+              onChange={setActiveTab}
+              options={[
+                { value: "ko", label: "국문" },
+                { value: "en", label: "영문", disabled: isKoreanOnly },
+              ]}
+            />
 
             <div className="flex items-center gap-4 flex-wrap">
               <label
-                className={`flex items-center gap-3 group bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl ${
+                className={`flex items-center gap-2.5 ${
                   isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
                 }`}
               >
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                    isKoreanOnly
-                      ? "bg-red-500 border-red-500 shadow-md shadow-red-500/15"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {isKoreanOnly && (
-                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
-                  )}
-                </div>
-                <input
+                <UiInput
                   type="checkbox"
-                  className="hidden"
+                  className="size-4 rounded border-slate-300 accent-brand-primary"
                   checked={isKoreanOnly}
                   disabled={isOngoing}
                   onChange={(e) => {
@@ -175,86 +141,100 @@ export function SurveySettingsForm({
                   }}
                 />
                 <span
-                  className={`text-sm font-bold ${isKoreanOnly ? "text-red-600" : "text-kaist-black"}`}
+                  className="text-sm font-normal text-[#344054]"
                 >
-                  Korean Speakers Only
+                  국문 전용
                 </span>
               </label>
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-kaist-black mb-2">
-                설문 제목 *
-              </label>
               {activeTab === "ko" ? (
-                <input
+                <UiInput
                   key="titleKo"
+                  aria-label="설문 제목"
                   className={inputCls}
-                  placeholder="국문 제목을 입력하세요"
+                  placeholder="설문 제목"
                   {...register("titleKo")}
                 />
               ) : (
-                <input
+                <UiInput
                   key="titleEn"
+                  aria-label="Survey title"
                   className={inputCls}
-                  placeholder="Enter the title in English"
+                  placeholder="Survey title"
                   {...register("titleEn")}
                 />
               )}
               {activeTab === "ko" && errors.titleKo && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">
+                <p className="mt-1 text-xs font-normal text-red-500">
                   {errors.titleKo.message as string}
                 </p>
               )}
               {activeTab === "en" && errors.titleEn && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">
+                <p className="mt-1 text-xs font-normal text-red-500">
                   {errors.titleEn.message as string}
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-kaist-black mb-2">
-                설명
-              </label>
               {activeTab === "ko" ? (
-                <textarea
-                  key="descriptionKo"
-                  className={`${inputCls} min-h-[220px] resize-y`}
-                  placeholder="설문에 대한 국문 설명을 입력하세요"
-                  {...register("descriptionKo")}
+                <Controller
+                  name="descriptionKo"
+                  control={control}
+                  render={({ field }) => (
+                    <RichTextEditor
+                      className="!mx-0 !max-w-none"
+                      compact
+                      disabled={isArchived}
+                      content={field.value ?? ""}
+                      onChange={field.onChange}
+                      lang="ko"
+                      placeholder="설문 설명을 입력하세요"
+                    />
+                  )}
                 />
               ) : (
-                <textarea
-                  key="descriptionEn"
-                  className={`${inputCls} min-h-[220px] resize-y`}
-                  placeholder="Enter the description in English"
-                  {...register("descriptionEn")}
+                <Controller
+                  name="descriptionEn"
+                  control={control}
+                  render={({ field }) => (
+                    <RichTextEditor
+                      className="!mx-0 !max-w-none"
+                      compact
+                      disabled={isArchived}
+                      content={field.value ?? ""}
+                      onChange={field.onChange}
+                      lang="en"
+                      placeholder="Enter a survey description"
+                    />
+                  )}
                 />
               )}
             </div>
           </div>
-        </div>
+        </div> : null}
 
         {/* 우측 메타데이터 영역 */}
-        <div className="lg:col-span-1 h-full space-y-6 bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 md:p-8 shadow-[0_20px_60px_rgba(11,31,18,0.08)]">
+        {mode !== "basic" ? <div className={`${mode === "all" ? "lg:col-span-1" : ""} h-full space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}>
           <div className="flex items-center justify-between border-b border-kaist-grey/10 pb-4">
-            <span className="text-sm font-bold text-kaist-black">
+            <span className="text-sm font-normal text-[#172033]">
               메타데이터 설정
             </span>
             <div className="flex items-center gap-2">
               {isArchived ? (
-                <span className="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-extrabold text-violet-700 border border-violet-200">
+                <span className="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-normal text-violet-700 border border-violet-200">
                   보관됨
                 </span>
               ) : isPublished ? (
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700 border border-emerald-200">
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-normal text-emerald-700 border border-emerald-200">
                   게시됨
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-full bg-slate-50 px-3 py-1 text-xs font-extrabold text-slate-600 border border-slate-200">
+                <span className="inline-flex items-center rounded-full bg-slate-50 px-3 py-1 text-xs font-normal text-[#344054] border border-slate-200">
                   임시저장
                 </span>
               )}
@@ -262,15 +242,12 @@ export function SurveySettingsForm({
           </div>
 
           <div className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
-                유형 *
-              </label>
+            <AdminFormField label="유형 *">
               <Controller
                 name="kind"
                 control={control}
                 render={({ field }) => (
-                  <SelectDropdown
+                  <AdminSelectDropdown
                     value={field.value}
                     options={SURVEY_KINDS}
                     onChange={field.onChange}
@@ -278,17 +255,14 @@ export function SurveySettingsForm({
                   />
                 )}
               />
-            </div>
+            </AdminFormField>
 
-            <div>
-              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
-                결과 공개 범위 *
-              </label>
+            <AdminFormField label="결과 공개 범위 *">
               <Controller
                 name="resultVisibility"
                 control={control}
                 render={({ field }) => (
-                  <SelectDropdown
+                  <AdminSelectDropdown
                     value={field.value}
                     options={SURVEY_VISIBILITIES}
                     onChange={field.onChange}
@@ -296,7 +270,7 @@ export function SurveySettingsForm({
                   />
                 )}
               />
-            </div>
+            </AdminFormField>
 
             <label
               className={`flex items-start gap-3 group ${
@@ -314,7 +288,7 @@ export function SurveySettingsForm({
                   <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
                 )}
               </div>
-              <input
+              <UiInput
                 type="checkbox"
                 className="hidden"
                 checked={isAlwaysOpen}
@@ -323,53 +297,27 @@ export function SurveySettingsForm({
                   !isOngoing && setValue("isAlwaysOpen", e.target.checked)
                 }
               />
-              <span className="text-sm font-bold text-kaist-black">
+              <span className="text-sm font-normal text-[#172033]">
                 상시 진행
-                <span className="mt-0.5 block text-[11px] font-semibold leading-relaxed text-kaist-grey">
-                  시작/마감 시각 없이 항상 참여 가능한 설문으로 게시합니다.
-                </span>
               </span>
             </label>
 
-            <div>
-              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
-                시작 시각 (Asia/Seoul) *
-              </label>
-              <input
+            <AdminFormField label="시작 시각 (Asia/Seoul) *">
+              <UiInput
                 type="datetime-local"
                 className={inputCls}
                 disabled={isOngoing || isAlwaysOpen}
                 {...register("openAt")}
               />
               {errors.openAt && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">
+                <p className="mt-1 text-xs font-normal text-red-500">
                   {errors.openAt.message as string}
                 </p>
               )}
-            </div>
+            </AdminFormField>
 
-            <div>
-              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
-                마감 시각 (Asia/Seoul) *
-              </label>
-              <input
-                type="datetime-local"
-                className={inputCls}
-                disabled={isOngoing || isAlwaysOpen}
-                {...register("closeAt")}
-              />
-              {errors.closeAt && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">
-                  {errors.closeAt.message as string}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-kaist-grey mb-1.5 uppercase tracking-wider">
-                최대 응답 수 (선택)
-              </label>
-              <input
+            <AdminFormField label="최대 응답 수 (선택)">
+              <UiInput
                 type="number"
                 className={inputCls}
                 placeholder="제한 없음"
@@ -377,11 +325,11 @@ export function SurveySettingsForm({
                 {...register("maxResponseCount")}
               />
               {errors.maxResponseCount && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">
+                <p className="mt-1 text-xs font-normal text-red-500">
                   {errors.maxResponseCount.message as string}
                 </p>
               )}
-            </div>
+            </AdminFormField>
 
             <div className="pt-2 border-t border-kaist-grey/10" />
 
@@ -402,7 +350,7 @@ export function SurveySettingsForm({
                     <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
                   )}
                 </div>
-                <input
+                <UiInput
                   type="checkbox"
                   className="hidden"
                   checked={feePayersOnly}
@@ -411,7 +359,7 @@ export function SurveySettingsForm({
                     !isOngoing && setValue("feePayersOnly", e.target.checked)
                   }
                 />
-                <span className="text-sm font-bold text-kaist-black">
+                <span className="text-sm font-normal text-[#172033]">
                   과비 납부자만 응답 가능
                 </span>
               </label>
@@ -428,13 +376,13 @@ export function SurveySettingsForm({
                     <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
                   )}
                 </div>
-                <input
+                <UiInput
                   type="checkbox"
                   className="hidden"
                   checked={showOnCalendar}
                   onChange={(e) => setValue("showOnCalendar", e.target.checked)}
                 />
-                <span className="text-sm font-bold text-kaist-black">
+                <span className="text-sm font-normal text-[#172033]">
                   캘린더에 표시
                 </span>
               </label>
@@ -455,7 +403,7 @@ export function SurveySettingsForm({
                     <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
                   )}
                 </div>
-                <input
+                <UiInput
                   type="checkbox"
                   className="hidden"
                   checked={allowMultipleResponses}
@@ -467,11 +415,8 @@ export function SurveySettingsForm({
                     if (checked) setValue("allowResponseEdit", false);
                   }}
                 />
-                <span className="text-sm font-bold text-kaist-black">
+                <span className="text-sm font-normal text-[#172033]">
                   복수 응답 허용
-                  <span className="mt-0.5 block text-[11px] font-semibold leading-relaxed text-kaist-grey">
-                    체크하지 않으면 사용자별 1회만 응답할 수 있습니다.
-                  </span>
                 </span>
               </label>
 
@@ -493,7 +438,7 @@ export function SurveySettingsForm({
                     <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
                   )}
                 </div>
-                <input
+                <UiInput
                   type="checkbox"
                   className="hidden"
                   checked={allowResponseEdit}
@@ -504,24 +449,18 @@ export function SurveySettingsForm({
                     setValue("allowResponseEdit", e.target.checked)
                   }
                 />
-                <span className="text-sm font-bold text-kaist-black">
+                <span className="text-sm font-normal text-[#172033]">
                   응답 제출 후 수정 허용
-                  <span className="mt-0.5 block text-[11px] font-semibold leading-relaxed text-kaist-grey">
-                    1회 응답 설문에서만 마감 전까지 본인 응답을 수정할 수 있습니다.
-                  </span>
                 </span>
               </label>
             </div>
 
             <div className="pt-2 border-t border-kaist-grey/10" />
 
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-kaist-grey uppercase tracking-wider">
-                연결 게시글 (선택)
-              </label>
+            <AdminFormField label="연결 게시글 (선택)" className="space-y-2">
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <input
+                  <UiInput
                     className={inputCls}
                     placeholder="ID 또는 제목 검색"
                     value={connectedArticleId}
@@ -531,45 +470,45 @@ export function SurveySettingsForm({
                     }}
                   />
                   {selectedArticleTitle && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-kaist-darkgreen font-bold bg-kaist-lightgreen/20 px-2.5 py-1 rounded-lg truncate max-w-[100px]">
+                    <div className="absolute right-3 top-1/2 max-w-[100px] -translate-y-1/2 truncate rounded-md bg-emerald-50 px-2.5 py-1 text-[10px] font-normal text-brand-primary">
                       {selectedArticleTitle}
                     </div>
                   )}
                 </div>
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={async () => {
                     await onFetchArticles();
                     onToggleArticleSearch();
                   }}
-                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-kaist-black text-xs font-bold rounded-xl border border-gray-200 transition-colors shrink-0 flex items-center gap-1"
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-[#344054] transition-colors hover:bg-slate-50"
                 >
-                  <Search className="w-3.5 h-3.5 text-kaist-grey" />
+                  <Search className="h-3.5 w-3.5 text-[#344054]" />
                   {showArticleSearch ? "닫기" : "찾기"}
-                </button>
+                </Button>
               </div>
               <div className="relative z-20">
                 {showArticleSearch && (
                   <div className="mt-2 border border-gray-200 rounded-xl bg-white shadow-xl max-h-60 overflow-y-auto absolute w-full top-0">
                     <div className="p-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0">
-                      <span className="text-[10px] font-bold text-kaist-grey/70 uppercase tracking-wider">
+                      <span className="text-[11px] font-normal text-[#344054]">
                         최근 게시글 (최대 30개)
                       </span>
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         onClick={onToggleArticleSearch}
-                        className="text-kaist-grey hover:text-kaist-black transition-colors"
+                        className="text-[#344054] transition-colors hover:text-[#172033]"
                       >
                         <X className="w-3.5 h-3.5" />
-                      </button>
+                      </Button>
                     </div>
                     {articleSearchResults.length === 0 && (
-                      <div className="p-4 text-xs text-kaist-grey/60 text-center font-medium">
+                      <div className="p-4 text-center text-xs font-normal text-[#344054]">
                         불러온 게시글이 없습니다.
                       </div>
                     )}
                     {articleSearchResults.map((art) => (
-                      <button
+                      <Button variant="ghost"
                         key={art.articleId}
                         type="button"
                         onClick={() =>
@@ -577,20 +516,20 @@ export function SurveySettingsForm({
                         }
                         className="w-full text-left px-3 py-2 text-xs hover:bg-kaist-lightgreen/10 border-b border-gray-100 last:border-0 transition-colors group flex items-center gap-2"
                       >
-                        <span className="font-bold text-kaist-grey group-hover:text-kaist-darkgreen transition-colors shrink-0">
+                        <span className="shrink-0 font-normal text-[#344054] transition-colors group-hover:text-brand-primary">
                           #{art.articleId}
                         </span>
-                        <span className="text-kaist-black font-semibold truncate">
+                        <span className="truncate font-normal text-[#172033]">
                           {art.titleKo}
                         </span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
               </div>
-            </div>
+            </AdminFormField>
           </div>
-        </div>
+        </div> : null}
       </div>
 
       {/* 에러 요약 박스 */}
@@ -628,92 +567,6 @@ export function SurveySettingsForm({
         </div>
       )}
 
-      {/* 고정 하단 바 스타일 버튼 */}
-      <div className="bg-white rounded-3xl border border-kaist-darkgreen/10 p-6 shadow-[0_20px_60px_rgba(11,31,18,0.08)] flex justify-end gap-3">
-        {isArchived ? (
-          <p className="text-sm font-semibold text-violet-700">
-            보관된 설문은 읽기 전용입니다. 새 변경본은 설문 목록에서 복제하세요.
-          </p>
-        ) : isOngoing ? (
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-8 py-3 bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold rounded-xl shadow-lg shadow-kaist-darkgreen/15 disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer text-sm border-0"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-            {saving ? "저장 중..." : "변경사항 저장"}
-          </button>
-        ) : (
-          <>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => {
-                setValue("isPublished", false);
-                handleSubmit(onSubmit)();
-              }}
-              className="px-6 py-3 bg-white text-kaist-darkgreen border border-kaist-darkgreen/30 font-bold rounded-xl shadow-sm hover:bg-kaist-darkgreen/5 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 transition-all flex items-center gap-2 cursor-pointer text-sm"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                <polyline points="17 21 17 13 7 13 7 21" />
-                <polyline points="7 3 7 8 15 8" />
-              </svg>
-              {saving ? "저장 중..." : "임시저장"}
-            </button>
-
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => {
-                setValue("isPublished", true);
-                handleSubmit(onSubmit)();
-              }}
-              className="px-8 py-3 bg-kaist-darkgreen text-white font-bold rounded-xl shadow-lg shadow-kaist-darkgreen/15 hover:bg-kaist-darkgreen/90 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 transition-all flex items-center gap-2 cursor-pointer text-sm border-0"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              {saving ? "게시 중..." : "설문 게시하기"}
-            </button>
-          </>
-        )}
-      </div>
       </fieldset>
     </form>
   );

@@ -1,27 +1,146 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { createApiClient } from "@soc/api-client";
 import type {
+  BulkEmailPreviewResponse,
   BulkEmailRecord,
   BulkEmailTemplate,
   SendBulkEmailRequest,
 } from "@soc/contracts";
-import { formatKoreanDateTime, isoToMs } from "@soc/shared";
-import { AlertTriangle, History, Mail, Send, Sparkles, Users } from "lucide-react";
+import {
+  formatKoreanDateTime,
+  htmlDatetimeLocalToIso,
+  isoToHtmlDatetimeLocal,
+  isoToMs,
+  msToIso,
+  nowMs,
+} from "@soc/shared";
+import {
+  ArrowLeft,
+  CalendarClock,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  History,
+  Plus,
+  Rocket,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { useNavigate } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { Skeleton } from "@/components/ui/skeleton";
+import { RichTextEditor } from "@/components/organisms/rich-text-editor";
+import { RichTextContent } from "@/components/ui/rich-text-content";
+import { AdminFormField, AdminPageShell } from "@/components/ui/admin-page";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
-const RECIPIENT_TYPES: Array<{
+const RECIPIENT_TYPES: ReadonlyArray<{
   value: SendBulkEmailRequest["recipientType"];
   label: string;
-  description: string;
 }> = [
-  { value: "ALL", label: "전체 학생", description: "활성 사용자 전체" },
-  { value: "PAID_STUDENTS", label: "과비 납부자", description: "납부 완료로 확인된 학생" },
-  { value: "UNPAID_STUDENTS", label: "F26 미납자", description: "미납 또는 아직 확인되지 않은 학생" },
+  { value: "ALL", label: "전체 학생" },
+  { value: "PAID_STUDENTS", label: "과비 납부자" },
+  { value: "UNPAID_STUDENTS", label: "과비 미납자" },
 ];
+
+type RecipientFilters = NonNullable<SendBulkEmailRequest["filters"]>;
+type RecipientFilterKey = keyof RecipientFilters;
+type DeliveryMode = "now" | "scheduled";
+
+const EMAIL_DRAFT_STORAGE_KEY = "soc:admin:bulk-email:draft";
+
+type StoredEmailDraft = {
+  content: string;
+  contentType: SendBulkEmailRequest["contentType"];
+  filters: RecipientFilters;
+  recipientType: SendBulkEmailRequest["recipientType"];
+  savedAt: string;
+  subject: string;
+};
+
+type RecipientFilterMenuOption =
+  | {
+      kind: "filter";
+      key: RecipientFilterKey;
+      label: string;
+      value: string;
+    }
+  | {
+      kind: "recipientType";
+      label: string;
+      value: SendBulkEmailRequest["recipientType"];
+    };
+
+const RECIPIENT_FILTER_GROUPS: ReadonlyArray<{
+  label: string;
+  options: ReadonlyArray<RecipientFilterMenuOption>;
+}> = [
+  {
+    label: "학번",
+    options: [
+      { kind: "filter", key: "studentNumber", value: "2026", label: "26학번" },
+      { kind: "filter", key: "studentNumber", value: "2025", label: "25학번" },
+      {
+        kind: "filter",
+        key: "studentNumber",
+        value: "2024_OR_EARLIER",
+        label: "24학번 이전",
+      },
+    ],
+  },
+  {
+    label: "학과 구분",
+    options: [
+      { kind: "filter", key: "primaryMajor", value: "전산학부", label: "전산학부 주전공" },
+      { kind: "filter", key: "doubleMajor", value: "전산학부", label: "전산학부 복수전공" },
+      { kind: "filter", key: "minor", value: "전산학부", label: "전산학부 부전공" },
+    ],
+  },
+  {
+    label: "과비 납부",
+    options: [
+      { kind: "recipientType", value: "PAID_STUDENTS", label: "납부" },
+      { kind: "recipientType", value: "UNPAID_STUDENTS", label: "미납부" },
+      { kind: "recipientType", value: "ALL", label: "전체 학생" },
+    ],
+  },
+  {
+    label: "학적",
+    options: [
+      { kind: "filter", key: "academicStatus", value: "재학", label: "재학" },
+      { kind: "filter", key: "academicStatus", value: "휴학", label: "휴학" },
+      { kind: "filter", key: "academicStatus", value: "졸업", label: "졸업" },
+      { kind: "filter", key: "academicStatus", value: "수료", label: "수료" },
+    ],
+  },
+];
+
+type AttachmentView = {
+  assetId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
+const EXECUTION_HISTORY_STATUSES = new Set<BulkEmailRecord["status"]>([
+  "SUCCESS",
+  "SCHEDULED",
+  "DRY_RUN",
+]);
 
 export function BulkEmailPage() {
   return (
@@ -33,258 +152,784 @@ export function BulkEmailPage() {
 
 function BulkEmailPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
-  const [history, setHistory] = useState<BulkEmailRecord[]>([]);
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
+
   const [templates, setTemplates] = useState<BulkEmailTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [templateSaveOpen, setTemplateSaveOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templateSaving, setTemplateSaving] = useState(false);
+
+  const [initialLocalDraft] = useState<StoredEmailDraft | null>(() => readStoredEmailDraft());
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftClearedRef = useRef(false);
+
   const [recipientType, setRecipientType] = useState<SendBulkEmailRequest["recipientType"]>(
     "UNPAID_STUDENTS",
   );
+  const [filters, setFilters] = useState<RecipientFilters>({});
+  const [recipientMenuOpen, setRecipientMenuOpen] = useState(false);
+  const [recipientCount, setRecipientCount] = useState<number | null>(null);
+  const [recipientCountLoading, setRecipientCountLoading] = useState(false);
+
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [templatesLoading, setTemplatesLoading] = useState(true);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [operationError, setOperationError] = useState<string | null>(null);
+  const [contentType, setContentType] = useState<SendBulkEmailRequest["contentType"]>("html");
+  const [editorMode, setEditorMode] = useState<"editor" | "preview" | "html">("editor");
+  const [attachments, setAttachments] = useState<AttachmentView[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewPreview, setReviewPreview] = useState<BulkEmailPreviewResponse | null>(null);
+  const [recipientListOpen, setRecipientListOpen] = useState(false);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("now");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [sending, setSending] = useState(false);
-  const [lastDeliveryMode, setLastDeliveryMode] = useState<"sent" | "dry_run" | null>(null);
+  const [testSending, setTestSending] = useState(false);
+
+  const [history, setHistory] = useState<BulkEmailRecord[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+
+  const filterSignature = useMemo(() => JSON.stringify(normalizeFilters(filters)), [filters]);
+  const activeFilterEntries = useMemo(() => {
+    const entries: Array<{ key: RecipientFilterKey; label: string; value: string }> = [];
+    const add = (key: RecipientFilterKey, label: string, value: string | undefined) => {
+      const normalized = value?.trim();
+      if (normalized) entries.push({ key, label, value: normalized });
+    };
+
+    add("studentNumber", "학번", formatStudentNumberFilter(filters.studentNumber));
+    add("academicStatus", "학적", filters.academicStatus);
+    add("primaryMajor", "주전공", filters.primaryMajor);
+    add("doubleMajor", "복수전공", filters.doubleMajor);
+    add("minor", "부전공", filters.minor);
+    add("query", "검색", filters.query);
+    return entries;
+  }, [filters]);
+  const selectedRecipientLabel =
+    RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "수신 대상";
+  const previewRecipientName = reviewPreview?.sample[0]?.nameKo || "학우";
+  const previewContent = renderEmailTemplate(content, {
+    이름: previewRecipientName,
+    학번: reviewPreview?.sample[0]?.studentNumber ?? "",
+  });
+
+  const applyTemplateToForm = (template: BulkEmailTemplate) => {
+    setSelectedTemplateId(template.id);
+    setRecipientType(template.recipientType);
+    setSubject(template.subject);
+    setContent(template.content);
+    setContentType(template.contentType);
+    setFilters(template.filters ?? {});
+    setScheduledAt("");
+    setAttachments([]);
+    setTemplateName("");
+    setTemplateDescription("");
+    setOperationError(null);
+  };
+
+  const applyLocalDraftToForm = (draft: StoredEmailDraft) => {
+    setSelectedTemplateId("");
+    setRecipientType(draft.recipientType);
+    setSubject(draft.subject);
+    setContent(draft.content);
+    setContentType(draft.contentType);
+    setFilters(draft.filters ?? {});
+    setScheduledAt("");
+    setAttachments([]);
+    setTemplateName("");
+    setTemplateDescription("");
+    setOperationError(null);
+    setDraftRestored(true);
+    setDraftSavedAt(draft.savedAt);
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    const loadInitialData = async () => {
+      const templateResult = await Promise.allSettled([apiClient.getBulkEmailTemplates()]);
+      if (!mounted) return;
+
+      if (templateResult.status === "fulfilled") {
+        setTemplates(templateResult.value[0].items);
+        const defaultTemplate =
+          templateResult.value[0].items.find((template) => template.id === "f26-unpaid-reminder") ??
+          templateResult.value[0].items[0];
+        if (initialLocalDraft) applyLocalDraftToForm(initialLocalDraft);
+        else if (defaultTemplate) applyTemplateToForm(defaultTemplate);
+      } else {
+        setOperationError("템플릿을 불러오지 못했습니다.");
+        if (initialLocalDraft) applyLocalDraftToForm(initialLocalDraft);
+      }
+      setTemplatesLoading(false);
+      setDraftReady(true);
+    };
+    void loadInitialData();
+    return () => {
+      mounted = false;
+    };
+  }, [apiClient, initialLocalDraft]);
+
+  useEffect(() => {
+    let active = true;
+    setRecipientCountLoading(true);
+    const timer = window.setTimeout(() => {
+      const request: SendBulkEmailRequest = {
+        subject: "recipient-preview",
+        content: "preview",
+        contentType: "plain",
+        recipientType,
+        filters: normalizeFilters(filters),
+        attachmentAssetIds: [],
+      };
+      void apiClient
+        .previewBulkEmailRecipients(request)
+        .then((response) => {
+          if (active) setRecipientCount(response.recipientCount);
+        })
+        .catch(() => {
+          if (active) setRecipientCount(null);
+        })
+        .finally(() => {
+          if (active) setRecipientCountLoading(false);
+        });
+    }, 220);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [apiClient, filterSignature, filters, recipientType]);
+
+  const buildRequest = (options?: {
+    includeSchedule?: boolean;
+    idempotencyKey?: string;
+  }): SendBulkEmailRequest => ({
+    subject: subject.trim(),
+    content: content.trim(),
+    contentType,
+    recipientType,
+    filters: normalizeFilters(filters),
+    attachmentAssetIds: attachments.map((attachment) => attachment.assetId),
+    ...(options?.includeSchedule !== false && deliveryMode === "scheduled" && scheduledAt
+      ? { scheduledAt: htmlDatetimeLocalToIso(scheduledAt) }
+      : {}),
+    ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+  });
+
+  const validateMessage = () => {
+    if (!subject.trim() || !content.trim()) {
+      setOperationError("제목과 본문을 입력해 주세요.");
+      return false;
+    }
+    if (deliveryMode === "scheduled" && !scheduledAt) {
+      setOperationError("예약 발송 일시를 선택해 주세요.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleReview = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    if (!validateMessage()) return;
+    try {
+      setOperationError(null);
+      setSending(true);
+      setReviewPreview(await apiClient.previewBulkEmailRecipients(buildRequest()));
+      setRecipientListOpen(false);
+      setReviewOpen(true);
+    } catch {
+      setOperationError("발송 전 수신 대상을 확인하지 못했습니다.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleConfirmSend = async () => {
+    if (!reviewPreview) return;
+    if (!validateMessage()) return;
+    try {
+      setSending(true);
+      setOperationError(null);
+      idempotencyKeyRef.current ??= crypto.randomUUID();
+      const response = await apiClient.sendBulkEmail(
+        buildRequest({ idempotencyKey: idempotencyKeyRef.current }),
+      );
+      if (recoveredDraftId) {
+        await apiClient.deleteBulkEmailDraft(recoveredDraftId).catch(() => undefined);
+      }
+      setRecoveredDraftId(undefined);
+      setReviewOpen(false);
+      setReviewPreview(null);
+      setDeliveryMode("now");
+      setScheduledAt("");
+      idempotencyKeyRef.current = null;
+      setStatusNotice(
+        response.deliveryMode === "scheduled"
+          ? "예약 발송을 등록했습니다."
+          : `${response.recipientCount}명에게 발송했습니다.`,
+      );
+    } catch {
+      setOperationError("메일 발송에 실패했습니다.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleTestSend = async () => {
+    if (!validateMessage()) return;
+    try {
+      setTestSending(true);
+      setOperationError(null);
+      const response = await apiClient.sendBulkEmailTest(
+        buildRequest({ includeSchedule: false }),
+      );
+      setStatusNotice(`내 계정(${response.recipientEmail})으로 테스트 메일을 보냈습니다.`);
+    } catch {
+      setOperationError("테스트 메일 발송에 실패했습니다.");
+    } finally {
+      setTestSending(false);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim() || !subject.trim() || !content.trim()) {
+      setOperationError("템플릿 이름과 제목, 본문을 입력해 주세요.");
+      return;
+    }
+    try {
+      setTemplateSaving(true);
+      setOperationError(null);
+      const templateInput = {
+        name: templateName.trim(),
+        description: templateDescription.trim() || undefined,
+        subject: subject.trim(),
+        content,
+        contentType,
+        recipientType,
+        filters: normalizeFilters(filters),
+      };
+      const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
+      const saved = selectedTemplate?.createdBy
+        ? await apiClient.updateBulkEmailTemplate(selectedTemplate.id, templateInput)
+        : await apiClient.createBulkEmailTemplate(templateInput);
+      setSelectedTemplateId(saved.id);
+      setTemplates((previous) => [
+        ...previous.filter((template) => template.id !== saved.id),
+        saved,
+      ]);
+      setTemplateSaveOpen(false);
+      setStatusNotice("템플릿을 저장했습니다.");
+    } catch {
+      setOperationError("템플릿 저장에 실패했습니다.");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    const template = templates.find((item) => item.id === templateId);
+    if (!template?.createdBy) return;
+    try {
+      setTemplateSaving(true);
+      await apiClient.deleteBulkEmailTemplate(templateId);
+      setTemplates((previous) => previous.filter((item) => item.id !== templateId));
+      if (selectedTemplateId === templateId) setSelectedTemplateId("");
+    } catch {
+      setOperationError("템플릿 삭제에 실패했습니다.");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
 
   const loadHistory = async () => {
     setHistoryLoading(true);
     setHistoryError(null);
     try {
       const response = await apiClient.getBulkEmailHistory();
-      setHistory([...response.items].sort((a, b) => isoToMs(b.sentAt) - isoToMs(a.sentAt)));
+      setHistory(
+        response.items
+          .filter((record) => EXECUTION_HISTORY_STATUSES.has(record.status))
+          .sort((a, b) => isoToMs(b.sentAt || b.updatedAt) - isoToMs(a.sentAt || a.updatedAt)),
+      );
     } catch {
-      setHistoryError("기존 처리 기록을 불러오지 못했습니다.");
+      setHistoryError("발송 이력을 불러오지 못했습니다.");
     } finally {
       setHistoryLoading(false);
     }
   };
 
-  useEffect(() => {
+  const openHistory = () => {
+    setHistoryOpen(true);
     void loadHistory();
-    apiClient
-      .getBulkEmailTemplates()
-      .then((response) => setTemplates(response.items))
-      .catch(() => setOperationError("메일 템플릿을 불러오지 못했습니다."))
-      .finally(() => setTemplatesLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (templates.length === 0) return;
-    const defaultTemplate =
-      templates.find((template) => template.id === "f26-unpaid-reminder") ?? templates[0];
-    setSelectedTemplateId(defaultTemplate.id);
-    setRecipientType(defaultTemplate.recipientType);
-    setSubject(defaultTemplate.subject);
-    setContent(defaultTemplate.content);
-  }, [templates]);
-
-  const applyTemplate = (template: BulkEmailTemplate) => {
-    setSelectedTemplateId(template.id);
-    setRecipientType(template.recipientType);
-    setSubject(template.subject);
-    setContent(template.content);
-    setOperationError(null);
   };
 
-  const handleSend = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!subject.trim() || !content.trim()) {
-      setOperationError("메일 제목과 본문을 입력해 주세요.");
-      return;
-    }
-
+  const handleCancelScheduled = async (emailId: string) => {
     try {
-      setSending(true);
       setOperationError(null);
-      const response = await apiClient.sendBulkEmail({
-        subject: subject.trim(),
-        content: content.trim(),
-        recipientType,
-      });
-      setLastDeliveryMode(response.deliveryMode);
+      await apiClient.cancelScheduledBulkEmail(emailId);
       await loadHistory();
     } catch {
-      setOperationError("메일 발송에 실패했습니다. SMTP 설정과 발송 권한을 확인해 주세요.");
-    } finally {
-      setSending(false);
+      setOperationError("예약 발송을 취소하지 못했습니다.");
     }
   };
 
+  const handleAttachmentChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length) return;
+    try {
+      setUploading(true);
+      setOperationError(null);
+      const uploaded = await Promise.all(files.map((file) => apiClient.uploadAsset(file)));
+      setAttachments((previous) =>
+        [
+          ...previous,
+          ...uploaded.map((asset) => ({
+            assetId: asset.assetId,
+            filename: asset.originalFilename,
+            mimeType: asset.mimeType,
+            sizeBytes: asset.sizeBytes,
+          })),
+        ].slice(0, 10),
+      );
+    } catch {
+      setOperationError("첨부파일을 업로드하지 못했습니다.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const dismissReview = () => {
+    if (sending || testSending) return;
+    setReviewOpen(false);
+    setReviewPreview(null);
+  };
+
+  const editorModeTabs = (
+    <SegmentedControl
+      ariaLabel="메일 본문 보기"
+      role="tablist"
+      value={editorMode}
+      onChange={setEditorMode}
+      className="!border-0 !bg-transparent !p-0 !shadow-none"
+      itemClassName="!h-8 !min-h-8 !rounded-md !px-2.5 text-xs"
+      options={[
+        { value: "editor" as const, label: "에디터" },
+        { value: "preview" as const, label: "미리보기" },
+        { value: "html" as const, label: "HTML" },
+      ]}
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20 text-kaist-black">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
-        <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-800">이메일 일괄발송</h1>
-            <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-400">
-              템플릿을 골라 전체 학생 또는 과비 상태별 그룹에 공지 메일을 보냅니다.
-            </p>
+    <AdminPageShell className="email-composer-page min-h-screen !bg-slate-50">
+      <main className="w-full px-5 pb-16 md:px-8">
+        <header className="mx-auto grid min-h-14 w-full max-w-[1180px] gap-3 border-b border-slate-200 bg-white px-4 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:px-6 md:py-0">
+          <div className="min-w-0">
+            <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="-ml-3 text-slate-600">
+              <ArrowLeft aria-hidden="true" />
+              이메일 목록
+            </Button>
           </div>
-          {lastDeliveryMode && (
-            <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
-              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-              {lastDeliveryMode === "dry_run" ? "개발용 드라이런 완료" : "SMTP 발송 완료"}
-            </span>
-          )}
-        </div>
+          <h1 className="text-center text-sm font-semibold text-slate-800">이메일 작성</h1>
+          <div className="flex flex-wrap items-center justify-start gap-2 md:justify-end">
+            <Button type="button" variant="ghost" size="sm" onClick={openHistory}>
+              <History aria-hidden="true" />
+              발송 이력
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setTemplateSaveOpen(false);
+                setTemplateModalOpen(true);
+              }}
+            >
+              <FileText aria-hidden="true" />
+              템플릿
+            </Button>
+            <Button form="bulk-email-compose" type="submit" size="sm" disabled={sending || templatesLoading}>
+              <Rocket aria-hidden="true" />
+              {sending ? "검토 중…" : "검토 및 발송"}
+            </Button>
+          </div>
+        </header>
 
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-950">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
-          <p className="text-xs font-semibold leading-5 sm:text-sm">
-            개발 환경에서는 기본적으로 실제 수신자에게 보내지 않는 드라이런으로 기록됩니다. 운영에서
-            실제 발송을 하려면 <code className="rounded bg-white/70 px-1">EMAIL_DRY_RUN=false</code>와
-            SMTP 설정이 필요합니다.
-          </p>
-        </div>
-
-        {operationError && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+        {operationError ? (
+          <div className="mx-auto mt-4 w-full max-w-4xl rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700" role="alert">
             {operationError}
           </div>
-        )}
+        ) : null}
+        {statusNotice ? (
+          <div className="mx-auto mt-4 w-full max-w-4xl rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700" role="status">
+            {statusNotice}
+          </div>
+        ) : null}
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.85fr)]">
-          <form onSubmit={(event) => void handleSend(event)} className="space-y-6 rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <h2 className="flex items-center gap-2 text-lg font-extrabold text-slate-800">
-                <Mail className="h-5 w-5 text-kaist-darkgreen" aria-hidden="true" />
-                메일 작성
-              </h2>
-              <span className="text-xs font-bold text-slate-400">
-                {templatesLoading ? "템플릿 불러오는 중..." : `${templates.length}개 템플릿`}
-              </span>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold text-slate-500">빠른 템플릿</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {templates.map((template) => (
-                  <button
-                    key={template.id}
+        <form id="bulk-email-compose" className="mx-auto mt-6 w-full max-w-4xl" onSubmit={(event) => void handleReview(event)}>
+          <div className="email-composer-canvas rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <section className="border-b border-slate-100 pb-5" aria-label="수신 대상">
+              <div className="flex min-h-10 items-center justify-between gap-4">
+                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                  <span className="shrink-0 text-sm font-medium text-slate-600">받는 사람:</span>
+                  <RecipientToken label={selectedRecipientLabel} onRemove={() => setRecipientType("ALL")} />
+                  {activeFilterEntries.map((entry) => (
+                    <RecipientToken
+                      key={entry.key}
+                      label={`${entry.label}: ${entry.value}`}
+                      onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: undefined }))}
+                    />
+                  ))}
+                  <Button
                     type="button"
-                    onClick={() => applyTemplate(template)}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      selectedTemplateId === template.id
-                        ? "border-kaist-darkgreen bg-emerald-50/60 ring-2 ring-kaist-darkgreen/10"
-                        : "border-slate-200 bg-white hover:border-kaist-darkgreen/40 hover:bg-slate-50"
-                    }`}
+                    variant="ghost"
+                    size="sm"
+                    aria-expanded={recipientPopoverOpen}
+                    onClick={() => setRecipientPopoverOpen((open) => !open)}
+                    className="shrink-0 text-slate-500"
                   >
-                    <p className="text-sm font-black text-slate-800">{template.name}</p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{template.description}</p>
-                  </button>
-                ))}
+                    <Plus aria-hidden="true" />
+                    필터 조건
+                    <ChevronDown aria-hidden="true" className={recipientPopoverOpen ? "rotate-180" : ""} />
+                  </Button>
+                </div>
+                <span className="shrink-0 whitespace-nowrap text-sm font-normal text-slate-500">
+                  수신 대상: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
+                </span>
               </div>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold text-slate-500">수신 대상</p>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {RECIPIENT_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setRecipientType(type.value)}
-                    className={`rounded-xl border px-3 py-3 text-left transition ${
-                      recipientType === type.value
-                        ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
-                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span className="block text-xs font-black">{type.label}</span>
-                    <span className={`mt-1 block text-[11px] font-semibold ${recipientType === type.value ? "text-white/75" : "text-slate-400"}`}>
-                      {type.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <label className="block">
-              <span className="mb-2 block text-xs font-bold text-slate-500">메일 제목</span>
-              <input
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                maxLength={255}
-                required
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-4 focus:ring-kaist-darkgreen/10"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-xs font-bold text-slate-500">메일 본문</span>
-              <textarea
-                value={content}
-                onChange={(event) => setContent(event.target.value)}
-                rows={13}
-                required
-                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-4 focus:ring-kaist-darkgreen/10"
-              />
-            </label>
-
-            <div className="flex justify-end border-t border-slate-100 pt-4">
-              <button
-                type="submit"
-                disabled={sending || templatesLoading}
-                className="inline-flex items-center gap-2 rounded-xl bg-kaist-darkgreen px-6 py-3 text-sm font-extrabold text-white transition hover:bg-kaist-darkgreen/90 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                <Send className="h-4 w-4" aria-hidden="true" />
-                {sending ? "발송 처리 중..." : "선택 그룹에 발송"}
-              </button>
-            </div>
-          </form>
-
-          <section className="space-y-4 rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-            <h2 className="flex items-center gap-2 border-b border-slate-100 pb-3 text-lg font-extrabold text-slate-800">
-              <History className="h-5 w-5 text-kaist-greygreen" aria-hidden="true" />
-              발송 기록
-            </h2>
-
-            {historyLoading ? (
-              <div className="space-y-4" aria-busy="true">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/30 p-4">
-                    <div className="flex items-start justify-between gap-2"><Skeleton className="h-5 w-16 rounded-md" /><Skeleton className="h-3 w-20" /></div>
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-3 w-20" />
+              {recipientPopoverOpen ? (
+                <div className="mt-3 w-full max-w-sm rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm" role="region" aria-label="세부 수신 조건">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <SlidersHorizontal className="size-4 text-slate-500" aria-hidden="true" />
+                      세부 조건
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setFilters({})} className="text-xs font-normal text-slate-500">
+                      초기화
+                    </Button>
                   </div>
-                ))}
+                  <div className="grid gap-3">
+                    {FILTER_OPTIONS.map((option) => (
+                      <AdminFormField key={option.key} label={option.label}>
+                        <AdminSelectDropdown
+                          id={`recipient-filter-${option.key}`}
+                          ariaLabel={option.label}
+                          value={filters[option.key] ?? ""}
+                          options={option.options}
+                          onChange={(value) => setFilters((previous) => ({ ...previous, [option.key]: value || undefined }))}
+                          className="w-full"
+                        />
+                      </AdminFormField>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+
+          <section className="pb-8 pt-6 md:pt-7">
+            <UiInput
+              aria-label="메일 제목"
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              maxLength={255}
+              placeholder="제목을 입력하세요"
+              required
+              className="!h-auto !rounded-none border-0 bg-transparent px-0 py-4 text-2xl font-bold leading-tight text-slate-800 shadow-none focus:border-0 focus:outline-none focus:ring-0 placeholder:text-slate-300 md:text-[30px]"
+            />
+            {editorMode === "editor" ? (
+              <div className="mt-2 min-w-0 overflow-hidden">
+                <RichTextEditor
+                  className="email-composer-editor max-w-none"
+                  content={content}
+                  fileInputRef={fileInputRef}
+                  lang="ko"
+                  onChange={(value) => {
+                    setContent(value);
+                    setContentType("html");
+                  }}
+                  placeholder="본문을 입력하세요"
+                  toolbarVariant="email"
+                  uploading={uploading}
+                  variableLabel="치환자: {이름}"
+                  variableToken="{이름}"
+                  toolbarSuffix={editorModeTabs}
+                />
               </div>
-            ) : historyError ? (
-              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-4 text-center text-xs font-semibold text-red-700">{historyError}</div>
-            ) : history.length === 0 ? (
-              <div className="py-8 text-center text-sm font-semibold text-slate-400">아직 발송 기록이 없습니다.</div>
+            ) : editorMode === "preview" ? (
+              <>
+                <div className="mt-2 flex items-center justify-end border-y border-slate-100 py-2.5">
+                  {editorModeTabs}
+                </div>
+                <div className="tiptap-container min-h-[400px] px-6 py-6 prose prose-slate">
+                  {content.trim() ? (
+                    <RichTextContent content={content} className="text-[15px] leading-7 text-slate-800" />
+                  ) : (
+                    <p className="text-[15px] font-normal text-slate-400">본문을 입력하세요</p>
+                  )}
+                </div>
+              </>
             ) : (
-              <div className="max-h-[640px] space-y-4 overflow-y-auto pr-1">
-                {history.map((record) => (
-                  <div key={record.id} className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/30 p-4 transition hover:border-kaist-darkgreen/15">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className={`rounded-md border px-2 py-0.5 text-[10px] font-extrabold ${
-                        record.status === "FAILED"
-                          ? "border-red-200 bg-red-50 text-red-700"
-                          : record.status === "DRY_RUN"
-                            ? "border-sky-200 bg-sky-50 text-sky-700"
-                            : record.status === "SUCCESS"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200 bg-amber-50 text-amber-800"
-                      }`}>
-                        {record.status === "DRY_RUN" ? "드라이런" : record.status === "SUCCESS" ? "발송 완료" : record.status === "FAILED" ? "발송 실패" : "처리 중"}
-                      </span>
-                      <span className="text-[10px] font-semibold text-kaist-grey">{formatKoreanDateTime(record.sentAt)}</span>
+              <>
+                <div className="mt-2 flex items-center justify-end border-y border-slate-100 py-2.5">
+                  {editorModeTabs}
+                </div>
+                <UiTextarea
+                  aria-label="HTML 본문"
+                  value={content}
+                  onChange={(event) => {
+                    setContent(event.target.value);
+                    setContentType("html");
+                  }}
+                  spellCheck={false}
+                  className="min-h-[400px] w-full resize-y rounded-none border-0 bg-transparent px-6 py-6 font-mono text-sm font-normal leading-6 text-slate-700 shadow-none focus:border-0 focus:ring-0"
+                />
+              </>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="sr-only"
+              onChange={(event) => void handleAttachmentChange(event)}
+              disabled={uploading || attachments.length >= 10}
+            />
+            {attachments.length ? (
+              <ul className="mt-4 flex flex-wrap gap-2" aria-label="첨부파일">
+                {attachments.map((attachment) => (
+                  <li key={attachment.assetId} className="inline-flex max-w-full items-center gap-2 rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-normal text-slate-600">
+                    <span className="max-w-[18rem] truncate">{attachment.filename}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${attachment.filename} 첨부 제거`}
+                      onClick={() => setAttachments((previous) => previous.filter((item) => item.assetId !== attachment.assetId))}
+                      className="size-5 rounded text-slate-400 hover:bg-slate-200"
+                    >
+                      <X aria-hidden="true" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+          </div>
+        </form>
+      </main>
+
+      <Modal
+        open={templateModalOpen}
+        onClose={() => setTemplateModalOpen(false)}
+        title="템플릿 양식 선택"
+        className="max-w-2xl"
+        footer={<Button type="button" variant="outline" onClick={() => setTemplateModalOpen(false)}>닫기</Button>}
+      >
+        <div className="space-y-5">
+          <Button type="button" variant="outline" onClick={() => setTemplateSaveOpen((open) => !open)} className="w-full justify-start">
+            <Plus aria-hidden="true" />
+            현재 작성 내용을 새 템플릿으로 저장
+          </Button>
+          {templateSaveOpen ? (
+            <div className="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2">
+              <AdminFormField label="템플릿 이름">
+                <UiInput value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="템플릿 이름" maxLength={100} className="h-9 text-sm font-normal" />
+              </AdminFormField>
+              <AdminFormField label="설명 (선택)">
+                <UiInput value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} placeholder="설명" maxLength={255} className="h-9 text-sm font-normal" />
+              </AdminFormField>
+              <div className="flex justify-end gap-2 sm:col-span-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setTemplateSaveOpen(false)}>취소</Button>
+                <Button type="button" size="sm" onClick={() => void handleSaveTemplate()} disabled={templateSaving}>{templateSaving ? "저장 중…" : "저장"}</Button>
+              </div>
+            </div>
+          ) : null}
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-slate-800">저장된 양식</h3>
+            {templatesLoading ? (
+              <p className="py-6 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
+            ) : templates.length === 0 ? (
+              <p className="py-6 text-center text-sm font-normal text-slate-500">저장된 양식이 없습니다.</p>
+            ) : (
+              <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                {templates.map((template) => (
+                  <div key={template.id} className="flex items-center gap-3 px-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-800">{template.name}</p>
+                      {template.description ? <p className="mt-0.5 truncate text-xs font-normal text-slate-500">{template.description}</p> : null}
                     </div>
-                    <h3 className="line-clamp-2 text-sm font-extrabold text-slate-800">{record.subject}</h3>
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-1 text-xs font-semibold text-slate-500">
-                      <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" aria-hidden="true" />대상 {record.recipientCount}명</span>
-                      <span>{record.senderName ?? "관리자"}</span>
-                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => { applyTemplateToForm(template); setTemplateModalOpen(false); }}>적용</Button>
+                    {template.createdBy ? (
+                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                        <Trash2 aria-hidden="true" />
+                      </Button>
+                    ) : null}
                   </div>
                 ))}
               </div>
             )}
           </section>
         </div>
-      </main>
-    </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(recoveryDraft)}
+        onClose={() => setRecoveryDraft(null)}
+        title="이전 작성 내용"
+        className="max-w-md"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setRecoveryDraft(null)}>나중에</Button>
+            <Button type="button" onClick={() => { if (recoveryDraft) applyRecordToForm(recoveryDraft); setRecoveryDraft(null); }}>불러오기</Button>
+          </>
+        }
+      >
+        {recoveryDraft ? (
+          <div className="space-y-2 text-sm font-normal text-slate-600">
+            <p className="truncate font-medium text-slate-800">
+              {recoveryDraft.subject && recoveryDraft.subject !== "__smoke_draft__"
+                ? recoveryDraft.subject
+                : "이전에 작성한 메일"}
+            </p>
+            <p>{formatKoreanDateTime(recoveryDraft.updatedAt)}에 작성된 내용입니다.</p>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="발송 이력"
+        className="max-w-2xl"
+        footer={<Button type="button" variant="outline" onClick={() => setHistoryOpen(false)}>닫기</Button>}
+      >
+        {historyLoading ? (
+          <p className="py-8 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
+        ) : historyError ? (
+          <p className="py-8 text-center text-sm font-normal text-rose-600">{historyError}</p>
+        ) : history.length === 0 ? (
+          <p className="py-8 text-center text-sm font-normal text-slate-500">발송 이력이 없습니다.</p>
+        ) : (
+          <ol className="scrollbar-thin max-h-[min(60vh,36rem)] overflow-y-auto pr-2">
+            {history.map((record) => (
+              <li key={record.id} className="flex gap-3 border-b border-slate-100 py-4 first:pt-0 last:border-b-0">
+                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium text-slate-800">{record.subject || "제목 없음"}</p>
+                    <span className="text-xs font-normal text-slate-500">{formatBulkEmailStatus(record.status)}</span>
+                  </div>
+                  <p className="mt-1 flex items-center gap-1 text-xs font-normal text-slate-500">
+                    <Users className="size-3.5" aria-hidden="true" />
+                    {record.recipientCount}명 · {formatKoreanDateTime(record.scheduledAt ?? record.sentAt ?? record.updatedAt)}
+                  </p>
+                  {record.status === "SCHEDULED" ? <Button type="button" variant="ghost" size="sm" onClick={() => void handleCancelScheduled(record.id)} className="mt-2 px-0 text-xs font-normal text-slate-500 hover:bg-transparent hover:text-rose-600">예약 취소</Button> : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Modal>
+
+      <Modal
+        open={reviewOpen}
+        onClose={dismissReview}
+        title="메일 발송 전 최종 검토"
+        className="max-w-2xl"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => void handleTestSend()} disabled={sending || testSending} className="mr-auto">
+              {testSending ? "테스트 발송 중…" : "내 계정으로 테스트 발송"}
+            </Button>
+            <Button type="button" variant="outline" onClick={dismissReview} disabled={sending || testSending}>취소</Button>
+            <Button type="button" onClick={() => void handleConfirmSend()} disabled={sending || !reviewPreview}>{sending ? "발송 중…" : "최종 발송 확정"}</Button>
+          </>
+        }
+      >
+        {reviewPreview ? (
+          <div className="space-y-5">
+            <dl className="divide-y divide-slate-100 text-sm">
+              <div className="grid grid-cols-[5rem_1fr] gap-3 py-2 first:pt-0">
+                <dt className="text-slate-500">발송 대상</dt>
+                <dd className="font-medium text-slate-800">
+                  {selectedRecipientLabel} · 총 {reviewPreview.recipientCount}명{" "}
+                  <Button type="button" variant="link" size="sm" onClick={() => setRecipientListOpen((open) => !open)} className="ml-2 h-auto p-0 text-xs font-normal text-slate-500">
+                    {recipientListOpen ? "명단 닫기" : "명단 확인"}
+                  </Button>
+                  {activeFilterEntries.length ? <span className="mt-1 block text-xs font-normal text-slate-500">{activeFilterEntries.map((entry) => `${entry.label}: ${entry.value}`).join(" · ")}</span> : null}
+                  {recipientListOpen && reviewPreview.sample.length ? <div className="mt-2 flex flex-wrap gap-1.5">{reviewPreview.sample.map((sample) => <span key={sample.email} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-600">{sample.nameKo} · {sample.email}</span>)}</div> : null}
+                </dd>
+              </div>
+              <div className="grid grid-cols-[5rem_1fr] gap-3 py-2">
+                <dt className="text-slate-500">제목</dt>
+                <dd className="font-medium text-slate-800">{subject}</dd>
+              </div>
+            </dl>
+            <section>
+              <h3 className="mb-2 text-xs font-medium text-slate-500">치환자 미리보기</h3>
+              <div className="max-h-48 overflow-y-auto rounded-lg bg-slate-50 px-3 py-3">
+                <RichTextContent content={previewContent} className="text-sm leading-6 text-slate-700" />
+              </div>
+            </section>
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-medium text-slate-500">발송 방식</legend>
+              <div className="flex flex-wrap gap-4 text-sm font-normal text-slate-700">
+                <label className="inline-flex items-center gap-2"><input type="radio" name="delivery-mode" checked={deliveryMode === "now"} onChange={() => setDeliveryMode("now")} className="accent-emerald-700" />즉시 발송</label>
+                <label className="inline-flex items-center gap-2"><input type="radio" name="delivery-mode" checked={deliveryMode === "scheduled"} onChange={() => setDeliveryMode("scheduled")} className="accent-emerald-700" />예약 발송</label>
+              </div>
+              {deliveryMode === "scheduled" ? (
+                <AdminFormField label="예약 일시" className="max-w-xs">
+                  <div className="relative">
+                    <CalendarClock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                    <UiInput type="datetime-local" value={scheduledAt} min={isoToHtmlDatetimeLocal(msToIso(nowMs() + 60_000))} onChange={(event) => setScheduledAt(event.target.value)} className="w-full pl-9 text-sm font-normal" />
+                  </div>
+                </AdminFormField>
+              ) : null}
+            </fieldset>
+            {attachments.length ? <p className="text-xs font-normal text-slate-500">첨부 파일 {attachments.length}개</p> : null}
+          </div>
+        ) : null}
+      </Modal>
+    </AdminPageShell>
   );
+}
+
+function RecipientToken({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800">
+      <span className="max-w-[16rem] truncate">{label}</span>
+      <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="size-4 rounded text-emerald-700 hover:bg-emerald-100">
+        <X aria-hidden="true" />
+      </Button>
+    </span>
+  );
+}
+
+function normalizeFilters(filters: RecipientFilters): RecipientFilters {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) => Boolean(value?.trim()))) as RecipientFilters;
+}
+
+function formatBulkEmailStatus(status: BulkEmailRecord["status"]): string {
+  switch (status) {
+    case "SUCCESS":
+      return "발송 완료";
+    case "SCHEDULED":
+      return "예약 중";
+    case "DRY_RUN":
+      return "테스트 발송";
+    default:
+      return "처리 기록";
+  }
 }

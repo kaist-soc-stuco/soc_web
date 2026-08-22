@@ -1,30 +1,51 @@
 import type {
   AdminUserRecord,
+  BulkProcessStudentFeePaymentsRequest,
+  BulkProcessStudentFeePaymentsResponse,
   AdminUserListResponse,
   AssignRoleGroupMemberRequest,
   AuditLogListResponse,
+  BulkUpdateStudentFeeStatusRequest,
+  BulkUpdateStudentFeeStatusResponse,
   BulkImportContactsRequest,
   BulkImportContactsResponse,
   BulkEmailListResponse,
+  BulkEmailDraftListResponse,
+  BulkEmailPreviewResponse,
+  BulkEmailRecord,
   BulkEmailTemplateListResponse,
+  BulkEmailTemplate,
+  CreateBulkEmailTemplateRequest,
+  UpdateBulkEmailTemplateRequest,
   ContactListResponse,
+  ContactListOptions,
   ContactRecord,
   CreateContactRequest,
+  ReorderContactsRequest,
   CreateRoleGroupRequest,
   MyActivityListResponse,
   MyArticleListResponse,
   MyCommentListResponse,
+  MyScrapListResponse,
   MySurveyResponseListResponse,
   PermissionRecord,
+  ReplaceRoleGroupMembersRequest,
+  RoleGroupCandidateListResponse,
   RoleGroupMemberRecord,
   RoleGroupRecord,
   SendBulkEmailRequest,
   SendBulkEmailResponse,
+  SendBulkEmailTestResponse,
+  SaveBulkEmailDraftRequest,
   StudentFeeListResponse,
+  StudentFeeListOptions,
+  StudentFeeDetailResponse,
+  StudentFeeStatsResponse,
   StudentFeeStatusRecord,
   UpdateContactRequest,
   UpdateRoleGroupRequest,
   UpdateStudentFeeStatusRequest,
+  UpdateUserActiveStatusRequest,
 } from "@soc/contracts";
 
 import {
@@ -38,6 +59,7 @@ export const createAdminApi = ({
   contactsBaseUrl,
   emailsBaseUrl,
   requestJson,
+  requestBlob,
   requestVoid,
   roleGroupsBaseUrl,
   usersBaseUrl,
@@ -125,6 +147,31 @@ export const createAdminApi = ({
         headers: { "Content-Type": "application/json" },
         method: "POST",
       },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  replaceRoleGroupMembers: async (
+    roleGroupId: number,
+    body: ReplaceRoleGroupMembersRequest,
+  ): Promise<RoleGroupMemberRecord[]> => {
+    return requestJson<RoleGroupMemberRecord[]>(
+      `${roleGroupsBaseUrl}/${roleGroupId}/users`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getMyScraps: async (
+    options?: ListQueryOptions,
+  ): Promise<MyScrapListResponse> => {
+    return requestJson<MyScrapListResponse>(
+      `${usersBaseUrl}/me/scraps${buildListQuery(options)}`,
+      { method: "GET" },
       { retryOnUnauthorized: true },
     );
   },
@@ -243,6 +290,8 @@ export const createAdminApi = ({
     sortBy?: "createdAt" | "actor" | "action";
     sortDirection?: "asc" | "desc";
     targetType?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }): Promise<AuditLogListResponse> => {
     const params = new URLSearchParams();
     if (options?.action?.trim()) {
@@ -254,6 +303,8 @@ export const createAdminApi = ({
     if (options?.targetType?.trim()) {
       params.set("targetType", options.targetType.trim());
     }
+    if (options?.dateFrom) params.set("dateFrom", options.dateFrom);
+    if (options?.dateTo) params.set("dateTo", options.dateTo);
     if (options?.page !== undefined) {
       params.set("page", String(options.page));
     }
@@ -302,20 +353,21 @@ export const createAdminApi = ({
   },
 
   listStudentsByFeeStatus: async (
-    status?: string,
-    page = 1,
-    pageSize = 20,
-    sortBy: "name" | "studentId" | "status" | "paidAt" = "name",
-    sortDirection: "asc" | "desc" = "asc",
+    options?: StudentFeeListOptions,
   ): Promise<StudentFeeListResponse> => {
     const params = new URLSearchParams();
-    if (status) {
-      params.set("status", status);
+    if (options?.status) {
+      params.set("status", options.status);
     }
-    params.set("page", String(page));
-    params.set("pageSize", String(pageSize));
-    params.set("sortBy", sortBy);
-    params.set("sortDirection", sortDirection);
+    params.set("page", String(options?.page ?? 1));
+    params.set("pageSize", String(options?.pageSize ?? 20));
+    params.set("sortBy", options?.sortBy ?? "name");
+    params.set("sortDirection", options?.sortDirection ?? "asc");
+    if (options?.query?.trim()) params.set("q", options.query.trim());
+    if (options?.referenceSemester) params.set("referenceSemester", options.referenceSemester);
+    if (options?.paymentYear !== undefined) params.set("paymentYear", String(options.paymentYear));
+    if (options?.majorCategory) params.set("majorCategory", options.majorCategory);
+    if (options?.userIds?.length) params.set("userIds", options.userIds.join(","));
 
     return requestJson<StudentFeeListResponse>(
       `${usersBaseUrl}/fee-status/list?${params.toString()}`,
@@ -347,6 +399,149 @@ export const createAdminApi = ({
     );
   },
 
+  getManagedContacts: async (
+    options?: ContactListOptions,
+  ): Promise<ContactListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.q?.trim()) params.set("q", options.q.trim());
+    if (options?.gender?.trim()) params.set("gender", options.gender.trim());
+    if (options?.cohort !== undefined) params.set("cohort", String(options.cohort));
+    if (options?.department?.trim()) params.set("department", options.department.trim());
+    if (options?.privacyConsented !== undefined) {
+      params.set("privacyConsented", String(options.privacyConsented));
+    }
+    if (options?.page !== undefined) params.set("page", String(options.page));
+    if (options?.pageSize !== undefined) params.set("pageSize", String(options.pageSize));
+    const query = params.toString();
+    return requestJson<ContactListResponse>(
+      `${contactsBaseUrl}/manage${query ? `?${query}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  downloadContactsXlsx: async (
+    options?: Omit<ContactListOptions, "page" | "pageSize">,
+  ): Promise<Blob> => {
+    const params = new URLSearchParams();
+    if (options?.q?.trim()) params.set("q", options.q.trim());
+    if (options?.gender?.trim()) params.set("gender", options.gender.trim());
+    if (options?.cohort !== undefined) params.set("cohort", String(options.cohort));
+    if (options?.department?.trim()) params.set("department", options.department.trim());
+    if (options?.privacyConsented !== undefined) {
+      params.set("privacyConsented", String(options.privacyConsented));
+    }
+    const query = params.toString();
+    return requestBlob(
+      `${contactsBaseUrl}/manage/export.xlsx${query ? `?${query}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateUserActiveStatus: async (
+    userId: string,
+    body: UpdateUserActiveStatusRequest,
+  ): Promise<{ userId: string; isActive: boolean }> => {
+    return requestJson<{ userId: string; isActive: boolean }>(
+      `${usersBaseUrl}/${encodeURIComponent(userId)}/status`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  downloadAuditLogsXlsx: async (options?: {
+    action?: string;
+    q?: string;
+    sortBy?: "createdAt" | "actor" | "action";
+    sortDirection?: "asc" | "desc";
+    targetType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<Blob> => {
+    const params = new URLSearchParams();
+    if (options?.action?.trim()) params.set("action", options.action.trim());
+    if (options?.q?.trim()) params.set("q", options.q.trim());
+    if (options?.sortBy) params.set("sortBy", options.sortBy);
+    if (options?.sortDirection) params.set("sortDirection", options.sortDirection);
+    if (options?.targetType?.trim()) params.set("targetType", options.targetType.trim());
+    if (options?.dateFrom) params.set("dateFrom", options.dateFrom);
+    if (options?.dateTo) params.set("dateTo", options.dateTo);
+    const query = params.toString();
+    return requestBlob(
+      `${auditLogsBaseUrl}/export.xlsx${query ? `?${query}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getStudentFeeStats: async (paymentYear?: number): Promise<StudentFeeStatsResponse> => {
+    const params = paymentYear === undefined ? "" : `?paymentYear=${paymentYear}`;
+    return requestJson<StudentFeeStatsResponse>(
+      `${usersBaseUrl}/fee-status/stats${params}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  downloadStudentFeeXlsx: async (options?: StudentFeeListOptions): Promise<Blob> => {
+    const params = new URLSearchParams();
+    if (options?.status) params.set("status", options.status);
+    if (options?.sortBy) params.set("sortBy", options.sortBy);
+    if (options?.sortDirection) params.set("sortDirection", options.sortDirection);
+    if (options?.query?.trim()) params.set("q", options.query.trim());
+    if (options?.referenceSemester) params.set("referenceSemester", options.referenceSemester);
+    if (options?.paymentYear !== undefined) params.set("paymentYear", String(options.paymentYear));
+    if (options?.majorCategory) params.set("majorCategory", options.majorCategory);
+    if (options?.userIds?.length) params.set("userIds", options.userIds.join(","));
+    const query = params.toString();
+    return requestBlob(
+      `${usersBaseUrl}/fee-status/export.xlsx${query ? `?${query}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  bulkUpdateStudentFeeStatuses: async (
+    body: BulkUpdateStudentFeeStatusRequest,
+  ): Promise<BulkUpdateStudentFeeStatusResponse> => {
+    return requestJson<BulkUpdateStudentFeeStatusResponse>(
+      `${usersBaseUrl}/fee-status/bulk`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  processStudentFeePayments: async (
+    body: BulkProcessStudentFeePaymentsRequest,
+  ): Promise<BulkProcessStudentFeePaymentsResponse> => {
+    return requestJson<BulkProcessStudentFeePaymentsResponse>(
+      `${usersBaseUrl}/fee-status/payments`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getStudentFeeDetail: async (userId: string): Promise<StudentFeeDetailResponse> => {
+    return requestJson<StudentFeeDetailResponse>(
+      `${usersBaseUrl}/fee-status/detail/${encodeURIComponent(userId)}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   bulkImportContacts: async (
     body: BulkImportContactsRequest,
   ): Promise<BulkImportContactsResponse> => {
@@ -361,12 +556,52 @@ export const createAdminApi = ({
     );
   },
 
+  listRoleGroupCandidates: async (
+    roleGroupId: number,
+    options?: {
+      q?: string;
+      department?: string;
+      academicStatus?: string;
+      status?: "active" | "inactive";
+      page?: number;
+      pageSize?: number;
+    },
+  ): Promise<RoleGroupCandidateListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.q?.trim()) params.set("q", options.q.trim());
+    if (options?.department?.trim()) params.set("department", options.department.trim());
+    if (options?.academicStatus?.trim()) params.set("academicStatus", options.academicStatus.trim());
+    if (options?.status) params.set("status", options.status);
+    if (options?.page !== undefined) params.set("page", String(options.page));
+    if (options?.pageSize !== undefined) params.set("pageSize", String(options.pageSize));
+
+    return requestJson<RoleGroupCandidateListResponse>(
+      `${roleGroupsBaseUrl}/${roleGroupId}/users/candidates${params.toString() ? `?${params.toString()}` : ""}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   updateContact: async (
     id: string,
     body: UpdateContactRequest,
   ): Promise<ContactRecord> => {
     return requestJson<ContactRecord>(
       `${contactsBaseUrl}/${id}`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  reorderContacts: async (
+    body: ReorderContactsRequest,
+  ): Promise<ContactRecord[]> => {
+    return requestJson<ContactRecord[]>(
+      `${contactsBaseUrl}/order`,
       {
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
@@ -412,6 +647,117 @@ export const createAdminApi = ({
     return requestJson<BulkEmailTemplateListResponse>(
       `${emailsBaseUrl}/templates`,
       { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  sendBulkEmailTest: async (
+    body: SendBulkEmailRequest,
+  ): Promise<SendBulkEmailTestResponse> => {
+    return requestJson<SendBulkEmailTestResponse>(
+      `${emailsBaseUrl}/test`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  createBulkEmailTemplate: async (
+    body: CreateBulkEmailTemplateRequest,
+  ): Promise<BulkEmailTemplate> => {
+    return requestJson<BulkEmailTemplate>(
+      `${emailsBaseUrl}/templates`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateBulkEmailTemplate: async (
+    templateId: string,
+    body: UpdateBulkEmailTemplateRequest,
+  ): Promise<BulkEmailTemplate> => {
+    return requestJson<BulkEmailTemplate>(
+      `${emailsBaseUrl}/templates/${encodeURIComponent(templateId)}`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  deleteBulkEmailTemplate: async (templateId: string): Promise<{ success: boolean }> => {
+    return requestJson<{ success: boolean }>(
+      `${emailsBaseUrl}/templates/${encodeURIComponent(templateId)}`,
+      { method: "DELETE" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getBulkEmailDrafts: async (): Promise<BulkEmailDraftListResponse> => {
+    return requestJson<BulkEmailDraftListResponse>(
+      `${emailsBaseUrl}/drafts`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  saveBulkEmailDraft: async (
+    body: SaveBulkEmailDraftRequest,
+  ): Promise<BulkEmailRecord> => {
+    return requestJson<BulkEmailRecord>(
+      `${emailsBaseUrl}/drafts`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  deleteBulkEmailDraft: async (draftId: string): Promise<{ success: boolean }> => {
+    return requestJson<{ success: boolean }>(
+      `${emailsBaseUrl}/drafts/${encodeURIComponent(draftId)}`,
+      { method: "DELETE" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  cancelScheduledBulkEmail: async (emailId: string): Promise<BulkEmailRecord> => {
+    return requestJson<BulkEmailRecord>(
+      `${emailsBaseUrl}/${encodeURIComponent(emailId)}/cancel`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  retryBulkEmail: async (emailId: string): Promise<SendBulkEmailResponse> => {
+    return requestJson<SendBulkEmailResponse>(
+      `${emailsBaseUrl}/${encodeURIComponent(emailId)}/retry`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  previewBulkEmailRecipients: async (
+    body: SendBulkEmailRequest,
+  ): Promise<BulkEmailPreviewResponse> => {
+    return requestJson<BulkEmailPreviewResponse>(
+      `${emailsBaseUrl}/preview`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
       { retryOnUnauthorized: true },
     );
   },

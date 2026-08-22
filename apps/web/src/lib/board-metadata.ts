@@ -11,6 +11,16 @@ export const BOARD_CODES = [
   "공약",
 ] as const;
 
+// These boards remain addressable for legacy links and data, but they are not
+// part of the current public board navigation. Events have their own landing
+// page and pledges/legacy Q&A have dedicated replacement paths.
+export const LEGACY_PUBLIC_BOARD_CODES = ["행사", "공약", "QnA"] as const;
+
+export const isLegacyPublicBoardCode = (code: string) =>
+  LEGACY_PUBLIC_BOARD_CODES.includes(
+    code as (typeof LEGACY_PUBLIC_BOARD_CODES)[number],
+  );
+
 export type BoardCode = (typeof BOARD_CODES)[number];
 
 // 서버 카탈로그를 못 받은 상태에서는 fallback으로 글쓰기 권한을 열지 않는다.
@@ -27,6 +37,8 @@ export interface BoardFallbackMetadata {
 export type BoardMetadata = Pick<
   BoardSummary,
   | "allowComment"
+  | "allowLike"
+  | "allowSecret"
   | "code"
   | "descriptionEn"
   | "descriptionKo"
@@ -137,6 +149,8 @@ export const getFallbackBoards = (): BoardMetadata[] =>
       descriptionKo: metadata.descriptionKo,
       descriptionEn: metadata.descriptionEn,
       allowComment: true,
+      allowLike: true,
+      allowSecret: code === "건의사항",
       writePermissionBit: metadata.writePermissionBit,
     };
   });

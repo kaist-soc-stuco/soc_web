@@ -1,18 +1,23 @@
-import type { CurrentUserResponse } from "@soc/contracts";
-import { isoToMs, nowMs } from "@soc/shared";
-import { Clock3, LogOut, User } from "lucide-react";
+import type {
+  ArticleDraftRecord,
+  CurrentUserResponse,
+  MyScrapItem,
+} from "@soc/contracts";
+import { isoToMs, msToDate, nowMs } from "@soc/shared";
+import { Bookmark, Clock3, User, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/data-state";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageSearchField } from "@/components/ui/page-layout";
 
 import type {
   ActivityItem,
   ActivityTab,
   MyPageMenu,
-  MyPageStat,
 } from "./use-my-page-controller";
+import { Button } from "@/components/ui/button";
 
 const formatRelative = (value: string | null | undefined, lang: string) => {
   if (!value) return "-";
@@ -25,17 +30,25 @@ const formatRelative = (value: string | null | undefined, lang: string) => {
   return lang === "ko" ? `${diffDays}일 전` : `${diffDays} days ago`;
 };
 
+const formatProfileDateTime = (value: string | null | undefined) => {
+  if (!value) return "-";
+  const time = isoToMs(value);
+  if (Number.isNaN(time)) return "-";
+  const date = msToDate(time);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 type UserInfo = CurrentUserResponse["user"] | undefined;
 
 interface SidebarProps {
   activeMenu: MyPageMenu;
   lang: string;
   menuItems: ReadonlyArray<{
-    icon: typeof User;
+    icon: LucideIcon;
     id: MyPageMenu;
     label: string;
   }>;
-  onLogout: () => void;
   onMenuChange: (menu: MyPageMenu) => void;
 }
 
@@ -43,7 +56,6 @@ export function MyPageSidebar({
   activeMenu,
   lang,
   menuItems,
-  onLogout,
   onMenuChange,
 }: SidebarProps) {
   return (
@@ -60,10 +72,10 @@ export function MyPageSidebar({
           const Icon = item.icon;
           const isActive = activeMenu === item.id;
           return (
-            <button
+            <Button variant="ghost"
               key={item.id}
               onClick={() => onMenuChange(item.id)}
-              className={`w-full flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold border-0 transition-colors cursor-pointer text-left ${
+              className={`w-full flex items-center justify-start gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold border-0 transition-colors cursor-pointer text-left ${
                 isActive
                   ? "bg-emerald-50/70 text-kaist-darkgreen shadow-sm shadow-emerald-500/5"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -71,21 +83,11 @@ export function MyPageSidebar({
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span>{item.label}</span>
-            </button>
+            </Button>
           );
         })}
       </nav>
 
-      <div className="mt-4 border-t border-slate-100 pt-3 select-none">
-        <button
-          type="button"
-          onClick={onLogout}
-          className="w-full flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-800 border-0 bg-transparent cursor-pointer text-left"
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          <span>{lang === "ko" ? "로그아웃" : "Logout"}</span>
-        </button>
-      </div>
     </aside>
   );
 }
@@ -243,155 +245,6 @@ function ActivityRowsSkeleton({ rows = 6 }: { rows?: number }) {
   );
 }
 
-interface OverviewPanelProps {
-  activities: ActivityItem[];
-  displayName: string;
-  isAdmin: boolean;
-  lang: string;
-  onShowAllActivities: () => void;
-  stats: MyPageStat[];
-  userInfo: UserInfo;
-}
-
-export function MyPageOverviewPanel({
-  activities,
-  displayName,
-  isAdmin,
-  lang,
-  onShowAllActivities,
-  stats,
-  userInfo,
-}: OverviewPanelProps) {
-  return (
-    <div className="flex flex-col gap-5 animate-in fade-in duration-300">
-      <div className="mb-1 select-none">
-        <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-          {lang === "ko" ? "개요" : "Overview"}
-        </h1>
-      </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col gap-4">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-            {displayName}
-          </h2>
-          {isAdmin && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#e6f4ea] text-kaist-darkgreen border border-emerald-100 select-none">
-              {lang === "ko" ? "관리자" : "Administrator"}
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 border-t border-slate-100 pt-4">
-          <div className="flex items-center gap-3 text-xs">
-            <span className="w-16 text-slate-400 font-semibold select-none">
-              {lang === "ko" ? "소속" : "Affiliation"}
-            </span>
-            <span className="text-[13px] font-semibold text-slate-800">
-              {(lang === "ko"
-                ? userInfo?.departmentKo || userInfo?.departmentEn
-                : userInfo?.departmentEn || userInfo?.departmentKo) ?? "-"}
-              {userInfo?.academicStatus && ` · ${userInfo.academicStatus}`}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="w-16 text-slate-400 font-semibold select-none">
-              {lang === "ko" ? "학번" : "Student ID"}
-            </span>
-            <span className="text-[13px] font-semibold text-slate-800">
-              {userInfo?.studentNumber ?? "-"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="w-16 text-slate-400 font-semibold select-none">
-              {lang === "ko" ? "이메일" : "Email"}
-            </span>
-            <span className="text-[13px] font-semibold text-slate-800">
-              {userInfo?.email ?? "-"}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={stat.label}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_5px_15px_rgba(0,0,0,0.015)] flex items-center gap-3 transition-all hover:translate-y-[-1px] hover:shadow-[0_8px_20px_rgba(0,0,0,0.02)]"
-            >
-              <div className={`p-2 rounded-lg border shrink-0 ${stat.color}`}>
-                <Icon className="h-4.5 w-4.5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-semibold text-slate-400">
-                  {stat.label}
-                </span>
-                <span className="text-xl font-bold text-slate-900 mt-0.5 leading-none">
-                  {stat.value}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col">
-        <div className="flex flex-col border-b border-slate-100 pb-3.5 mb-4 select-none gap-1">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">
-              {lang === "ko" ? "최근 활동" : "Recent activity"}
-            </h2>
-            <button
-              onClick={onShowAllActivities}
-              className="text-[13px] font-bold text-kaist-darkgreen hover:opacity-85 border-0 bg-transparent cursor-pointer flex items-center gap-0.5 transition-opacity"
-            >
-              <span>{lang === "ko" ? "전체 보기" : "View all"}</span>
-              <svg
-                className="w-3 h-3 text-kaist-darkgreen"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth="2.5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
-          </div>
-          <p className="text-xs font-medium text-slate-400">
-            {lang === "ko"
-              ? "최근 30일 동안 제출된 설문, 작성된 게시글 및 댓글의 전체 기록을 확인합니다."
-              : "Review surveys, posts, and comments from the past 30 days."}
-          </p>
-        </div>
-
-        {activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 px-4 text-center select-none">
-            <div className="p-3 rounded-full bg-slate-50 border border-slate-100 text-slate-400 mb-3">
-              <Clock3 className="h-6 w-6 stroke-[1.75]" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-800">
-              {lang === "ko" ? "최근 활동 내역이 없습니다" : "No recent activity"}
-            </h3>
-            <p className="text-xs font-medium text-slate-400 mt-1 max-w-xs leading-normal">
-              {lang === "ko"
-                ? "설문 참여, 커뮤니티 게시글 및 댓글 작성을 통해 SOC 활동을 시작해 보세요."
-                : "Join a survey or contribute a post or comment to get started."}
-            </p>
-          </div>
-        ) : (
-          <ActivityRows items={activities.slice(0, 10)} lang={lang} />
-        )}
-      </section>
-    </div>
-  );
-}
-
 interface ProfilePanelProps {
   displayName: string;
   isAdmin: boolean;
@@ -405,52 +258,82 @@ export function MyPageProfilePanel({
   lang,
   userInfo,
 }: ProfilePanelProps) {
+  const profileRows = [
+    [lang === "ko" ? "이름" : "Name", displayName],
+    [lang === "ko" ? "학번" : "Student ID", userInfo?.studentNumber ?? "-"],
+    [lang === "ko" ? "이메일" : "Email", userInfo?.email ?? "-"],
+    [lang === "ko" ? "KAIST UID" : "KAIST UID", userInfo?.kaistUid ?? "-"],
+    [lang === "ko" ? "주전공" : "Primary major", userInfo?.primaryMajor ?? "-"],
+    [lang === "ko" ? "복수전공" : "Double major", userInfo?.doubleMajor ?? "-"],
+    [lang === "ko" ? "부전공" : "Minor", userInfo?.minor ?? "-"],
+    [lang === "ko" ? "성별" : "Gender", userInfo?.gender ?? "-"],
+    [
+      lang === "ko" ? "전화번호" : "Phone",
+      userInfo?.phoneNumber ?? userInfo?.userMobile ?? "-",
+    ],
+    [
+      lang === "ko" ? "소속" : "Affiliation",
+      `${
+        (lang === "ko"
+          ? userInfo?.departmentKo || userInfo?.departmentEn
+          : userInfo?.departmentEn || userInfo?.departmentKo) ?? "-"
+      }${userInfo?.academicStatus ? ` (${userInfo.academicStatus})` : ""}`,
+    ],
+    [lang === "ko" ? "상태" : "Status", userInfo?.academicStatus ?? "-"],
+    [
+      lang === "ko" ? "개인정보 동의" : "Privacy consent",
+      formatProfileDateTime(userInfo?.privacyConsentAt),
+    ],
+    [
+      lang === "ko" ? "회비 납부" : "Student fee",
+      userInfo?.feeStatus === "PAID"
+        ? lang === "ko"
+          ? "납부 완료"
+          : "Paid"
+        : userInfo?.feeStatus === "PARTIAL"
+          ? lang === "ko"
+            ? "부분 납부"
+            : "Partially paid"
+          : userInfo?.feeStatus === "UNPAID"
+            ? lang === "ko"
+              ? "미납"
+              : "Unpaid"
+            : "-",
+    ],
+    [
+      lang === "ko" ? "최근 로그인" : "Last login",
+      formatProfileDateTime(userInfo?.lastLoginAt),
+    ],
+    [lang === "ko" ? "가입일" : "Created", formatProfileDateTime(userInfo?.createdAt)],
+    [lang === "ko" ? "정보 갱신" : "Updated", formatProfileDateTime(userInfo?.updatedAt)],
+    [
+      lang === "ko" ? "권한" : "Role",
+      isAdmin
+        ? lang === "ko"
+          ? "관리자"
+          : "Administrator"
+        : lang === "ko"
+          ? "일반 사용자"
+          : "Member",
+    ],
+  ] as const;
+
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-300">
       <div className="mb-1.5 select-none">
         <h1 className="text-lg font-bold text-slate-900 tracking-tight">
           {lang === "ko" ? "내 정보" : "Profile"}
         </h1>
-        <p className="text-xs font-medium text-slate-400 mt-1">
-          {lang === "ko"
-            ? "KAIST 포털 계정과 연동된 기본 정보입니다."
-            : "Basic information linked to your KAIST portal account."}
-        </p>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] divide-y divide-slate-100 select-none">
-        {[
-          [lang === "ko" ? "이름" : "Name", displayName],
-          [lang === "ko" ? "학번" : "Student ID", userInfo?.studentNumber ?? "-"],
-          [lang === "ko" ? "이메일" : "Email", userInfo?.email ?? "-"],
-          [
-            lang === "ko" ? "소속" : "Affiliation",
-            `${
-              (lang === "ko"
-                ? userInfo?.departmentKo || userInfo?.departmentEn
-                : userInfo?.departmentEn || userInfo?.departmentKo) ?? "-"
-            }${
-              userInfo?.academicStatus ? ` (${userInfo.academicStatus})` : ""
-            }`,
-          ],
-          [lang === "ko" ? "상태" : "Status", userInfo?.academicStatus ?? "-"],
-          [
-            lang === "ko" ? "권한" : "Role",
-            isAdmin
-              ? lang === "ko"
-                ? "관리자"
-                : "Administrator"
-              : lang === "ko"
-                ? "일반 사용자"
-                : "Member",
-          ],
-        ].map(([label, value]) => (
+      <div className="grid grid-cols-1 gap-x-8 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:grid-cols-2 sm:p-5 select-none">
+        {profileRows.map(([label, value]) => (
           <div
             key={label}
-            className="grid grid-cols-[120px_1fr] py-4 text-[13px] items-center"
+            className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-100 py-2.5 text-[13px] last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
           >
-            <span className="font-semibold text-slate-400">{label}</span>
-            <span className="font-bold text-slate-800 text-[14px]">
+            <span className="font-normal text-xs text-slate-400">{label}</span>
+            <span className="min-w-0 break-words font-normal text-sm text-slate-800">
               {value}
             </span>
           </div>
@@ -463,10 +346,14 @@ export function MyPageProfilePanel({
 interface ActivityPanelProps {
   activeTab: ActivityTab;
   activities: ActivityItem[];
+  activityQuery: string;
+  contentTab: ActivityTab;
   currentPage: number;
+  drafts: ArticleDraftRecord[];
+  scraps: MyScrapItem[];
   lang: string;
-  loading: boolean;
   onPageChange: (page: number) => void;
+  onQueryChange: (query: string) => void;
   onTabChange: (tab: ActivityTab) => void;
   totalPages: number;
 }
@@ -474,43 +361,140 @@ interface ActivityPanelProps {
 export function MyPageActivityPanel({
   activeTab,
   activities,
+  activityQuery,
+  contentTab,
   currentPage,
+  drafts,
   lang,
-  loading,
   onPageChange,
+  onQueryChange,
   onTabChange,
+  scraps,
   totalPages,
 }: ActivityPanelProps) {
+  const query = activityQuery.trim().toLocaleLowerCase();
+  const visibleDrafts = drafts.filter((draft) => {
+    if (!query) return true;
+    return `${draft.titleKo} ${draft.titleEn ?? ""} ${draft.boardCode}`
+      .toLocaleLowerCase()
+      .includes(query);
+  });
+  const visibleScraps = scraps.filter((item) => {
+    if (!query) return true;
+    return `${item.titleKo} ${item.boardNameKo}`.toLocaleLowerCase().includes(query);
+  });
+
+  const tabs = [
+    { id: "all", label: lang === "ko" ? "전체" : "All" },
+    { id: "survey", label: lang === "ko" ? "설문" : "Surveys" },
+    { id: "post", label: lang === "ko" ? "작성한 글" : "Posts" },
+    { id: "comment", label: lang === "ko" ? "작성한 댓글" : "Comments" },
+    { id: "scraps", label: lang === "ko" ? "스크랩" : "Scraps" },
+    { id: "drafts", label: lang === "ko" ? "임시저장글" : "Drafts" },
+  ] as const satisfies ReadonlyArray<{ id: ActivityTab; label: string }>;
+
+  const renderCollection = () => {
+    if (contentTab === "drafts") {
+      if (visibleDrafts.length === 0) {
+        return (
+          <EmptyState
+            message={lang === "ko" ? "임시저장글이 없습니다." : "No saved drafts."}
+            minHeightClassName="min-h-[200px]"
+          />
+        );
+      }
+      return (
+        <div className="divide-y divide-slate-100">
+          {visibleDrafts.map((draft) => (
+            <Link
+              key={draft.draftId}
+              to={`/board/${draft.boardCode}/write?draftId=${encodeURIComponent(draft.draftId)}`}
+              className="interaction-row flex items-center justify-between gap-4 px-3 py-3"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-normal text-slate-800">
+                  {draft.titleKo || (lang === "ko" ? "제목 없는 글" : "Untitled post")}
+                </p>
+                <p className="mt-1 text-[11px] font-normal text-slate-400">
+                  {draft.boardCode} · {formatRelative(draft.updatedAt, lang)}
+                </p>
+              </div>
+              <span className="shrink-0 text-xs font-medium text-kaist-darkgreen">
+                {lang === "ko" ? "이어쓰기" : "Continue"}
+              </span>
+            </Link>
+          ))}
+        </div>
+      );
+    }
+
+    if (contentTab === "scraps") {
+      if (visibleScraps.length === 0) {
+        return (
+          <EmptyState
+            message={lang === "ko" ? "스크랩한 콘텐츠가 없습니다." : "No saved content."}
+            minHeightClassName="min-h-[200px]"
+          />
+        );
+      }
+      return (
+        <div className="divide-y divide-slate-100">
+          {visibleScraps.map((item) => {
+            const isEvent = Boolean(item.eventStartDate || item.eventEndDate);
+            return (
+              <Link
+                key={item.articleId}
+                to={`/board/${item.boardCode}/${item.articleId}`}
+                className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50"
+              >
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-slate-700">
+                  <Bookmark className="h-3 w-3" aria-hidden="true" />
+                  {isEvent ? (lang === "ko" ? "행사" : "Event") : item.boardNameKo}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-normal text-slate-800 group-hover:text-kaist-darkgreen">
+                    {item.titleKo}
+                  </span>
+                  <span className="mt-1 block truncate text-[11px] font-normal text-slate-400">
+                    {item.boardNameKo} · {formatRelative(item.scrapUpdatedAt, lang)}
+                  </span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (activities.length === 0) {
+      return (
+        <EmptyState
+          message={lang === "ko" ? "내역이 없습니다." : "No activity found."}
+          minHeightClassName="min-h-[200px]"
+        />
+      );
+    }
+    return <ActivityRows items={activities} lang={lang} />;
+  };
+
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-300">
       <div className="mb-1.5 select-none">
         <h1 className="text-lg font-bold text-slate-900 tracking-tight">
           {lang === "ko" ? "활동 내역" : "Activity"}
         </h1>
-        <p className="text-xs font-medium text-slate-400 mt-1">
-          {lang === "ko"
-            ? "게시글, 댓글, 설문 참여 기록을 확인할 수 있습니다."
-            : "Review your posts, comments, and survey participation."}
-        </p>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col">
-        <div className="flex gap-6 border-b border-slate-100 pb-2 mb-4 overflow-x-auto items-stretch select-none">
-          {([
-            { id: "all", label: lang === "ko" ? "전체" : "All" },
-            { id: "survey", label: lang === "ko" ? "설문" : "Surveys" },
-            { id: "post", label: lang === "ko" ? "작성한 글" : "Posts" },
-            { id: "comment", label: lang === "ko" ? "작성한 댓글" : "Comments" },
-          ] as const satisfies ReadonlyArray<{
-            id: ActivityTab;
-            label: string;
-          }>).map((tab) => {
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto select-none">
+          {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
-              <button
+              <Button variant="ghost"
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`relative flex items-center justify-center text-[13px] font-semibold pb-2 border-0 bg-transparent cursor-pointer transition-colors ${
+                className={`relative flex h-8 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[13px] font-normal cursor-pointer transition-colors ${
                   isActive
                     ? "text-kaist-darkgreen"
                     : "text-slate-400 hover:text-kaist-darkgreen"
@@ -522,25 +506,23 @@ export function MyPageActivityPanel({
                     isActive ? "scale-x-100" : "scale-x-0"
                   }`}
                 />
-              </button>
+              </Button>
             );
           })}
+          </div>
+          <PageSearchField
+            ariaLabel={lang === "ko" ? "활동 내역 검색" : "Search activity"}
+            className="w-full flex-none sm:w-64"
+            onChange={onQueryChange}
+            onClear={() => onQueryChange("")}
+            placeholder={lang === "ko" ? "활동 내역 검색" : "Search activity"}
+            value={activityQuery}
+          />
         </div>
 
-        {loading ? (
-          <ActivityRowsSkeleton />
-        ) : activities.length === 0 ? (
-          <EmptyState
-            message={lang === "ko" ? "내역이 없습니다." : "No activity found."}
-            minHeightClassName="min-h-[200px]"
-          />
-        ) : (
-          <div className="divide-y divide-slate-100 flex-1">
-            <ActivityRows items={activities} lang={lang} />
-          </div>
-        )}
+        <div className="min-h-[200px] flex-1 divide-y divide-slate-100">{renderCollection()}</div>
 
-        {!loading && totalPages > 1 && (
+        {totalPages > 1 && (
           <div className="border-t border-slate-100 pt-4 mt-4 flex justify-center select-none">
             <Pagination
               currentPage={currentPage}

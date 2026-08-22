@@ -1,16 +1,18 @@
 import { Module } from "@nestjs/common";
 import { BulkEmailRepository } from "./bulk-email.repository";
+import { BulkEmailTemplateRepository } from "./bulk-email-template.repository";
 import { BulkEmailService } from "./bulk-email.service";
 import { BulkEmailController } from "./bulk-email.controller";
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
 import { EmailDeliveryService } from "./email-delivery.service";
+import { AssetModule } from "../asset/asset.module";
 
 @Module({
-  imports: [AuthModule, UsersModule, PostgresModule],
+  imports: [AuthModule, UsersModule, PostgresModule, AssetModule],
   controllers: [BulkEmailController],
-  providers: [BulkEmailRepository, BulkEmailService, EmailDeliveryService],
+  providers: [BulkEmailRepository, BulkEmailTemplateRepository, BulkEmailService, EmailDeliveryService],
   exports: [BulkEmailService, BulkEmailRepository],
 })
 export class BulkEmailModule {}

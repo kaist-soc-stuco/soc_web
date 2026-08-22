@@ -33,7 +33,7 @@ export function SurveyStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center rounded-md border font-extrabold whitespace-nowrap",
+        "inline-flex items-center justify-center rounded-md border font-semibold whitespace-nowrap",
         size === "sm"
           ? "px-2 py-0.5 text-[10.5px]"
           : "px-2.5 py-0.5 text-[11.5px]",

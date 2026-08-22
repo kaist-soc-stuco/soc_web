@@ -109,6 +109,7 @@ export const surveyQuestions = pgTable("survey_questions", {
   descriptionEn: text("description_en"),
   questionType: text("question_type").notNull(),
   options: jsonb("options"),
+  config: jsonb("config"),
   answerRegex: text("answer_regex"),
   isRequired: boolean("is_required").notNull().default(true),
   editDeadlineAt: timestamp("edit_deadline_at", { withTimezone: true }),

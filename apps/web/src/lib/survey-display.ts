@@ -9,10 +9,10 @@ export type SurveyStatusTone =
   | "open";
 
 export interface SurveyStatusLike {
-  closesAt?: string | null;
   computedState?: "before_open" | "open" | "closed" | string | null;
   isPublished?: boolean | null;
   lifecycleStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED" | string | null;
+  closesAt?: string | null;
   opensAt?: string | null;
 }
 
@@ -41,23 +41,10 @@ export interface SurveyListFilterOptions {
   typeFilter: SurveyTypeFilter;
 }
 
-function getDdayText(closesAt: string | null | undefined, currentMs: number) {
-  if (!closesAt) return "";
-
-  const closeMs = isoToMs(closesAt);
-  if (Number.isNaN(closeMs)) return "";
-
-  const diffDays = Math.ceil((closeMs - currentMs) / (1000 * 60 * 60 * 24));
-
-  if (diffDays > 0) return ` · D-${diffDays}`;
-  if (diffDays === 0) return " · D-Day";
-  return "";
-}
-
 export function getSurveyStatusInfo(
   survey: SurveyStatusLike,
-  showDday = true,
-  currentMs = nowMs(),
+  _showDday = true,
+  _currentMs = nowMs(),
 ): SurveyStatusInfo {
   if (survey.lifecycleStatus === "ARCHIVED") {
     return { label: "보관됨", tone: "archived" };
@@ -76,27 +63,21 @@ export function getSurveyStatusInfo(
   }
 
   if (survey.computedState === "open") {
-    return {
-      label: `진행중${showDday ? getDdayText(survey.closesAt, currentMs) : ""}`,
-      tone: "open",
-    };
+    return { label: "진행중", tone: "open" };
   }
 
   const openMs = survey.opensAt ? isoToMs(survey.opensAt) : null;
   const closeMs = survey.closesAt ? isoToMs(survey.closesAt) : null;
 
-  if (openMs !== null && !Number.isNaN(openMs) && openMs > currentMs) {
-    return { label: "개시 전", tone: "beforeOpen" };
-  }
-
-  if (closeMs !== null && !Number.isNaN(closeMs) && closeMs <= currentMs) {
+  if (closeMs !== null && !Number.isNaN(closeMs) && closeMs <= _currentMs) {
     return { label: "마감", tone: "closed" };
   }
 
-  return {
-    label: `진행중${showDday ? getDdayText(survey.closesAt, currentMs) : ""}`,
-    tone: "open",
-  };
+  if (openMs !== null && !Number.isNaN(openMs) && openMs > _currentMs) {
+    return { label: "개시 전", tone: "beforeOpen" };
+  }
+
+  return { label: "진행중", tone: "open" };
 }
 
 export function filterAndSortSurveys(
