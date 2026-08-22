@@ -35,6 +35,7 @@ test("contact creation requires complete non-blank bilingual identity fields", (
       nameEn: "Hong Gildong",
       roleKo: "회장",
       roleEn: "President",
+      privacyConsented: true,
     },
   );
 

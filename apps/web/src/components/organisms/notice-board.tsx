@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import { isoToDate, isoToMs, nowMs } from "@soc/shared";
-import { ChevronRight, Pin } from "lucide-react";
+import { isoToMs, nowMs } from "@soc/shared";
+import { ChevronRight } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { formatNumericDate } from "@/lib/date-display";
+import { SectionHeader } from "@/components/ui/section-header";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { EmptyState } from "@/components/ui/data-state";
 import { useLanguage } from "@/hooks/use-language";
 
 interface NoticeItemProps {
@@ -11,12 +15,14 @@ interface NoticeItemProps {
   category: string;
   categoryLabel: string;
   lang: string;
+  author: string;
   title: string;
   date: string;
   isImportant?: boolean;
   isNew?: boolean;
   count?: number;
   showGroupDivider?: boolean;
+  showCategoryBadge?: boolean;
 }
 
 function NoticeItem({
@@ -24,52 +30,54 @@ function NoticeItem({
   category,
   categoryLabel,
   lang,
+  author,
   title,
   date,
   isImportant,
   isNew,
   showGroupDivider,
+  showCategoryBadge,
 }: NoticeItemProps) {
   return (
     <Link
       to={`/board/${category}/${id}`}
-      className={`block px-3 transition-colors hover:bg-slate-50/80 ${
-        showGroupDivider ? "border-t border-slate-100" : ""
-      }`}
+      className={`flex h-full min-h-0 items-center overflow-hidden border-b border-slate-100 px-3 transition-colors last:border-b-0 hover:bg-slate-50/80 ${
+        isImportant ? "bg-brand-primary-light/35" : ""
+      } ${showGroupDivider ? "border-t border-brand-primary-border/50" : ""}`}
     >
-      <div className="flex items-center justify-between py-2.5 gap-4">
+      <div className="flex w-full min-w-0 items-center justify-between gap-4 py-0.5">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          {isImportant ? (
-            <span className="inline-flex items-center bg-brand-primary-light text-brand-primary border border-brand-primary/10 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 select-none">
-              <span>{categoryLabel}</span>
-            </span>
-          ) : (
-            <span className="bg-brand-primary-light text-brand-primary rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 tracking-tight select-none">
+          {showCategoryBadge ? (
+            <span className="inline-flex shrink-0 items-center rounded-md border-0 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-slate-700">
               {categoryLabel}
             </span>
-          )}
+          ) : null}
           <div
-            className={`text-[13px] truncate ${
-              isImportant
-                ? "text-slate-800 font-semibold"
-                : "text-slate-600 font-normal hover:text-brand-primary"
-            } flex min-w-0 items-center gap-1.5`}
+            className={`home-board-title flex min-w-0 items-center gap-1.5 truncate text-slate-700 hover:text-brand-primary ${
+              isImportant ? "is-important" : ""
+            }`}
           >
-            {isImportant ? (
-              <Pin className="mr-1 inline h-3 w-3 align-[-1px] fill-[#E11D48] text-[#E11D48]" />
-            ) : null}
             <span className="min-w-0 truncate">{title}</span>
-            {isNew && (
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#f03e3e] text-[9px] font-black text-white select-none">
-                N
+            {isNew ? (
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"
+                title={lang === "ko" ? "새 글" : "New"}
+              >
+                <span className="sr-only">{lang === "ko" ? "새 글" : "New"}</span>
               </span>
-            )}
+            ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="home-meta-text text-slate-500">
-            {date}
+        <div className="home-notice-meta grid w-[13.5rem] min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center text-right">
+          <span className="home-meta-text min-w-0 truncate text-slate-400">
+            {author}
           </span>
+          <span aria-hidden="true" className="home-meta-text text-center text-slate-300">
+            ·
+          </span>
+          <time className="home-meta-text shrink-0 tabular-nums text-slate-400">
+            {date}
+          </time>
         </div>
       </div>
     </Link>
@@ -77,19 +85,14 @@ function NoticeItem({
 }
 
 function formatDate(dateIso: string) {
-  const d = isoToDate(dateIso);
-  if (isNaN(d.getTime())) return "";
-  const yy = String(d.getFullYear()).slice(-2);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yy}.${mm}.${dd}`;
+  return formatNumericDate(dateIso);
 }
 
 function NoticeBoardSkeleton() {
   return (
-    <div className="divide-y divide-slate-100" aria-busy="true">
+    <div className="grid h-full min-h-0 grid-rows-8 divide-y divide-slate-100" aria-busy="true">
       {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="flex items-center justify-between gap-4 px-3 py-2.5">
+        <div key={index} className="flex min-h-0 items-center justify-between gap-4 px-3 py-1">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="home-loading-surface h-5 w-12 shrink-0 rounded-full" />
             <div
@@ -111,20 +114,18 @@ function NoticeBoardSkeleton() {
 
 export function NoticeBoard() {
   const { lang } = useLanguage();
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [notices, setNotices] = useState<Record<string, NoticeItemProps[]>>({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [lastLoadedNotices, setLastLoadedNotices] = useState<NoticeItemProps[]>([]);
 
   const tabs = [
     { code: "all", labelKo: "전체", labelEn: "All" },
     { code: "공지", labelKo: "공지", labelEn: "Notice" },
-    { code: "행사", labelKo: "행사", labelEn: "Events" },
     { code: "HoC", labelKo: "HoC", labelEn: "HoC" },
     { code: "홍보글", labelKo: "홍보글", labelEn: "Promotions" },
     { code: "건의사항", labelKo: "건의사항", labelEn: "Suggestions" },
     { code: "연구실", labelKo: "연구실", labelEn: "Labs" },
-    { code: "QnA", labelKo: "QnA", labelEn: "Q&A" },
   ];
 
   const apiClient = useMemo(
@@ -140,10 +141,21 @@ export function NoticeBoard() {
   };
 
   const currentNotices = notices[activeNoticeKey] || [];
+  const hasCurrentNoticeData = Object.prototype.hasOwnProperty.call(
+    notices,
+    activeNoticeKey,
+  );
 
   const displayNotices = useMemo(() => {
-    return currentNotices;
+    const pinned = currentNotices.filter((notice) => notice.isImportant).slice(0, 3);
+    const regular = currentNotices.filter((notice) => !notice.isImportant);
+    return [...pinned, ...regular];
   }, [currentNotices]);
+  const visibleNotices = displayNotices.slice(0, 8);
+  const renderedNotices = hasCurrentNoticeData
+    ? visibleNotices
+    : lastLoadedNotices.slice(0, 8);
+  const showInitialSkeleton = loading && !hasCurrentNoticeData && lastLoadedNotices.length === 0;
 
   useEffect(() => {
     let active = true;
@@ -152,10 +164,14 @@ export function NoticeBoard() {
       try {
         const res =
           activeCategory === "all"
-            ? await apiClient.getAllArticles({ limit: 12, page: 1 })
-            : await apiClient.getArticles(activeCategory, { limit: 12 });
+            ? await apiClient.getAllArticles({ limit: 20, page: 1 })
+            : await apiClient.getArticles(activeCategory, { limit: 20 });
         // Filter out items with blank/empty titles
         const items = res.items
+          .filter((item) => item.boardCode !== "QnA")
+          .filter(
+            (item) => item.boardCode !== "행사" && item.boardCode !== "공약",
+          )
           .filter((item) => item.titleKo && item.titleKo.trim() !== "")
           .sort((a, b) => {
             if (a.isPinned !== b.isPinned) {
@@ -175,6 +191,11 @@ export function NoticeBoard() {
                 : activeCategory,
             ),
             lang,
+            author: item.isAnonymous
+              ? lang === "ko"
+                ? "익명"
+                : "Anonymous"
+              : item.author.name,
             title: lang === "ko" ? item.titleKo : item.titleEn || item.titleKo,
             date: formatDate(item.postedAt),
             isImportant: item.isPinned,
@@ -191,6 +212,7 @@ export function NoticeBoard() {
         }));
         if (active) {
           setNotices((prev) => ({ ...prev, [activeNoticeKey]: items }));
+          setLastLoadedNotices(items);
         }
       } catch (err) {
         console.error(err);
@@ -213,75 +235,69 @@ export function NoticeBoard() {
   ]);
 
   return (
-    <section className="home-bento-card flex h-full min-w-0 flex-col overflow-hidden px-5 py-2 pt-2.5 pb-1.5 select-none">
-      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col">
-        {/* Tabs */}
-        <div className="mb-1.5 flex shrink-0 items-stretch justify-between gap-4 border-b border-slate-100">
-          <div className="flex min-w-0 flex-1 flex-nowrap items-stretch gap-4 overflow-x-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {tabs.map((tab, index) => (
-              <div
-                key={index}
-                className="relative group"
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                <button
-                  onClick={() => setActiveTab(index)}
-                  className={`relative flex h-full items-center justify-center whitespace-nowrap border-0 bg-transparent text-[13px] font-semibold transition-colors cursor-pointer ${
-                    activeTab === index
-                      ? "text-brand-primary"
-                      : "text-slate-400 hover:text-brand-primary"
-                  }`}
-                >
-                  <span className="py-1.5">
-                    {lang === "ko" ? tab.labelKo : tab.labelEn}
-                  </span>
-                  <span
-                    className={`absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary transition-transform duration-200 origin-center rounded-t-full ${
-                      activeTab === index
-                        ? "scale-x-100"
-                        : hoveredIndex === index
-                          ? "scale-x-100"
-                          : "scale-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <Link
-            to={activeCategory === "all" ? "/board" : `/board/${activeCategory}`}
-            className="home-more-link shrink-0"
-            onMouseEnter={() => setHoveredIndex(tabs.length)}
-            onMouseLeave={() => setHoveredIndex(null)}
-          >
-            <span>{lang === "ko" ? "더보기" : "More"}</span>
-            <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
+    <section className="home-bento-card flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full flex-col">
+        <SectionHeader
+          navigation={
+            <SegmentedControl
+              ariaLabel={lang === "ko" ? "게시판 카테고리" : "Board categories"}
+              className="home-board-tabs clean-segmented-control max-w-full"
+              itemClassName="!text-[12px]"
+              options={tabs.map((tab) => ({
+                label: lang === "ko" ? tab.labelKo : tab.labelEn,
+                value: tab.code,
+              }))}
+              value={activeCategory}
+              onChange={(value) => {
+                const nextIndex = tabs.findIndex((tab) => tab.code === value);
+                if (nextIndex >= 0) setActiveTab(nextIndex);
+              }}
+            />
+          }
+          action={
+            <Link
+              to={activeCategory === "all" ? "/board" : `/board/${activeCategory}`}
+              className="home-more-link shrink-0"
+            >
+              <span>{lang === "ko" ? "더보기" : "More"}</span>
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          }
+        />
 
         {/* Notice List */}
-        <div className="min-h-0 flex-1 overflow-y-auto pt-1 pb-1">
-          {loading ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pb-1 pt-1">
+          {showInitialSkeleton ? (
             <NoticeBoardSkeleton />
-          ) : displayNotices.length > 0 ? (
-            displayNotices.map((notice, index) => (
-              <NoticeItem
-                key={notice.id}
-                {...notice}
-                lang={lang}
-                showGroupDivider={
-                  index > 0 &&
-                  !notice.isImportant &&
-                  Boolean(displayNotices[index - 1]?.isImportant)
-                }
-              />
-            ))
-          ) : (
-            <div className="flex h-full min-h-[180px] flex-col items-center justify-center text-slate-400 text-sm font-semibold">
-              {lang === "ko" ? "게시글이 없습니다." : "No posts available."}
+          ) : renderedNotices.length > 0 ? (
+            <div
+              className={`grid min-h-0 flex-1 transition-opacity duration-150 ${
+                loading ? "opacity-70" : "opacity-100"
+              }`}
+              style={{
+                gridTemplateRows: `repeat(${renderedNotices.length}, minmax(0, 1fr))`,
+              }}
+            >
+              {renderedNotices.map((notice, index) => (
+                <NoticeItem
+                  key={notice.id}
+                  {...notice}
+                  lang={lang}
+                  showCategoryBadge={activeCategory === "all"}
+                  showGroupDivider={
+                    index > 0 &&
+                    !notice.isImportant &&
+                    Boolean(visibleNotices[index - 1]?.isImportant)
+                  }
+                />
+              ))}
             </div>
+          ) : (
+            <EmptyState
+              className="min-h-0 flex-1 rounded-none border-0 bg-transparent p-4"
+              message={lang === "ko" ? "등록된 게시글이 없습니다." : "No posts available."}
+              minHeightClassName="min-h-0"
+            />
           )}
         </div>
       </div>

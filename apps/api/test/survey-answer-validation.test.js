@@ -139,20 +139,16 @@ test("validates text answer regex", () => {
   );
 });
 
-test("rejects answers after question edit deadline", () => {
-  expectHttpError(
-    () =>
-      validateSurveyAnswers(
-        [
-          question({
-            id: "late",
-            editDeadlineAt: "2026-05-29T23:59:59.000Z",
-          }),
-        ],
-        [{ questionId: "late", content: { text: "too late" } }],
-        NOW,
-      ),
-    ConflictException,
-    "question_edit_deadline_passed",
+test("ignores the retired question edit deadline", () => {
+  assert.doesNotThrow(() =>
+    validateSurveyAnswers(
+      [
+        question({
+          id: "late",
+          editDeadlineAt: "2026-05-29T23:59:59.000Z",
+        }),
+      ],
+      [{ questionId: "late", content: { text: "still valid" } }],
+    ),
   );
 });

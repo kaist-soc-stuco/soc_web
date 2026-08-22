@@ -2,8 +2,8 @@ import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
-import { isoToMs, msToIso, nowDate } from "@soc/shared";
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { isoToDate, isoToMs, msToIso, nowDate } from "@soc/shared";
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -13,12 +13,14 @@ import { REDIS_CLIENT } from "../../../infrastructure/redis/redis.provider";
 import {
   permissions,
   roleGroupPermissions,
+  studentFeePayments,
   studentFeeStatus,
   userRoleGroups,
   users,
   articles,
   boards,
   comments,
+  articleEngagements,
   surveyResponses,
   surveys,
 } from "../../../infrastructure/postgres/postgres.schema";
@@ -27,16 +29,25 @@ import type { UserRecord } from "../entities/user";
 import type {
   AdminUserListResponse,
   AdminUserRecord,
+  BulkProcessStudentFeePaymentsRequest,
+  BulkProcessStudentFeePaymentsResponse,
   ArticleStatus,
   CommentStatus,
+  FeeMajorCategory,
   FeeStatus,
   MyActivityItem,
   MyArticleItem,
   MyCommentItem,
+  MyScrapItem,
   MySurveyResponseItem,
   ResponseStatus,
   StudentFeeListResponse,
+  StudentFeeStatsResponse,
   StudentFeeStatusRecord,
+  StudentFeeDetailResponse,
+  StudentFeePaymentRecord,
+  FeePaymentMethod,
+  FeePaymentType,
   VisibilityScope,
 } from "@soc/contracts";
 
@@ -48,6 +59,11 @@ type UserUpsertInput = {
   stdNo?: string | null;
   departmentEn?: string | null;
   departmentKo?: string | null;
+  primaryMajor?: string | null;
+  doubleMajor?: string | null;
+  minor?: string | null;
+  gender?: string | null;
+  phoneNumber?: string | null;
   email: string;
   identityCode?: string | null;
   isActive?: boolean;
@@ -59,6 +75,11 @@ type UserProfileUpdateInput = {
   academicStatus?: string | null;
   departmentEn?: string | null;
   departmentKo?: string | null;
+  primaryMajor?: string | null;
+  doubleMajor?: string | null;
+  minor?: string | null;
+  gender?: string | null;
+  phoneNumber?: string | null;
   email?: string;
   identityCode?: string | null;
   nameEn?: string | null;
@@ -69,6 +90,15 @@ type UserProfileUpdateInput = {
 
 export type StudentFeeSortBy = "name" | "studentId" | "status" | "paidAt";
 export type SortDirection = "asc" | "desc";
+export type FeeReferenceSemester = string;
+export type EmailRecipientFilters = {
+  query?: string;
+  studentNumber?: string;
+  primaryMajor?: string;
+  doubleMajor?: string;
+  minor?: string;
+  academicStatus?: string;
+};
 export type AdminUserSortBy =
   | "name"
   | "studentId"
@@ -128,6 +158,11 @@ export class UsersRepository {
       email: row.email,
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
+      primaryMajor: row.primaryMajor ?? null,
+      doubleMajor: row.doubleMajor ?? null,
+      minor: row.minor ?? null,
+      gender: row.gender ?? null,
+      phoneNumber: row.phoneNumber ?? null,
       academicStatus: row.academicStatus ?? null,
       identityCode: row.identityCode ?? null,
       privacyConsentAt: row.privacyConsentAt ? msToIso(row.privacyConsentAt.valueOf()) : null,
@@ -139,12 +174,22 @@ export class UsersRepository {
 
   private mapRowToAdminUserRecord(
     row: typeof users.$inferSelect,
+  feeStatus?: FeeStatus,
   ): AdminUserRecord {
     return {
       academicStatus: row.academicStatus ?? null,
       createdAt: msToIso(row.createdAt.valueOf()),
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
+      primaryMajor: row.primaryMajor ?? null,
+      doubleMajor: row.doubleMajor ?? null,
+      minor: row.minor ?? null,
+      gender: row.gender ?? null,
+      phoneNumber: row.phoneNumber ?? null,
+      privacyConsentAt: row.privacyConsentAt
+        ? msToIso(row.privacyConsentAt.valueOf())
+        : null,
+      ...(feeStatus ? { feeStatus } : {}),
       email: row.email,
       identityCode: row.identityCode ?? null,
       isActive: row.isActive,
@@ -185,6 +230,15 @@ export class UsersRepository {
     return found ? this.mapRowToUserRecord(found) : null;
   }
 
+  /** 스프레드시트 과비 이관에서 학번을 안정적인 사용자 식별자로 사용합니다. */
+  async findByStdNo(stdNo: string): Promise<UserRecord | null> {
+    const found = await this.db.query.users.findFirst({
+      where: eq(users.stdNo, stdNo),
+    });
+
+    return found ? this.mapRowToUserRecord(found) : null;
+  }
+
   /** 신규 users 레코드를 생성하고 생성 결과를 반환합니다. */
   async insert(input: UserUpsertInput): Promise<UserRecord> {
     const inserted = await this.db
@@ -198,6 +252,11 @@ export class UsersRepository {
         stdNo: input.stdNo ?? null,
         departmentEn: input.departmentEn ?? null,
         departmentKo: input.departmentKo ?? null,
+        primaryMajor: input.primaryMajor ?? null,
+        doubleMajor: input.doubleMajor ?? null,
+        minor: input.minor ?? null,
+        gender: input.gender ?? null,
+        phoneNumber: input.phoneNumber ?? null,
         email: input.email,
         identityCode: input.identityCode ?? null,
         isActive: input.isActive ?? true,
@@ -225,6 +284,17 @@ export class UsersRepository {
         : {}),
       ...(input.departmentEn !== undefined
         ? { departmentEn: input.departmentEn }
+        : {}),
+      ...(input.primaryMajor !== undefined
+        ? { primaryMajor: input.primaryMajor }
+        : {}),
+      ...(input.doubleMajor !== undefined
+        ? { doubleMajor: input.doubleMajor }
+        : {}),
+      ...(input.minor !== undefined ? { minor: input.minor } : {}),
+      ...(input.gender !== undefined ? { gender: input.gender } : {}),
+      ...(input.phoneNumber !== undefined
+        ? { phoneNumber: input.phoneNumber }
         : {}),
       ...(input.academicStatus !== undefined
         ? { academicStatus: input.academicStatus }
@@ -277,6 +347,11 @@ export class UsersRepository {
           nameEn: input.nameEn ?? null,
           stdNo: input.stdNo ?? null,
           departmentKo: input.departmentKo ?? null,
+          primaryMajor: input.primaryMajor ?? null,
+          doubleMajor: input.doubleMajor ?? null,
+          minor: input.minor ?? null,
+          gender: input.gender ?? null,
+          phoneNumber: input.phoneNumber ?? null,
           departmentEn: input.departmentEn ?? null,
           academicStatus: input.academicStatus ?? null,
           identityCode: input.identityCode ?? null,
@@ -298,6 +373,11 @@ export class UsersRepository {
       academicStatus?: string | null;
       departmentEn?: string | null;
       departmentKo?: string | null;
+      primaryMajor?: string | null;
+      doubleMajor?: string | null;
+      minor?: string | null;
+      gender?: string | null;
+      phoneNumber?: string | null;
       updatedAt: Date;
       email?: string;
       identityCode?: string | null;
@@ -333,6 +413,26 @@ export class UsersRepository {
       updateSet.departmentEn = input.departmentEn;
     }
 
+    if (input.primaryMajor !== undefined) {
+      updateSet.primaryMajor = input.primaryMajor;
+    }
+
+    if (input.doubleMajor !== undefined) {
+      updateSet.doubleMajor = input.doubleMajor;
+    }
+
+    if (input.minor !== undefined) {
+      updateSet.minor = input.minor;
+    }
+
+    if (input.gender !== undefined) {
+      updateSet.gender = input.gender;
+    }
+
+    if (input.phoneNumber !== undefined) {
+      updateSet.phoneNumber = input.phoneNumber;
+    }
+
     if (input.academicStatus !== undefined) {
       updateSet.academicStatus = input.academicStatus;
     }
@@ -346,6 +446,23 @@ export class UsersRepository {
     }
 
     await this.db.update(users).set(updateSet).where(eq(users.userId, userId));
+  }
+
+  /** 계정 활성 상태를 변경하고 최신 사용자 레코드를 반환합니다. */
+  async setActiveStatus(
+    userId: string,
+    isActive: boolean,
+  ): Promise<UserRecord | null> {
+    const [updated] = await this.db
+      .update(users)
+      .set({ isActive, updatedAt: nowDate() })
+      .where(eq(users.userId, userId))
+      .returning();
+
+    if (!updated) return null;
+
+    await this.invalidatePermissionBitmask(userId);
+    return this.mapRowToUserRecord(updated);
   }
 
   async searchUsers(query: string | undefined, limit = 20): Promise<AdminUserRecord[]> {
@@ -371,6 +488,7 @@ export class UsersRepository {
 
   async listEmailRecipients(
     recipientType: "ALL" | "PAID_STUDENTS" | "UNPAID_STUDENTS",
+    filters?: EmailRecipientFilters,
   ): Promise<Array<{ email: string; nameKo: string }>> {
     const feeFilter =
       recipientType === "PAID_STUDENTS"
@@ -382,11 +500,29 @@ export class UsersRepository {
             )
           : undefined;
 
+    const conditions: SQL[] = [eq(users.isActive, true)];
+    if (feeFilter) conditions.push(feeFilter);
+    const query = filters?.query?.trim();
+    if (query) {
+      const queryFilter = or(
+        ilike(users.nameKo, `%${query}%`),
+        ilike(users.nameEn, `%${query}%`),
+        ilike(users.stdNo, `%${query}%`),
+        ilike(users.email, `%${query}%`),
+      );
+      if (queryFilter) conditions.push(queryFilter);
+    }
+    if (filters?.studentNumber?.trim()) conditions.push(ilike(users.stdNo, `%${filters.studentNumber.trim()}%`));
+    if (filters?.primaryMajor?.trim()) conditions.push(ilike(users.primaryMajor, `%${filters.primaryMajor.trim()}%`));
+    if (filters?.doubleMajor?.trim()) conditions.push(ilike(users.doubleMajor, `%${filters.doubleMajor.trim()}%`));
+    if (filters?.minor?.trim()) conditions.push(ilike(users.minor, `%${filters.minor.trim()}%`));
+    if (filters?.academicStatus?.trim()) conditions.push(eq(users.academicStatus, filters.academicStatus.trim()));
+
     const rows = await this.db
       .select({ email: users.email, nameKo: users.nameKo })
       .from(users)
       .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
-      .where(and(eq(users.isActive, true), feeFilter))
+      .where(and(...conditions))
       .orderBy(asc(users.nameKo), asc(users.email));
 
     return rows.filter((row) => row.email.trim().length > 0);
@@ -448,8 +584,23 @@ export class UsersRepository {
       .from(users)
       .where(whereClause);
 
+    const feeRows = rows.length
+      ? await this.db
+          .select({ userId: studentFeeStatus.userId, status: studentFeeStatus.status })
+          .from(studentFeeStatus)
+          .where(inArray(studentFeeStatus.userId, rows.map((row) => row.userId)))
+      : [];
+    const feeStatusByUserId = new Map(
+      feeRows.map((row) => [
+        row.userId,
+        row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID",
+      ] as const),
+    );
+
     return {
-      items: rows.map((row) => this.mapRowToAdminUserRecord(row)),
+      items: rows.map((row) =>
+        this.mapRowToAdminUserRecord(row, feeStatusByUserId.get(row.userId)),
+      ),
       page,
       pageSize,
       total: Number(countResult[0]?.count ?? 0),
@@ -506,7 +657,8 @@ export class UsersRepository {
     if (!found.length) return null;
 
     const row = found[0];
-    const normalizedStatus: FeeStatus = row.status === "PAID" ? "PAID" : "UNPAID";
+    const normalizedStatus: FeeStatus =
+      row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID";
 
     return {
       userId: row.userId,
@@ -519,6 +671,150 @@ export class UsersRepository {
       note: row.note,
       updatedAt: msToIso(row.updatedAt.valueOf()),
     };
+  }
+
+  private mapFeePaymentRow(row: typeof studentFeePayments.$inferSelect): StudentFeePaymentRecord {
+    return {
+      paymentId: row.paymentId,
+      userId: row.userId,
+      amount: row.amount,
+      paymentType: row.paymentType as FeePaymentType,
+      paymentMethod: row.paymentMethod as FeePaymentMethod,
+      effectiveStartSemester: row.effectiveStartSemester,
+      coverageSemesters: row.coverageSemesters,
+      paidAt: msToIso(row.paidAt.valueOf()),
+      note: row.note,
+      recordedBy: row.recordedBy,
+      createdAt: msToIso(row.createdAt.valueOf()),
+    };
+  }
+
+  async getStudentFeeDetail(userId: string): Promise<StudentFeeDetailResponse | null> {
+    const [user, statusRecord, history] = await Promise.all([
+      this.db
+        .select({
+          userId: users.userId,
+          nameKo: users.nameKo,
+          nameEn: users.nameEn,
+          stdNo: users.stdNo,
+          email: users.email,
+          primaryMajor: users.primaryMajor,
+          doubleMajor: users.doubleMajor,
+          minor: users.minor,
+        })
+        .from(users)
+        .where(eq(users.userId, userId))
+        .limit(1),
+      this.getStudentFeeStatus(userId),
+      this.db
+        .select()
+        .from(studentFeePayments)
+        .where(eq(studentFeePayments.userId, userId))
+        .orderBy(desc(studentFeePayments.paidAt), desc(studentFeePayments.createdAt)),
+    ]);
+
+    if (!user[0]) return null;
+    const status = statusRecord ?? await this.ensureStudentFeeStatus(userId);
+
+    return {
+      user: {
+        userId: user[0].userId,
+        nameKo: user[0].nameKo,
+        nameEn: user[0].nameEn ?? undefined,
+        stdNo: user[0].stdNo ?? undefined,
+        email: user[0].email,
+        primaryMajor: user[0].primaryMajor,
+        doubleMajor: user[0].doubleMajor,
+        minor: user[0].minor,
+      },
+      status,
+      history: history.map((row) => this.mapFeePaymentRow(row)),
+    };
+  }
+
+  async processStudentFeePayments(
+    input: BulkProcessStudentFeePaymentsRequest,
+    recordedBy?: string,
+  ): Promise<BulkProcessStudentFeePaymentsResponse> {
+    const result = await this.db.transaction(async (tx) => {
+      const updated: StudentFeeStatusRecord[] = [];
+      const payments: StudentFeePaymentRecord[] = [];
+
+      for (const payment of input.payments) {
+        const lockedUser = await tx
+          .select({ userId: users.userId })
+          .from(users)
+          .where(eq(users.userId, payment.userId))
+          .for("update")
+          .limit(1);
+        if (!lockedUser[0]) {
+          throw new InternalServerErrorException(`fee_user_not_found:${payment.userId}`);
+        }
+
+        const [insertedPayment] = await tx
+          .insert(studentFeePayments)
+          .values({
+            userId: payment.userId,
+            amount: payment.amount,
+            paymentType: payment.paymentType,
+            paymentMethod: payment.paymentMethod,
+            effectiveStartSemester: payment.effectiveStartSemester,
+            coverageSemesters: payment.coverageSemesters,
+            paidAt: isoToDate(payment.paidAt),
+            note: payment.note ?? null,
+            recordedBy: recordedBy ?? null,
+            updatedAt: nowDate(),
+          })
+          .returning();
+
+        if (!insertedPayment) {
+          throw new InternalServerErrorException("fee_payment_insert_failed");
+        }
+        payments.push(this.mapFeePaymentRow(insertedPayment));
+
+        const [current] = await tx
+          .select()
+          .from(studentFeeStatus)
+          .where(eq(studentFeeStatus.userId, payment.userId))
+          .for("update")
+          .limit(1);
+        const nextRecord = {
+          userId: payment.userId,
+          status: "PAID",
+          coverageSemesters: payment.coverageSemesters,
+          paidAmount: payment.amount,
+          paidAt: isoToDate(payment.paidAt),
+          note: payment.note ?? current?.note ?? null,
+          verifiedBy: recordedBy ?? current?.verifiedBy ?? null,
+          verifiedAt: nowDate(),
+          updatedAt: nowDate(),
+        } as const;
+        const [saved] = current
+          ? await tx
+              .update(studentFeeStatus)
+              .set(nextRecord)
+              .where(eq(studentFeeStatus.userId, payment.userId))
+              .returning()
+          : await tx.insert(studentFeeStatus).values(nextRecord).returning();
+
+        if (!saved) throw new InternalServerErrorException("fee_status_update_failed");
+        updated.push({
+          userId: saved.userId,
+          status: "PAID",
+          coverageSemesters: saved.coverageSemesters,
+          paidAmount: saved.paidAmount,
+          paidAt: saved.paidAt ? msToIso(saved.paidAt.valueOf()) : null,
+          verifiedBy: saved.verifiedBy,
+          verifiedAt: saved.verifiedAt ? msToIso(saved.verifiedAt.valueOf()) : null,
+          note: saved.note,
+          updatedAt: msToIso(saved.updatedAt.valueOf()),
+        });
+      }
+
+      return { updated, payments };
+    });
+
+    return { ...result, count: result.updated.length };
   }
 
   async updateStudentFeeStatus(
@@ -556,7 +852,10 @@ export class UsersRepository {
         .limit(1);
 
       const current = existing[0];
-      const currentStatus: FeeStatus = current?.status === "PAID" ? "PAID" : "UNPAID";
+      const currentStatus: FeeStatus =
+        current?.status === "PAID" || current?.status === "PARTIAL"
+          ? current.status
+          : "UNPAID";
       const nextStatus = input.status ?? currentStatus;
       const statusChanged = input.status !== undefined && input.status !== currentStatus;
       const verifierChanged = statusChanged && input.verifiedBy !== undefined;
@@ -607,7 +906,8 @@ export class UsersRepository {
 
     return {
       userId: row.userId,
-      status: row.status === "PAID" ? "PAID" : "UNPAID",
+      status:
+        row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID",
       coverageSemesters: row.coverageSemesters,
       paidAmount: row.paidAmount,
       paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
@@ -636,7 +936,7 @@ export class UsersRepository {
         .values({
           userId,
           status: "UNPAID",
-          coverageSemesters: 4,
+          coverageSemesters: 6,
           paidAmount: 0,
           updatedAt: nowDate(),
         })
@@ -654,7 +954,8 @@ export class UsersRepository {
 
     return {
       userId: row.userId,
-      status: row.status as FeeStatus,
+      status:
+        row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID",
       coverageSemesters: row.coverageSemesters,
       paidAmount: row.paidAmount,
       paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
@@ -665,33 +966,74 @@ export class UsersRepository {
     };
   }
 
+  private currentReferenceSemester(): string {
+    const now = nowDate();
+    return `${now.getUTCFullYear()}-${now.getUTCMonth() < 6 ? 1 : 2}`;
+  }
+
+  private semesterOrdinal(value: string | null | undefined): number | null {
+    const match = value?.match(/^(\d{4})-([12])$/);
+    if (!match) return null;
+    return Number(match[1]) * 2 + Number(match[2]) - 1;
+  }
+
+  private semesterFromDate(value: Date | null | undefined): string | null {
+    if (!value) return null;
+    return `${value.getUTCFullYear()}-${value.getUTCMonth() < 6 ? 1 : 2}`;
+  }
+
+  private isSemesterCovered(
+    startSemester: string | null | undefined,
+    coverageSemesters: number | null | undefined,
+    referenceSemester: string,
+  ): boolean {
+    const start = this.semesterOrdinal(startSemester);
+    const reference = this.semesterOrdinal(referenceSemester);
+    if (start === null || reference === null) return false;
+    return reference >= start && reference < start + Math.max(1, coverageSemesters ?? 6);
+  }
+
   async listStudentsByFeeStatus(
     status?: FeeStatus,
     page = 1,
     pageSize = 20,
     sortBy: StudentFeeSortBy = "name",
     sortDirection: SortDirection = "asc",
+    query?: string,
+    paymentYear?: number,
+    majorCategory?: FeeMajorCategory,
+    referenceSemester?: FeeReferenceSemester,
+    userIds?: string[],
   ): Promise<StudentFeeListResponse> {
-    const offset = (page - 1) * pageSize;
+    const normalizedPage = Math.max(1, Math.floor(page));
+    const normalizedPageSize = Math.min(1_000, Math.max(1, Math.floor(pageSize)));
+    const offset = (normalizedPage - 1) * normalizedPageSize;
+    const filters: SQL[] = [];
+    const normalizedQuery = query?.trim();
 
-    const where = status
-      ? status === "UNPAID"
-        ? or(
-            eq(studentFeeStatus.status, "UNPAID"),
-            isNull(studentFeeStatus.status),
-          )
-        : eq(studentFeeStatus.status, status)
-      : undefined;
-    const direction = sortDirection === "desc" ? desc : asc;
-    const primarySort =
-      sortBy === "studentId"
-        ? direction(users.stdNo)
-        : sortBy === "status"
-          ? direction(sql<string>`COALESCE(${studentFeeStatus.status}, 'UNPAID')`)
-          : sortBy === "paidAt"
-            ? direction(studentFeeStatus.paidAt)
-            : direction(users.nameKo);
+    if (normalizedQuery) {
+      const searchFilter = or(
+        ilike(users.nameKo, `%${normalizedQuery}%`),
+        ilike(users.nameEn, `%${normalizedQuery}%`),
+        ilike(users.stdNo, `%${normalizedQuery}%`),
+        ilike(users.email, `%${normalizedQuery}%`),
+        ilike(users.primaryMajor, `%${normalizedQuery}%`),
+        ilike(users.doubleMajor, `%${normalizedQuery}%`),
+        ilike(users.minor, `%${normalizedQuery}%`),
+      );
+      if (searchFilter) filters.push(searchFilter);
+    }
+    if (userIds?.length) filters.push(inArray(users.userId, userIds));
+    if (paymentYear !== undefined) {
+      filters.push(
+        sql`EXTRACT(YEAR FROM ${studentFeeStatus.paidAt}) = ${paymentYear}`,
+      );
+    }
+    if (majorCategory === "PRIMARY") filters.push(isNotNull(users.primaryMajor));
+    if (majorCategory === "DOUBLE") filters.push(isNotNull(users.doubleMajor));
+    if (majorCategory === "MINOR") filters.push(isNotNull(users.minor));
 
+    const where = filters.length > 0 ? and(...filters) : undefined;
     const rows = await this.db
       .select({
         userId: users.userId,
@@ -699,6 +1041,10 @@ export class UsersRepository {
         nameEn: users.nameEn,
         stdNo: users.stdNo,
         email: users.email,
+        departmentKo: users.departmentKo,
+        primaryMajor: users.primaryMajor,
+        doubleMajor: users.doubleMajor,
+        minor: users.minor,
         status: studentFeeStatus.status,
         coverageSemesters: studentFeeStatus.coverageSemesters,
         paidAmount: studentFeeStatus.paidAmount,
@@ -708,59 +1054,235 @@ export class UsersRepository {
       })
       .from(users)
       .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
-      .where(where)
-      .orderBy(primarySort, asc(users.nameKo), asc(users.stdNo))
-      .limit(pageSize)
-      .offset(offset);
-
-    const countResult = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(users)
-      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
       .where(where);
 
-    const total = Number(countResult[0]?.count ?? 0);
+    const normalizedReference = this.semesterOrdinal(referenceSemester)
+      ? referenceSemester!
+      : this.currentReferenceSemester();
+    const paymentRows = rows.length
+      ? await this.db
+          .select()
+          .from(studentFeePayments)
+          .where(inArray(studentFeePayments.userId, rows.map((row) => row.userId)))
+          .orderBy(desc(studentFeePayments.paidAt), desc(studentFeePayments.createdAt))
+      : [];
+    const paymentsByUser = new Map<string, typeof paymentRows>();
+    for (const payment of paymentRows) {
+      const existing = paymentsByUser.get(payment.userId) ?? [];
+      existing.push(payment);
+      paymentsByUser.set(payment.userId, existing);
+    }
 
-    const summaryRows = await this.db
+    const mapped = rows.map((row) => {
+      const payments = paymentsByUser.get(row.userId) ?? [];
+      const coveredPayment = payments.find((payment) =>
+        this.isSemesterCovered(
+          payment.effectiveStartSemester,
+          payment.coverageSemesters,
+          normalizedReference,
+        ),
+      );
+      const legacyStartSemester = this.semesterFromDate(row.paidAt);
+      const legacyCovered =
+        row.status === "PAID" &&
+        (row.paidAt === null ||
+          this.isSemesterCovered(
+            legacyStartSemester,
+            row.coverageSemesters ?? 6,
+            normalizedReference,
+          ));
+      const eligible = Boolean(coveredPayment || legacyCovered);
+      const latestPayment = payments[0];
+      const totalPaidAmount = payments.length
+        ? payments.reduce((sum, payment) => sum + payment.amount, 0)
+        : row.paidAmount ?? 0;
+
+      return {
+        status: eligible ? ("PAID" as const) : ("UNPAID" as const),
+        eligible,
+        userId: row.userId,
+        nameKo: row.nameKo,
+        nameEn: row.nameEn ?? undefined,
+        stdNo: row.stdNo ?? undefined,
+        email: row.email,
+        departmentKo: row.departmentKo,
+        primaryMajor: row.primaryMajor,
+        doubleMajor: row.doubleMajor,
+        minor: row.minor,
+        coverageSemesters:
+          latestPayment?.coverageSemesters ?? row.coverageSemesters ?? 6,
+        coverageStartSemester:
+          latestPayment?.effectiveStartSemester ?? legacyStartSemester,
+        paymentType: (latestPayment?.paymentType ?? null) as FeePaymentType | null,
+        paymentMethod: (latestPayment?.paymentMethod ?? null) as FeePaymentMethod | null,
+        paidAmount: totalPaidAmount,
+        requiredAmount: 45_000,
+        paidAt: latestPayment?.paidAt
+          ? msToIso(latestPayment.paidAt.valueOf())
+          : row.paidAt
+            ? msToIso(row.paidAt.valueOf())
+            : null,
+        verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
+        note: latestPayment?.note ?? row.note,
+      };
+    });
+
+    const filtered = mapped.filter((row) => {
+      if (!status) return true;
+      return status === "PAID" ? row.status === "PAID" : row.status === "UNPAID";
+    });
+    const direction = sortDirection === "desc" ? -1 : 1;
+    const sorted = [...filtered].sort((left, right) => {
+      const leftValue =
+        sortBy === "studentId"
+          ? left.stdNo ?? ""
+          : sortBy === "status"
+            ? left.status
+            : sortBy === "paidAt"
+              ? left.paidAt ?? ""
+              : left.nameKo;
+      const rightValue =
+        sortBy === "studentId"
+          ? right.stdNo ?? ""
+          : sortBy === "status"
+            ? right.status
+            : sortBy === "paidAt"
+              ? right.paidAt ?? ""
+              : right.nameKo;
+      return String(leftValue).localeCompare(String(rightValue), "ko") * direction;
+    });
+    const paged = sorted.slice(offset, offset + normalizedPageSize);
+    const summaryTotal = mapped.length;
+    const summaryPaid = mapped.filter((row) => row.status === "PAID").length;
+    const summaryUnpaid = summaryTotal - summaryPaid;
+
+    return {
+      students: paged,
+      total: filtered.length,
+      page: normalizedPage,
+      pageSize: normalizedPageSize,
+      summary: {
+        totalStudents: summaryTotal,
+        paidStudents: summaryPaid,
+        partialStudents: 0,
+        unpaidStudents: summaryUnpaid,
+        paymentRate:
+          summaryTotal > 0
+            ? Math.round((summaryPaid / summaryTotal) * 1000) / 10
+            : 0,
+        paidAmount: mapped.reduce((sum, row) => sum + row.paidAmount, 0),
+        referenceSemester: normalizedReference,
+      },
+    };
+  }
+
+  async getStudentFeeStats(paymentYear?: number): Promise<StudentFeeStatsResponse> {
+    const hasYear = paymentYear !== undefined;
+    const start = hasYear
+      ? isoToDate(`${paymentYear}-01-01T00:00:00.000Z`)
+      : undefined;
+    const end = hasYear
+      ? isoToDate(`${paymentYear! + 1}-01-01T00:00:00.000Z`)
+      : undefined;
+    const paidInPeriod = hasYear
+      ? sql`${studentFeeStatus.paidAt} >= ${start} AND ${studentFeeStatus.paidAt} < ${end}`
+      : sql`TRUE`;
+    const paidStatusInPeriod = sql`(${studentFeeStatus.status} IN ('PAID', 'PARTIAL') AND ${paidInPeriod})`;
+
+    const totalsPromise = this.db
       .select({
         totalStudents: sql<number>`COUNT(*)`,
-        paidStudents: sql<number>`COUNT(*) FILTER (WHERE COALESCE(${studentFeeStatus.status}, 'UNPAID') = 'PAID')`,
-        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${studentFeeStatus.status} = 'PAID' THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
+        paidStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PAID' AND ${paidInPeriod})`,
+        partialStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PARTIAL' AND ${paidInPeriod})`,
+        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${paidStatusInPeriod} THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
       })
       .from(users)
       .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId));
 
-    const summaryRow = summaryRows[0];
-    const summaryTotal = Number(summaryRow?.totalStudents ?? 0);
-    const summaryPaid = Number(summaryRow?.paidStudents ?? 0);
+    const trendPromise = this.db
+      .select({
+        period: sql<string>`TO_CHAR(${studentFeeStatus.paidAt}, 'YYYY-MM')`,
+        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${studentFeeStatus.status} IN ('PAID', 'PARTIAL') THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
+        paidStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} IN ('PAID', 'PARTIAL'))`,
+      })
+      .from(studentFeeStatus)
+      .where(
+        and(
+          isNotNull(studentFeeStatus.paidAt),
+          ...(hasYear ? [gte(studentFeeStatus.paidAt, start!), lt(studentFeeStatus.paidAt, end!)] : []),
+        ),
+      )
+      .groupBy(sql`TO_CHAR(${studentFeeStatus.paidAt}, 'YYYY-MM')`)
+      .orderBy(sql`TO_CHAR(${studentFeeStatus.paidAt}, 'YYYY-MM')`);
+
+    const categoryFields: Array<{
+      category: FeeMajorCategory;
+      label: string;
+      field:
+        | typeof users.primaryMajor
+        | typeof users.doubleMajor
+        | typeof users.minor;
+    }> = [
+      { category: "PRIMARY", label: "주전공", field: users.primaryMajor },
+      { category: "DOUBLE", label: "복수전공", field: users.doubleMajor },
+      { category: "MINOR", label: "부전공", field: users.minor },
+    ];
+    const categoryPromises = categoryFields.map(({ category, label, field }) =>
+      this.db
+        .select({
+          totalStudents: sql<number>`COUNT(*)`,
+          paidStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PAID' AND ${paidInPeriod})`,
+          partialStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PARTIAL' AND ${paidInPeriod})`,
+          paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${paidStatusInPeriod} THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
+        })
+        .from(users)
+        .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
+        .where(isNotNull(field))
+        .then((rows) => ({ category, label, row: rows[0] })),
+    );
+
+    const [totalsRows, trendRows, categoryRows] = await Promise.all([
+      totalsPromise,
+      trendPromise,
+      Promise.all(categoryPromises),
+    ]);
+    const totalsRow = totalsRows[0];
+    const totalStudents = Number(totalsRow?.totalStudents ?? 0);
+    const paidStudents = Number(totalsRow?.paidStudents ?? 0);
+    const partialStudents = Number(totalsRow?.partialStudents ?? 0);
 
     return {
-      students: rows.map((r) => ({
-          status:
-            r.status === "PAID"
-            ? r.status
-            : "UNPAID",
-          userId: r.userId,
-          nameKo: r.nameKo,
-          nameEn: r.nameEn ?? undefined,
-          stdNo: r.stdNo ?? undefined,
-          email: r.email,
-          coverageSemesters: r.coverageSemesters ?? 4,
-          paidAmount: r.paidAmount ?? 0,
-          paidAt: r.paidAt ? msToIso(r.paidAt.valueOf()) : null,
-        verifiedAt: r.verifiedAt ? msToIso(r.verifiedAt.valueOf()) : null,
-        note: r.note,
-      })),
-      total,
-      page,
-      pageSize,
-      summary: {
-        totalStudents: summaryTotal,
-        paidStudents: summaryPaid,
-        unpaidStudents: Math.max(0, summaryTotal - summaryPaid),
-        paymentRate: summaryTotal > 0 ? Math.round((summaryPaid / summaryTotal) * 1000) / 10 : 0,
-        paidAmount: Number(summaryRow?.paidAmount ?? 0),
+      totals: {
+        totalStudents,
+        paidStudents,
+        partialStudents,
+        unpaidStudents: Math.max(0, totalStudents - paidStudents - partialStudents),
+        paymentRate:
+          totalStudents > 0
+            ? Math.round(((paidStudents + partialStudents) / totalStudents) * 1000) / 10
+            : 0,
+        paidAmount: Number(totalsRow?.paidAmount ?? 0),
       },
+      trend: trendRows.map((row) => ({
+        period: row.period,
+        paidAmount: Number(row.paidAmount ?? 0),
+        paidStudents: Number(row.paidStudents ?? 0),
+      })),
+      majorBreakdown: categoryRows.map(({ category, label, row }) => {
+        const total = Number(row?.totalStudents ?? 0);
+        const paid = Number(row?.paidStudents ?? 0);
+        const partial = Number(row?.partialStudents ?? 0);
+        return {
+          category,
+          label,
+          totalStudents: total,
+          paidStudents: paid,
+          partialStudents: partial,
+          unpaidStudents: Math.max(0, total - paid - partial),
+          paymentRate: total > 0 ? Math.round(((paid + partial) / total) * 1000) / 10 : 0,
+          paidAmount: Number(row?.paidAmount ?? 0),
+        };
+      }),
     };
   }
 
@@ -768,7 +1290,17 @@ export class UsersRepository {
     userId: string,
     limit: number,
     offset: number,
+    query?: string,
   ): Promise<MyArticleItem[]> {
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(articles.titleKo, `%${normalizedQuery}%`),
+          ilike(articles.titleEn, `%${normalizedQuery}%`),
+          ilike(articles.contentKo, `%${normalizedQuery}%`),
+          ilike(articles.contentEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
     const rows = await this.db
       .select({
         articleId: articles.articleId,
@@ -790,7 +1322,7 @@ export class UsersRepository {
       })
       .from(articles)
       .innerJoin(boards, eq(articles.boardId, boards.boardId))
-      .where(and(eq(articles.authorUserId, userId), eq(articles.status, 'PUBLISHED')))
+      .where(and(eq(articles.authorUserId, userId), eq(articles.status, 'PUBLISHED'), searchFilter))
       .orderBy(desc(articles.postedAt))
       .limit(limit)
       .offset(offset);
@@ -810,11 +1342,20 @@ export class UsersRepository {
     }));
   }
 
-  async countMyArticles(userId: string): Promise<number> {
+  async countMyArticles(userId: string, query?: string): Promise<number> {
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(articles.titleKo, `%${normalizedQuery}%`),
+          ilike(articles.titleEn, `%${normalizedQuery}%`),
+          ilike(articles.contentKo, `%${normalizedQuery}%`),
+          ilike(articles.contentEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
     const rows = await this.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(articles)
-      .where(and(eq(articles.authorUserId, userId), eq(articles.status, "PUBLISHED")));
+      .where(and(eq(articles.authorUserId, userId), eq(articles.status, "PUBLISHED"), searchFilter));
 
     return Number(rows[0]?.count ?? 0);
   }
@@ -823,7 +1364,16 @@ export class UsersRepository {
     userId: string,
     limit: number,
     offset: number,
+    query?: string,
   ): Promise<MyCommentItem[]> {
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(comments.content, `%${normalizedQuery}%`),
+          ilike(articles.titleKo, `%${normalizedQuery}%`),
+          ilike(articles.titleEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
     const rows = await this.db
       .select({
         commentId: comments.commentId,
@@ -841,7 +1391,7 @@ export class UsersRepository {
       .from(comments)
       .innerJoin(articles, eq(comments.articleId, articles.articleId))
       .innerJoin(boards, eq(articles.boardId, boards.boardId))
-      .where(and(eq(comments.authorUserId, userId), eq(comments.status, 'PUBLISHED')))
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, 'PUBLISHED'), searchFilter))
       .orderBy(desc(comments.createdAt))
       .limit(limit)
       .offset(offset);
@@ -861,11 +1411,20 @@ export class UsersRepository {
     }));
   }
 
-  async countMyComments(userId: string): Promise<number> {
+  async countMyComments(userId: string, query?: string): Promise<number> {
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(comments.content, `%${normalizedQuery}%`),
+          ilike(articles.titleKo, `%${normalizedQuery}%`),
+          ilike(articles.titleEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
     const rows = await this.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(comments)
-      .where(and(eq(comments.authorUserId, userId), eq(comments.status, "PUBLISHED")));
+      .innerJoin(articles, eq(comments.articleId, articles.articleId))
+      .where(and(eq(comments.authorUserId, userId), eq(comments.status, "PUBLISHED"), searchFilter));
 
     return Number(rows[0]?.count ?? 0);
   }
@@ -874,7 +1433,15 @@ export class UsersRepository {
     userId: string,
     limit: number,
     offset: number,
+    query?: string,
   ): Promise<MySurveyResponseItem[]> {
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(surveys.titleKo, `%${normalizedQuery}%`),
+          ilike(surveys.titleEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
     const rows = await this.db
       .select({
         responseId: surveyResponses.id,
@@ -886,7 +1453,7 @@ export class UsersRepository {
       })
       .from(surveyResponses)
       .innerJoin(surveys, eq(surveyResponses.surveyId, surveys.surveyId))
-      .where(eq(surveyResponses.userId, userId))
+      .where(and(eq(surveyResponses.userId, userId), searchFilter))
       .orderBy(desc(surveyResponses.createdAt))
       .limit(limit)
       .offset(offset);
@@ -901,11 +1468,19 @@ export class UsersRepository {
     }));
   }
 
-  async countMySurveyResponses(userId: string): Promise<number> {
+  async countMySurveyResponses(userId: string, query?: string): Promise<number> {
+    const normalizedQuery = query?.trim();
+    const searchFilter = normalizedQuery
+      ? or(
+          ilike(surveys.titleKo, `%${normalizedQuery}%`),
+          ilike(surveys.titleEn, `%${normalizedQuery}%`),
+        )
+      : undefined;
     const rows = await this.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(surveyResponses)
-      .where(eq(surveyResponses.userId, userId));
+      .innerJoin(surveys, eq(surveyResponses.surveyId, surveys.surveyId))
+      .where(and(eq(surveyResponses.userId, userId), searchFilter));
 
     return Number(rows[0]?.count ?? 0);
   }
@@ -914,7 +1489,8 @@ export class UsersRepository {
     userId: string,
     limit: number,
     offset: number,
-  ): Promise<MyActivityItem[]> {
+    query?: string,
+  ): Promise<{ items: MyActivityItem[]; total: number }> {
     type MyActivityRow = {
       activityType: "survey" | "post" | "comment";
       resourceId: string;
@@ -925,7 +1501,31 @@ export class UsersRepository {
       articleId: string | null;
       boardCode: string | null;
       surveyId: string | null;
+      totalCount: number | string;
     };
+
+    const normalizedQuery = query?.trim();
+    const postSearch = normalizedQuery
+      ? sql`AND (
+          ${articles.titleKo} ILIKE ${`%${normalizedQuery}%`}
+          OR ${articles.titleEn} ILIKE ${`%${normalizedQuery}%`}
+          OR ${articles.contentKo} ILIKE ${`%${normalizedQuery}%`}
+          OR ${articles.contentEn} ILIKE ${`%${normalizedQuery}%`}
+        )`
+      : sql``;
+    const commentSearch = normalizedQuery
+      ? sql`AND (
+          ${comments.content} ILIKE ${`%${normalizedQuery}%`}
+          OR ${articles.titleKo} ILIKE ${`%${normalizedQuery}%`}
+          OR ${articles.titleEn} ILIKE ${`%${normalizedQuery}%`}
+        )`
+      : sql``;
+    const surveySearch = normalizedQuery
+      ? sql`AND (
+          ${surveys.titleKo} ILIKE ${`%${normalizedQuery}%`}
+          OR ${surveys.titleEn} ILIKE ${`%${normalizedQuery}%`}
+        )`
+      : sql``;
 
     const result = await this.db.execute<MyActivityRow>(sql`
       WITH my_activity AS (
@@ -943,6 +1543,7 @@ export class UsersRepository {
         INNER JOIN ${boards} ON ${articles.boardId} = ${boards.boardId}
         WHERE ${articles.authorUserId} = ${userId}
           AND ${articles.status} = 'PUBLISHED'
+          ${postSearch}
 
         UNION ALL
 
@@ -961,6 +1562,7 @@ export class UsersRepository {
         INNER JOIN ${boards} ON ${articles.boardId} = ${boards.boardId}
         WHERE ${comments.authorUserId} = ${userId}
           AND ${comments.status} = 'PUBLISHED'
+          ${commentSearch}
 
         UNION ALL
 
@@ -977,15 +1579,17 @@ export class UsersRepository {
         FROM ${surveyResponses}
         INNER JOIN ${surveys} ON ${surveyResponses.surveyId} = ${surveys.surveyId}
         WHERE ${surveyResponses.userId} = ${userId}
+          ${surveySearch}
       )
-      SELECT *
+      SELECT *, COUNT(*) OVER()::int AS "totalCount"
       FROM my_activity
       ORDER BY "occurredAt" DESC
       LIMIT ${limit}
       OFFSET ${offset}
     `);
 
-    return result.rows.map((row) => ({
+    const total = Number(result.rows[0]?.totalCount ?? 0);
+    const items = result.rows.map((row) => ({
       articleId: row.articleId,
       boardCode: row.boardCode,
       commentContent: row.commentContent,
@@ -999,5 +1603,73 @@ export class UsersRepository {
       titleEn: row.titleEn,
       type: row.activityType,
     }));
+
+    return { items, total };
+  }
+
+  async getMyScraps(
+    userId: string,
+    limit: number,
+    offset: number,
+  ): Promise<MyScrapItem[]> {
+    const rows = await this.db
+      .select({
+        articleId: articles.articleId,
+        boardId: boards.boardId,
+        boardCode: boards.code,
+        boardNameKo: boards.nameKo,
+        boardNameEn: boards.nameEn,
+        titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
+        isPinned: articles.isPinned,
+        postedAt: articles.postedAt,
+        scrapUpdatedAt: articleEngagements.updatedAt,
+        eventStartDate: articles.eventStartDate,
+        eventEndDate: articles.eventEndDate,
+      })
+      .from(articleEngagements)
+      .innerJoin(articles, eq(articleEngagements.articleId, articles.articleId))
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .where(
+        and(
+          eq(articleEngagements.userId, userId),
+          eq(articleEngagements.kind, "SCRAP"),
+          eq(articles.status, "PUBLISHED"),
+        ),
+      )
+      .orderBy(desc(articleEngagements.updatedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return rows.map((row): MyScrapItem => ({
+      articleId: String(row.articleId),
+      boardId: row.boardId,
+      boardCode: row.boardCode,
+      boardNameKo: row.boardNameKo,
+      boardNameEn: row.boardNameEn,
+      titleKo: row.titleKo,
+      titleEn: row.titleEn,
+      isPinned: row.isPinned,
+      postedAt: msToIso(row.postedAt.valueOf()),
+      scrapUpdatedAt: msToIso(row.scrapUpdatedAt.valueOf()),
+      eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : null,
+      eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : null,
+    }));
+  }
+
+  async countMyScraps(userId: string): Promise<number> {
+    const rows = await this.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(articleEngagements)
+      .innerJoin(articles, eq(articleEngagements.articleId, articles.articleId))
+      .where(
+        and(
+          eq(articleEngagements.userId, userId),
+          eq(articleEngagements.kind, "SCRAP"),
+          eq(articles.status, "PUBLISHED"),
+        ),
+      );
+
+    return Number(rows[0]?.count ?? 0);
   }
 }

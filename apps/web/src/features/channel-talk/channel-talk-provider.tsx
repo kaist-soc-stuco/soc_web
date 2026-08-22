@@ -45,6 +45,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
           memberId: config.memberId,
           pluginKey,
           profile: config.profile,
+          zIndex: 40,
         });
         hasBootedRef.current = true;
       } catch (error) {
@@ -59,5 +60,7 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
     };
   }, [data]);
 
-  return children;
+  // The SDK owns the launcher and messenger UI. Keeping this provider renderless
+  // avoids a second, competing affordance in the page layout.
+  return <>{children}</>;
 }

@@ -1,6 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
-import type { BoardSummary } from "@soc/contracts";
+import { asc, eq, inArray, sql } from "drizzle-orm";
+import type {
+  BoardCreateRequest,
+  BoardSummary,
+  BoardUpdateRequest,
+} from "@soc/contracts";
 
 import {
   DRIZZLE_DB,
@@ -71,14 +75,26 @@ export class BoardRepository {
       allowComment: row.allowComment,
       allowSecret: row.allowSecret,
       allowLike: row.allowLike,
+      sortOrder: row.sortOrder,
       isActive: row.isActive,
     }));
   }
 
   async listBoards(): Promise<BoardSummary[]> {
-    const rows = await this.db.query.boards.findMany({
-      where: eq(boards.isActive, true),
-    });
+    const rows = await this.db
+      .select()
+      .from(boards)
+      .where(eq(boards.isActive, true))
+      .orderBy(asc(boards.sortOrder), asc(boards.boardId));
+
+    return this.resolveBoardWithPermissions(rows);
+  }
+
+  async listAllBoards(): Promise<BoardSummary[]> {
+    const rows = await this.db
+      .select()
+      .from(boards)
+      .orderBy(asc(boards.sortOrder), asc(boards.boardId));
 
     return this.resolveBoardWithPermissions(rows);
   }
@@ -92,5 +108,130 @@ export class BoardRepository {
 
     const results = await this.resolveBoardWithPermissions([row]);
     return results[0] ?? null;
+  }
+
+  private async resolvePermissionIds(
+    bits: number[],
+  ): Promise<(number | null)[]> {
+    const uniqueBits = [...new Set(bits.filter((bit) => bit > 0))];
+    if (uniqueBits.length === 0) {
+      return bits.map(() => null);
+    }
+
+    const rows = await this.db
+      .select({ permissionId: permissions.permissionId, bitValue: permissions.bitValue })
+      .from(permissions)
+      .where(inArray(permissions.bitValue, uniqueBits));
+    const idsByBit = new Map(rows.map((row) => [Number(row.bitValue), row.permissionId]));
+
+    return bits.map((bit) => (bit > 0 ? idsByBit.get(bit) ?? null : null));
+  }
+
+  private async permissionIdsForInput(
+    input: Pick<BoardCreateRequest, "writePermissionBit" | "commentPermissionBit" | "managePermissionBit">,
+  ): Promise<{
+    writePermissionId: number | null;
+    commentPermissionId: number | null;
+    managePermissionId: number | null;
+  }> {
+    const [writePermissionId, commentPermissionId, managePermissionId] =
+      await this.resolvePermissionIds([
+        input.writePermissionBit,
+        input.commentPermissionBit,
+        input.managePermissionBit,
+      ]);
+
+    return { writePermissionId, commentPermissionId, managePermissionId };
+  }
+
+  async create(input: BoardCreateRequest): Promise<BoardSummary> {
+    const permissionIds = await this.permissionIdsForInput(input);
+    const [row] = await this.db
+      .insert(boards)
+      .values({
+        code: input.code,
+        nameKo: input.nameKo,
+        nameEn: input.nameEn ?? null,
+        descriptionKo: input.descriptionKo ?? null,
+        descriptionEn: input.descriptionEn ?? null,
+        readScope: input.readScope,
+        ...permissionIds,
+        allowComment: input.allowComment,
+        allowSecret: input.allowSecret,
+        allowLike: input.allowLike,
+        sortOrder: input.sortOrder,
+        isActive: true,
+      })
+      .returning();
+
+    const [result] = await this.resolveBoardWithPermissions(row ? [row] : []);
+    return result;
+  }
+
+  async update(code: string, input: BoardUpdateRequest): Promise<BoardSummary | null> {
+    const set: Partial<typeof boards.$inferInsert> = {};
+
+    if (input.nameKo !== undefined) set.nameKo = input.nameKo;
+    if (input.nameEn !== undefined) set.nameEn = input.nameEn;
+    if (input.descriptionKo !== undefined) set.descriptionKo = input.descriptionKo;
+    if (input.descriptionEn !== undefined) set.descriptionEn = input.descriptionEn;
+    if (input.readScope !== undefined) set.readScope = input.readScope;
+    if (input.allowComment !== undefined) set.allowComment = input.allowComment;
+    if (input.allowSecret !== undefined) set.allowSecret = input.allowSecret;
+    if (input.allowLike !== undefined) set.allowLike = input.allowLike;
+    if (input.sortOrder !== undefined) set.sortOrder = input.sortOrder;
+    if (input.isActive !== undefined) set.isActive = input.isActive;
+
+    if (
+      input.writePermissionBit !== undefined ||
+      input.commentPermissionBit !== undefined ||
+      input.managePermissionBit !== undefined
+    ) {
+      const current = await this.findByCode(code);
+      if (!current) return null;
+      const permissionIds = await this.permissionIdsForInput({
+        writePermissionBit: input.writePermissionBit ?? current.writePermissionBit,
+        commentPermissionBit: input.commentPermissionBit ?? current.commentPermissionBit,
+        managePermissionBit: input.managePermissionBit ?? current.managePermissionBit,
+      });
+      Object.assign(set, permissionIds);
+    }
+
+    if (Object.keys(set).length === 0) {
+      return this.findByCode(code);
+    }
+
+    const [row] = await this.db
+      .update(boards)
+      .set(set)
+      .where(eq(boards.code, code))
+      .returning();
+    if (!row) return null;
+
+    const [result] = await this.resolveBoardWithPermissions([row]);
+    return result ?? null;
+  }
+
+  async archive(code: string): Promise<BoardSummary | null> {
+    const [row] = await this.db
+      .update(boards)
+      .set({ isActive: false })
+      .where(eq(boards.code, code))
+      .returning();
+    if (!row) return null;
+
+    const [result] = await this.resolveBoardWithPermissions([row]);
+    return result ?? null;
+  }
+
+  async reorder(items: Array<{ code: string; sortOrder: number }>): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      for (const item of items) {
+        await tx
+          .update(boards)
+          .set({ sortOrder: item.sortOrder })
+          .where(eq(boards.code, item.code));
+      }
+    });
   }
 }

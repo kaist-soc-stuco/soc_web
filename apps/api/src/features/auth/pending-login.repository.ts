@@ -25,6 +25,10 @@ interface StoredPendingSsoUser {
   academicStatus?: string;
   departmentEn?: string;
   departmentKo?: string;
+  primaryMajor?: string;
+  doubleMajor?: string;
+  minor?: string;
+  gender?: string;
   identityCode?: string;
   nameEn?: string;
   nameKo: string;
@@ -102,6 +106,10 @@ export class PendingLoginRepository {
       academicStatus: payload.academicStatus,
       departmentEn: payload.departmentEn,
       departmentKo: payload.departmentKo,
+      primaryMajor: payload.primaryMajor,
+      doubleMajor: payload.doubleMajor,
+      minor: payload.minor,
+      gender: payload.gender,
       expiresAt: payload.expiresAt,
       identityCode: payload.identityCode,
       kaistUid: payload.kaistUid,
@@ -120,6 +128,10 @@ export class PendingLoginRepository {
         academicStatus: parsed.academicStatus,
         departmentEn: parsed.departmentEn,
         departmentKo: parsed.departmentKo,
+        primaryMajor: parsed.primaryMajor,
+        doubleMajor: parsed.doubleMajor,
+        minor: parsed.minor,
+        gender: parsed.gender,
         email: this.decrypt(parsed.encryptedEmail),
         expiresAt: parsed.expiresAt,
         identityCode: parsed.identityCode,

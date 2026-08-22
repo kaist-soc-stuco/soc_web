@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { ArticleListItem, BoardSummary, SurveyRecord } from "@soc/contracts";
+import type {
+  ArticleListItem,
+  BoardSummary,
+  PublicCalendarEventItem,
+  SurveyRecord,
+} from "@soc/contracts";
 
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -15,6 +20,7 @@ export function useSearchPageController() {
   const query = searchParams.get("q")?.trim() ?? "";
   const [inputValue, setInputValue] = useState(query);
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<PublicCalendarEventItem[]>([]);
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,6 +38,7 @@ export function useSearchPageController() {
   useEffect(() => {
     if (!query) {
       setArticles([]);
+      setCalendarEvents([]);
       setSurveys([]);
       setError(null);
       setLoading(false);
@@ -43,13 +50,19 @@ export function useSearchPageController() {
     setError(null);
 
     Promise.all([
-      apiClient.searchArticles(query, 24),
+      apiClient.searchArticles(query, 60),
       apiClient.getPublicSurveys(),
       apiClient.getBoards().catch(() => ({ items: [] as BoardSummary[] })),
+      apiClient.searchPublicCalendarEvents(query, 40),
     ])
-      .then(([articleItems, surveyItems, boardResponse]) => {
+      .then(([articleItems, surveyItems, boardResponse, calendarResponse]) => {
         if (cancelled) return;
         setArticles(articleItems);
+        setCalendarEvents(
+          calendarResponse.items.filter(
+            (item) => item.sourceType === "MANUAL" || item.sourceType === "KAIST_ACADEMIC",
+          ),
+        );
         setSurveys(
           surveyItems.filter((survey) =>
             includesQuery(
@@ -69,6 +82,7 @@ export function useSearchPageController() {
       .catch(() => {
         if (!cancelled) {
           setArticles([]);
+          setCalendarEvents([]);
           setSurveys([]);
           setError(
             lang === "ko"
@@ -91,6 +105,16 @@ export function useSearchPageController() {
     [boards],
   );
 
+  const eventArticles = useMemo(
+    () => articles.filter((article) => article.boardCode === "행사"),
+    [articles],
+  );
+
+  const boardArticles = useMemo(
+    () => articles.filter((article) => article.boardCode !== "행사"),
+    [articles],
+  );
+
   const aboutResults = useMemo(() => {
     if (!query) return ABOUT_ITEMS;
     return ABOUT_ITEMS.filter((item) =>
@@ -107,7 +131,12 @@ export function useSearchPageController() {
     );
   }, [query]);
 
-  const totalCount = articles.length + surveys.length + aboutResults.length;
+  const totalCount =
+    boardArticles.length +
+    eventArticles.length +
+    surveys.length +
+    calendarEvents.length +
+    aboutResults.length;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -117,8 +146,10 @@ export function useSearchPageController() {
 
   return {
     aboutResults,
-    articles,
     boardById,
+    boardArticles,
+    calendarEvents,
+    eventArticles,
     error,
     handleSubmit,
     inputValue,

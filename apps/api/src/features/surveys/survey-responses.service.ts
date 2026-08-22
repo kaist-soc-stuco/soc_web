@@ -1,19 +1,25 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 
 import { SurveyResponsesRepository } from "./survey-responses.repository";
 import { SurveysRepository } from "./surveys.repository";
 import { UsersService } from "../users/users.service";
+import { AssetRepository } from "../asset/repositories/asset.repository";
+import { SurveyQuestionsRepository } from "./survey-questions.repository";
+import { SurveySectionsRepository } from "./survey-sections.repository";
 
 
 import type { ResponseDetailResponse } from "@soc/contracts";
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
+import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import { isoToMs, nowMs } from "@soc/shared";
 
 @Injectable()
@@ -22,7 +28,62 @@ export class SurveyResponsesService {
     private readonly responsesRepo: SurveyResponsesRepository,
     private readonly surveysRepo: SurveysRepository,
     private readonly usersService: UsersService,
+    private readonly assetRepository: AssetRepository,
+    @Optional() private readonly sectionsRepo?: SurveySectionsRepository,
+    @Optional() private readonly questionsRepo?: SurveyQuestionsRepository,
   ) {}
+
+  private async validateUploadedAssets(
+    answers: SubmitResponseDto["answers"],
+    userId: string,
+    questions: SurveyQuestionRecord[] = [],
+  ): Promise<void> {
+    const questionById = new Map(questions.map((question) => [question.id, question]));
+    const assetInputs = answers.flatMap((answer) => {
+      const content = answer.content;
+      const ids = typeof content.assetId === "string"
+        ? [content.assetId]
+        : Array.isArray(content.assetIds)
+          ? content.assetIds.filter((assetId): assetId is string => typeof assetId === "string")
+          : [];
+      return ids.map((assetId) => ({ assetId, question: questionById.get(answer.questionId) }));
+    });
+    const uniqueAssetIds = [...new Set(assetInputs.map((input) => input.assetId))];
+    const ownedAssets = await Promise.all(
+      uniqueAssetIds.map((assetId) => this.assetRepository.findOwnedAssetDetails(assetId, userId)),
+    );
+    if (ownedAssets.some((asset) => !asset)) {
+      throw new ForbiddenException("answer_file_not_owned");
+    }
+
+    const assetById = new Map(
+      ownedAssets.filter((asset): asset is NonNullable<typeof asset> => Boolean(asset)).map((asset) => [asset.assetId, asset]),
+    );
+    for (const input of assetInputs) {
+      const question = input.question;
+      const asset = assetById.get(input.assetId);
+      if (!asset || !question || question.questionType !== "file_upload") {
+        throw new BadRequestException("answer_file_invalid");
+      }
+
+      const maxSizeBytes = question.config?.maxSizeBytes;
+      if (maxSizeBytes !== undefined && asset.sizeBytes > maxSizeBytes) {
+        throw new BadRequestException("answer_file_too_large");
+      }
+
+      const allowedMimeTypes = question.config?.allowedMimeTypes ?? [];
+      if (
+        allowedMimeTypes.length > 0 &&
+        !allowedMimeTypes.some((allowed) =>
+          allowed.endsWith("/*")
+            ? asset.mimeType.toLowerCase().startsWith(`${allowed.slice(0, -1).toLowerCase()}`)
+            : asset.mimeType.toLowerCase() === allowed.toLowerCase(),
+        )
+      ) {
+        throw new BadRequestException("answer_file_type_not_allowed");
+      }
+    }
+  }
 
   async submit(
     surveyId: string,
@@ -37,8 +98,6 @@ export class SurveyResponsesService {
     const now = nowMs();
     if (survey.opensAt && isoToMs(survey.opensAt) > now)
       throw new ConflictException("survey_not_open_yet");
-    if (survey.closesAt && isoToMs(survey.closesAt) <= now)
-      throw new ConflictException("survey_closed");
 
     if (!caller) {
       throw new ForbiddenException("login_required");
@@ -50,6 +109,11 @@ export class SurveyResponsesService {
         throw new ForbiddenException("fee_payer_only");
       }
     }
+
+    const questions = this.sectionsRepo && this.questionsRepo
+      ? await this.loadQuestions(surveyId)
+      : [];
+    await this.validateUploadedAssets(dto.answers, caller.id, questions);
 
     const submission = await this.responsesRepo.insertSubmission({
       surveyId,
@@ -65,9 +129,6 @@ export class SurveyResponsesService {
     }
     if (submission.status === "survey_not_open_yet") {
       throw new ConflictException("survey_not_open_yet");
-    }
-    if (submission.status === "survey_closed") {
-      throw new ConflictException("survey_closed");
     }
     if (submission.status === "fee_payer_only") {
       throw new ForbiddenException("fee_payer_only");
@@ -121,9 +182,6 @@ export class SurveyResponsesService {
     if (survey.opensAt && isoToMs(survey.opensAt) > now) {
       throw new ConflictException("survey_not_open_yet");
     }
-    if (survey.closesAt && isoToMs(survey.closesAt) <= now) {
-      throw new ConflictException("survey_closed");
-    }
 
     if (survey.feePayersOnly) {
       const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
@@ -131,6 +189,11 @@ export class SurveyResponsesService {
         throw new ForbiddenException("fee_payer_only");
       }
     }
+
+    const questions = this.sectionsRepo && this.questionsRepo
+      ? await this.loadQuestions(surveyId)
+      : [];
+    await this.validateUploadedAssets(dto.answers, caller.id, questions);
 
     const existing = await this.responsesRepo.findByUserAndSurvey(surveyId, caller.id);
     if (!existing) throw new NotFoundException("response_not_found");
@@ -154,9 +217,6 @@ export class SurveyResponsesService {
     if (update.status === "survey_not_open_yet") {
       throw new ConflictException("survey_not_open_yet");
     }
-    if (update.status === "survey_closed") {
-      throw new ConflictException("survey_closed");
-    }
     if (update.status === "fee_payer_only") {
       throw new ForbiddenException("fee_payer_only");
     }
@@ -167,6 +227,15 @@ export class SurveyResponsesService {
       throw new ConflictException("multiple_response_edit_not_supported");
     }
     throw new NotFoundException("response_not_found");
+  }
+
+  private async loadQuestions(surveyId: string): Promise<SurveyQuestionRecord[]> {
+    if (!this.questionsRepo) return [];
+    const sections = await this.sectionsRepo!.findBySurveyId(surveyId);
+    const questions = await Promise.all(
+      sections.map((section) => this.questionsRepo!.findBySectionId(section.id)),
+    );
+    return questions.flat();
   }
 
   async findAll(surveyId: string): Promise<SurveyResponseRecord[]> {

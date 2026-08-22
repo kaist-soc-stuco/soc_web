@@ -3,10 +3,14 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import type {
   CommentCreateRequest,
   CommentCreateResponse,
+  CommentDeleteResponse,
+  CommentEngagementKind,
+  CommentEngagementResponse,
   CommentItem,
+  CommentReportRequest,
+  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
-  CommentDeleteResponse,
 } from "@soc/contracts";
 
 import {
@@ -15,6 +19,8 @@ import {
 } from "../../../infrastructure/postgres/postgres.provider";
 import {
   articles,
+  commentEngagements,
+  commentReports,
   comments,
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
@@ -29,6 +35,7 @@ export class CommentRepository {
     articleId: string,
     page: number,
     limit: number,
+    viewerUserId?: string,
   ): Promise<{ items: CommentItem[]; total: number }> {
     const offset = (page - 1) * limit;
     const baseFilter = and(
@@ -41,6 +48,30 @@ export class CommentRepository {
       .from(comments)
       .where(baseFilter);
 
+    const likeCount = sql<number>`(
+      select count(*)
+      from ${commentEngagements}
+      where ${commentEngagements.commentId} = ${comments.commentId}
+        and ${commentEngagements.kind} = 'LIKE'
+    )`;
+    const viewerHasLiked = viewerUserId
+      ? sql<boolean>`exists (
+          select 1
+          from ${commentEngagements}
+          where ${commentEngagements.commentId} = ${comments.commentId}
+            and ${commentEngagements.userId} = ${viewerUserId}
+            and ${commentEngagements.kind} = 'LIKE'
+        )`
+      : sql<boolean>`false`;
+    const viewerHasReported = viewerUserId
+      ? sql<boolean>`exists (
+          select 1
+          from ${commentReports}
+          where ${commentReports.commentId} = ${comments.commentId}
+            and ${commentReports.reporterUserId} = ${viewerUserId}
+        )`
+      : sql<boolean>`false`;
+
     const rows = await this.db
       .select({
         commentId: comments.commentId,
@@ -52,6 +83,9 @@ export class CommentRepository {
         updatedAt: comments.updatedAt,
         authorId: users.userId,
         authorName: users.nameKo,
+        likeCount,
+        viewerHasLiked,
+        viewerHasReported,
       })
       .from(comments)
       .leftJoin(users, eq(comments.authorUserId, users.userId))
@@ -74,7 +108,144 @@ export class CommentRepository {
           userId: String(row.authorId ?? ""),
           name: row.authorName ?? "unknown",
         },
+        likeCount: Number(row.likeCount ?? 0),
+        viewerHasLiked: Boolean(row.viewerHasLiked),
+        viewerHasReported: Boolean(row.viewerHasReported),
       })),
+    };
+  }
+
+  async setCommentEngagement(
+    commentId: string,
+    userId: string,
+    kind: CommentEngagementKind,
+    active: boolean,
+  ): Promise<CommentEngagementResponse> {
+    const normalizedCommentId = Number(commentId);
+    const now = nowDate();
+
+    if (active) {
+      await this.db
+        .insert(commentEngagements)
+        .values({
+          commentId: normalizedCommentId,
+          userId,
+          kind,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            commentEngagements.commentId,
+            commentEngagements.userId,
+            commentEngagements.kind,
+          ],
+          set: { updatedAt: now },
+        });
+    } else {
+      await this.db
+        .delete(commentEngagements)
+        .where(
+          and(
+            eq(commentEngagements.commentId, normalizedCommentId),
+            eq(commentEngagements.userId, userId),
+            eq(commentEngagements.kind, kind),
+          ),
+        );
+    }
+
+    const summary = await this.getCommentEngagementSummary(commentId, userId);
+    return {
+      commentId,
+      kind,
+      active: summary.viewerHasLiked,
+      likeCount: summary.likeCount,
+      viewerHasLiked: summary.viewerHasLiked,
+      viewerHasReported: summary.viewerHasReported,
+    };
+  }
+
+  async getCommentEngagementSummary(
+    commentId: string,
+    userId: string,
+  ): Promise<Pick<CommentEngagementResponse, "likeCount" | "viewerHasLiked" | "viewerHasReported">> {
+    const normalizedCommentId = Number(commentId);
+    const [countResult] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(commentEngagements)
+      .where(
+        and(
+          eq(commentEngagements.commentId, normalizedCommentId),
+          eq(commentEngagements.kind, "LIKE"),
+        ),
+      );
+    const [likeResult] = await this.db
+      .select({ commentId: commentEngagements.commentId })
+      .from(commentEngagements)
+      .where(
+        and(
+          eq(commentEngagements.commentId, normalizedCommentId),
+          eq(commentEngagements.userId, userId),
+          eq(commentEngagements.kind, "LIKE"),
+        ),
+      )
+      .limit(1);
+    const [reportResult] = await this.db
+      .select({ reportId: commentReports.reportId })
+      .from(commentReports)
+      .where(
+        and(
+          eq(commentReports.commentId, normalizedCommentId),
+          eq(commentReports.reporterUserId, userId),
+        ),
+      )
+      .limit(1);
+
+    return {
+      likeCount: Number(countResult?.count ?? 0),
+      viewerHasLiked: Boolean(likeResult),
+      viewerHasReported: Boolean(reportResult),
+    };
+  }
+
+  async reportComment(
+    commentId: string,
+    reporterUserId: string,
+    payload: CommentReportRequest,
+  ): Promise<CommentReportResponse> {
+    const [created] = await this.db
+      .insert(commentReports)
+      .values({
+        commentId: Number(commentId),
+        reporterUserId,
+        reason: payload.reason?.trim() || null,
+      })
+      .onConflictDoNothing()
+      .returning({ reportId: commentReports.reportId });
+
+    if (created) {
+      return {
+        commentId,
+        reported: true,
+        reportId: String(created.reportId),
+      };
+    }
+
+    const [existing] = await this.db
+      .select({ reportId: commentReports.reportId })
+      .from(commentReports)
+      .where(
+        and(
+          eq(commentReports.commentId, Number(commentId)),
+          eq(commentReports.reporterUserId, reporterUserId),
+        ),
+      )
+      .limit(1);
+
+    return {
+      commentId,
+      reported: true,
+      reportId: String(existing?.reportId ?? ""),
     };
   }
 
@@ -113,12 +284,14 @@ export class CommentRepository {
   async findById(commentId: string): Promise<{
     commentId: string;
     articleId: string;
+    parentCommentId: string | null;
     status: string;
   } | null> {
     const row = await this.db
       .select({
         commentId: comments.commentId,
         articleId: comments.articleId,
+        parentCommentId: comments.parentCommentId,
         status: comments.status,
       })
       .from(comments)
@@ -130,6 +303,9 @@ export class CommentRepository {
     return {
       commentId: String(row[0].commentId),
       articleId: String(row[0].articleId),
+      parentCommentId: row[0].parentCommentId
+        ? String(row[0].parentCommentId)
+        : null,
       status: row[0].status,
     };
   }
@@ -159,6 +335,60 @@ export class CommentRepository {
     return {
       commentId: String(created.commentId),
       createdAt: msToIso(created.createdAt.valueOf()),
+    };
+  }
+
+  async findNotificationTargets(commentId: string): Promise<{
+    articleId: string;
+    articleAuthorUserId: string;
+    articleTitleKo: string;
+    boardCode: string;
+    parentCommentAuthorUserId: string | null;
+    isReply: boolean;
+  } | null> {
+    const [comment] = await this.db
+      .select({
+        articleId: comments.articleId,
+        parentCommentId: comments.parentCommentId,
+      })
+      .from(comments)
+      .where(eq(comments.commentId, Number(commentId)))
+      .limit(1);
+
+    if (!comment) return null;
+
+    const [article] = await this.db
+      .select({
+        articleAuthorUserId: articles.authorUserId,
+        articleId: articles.articleId,
+        articleTitleKo: articles.titleKo,
+        boardCode: sql<string>`(
+          select code from board where board_id = ${articles.boardId} limit 1
+        )`,
+      })
+      .from(articles)
+      .where(eq(articles.articleId, comment.articleId))
+      .limit(1);
+
+    if (!article) return null;
+
+    let parentCommentAuthorUserId: string | null = null;
+    if (comment.parentCommentId) {
+      const [parent] = await this.db
+        .select({ authorUserId: comments.authorUserId })
+        .from(comments)
+        .where(eq(comments.commentId, comment.parentCommentId))
+        .limit(1);
+      parentCommentAuthorUserId = parent?.authorUserId ?? null;
+    }
+
+    return {
+      articleId: String(article.articleId),
+      articleAuthorUserId: String(article.articleAuthorUserId),
+      articleTitleKo: article.articleTitleKo,
+      boardCode: article.boardCode,
+      parentCommentAuthorUserId,
+      isReply: Boolean(comment.parentCommentId),
     };
   }
 

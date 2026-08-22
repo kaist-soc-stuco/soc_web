@@ -1,6 +1,6 @@
 import { Header } from '@/components/organisms/header';
-import { Footer } from '@/components/organisms/footer';
 import { useLanguage } from '@/hooks/use-language';
+import { PageHeader, PageMain, PageShell } from '@/components/ui/page-layout';
 
 const privacySections = [
   {
@@ -33,25 +33,17 @@ export function PrivacyPage() {
   const { lang } = useLanguage();
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50/50">
-      <Header showLogo />
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-10 md:px-8">
-        <section className="border-b border-slate-200 pb-5">
-          <h1 className="text-2xl font-black tracking-tight text-kaist-black">
-            {lang === 'ko' ? '개인정보처리방침' : 'Privacy Policy'}
-          </h1>
-          <p className="mt-2 text-sm font-semibold text-kaist-grey">
-            {lang === 'ko'
-              ? '전산학부 학생회 사이트 운영에 필요한 개인정보 처리 기준을 안내합니다.'
-              : 'Learn how the School of Computing Student Council website handles personal information.'}
-          </p>
-        </section>
+    <PageShell>
+      <Header />
+      <PageMain>
+        <PageHeader title={lang === 'ko' ? '개인정보처리방침' : 'Privacy Policy'} />
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7">
+        <section className="mx-auto w-full max-w-[1200px] px-5 pb-8 md:px-8">
+          <div className="rounded-lg border border-slate-200 bg-white p-5 md:p-7">
           <div className="divide-y divide-slate-100">
             {privacySections.map((section) => (
               <article key={section.titleEn} className="grid gap-2 py-4 first:pt-0 last:pb-0 md:grid-cols-[10rem_1fr]">
-                <h2 className="text-sm font-extrabold text-kaist-black">
+                <h2 className="text-sm font-semibold text-kaist-black">
                   {lang === 'ko' ? section.titleKo : section.titleEn}
                 </h2>
                 <p className="text-sm leading-6 text-slate-600">
@@ -60,9 +52,9 @@ export function PrivacyPage() {
               </article>
             ))}
           </div>
+          </div>
         </section>
-      </main>
-      <Footer />
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }

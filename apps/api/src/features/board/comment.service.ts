@@ -8,7 +8,11 @@ import type {
   CommentCreateRequest,
   CommentCreateResponse,
   CommentDeleteResponse,
+  CommentEngagementKind,
+  CommentEngagementResponse,
   CommentListResponse,
+  CommentReportRequest,
+  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
@@ -20,6 +24,7 @@ import { CommentRepository } from "./repositories/comment.repository";
 import { getReadableArticleScopes } from "./article-access";
 import { assertBoardReadable, type CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "./board.constants";
+import { NotificationsService } from "../notifications/notifications.service";
 
 interface CommentQueryParams {
   page?: number;
@@ -40,6 +45,7 @@ export class CommentService {
     private readonly boardRepository: BoardRepository,
     private readonly articleRepository: ArticleRepository,
     private readonly commentRepository: CommentRepository,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getComments(
@@ -74,6 +80,7 @@ export class CommentService {
       articleId,
       page,
       limit,
+      currentUser.user?.id,
     );
 
     return {
@@ -82,6 +89,39 @@ export class CommentService {
       total: result.total,
       items: result.items,
     };
+  }
+
+  async setCommentEngagement(
+    code: string,
+    articleId: string,
+    commentId: string,
+    rawKind: string,
+    active: boolean,
+    user: AuthenticatedUser,
+  ): Promise<CommentEngagementResponse> {
+    const kind = rawKind.toUpperCase() as CommentEngagementKind;
+    if (kind !== "LIKE") {
+      throw new BadRequestException("unsupported_comment_engagement");
+    }
+
+    await this.assertCommentActionAllowed(code, articleId, commentId, user);
+    return this.commentRepository.setCommentEngagement(
+      commentId,
+      user.id,
+      kind,
+      active,
+    );
+  }
+
+  async reportComment(
+    code: string,
+    articleId: string,
+    commentId: string,
+    payload: CommentReportRequest,
+    user: AuthenticatedUser,
+  ): Promise<CommentReportResponse> {
+    await this.assertCommentActionAllowed(code, articleId, commentId, user);
+    return this.commentRepository.reportComment(commentId, user.id, payload);
   }
 
   async createComment(
@@ -137,13 +177,30 @@ export class CommentService {
       ) {
         throw new BadRequestException("parent_comment_invalid");
       }
+
+      if (parent.parentCommentId) {
+        throw new BadRequestException("nested_reply_not_allowed");
+      }
     }
 
-    return this.commentRepository.createComment({
+    const created = await this.commentRepository.createComment({
       articleId,
       authorUserId: user.id,
       payload,
     });
+
+    const notificationTargets = await this.commentRepository.findNotificationTargets(
+      created.commentId,
+    );
+    if (notificationTargets) {
+      await this.notificationsService.notifyCommentCreated({
+        ...notificationTargets,
+        actorUserId: user.id,
+        commentId: created.commentId,
+      });
+    }
+
+    return created;
   }
 
   async updateComment(
@@ -237,5 +294,38 @@ export class CommentService {
     }
 
     return this.commentRepository.softDeleteComment(commentId);
+  }
+
+  private async assertCommentActionAllowed(
+    code: string,
+    articleId: string,
+    commentId: string,
+    user: AuthenticatedUser,
+  ): Promise<void> {
+    const board = await this.boardRepository.findByCode(code);
+
+    if (!board || !board.isActive) {
+      throw new NotFoundException("board_not_found");
+    }
+
+    const articleReadable = await this.articleRepository.isReadableArticle(
+      board.boardId,
+      articleId,
+      getReadableArticleScopes({ authenticated: true, user }),
+    );
+
+    if (!articleReadable) {
+      throw new NotFoundException("article_not_found");
+    }
+
+    const comment = await this.commentRepository.findPermissionInfo(
+      commentId,
+      articleId,
+      board.boardId,
+    );
+
+    if (!comment || comment.status === COMMENT_STATUS.DELETED) {
+      throw new NotFoundException("comment_not_found");
+    }
   }
 }

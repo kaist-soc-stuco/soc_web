@@ -1,27 +1,19 @@
 import type {
+  ArticleDraftListResponse,
   CurrentUserResponse,
   MyActivityListResponse,
   MyArticleListResponse,
   MyCommentListResponse,
+  MyScrapListResponse,
   MySurveyResponseListResponse,
 } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  ClipboardCheck,
-  Clock3,
-  FileText,
-  MessageCircle,
-  User,
-  type LucideIcon,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Clock3, FileText } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { clearStoredAuthState } from "@/lib/auth-storage";
-import { getTemporaryAuthRequest } from "@/lib/auth-session";
 import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 import {
@@ -40,15 +32,14 @@ export type ActivityItem = {
   type: "survey" | "post" | "comment";
 };
 
-export type ActivityTab = "all" | "survey" | "post" | "comment";
-export type MyPageMenu = "overview" | "profile" | "activity";
-
-export type MyPageStat = {
-  color: string;
-  icon: LucideIcon;
-  label: string;
-  value: number;
-};
+export type ActivityTab =
+  | "all"
+  | "survey"
+  | "post"
+  | "comment"
+  | "scraps"
+  | "drafts";
+export type MyPageMenu = "profile" | "activity";
 
 const MY_PAGE_LIMIT = 20;
 const ITEMS_PER_PAGE = 10;
@@ -64,13 +55,14 @@ export function useMyPageController() {
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  const queryClient = useQueryClient();
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { lang } = useLanguage();
 
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
   const [articles, setArticles] = useState<MyArticleListResponse | null>(null);
+  const [drafts, setDrafts] = useState<ArticleDraftListResponse | null>(null);
   const [comments, setComments] = useState<MyCommentListResponse | null>(null);
+  const [scraps, setScraps] = useState<MyScrapListResponse | null>(null);
   const [surveyResponses, setSurveyResponses] =
     useState<MySurveyResponseListResponse | null>(null);
   const [activities, setActivities] = useState<MyActivityListResponse | null>(
@@ -78,9 +70,13 @@ export function useMyPageController() {
   );
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeMenu, setActiveMenu] = useState<MyPageMenu>("overview");
+  const [activeMenu, setActiveMenu] = useState<MyPageMenu>("profile");
   const [activeTab, setActiveTab] = useState<ActivityTab>("all");
+  const [displayedActivityTab, setDisplayedActivityTab] =
+    useState<ActivityTab>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [activityQuery, setActivityQuery] = useState("");
+  const hasLoadedDataRef = useRef(false);
 
   const canUseMyPage = hasPersistedProfile(session ?? null);
 
@@ -88,9 +84,13 @@ export function useMyPageController() {
     if (!canUseMyPage) {
       setUser(null);
       setArticles(null);
+      setDrafts(null);
       setComments(null);
+      setScraps(null);
       setSurveyResponses(null);
       setActivities(null);
+      setDisplayedActivityTab("all");
+      hasLoadedDataRef.current = false;
       setLoading(false);
       setLoadError(null);
       return;
@@ -98,12 +98,15 @@ export function useMyPageController() {
 
     let cancelled = false;
     const isActivityView = activeMenu === "activity";
-    const activeListPage = isActivityView ? currentPage : 1;
-    const activeListLimit = isActivityView ? ITEMS_PER_PAGE : OVERVIEW_LIMIT;
+    const isListView = isActivityView;
+    const activeListPage = isListView ? currentPage : 1;
+    const activeListLimit = isListView ? ITEMS_PER_PAGE : OVERVIEW_LIMIT;
     const activityPage = activeTab === "all" ? activeListPage : 1;
     const articlePage = activeTab === "post" ? activeListPage : 1;
     const commentPage = activeTab === "comment" ? activeListPage : 1;
     const surveyPage = activeTab === "survey" ? activeListPage : 1;
+    const scrapPage = activeTab === "scraps" ? activeListPage : 1;
+    const draftPage = activeTab === "drafts" ? activeListPage : 1;
 
     setLoading(true);
     setLoadError(null);
@@ -113,48 +116,68 @@ export function useMyPageController() {
       apiClient.getMyActivities({
         limit: activeTab === "all" ? activeListLimit : OVERVIEW_LIMIT,
         page: activityPage,
+        q: activityQuery,
       }),
       apiClient.getMyArticles({
         limit: activeTab === "post" ? activeListLimit : MY_PAGE_LIMIT,
         page: articlePage,
+        q: activityQuery,
+      }),
+      apiClient.getArticleDrafts({
+        limit: activeTab === "drafts" ? ITEMS_PER_PAGE : 20,
+        page: draftPage,
       }),
       apiClient.getMyComments({
         limit: activeTab === "comment" ? activeListLimit : MY_PAGE_LIMIT,
         page: commentPage,
+        q: activityQuery,
       }),
       apiClient.getMySurveyResponses({
         limit: activeTab === "survey" ? activeListLimit : MY_PAGE_LIMIT,
         page: surveyPage,
+        q: activityQuery,
       }),
+      apiClient.getMyScraps({ limit: ITEMS_PER_PAGE, page: scrapPage }),
     ])
       .then(
         ([
           fetchedUser,
           fetchedActivities,
           fetchedArticles,
+          fetchedDrafts,
           fetchedComments,
           fetchedSurveyResponses,
+          fetchedScraps,
         ]) => {
           if (cancelled) return;
           setUser(fetchedUser);
           setActivities(fetchedActivities);
           setArticles(fetchedArticles);
+          setDrafts(fetchedDrafts);
           setComments(fetchedComments);
           setSurveyResponses(fetchedSurveyResponses);
+          setScraps(fetchedScraps);
+          setDisplayedActivityTab(activeTab);
+          hasLoadedDataRef.current = true;
         },
       )
       .catch(() => {
         if (cancelled) return;
-        setUser(null);
-        setActivities({ items: [], limit: OVERVIEW_LIMIT, page: 1, total: 0 });
-        setArticles({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
-        setComments({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
-        setSurveyResponses({
-          items: [],
-          limit: MY_PAGE_LIMIT,
-          page: 1,
-          total: 0,
-        });
+        if (!hasLoadedDataRef.current) {
+          setUser(null);
+          setActivities({ items: [], limit: OVERVIEW_LIMIT, page: 1, total: 0 });
+          setArticles({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
+          setDrafts({ items: [], limit: 20, page: 1, total: 0 });
+          setComments({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
+          setScraps({ items: [], limit: ITEMS_PER_PAGE, page: 1, total: 0 });
+          setSurveyResponses({
+            items: [],
+            limit: MY_PAGE_LIMIT,
+            page: 1,
+            total: 0,
+          });
+          hasLoadedDataRef.current = true;
+        }
         setLoadError(
           lang === "ko"
             ? "마이페이지 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
@@ -168,7 +191,15 @@ export function useMyPageController() {
     return () => {
       cancelled = true;
     };
-  }, [activeMenu, activeTab, apiClient, canUseMyPage, currentPage, lang]);
+  }, [
+    activeMenu,
+    activeTab,
+    activityQuery,
+    apiClient,
+    canUseMyPage,
+    currentPage,
+    lang,
+  ]);
 
   const displayName = useMemo(() => {
     if (!user?.user) {
@@ -183,17 +214,19 @@ export function useMyPageController() {
   const hasLoadedMyPageData =
     user !== null ||
     articles !== null ||
+    drafts !== null ||
     comments !== null ||
+    scraps !== null ||
     surveyResponses !== null ||
     activities !== null ||
     loadError !== null;
   const initialLoading =
     sessionLoading || (canUseMyPage && loading && !hasLoadedMyPageData);
-  const isContentRefreshing =
-    canUseMyPage && loading && hasLoadedMyPageData;
   const isAdmin = hasAdminPermission(userInfo?.permission);
   const articleItems = articles?.items ?? [];
+  const draftItems = drafts?.items ?? [];
   const commentItems = comments?.items ?? [];
+  const scrapItems = scraps?.items ?? [];
   const surveyItems = surveyResponses?.items ?? [];
 
   const allActivities = useMemo<ActivityItem[]>(() => {
@@ -266,14 +299,14 @@ export function useMyPageController() {
   );
 
   const filteredActivities = useMemo(() => {
-    if (activeTab === "all") return allActivities;
-    if (activeTab === "survey") return surveyActivities;
-    if (activeTab === "post") return postActivities;
+    if (displayedActivityTab === "all") return allActivities;
+    if (displayedActivityTab === "survey") return surveyActivities;
+    if (displayedActivityTab === "post") return postActivities;
     return commentActivities;
   }, [
-    activeTab,
     allActivities,
     commentActivities,
+    displayedActivityTab,
     postActivities,
     surveyActivities,
   ]);
@@ -283,84 +316,47 @@ export function useMyPageController() {
   const commentTotal = comments?.total ?? commentItems.length;
   const surveyTotal = surveyResponses?.total ?? surveyItems.length;
   const selectedTotal =
-    activeTab === "all"
-      ? activityTotal
-      : activeTab === "survey"
-        ? surveyTotal
-        : activeTab === "post"
-          ? articleTotal
-          : commentTotal;
+    displayedActivityTab === "scraps"
+      ? scraps?.total ?? scrapItems.length
+      : displayedActivityTab === "drafts"
+        ? drafts?.total ?? draftItems.length
+        : displayedActivityTab === "all"
+        ? activityTotal
+        : displayedActivityTab === "survey"
+          ? surveyTotal
+          : displayedActivityTab === "post"
+            ? articleTotal
+            : commentTotal;
   const totalPages = Math.max(1, Math.ceil(selectedTotal / ITEMS_PER_PAGE));
 
-  const stats: MyPageStat[] = [
-    {
-      label: lang === "ko" ? "설문 참여" : "Survey responses",
-      value: surveyTotal,
-      icon: ClipboardCheck,
-      color: "text-emerald-600 bg-emerald-50 border-emerald-100/50",
-    },
-    {
-      label: lang === "ko" ? "최근 활동" : "Recent activity",
-      value: activityTotal,
-      icon: Clock3,
-      color: "text-blue-600 bg-blue-50 border-blue-100/50",
-    },
-    {
-      label: lang === "ko" ? "작성한 글" : "Posts",
-      value: articleTotal,
-      icon: FileText,
-      color: "text-indigo-600 bg-indigo-50 border-indigo-100/50",
-    },
-    {
-      label: lang === "ko" ? "작성한 댓글" : "Comments",
-      value: commentTotal,
-      icon: MessageCircle,
-      color: "text-slate-600 bg-slate-50 border-slate-200/50",
-    },
-  ];
-
   const menuItems = [
-    { id: "overview", label: lang === "ko" ? "개요" : "Overview", icon: User },
     { id: "profile", label: lang === "ko" ? "내 정보" : "Profile", icon: FileText },
     { id: "activity", label: lang === "ko" ? "활동 내역" : "Activity", icon: Clock3 },
   ] as const;
 
-  const handleLogout = async () => {
-    await apiClient.logout(getTemporaryAuthRequest());
-    clearStoredAuthState();
-    await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-    window.location.assign("/");
-  };
-
-  const showAllActivities = () => {
-    setActiveMenu("activity");
-    setActiveTab("all");
-    setCurrentPage(1);
-  };
-
   return {
     activeMenu,
     activeTab,
-    allActivities,
+    activityQuery,
     canUseMyPage,
     currentPage,
     displayName,
+    displayedActivityTab,
     filteredActivities,
-    handleLogout,
+    drafts: draftItems,
     initialLoading,
     isAdmin,
-    isContentRefreshing,
     lang,
     loadError,
     loading,
     menuItems,
     session,
     sessionLoading,
+    scraps: scrapItems,
+    setActivityQuery,
     setActiveMenu,
     setActiveTab,
     setCurrentPage,
-    showAllActivities,
-    stats,
     totalPages,
     userInfo,
   };

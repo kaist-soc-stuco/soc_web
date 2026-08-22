@@ -1,17 +1,25 @@
 import { createApiClient } from "@soc/api-client";
 import type { AdminUserListResponse, AdminUserRecord } from "@soc/contracts";
-import { isoToDate } from "@soc/shared";
-import { ArrowDown, Search } from "lucide-react";
+import { isoToDate, nowMs } from "@soc/shared";
+import { UserRoundCheck, UserRoundX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { Pagination } from "@/components/ui/pagination";
+import { AdminDataTable, AdminSortableHead, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
+import { AdminDrawer } from "@/components/ui/admin-drawer";
+import { AdminCardHeader, AdminEmptyState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
+import { Button } from "@/components/ui/button";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
+import { PageSearchField } from "@/components/ui/page-layout";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
 
-type UserSortBy = "name" | "studentId" | "status" | "lastLoginAt" | "createdAt";
+type UserSortBy = "name" | "lastLoginAt";
 type SortDirection = "asc" | "desc";
 type UserStatusFilter = "all" | "active" | "inactive";
 
@@ -30,11 +38,32 @@ const formatShortDateTime = (value?: string | null) => {
 
 const displayStudentId = (user: AdminUserRecord) => user.stdNo ?? user.kaistUid;
 
+const formatRelativeTime = (value?: string | null) => {
+  if (!value) return "기록 없음";
+  const date = isoToDate(value);
+  if (Number.isNaN(date.getTime())) return "기록 없음";
+
+  const elapsedSeconds = Math.max(0, Math.floor((nowMs() - date.getTime()) / 1000));
+  if (elapsedSeconds < 60) return "방금 전";
+  const minutes = Math.floor(elapsedSeconds / 60);
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}일 전`;
+  const weeks = Math.floor(days / 7);
+  if (days < 30) return `${weeks}주 전`;
+  const months = Math.floor(days / 30);
+  if (days < 365) return `${months}개월 전`;
+  return `${Math.floor(days / 365)}년 전`;
+};
+
 export function UserManagementPage() {
   const client = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
+  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const [data, setData] = useState<AdminUserListResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +73,10 @@ export function UserManagementPage() {
   const [sortBy, setSortBy] = useState<UserSortBy>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(20);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [selectedUser, setSelectedUser] = useState<AdminUserRecord | null>(null);
 
   const canManageUsers = Permissions.has(
     session?.permission ?? 0,
@@ -72,8 +104,7 @@ export function UserManagementPage() {
       })
       .catch(() => {
         if (!cancelled) {
-          setData(null);
-          setError("유저 목록을 불러오지 못했습니다.");
+          setError("사용자 목록을 불러오지 못했습니다.");
         }
       })
       .finally(() => {
@@ -89,6 +120,7 @@ export function UserManagementPage() {
     currentPage,
     pageSize,
     query,
+    refreshVersion,
     sessionLoading,
     sortBy,
     sortDirection,
@@ -97,6 +129,9 @@ export function UserManagementPage() {
 
   const totalCount = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(totalCount, currentPage * pageSize);
+  const showInitialLoading = loading && !data;
 
   const handleSortChange = (nextSortBy: UserSortBy) => {
     if (sortBy === nextSortBy) {
@@ -110,220 +145,269 @@ export function UserManagementPage() {
     setCurrentPage(1);
   };
 
+  const handleToggleActive = async (user: AdminUserRecord) => {
+    const isDeactivation = user.isActive;
+    const confirmed = await requestConfirm({
+      title: isDeactivation
+        ? `${user.nameKo} 계정을 비활성화할까요?`
+        : `${user.nameKo} 계정을 복구할까요?`,
+      confirmLabel: isDeactivation ? "비활성화" : "복구",
+      tone: isDeactivation ? "danger" : "default",
+    });
+    if (!confirmed) return;
+
+    setUpdatingUserId(user.userId);
+    setError(null);
+    try {
+      const result = await client.updateUserActiveStatus(user.userId, {
+        isActive: !user.isActive,
+      });
+      setSelectedUser((current) => current?.userId === user.userId ? { ...current, isActive: result.isActive } : current);
+      if (result.isActive !== user.isActive) setRefreshVersion((version) => version + 1);
+    } catch {
+      setError("유저 상태를 변경하지 못했습니다.");
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
   return (
     <AuthGuard requirePermission={Permissions.ADMIN}>
-      <div className="min-h-screen bg-slate-50/50 pb-20 text-slate-950">
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
-          <header className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center">
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-800">
-                유저 관리
-              </h1>
-              <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-400">
-                저장된 회원 프로필과 활동 가능 상태를 확인합니다.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-bold">
-              <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-700">
-                전체 {totalCount}명
-              </span>
-            </div>
-          </header>
+      <AdminPageShell>
+        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+          <AdminPageHeader title="유저 관리" />
 
-          <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="relative min-w-0 flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[13px] font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-                  placeholder="이름, 학번, 이메일, 소속 검색"
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {[
-                  { key: "all", label: "전체" },
-                  { key: "active", label: "활성" },
-                  { key: "inactive", label: "비활성" },
-                ].map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter(item.key as UserStatusFilter);
-                      setCurrentPage(1);
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-xs font-black transition ${
-                      statusFilter === item.key
-                        ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
+          <AdminTableCard aria-busy={loading}>
+            <AdminCardHeader className="items-center gap-4">
+              <SegmentedControl<UserStatusFilter>
+                ariaLabel="사용자 상태"
+                role="tablist"
+                options={[
+                  { value: "all", label: "전체" },
+                  { value: "active", label: "활성" },
+                  { value: "inactive", label: "비활성" },
+                ]}
+                value={statusFilter}
+                onChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
+              />
+              <PageSearchField
+                ariaLabel="사용자 검색"
+                className="w-full md:w-72 lg:w-80"
+                onChange={(value) => {
+                  setQuery(value);
+                  setCurrentPage(1);
+                }}
+                onClear={() => {
+                  setQuery("");
+                  setCurrentPage(1);
+                }}
+                placeholder="이름, 학번, 이메일, 소속 검색"
+                value={query}
+              />
+            </AdminCardHeader>
 
-          <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-            {loading ? (
-              <TableSkeleton columns={7} rows={8} />
-            ) : error ? (
-              <div className="m-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {error && data ? (
+              <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm font-medium text-rose-700">
+                {error}
+              </div>
+            ) : null}
+
+            {showInitialLoading ? (
+              <TableSkeleton columns={6} rows={8} />
+            ) : error && !data ? (
+              <div className="m-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
                 {error}
               </div>
             ) : (data?.items ?? []).length === 0 ? (
-              <div className="px-6 py-16 text-center text-sm font-bold text-slate-400">
-                조건에 맞는 유저가 없습니다.
-              </div>
+              <AdminEmptyState message="조건에 맞는 사용자가 없습니다." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse text-[13px]">
-                  <thead className="bg-slate-50/50 text-xs font-extrabold text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3 text-left">
-                        <SortableHeader
-                          active={sortBy === "name"}
-                          ascending={sortBy === "name" && sortDirection === "asc"}
-                          label="이름"
-                          onClick={() => handleSortChange("name")}
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <SortableHeader
-                          active={sortBy === "studentId"}
-                          ascending={
-                            sortBy === "studentId" && sortDirection === "asc"
+              <AdminDataTable minWidth={1080}>
+                <colgroup>
+                  <col style={{ width: 220 }} />
+                  <col style={{ width: 140 }} />
+                  <col style={{ width: 260 }} />
+                  <col style={{ width: 240 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 150 }} />
+                </colgroup>
+                <AdminTableHeader>
+                  <tr>
+                    <AdminSortableHead
+                      active={sortBy === "name"}
+                      ascending={sortBy === "name" && sortDirection === "asc"}
+                      onClick={() => handleSortChange("name")}
+                    >
+                      이름
+                    </AdminSortableHead>
+                    <AdminTableHead>학번</AdminTableHead>
+                    <AdminTableHead>이메일</AdminTableHead>
+                    <AdminTableHead>소속 · 전공</AdminTableHead>
+                    <AdminTableHead>상태</AdminTableHead>
+                    <AdminSortableHead
+                      active={sortBy === "lastLoginAt"}
+                      ascending={sortBy === "lastLoginAt" && sortDirection === "asc"}
+                      onClick={() => handleSortChange("lastLoginAt")}
+                    >
+                      최근 접속
+                    </AdminSortableHead>
+                  </tr>
+                </AdminTableHeader>
+                <AdminTableBody>
+                  {(data?.items ?? []).map((user) => {
+                    const major = [user.primaryMajor, user.doubleMajor, user.minor]
+                      .filter(Boolean)
+                      .join(" / ");
+
+                    return (
+                      <tr
+                        key={user.userId}
+                        tabIndex={0}
+                        aria-label={`${user.nameKo} 사용자 상세 정보 열기`}
+                        className="cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none"
+                        onClick={() => setSelectedUser(user)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedUser(user);
                           }
-                          label="학번"
-                          onClick={() => handleSortChange("studentId")}
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left">이메일</th>
-                      <th className="px-4 py-3 text-left">소속</th>
-                      <th className="px-4 py-3 text-left">
-                        <SortableHeader
-                          active={sortBy === "status"}
-                          ascending={
-                            sortBy === "status" && sortDirection === "asc"
-                          }
-                          label="상태"
-                          onClick={() => handleSortChange("status")}
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <SortableHeader
-                          active={sortBy === "lastLoginAt"}
-                          ascending={
-                            sortBy === "lastLoginAt" &&
-                            sortDirection === "asc"
-                          }
-                          label="최근 로그인"
-                          onClick={() => handleSortChange("lastLoginAt")}
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <SortableHeader
-                          active={sortBy === "createdAt"}
-                          ascending={
-                            sortBy === "createdAt" && sortDirection === "asc"
-                          }
-                          label="가입일"
-                          onClick={() => handleSortChange("createdAt")}
-                        />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-600">
-                    {(data?.items ?? []).map((user) => (
-                      <tr key={user.userId} className="transition hover:bg-slate-50/60">
-                        <td className="px-4 py-3">
-                          <div className="truncate text-sm font-bold text-slate-900">
-                            {user.nameKo}
-                          </div>
-                          {user.nameEn && (
-                            <div className="mt-0.5 truncate text-xs font-medium text-slate-400">
-                              {user.nameEn}
-                            </div>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-500">
+                        }}
+                      >
+                        <AdminTableCell>
+                          <div className="admin-table-text-emphasis truncate" title={user.nameKo}>{user.nameKo}</div>
+                          {user.nameEn ? <div className="admin-table-text mt-1 truncate" title={user.nameEn}>{user.nameEn}</div> : null}
+                        </AdminTableCell>
+                        <AdminTableCell className="tabular-nums text-slate-700">
                           {displayStudentId(user)}
-                        </td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">
-                          {user.email}
-                        </td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">
-                          {user.departmentKo ?? "-"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
-                              user.isActive
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-rose-200 bg-rose-50 text-rose-700"
-                            }`}
-                          >
+                        </AdminTableCell>
+                        <AdminTableCell className="truncate" title={user.email}>{user.email}</AdminTableCell>
+                        <AdminTableCell>
+                          {user.departmentKo ? <div className="truncate">{user.departmentKo}</div> : null}
+                          {major ? <div className="admin-table-text mt-1 truncate">{major}</div> : null}
+                        </AdminTableCell>
+                        <AdminTableCell>
+                          <AdminStatusBadge tone={user.isActive ? "positive" : "danger"}>
                             {user.isActive ? "활성" : "비활성"}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-500">
-                          {formatShortDateTime(user.lastLoginAt)}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-500">
-                          {formatShortDateTime(user.createdAt)}
-                        </td>
+                          </AdminStatusBadge>
+                        </AdminTableCell>
+                        <AdminTableCell>
+                          <time dateTime={user.lastLoginAt ?? undefined} title={formatShortDateTime(user.lastLoginAt)}>
+                            {formatRelativeTime(user.lastLoginAt)}
+                          </time>
+                        </AdminTableCell>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+                </AdminTableBody>
+              </AdminDataTable>
             )}
 
-            <div className="flex justify-center border-t border-slate-100 bg-slate-50/10 px-6 py-4">
-              <Pagination
-                currentPage={currentPage}
-                onPageChange={setCurrentPage}
-                totalPages={totalPages}
-              />
-            </div>
-          </section>
+            {!showInitialLoading && totalCount > 0 ? (
+              <div className="flex justify-center border-t border-slate-100 bg-slate-50/10 px-5 py-4">
+                <Pagination
+                  className="m-0 w-full"
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  pageSizeControl={
+                    <PageSizeSelect
+                      value={pageSize}
+                      onChange={(value) => {
+                        setPageSize(value);
+                        setCurrentPage(1);
+                      }}
+                    />
+                  }
+                  range={<span className="whitespace-nowrap text-sm font-normal text-[var(--j-color-text-secondary)]">총 {totalCount}건 중 {rangeStart}-{rangeEnd}</span>}
+                  totalPages={totalPages}
+                />
+              </div>
+            ) : null}
+          </AdminTableCard>
         </main>
-      </div>
+        <UserDetailDrawer
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+          onToggleActive={() => selectedUser ? void handleToggleActive(selectedUser) : undefined}
+          updating={selectedUser ? updatingUserId === selectedUser.userId : false}
+        />
+        {ConfirmDialog}
+      </AdminPageShell>
     </AuthGuard>
   );
 }
 
-function SortableHeader({
-  active,
-  ascending,
-  label,
-  onClick,
+function UserDetailDrawer({
+  onClose,
+  onToggleActive,
+  updating,
+  user,
 }: {
-  active: boolean;
-  ascending: boolean;
-  label: string;
-  onClick: () => void;
+  onClose: () => void;
+  onToggleActive: () => void;
+  updating: boolean;
+  user: AdminUserRecord | null;
 }) {
+  const major = [user?.primaryMajor, user?.doubleMajor && `복수전공 ${user.doubleMajor}`, user?.minor && `부전공 ${user.minor}`]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors ${
-        active ? "text-kaist-darkgreen" : "text-slate-500 hover:text-slate-700"
-      }`}
+    <AdminDrawer
+      open={Boolean(user)}
+      onClose={onClose}
+      title={user ? `${user.nameKo} 상세 정보` : "사용자 상세 정보"}
+      width="max-w-xl"
+      footer={user ? <div className="flex justify-end"><Button type="button" variant="outline" disabled={updating} onClick={onToggleActive}><span className="inline-flex items-center gap-2">{user.isActive ? <UserRoundX aria-hidden="true" className="size-4" /> : <UserRoundCheck aria-hidden="true" className="size-4" />}{updating ? "처리 중" : user.isActive ? "계정 비활성화" : "계정 복구"}</span></Button></div> : undefined}
     >
-      <span>{label}</span>
-      <ArrowDown
-        className={`h-3 w-3 transition-transform ${
-          ascending ? "rotate-180" : ""
-        }`}
-      />
-    </button>
+      {user ? (
+        <div className="space-y-6">
+          <section className="rounded-xl bg-slate-50 px-4 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="truncate text-lg font-semibold text-slate-950">{user.nameKo}</h3>
+                {user.nameEn ? <p className="mt-1 truncate text-sm font-normal text-slate-500">{user.nameEn}</p> : null}
+              </div>
+              <AdminStatusBadge tone={user.isActive ? "positive" : "danger"}>{user.isActive ? "활성 계정" : "비활성 계정"}</AdminStatusBadge>
+            </div>
+            <dl className="mt-4 grid gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
+              <UserDetailItem label="학번" value={displayStudentId(user)} />
+              <UserDetailItem label="KAIST UID" value={user.kaistUid} />
+              <UserDetailItem label="이메일" value={user.email} />
+              <UserDetailItem label="소속" value={user.departmentKo ?? "—"} />
+              <UserDetailItem label="전공" value={major || "—"} />
+              <UserDetailItem label="학적 상태" value={user.academicStatus ?? "—"} />
+            </dl>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">계정 상세 메타데이터</h3>
+            <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+              <UserDetailRow label="가입 일시" value={formatShortDateTime(user.createdAt)} />
+              <UserDetailRow label="최근 접속" value={formatShortDateTime(user.lastLoginAt)} />
+              <UserDetailRow label="개인정보 동의" value={user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : "미동의"} />
+              <UserDetailRow label="계정 식별 코드" value={user.identityCode ?? "—"} />
+            </dl>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">과비 납부</h3>
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
+              <span className="text-sm text-slate-600">현재 상태</span>
+              <AdminStatusBadge tone={user.feeStatus === "PAID" ? "positive" : "neutral"}>{user.feeStatus === "PAID" ? "완납" : user.feeStatus === "PARTIAL" ? "부분 납부" : user.feeStatus === "UNPAID" ? "미납" : "기록 없음"}</AdminStatusBadge>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </AdminDrawer>
   );
+}
+
+function UserDetailItem({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0"><dt className="text-xs font-medium text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-normal text-slate-900">{value}</dd></div>;
+}
+
+function UserDetailRow({ label, value }: { label: string; value: string }) {
+  return <div className="grid gap-1 px-4 py-3 sm:grid-cols-[7rem_1fr]"><dt className="text-xs font-medium text-slate-500">{label}</dt><dd className="break-words text-sm font-normal text-slate-800">{value}</dd></div>;
 }

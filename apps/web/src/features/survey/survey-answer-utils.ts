@@ -5,7 +5,27 @@ import type {
 } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
 
-export type AnswerValue = string | string[];
+export type GridAnswer = Record<string, string | string[]>;
+export interface FileAnswer {
+  assetId: string;
+  fileName: string;
+  sizeBytes?: number;
+  mimeType?: string;
+}
+export type AnswerValue =
+  | string
+  | string[]
+  | { kind: "grid"; values: GridAnswer }
+  | { kind: "file"; file: FileAnswer | null };
+
+export function emptyAnswerValue(type: QuestionType): AnswerValue {
+  if (type === "multiple_choice") return [];
+  if (type === "grid_single" || type === "grid_multiple") {
+    return { kind: "grid", values: {} };
+  }
+  if (type === "file_upload") return { kind: "file", file: null };
+  return "";
+}
 
 export function toAnswerContent(
   type: QuestionType,
@@ -20,6 +40,20 @@ export function toAnswerContent(
       return { value: value as string };
     case "multiple_choice":
       return { values: value as string[] };
+    case "grid_single":
+    case "grid_multiple":
+      return { grid: (value as { kind: "grid"; values: GridAnswer }).values };
+    case "file_upload": {
+      const file = (value as { kind: "file"; file: FileAnswer | null }).file;
+      return file
+        ? {
+            assetId: file.assetId,
+            fileName: file.fileName,
+            sizeBytes: file.sizeBytes,
+            mimeType: file.mimeType,
+          }
+        : {};
+    }
     case "date":
       return { date: value as string };
     case "time":
@@ -35,7 +69,14 @@ export function answerContentToValue(
   type: QuestionType,
   answer: SurveyAnswerRecord | undefined,
 ): AnswerValue {
-  if (!answer) return type === "multiple_choice" ? [] : "";
+  if (!answer) {
+    if (type === "multiple_choice") return [];
+    if (type === "grid_single" || type === "grid_multiple") {
+      return { kind: "grid", values: {} };
+    }
+    if (type === "file_upload") return { kind: "file", file: null };
+    return "";
+  }
   const content = answer.content;
 
   if (type === "multiple_choice") {
@@ -44,6 +85,32 @@ export function answerContentToValue(
           (value): value is string => typeof value === "string",
         )
       : [];
+  }
+  if (type === "grid_single" || type === "grid_multiple") {
+    const grid = content.grid;
+    return grid && typeof grid === "object"
+      ? { kind: "grid", values: grid as GridAnswer }
+      : { kind: "grid", values: {} };
+  }
+  if (type === "file_upload") {
+    return typeof content.assetId === "string"
+      ? {
+          kind: "file",
+          file: {
+            assetId: content.assetId,
+            fileName:
+              typeof content.fileName === "string"
+                ? content.fileName
+                : "uploaded-file",
+            sizeBytes:
+              typeof content.sizeBytes === "number"
+                ? content.sizeBytes
+                : undefined,
+            mimeType:
+              typeof content.mimeType === "string" ? content.mimeType : undefined,
+          },
+        }
+      : { kind: "file", file: null };
   }
   if (type === "short_text" || type === "long_text") {
     return typeof content.text === "string" ? content.text : "";
@@ -69,6 +136,24 @@ export function isAnswerFilled(
 ) {
   if (type === "multiple_choice") {
     return Array.isArray(value) && value.length > 0;
+  }
+  if (type === "grid_single" || type === "grid_multiple") {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      "kind" in value &&
+      value.kind === "grid" &&
+      Object.keys(value.values).length > 0
+    );
+  }
+  if (type === "file_upload") {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      "kind" in value &&
+      value.kind === "file" &&
+      Boolean(value.file?.assetId)
+    );
   }
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -133,20 +218,10 @@ export function getResponsePolicyLabel(
 }
 
 export function getScheduleLabel(survey: SurveyDetailResponse, lang: string) {
-  if (!survey.opensAt && !survey.closesAt) {
+  if (!survey.opensAt) {
     return lang === "ko" ? "상시 응답 가능" : "Always open";
   }
 
-  const opensAt = survey.opensAt ? formatSurveyDateTime(survey.opensAt) : null;
-  const closesAt = survey.closesAt
-    ? formatSurveyDateTime(survey.closesAt)
-    : null;
-
-  if (opensAt && closesAt) {
-    return lang === "ko"
-      ? `${opensAt} ~ ${closesAt}`
-      : `${opensAt} - ${closesAt}`;
-  }
-  if (opensAt) return lang === "ko" ? `${opensAt}부터` : `From ${opensAt}`;
-  return lang === "ko" ? `${closesAt}까지` : `Until ${closesAt}`;
+  const opensAt = formatSurveyDateTime(survey.opensAt);
+  return lang === "ko" ? `${opensAt}부터` : `From ${opensAt}`;
 }

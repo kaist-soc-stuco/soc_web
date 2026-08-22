@@ -23,6 +23,7 @@ import type {
 } from "./auth.types";
 import { AuthSessionRepository } from "./auth-session.repository";
 import { PendingLoginRepository } from "./pending-login.repository";
+import { AuthEligibilityService } from "./auth-eligibility.service";
 import { UsersService } from "../users/users.service";
 import {
   AUTH_ACCESS_TOKEN_TTL_SECONDS,
@@ -40,6 +41,7 @@ export class AuthSessionService {
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly pendingLoginRepository: PendingLoginRepository,
     private readonly usersService: UsersService,
+    private readonly authEligibilityService: AuthEligibilityService,
   ) {}
 
   /** JWT 서명/검증에 사용할 필수 시크릿을 반환합니다. */
@@ -276,6 +278,29 @@ export class AuthSessionService {
 
     this.assertActiveSession(session);
 
+    if (session.mode === "persisted" && session.userId) {
+      const user = await this.usersService.findById(session.userId);
+
+      if (!user) {
+        await this.authSessionRepository.revoke(session.sessionId);
+        throw new UnauthorizedException("user_not_found");
+      }
+
+      if (!user.isActive) {
+        await this.authSessionRepository.revoke(session.sessionId);
+        throw new UnauthorizedException("account_expired");
+      }
+
+      if (!this.authEligibilityService.isEligibleUser(user)) {
+        await this.usersService.expireAccount(
+          user.userId,
+          "department_not_eligible",
+        );
+        await this.authSessionRepository.revoke(session.sessionId);
+        throw new UnauthorizedException("department_not_eligible");
+      }
+    }
+
     if (!session.refreshJti || session.refreshJti !== claims.jti) {
       await this.authSessionRepository.revoke(claims.sid);
       throw new UnauthorizedException("refresh_token_reused_or_invalid");
@@ -284,6 +309,13 @@ export class AuthSessionService {
     const rotatedJti = randomUUID();
     const rotatedSession: AuthSessionRecord = {
       ...session,
+      // Active users receive a fresh sliding refresh window on rotation;
+      // inactive sessions still expire when the current refresh window ends.
+      expiresAt: expiresAtMs(
+        session.mode === "persisted"
+          ? AUTH_REFRESH_TOKEN_TTL_SECONDS
+          : AUTH_TEMPORARY_REFRESH_TTL_SECONDS,
+      ),
       refreshJti: rotatedJti,
     };
 
@@ -324,10 +356,23 @@ export class AuthSessionService {
     }
 
     if (input.consent) {
+      if (
+        !this.authEligibilityService.isEligibleDepartment(
+          pendingUser.departmentKo,
+          pendingUser.departmentEn,
+        )
+      ) {
+        throw new UnauthorizedException("department_not_eligible");
+      }
+
       const persistedUser = await this.usersService.upsertUserFromConsent({
         academicStatus: pendingUser.academicStatus,
         departmentEn: pendingUser.departmentEn,
         departmentKo: pendingUser.departmentKo,
+        primaryMajor: pendingUser.primaryMajor,
+        doubleMajor: pendingUser.doubleMajor,
+        minor: pendingUser.minor,
+        gender: pendingUser.gender,
         kaistUid: pendingUser.kaistUid,
         email: pendingUser.email,
         identityCode: pendingUser.identityCode,
@@ -395,7 +440,10 @@ export class AuthSessionService {
 
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
-      if (user) {
+      if (
+        user?.isActive &&
+        this.authEligibilityService.isEligibleUser(user)
+      ) {
         permission = await this.usersService.resolvePermissionBitmaskByUserId(user.userId);
         userName = user.nameKo;
         nameKo = user.nameKo;
@@ -404,8 +452,14 @@ export class AuthSessionService {
     }
 
     return {
-      authenticated: true,
-      canUsePersistentFeatures: session.mode === "persisted",
+      authenticated: Boolean(
+        session.mode === "temporary" ||
+          (session.userId &&
+            permission !== undefined &&
+            userName !== undefined),
+      ),
+      canUsePersistentFeatures:
+        session.mode === "persisted" && permission !== undefined,
       permission,
       requiresConsent: session.mode === "temporary",
       storageMode: session.mode,
@@ -438,21 +492,43 @@ export class AuthSessionService {
       };
     }
 
+    if (!user.isActive || !this.authEligibilityService.isEligibleUser(user)) {
+      return {
+        authenticated: false,
+        storageMode: null,
+      };
+    }
+
+    const [permission, feeStatus] = await Promise.all([
+      this.usersService.resolvePermissionBitmaskByUserId(user.userId),
+      this.usersService.getStudentFeeStatus(user.userId),
+    ]);
+
     return {
       authenticated: true,
       storageMode: "persisted",
       user: {
         id: user.userId,
         name: user.nameKo,
-        permission:
-          await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
+        permission,
         email: user.email,
         nameKo: user.nameKo,
         nameEn: user.nameEn,
-        userMobile: null,
+        userMobile: user.phoneNumber,
         studentNumber: user.stdNo,
         departmentKo: user.departmentKo,
         departmentEn: user.departmentEn,
+        primaryMajor: user.primaryMajor,
+        doubleMajor: user.doubleMajor,
+        minor: user.minor,
+        gender: user.gender,
+        phoneNumber: user.phoneNumber,
+        privacyConsentAt: user.privacyConsentAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLoginAt: user.lastLoginAt,
+        kaistUid: user.kaistUid,
+        feeStatus: feeStatus?.status ?? null,
         academicStatus: user.academicStatus,
         identityCode: user.identityCode,
       },

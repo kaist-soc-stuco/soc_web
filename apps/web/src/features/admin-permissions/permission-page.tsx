@@ -1,1032 +1,397 @@
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
-import type {
-  AdminUserRecord,
-  PermissionRecord,
-  RoleGroupMemberRecord,
-  RoleGroupRecord,
-} from "@soc/contracts";
+import type { PermissionRecord, RoleGroupCandidateListResponse, RoleGroupMemberRecord, RoleGroupRecord } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
-import {
-  ArrowDown,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
+import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableEmpty, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
+import { AdminCard, AdminCardHeader, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle, AdminToolbar, AdminToolbarGroup } from "@/components/ui/admin-page";
+import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
+import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { EmptyState } from "@/components/ui/data-state";
+import { UiInput } from "@/components/ui/form-control";
+import { Modal } from "@/components/ui/modal";
+import { Pagination } from "@/components/ui/pagination";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { hasAdminPermission, Permissions } from "@/lib/permissions";
+import { Permissions } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
-type RoleGroupFormState = {
+type DetailTab = "permissions" | "members";
+
+interface RoleDraft {
   description: string;
   nameKo: string;
+  permissionIds: number[];
+}
+
+const CANDIDATE_PAGE_SIZE = 20;
+const permissionDomains = [
+  { id: "content", label: "콘텐츠", codes: ["WRITE_NOTICE", "WRITE_GENERAL", "WRITE_REPLY", "MANAGE_CONTENT"] },
+  { id: "operations", label: "운영", codes: ["MANAGE_SURVEY", "MANAGE_FINANCE", "MANAGE_TOOL"] },
+  { id: "system", label: "시스템", codes: ["MODERATOR", "ADMIN"] },
+] as const;
+
+const permissionLabels: Record<string, string> = {
+  WRITE_NOTICE: "공지·행사 작성",
+  WRITE_GENERAL: "일반 게시판 작성",
+  WRITE_REPLY: "공식 답변 관리",
+  MANAGE_SURVEY: "설문조사 관리",
+  MANAGE_FINANCE: "학생회비 관리",
+  MANAGE_CONTENT: "운영 콘텐츠 관리",
+  MANAGE_TOOL: "운영 도구 관리",
+  MODERATOR: "게시글·댓글 관리",
+  ADMIN: "권한 및 관리자 설정",
 };
 
-type MemberSortBy = "name" | "studentId" | "grantedAt";
-type SortDirection = "asc" | "desc";
+const emptyRoleDraft = (): RoleDraft => ({ description: "", nameKo: "", permissionIds: [] });
+const draftFromRole = (role: RoleGroupRecord): RoleDraft => ({ description: role.description ?? "", nameKo: role.nameKo, permissionIds: [...role.permissionIds] });
+const sameIds = (left: number[], right: number[]) => left.length === right.length && left.every((id) => right.includes(id));
 
-const emptyRoleGroupForm = (): RoleGroupFormState => ({
-  description: "",
-  nameKo: "",
-});
-
-const formatShortDate = (value?: string | null) => {
-  if (!value) return "-";
+const formatDate = (value?: string | null) => {
+  if (!value) return "—";
   const date = isoToDate(value);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}.${mm}.${dd}`;
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }).format(date).replace(/\. /g, ".").replace(/\.$/, "");
 };
 
-const displayStudentId = (user: Pick<AdminUserRecord, "stdNo" | "kaistUid">) =>
-  user.stdNo ?? user.kaistUid;
-
-const compareText = (left?: string | null, right?: string | null) =>
-  (left ?? "").localeCompare(right ?? "", "ko-KR", {
-    numeric: true,
-    sensitivity: "base",
-  });
-
-const operationErrorMessage = (error: unknown, fallback: string) => {
+const displayError = (error: unknown, fallback: string) => {
   if (error instanceof ApiClientHttpError) {
-    if (error.status === 401) {
-      return "로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.";
-    }
-    if (error.status === 403) {
-      return "이 작업을 수행할 권한이 없습니다.";
-    }
+    if (error.status === 401) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
+    if (error.status === 403) return "이 작업을 수행할 권한이 없습니다.";
+    if (error.status === 409) return "다른 관리자가 먼저 변경했습니다. 새로고침 후 다시 시도해 주세요.";
   }
-
   return fallback;
 };
 
-const permissionDisplay: Record<
-  string,
-  { description: string; label: string }
-> = {
-  WRITE_NOTICE: {
-    description: "공지, 행사 게시판에 공식 게시글을 작성할 수 있습니다.",
-    label: "공지/행사 작성",
-  },
-  WRITE_GENERAL: {
-    description: "HoC, 홍보글, 연구실 게시판에 글을 작성할 수 있습니다.",
-    label: "일반 게시판 작성",
-  },
-  WRITE_REPLY: {
-    description: "건의사항, QnA 게시판에 공식 답변을 작성하고 상태를 변경할 수 있습니다.",
-    label: "공식 답변 관리",
-  },
-  MANAGE_SURVEY: {
-    description: "행사, 설문·투표, 신청폼을 만들고 응답/결과를 확인할 수 있습니다.",
-    label: "설문조사 관리",
-  },
-  MANAGE_FINANCE: {
-    description: "학생회비 납부 상태를 확인·수정하고 독촉 메일을 발송할 수 있습니다.",
-    label: "학생회비 관리",
-  },
-  MANAGE_CONTENT: {
-    description: "홈 화면, 배너, 소개/로드맵, 캘린더 콘텐츠를 수정할 수 있습니다.",
-    label: "사이트 콘텐츠 관리",
-  },
-  MANAGE_TOOL: {
-    description: "POM 채점기, 챗봇 등 운영 도구 데이터와 설정을 관리할 수 있습니다.",
-    label: "운영 도구 관리",
-  },
-  MODERATOR: {
-    description: "전체 게시판의 게시글·댓글을 숨김/삭제하고 사용자 제재를 처리할 수 있습니다.",
-    label: "게시글/댓글 관리",
-  },
-  ADMIN: {
-    description: "운영 역할을 만들고 권한을 부여하며 구성원을 관리할 수 있습니다.",
-    label: "권한 관리",
-  },
-};
-
-const getPermissionDisplay = (permission: PermissionRecord) =>
-  permissionDisplay[permission.code] ?? {
-    description: permission.description ?? "운영 권한입니다.",
-    label: permission.nameKo || "운영 권한",
-  };
-
-const arePermissionIdsEqual = (left: number[], right: number[]) => {
-  if (left.length !== right.length) return false;
-
-  const leftSorted = [...left].sort((a, b) => a - b);
-  const rightSorted = [...right].sort((a, b) => a - b);
-  return leftSorted.every((id, index) => id === rightSorted[index]);
-};
-
 export function PermissionPage() {
-  const client = useMemo(
-    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
-    [],
-  );
-  const { data: session, isLoading: sessionLoading } = useCurrentSession();
-  const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
-
-  const [roleGroups, setRoleGroups] = useState<RoleGroupRecord[]>([]);
+  const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
+  const [roles, setRoles] = useState<RoleGroupRecord[]>([]);
   const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
-  const [selectedRoleGroupId, setSelectedRoleGroupId] = useState<number | null>(
-    null,
-  );
-  const [roleGroupMembers, setRoleGroupMembers] = useState<
-    RoleGroupMemberRecord[]
-  >([]);
-  const [roleGroupForm, setRoleGroupForm] =
-    useState<RoleGroupFormState>(emptyRoleGroupForm());
-  const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>(
-    [],
-  );
-  const [memberQuery, setMemberQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<AdminUserRecord[]>([]);
-  const [roleGroupLoading, setRoleGroupLoading] = useState(false);
-  const [memberLoading, setMemberLoading] = useState(false);
-  const [roleGroupSaving, setRoleGroupSaving] = useState(false);
-  const [memberSavingUserId, setMemberSavingUserId] = useState<string | null>(
-    null,
-  );
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [roleGroupError, setRoleGroupError] = useState<string | null>(null);
-  const [memberError, setMemberError] = useState<string | null>(null);
-  const [memberSortBy, setMemberSortBy] = useState<MemberSortBy>("name");
-  const [memberSortDirection, setMemberSortDirection] =
-    useState<SortDirection>("asc");
-  const [roleGroupSaveStatus, setRoleGroupSaveStatus] = useState<
-    "saved" | null
-  >(null);
+  const [members, setMembers] = useState<RoleGroupMemberRecord[]>([]);
+  const [draft, setDraft] = useState<RoleDraft>(emptyRoleDraft());
+  const [roleQuery, setRoleQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<RoleDraft>(emptyRoleDraft());
+  const [memberEditorOpen, setMemberEditorOpen] = useState(false);
+  const [candidateData, setCandidateData] = useState<RoleGroupCandidateListResponse | null>(null);
+  const [candidateQuery, setCandidateQuery] = useState("");
+  const [candidatePage, setCandidatePage] = useState(1);
+  const [candidateLoading, setCandidateLoading] = useState(false);
+  const [candidateSaving, setCandidateSaving] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [editingField, setEditingField] = useState<"name" | "description" | null>(null);
 
-  const permissionMask = session?.permission ?? 0;
-  const canEditRoleGroups = hasAdminPermission(permissionMask);
+  const selectedRoleId = Number(searchParams.get("role")) || roles[0]?.roleGroupId || null;
+  const selectedRole = roles.find((role) => role.roleGroupId === selectedRoleId) ?? null;
+  const selectedTab: DetailTab = searchParams.get("tab") === "members" ? "members" : "permissions";
+  const isDirty = Boolean(selectedRole && (draft.nameKo !== selectedRole.nameKo || draft.description !== (selectedRole.description ?? "") || !sameIds(draft.permissionIds, selectedRole.permissionIds)));
 
-  const selectedRoleGroup =
-    roleGroups.find(
-      (roleGroup) => roleGroup.roleGroupId === selectedRoleGroupId,
-    ) ?? null;
-  const hasRoleGroupChanges = selectedRoleGroup
-    ? roleGroupForm.nameKo !== selectedRoleGroup.nameKo ||
-      roleGroupForm.description !== (selectedRoleGroup.description ?? "") ||
-      !arePermissionIdsEqual(
-        selectedPermissionIds,
-        selectedRoleGroup.permissionIds,
-      )
-    : false;
-  const sortedRoleGroupMembers = useMemo(() => {
-    const direction = memberSortDirection === "asc" ? 1 : -1;
+  const filteredRoles = useMemo(() => {
+    const query = roleQuery.trim().toLocaleLowerCase("ko-KR");
+    if (!query) return roles;
+    return roles.filter((role) => `${role.nameKo} ${role.description ?? ""}`.toLocaleLowerCase("ko-KR").includes(query));
+  }, [roleQuery, roles]);
 
-    return [...roleGroupMembers].sort((left, right) => {
-      if (memberSortBy === "studentId") {
-        return (
-          compareText(displayStudentId(left), displayStudentId(right)) *
-          direction
-        );
-      }
+  const groupedPermissions = useMemo(() => {
+    const claimed = new Set<string>(permissionDomains.flatMap((domain) => [...domain.codes]));
+    const groups = permissionDomains.map((domain) => ({ ...domain, permissions: permissions.filter((permission) => domain.codes.some((code) => code === permission.code)) }));
+    const other = permissions.filter((permission) => !claimed.has(permission.code));
+    return other.length ? [...groups, { id: "other", label: "기타", codes: [] as string[], permissions: other }] : groups;
+  }, [permissions]);
 
-      if (memberSortBy === "grantedAt") {
-        const leftTime = left.grantedAt ? isoToDate(left.grantedAt).getTime() : 0;
-        const rightTime = right.grantedAt
-          ? isoToDate(right.grantedAt).getTime()
-          : 0;
-        return (leftTime - rightTime) * direction;
-      }
+  const setSelection = useCallback((roleId: number, tab: DetailTab = selectedTab) => {
+    setSearchParams({ role: String(roleId), tab }, { replace: true });
+  }, [selectedTab, setSearchParams]);
 
-      return compareText(left.nameKo, right.nameKo) * direction;
-    });
-  }, [memberSortBy, memberSortDirection, roleGroupMembers]);
-
-  const handleMemberSortChange = (nextSortBy: MemberSortBy) => {
-    if (memberSortBy === nextSortBy) {
-      setMemberSortDirection((currentDirection) =>
-        currentDirection === "asc" ? "desc" : "asc",
-      );
-      return;
-    }
-
-    setMemberSortBy(nextSortBy);
-    setMemberSortDirection("asc");
-  };
-
-  const openRoleGroupEditor = (roleGroup: RoleGroupRecord) => {
-    setSelectedRoleGroupId(roleGroup.roleGroupId);
-    setRoleGroupForm({
-      description: roleGroup.description ?? "",
-      nameKo: roleGroup.nameKo,
-    });
-    setSelectedPermissionIds(roleGroup.permissionIds);
-    setSearchResults([]);
-    setMemberQuery("");
-    setRoleGroupSaveStatus(null);
-  };
-
-  const resetRoleGroupEditor = () => {
-    setSelectedRoleGroupId(null);
-    setRoleGroupForm(emptyRoleGroupForm());
-    setSelectedPermissionIds([]);
-    setRoleGroupMembers([]);
-    setSearchResults([]);
-    setMemberQuery("");
-    setRoleGroupSaveStatus(null);
-  };
-
-  const loadRoleGroupMembers = async (roleGroupId: number) => {
-    setMemberLoading(true);
-    setMemberError(null);
-
+  const loadBase = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const fetchedMembers = await client.listRoleGroupMembers(roleGroupId);
-      setRoleGroupMembers(fetchedMembers);
-    } catch (error) {
-      setMemberError(
-        operationErrorMessage(error, "구성원 정보를 불러오지 못했습니다."),
-      );
-      setRoleGroupMembers([]);
+      const [nextRoles, nextPermissions] = await Promise.all([client.listRoleGroups(), client.listPermissions()]);
+      setRoles(nextRoles);
+      setPermissions(nextPermissions.filter((permission) => permission.isActive));
+      const requestedId = Number(searchParams.get("role"));
+      const nextSelected = nextRoles.find((role) => role.roleGroupId === requestedId) ?? nextRoles[0] ?? null;
+      if (nextSelected) {
+        setDraft(draftFromRole(nextSelected));
+        if (requestedId !== nextSelected.roleGroupId) setSelection(nextSelected.roleGroupId);
+      }
+    } catch (loadError) {
+      setError(displayError(loadError, "역할과 권한 정보를 불러오지 못했습니다."));
     } finally {
-      setMemberLoading(false);
+      setLoading(false);
     }
-  };
+  }, [client, searchParams, setSelection]);
 
-  const loadRoleGroups = async (preferSelectedId?: number | null) => {
-    const [fetchedRoleGroups, fetchedPermissions] = await Promise.all([
-      client.listRoleGroups(),
-      client.listPermissions(),
-    ]);
-
-    setRoleGroups(fetchedRoleGroups);
-    setPermissions(fetchedPermissions);
-
-    const selectedId = preferSelectedId ?? selectedRoleGroupId;
-    const selected =
-      selectedId !== null
-        ? fetchedRoleGroups.find(
-            (roleGroup) => roleGroup.roleGroupId === selectedId,
-          )
-        : fetchedRoleGroups[0];
-
-    if (selected) {
-      openRoleGroupEditor(selected);
-      await loadRoleGroupMembers(selected.roleGroupId);
-      return;
+  const loadMembers = useCallback(async (roleId: number) => {
+    setMembersLoading(true);
+    setError(null);
+    try {
+      setMembers(await client.listRoleGroupMembers(roleId));
+    } catch (loadError) {
+      setError(displayError(loadError, "구성원 정보를 불러오지 못했습니다."));
+      setMembers([]);
+    } finally {
+      setMembersLoading(false);
     }
+  }, [client]);
 
-    resetRoleGroupEditor();
-  };
-
+  useEffect(() => { void loadBase(); }, []);
   useEffect(() => {
-    if (sessionLoading || !session || !canEditRoleGroups) return;
+    if (!selectedRole) return;
+    setDraft(draftFromRole(selectedRole));
+    setEditingField(null);
+  }, [selectedRole?.roleGroupId]);
+  useEffect(() => {
+    if (!selectedRole || selectedTab !== "members") return;
+    void loadMembers(selectedRole.roleGroupId);
+  }, [selectedRole?.roleGroupId, selectedTab]);
 
-    let cancelled = false;
-    setRoleGroupLoading(true);
-    setRoleGroupError(null);
-
-    Promise.all([client.listRoleGroups(), client.listPermissions()])
-      .then(async ([fetchedRoleGroups, fetchedPermissions]) => {
-        if (cancelled) return;
-
-        setRoleGroups(fetchedRoleGroups);
-        setPermissions(fetchedPermissions);
-
-        const first = fetchedRoleGroups[0];
-        if (first) {
-          openRoleGroupEditor(first);
-          await loadRoleGroupMembers(first.roleGroupId);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setRoleGroupError(
-            operationErrorMessage(
-              error,
-              "역할 그룹 데이터를 불러오지 못했습니다.",
-            ),
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setRoleGroupLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canEditRoleGroups, client, session, sessionLoading]);
-
-  const handleSelectRoleGroup = async (roleGroup: RoleGroupRecord) => {
-    openRoleGroupEditor(roleGroup);
-    await loadRoleGroupMembers(roleGroup.roleGroupId);
+  const selectRole = async (role: RoleGroupRecord) => {
+    if (role.roleGroupId === selectedRoleId) return;
+    if (isDirty) {
+      const discard = await confirm({ title: "저장하지 않은 변경 사항을 버릴까요?", confirmLabel: "변경 사항 버리기", tone: "danger" });
+      if (!discard) return;
+    }
+    setSelection(role.roleGroupId);
   };
 
-  const handleCreateRoleGroup = async () => {
-    if (!canEditRoleGroups || roleGroupSaving) return;
-
-    setRoleGroupSaving(true);
-    setRoleGroupError(null);
-    setMemberError(null);
-
+  const saveRole = async () => {
+    if (!selectedRole || !isDirty) return;
+    setSaving(true);
+    setError(null);
     try {
-      const nextIndex = roleGroups.length + 1;
-      const createdRoleGroup = await client.createRoleGroup({
-        description: "역할 설명을 입력하세요.",
-        nameKo: `새 역할 ${nextIndex}`,
-        permissionIds: [],
-      });
-      await loadRoleGroups(createdRoleGroup.roleGroupId);
-    } catch (error) {
-      setRoleGroupError(
-        operationErrorMessage(error, "역할 그룹을 추가하지 못했습니다."),
-      );
+      const updated = await client.updateRoleGroup(selectedRole.roleGroupId, { nameKo: draft.nameKo.trim(), description: draft.description.trim(), permissionIds: draft.permissionIds });
+      setRoles((current) => current.map((role) => role.roleGroupId === updated.roleGroupId ? updated : role));
+      setDraft(draftFromRole(updated));
+    } catch (saveError) {
+      setError(displayError(saveError, "역할 변경 사항을 저장하지 못했습니다."));
     } finally {
-      setRoleGroupSaving(false);
+      setSaving(false);
     }
   };
 
-  const togglePermissionId = (permissionId: number) => {
-    setSelectedPermissionIds((prev) =>
-      prev.includes(permissionId)
-        ? prev.filter((id) => id !== permissionId)
-        : [...prev, permissionId],
-    );
-  };
-
-  const handleSaveRoleGroup = async () => {
-    if (!canEditRoleGroups) return;
-
-    if (!roleGroupForm.nameKo.trim()) {
-      setRoleGroupError("역할 이름은 필수입니다.");
-      return;
-    }
-
-    setRoleGroupSaving(true);
-    setRoleGroupError(null);
-
+  const createRole = async () => {
+    if (!createDraft.nameKo.trim()) return;
+    setSaving(true);
+    setError(null);
     try {
-      const payload = {
-        description: roleGroupForm.description.trim() || undefined,
-        nameKo: roleGroupForm.nameKo.trim(),
-        permissionIds: selectedPermissionIds,
-      };
-
-      const savedRoleGroup =
-        selectedRoleGroupId === null
-          ? await client.createRoleGroup(payload)
-          : await client.updateRoleGroup(selectedRoleGroupId, payload);
-
-      await loadRoleGroups(savedRoleGroup.roleGroupId);
-      setRoleGroupSaveStatus("saved");
-    } catch (error) {
-      setRoleGroupError(
-        operationErrorMessage(error, "역할 그룹을 저장하지 못했습니다."),
-      );
+      const created = await client.createRoleGroup({ nameKo: createDraft.nameKo.trim(), description: createDraft.description.trim(), permissionIds: [] });
+      setRoles((current) => [...current, created]);
+      setCreateDraft(emptyRoleDraft());
+      setCreateOpen(false);
+      setSelection(created.roleGroupId);
+    } catch (createError) {
+      setError(displayError(createError, "역할을 만들지 못했습니다."));
     } finally {
-      setRoleGroupSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleCancelRoleGroupChanges = () => {
-    if (!selectedRoleGroup) return;
-    openRoleGroupEditor(selectedRoleGroup);
-  };
-
-  const handleDeleteRoleGroup = async () => {
-    if (!canEditRoleGroups || !selectedRoleGroup) return;
-
-    if (selectedRoleGroup.isSystem) {
-      setRoleGroupError("시스템 역할 그룹은 삭제할 수 없습니다.");
-      return;
-    }
-
-    const confirmed = await requestConfirm({
-      confirmLabel: "삭제",
-      description: "역할에 연결된 구성원 권한도 함께 해제됩니다.",
-      title: `"${selectedRoleGroup.nameKo}" 역할을 삭제하시겠습니까?`,
-      tone: "danger",
-    });
-    if (!confirmed) return;
-
-    setRoleGroupSaving(true);
-    setRoleGroupError(null);
-
+  const deleteRole = async () => {
+    if (!selectedRole || selectedRole.isSystem) return;
+    const approved = await confirm({ title: `‘${selectedRole.nameKo}’ 역할을 삭제할까요?`, confirmLabel: "역할 삭제", tone: "danger" });
+    if (!approved) return;
+    setSaving(true);
     try {
-      await client.deleteRoleGroup(selectedRoleGroup.roleGroupId);
-      await loadRoleGroups(null);
-    } catch (error) {
-      setRoleGroupError(
-        operationErrorMessage(error, "역할 그룹을 삭제하지 못했습니다."),
-      );
+      await client.deleteRoleGroup(selectedRole.roleGroupId);
+      const remaining = roles.filter((role) => role.roleGroupId !== selectedRole.roleGroupId);
+      setRoles(remaining);
+      if (remaining[0]) setSelection(remaining[0].roleGroupId);
+    } catch (deleteError) {
+      setError(displayError(deleteError, "역할을 삭제하지 못했습니다."));
     } finally {
-      setRoleGroupSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleSearchUsers = async () => {
-    if (!canEditRoleGroups || selectedRoleGroupId === null) return;
+  const togglePermission = (permissionId: number) => setDraft((current) => ({ ...current, permissionIds: current.permissionIds.includes(permissionId) ? current.permissionIds.filter((id) => id !== permissionId) : [...current.permissionIds, permissionId] }));
+  const togglePermissionGroup = (permissionIds: number[]) => {
+    const allSelected = permissionIds.every((id) => draft.permissionIds.includes(id));
+    setDraft((current) => ({ ...current, permissionIds: allSelected ? current.permissionIds.filter((id) => !permissionIds.includes(id)) : [...new Set([...current.permissionIds, ...permissionIds])] }));
+  };
 
-    if (memberQuery.trim().length < 2) {
-      setMemberError("이름, 학번, 이메일 중 두 글자 이상 입력해 주세요.");
-      setSearchResults([]);
-      return;
-    }
-
-    setSearchLoading(true);
-    setMemberError(null);
-
+  const loadCandidates = async (roleId: number, page = 1, query = candidateQuery) => {
+    setCandidateLoading(true);
+    setError(null);
     try {
-      const fetchedUsers = await client.searchUsers(memberQuery, 20);
-      setSearchResults(fetchedUsers);
-    } catch (error) {
-      setMemberError(
-        operationErrorMessage(error, "사용자 검색에 실패했습니다."),
-      );
-      setSearchResults([]);
+      const data = await client.listRoleGroupCandidates(roleId, { q: query, page, pageSize: CANDIDATE_PAGE_SIZE });
+      setCandidateData(data);
+      setCandidatePage(page);
+    } catch (candidateError) {
+      setError(displayError(candidateError, "구성원 후보를 불러오지 못했습니다."));
     } finally {
-      setSearchLoading(false);
+      setCandidateLoading(false);
     }
   };
 
-  const handleAddMember = async (user: AdminUserRecord) => {
-    if (!canEditRoleGroups || selectedRoleGroupId === null) return;
-
-    setMemberSavingUserId(user.userId);
-    setMemberError(null);
-
-    try {
-      await client.addRoleGroupMember(selectedRoleGroupId, {
-        userId: user.userId,
-      });
-      await loadRoleGroupMembers(selectedRoleGroupId);
-      if (memberQuery.trim().length >= 2) {
-        await handleSearchUsers();
-      }
-    } catch (error) {
-      setMemberError(
-        operationErrorMessage(error, "구성원 변경사항을 저장하지 못했습니다."),
-      );
-    } finally {
-      setMemberSavingUserId(null);
-    }
+  const openMemberEditor = async () => {
+    if (!selectedRole) return;
+    const currentMembers = await client.listRoleGroupMembers(selectedRole.roleGroupId);
+    setMembers(currentMembers);
+    setSelectedMemberIds(currentMembers.map((member) => member.userId));
+    setCandidateQuery("");
+    setCandidatePage(1);
+    setMemberEditorOpen(true);
+    await loadCandidates(selectedRole.roleGroupId, 1, "");
   };
 
-  const handleRemoveMember = async (member: RoleGroupMemberRecord) => {
-    if (!canEditRoleGroups || selectedRoleGroupId === null) return;
-
-    const confirmed = await requestConfirm({
-      confirmLabel: "제거",
-      description: "이 사용자는 해당 역할로 부여받던 권한을 잃게 됩니다.",
-      title: `"${member.nameKo}" 사용자를 역할에서 제거하시겠습니까?`,
-      tone: "danger",
-    });
-    if (!confirmed) return;
-
-    const userId = member.userId;
-    setMemberSavingUserId(userId);
-    setMemberError(null);
-
+  const saveMembers = async () => {
+    if (!selectedRole) return;
+    setCandidateSaving(true);
+    setError(null);
     try {
-      await client.removeRoleGroupMember(selectedRoleGroupId, userId);
-      await loadRoleGroupMembers(selectedRoleGroupId);
-    } catch (error) {
-      setMemberError(
-        operationErrorMessage(error, "구성원 변경사항을 저장하지 못했습니다."),
-      );
+      const updatedMembers = await client.replaceRoleGroupMembers(selectedRole.roleGroupId, { userIds: selectedMemberIds });
+      setMembers(updatedMembers);
+      setRoles((current) => current.map((role) => role.roleGroupId === selectedRole.roleGroupId ? { ...role, userCount: updatedMembers.length } : role));
+      setMemberEditorOpen(false);
+    } catch (memberError) {
+      setError(displayError(memberError, "구성원 변경 사항을 저장하지 못했습니다."));
     } finally {
-      setMemberSavingUserId(null);
+      setCandidateSaving(false);
     }
   };
 
   return (
     <AuthGuard requirePermission={Permissions.ADMIN}>
-      <div className="min-h-screen bg-slate-50/50 text-slate-950">
+      <AdminPageShell>
         {ConfirmDialog}
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
-          <header className="border-b border-slate-200 pb-5">
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-800">
-                권한 관리
-              </h1>
-              <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-400">
-                운영 역할과 구성원을 관리합니다.
-              </p>
-            </div>
-          </header>
+        <AdminPageMain>
+          <AdminPageHeader title="권한 관리" actions={<Button type="button" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" /> 역할 추가</Button>} />
+          {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
 
-          {!canEditRoleGroups ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">
-              관리자 권한이 있는 계정에서만 역할과 구성원을 관리할 수 있습니다.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <section className="rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-                  <div>
-                    <h2 className="text-base font-extrabold tracking-tight text-slate-800">
-                      운영 역할
-                    </h2>
-                    <p className="mt-0.5 text-xs font-bold text-slate-400">
-                      전체 {roleGroups.length}개
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateRoleGroup()}
-                    disabled={roleGroupSaving}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3 py-1.5 text-xs font-black text-white shadow-sm hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    역할 추가
-                  </button>
-                </div>
+          <div className="grid min-h-[640px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <AdminCard className="self-start lg:sticky lg:top-6">
+              <AdminCardHeader>
+                <div><AdminSectionTitle>역할</AdminSectionTitle><AdminMetaText>전체 {roles.length}개</AdminMetaText></div>
+              </AdminCardHeader>
+              <div className="border-b border-slate-100 p-3"><AdminSearchField aria-label="역할 검색" placeholder="역할 검색" value={roleQuery} onValueChange={setRoleQuery} /></div>
+              <div className="max-h-[560px] overflow-y-auto p-2">
+                {loading ? <div className="grid gap-1 p-1">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-14 w-full rounded-lg" />)}</div>
+                  : filteredRoles.length === 0 ? <p className="px-3 py-10 text-center text-sm font-normal text-[#344054]">검색 결과가 없습니다.</p>
+                  : <div className="grid gap-1" role="listbox" aria-label="역할 목록">{filteredRoles.map((role) => {
+                      const selected = role.roleGroupId === selectedRoleId;
+                      return <Button key={role.roleGroupId} type="button" variant="ghost" role="option" aria-selected={selected} onClick={() => void selectRole(role)} className={cn("relative h-auto min-h-14 w-full rounded-lg px-3 py-2 text-left", selected ? "bg-slate-100 text-[#172033] before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-brand-primary" : "text-[#344054] hover:bg-slate-50 hover:text-[#172033]")}>
+                        <ShieldCheck aria-hidden="true" className="size-4 shrink-0" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-normal text-[#172033]">{role.nameKo}</span><span className="block truncate text-xs font-normal text-[#344054]">{role.description || "설명 없음"}</span></span><span className="shrink-0 text-xs font-normal text-[#344054]">{role.userCount}명</span>
+                      </Button>;
+                    })}</div>}
+              </div>
+            </AdminCard>
 
-                <div className="p-4">
-                  {roleGroupLoading ? (
-                    <div className="flex flex-wrap gap-2" aria-busy="true">
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <div
-                          key={index}
-                          className="flex min-h-[3rem] min-w-44 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2"
-                        >
-                          <span className="min-w-0 flex-1 space-y-2">
-                            <Skeleton className="h-3.5 w-24" />
-                            <Skeleton className="h-3 w-32" />
-                          </span>
-                          <Skeleton className="h-5 w-8 rounded-full" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : roleGroups.length === 0 ? (
-                    <div className="space-y-3">
-                      <EmptyState
-                        message="등록된 역할이 없습니다."
-                        minHeightClassName="min-h-20"
+            {selectedRole ? <AdminCard className="min-w-0">
+              <AdminCardHeader className="min-h-[84px] px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    {editingField === "name" ? (
+                      <UiInput
+                        autoFocus
+                        value={draft.nameKo}
+                        aria-label="역할 이름"
+                        className="h-9 max-w-sm text-base font-normal text-[#172033]"
+                        onChange={(event) => setDraft((current) => ({ ...current, nameKo: event.currentTarget.value }))}
+                        onBlur={() => setEditingField(null)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") setEditingField(null);
+                          if (event.key === "Escape") {
+                            setDraft((current) => ({ ...current, nameKo: selectedRole.nameKo }));
+                            setEditingField(null);
+                          }
+                        }}
                       />
-                      <button
-                        type="button"
-                        onClick={() => void handleCreateRoleGroup()}
-                        disabled={roleGroupSaving}
-                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3 py-2 text-xs font-black text-white hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Plus className="h-3.5 w-3.5" />첫 역할 추가
+                    ) : (
+                      <button type="button" disabled={selectedRole.isSystem} onClick={() => setEditingField("name")} className="group inline-flex min-w-0 items-center gap-1.5 rounded-md text-left disabled:cursor-default">
+                        <AdminSectionTitle className="truncate text-[#172033]">{draft.nameKo}</AdminSectionTitle>
+                        {!selectedRole.isSystem ? <Pencil aria-hidden="true" className="size-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" /> : null}
                       </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {roleGroups.map((roleGroup) => {
-                        const selected =
-                          roleGroup.roleGroupId === selectedRoleGroupId;
-
-                        return (
-                          <button
-                            key={roleGroup.roleGroupId}
-                            type="button"
-                            onClick={() =>
-                              void handleSelectRoleGroup(roleGroup)
-                            }
-                            className={`inline-flex min-h-[3rem] max-w-full items-center gap-3 rounded-full border px-4 py-2 text-left transition ${
-                              selected
-                                ? "border-kaist-darkgreen bg-kaist-darkgreen text-white shadow-sm"
-                                : "border-slate-200 bg-white text-slate-700 hover:border-kaist-darkgreen/30 hover:bg-emerald-50/45"
-                            }`}
-                          >
-                            <span className="min-w-0">
-                              <span
-                                className={`block truncate text-[13px] font-extrabold ${selected ? "text-white" : "text-slate-900"}`}
-                              >
-                                {roleGroup.nameKo}
-                              </span>
-                              <span
-                                className={`mt-0.5 block max-w-[16rem] truncate text-[11px] font-semibold ${selected ? "text-white/75" : "text-slate-500"}`}
-                              >
-                                {roleGroup.description ?? "설명 없음"}
-                              </span>
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-black ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-600"}`}
-                            >
-                              {roleGroup.userCount}명
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {roleGroupError && !selectedRoleGroup && (
-                    <p className="mx-3 mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">
-                      {roleGroupError}
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              {selectedRoleGroup ? (
-                  <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-base font-extrabold tracking-tight text-slate-800">
-                            역할 정보
-                          </h2>
-                          {selectedRoleGroup.isSystem && (
-                            <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-black text-slate-500">
-                              시스템 역할
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {hasRoleGroupChanges && (
-                          <button
-                            type="button"
-                            onClick={handleCancelRoleGroupChanges}
-                            disabled={roleGroupSaving}
-                            className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            취소
-                          </button>
-                        )}
-                        {!selectedRoleGroup?.isSystem &&
-                        selectedRoleGroupId !== null ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteRoleGroup()}
-                            disabled={roleGroupSaving}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            삭제
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => void handleSaveRoleGroup()}
-                          disabled={roleGroupSaving || !hasRoleGroupChanges}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3 py-2 text-xs font-black text-white hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          {roleGroupSaving ? "저장 중" : "역할 저장"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-[0.7fr_1.35fr]">
-                      <label className="space-y-1.5 text-xs font-bold text-slate-500">
-                        <span>역할 이름</span>
-                        <input
-                          value={roleGroupForm.nameKo}
-                          onChange={(event) =>
-                            setRoleGroupForm((prev) => ({
-                              ...prev,
-                              nameKo: event.target.value,
-                            }))
-                          }
-                          readOnly={selectedRoleGroup.isSystem}
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10 read-only:bg-slate-50 read-only:text-slate-500"
-                          placeholder="예: 게시판 관리자"
-                        />
-                      </label>
-                      <label className="space-y-1.5 text-xs font-bold text-slate-500">
-                        <span>역할 설명</span>
-                        <input
-                          value={roleGroupForm.description}
-                          onChange={(event) =>
-                            setRoleGroupForm((prev) => ({
-                              ...prev,
-                              description: event.target.value,
-                            }))
-                          }
-                          readOnly={selectedRoleGroup.isSystem}
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10 read-only:bg-slate-50 read-only:text-slate-500"
-                          placeholder="역할의 관리 범위를 입력하세요."
-                        />
-                      </label>
-                    </div>
-
-                    <div className="mt-5">
-                      <p className="mb-2.5 text-sm font-extrabold tracking-tight text-slate-800">
-                        권한 목록 · 선택됨 {selectedPermissionIds.length} / 전체{" "}
-                        {permissions.length}
-                      </p>
-                      <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
-                        {permissions.map((permission) => {
-                          const selected = selectedPermissionIds.includes(
-                            permission.permissionId,
-                          );
-                          const permissionInfo =
-                            getPermissionDisplay(permission);
-
-                          return (
-                            <button
-                              key={permission.permissionId}
-                              type="button"
-                              onClick={() =>
-                                togglePermissionId(permission.permissionId)
-                              }
-                              className={`flex min-h-[3.75rem] items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-                                selected
-                                  ? "border-emerald-200 bg-emerald-50/40 text-kaist-darkgreen"
-                                  : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                              }`}
-                            >
-                              <span
-                                className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
-                                  selected
-                                    ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
-                                    : "border-slate-300 bg-white"
-                                }`}
-                              >
-                                {selected && (
-                                  <Check
-                                    className="h-2.5 w-2.5"
-                                    strokeWidth={4}
-                                  />
-                                )}
-                              </span>
-                              <span className="min-w-0">
-                                <span className="block text-[11.5px] font-extrabold">
-                                  {permissionInfo.label}
-                                </span>
-                                <span className="mt-0.5 line-clamp-2 block text-[10.5px] font-semibold leading-4 text-slate-500">
-                                  {permissionInfo.description}
-                                </span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {roleGroupError && (
-                      <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">
-                        {roleGroupError}
-                      </p>
                     )}
-                  </section>
-                ) : (
-                  <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-                    <EmptyState
-                      message="상단에서 역할을 추가하거나 선택해 주세요."
-                      minHeightClassName="min-h-24"
+                    {selectedRole.isSystem ? <AdminStatusBadge>시스템 역할</AdminStatusBadge> : null}
+                  </div>
+                  {editingField === "description" ? (
+                    <UiInput
+                      autoFocus
+                      value={draft.description}
+                      aria-label="역할 설명"
+                      className="mt-1 h-9 max-w-xl text-sm font-normal text-[#344054]"
+                      placeholder="역할 설명"
+                      onChange={(event) => setDraft((current) => ({ ...current, description: event.currentTarget.value }))}
+                      onBlur={() => setEditingField(null)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") setEditingField(null);
+                        if (event.key === "Escape") {
+                          setDraft((current) => ({ ...current, description: selectedRole.description ?? "" }));
+                          setEditingField(null);
+                        }
+                      }}
                     />
-                  </section>
-                )}
-
-                <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-                  <div className="mb-4 flex flex-col gap-3">
-                    <div>
-                      <h2 className="text-base font-extrabold tracking-tight text-slate-800">
-                        {selectedRoleGroup
-                          ? `‘${selectedRoleGroup.nameKo}’ 구성원`
-                          : "구성원 관리"}
-                      </h2>
-                      <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                        이 역할에 속한 사용자를 관리합니다.
-                      </p>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
-                      <select
-                        className="h-9 shrink-0 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 outline-none"
-                        defaultValue="10"
-                      >
-                        <option value="10">10명</option>
-                      </select>
-                      <div className="flex h-9 min-w-[18rem] flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3">
-                        <Search className="h-3.5 w-3.5 text-slate-400" />
-                        <input
-                          value={memberQuery}
-                          onChange={(event) =>
-                            setMemberQuery(event.target.value)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void handleSearchUsers();
-                            }
-                          }}
-                          className="w-full bg-transparent text-xs font-semibold outline-none placeholder:text-slate-400"
-                          placeholder="이름, 학번, 이메일 검색"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleSearchUsers()}
-                        disabled={searchLoading || selectedRoleGroupId === null}
-                        className="h-9 shrink-0 rounded-lg bg-kaist-darkgreen px-3 text-xs font-black text-white hover:bg-[#0f5c29] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {searchLoading ? "검색 중" : "사용자 추가"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {memberError && (
-                    <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">
-                      {memberError}
-                    </p>
+                  ) : (
+                    <button type="button" disabled={selectedRole.isSystem} onClick={() => setEditingField("description")} className="group mt-1 inline-flex max-w-full items-center gap-1.5 rounded-md text-left text-xs font-normal text-[#344054] disabled:cursor-default">
+                      <span className="truncate">{draft.description || "설명 추가"}</span>
+                      {!selectedRole.isSystem ? <Pencil aria-hidden="true" className="size-3 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" /> : null}
+                    </button>
                   )}
+                  <AdminMetaText className="mt-1 block text-[#344054]">{selectedRole.userCount}명의 구성원 · {draft.permissionIds.length}개 권한</AdminMetaText>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {!selectedRole.isSystem ? <Button type="button" size="sm" variant="ghost" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" /> 삭제</Button> : null}
+                  <Button type="button" size="sm" onClick={() => void saveRole()} disabled={selectedRole.isSystem || !isDirty || saving || !draft.nameKo.trim()}>{saving ? "저장 중" : "저장"}</Button>
+                </div>
+              </AdminCardHeader>
+              <div className="border-b border-slate-100 px-5 pt-3"><SegmentedControl ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control mb-3 w-fit" options={[{ value: "permissions", label: "권한" }, { value: "members", label: `구성원 ${selectedRole.userCount}` }]} /></div>
 
-                  {searchResults.length > 0 && (
-                    <div className="mb-4 rounded-xl border border-kaist-darkgreen/20 bg-kaist-darkgreen/5 p-3">
-                      <p className="mb-2 text-xs font-black text-kaist-darkgreen">
-                        검색 결과
-                      </p>
-                      <div className="grid gap-2 md:grid-cols-2">
-                        {searchResults.map((user) => {
-                          const alreadyMember = roleGroupMembers.some(
-                            (member) => member.userId === user.userId,
-                          );
+              {selectedTab === "permissions" ? <div className="p-5">
+                <div className="grid items-start gap-4 xl:grid-cols-3">{groupedPermissions.map((group) => {
+                  const ids = group.permissions.map((permission) => permission.permissionId);
+                  const allSelected = ids.length > 0 && ids.every((id) => draft.permissionIds.includes(id));
+                  return <section key={group.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <label className="flex min-h-12 cursor-pointer items-center gap-2.5 border-b border-slate-200 px-4">
+                      <UiInput type="checkbox" checked={allSelected} disabled={selectedRole.isSystem} onChange={() => togglePermissionGroup(ids)} className="size-4 accent-brand-primary" aria-label={`${group.label} 권한 전체 선택`} />
+                      <span className="text-sm font-normal text-[#172033]">{group.label}</span>
+                      <span className="ml-auto text-xs font-normal text-[#344054]">{group.permissions.length}개</span>
+                    </label>
+                    <div className="divide-y divide-slate-100">{group.permissions.map((permission) => {
+                      const checked = draft.permissionIds.includes(permission.permissionId);
+                      return <label key={permission.permissionId} className="flex cursor-pointer items-start gap-3 px-4 py-3.5 hover:bg-slate-50/70"><UiInput type="checkbox" checked={checked} disabled={selectedRole.isSystem} onChange={() => togglePermission(permission.permissionId)} className="mt-0.5 size-4 accent-brand-primary" /><span className="min-w-0"><span className="block text-sm font-normal text-[#172033]">{permissionLabels[permission.code] ?? permission.nameKo}</span><span className="mt-0.5 block text-xs font-normal leading-5 text-[#344054]">{permission.description || "이 권한이 허용하는 작업을 관리합니다."}</span></span></label>;
+                    })}</div>
+                  </section>;
+                })}</div>
+              </div> : <div className="min-w-0">
+                <AdminToolbar className="m-5 border-slate-200"><AdminToolbarGroup><Users aria-hidden="true" className="size-4 text-[#344054]" /><span className="text-sm font-normal text-[#344054]">구성원 {members.length}명</span></AdminToolbarGroup><Button type="button" onClick={() => void openMemberEditor()}><UserPlus aria-hidden="true" /> 구성원 편집</Button></AdminToolbar>
+                <AdminDataTable minWidth={740}><colgroup><col style={{ width: 220 }} /><col style={{ width: 140 }} /><col style={{ width: 240 }} /><col style={{ width: 140 }} /></colgroup><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>부여일</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
+                  {membersLoading ? Array.from({ length: 4 }).map((_, index) => <tr key={index}>{Array.from({ length: 4 }).map((__, cell) => <AdminTableCell key={cell}><Skeleton className="h-4 w-24" /></AdminTableCell>)}</tr>)
+                    : members.length === 0 ? <AdminTableEmpty colSpan={4}>이 역할에 지정된 구성원이 없습니다.</AdminTableEmpty>
+                    : members.map((member) => <tr key={member.userId}><AdminTableCell truncate className="admin-table-text-emphasis">{member.nameKo}</AdminTableCell><AdminTableCell truncate>{member.stdNo ?? member.kaistUid}</AdminTableCell><AdminTableCell truncate>{member.email}</AdminTableCell><AdminTableCell truncate>{formatDate(member.grantedAt)}</AdminTableCell></tr>)}
+                </AdminTableBody></AdminDataTable>
+              </div>}
+            </AdminCard> : <AdminCard className="grid min-h-[360px] place-items-center p-8 text-center"><div><ShieldCheck aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-normal text-[#344054]">선택할 역할이 없습니다.</p></div></AdminCard>}
+          </div>
+        </AdminPageMain>
 
-                          return (
-                            <div
-                              key={user.userId}
-                              className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2"
-                            >
-                              <div className="min-w-0">
-                                <p className="truncate text-xs font-black">
-                                  {user.nameKo}
-                                </p>
-                                <p className="truncate text-xs font-semibold text-slate-500">
-                                  {displayStudentId(user)} · {user.email}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => void handleAddMember(user)}
-                                disabled={
-                                  alreadyMember ||
-                                  memberSavingUserId === user.userId
-                                }
-                                className="rounded-lg bg-kaist-darkgreen px-3 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                              >
-                                {alreadyMember
-                                  ? "추가됨"
-                                  : memberSavingUserId === user.userId
-                                    ? "처리 중"
-                                    : "추가"}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+        <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="새 역할 만들기" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createRole()} disabled={saving || !createDraft.nameKo.trim()}>{saving ? "만드는 중" : "역할 만들기"}</Button></>}>
+          <div className="grid gap-4"><AdminFormField label="역할 이름"><UiInput autoFocus value={createDraft.nameKo} onChange={(event) => setCreateDraft((current) => ({ ...current, nameKo: event.currentTarget.value }))} placeholder="예: 콘텐츠 관리자" /></AdminFormField><AdminFormField label="설명" hint="권한은 역할을 만든 뒤 상세 화면에서 지정합니다."><UiInput value={createDraft.description} onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.currentTarget.value }))} placeholder="이 역할이 담당하는 업무" /></AdminFormField></div>
+        </Modal>
 
-                  <div className="overflow-hidden rounded-lg border border-slate-200">
-                    <table className="w-full min-w-[44rem] text-left text-sm">
-                      <thead className="bg-slate-50 text-xs font-black text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3">
-                            <SortableHeader
-                              active={memberSortBy === "name"}
-                              ascending={
-                                memberSortBy === "name" &&
-                                memberSortDirection === "asc"
-                              }
-                              label="이름"
-                              onClick={() => handleMemberSortChange("name")}
-                            />
-                          </th>
-                          <th className="px-4 py-3">
-                            <SortableHeader
-                              active={memberSortBy === "studentId"}
-                              ascending={
-                                memberSortBy === "studentId" &&
-                                memberSortDirection === "asc"
-                              }
-                              label="학번"
-                              onClick={() =>
-                                handleMemberSortChange("studentId")
-                              }
-                            />
-                          </th>
-                          <th className="px-4 py-3">이메일</th>
-                          <th className="px-4 py-3">
-                            <SortableHeader
-                              active={memberSortBy === "grantedAt"}
-                              ascending={
-                                memberSortBy === "grantedAt" &&
-                                memberSortDirection === "asc"
-                              }
-                              label="추가일"
-                              onClick={() =>
-                                handleMemberSortChange("grantedAt")
-                              }
-                            />
-                          </th>
-                          <th className="px-4 py-3 text-center">작업</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {memberLoading ? (
-                          Array.from({ length: 5 }).map((_, index) => (
-                            <tr key={index}>
-                              {Array.from({ length: 5 }).map((__, columnIndex) => (
-                                <td key={columnIndex} className="px-4 py-3">
-                                  <Skeleton className="h-4 w-full max-w-28" />
-                                </td>
-                              ))}
-                            </tr>
-                          ))
-                        ) : roleGroupMembers.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={5}
-                              className="px-4 py-8 text-center text-sm font-bold text-slate-400"
-                            >
-                              아직 구성원이 없습니다.
-                            </td>
-                          </tr>
-                        ) : (
-                          sortedRoleGroupMembers.map((member) => (
-                            <tr
-                              key={member.userRoleGroupId}
-                              className="text-sm text-slate-700"
-                            >
-                              <td className="px-4 py-3 font-black text-slate-950">
-                                {member.nameKo}
-                              </td>
-                              <td className="px-4 py-3 font-semibold">
-                                {displayStudentId(member)}
-                              </td>
-                              <td className="px-4 py-3 font-semibold">
-                                {member.email}
-                              </td>
-                              <td className="px-4 py-3 font-semibold">
-                                {formatShortDate(member.grantedAt)}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleRemoveMember(member)
-                                  }
-                                  disabled={
-                                    memberSavingUserId === member.userId
-                                  }
-                                  className="inline-flex rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                  title="역할에서 제거"
-                                  aria-label={`${member.nameKo} 역할에서 제거`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-xs font-bold text-slate-500">
-                    <span>총 {roleGroupMembers.length}명</span>
-                    <div className="flex items-center gap-4">
-                      <ChevronLeft className="h-4 w-4" />
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-kaist-darkgreen text-white">
-                        1
-                      </span>
-                      <ChevronRight className="h-4 w-4" />
-                    </div>
-                  </div>
-                </section>
-            </div>
-          )}
-        </main>
-      </div>
+        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="max-w-4xl" footer={<><span className="mr-auto self-center text-sm font-normal text-[#344054]">선택 {selectedMemberIds.length}명</span><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button type="button" onClick={() => void saveMembers()} disabled={candidateSaving}>{candidateSaving ? "적용 중" : "구성원 적용"}</Button></>}>
+          <div className="space-y-4">
+            <form className="flex items-end gap-2" onSubmit={(event) => { event.preventDefault(); if (selectedRole) void loadCandidates(selectedRole.roleGroupId, 1); }}><AdminFormField label="구성원 검색" className="min-w-0 flex-1"><div className="relative"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput className="w-full pl-9" value={candidateQuery} onChange={(event) => setCandidateQuery(event.currentTarget.value)} placeholder="이름, 학번, 이메일, 소속 검색" /></div></AdminFormField><Button type="submit" variant="outline" disabled={candidateLoading}>검색</Button></form>
+            <div className="overflow-hidden rounded-xl border border-slate-200"><AdminDataTable minWidth={788}><colgroup><col style={{ width: 48 }} /><col style={{ width: 240 }} /><col style={{ width: 150 }} /><col style={{ width: 250 }} /><col style={{ width: 100 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center"><UiInput type="checkbox" aria-label="현재 페이지 전체 선택" checked={Boolean(candidateData?.items.length && candidateData.items.every((item) => selectedMemberIds.includes(item.userId)))} onChange={(event) => { const pageIds = candidateData?.items.map((item) => item.userId) ?? []; setSelectedMemberIds((current) => event.currentTarget.checked ? [...new Set([...current, ...pageIds])] : current.filter((id) => !pageIds.includes(id))); }} /></AdminTableHead><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>선택</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
+              {candidateLoading ? Array.from({ length: 5 }).map((_, index) => <tr key={index}>{Array.from({ length: 5 }).map((__, cell) => <AdminTableCell key={cell}><Skeleton className="h-4 w-20" /></AdminTableCell>)}</tr>)
+                : (candidateData?.items.length ?? 0) === 0 ? <AdminTableEmpty colSpan={5}>조건에 맞는 사용자가 없습니다.</AdminTableEmpty>
+                : candidateData?.items.map((candidate) => { const checked = selectedMemberIds.includes(candidate.userId); return <tr key={candidate.userId}><AdminTableCell className="text-center"><UiInput type="checkbox" checked={checked} onChange={() => setSelectedMemberIds((current) => checked ? current.filter((id) => id !== candidate.userId) : [...current, candidate.userId])} aria-label={`${candidate.nameKo} 선택`} /></AdminTableCell><AdminTableCell truncate className="admin-table-text-emphasis">{candidate.nameKo}</AdminTableCell><AdminTableCell truncate>{candidate.stdNo ?? candidate.kaistUid}</AdminTableCell><AdminTableCell truncate>{candidate.email}</AdminTableCell><AdminTableCell>{checked ? <AdminStatusBadge tone="positive">포함</AdminStatusBadge> : <AdminStatusBadge>미포함</AdminStatusBadge>}</AdminTableCell></tr>; })}
+            </AdminTableBody></AdminDataTable></div>
+            <Pagination className="m-0" currentPage={candidatePage} onPageChange={(page) => selectedRole && void loadCandidates(selectedRole.roleGroupId, page)} range={`전체 ${candidateData?.total ?? 0}명`} totalPages={Math.max(1, Math.ceil((candidateData?.total ?? 0) / CANDIDATE_PAGE_SIZE))} />
+          </div>
+        </Modal>
+      </AdminPageShell>
     </AuthGuard>
-  );
-}
-
-function SortableHeader({
-  active,
-  ascending,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  ascending: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors ${
-        active ? "text-kaist-darkgreen" : "text-slate-500 hover:text-slate-700"
-      }`}
-    >
-      <span>{label}</span>
-      <ArrowDown
-        className={`h-3 w-3 transition-transform ${
-          ascending ? "rotate-180" : ""
-        }`}
-      />
-    </button>
   );
 }

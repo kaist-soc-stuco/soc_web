@@ -15,6 +15,10 @@ services:
       - '${API_PORT:-3000}:3000'
     volumes:
       - ../../apps/api/uploads:/app/apps/api/uploads
+      - type: bind
+        source: ../../secrets/google-calendar-service-account.json
+        target: /run/secrets/google-calendar-service-account.json
+        read_only: true
     depends_on:
       db-migrate:
         condition: service_completed_successfully

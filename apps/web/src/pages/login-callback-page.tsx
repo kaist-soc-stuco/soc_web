@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { clearStoredAuthState, writeStoredAuthState } from "@/lib/auth-storage";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
+import { Button } from "@/components/ui/button";
 
 const LAST_CONSUMED_RESULT_TOKEN_KEY = "soc.auth.last-consumed-result-token";
 
@@ -207,7 +208,7 @@ export function LoginCallbackPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-white px-6 text-kaist-black">
       <section className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-        <p className="text-sm font-extrabold text-kaist-darkgreen">
+        <p className="text-sm font-semibold text-kaist-darkgreen">
           {status === "failed"
             ? lang === "ko"
               ? "로그인 실패"
@@ -227,23 +228,23 @@ export function LoginCallbackPage() {
               : "Opening the SSO sign-in page or verifying your sign-in result."}
         </p>
         {status === "failed" ? (
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => window.location.assign("/login")}
-            className="mt-5 rounded-lg bg-kaist-darkgreen px-4 py-2 text-xs font-extrabold text-white"
+            className="mt-5 rounded-lg bg-kaist-darkgreen px-4 py-2 text-xs font-semibold text-white"
           >
             {lang === "ko" ? "다시 로그인" : "Try again"}
-          </button>
+          </Button>
         ) : null}
       </section>
 
       {pendingConsentToken ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
           <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-kaist-greygreen">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
               {lang === "ko" ? "개인정보 동의" : "Privacy Consent"}
             </p>
-            <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-kaist-black">
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-kaist-black">
               {lang === "ko" ? "개인정보 제공 동의" : "Personal Data Consent"}
             </h1>
             <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-600">
@@ -266,11 +267,11 @@ export function LoginCallbackPage() {
             ) : null}
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <button
+              <Button variant="ghost"
                 type="button"
                 disabled={consentSubmitting !== null}
                 onClick={() => void submitConsentDecision(false)}
-                className="rounded-xl border border-kaist-darkgreen/30 bg-white px-5 py-2.5 text-sm font-extrabold text-kaist-darkgreen disabled:opacity-50"
+                className="rounded-xl border border-kaist-darkgreen/30 bg-white px-5 py-2.5 text-sm font-semibold text-kaist-darkgreen disabled:opacity-50"
               >
                 {consentSubmitting === "temporary"
                   ? lang === "ko"
@@ -279,12 +280,12 @@ export function LoginCallbackPage() {
                   : lang === "ko"
                     ? "저장하지 않고 계속"
                     : "Continue without saving"}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 disabled={consentSubmitting !== null}
                 onClick={() => void submitConsentDecision(true)}
-                className="rounded-xl bg-kaist-darkgreen px-5 py-2.5 text-sm font-extrabold text-white shadow-sm disabled:opacity-50"
+                className="rounded-xl bg-kaist-darkgreen px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
               >
                 {consentSubmitting === "persisted"
                   ? lang === "ko"
@@ -293,7 +294,7 @@ export function LoginCallbackPage() {
                   : lang === "ko"
                     ? "동의하고 저장"
                     : "Consent and save"}
-              </button>
+              </Button>
             </div>
           </section>
         </div>

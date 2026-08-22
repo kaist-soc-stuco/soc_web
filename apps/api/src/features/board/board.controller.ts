@@ -1,6 +1,30 @@
-import { Controller, Get, Param } from "@nestjs/common";
-import type { BoardListResponse, BoardSummary } from "@soc/contracts";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+} from "@nestjs/common";
+import {
+  BoardCreateSchema,
+  BoardReorderSchema,
+  BoardUpdateSchema,
+  Permissions,
+} from "@soc/contracts";
+import type {
+  BoardArchiveResponse,
+  BoardCreateRequest,
+  BoardListResponse,
+  BoardReorderRequest,
+  BoardSummary,
+  BoardUpdateRequest,
+} from "@soc/contracts";
 
+import { RequirePermissions } from "../auth/guards";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { BoardService } from "./board.service";
 
 @Controller("boards")
@@ -12,8 +36,47 @@ export class BoardController {
     return this.boardService.getBoards();
   }
 
+  @Get("admin")
+  @RequirePermissions(Permissions.ADMIN)
+  async getAdminBoards(): Promise<BoardListResponse> {
+    return this.boardService.getAdminBoards();
+  }
+
+  @Post()
+  @RequirePermissions(Permissions.ADMIN)
+  async createBoard(
+    @Body(new ZodValidationPipe(BoardCreateSchema)) body: BoardCreateRequest,
+  ): Promise<BoardSummary> {
+    return this.boardService.createBoard(body);
+  }
+
+  @Patch("admin/order")
+  @RequirePermissions(Permissions.ADMIN)
+  async reorderBoards(
+    @Body(new ZodValidationPipe(BoardReorderSchema)) body: BoardReorderRequest,
+  ): Promise<BoardListResponse> {
+    return this.boardService.reorderBoards(body);
+  }
+
   @Get(":code")
   async getBoard(@Param("code") code: string): Promise<BoardSummary> {
     return this.boardService.getBoardByCode(code);
+  }
+
+  @Patch(":code")
+  @RequirePermissions(Permissions.ADMIN)
+  async updateBoard(
+    @Param("code") code: string,
+    @Body(new ZodValidationPipe(BoardUpdateSchema)) body: BoardUpdateRequest,
+  ): Promise<BoardSummary> {
+    return this.boardService.updateBoard(code, body);
+  }
+
+  @Delete(":code")
+  @HttpCode(200)
+  @RequirePermissions(Permissions.ADMIN)
+  async archiveBoard(@Param("code") code: string): Promise<BoardArchiveResponse> {
+    const board = await this.boardService.archiveBoard(code);
+    return { ok: true, boardId: board.boardId, isActive: false };
   }
 }

@@ -28,7 +28,6 @@ export interface SurveyRecord {
   maxResponses: number | null;
   isAlwaysOpen: boolean;
   opensAt: string | null;
-  closesAt: string | null;
   createdAt: string;
   updatedAt: string;
   responseCount?: number;

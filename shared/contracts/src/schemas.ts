@@ -42,6 +42,55 @@ export const UpsertSiteContentSchema = z
   })
   .strict();
 
+export const CONTENT_BLOCK_TYPES = [
+  "HERO",
+  "TOP_BANNER",
+  "POPUP",
+  "STATUS_NOTICE",
+  "QUICK_LINK",
+] as const;
+
+export const CONTENT_BLOCK_STATUSES = [
+  "DRAFT",
+  "SCHEDULED",
+  "PUBLISHED",
+  "ARCHIVED",
+] as const;
+
+export const ContentBlockTypeSchema = z.enum(CONTENT_BLOCK_TYPES);
+export const ContentBlockStatusSchema = z.enum(CONTENT_BLOCK_STATUSES);
+
+const NullableContentBlockDateSchema = z.string().datetime({ offset: true }).nullable();
+const NullableContentBlockUrlSchema = z.string().trim().url().max(2_000).nullable();
+
+const ContentBlockFieldsSchema = z
+  .object({
+    type: ContentBlockTypeSchema,
+    titleKo: z.string().trim().min(1).max(255),
+    titleEn: z.string().trim().max(255).default(""),
+    bodyKo: z.string().trim().max(20_000).nullable().default(null),
+    bodyEn: z.string().trim().max(20_000).nullable().default(null),
+    linkUrl: NullableContentBlockUrlSchema.default(null),
+    imageUrl: NullableContentBlockUrlSchema.default(null),
+    startsAt: NullableContentBlockDateSchema.default(null),
+    endsAt: NullableContentBlockDateSchema.default(null),
+    sortOrder: z.number().int().min(0).default(0),
+    isEnabled: z.boolean().default(true),
+  })
+  .strict();
+
+const validateContentBlockSchedule = (
+  value: { startsAt?: string | null; endsAt?: string | null },
+  context: z.RefinementCtx,
+) => {
+    if (value.startsAt && value.endsAt && Date.parse(value.startsAt) >= Date.parse(value.endsAt)) {
+      context.addIssue({ code: "custom", message: "content_block_invalid_schedule", path: ["endsAt"] });
+    }
+};
+
+export const CreateContentBlockSchema = ContentBlockFieldsSchema.superRefine(validateContentBlockSchedule);
+export const UpdateContentBlockSchema = ContentBlockFieldsSchema.partial().superRefine(validateContentBlockSchedule);
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export const ConsentDecisionSchema = z.object({
@@ -56,7 +105,81 @@ export const SsoCallbackBodySchema = z.object({
   state: z.string().optional(),
 });
 
-// ─── Board / Article ─────────────────────────────────────────────────────────
+  // ─── Board / Article ─────────────────────────────────────────────────────────
+
+  export const BoardReadScopeSchema = z.enum(["PUBLIC", "LOGIN", "STAFF_ONLY"]);
+
+  const BoardPermissionBitSchema = z.number().int().nonnegative();
+
+  export const BoardCreateSchema = z.object({
+    code: z
+      .string()
+      .trim()
+      .min(1)
+      .max(20)
+      .regex(/^[\\p{L}\\p{N}_-]+$/u, "invalid_board_code"),
+    nameKo: z.string().trim().min(1).max(20),
+    nameEn: z.string().trim().max(100).optional(),
+    descriptionKo: z.string().trim().max(255).optional(),
+    descriptionEn: z.string().trim().max(255).optional(),
+    readScope: BoardReadScopeSchema.default("PUBLIC"),
+    writePermissionBit: BoardPermissionBitSchema.default(0),
+    commentPermissionBit: BoardPermissionBitSchema.default(0),
+    managePermissionBit: BoardPermissionBitSchema.default(0),
+    allowComment: z.boolean().default(true),
+    allowSecret: z.boolean().default(false),
+    allowLike: z.boolean().default(true),
+    sortOrder: z.number().int().default(0),
+  });
+
+  export const BoardUpdateSchema = BoardCreateSchema.omit({ code: true }).partial().extend({
+    isActive: z.boolean().optional(),
+  });
+
+  export const BoardReorderSchema = z.object({
+    items: z.array(z.object({
+      code: z.string().trim().min(1).max(20),
+      sortOrder: z.number().int().min(0),
+    })).min(1).max(100),
+  }).strict();
+
+  const CalendarDateTimeSchema = z.string().refine(
+    (value) => !Number.isNaN(Date.parse(value)),
+    "invalid_calendar_datetime",
+  );
+
+  const CalendarEventFieldsSchema = z.object({
+    titleKo: z.string().trim().min(1).max(255),
+    titleEn: z.string().trim().max(255).optional(),
+    descriptionKo: z.string().max(10_000).optional(),
+    descriptionEn: z.string().max(10_000).optional(),
+    startAt: CalendarDateTimeSchema,
+    endAt: CalendarDateTimeSchema,
+    location: z.string().trim().max(255).optional(),
+    sourceUid: z.string().trim().max(255).optional(),
+  });
+
+  export const CalendarEventCreateSchema = CalendarEventFieldsSchema.refine(
+    (value) => Date.parse(value.endAt) >= Date.parse(value.startAt),
+    {
+    message: "calendar_end_before_start",
+    path: ["endAt"],
+    },
+  );
+
+  export const CalendarEventUpdateSchema = CalendarEventFieldsSchema.partial()
+    .extend({ isActive: z.boolean().optional() })
+    .refine(
+      (value) =>
+        value.startAt === undefined ||
+        value.endAt === undefined ||
+        Date.parse(value.endAt) >= Date.parse(value.startAt),
+      { message: "calendar_end_before_start", path: ["endAt"] },
+    );
+
+  export const CalendarIcsImportSchema = z.object({
+    ics: z.string().min(1).max(2_000_000),
+  });
 
 export const VisibilityScopeSchema = z.enum(["PUBLIC", "MEMBERS", "STAFF_ONLY"]);
 
@@ -82,7 +205,7 @@ const ArticleAssetsSchema = z
     }
   });
 
-export const ArticleCreateSchema = z.object({
+  export const ArticleCreateSchema = z.object({
   titleKo: z.string().min(1).max(255),
   titleEn: z.string().max(255).optional(),
   contentKo: z.string().min(1).max(50_000),
@@ -90,6 +213,7 @@ export const ArticleCreateSchema = z.object({
   visibilityScope: VisibilityScopeSchema,
   isPinned: z.boolean().optional(),
   pinOrder: z.number().int().nullable().optional(),
+  isSecret: z.boolean().optional(),
   isAnonymous: z.boolean().optional(),
   allowComment: z.boolean().optional(),
   assets: ArticleAssetsSchema.optional(),
@@ -107,6 +231,7 @@ export const ArticleUpdateSchema = z.object({
   visibilityScope: VisibilityScopeSchema.optional(),
   isPinned: z.boolean().optional(),
   pinOrder: z.number().int().nullable().optional(),
+  isSecret: z.boolean().optional(),
   isAnonymous: z.boolean().optional(),
   allowComment: z.boolean().optional(),
   assets: ArticleAssetsSchema.optional(),
@@ -114,6 +239,31 @@ export const ArticleUpdateSchema = z.object({
   eventEndDate: z.string().nullable().optional(),
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
+});
+
+export const ArticleDraftSaveSchema = z.object({
+  draftId: z.string().uuid().optional(),
+  boardCode: z.string().trim().min(1).max(20),
+  targetArticleId: z.string().regex(/^\d+$/).nullable().optional(),
+  titleKo: z.string().max(255).default(""),
+  titleEn: z.string().max(255).nullable().optional(),
+  contentKo: z.string().max(50_000).default(""),
+  contentEn: z.string().max(50_000).nullable().optional(),
+  visibilityScope: VisibilityScopeSchema.default("PUBLIC"),
+  isPinned: z.boolean().default(false),
+  pinOrder: z.number().int().nullable().optional(),
+  isSecret: z.boolean().default(false),
+  isAnonymous: z.boolean().default(false),
+  allowComment: z.boolean().default(true),
+  isKoreanOnly: z.boolean().default(false),
+  assets: ArticleAssetsSchema.optional(),
+  eventStartDate: z.string().nullable().optional(),
+  eventEndDate: z.string().nullable().optional(),
+  eventDescriptionKo: z.string().nullable().optional(),
+  eventDescriptionEn: z.string().nullable().optional(),
+  linkedSurveyId: z.string().uuid().nullable().optional(),
+  fingerprint: z.string().trim().min(1).max(128),
+  expectedVersion: z.number().int().positive().optional(),
 });
 
 // ─── Comment ─────────────────────────────────────────────────────────────────
@@ -127,16 +277,21 @@ export const CommentUpdateSchema = z.object({
   content: z.string().min(1).max(50_000),
 });
 
+export const CommentReportSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+});
+
 // ─── Survey ──────────────────────────────────────────────────────────────────
 
 const SurveyResultVisibilitySchema = z.enum(["PRIVATE", "PUBLIC"]);
+const SurveyRichTextSchema = z.string().max(50_000).optional();
 
 export const CreateSurveySchema = z.object({
   kind: z.string().min(1).max(20),
   titleKo: z.string().min(1).max(255),
   titleEn: z.string().max(255).optional(),
-  descriptionKo: z.string().optional(),
-  descriptionEn: z.string().optional(),
+  descriptionKo: SurveyRichTextSchema,
+  descriptionEn: SurveyRichTextSchema,
   feeRequirementPolicy: z.string().max(20).optional(),
   allowMultipleResponses: z.boolean().optional(),
   allowResponseEdit: z.boolean().optional(),
@@ -147,7 +302,6 @@ export const CreateSurveySchema = z.object({
   resultVisibility: SurveyResultVisibilitySchema.default("PRIVATE"),
   maxResponseCount: z.number().int().positive().nullable().optional(),
   openAt: z.string().nullable().optional(),
-  closeAt: z.string().nullable().optional(),
   connectedArticleId: z.string().nullable().optional(),
 });
 
@@ -159,8 +313,8 @@ export const UpdateSurveySchema = CreateSurveySchema.partial().extend({
 export const CreateSectionSchema = z.object({
   titleKo: z.string().min(1),
   titleEn: z.string().optional(),
-  descriptionKo: z.string().optional(),
-  descriptionEn: z.string().optional(),
+  descriptionKo: SurveyRichTextSchema,
+  descriptionEn: SurveyRichTextSchema,
   sortOrder: z.number().int().min(0).optional(),
 });
 
@@ -172,6 +326,9 @@ export const QuestionTypeSchema = z.enum([
   "single_choice",
   "multiple_choice",
   "dropdown",
+  "grid_single",
+  "grid_multiple",
+  "file_upload",
   "date",
   "time",
   "datetime",
@@ -183,16 +340,29 @@ export const QuestionOptionSchema = z.object({
   labelEn: z.string().optional(),
 });
 
+export const QuestionConfigSchema = z.object({
+  rows: z.array(QuestionOptionSchema).max(100).optional(),
+  columns: z.array(QuestionOptionSchema).max(100).optional(),
+  maxFiles: z.number().int().positive().max(10).optional(),
+  maxSizeBytes: z.number().int().positive().max(20_000_000).optional(),
+  allowedMimeTypes: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
+  // Google Forms-style section branching. Values are option IDs; targets are
+  // section IDs or the terminal `SUBMIT` marker.
+  goToSectionByValue: z
+    .record(z.string().trim().min(1).max(100), z.string().trim().min(1).max(100))
+    .optional(),
+});
+
 export const CreateQuestionSchema = z.object({
   titleKo: z.string().min(1),
   titleEn: z.string().optional(),
-  descriptionKo: z.string().optional(),
-  descriptionEn: z.string().optional(),
+  descriptionKo: SurveyRichTextSchema,
+  descriptionEn: SurveyRichTextSchema,
   questionType: QuestionTypeSchema,
   options: z.array(QuestionOptionSchema).optional(),
+  config: QuestionConfigSchema.optional(),
   answerRegex: z.string().optional(),
   isRequired: z.boolean().optional(),
-  editDeadlineAt: z.string().optional(),
   sortOrder: z.number().int().min(0).optional(),
 });
 
@@ -221,12 +391,29 @@ export const AssignRoleGroupMemberSchema = z.object({
   userId: z.string().uuid(),
 });
 
+export const RoleGroupMemberFilterSchema = z.object({
+  q: z.string().optional(),
+  department: z.string().optional(),
+  academicStatus: z.string().optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+  page: z.number().int().positive().optional(),
+  pageSize: z.number().int().positive().max(100).optional(),
+});
+
+export const ReplaceRoleGroupMembersSchema = z.object({
+  userIds: z.array(z.string().uuid()).max(500),
+});
+
+export const UpdateUserActiveStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
 // ─── Finance ─────────────────────────────────────────────────────────────────
 
 export const UpdateStudentFeeStatusSchema = z
   .object({
     paidAmount: z.number().int().min(0).max(100_000_000).optional(),
-    status: z.enum(["PAID", "UNPAID"]).optional(),
+    status: z.enum(["PAID", "PARTIAL", "UNPAID"]).optional(),
     coverageSemesters: z.number().int().positive().optional(),
     note: z.string().nullable().optional(),
   })
@@ -239,23 +426,87 @@ export const UpdateStudentFeeStatusSchema = z
     { message: "fee_status_update_required" },
   );
 
+const StudentFeePaymentInputSchema = z.object({
+  userId: z.string().uuid(),
+  amount: z.number().int().min(0).max(100_000_000),
+  paymentType: z.enum(["SIX_SEMESTER_LUMP_SUM", "PRIOR_PAYMENT_BALANCE"]),
+  paymentMethod: z.enum(["BANK_TRANSFER", "CASH", "OTHER"]),
+  effectiveStartSemester: z.string().regex(/^\d{4}-[12]$/, "invalid_reference_semester"),
+  coverageSemesters: z.number().int().min(1).max(6),
+  paidAt: z.string().datetime(),
+  note: z.string().trim().max(500).nullable().optional(),
+});
+
+export const BulkProcessStudentFeePaymentsSchema = z.object({
+  payments: z.array(StudentFeePaymentInputSchema).min(1).max(1_000),
+});
+
+export const BulkUpdateStudentFeeStatusSchema = z.object({
+  updates: z
+    .array(
+      z
+        .object({
+          userId: z.string().uuid().optional(),
+          stdNo: z.string().trim().max(30).optional(),
+          paidAmount: z.number().int().min(0).max(100_000_000).optional(),
+          status: z.enum(["PAID", "PARTIAL", "UNPAID"]).optional(),
+          coverageSemesters: z.number().int().positive().optional(),
+          note: z.string().nullable().optional(),
+        })
+        .refine((value) => Boolean(value.userId || value.stdNo), {
+          message: "user_id_or_student_number_required",
+        })
+        .refine(
+          (value) =>
+            value.paidAmount !== undefined ||
+            value.status !== undefined ||
+            value.coverageSemesters !== undefined ||
+            value.note !== undefined,
+          { message: "fee_status_update_required" },
+        ),
+    )
+    .min(1)
+    .max(1_000),
+});
+
 // ─── Executive Contacts ──────────────────────────────────────────────────────
 
 const RequiredContactTextSchema = z.string().trim().min(1).max(100);
 
-export const CreateContactSchema = z.object({
+const ContactFieldsSchema = z.object({
   nameKo: RequiredContactTextSchema,
   nameEn: RequiredContactTextSchema,
   roleKo: RequiredContactTextSchema,
   roleEn: RequiredContactTextSchema,
+  gender: z.string().trim().max(20).nullable().optional(),
+  cohort: z.number().int().positive().max(100).nullable().optional(),
   email: z.string().email().or(z.literal("")).nullable().optional(),
   phoneNumber: z.string().max(50).nullable().optional(),
+  privacyConsented: z.boolean(),
   sortOrder: z.number().int().optional(),
 });
 
+export const CreateContactSchema = ContactFieldsSchema.extend({
+  privacyConsented: z.boolean().default(true),
+});
+
+export const ReorderContactsSchema = z
+  .object({
+    items: z
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          sortOrder: z.number().int().min(0),
+        }),
+      )
+      .min(1)
+      .max(500),
+  })
+  .strict();
+
 // PATCH keeps the same validation and normalization rules as creation, but
 // only applies them to fields the caller actually supplies.
-export const UpdateContactSchema = CreateContactSchema.partial();
+export const UpdateContactSchema = ContactFieldsSchema.partial();
 
 export const BulkImportContactsSchema = z.object({
   items: z.array(CreateContactSchema).min(1).max(500),
@@ -264,8 +515,56 @@ export const BulkImportContactsSchema = z.object({
 
 // ─── Bulk Email ──────────────────────────────────────────────────────────────
 
+export const BulkEmailRecipientFiltersSchema = z.object({
+  query: z.string().trim().max(100).optional(),
+  studentNumber: z.string().trim().max(30).optional(),
+  primaryMajor: z.string().trim().max(100).optional(),
+  doubleMajor: z.string().trim().max(100).optional(),
+  minor: z.string().trim().max(100).optional(),
+  academicStatus: z.string().trim().max(30).optional(),
+});
+
+const BulkEmailAttachmentIdsSchema = z
+  .array(z.string().regex(/^\d+$/, "asset_id_invalid"))
+  .max(10)
+  .default([]);
+
 export const SendBulkEmailSchema = z.object({
   subject: z.string().min(1).max(255),
   content: z.string().min(1),
+  contentType: z.enum(["plain", "html"]).default("html"),
   recipientType: z.enum(["ALL", "PAID_STUDENTS", "UNPAID_STUDENTS"]),
+  filters: BulkEmailRecipientFiltersSchema.optional(),
+  scheduledAt: z.string().datetime({ offset: true }).optional(),
+  attachmentAssetIds: BulkEmailAttachmentIdsSchema,
+  idempotencyKey: z.string().trim().min(1).max(128).optional(),
 });
+
+export const SaveBulkEmailDraftSchema = z.object({
+  draftId: z.string().uuid().optional(),
+  subject: z.string().max(255).default(""),
+  content: z.string().default(""),
+  contentType: z.enum(["plain", "html"]).default("html"),
+  recipientType: z.enum(["ALL", "PAID_STUDENTS", "UNPAID_STUDENTS"]).default("ALL"),
+  filters: BulkEmailRecipientFiltersSchema.optional(),
+  attachmentAssetIds: BulkEmailAttachmentIdsSchema,
+});
+
+const BulkEmailContentTypeSchema = z.enum(["plain", "html"]);
+const BulkEmailRecipientTypeSchema = z.enum([
+  "ALL",
+  "PAID_STUDENTS",
+  "UNPAID_STUDENTS",
+]);
+
+export const CreateBulkEmailTemplateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(255).optional(),
+  subject: z.string().min(1).max(255),
+  content: z.string().min(1).max(100_000),
+  contentType: BulkEmailContentTypeSchema.default("html"),
+  recipientType: BulkEmailRecipientTypeSchema.default("ALL"),
+  filters: BulkEmailRecipientFiltersSchema.optional(),
+});
+
+export const UpdateBulkEmailTemplateSchema = CreateBulkEmailTemplateSchema.partial();

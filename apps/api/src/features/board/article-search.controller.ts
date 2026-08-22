@@ -26,7 +26,7 @@ export class ArticleSearchController {
     @Query("searchBy") searchBy?: "title" | "author" | "title_content",
     @Query("sortBy") sortBy?: "latest" | "views",
     @Query("sortDirection") sortDirection?: "asc" | "desc",
-    @Query("period") period?: "all" | "7days" | "30days",
+    @Query("period") period?: "all" | "today" | "7days" | "30days",
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListResponse> {
     const currentUser =

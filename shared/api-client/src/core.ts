@@ -6,7 +6,7 @@ export interface ApiClientOptions {
 export interface ListQueryOptions {
   limit?: number;
   page?: number;
-  period?: "all" | "7days" | "30days";
+  period?: "all" | "today" | "7days" | "30days";
   q?: string;
   searchBy?: "title" | "author" | "title_content";
   sortBy?: "latest" | "views";
@@ -28,11 +28,27 @@ export interface ApiClientContext {
   contactsBaseUrl: string;
   emailsBaseUrl: string;
   normalizedBaseUrl: string;
+  notificationsBaseUrl: string;
   requestJson: <T>(
     url: string,
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ) => Promise<T>;
+  requestText: (
+    url: string,
+    init: RequestInit,
+    options?: { retryOnUnauthorized?: boolean },
+  ) => Promise<string>;
+  requestBlob: (
+    url: string,
+    init: RequestInit,
+    options?: { retryOnUnauthorized?: boolean },
+  ) => Promise<Blob>;
+  putObject: (
+    url: string,
+    body: BodyInit,
+    headers?: HeadersInit,
+  ) => Promise<void>;
   requestVoid: (
     url: string,
     init: RequestInit,
@@ -125,6 +141,22 @@ const readJson = async <T>(response: Response): Promise<T> => {
   }
 
   return response.json() as Promise<T>;
+};
+
+const readText = async (response: Response): Promise<string> => {
+  if (!response.ok) {
+    throw new ApiClientHttpError(response.status);
+  }
+
+  return response.text();
+};
+
+const readBlob = async (response: Response): Promise<Blob> => {
+  if (!response.ok) {
+    throw new ApiClientHttpError(response.status);
+  }
+
+  return response.blob();
 };
 
 export const createApiClientContext = ({
@@ -220,6 +252,69 @@ export const createApiClientContext = ({
     }
   };
 
+  const requestText = async (
+    url: string,
+    init: RequestInit,
+    options?: { retryOnUnauthorized?: boolean },
+  ): Promise<string> => {
+    const response = await fetcher(url, {
+      credentials: "include",
+      ...init,
+    });
+
+    if (response.status === 401 && options?.retryOnUnauthorized) {
+      await sendRefreshRequest();
+
+      const retriedResponse = await fetcher(url, {
+        credentials: "include",
+        ...init,
+      });
+
+      return readText(retriedResponse);
+    }
+
+    return readText(response);
+  };
+
+  const requestBlob = async (
+    url: string,
+    init: RequestInit,
+    options?: { retryOnUnauthorized?: boolean },
+  ): Promise<Blob> => {
+    const response = await fetcher(url, {
+      credentials: "include",
+      ...init,
+    });
+
+    if (response.status === 401 && options?.retryOnUnauthorized) {
+      await sendRefreshRequest();
+
+      const retriedResponse = await fetcher(url, {
+        credentials: "include",
+        ...init,
+      });
+
+      return readBlob(retriedResponse);
+    }
+
+    return readBlob(response);
+  };
+
+  const putObject = async (
+    url: string,
+    body: BodyInit,
+    headers?: HeadersInit,
+  ): Promise<void> => {
+    const response = await fetcher(url, {
+      body,
+      headers,
+      method: "PUT",
+    });
+    if (!response.ok) {
+      throw new ApiClientHttpError(response.status);
+    }
+  };
+
   return {
     auditLogsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "audit-logs"),
     assetBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "assets"),
@@ -228,7 +323,11 @@ export const createApiClientContext = ({
     contactsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "contacts"),
     emailsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "admin/emails"),
     normalizedBaseUrl,
+    notificationsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "notifications"),
+    putObject,
     requestJson,
+    requestBlob,
+    requestText,
     requestVoid,
     roleGroupsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "role-groups"),
     siteContentBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "site-content"),

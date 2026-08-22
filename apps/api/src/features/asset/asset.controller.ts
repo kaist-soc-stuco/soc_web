@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
@@ -18,6 +19,10 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Permissions } from "@soc/contracts";
+import type {
+  AssetDirectUploadCompleteRequest,
+  AssetDirectUploadPrepareRequest,
+} from "@soc/contracts";
 import { Request, Response } from "express";
 
 import { AuthGuard, RequirePermissions } from "../auth/guards";
@@ -58,7 +63,6 @@ const ALLOWED_ASSET_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
-  "text/csv",
   "text/plain",
 ]);
 
@@ -128,9 +132,71 @@ export class AssetController {
     });
   }
 
+  @Post("presign")
+  @UseGuards(AuthGuard)
+  async presign(
+    @Body() body: AssetDirectUploadPrepareRequest,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!request.user) {
+      throw new UnauthorizedException("user_not_found_in_request");
+    }
+    if (
+      typeof body?.originalFilename !== "string" ||
+      typeof body?.mimeType !== "string" ||
+      !Number.isInteger(body?.sizeBytes) ||
+      body.sizeBytes <= 0 ||
+      body.sizeBytes > MAX_FILE_SIZE_BYTES
+    ) {
+      throw new BadRequestException("asset_metadata_invalid");
+    }
+    if (!ALLOWED_ASSET_MIME_TYPES.has(body.mimeType)) {
+      throw new BadRequestException("unsupported_asset_mime_type");
+    }
+
+    return this.assetService.prepareDirectUpload({
+      originalFilename: body.originalFilename,
+      mimeType: body.mimeType,
+      sizeBytes: body.sizeBytes,
+      userId: request.user.id,
+    });
+  }
+
+  @Post("complete")
+  @UseGuards(AuthGuard)
+  async complete(
+    @Body() body: AssetDirectUploadCompleteRequest,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!request.user) {
+      throw new UnauthorizedException("user_not_found_in_request");
+    }
+    if (
+      typeof body?.storageKey !== "string" ||
+      !body.storageKey.startsWith("s3://")
+    ) {
+      throw new BadRequestException("asset_storage_key_invalid");
+    }
+
+    return this.assetService.completeDirectUpload({
+      storageKey: body.storageKey,
+      userId: request.user.id,
+    });
+  }
+
   @Post("cleanup-orphans")
   @RequirePermissions(Permissions.ADMIN)
   async cleanupOrphans() {
     return this.assetService.cleanupUnlinkedAssets();
+  }
+
+  @Post("migrate-local")
+  @RequirePermissions(Permissions.ADMIN)
+  async migrateLocal(@Body() body: { limit?: number }) {
+    const rawLimit = Number(body?.limit ?? 100);
+    const limit = Number.isInteger(rawLimit)
+      ? Math.min(Math.max(rawLimit, 1), 500)
+      : 100;
+    return this.assetService.migrateLocalAssets(limit);
   }
 }

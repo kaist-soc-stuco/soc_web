@@ -8,6 +8,9 @@ import type {
 } from "@soc/contracts";
 
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { Button } from "@/components/ui/button";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { UiInput, UiTextarea } from "@/components/ui/form-control";
 
 type BoardDebugResult =
   | {
@@ -107,7 +110,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
             Dev Board Test
           </p>
-          <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-kaist-black">
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-kaist-black">
             게시판 API 임시 검증
           </h2>
           <p className="mt-2 text-sm font-medium leading-7 text-kaist-grey">
@@ -122,7 +125,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <label className="space-y-2 text-sm font-semibold text-kaist-black">
           <span>boardCode</span>
-          <input
+          <UiInput
             value={boardCode}
             onChange={(event) => setBoardCode(event.target.value)}
             className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
@@ -130,7 +133,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
         </label>
         <label className="space-y-2 text-sm font-semibold text-kaist-black">
           <span>articleId</span>
-          <input
+          <UiInput
             value={articleId}
             onChange={(event) => setArticleId(event.target.value)}
             className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
@@ -138,7 +141,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
         </label>
         <label className="space-y-2 text-sm font-semibold text-kaist-black">
           <span>commentId</span>
-          <input
+          <UiInput
             value={commentId}
             onChange={(event) => setCommentId(event.target.value)}
             className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
@@ -149,7 +152,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
       <div className="mt-4 grid gap-4 md:grid-cols-4">
         <label className="space-y-2 text-sm font-semibold text-kaist-black">
           <span>article page</span>
-          <input
+          <UiInput
             value={articlePage}
             onChange={(event) => setArticlePage(event.target.value)}
             className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
@@ -157,7 +160,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
         </label>
         <label className="space-y-2 text-sm font-semibold text-kaist-black">
           <span>article limit</span>
-          <input
+          <UiInput
             value={articleLimit}
             onChange={(event) => setArticleLimit(event.target.value)}
             className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
@@ -165,7 +168,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
         </label>
         <label className="space-y-2 text-sm font-semibold text-kaist-black">
           <span>comment page</span>
-          <input
+          <UiInput
             value={commentPage}
             onChange={(event) => setCommentPage(event.target.value)}
             className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
@@ -173,7 +176,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
         </label>
         <label className="space-y-2 text-sm font-semibold text-kaist-black">
           <span>comment limit</span>
-          <input
+          <UiInput
             value={commentLimit}
             onChange={(event) => setCommentLimit(event.target.value)}
             className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
@@ -183,27 +186,27 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-kaist-grey/20 p-4">
-          <h3 className="text-base font-extrabold tracking-tight text-kaist-black">
+          <h3 className="text-base font-semibold tracking-tight text-kaist-black">
             Read APIs
           </h3>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               disabled={loadingLabel !== null}
               onClick={() => void runAction("boards", () => apiClient.getBoards())}
               className="rounded-full bg-kaist-darkgreen px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
               boards
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               disabled={loadingLabel !== null || !boardCode.trim()}
               onClick={() => void runAction("board", () => apiClient.getBoard(boardCode.trim()))}
               className="rounded-full bg-kaist-darkgreen px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
               board detail
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               disabled={loadingLabel !== null || !boardCode.trim()}
               onClick={() =>
@@ -217,8 +220,8 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
               className="rounded-full bg-kaist-darkgreen px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
               articles
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               disabled={loadingLabel !== null || !boardCode.trim() || !articleId.trim()}
               onClick={() =>
@@ -229,8 +232,8 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
               className="rounded-full bg-kaist-darkgreen px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
               article detail
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               disabled={loadingLabel !== null || !boardCode.trim() || !articleId.trim()}
               onClick={() =>
@@ -244,18 +247,18 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
               className="rounded-full bg-kaist-darkgreen px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
               comments
-            </button>
+            </Button>
           </div>
         </div>
 
         <div className="rounded-2xl border border-kaist-grey/20 p-4">
-          <h3 className="text-base font-extrabold tracking-tight text-kaist-black">
+          <h3 className="text-base font-semibold tracking-tight text-kaist-black">
             Write APIs
           </h3>
           <div className="mt-4 space-y-3">
             <label className="block space-y-2 text-sm font-semibold text-kaist-black">
               <span>article titleKo</span>
-              <input
+              <UiInput
                 value={articleForm.titleKo}
                 onChange={(event) =>
                   setArticleForm((current) => ({
@@ -268,7 +271,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
             </label>
             <label className="block space-y-2 text-sm font-semibold text-kaist-black">
               <span>article contentKo</span>
-              <textarea
+              <UiTextarea
                 value={articleForm.contentKo}
                 onChange={(event) =>
                   setArticleForm((current) => ({
@@ -282,24 +285,22 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
             </label>
             <label className="block space-y-2 text-sm font-semibold text-kaist-black">
               <span>visibilityScope</span>
-              <select
+              <AdminSelectDropdown
+                ariaLabel="visibilityScope"
                 value={articleForm.visibilityScope}
                 onChange={(event) =>
                   setArticleForm((current) => ({
                     ...current,
-                    visibilityScope: event.target.value as ArticleCreateRequest["visibilityScope"],
+                    visibilityScope: event as ArticleCreateRequest["visibilityScope"],
                   }))
                 }
-                className="w-full rounded-lg border border-kaist-grey/30 px-3 py-2 text-sm font-medium outline-none focus:border-kaist-darkgreen"
-              >
-                <option value="PUBLIC">PUBLIC</option>
-                <option value="MEMBERS">MEMBERS</option>
-                <option value="STAFF_ONLY">STAFF_ONLY</option>
-              </select>
+                className="w-full"
+                options={[{ value: "PUBLIC", label: "PUBLIC" }, { value: "MEMBERS", label: "MEMBERS" }, { value: "STAFF_ONLY", label: "STAFF_ONLY" }]}
+              />
             </label>
             <label className="block space-y-2 text-sm font-semibold text-kaist-black">
               <span>comment content</span>
-              <input
+              <UiInput
                 value={commentForm.content}
                 onChange={(event) =>
                   setCommentForm({ content: event.target.value })
@@ -308,7 +309,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
               />
             </label>
             <div className="flex flex-wrap gap-2 pt-2">
-              <button
+              <Button variant="ghost"
                 type="button"
                 disabled={loadingLabel !== null || !canMutate}
                 onClick={() =>
@@ -319,8 +320,8 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
                 className="rounded-full border border-kaist-darkgreen px-4 py-2 text-xs font-bold text-kaist-darkgreen disabled:opacity-50"
               >
                 create article
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 disabled={loadingLabel !== null || !canMutate}
                 onClick={() =>
@@ -335,8 +336,8 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
                 className="rounded-full border border-kaist-darkgreen px-4 py-2 text-xs font-bold text-kaist-darkgreen disabled:opacity-50"
               >
                 update article
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 disabled={loadingLabel !== null || !canMutate}
                 onClick={() =>
@@ -347,8 +348,8 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
                 className="rounded-full border border-red-400 px-4 py-2 text-xs font-bold text-red-600 disabled:opacity-50"
               >
                 delete article
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 disabled={loadingLabel !== null || !canMutate}
                 onClick={() =>
@@ -362,8 +363,8 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
                 className="rounded-full border border-kaist-darkgreen px-4 py-2 text-xs font-bold text-kaist-darkgreen disabled:opacity-50"
               >
                 create comment
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 disabled={loadingLabel !== null || !canMutate}
                 onClick={() =>
@@ -379,8 +380,8 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
                 className="rounded-full border border-kaist-darkgreen px-4 py-2 text-xs font-bold text-kaist-darkgreen disabled:opacity-50"
               >
                 update comment
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 disabled={loadingLabel !== null || !canMutate}
                 onClick={() =>
@@ -395,7 +396,7 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
                 className="rounded-full border border-red-400 px-4 py-2 text-xs font-bold text-red-600 disabled:opacity-50"
               >
                 delete comment
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -404,20 +405,20 @@ export function BoardDebugPanel({ defaultBoardCode }: BoardDebugPanelProps) {
       <div className="mt-6 rounded-2xl border border-kaist-grey/20 bg-kaist-grey/5 p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-extrabold tracking-tight text-kaist-black">
+            <h3 className="text-base font-semibold tracking-tight text-kaist-black">
               Result
             </h3>
             <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
               {loadingLabel ? `running: ${loadingLabel}` : "idle"}
             </p>
           </div>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => setResult(null)}
             className="rounded-full border border-kaist-grey/30 px-4 py-2 text-xs font-bold text-kaist-greygreen"
           >
             clear
-          </button>
+          </Button>
         </div>
 
         <div className="mt-4">

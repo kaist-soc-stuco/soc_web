@@ -2,6 +2,8 @@ import { AlertTriangle, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { useLanguage } from "@/hooks/use-language";
 
 type ConfirmTone = "default" | "danger";
@@ -74,7 +76,7 @@ export function useConfirmDialog() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-6 backdrop-blur-[2px]"
           role="dialog"
         >
-          <button
+          <Button variant="ghost"
             type="button"
             aria-label={lang === "ko" ? "닫기" : "Close"}
             className="absolute inset-0 cursor-default"
@@ -92,7 +94,7 @@ export function useConfirmDialog() {
                 <AlertTriangle className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-[15px] font-extrabold leading-snug text-slate-900">
+                <h2 className="text-[15px] font-semibold leading-snug text-slate-900">
                   {state.title}
                 </h2>
                 {state.description && (
@@ -101,35 +103,36 @@ export function useConfirmDialog() {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
+              <IconButton
+                size="sm"
                 aria-label={lang === "ko" ? "닫기" : "Close"}
                 onClick={() => close(false)}
-                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
-                <X className="h-4 w-4" />
-              </button>
+                <X aria-hidden="true" />
+              </IconButton>
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => close(false)}
-                className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
               >
                 {state.cancelLabel}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                size="sm"
                 onClick={() => close(true)}
-                className={`inline-flex h-8 items-center rounded-lg px-3 text-xs font-bold text-white transition ${
+                className={`text-white ${
                   state.tone === "danger"
                     ? "bg-rose-600 hover:bg-rose-700"
                     : "bg-kaist-darkgreen hover:bg-[#0f5c29]"
                 }`}
               >
                 {state.confirmLabel}
-              </button>
+              </Button>
             </div>
           </div>
         </div>,

@@ -123,7 +123,7 @@ export function SuccessView({
       <div className="w-14 h-14 rounded-2xl bg-kaist-lightgreen/20 flex items-center justify-center text-kaist-darkgreen mb-5 border border-kaist-lightgreen/30">
         <CheckCircle2 className="w-8 h-8" />
       </div>
-      <h2 className="text-2xl font-black text-kaist-black mb-3">
+      <h2 className="text-2xl font-bold text-kaist-black mb-3">
         {lang === "ko" ? "제출이 완료되었습니다" : "Submission Completed"}
       </h2>
       <p className="text-sm text-kaist-grey/80 leading-relaxed mb-8">
@@ -135,15 +135,15 @@ export function SuccessView({
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-extrabold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
           </Link>
         )}
         <Link
-          to="/events-surveys?tab=survey"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-extrabold text-slate-800 transition hover:bg-slate-100"
+          to="/surveys"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
         >
           <ListChecks className="h-4 w-4" />
           {lang === "ko" ? "설문 목록으로" : "Survey list"}
@@ -169,7 +169,7 @@ export function AlreadySubmittedView({
       <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 mb-5 border border-blue-100">
         <CheckCircle2 className="w-8 h-8" />
       </div>
-      <h2 className="text-2xl font-black text-kaist-black mb-3">
+      <h2 className="text-2xl font-bold text-kaist-black mb-3">
         {lang === "ko" ? "이미 참여한 설문입니다" : "Already Participated"}
       </h2>
       <p className="text-sm text-kaist-grey/80 leading-relaxed mb-8">
@@ -185,15 +185,15 @@ export function AlreadySubmittedView({
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-extrabold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
           </Link>
         )}
         <Link
-          to="/events-surveys?tab=survey"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-extrabold text-slate-800 transition hover:bg-slate-100"
+          to="/surveys"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
         >
           <ListChecks className="h-4 w-4" />
           {lang === "ko" ? "설문 목록으로" : "Survey list"}

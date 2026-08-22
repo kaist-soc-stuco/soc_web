@@ -1,11 +1,45 @@
-import { BadRequestException, Controller, Get, Query } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  Param,
+  Patch,
+  Post,
+  ParseIntPipe,
+  Query,
+  Req,
+} from "@nestjs/common";
+import {
+  CalendarEventCreateSchema,
+  CalendarEventUpdateSchema,
+  CalendarIcsImportSchema,
+  Permissions,
+} from "@soc/contracts";
 import type {
+  CalendarEventCreateRequest,
+  CalendarEventListResponse,
+  CalendarEventRecord,
+  CalendarEventUpdateRequest,
+  CalendarExternalSyncResponse,
+  CalendarGoogleSyncResponse,
+  CalendarIcsImportRequest,
+  CalendarIcsImportResponse,
+  CalendarKaistSyncResponse,
   KoreanHolidayRecord,
   PublicCalendarEventsResponse,
 } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
+import type { Request } from "express";
 
+import { RequirePermissions } from "../auth/guards";
+import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { CalendarService } from "./calendar.service";
+import { seoulYear } from "./calendar.utils";
+
+type AuthenticatedRequest = Request & { user?: { id: string } };
 
 @Controller("calendar")
 export class CalendarController {
@@ -15,6 +49,7 @@ export class CalendarController {
   async listPublicCalendarEvents(
     @Query("from") from: string,
     @Query("to") to: string,
+    @Query("q") query?: string,
   ): Promise<PublicCalendarEventsResponse> {
     const fromDate = this.parseRangeDate(from);
     const toDate = this.parseRangeDate(to);
@@ -28,7 +63,93 @@ export class CalendarController {
       throw new BadRequestException("Date range is too large");
     }
 
-    return this.calendarService.listPublicCalendarEvents(fromDate, toDate);
+    return this.calendarService.listPublicCalendarEvents(fromDate, toDate, query);
+  }
+
+  @Get("search")
+  async searchPublicCalendarEvents(
+    @Query("q") query?: string,
+    @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
+  ): Promise<PublicCalendarEventsResponse> {
+    return this.calendarService.searchPublicCalendarEvents(query, limit ?? 40);
+  }
+
+  @Get("manual")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async listManualEvents(): Promise<CalendarEventListResponse> {
+    return this.calendarService.listManualEvents();
+  }
+
+  @Get("manual/export")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @Header("Content-Type", "text/calendar; charset=utf-8")
+  @Header("Content-Disposition", "attachment; filename=\"soc-calendar.ics\"")
+  async exportIcs(): Promise<string> {
+    return this.calendarService.exportIcs();
+  }
+
+  @Post("manual")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async createManualEvent(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(CalendarEventCreateSchema))
+    body: CalendarEventCreateRequest,
+  ): Promise<CalendarEventRecord> {
+    return this.calendarService.createManualEvent(request.user!.id, body);
+  }
+
+  @Post("manual/sync-external")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async syncExternalCalendarIcs(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<CalendarExternalSyncResponse> {
+    return this.calendarService.syncExternalCalendarIcs(request.user!.id);
+  }
+
+  @Post("manual/sync-kaist")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async syncKaistAcademicCalendar(
+    @Query("year") year?: string,
+  ): Promise<CalendarKaistSyncResponse> {
+    const parsedYear = year === undefined ? seoulYear() : Number(year);
+    if (!Number.isInteger(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
+      throw new BadRequestException("Invalid year");
+    }
+    return this.calendarService.syncKaistAcademicCalendar(parsedYear);
+  }
+
+  @Post("manual/sync-google")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async syncGoogleCalendars(): Promise<CalendarGoogleSyncResponse> {
+    return this.calendarService.syncGoogleCalendars();
+  }
+
+  @Post("manual/import")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async importIcs(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(CalendarIcsImportSchema))
+    body: CalendarIcsImportRequest,
+  ): Promise<CalendarIcsImportResponse> {
+    return this.calendarService.importIcs(request.user!.id, body.ics);
+  }
+
+  @Patch("manual/:id")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async updateManualEvent(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(CalendarEventUpdateSchema))
+    body: CalendarEventUpdateRequest,
+  ): Promise<CalendarEventRecord> {
+    return this.calendarService.updateManualEvent(id, body);
+  }
+
+  @Delete("manual/:id")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async archiveManualEvent(
+    @Param("id") id: string,
+  ): Promise<{ ok: true; calendarEventId: string }> {
+    return this.calendarService.archiveManualEvent(id);
   }
 
   @Get("holidays")

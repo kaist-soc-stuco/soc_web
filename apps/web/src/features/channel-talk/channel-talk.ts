@@ -1,6 +1,9 @@
 import * as ChannelService from "@channel.io/channel-web-sdk-loader";
 
 export interface ChannelTalkBootOptions {
+  customLauncherSelector?: string;
+  hideChannelButtonOnBoot?: boolean;
+  hidePopup?: boolean;
   pluginKey: string;
   memberId?: string;
   memberHash?: string;
@@ -9,6 +12,7 @@ export interface ChannelTalkBootOptions {
     name: string;
     email: string;
   };
+  zIndex?: number;
 }
 
 let scriptPromise: Promise<void> | null = null;

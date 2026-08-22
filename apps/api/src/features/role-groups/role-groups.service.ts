@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 
 import type {
   AssignRoleGroupMemberRequest,
@@ -6,6 +6,9 @@ import type {
   PermissionRecord,
   RoleGroupRecord,
   RoleGroupMemberRecord,
+  RoleGroupCandidateListResponse,
+  RoleGroupMemberFilterRequest,
+  ReplaceRoleGroupMembersRequest,
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
 
@@ -127,6 +130,18 @@ export class RoleGroupsService {
     return this.roleGroupsRepository.listRoleGroupMembers(roleGroupId);
   }
 
+  async listRoleGroupCandidates(
+    roleGroupId: number,
+    input: RoleGroupMemberFilterRequest,
+  ): Promise<RoleGroupCandidateListResponse> {
+    const existing = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
+    if (!existing) {
+      throw new NotFoundException("role_group_not_found");
+    }
+
+    return this.roleGroupsRepository.listRoleGroupCandidates(roleGroupId, input);
+  }
+
   async addUserToRoleGroup(
     roleGroupId: number,
     input: AssignRoleGroupMemberRequest,
@@ -184,5 +199,41 @@ export class RoleGroupsService {
       targetId: `${roleGroupId}:${userId}`,
       targetType: "role_group_member",
     });
+  }
+
+  async replaceRoleGroupMembers(
+    roleGroupId: number,
+    input: ReplaceRoleGroupMembersRequest,
+    audit?: AuditMetadata,
+  ): Promise<RoleGroupMemberRecord[]> {
+    const roleGroup = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
+    if (!roleGroup) {
+      throw new NotFoundException("role_group_not_found");
+    }
+
+    const before = await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId);
+    const replaced = await this.roleGroupsRepository.replaceRoleGroupMembers(
+      roleGroupId,
+      input.userIds,
+      audit?.actorUserId ?? null,
+    );
+    if (!replaced) {
+      throw new BadRequestException("role_group_user_not_found");
+    }
+
+    await this.usersService.invalidatePermissionCaches([
+      ...before.map((member) => member.userId),
+      ...input.userIds,
+    ]);
+    await this.auditLogService.record({
+      action: "role_group_member.replace",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { roleGroup, userIds: input.userIds },
+      targetId: String(roleGroupId),
+      targetType: "role_group_member",
+    });
+
+    return replaced;
   }
 }

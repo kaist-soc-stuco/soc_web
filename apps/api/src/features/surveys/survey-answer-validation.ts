@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from "@nestjs/common";
+import { BadRequestException } from "@nestjs/common";
 
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
@@ -9,6 +9,23 @@ function isEmptyAnswer(
 ): boolean {
   if (question.questionType === "multiple_choice") {
     return !Array.isArray(content.values) || content.values.length === 0;
+  }
+
+  if (question.questionType === "grid_single" || question.questionType === "grid_multiple") {
+    return (
+      typeof content.grid !== "object" ||
+      content.grid === null ||
+      Object.keys(content.grid as Record<string, unknown>).length === 0
+    );
+  }
+
+  if (question.questionType === "file_upload") {
+    const assetIds = Array.isArray(content.assetIds)
+      ? content.assetIds
+      : typeof content.assetId === "string"
+        ? [content.assetId]
+        : [];
+    return assetIds.length === 0;
   }
 
   const value =
@@ -69,6 +86,54 @@ function validateAnswerContent(
       }
       break;
     }
+    case "grid_single":
+    case "grid_multiple": {
+      const rows = question.config?.rows ?? [];
+      const columns = new Set((question.config?.columns ?? []).map((option) => option.value));
+      const grid = content.grid;
+      if (typeof grid !== "object" || grid === null) {
+        throw new BadRequestException("answer_grid_invalid");
+      }
+      const values = grid as Record<string, unknown>;
+      const rowValues = new Set(rows.map((row) => row.value));
+      for (const [rowValue, answer] of Object.entries(values)) {
+        if (!rowValues.has(rowValue)) {
+          throw new BadRequestException("answer_grid_invalid");
+        }
+        if (question.questionType === "grid_single") {
+          if (typeof answer !== "string" || !columns.has(answer)) {
+            throw new BadRequestException("answer_grid_invalid");
+          }
+        } else if (
+          !Array.isArray(answer) ||
+          !answer.every((value) => typeof value === "string" && columns.has(value))
+        ) {
+          throw new BadRequestException("answer_grid_invalid");
+        }
+      }
+      if (question.isRequired && rows.some((row) => values[row.value] === undefined)) {
+        throw new BadRequestException("required_answer_missing");
+      }
+      break;
+    }
+    case "file_upload": {
+      const assetIds = Array.isArray(content.assetIds)
+        ? content.assetIds
+        : typeof content.assetId === "string"
+          ? [content.assetId]
+          : [];
+      if (
+        assetIds.length === 0 ||
+        !assetIds.every((assetId) => typeof assetId === "string" && /^\d+$/.test(assetId))
+      ) {
+        throw new BadRequestException("answer_file_invalid");
+      }
+      const maxFiles = question.config?.maxFiles ?? 1;
+      if (assetIds.length > maxFiles) {
+        throw new BadRequestException("answer_file_too_many");
+      }
+      break;
+    }
     case "date": {
       if (typeof content.date !== "string") {
         throw new BadRequestException("answer_content_invalid");
@@ -95,7 +160,6 @@ function validateAnswerContent(
 export function validateSurveyAnswers(
   questions: SurveyQuestionRecord[],
   answers: SubmitResponseDto["answers"],
-  currentMs: number,
 ): void {
   const questionById = new Map(questions.map((question) => [question.id, question]));
   const answerByQuestionId = new Map<string, Record<string, unknown>>();
@@ -108,10 +172,6 @@ export function validateSurveyAnswers(
     const question = questionById.get(answerInput.questionId);
     if (!question) {
       throw new BadRequestException("question_not_found");
-    }
-
-    if (question.editDeadlineAt && Date.parse(question.editDeadlineAt) <= currentMs) {
-      throw new ConflictException("question_edit_deadline_passed");
     }
 
     validateAnswerContent(question, answerInput.content);

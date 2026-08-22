@@ -1,17 +1,20 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type {
+  ContentBlockRecord,
+  CreateContentBlockRequest,
   SiteContentKey,
   SiteContentRecord,
+  UpdateContentBlockRequest,
   UpsertSiteContentRequest,
 } from "@soc/contracts";
-import { msToIso, nowDate } from "@soc/shared";
-import { asc, eq } from "drizzle-orm";
+import { isoToDate, msToIso, nowDate } from "@soc/shared";
+import { asc, desc, eq } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
-import { siteContents } from "../../infrastructure/postgres/postgres.schema";
+import { contentBlocks, siteContents } from "../../infrastructure/postgres/postgres.schema";
 
 @Injectable()
 export class SiteContentRepository {
@@ -25,6 +28,30 @@ export class SiteContentRepository {
       updatedBy: row.updatedBy ?? null,
       valueEn: row.valueEn,
       valueKo: row.valueKo,
+    };
+  }
+
+  private mapBlock(row: typeof contentBlocks.$inferSelect): ContentBlockRecord {
+    return {
+      bodyEn: row.bodyEn,
+      bodyKo: row.bodyKo,
+      contentBlockId: row.contentBlockId,
+      createdAt: msToIso(row.createdAt.valueOf()),
+      createdBy: row.createdBy,
+      endsAt: row.endsAt ? msToIso(row.endsAt.valueOf()) : null,
+      imageUrl: row.imageUrl,
+      isEnabled: row.isEnabled,
+      linkUrl: row.linkUrl,
+      publishedAt: row.publishedAt ? msToIso(row.publishedAt.valueOf()) : null,
+      publishedBy: row.publishedBy,
+      sortOrder: row.sortOrder,
+      startsAt: row.startsAt ? msToIso(row.startsAt.valueOf()) : null,
+      status: row.status,
+      titleEn: row.titleEn,
+      titleKo: row.titleKo,
+      type: row.type,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+      updatedBy: row.updatedBy,
     };
   }
 
@@ -82,5 +109,96 @@ export class SiteContentRepository {
       .returning();
 
     return row ? this.map(row) : null;
+  }
+
+  async listContentBlocks(): Promise<ContentBlockRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(contentBlocks)
+      .orderBy(asc(contentBlocks.sortOrder), desc(contentBlocks.updatedAt));
+    return rows.map((row) => this.mapBlock(row));
+  }
+
+  async findContentBlockById(contentBlockId: string): Promise<ContentBlockRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(contentBlocks)
+      .where(eq(contentBlocks.contentBlockId, contentBlockId));
+    return row ? this.mapBlock(row) : null;
+  }
+
+  async createContentBlock(input: CreateContentBlockRequest, actorUserId: string): Promise<ContentBlockRecord> {
+    const [row] = await this.db
+      .insert(contentBlocks)
+      .values({
+        ...input,
+        bodyEn: input.bodyEn ?? null,
+        bodyKo: input.bodyKo ?? null,
+        createdBy: actorUserId,
+        endsAt: input.endsAt ? isoToDate(input.endsAt) : null,
+        imageUrl: input.imageUrl ?? null,
+        linkUrl: input.linkUrl ?? null,
+        startsAt: input.startsAt ? isoToDate(input.startsAt) : null,
+        updatedBy: actorUserId,
+      })
+      .returning();
+    return this.mapBlock(row);
+  }
+
+  async updateContentBlock(
+    contentBlockId: string,
+    input: UpdateContentBlockRequest,
+    actorUserId: string,
+  ): Promise<ContentBlockRecord | null> {
+    const values: Partial<typeof contentBlocks.$inferInsert> = {
+      updatedAt: nowDate(),
+      updatedBy: actorUserId,
+    };
+    if (input.type !== undefined) values.type = input.type;
+    if (input.titleKo !== undefined) values.titleKo = input.titleKo;
+    if (input.titleEn !== undefined) values.titleEn = input.titleEn;
+    if (input.bodyKo !== undefined) values.bodyKo = input.bodyKo;
+    if (input.bodyEn !== undefined) values.bodyEn = input.bodyEn;
+    if (input.linkUrl !== undefined) values.linkUrl = input.linkUrl;
+    if (input.imageUrl !== undefined) values.imageUrl = input.imageUrl;
+    if (input.startsAt !== undefined) values.startsAt = input.startsAt ? isoToDate(input.startsAt) : null;
+    if (input.endsAt !== undefined) values.endsAt = input.endsAt ? isoToDate(input.endsAt) : null;
+    if (input.sortOrder !== undefined) values.sortOrder = input.sortOrder;
+    if (input.isEnabled !== undefined) values.isEnabled = input.isEnabled;
+
+    const [row] = await this.db
+      .update(contentBlocks)
+      .set(values)
+      .where(eq(contentBlocks.contentBlockId, contentBlockId))
+      .returning();
+    return row ? this.mapBlock(row) : null;
+  }
+
+  async setContentBlockStatus(
+    contentBlockId: string,
+    status: ContentBlockRecord["status"],
+    actorUserId: string,
+  ): Promise<ContentBlockRecord | null> {
+    const now = nowDate();
+    const [row] = await this.db
+      .update(contentBlocks)
+      .set({
+        publishedAt: status === "PUBLISHED" ? now : undefined,
+        publishedBy: status === "PUBLISHED" ? actorUserId : undefined,
+        status,
+        updatedAt: now,
+        updatedBy: actorUserId,
+      })
+      .where(eq(contentBlocks.contentBlockId, contentBlockId))
+      .returning();
+    return row ? this.mapBlock(row) : null;
+  }
+
+  async deleteContentBlock(contentBlockId: string): Promise<ContentBlockRecord | null> {
+    const [row] = await this.db
+      .delete(contentBlocks)
+      .where(eq(contentBlocks.contentBlockId, contentBlockId))
+      .returning();
+    return row ? this.mapBlock(row) : null;
   }
 }

@@ -1,80 +1,61 @@
 import { Header } from "@/components/organisms/header";
-import { Footer } from "@/components/organisms/footer";
-import { PageHero } from "@/components/organisms/page-hero";
+import { PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   BoardArticleTable,
-  BoardNavigationBar,
+  BoardCategoryNavigation,
+  BoardDataControls,
 } from "@/features/board-list/board-page-sections";
 import { useBoardPageController } from "@/features/board-list/use-board-page-controller";
-import { ChannelTalkInquiryCard } from "@/features/channel-talk/channel-talk-launcher";
 
 export function BoardPage() {
   const {
     articles,
     boardByCode,
-    boardDescription,
     boards,
     boardTitle,
     canWrite,
     category,
     currentPage,
     handlePageChange,
-    handleSortChange,
     isArticleLoading,
-    isFilterDropdownOpen,
     lang,
-    period,
     postsPerPage,
-    searchCriteria,
     searchQuery,
     setCurrentPage,
-    setIsFilterDropdownOpen,
-    setPeriod,
     setPostsPerPage,
-    setSearchCriteria,
     setSearchQuery,
-    sortBy,
-    sortDirection,
     totalCount,
     totalPages,
     writeState,
   } = useBoardPageController();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fafafa]">
-      <Header showLogo={true} />
+    <PageShell>
+      <Header />
 
-      <main className="channel-talk-safe-area flex-1 w-full mx-auto">
-        <PageHero
-          title={boardTitle}
-          description={boardDescription}
-          variant="medium"
-          showDescription={false}
-        />
+      <PageMain>
+        <PageHeader title={boardTitle} titleId="board-page-title" />
 
-        <BoardNavigationBar
+        <BoardCategoryNavigation
           boards={boards}
           category={category}
-          isFilterDropdownOpen={isFilterDropdownOpen}
           lang={lang}
-          onCurrentPageChange={setCurrentPage}
-          onFilterDropdownOpenChange={setIsFilterDropdownOpen}
-          onPeriodChange={setPeriod}
-          onSearchCriteriaChange={setSearchCriteria}
-          onSearchQueryChange={setSearchQuery}
-          period={period}
-          searchCriteria={searchCriteria}
-          searchQuery={searchQuery}
         />
 
-        {(category === "QnA" || category === "건의사항") && (
-          <ChannelTalkInquiryCard lang={lang} />
-        )}
-
         <BoardArticleTable
+          toolbar={
+            <BoardDataControls
+              lang={lang}
+              onCurrentPageChange={setCurrentPage}
+              onSearchQueryChange={setSearchQuery}
+              searchQuery={searchQuery}
+              canWrite={canWrite}
+              totalCount={totalCount}
+              writeState={writeState}
+            />
+          }
           articles={articles}
           boardByCode={boardByCode}
-          canWrite={canWrite}
           category={category}
           currentPage={currentPage}
           isLoading={isArticleLoading}
@@ -84,17 +65,11 @@ export function BoardPage() {
             setPostsPerPage(value);
             setCurrentPage(1);
           }}
-          onSortChange={handleSortChange}
           postsPerPage={postsPerPage}
-          sortBy={sortBy}
-          sortDirection={sortDirection}
           totalCount={totalCount}
           totalPages={totalPages}
-          writeState={writeState}
         />
-      </main>
-
-      <Footer />
-    </div>
+      </PageMain>
+    </PageShell>
   );
 }

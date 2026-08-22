@@ -14,11 +14,11 @@ import {
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
-import { Footer } from "@/components/organisms/footer";
 import { Header } from "@/components/organisms/header";
-import { PageHero } from "@/components/organisms/page-hero";
+import { PageHeader, PageShell } from "@/components/ui/page-layout";
 import { useLanguage, type Language } from "@/hooks/use-language";
 import { useLocalizedSiteContent } from "@/features/site-content/site-content";
+import { Button } from "@/components/ui/button";
 
 interface LocalizedCopy {
   ko: string;
@@ -196,18 +196,13 @@ export function RoadmapPage() {
   const { lang } = useLanguage();
   const [selectedTrackId, setSelectedTrackId] = useState(ROADMAP_TRACKS[0].id);
   const title = useLocalizedSiteContent("about.roadmap.title");
-  const description = useLocalizedSiteContent("about.roadmap.description");
   const selectedTrack = ROADMAP_TRACKS.find((track) => track.id === selectedTrackId) ?? ROADMAP_TRACKS[0];
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50/60">
-      <Header showLogo />
+    <PageShell>
+      <Header />
 
-      <PageHero
-        title={title}
-        description={description}
-        variant="large"
-      />
+      <PageHeader title={title} />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 md:px-8 md:py-14">
         <Link
@@ -222,11 +217,11 @@ export function RoadmapPage() {
           <div>
             <div className="flex items-center gap-2 text-kaist-darkgreen">
               <Compass aria-hidden="true" className="h-5 w-5" />
-              <p className="text-xs font-black uppercase tracking-[0.14em]">
+              <p className="text-xs font-bold uppercase tracking-[0.14em]">
                 {lang === "ko" ? "로드맵 활용법" : "How to use this roadmap"}
               </p>
             </div>
-            <h2 className="mt-3 text-2xl font-black tracking-tight text-kaist-black">
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-kaist-black">
               {lang === "ko"
                 ? "학년보다 현재의 준비 상태를 기준으로 보세요"
                 : "Focus on your current readiness, not just your year"}
@@ -241,7 +236,7 @@ export function RoadmapPage() {
           <aside className="rounded-2xl border border-amber-200 bg-amber-50 p-5" aria-label={lang === "ko" ? "안내" : "Notice"}>
             <div className="flex items-center gap-2 text-amber-900">
               <Info aria-hidden="true" className="h-4 w-4" />
-              <h3 className="text-sm font-black">
+              <h3 className="text-sm font-bold">
                 {lang === "ko" ? "공식 이수 기준이 아닙니다" : "Not an official degree plan"}
               </h3>
             </div>
@@ -256,10 +251,10 @@ export function RoadmapPage() {
         <section className="mt-12" aria-labelledby="roadmap-track-title">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div className="max-w-3xl">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-kaist-darkgreen">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-kaist-darkgreen">
                 {lang === "ko" ? "전공 트랙 탐색" : "Explore the tracks"}
               </p>
-              <h2 id="roadmap-track-title" className="mt-2 text-2xl font-black tracking-tight text-kaist-black md:text-3xl">
+              <h2 id="roadmap-track-title" className="mt-2 text-2xl font-bold tracking-tight text-kaist-black md:text-3xl">
                 {lang === "ko" ? "관심 있는 색을 눌러 과목 흐름을 살펴보세요" : "Select a color to explore a course direction"}
               </h2>
               <p className="mt-3 text-sm font-medium leading-7 text-slate-600">
@@ -278,7 +273,7 @@ export function RoadmapPage() {
               {ROADMAP_TRACKS.map((track) => {
                 const isSelected = selectedTrack.id === track.id;
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={track.id}
                     type="button"
                     role="tab"
@@ -290,10 +285,10 @@ export function RoadmapPage() {
                   >
                     <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: track.color }} aria-hidden="true" />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-black text-slate-800">{copy(track.title, lang)}</span>
+                      <span className="block truncate text-sm font-bold text-slate-800">{copy(track.title, lang)}</span>
                       <span className="mt-0.5 block text-[11px] font-semibold text-slate-400">{track.courses.length}{lang === "ko" ? "개 대표 과목" : " sample courses"}</span>
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -304,16 +299,16 @@ export function RoadmapPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="h-3 w-3 rounded-full" style={{ backgroundColor: selectedTrack.color }} aria-hidden="true" />
-                      <span className="text-xs font-black uppercase tracking-[0.14em]" style={{ color: selectedTrack.color }}>
+                      <span className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: selectedTrack.color }}>
                         {lang === "ko" ? "관심 분야" : "Focus area"}
                       </span>
                     </div>
-                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">{copy(selectedTrack.title, lang)}</h3>
+                    <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{copy(selectedTrack.title, lang)}</h3>
                     <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-600">{copy(selectedTrack.description, lang)}</p>
                   </div>
                   <div className="hidden rounded-2xl bg-white/80 px-3 py-2 text-right shadow-sm sm:block">
-                    <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{lang === "ko" ? "탐색 순서" : "Flow"}</span>
-                    <span className="mt-1 block text-sm font-black text-slate-700">기초 → 핵심 → 응용</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{lang === "ko" ? "탐색 순서" : "Flow"}</span>
+                    <span className="mt-1 block text-sm font-bold text-slate-700">기초 → 핵심 → 응용</span>
                   </div>
                 </div>
               </div>
@@ -321,12 +316,12 @@ export function RoadmapPage() {
                 {selectedTrack.courses.map((course, index) => (
                   <li key={course.code} className="relative rounded-2xl border border-white/90 bg-white/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                     <div className="flex items-start justify-between gap-3">
-                      <span className="rounded-lg px-2.5 py-1 text-xs font-black text-white" style={{ backgroundColor: selectedTrack.color }}>
+                      <span className="rounded-lg px-2.5 py-1 text-xs font-bold text-white" style={{ backgroundColor: selectedTrack.color }}>
                         {course.code}
                       </span>
                       <span className="text-xs font-bold text-slate-400">{String(index + 1).padStart(2, "0")}</span>
                     </div>
-                    <h4 className="mt-4 text-base font-black text-slate-800">{copy(course.name, lang)}</h4>
+                    <h4 className="mt-4 text-base font-bold text-slate-800">{copy(course.name, lang)}</h4>
                     <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{copy(course.note, lang)}</p>
                     {index < selectedTrack.courses.length - 1 && (
                       <span className="absolute -bottom-3 left-1/2 z-10 hidden h-6 w-px bg-slate-200 md:block" aria-hidden="true" />
@@ -340,10 +335,10 @@ export function RoadmapPage() {
 
         <section className="mt-12" aria-labelledby="roadmap-stages-title">
           <div className="max-w-3xl">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-kaist-darkgreen">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-kaist-darkgreen">
               {lang === "ko" ? "4단계 흐름" : "Four-stage journey"}
             </p>
-            <h2 id="roadmap-stages-title" className="mt-2 text-2xl font-black tracking-tight text-kaist-black md:text-3xl">
+            <h2 id="roadmap-stages-title" className="mt-2 text-2xl font-bold tracking-tight text-kaist-black md:text-3xl">
               {lang === "ko" ? "학부 생활의 밀도를 높이는 과정" : "Build a richer undergraduate journey"}
             </h2>
             <p className="mt-3 text-sm font-medium leading-7 text-slate-600">
@@ -364,7 +359,7 @@ export function RoadmapPage() {
                       <Icon aria-hidden="true" className="h-5 w-5" />
                     </div>
                     <div>
-                      <span className="text-xs font-black uppercase tracking-[0.14em] text-kaist-darkgreen">
+                      <span className="text-xs font-bold uppercase tracking-[0.14em] text-kaist-darkgreen">
                         {lang === "ko" ? `${index + 1}단계` : `Stage ${index + 1}`}
                       </span>
                       <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
@@ -374,7 +369,7 @@ export function RoadmapPage() {
                   </div>
 
                   <div className="p-5 md:p-7">
-                    <h3 className="text-xl font-black tracking-tight text-kaist-black">
+                    <h3 className="text-xl font-bold tracking-tight text-kaist-black">
                       {copy(stage.title, lang)}
                     </h3>
                     <p className="mt-2 text-sm font-medium leading-7 text-slate-600">
@@ -400,7 +395,7 @@ export function RoadmapPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-kaist-lightgreen/15 text-kaist-darkgreen">
                 <CircleCheck aria-hidden="true" className="h-5 w-5" />
               </div>
-              <h2 className="text-xl font-black text-kaist-black">
+              <h2 className="text-xl font-bold text-kaist-black">
                 {lang === "ko" ? "학기마다 점검할 것" : "Semester check-in"}
               </h2>
             </div>
@@ -417,7 +412,7 @@ export function RoadmapPage() {
           <div className="rounded-3xl bg-kaist-darkgreen p-6 text-white shadow-sm md:p-8">
             <div className="flex items-center gap-3">
               <Users aria-hidden="true" className="h-5 w-5 text-kaist-lightgreen" />
-              <h2 className="text-xl font-black">
+              <h2 className="text-xl font-bold">
                 {lang === "ko" ? "SOC에서 다음 정보 찾기" : "Find your next step on SOC"}
               </h2>
             </div>
@@ -435,7 +430,7 @@ export function RoadmapPage() {
                 <ArrowRight aria-hidden="true" className="h-4 w-4" />
               </Link>
               <Link
-                to="/events-surveys"
+                to="/events"
                 className="inline-flex min-h-11 items-center justify-between rounded-xl border border-white/25 px-4 text-sm font-bold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
                 {lang === "ko" ? "행사·설문 보기" : "Events & surveys"}
@@ -446,7 +441,6 @@ export function RoadmapPage() {
         </section>
       </main>
 
-      <Footer />
-    </div>
+    </PageShell>
   );
 }

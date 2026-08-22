@@ -15,31 +15,15 @@ import {
 import { Link } from "react-router-dom";
 
 import { useLocalizedSiteContent } from "@/features/site-content/site-content";
+import { Button } from "@/components/ui/button";
+import { PageTabButton, PageTabs, PageToolbar } from "@/components/ui/page-layout";
 
 const TABS = [
-  { id: "intro", labelKo: "소개", labelEn: "Intro", icon: Info },
-  { id: "history", labelKo: "연혁", labelEn: "History", icon: Calendar },
+  { id: "intro", labelKo: "학생회 소개", labelEn: "Student Council", icon: Info },
+  { id: "history", labelKo: "당해 학생회 소개", labelEn: "Current Council", icon: Calendar },
   { id: "org", labelKo: "조직도", labelEn: "Org Chart", icon: Network },
-  { id: "members", labelKo: "구성원", labelEn: "Members", icon: User },
+  { id: "members", labelKo: "Contact me", labelEn: "Contact me", icon: User },
 ];
-
-export function AboutHero() {
-  const description = useLocalizedSiteContent("about.hero.description");
-
-  return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-kaist-darkgreen to-[#002613] px-4 py-16 text-center text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(113,185,141,0.15),transparent)]" />
-      <div className="relative z-10 mx-auto max-w-4xl animate-in space-y-4 fade-in slide-in-from-bottom-6 duration-500">
-        <h1 className="text-4xl font-black tracking-tight md:text-5xl">
-          KAIST SOC
-        </h1>
-        <p className="text-lg font-medium tracking-wide text-white/80 md:text-xl">
-          {description}
-        </p>
-      </div>
-    </section>
-  );
-}
 
 export function AboutTabs({
   currentTab,
@@ -51,31 +35,22 @@ export function AboutTabs({
   onTabChange: (tab: string) => void;
 }) {
   return (
-    <div className="sticky top-0 z-30 border-b border-gray-200 bg-white shadow-xs">
-      <div className="mx-auto max-w-4xl px-4">
-        <div className="flex justify-between gap-1 overflow-x-auto py-3 md:justify-start md:gap-8">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = currentTab === tab.id;
-
-            return (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border-0 px-4 py-2.5 text-sm font-bold transition-all ${
-                  isActive
-                    ? "bg-kaist-darkgreen text-white shadow-md shadow-kaist-darkgreen/10"
-                    : "bg-transparent text-kaist-grey hover:bg-gray-50 hover:text-kaist-darkgreen"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{lang === "ko" ? tab.labelKo : tab.labelEn}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <PageToolbar>
+      <PageTabs aria-label={lang === "ko" ? "학생회 소개 분류" : "Student council sections"}>
+        {TABS.map((tab) => {
+          const isActive = currentTab === tab.id;
+          return (
+            <PageTabButton
+              key={tab.id}
+              active={isActive}
+              onClick={() => onTabChange(tab.id)}
+            >
+              {lang === "ko" ? tab.labelKo : tab.labelEn}
+            </PageTabButton>
+          );
+        })}
+      </PageTabs>
+    </PageToolbar>
   );
 }
 
@@ -115,7 +90,7 @@ function IntroSection({ lang }: { lang: string }) {
   return (
     <div className="animate-in space-y-12 fade-in duration-300">
       <div className="space-y-4">
-        <h2 className="text-2xl font-black text-kaist-black">{title}</h2>
+        <h2 className="text-2xl font-bold text-kaist-black">{title}</h2>
         <p className="text-base font-medium leading-relaxed text-gray-700">
           {body}
         </p>
@@ -177,6 +152,26 @@ function IntroSection({ lang }: { lang: string }) {
           <ArrowRight aria-hidden="true" className="h-4 w-4" />
         </Link>
       </div>
+
+      <div className="flex flex-col gap-4 border-t border-gray-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="font-bold text-kaist-black">
+            {lang === "ko" ? "자주 묻는 질문" : "Frequently asked questions"}
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-gray-600">
+            {lang === "ko"
+              ? "로그인, 비밀글, 행사·일정 이용 방법을 확인하세요."
+              : "Find guidance on login, secret posts, events, and the calendar."}
+          </p>
+        </div>
+        <Link
+          to="/about/faq"
+          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-kaist-darkgreen/20 bg-white px-4 text-sm font-bold text-kaist-darkgreen transition-colors hover:bg-kaist-lightgreen/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kaist-darkgreen"
+        >
+          {lang === "ko" ? "FAQ 보기" : "View FAQ"}
+          <ArrowRight aria-hidden="true" className="h-4 w-4" />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -204,9 +199,14 @@ function ValueCard({
 function HistorySection({ lang }: { lang: string }) {
   return (
     <div className="animate-in space-y-8 fade-in duration-300">
-      <h2 className="mb-8 text-2xl font-black text-kaist-black">
-        {lang === "ko" ? "연혁 및 주요 활동" : "Milestones & Major Activities"}
+      <h2 className="mb-8 text-2xl font-bold text-kaist-black">
+        {lang === "ko" ? "당해 학생회 소개" : "Current Student Council"}
       </h2>
+      <p className="max-w-2xl text-sm font-medium leading-6 text-gray-600">
+        {lang === "ko"
+          ? "현재 집행위원회가 이번 학기에 집중하고 있는 방향과 주요 활동을 소개합니다. 세부 일정과 진행 상황은 행사·일정 및 공약 이행 현황에서 계속 업데이트합니다."
+          : "This section introduces the current executive committee’s focus and activities for the term. Events and pledge progress are updated in their respective sections."}
+      </p>
       <div className="relative ml-2 space-y-10 border-l-2 border-kaist-lightgreen pl-6">
         <TimelineItem
           description={
@@ -264,7 +264,7 @@ function TimelineItem({
   return (
     <div className="relative">
       <div className="absolute -left-[31px] top-1.5 h-4 w-4 rounded-full border-4 border-white bg-kaist-darkgreen shadow-sm" />
-      <span className="text-lg font-black text-kaist-darkgreen">
+      <span className="text-lg font-bold text-kaist-darkgreen">
         {year}
       </span>
       <h3 className="mt-1 font-bold text-kaist-black">{title}</h3>
@@ -276,7 +276,7 @@ function TimelineItem({
 function OrgSection({ lang }: { lang: string }) {
   return (
     <div className="animate-in space-y-8 fade-in duration-300">
-      <h2 className="mb-8 text-2xl font-black text-kaist-black">
+      <h2 className="mb-8 text-2xl font-bold text-kaist-black">
         {lang === "ko" ? "조직도" : "Organization Chart"}
       </h2>
       <div className="flex flex-col items-center space-y-8 pt-4">
@@ -356,7 +356,7 @@ function MembersSection({
 }) {
   return (
     <div className="animate-in space-y-8 fade-in duration-300">
-      <h2 className="text-2xl font-black text-kaist-black">
+      <h2 className="text-2xl font-bold text-kaist-black">
         {lang === "ko" ? "집행위원회 구성원" : "Executive Committee Members"}
       </h2>
       <p className="-mt-4 text-sm text-kaist-grey">
@@ -408,7 +408,7 @@ function MemberCard({
         <User className="h-6 w-6" />
       </div>
       <div className="min-w-0 space-y-1.5">
-        <div className="truncate text-base font-black text-kaist-black">
+        <div className="truncate text-base font-bold text-kaist-black">
           {name}
         </div>
         <div className="text-xs font-bold text-kaist-darkgreen">{role}</div>

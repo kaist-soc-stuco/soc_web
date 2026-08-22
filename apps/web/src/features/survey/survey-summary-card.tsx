@@ -2,7 +2,6 @@ import type { SurveyDetailResponse } from "@soc/contracts";
 import {
   Calendar,
   ClipboardList,
-  Clock,
   Languages,
   ShieldCheck,
   Users,
@@ -16,6 +15,7 @@ import {
   getScheduleLabel,
   getSurveyKindLabel,
 } from "./survey-answer-utils";
+import { RichTextContent } from "@/components/ui/rich-text-content";
 
 interface SurveySummaryCardProps {
   lang: string;
@@ -32,27 +32,20 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
   return (
     <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.06)] animate-in fade-in slide-in-from-top-4 duration-300 sm:p-8">
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-md border border-kaist-darkgreen/15 bg-kaist-lightgreen/20 px-3 py-1.5 text-xs font-extrabold text-kaist-darkgreen">
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-kaist-darkgreen/15 bg-kaist-lightgreen/20 px-3 py-1.5 text-xs font-semibold text-kaist-darkgreen">
           <ClipboardList className="h-3.5 w-3.5" />
           {getSurveyKindLabel(survey.kind, lang)}
         </span>
-        {survey.closesAt && survey.computedState === "open" && (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700">
-            <Clock className="w-3.5 h-3.5 text-emerald-600" />
-            {lang === "ko"
-              ? `진행 중 (~${formatSurveyDateTime(survey.closesAt)})`
-              : `Open (closes: ${formatSurveyDateTime(survey.closesAt)})`}
-          </span>
-        )}
       </div>
 
-      <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+      <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
         {getLocalizedText(lang, survey.titleKo, survey.titleEn)}
       </h1>
       {description && (
-        <p className="mt-4 border-t border-slate-100 pt-4 text-sm font-medium leading-relaxed text-slate-600 sm:text-base">
-          {description}
-        </p>
+        <RichTextContent
+          content={description}
+          className="mt-4 border-t border-slate-100 pt-4 text-sm font-medium leading-relaxed text-slate-600 sm:text-base"
+        />
       )}
 
       <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-bold text-slate-500">

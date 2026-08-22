@@ -1,23 +1,32 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 
 import { AuditLogService } from "../audit/audit-log.service";
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
 import type {
   AdminUserSortBy,
+  EmailRecipientFilters,
   SortDirection,
   StudentFeeSortBy,
 } from "./repositories/users.repository";
 import type {
   AdminUserListResponse,
   AdminUserRecord,
+  BulkUpdateStudentFeeStatusRequest,
+  BulkUpdateStudentFeeStatusResponse,
+  BulkProcessStudentFeePaymentsRequest,
+  BulkProcessStudentFeePaymentsResponse,
+  FeeMajorCategory,
   FeeStatus,
   MyActivityListResponse,
   MyArticleListResponse,
   MyCommentListResponse,
+  MyScrapListResponse,
   MySurveyResponseListResponse,
   StudentFeeListResponse,
+  StudentFeeStatsResponse,
   StudentFeeStatusRecord,
+  StudentFeeDetailResponse,
 } from "@soc/contracts";
 import { nowDate } from "@soc/shared";
 
@@ -66,6 +75,10 @@ export class UsersService {
     academicStatus?: string;
     departmentEn?: string;
     departmentKo?: string;
+    primaryMajor?: string;
+    doubleMajor?: string;
+    minor?: string;
+    gender?: string;
     identityCode?: string;
     stdNo?: string;
     userMobile?: string;
@@ -76,6 +89,11 @@ export class UsersService {
       academicStatus: input.academicStatus,
       departmentEn: input.departmentEn,
       departmentKo: input.departmentKo,
+      primaryMajor: input.primaryMajor,
+      doubleMajor: input.doubleMajor,
+      minor: input.minor,
+      gender: input.gender,
+      phoneNumber: input.userMobile,
       kaistUid: input.kaistUid,
       identityCode: input.identityCode,
       nameEn: input.nameEn,
@@ -99,14 +117,45 @@ export class UsersService {
     await this.usersRepository.invalidatePermissionBitmasks(userIds);
   }
 
+  async setAccountActive(
+    userId: string,
+    isActive: boolean,
+    audit?: AuditMetadata,
+    reason = "manual",
+  ): Promise<UserRecord | null> {
+    const updated = await this.usersRepository.setActiveStatus(userId, isActive);
+
+    if (updated) {
+      await this.auditLogService.record({
+        action: isActive ? "user.account.activate" : "user.account.expire",
+        actorUserId: audit?.actorUserId ?? null,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: { reason },
+        targetId: userId,
+        targetType: "user",
+      });
+    }
+
+    return updated;
+  }
+
+  async expireAccount(
+    userId: string,
+    reason: string,
+    audit?: AuditMetadata,
+  ): Promise<UserRecord | null> {
+    return this.setAccountActive(userId, false, audit, reason);
+  }
+
   async searchUsers(input: { query?: string; limit?: number }): Promise<AdminUserRecord[]> {
     return this.usersRepository.searchUsers(input.query, input.limit ?? 20);
   }
 
   async listEmailRecipients(
     recipientType: "ALL" | "PAID_STUDENTS" | "UNPAID_STUDENTS",
+    filters?: EmailRecipientFilters,
   ): Promise<Array<{ email: string; nameKo: string }>> {
-    return this.usersRepository.listEmailRecipients(recipientType);
+    return this.usersRepository.listEmailRecipients(recipientType, filters);
   }
 
   async listAdminUsers(input: {
@@ -135,14 +184,22 @@ export class UsersService {
       academicStatus?: string;
       departmentEn?: string;
       departmentKo?: string;
+      primaryMajor?: string;
+      doubleMajor?: string;
+      minor?: string;
+      gender?: string;
       email?: string;
       identityCode?: string;
       nameEn?: string;
       nameKo?: string;
       stdNo?: string;
+      userMobile?: string;
     },
   ): Promise<void> {
-    await this.usersRepository.updateProfile(userId, input);
+    await this.usersRepository.updateProfile(userId, {
+      ...input,
+      phoneNumber: input.userMobile,
+    });
   }
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
@@ -174,8 +231,70 @@ export class UsersService {
     return record;
   }
 
+  async bulkUpdateStudentFeeStatuses(
+    input: BulkUpdateStudentFeeStatusRequest,
+    audit?: AuditMetadata,
+  ): Promise<BulkUpdateStudentFeeStatusResponse> {
+    const resolved = await Promise.all(
+      input.updates.map(async (update) => {
+        const user = update.userId
+          ? await this.usersRepository.findById(update.userId)
+          : await this.usersRepository.findByStdNo(update.stdNo!);
+        if (!user) {
+          throw new BadRequestException(
+            `fee_user_not_found:${update.userId ?? update.stdNo}`,
+          );
+        }
+        return { update, userId: user.userId };
+      }),
+    );
+
+    const updated: StudentFeeStatusRecord[] = [];
+    for (const { update, userId } of resolved) {
+      updated.push(
+        await this.updateStudentFeeStatus(
+          userId,
+          {
+            paidAmount: update.paidAmount,
+            status: update.status,
+            coverageSemesters: update.coverageSemesters,
+            note: update.note,
+            verifiedBy: audit?.actorUserId ?? undefined,
+          },
+          audit,
+        ),
+      );
+    }
+
+    return { updated, count: updated.length };
+  }
+
   async ensureStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord> {
     return this.usersRepository.ensureStudentFeeStatus(userId);
+  }
+
+  async getStudentFeeDetail(userId: string): Promise<StudentFeeDetailResponse | null> {
+    return this.usersRepository.getStudentFeeDetail(userId);
+  }
+
+  async processStudentFeePayments(
+    input: BulkProcessStudentFeePaymentsRequest,
+    audit?: AuditMetadata,
+  ): Promise<BulkProcessStudentFeePaymentsResponse> {
+    const result = await this.usersRepository.processStudentFeePayments(
+      input,
+      audit?.actorUserId ?? undefined,
+    );
+
+    await this.auditLogService.record({
+      action: "student_fee_payment.process",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { count: result.count, paymentIds: result.payments.map((payment) => payment.paymentId) },
+      targetType: "student_fee_payment",
+    });
+
+    return result;
   }
 
   async listStudentsByFeeStatus(
@@ -184,6 +303,11 @@ export class UsersService {
     pageSize?: number,
     sortBy?: StudentFeeSortBy,
     sortDirection?: SortDirection,
+    query?: string,
+    paymentYear?: number,
+    majorCategory?: FeeMajorCategory,
+    referenceSemester?: string,
+    userIds?: string[],
   ): Promise<StudentFeeListResponse> {
     return this.usersRepository.listStudentsByFeeStatus(
       status,
@@ -191,17 +315,69 @@ export class UsersService {
       pageSize,
       sortBy,
       sortDirection,
+      query,
+      paymentYear,
+      majorCategory,
+      referenceSemester,
+      userIds,
     );
+  }
+
+  async getStudentFeeStats(paymentYear?: number): Promise<StudentFeeStatsResponse> {
+    return this.usersRepository.getStudentFeeStats(paymentYear);
+  }
+
+  async exportStudentsByFeeStatus(
+    status?: FeeStatus,
+    sortBy?: StudentFeeSortBy,
+    sortDirection?: SortDirection,
+    query?: string,
+    paymentYear?: number,
+    majorCategory?: FeeMajorCategory,
+    referenceSemester?: string,
+    userIds?: string[],
+  ): Promise<StudentFeeListResponse["students"]> {
+    const pageSize = 1_000;
+    const first = await this.listStudentsByFeeStatus(
+      status,
+      1,
+      pageSize,
+      sortBy,
+      sortDirection,
+      query,
+      paymentYear,
+      majorCategory,
+      referenceSemester,
+      userIds,
+    );
+    const pages = Math.ceil(first.total / pageSize);
+    const items = [...first.students];
+    for (let page = 2; page <= pages; page += 1) {
+      const next = await this.listStudentsByFeeStatus(
+        status,
+        page,
+        pageSize,
+        sortBy,
+        sortDirection,
+        query,
+        paymentYear,
+        majorCategory,
+        referenceSemester,
+        userIds,
+      );
+      items.push(...next.students);
+    }
+    return items;
   }
 
   async getMyArticles(
     userId: string,
-    options: { page: number; limit: number },
+    options: { page: number; limit: number; query?: string },
   ): Promise<MyArticleListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
-      this.usersRepository.getMyArticles(userId, limit, offset),
-      this.usersRepository.countMyArticles(userId),
+      this.usersRepository.getMyArticles(userId, limit, offset, options.query),
+      this.usersRepository.countMyArticles(userId, options.query),
     ]);
 
     return { items, limit, page, total };
@@ -209,12 +385,12 @@ export class UsersService {
 
   async getMyComments(
     userId: string,
-    options: { page: number; limit: number },
+    options: { page: number; limit: number; query?: string },
   ): Promise<MyCommentListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
-      this.usersRepository.getMyComments(userId, limit, offset),
-      this.usersRepository.countMyComments(userId),
+      this.usersRepository.getMyComments(userId, limit, offset, options.query),
+      this.usersRepository.countMyComments(userId, options.query),
     ]);
 
     return { items, limit, page, total };
@@ -222,12 +398,12 @@ export class UsersService {
 
   async getMySurveyResponses(
     userId: string,
-    options: { page: number; limit: number },
+    options: { page: number; limit: number; query?: string },
   ): Promise<MySurveyResponseListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
     const [items, total] = await Promise.all([
-      this.usersRepository.getMySurveyResponses(userId, limit, offset),
-      this.usersRepository.countMySurveyResponses(userId),
+      this.usersRepository.getMySurveyResponses(userId, limit, offset, options.query),
+      this.usersRepository.countMySurveyResponses(userId, options.query),
     ]);
 
     return { items, limit, page, total };
@@ -235,16 +411,29 @@ export class UsersService {
 
   async getMyActivities(
     userId: string,
-    options: { page: number; limit: number },
+    options: { page: number; limit: number; query?: string },
   ): Promise<MyActivityListResponse> {
     const { limit, offset, page } = this.normalizeListOptions(options);
-    const [items, articleTotal, commentTotal, surveyTotal] = await Promise.all([
-      this.usersRepository.getMyActivities(userId, limit, offset),
-      this.usersRepository.countMyArticles(userId),
-      this.usersRepository.countMyComments(userId),
-      this.usersRepository.countMySurveyResponses(userId),
+    const result = await this.usersRepository.getMyActivities(
+      userId,
+      limit,
+      offset,
+      options.query,
+    );
+
+    return { items: result.items, limit, page, total: result.total };
+  }
+
+  async getMyScraps(
+    userId: string,
+    options: { page: number; limit: number },
+  ): Promise<MyScrapListResponse> {
+    const { limit, offset, page } = this.normalizeListOptions(options);
+    const [items, total] = await Promise.all([
+      this.usersRepository.getMyScraps(userId, limit, offset),
+      this.usersRepository.countMyScraps(userId),
     ]);
 
-    return { items, limit, page, total: articleTotal + commentTotal + surveyTotal };
+    return { items, limit, page, total };
   }
 }

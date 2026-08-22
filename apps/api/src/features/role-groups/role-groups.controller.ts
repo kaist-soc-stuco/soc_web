@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from "@nestjs/common";
-import { CreateRoleGroupSchema, UpdateRoleGroupSchema, AssignRoleGroupMemberSchema } from "@soc/contracts";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Req } from "@nestjs/common";
+import { CreateRoleGroupSchema, UpdateRoleGroupSchema, AssignRoleGroupMemberSchema, ReplaceRoleGroupMembersSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
-import type { AssignRoleGroupMemberRequest } from "@soc/contracts";
+import type { AssignRoleGroupMemberRequest, ReplaceRoleGroupMembersRequest } from "@soc/contracts";
 import { Request } from "express";
 
 import { RequirePermissions } from "../auth/guards";
@@ -58,6 +58,26 @@ export class RoleGroupsController {
     return this.roleGroupsService.listRoleGroupMembers(roleGroupId);
   }
 
+  @Get(":roleGroupId/users/candidates")
+  listCandidates(
+    @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
+    @Query("q") q?: string,
+    @Query("department") department?: string,
+    @Query("academicStatus") academicStatus?: string,
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.roleGroupsService.listRoleGroupCandidates(roleGroupId, {
+      q,
+      department,
+      academicStatus,
+      status: status === "active" || status === "inactive" ? status : undefined,
+      page: page ? Number(page) : 1,
+      pageSize: pageSize ? Number(pageSize) : 20,
+    });
+  }
+
   @Post(":roleGroupId/users")
   addMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
@@ -66,6 +86,19 @@ export class RoleGroupsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.roleGroupsService.addUserToRoleGroup(roleGroupId, dto, {
+      actorUserId: request.user?.id,
+      ipAddress: request.ip,
+    });
+  }
+
+  @Put(":roleGroupId/users")
+  replaceMembers(
+    @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
+    @Body(new ZodValidationPipe(ReplaceRoleGroupMembersSchema))
+    dto: ReplaceRoleGroupMembersRequest,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.roleGroupsService.replaceRoleGroupMembers(roleGroupId, dto, {
       actorUserId: request.user?.id,
       ipAddress: request.ip,
     });

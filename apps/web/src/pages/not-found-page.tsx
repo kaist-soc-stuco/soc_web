@@ -1,28 +1,29 @@
 import { ArrowLeft, Home } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Footer } from "@/components/organisms/footer";
 import { Header } from "@/components/organisms/header";
 import { useLanguage } from "@/hooks/use-language";
+import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/ui/page-layout";
 
 export function NotFoundPage() {
   const { lang } = useLanguage();
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <Header showLogo />
+    <PageShell>
+      <Header />
       <main className="mx-auto flex w-full max-w-5xl flex-1 items-center px-4 py-16 md:px-8">
         <section className="w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="h-2 bg-gradient-to-r from-kaist-darkgreen to-kaist-lightgreen" />
           <div className="grid gap-10 p-8 md:grid-cols-[12rem_1fr] md:p-12">
-            <div className="flex h-40 items-center justify-center rounded-2xl bg-kaist-lightgreen/10 text-6xl font-black tracking-tight text-kaist-darkgreen">
+            <div className="flex h-40 items-center justify-center rounded-2xl bg-kaist-lightgreen/10 text-6xl font-bold tracking-tight text-kaist-darkgreen">
               404
             </div>
             <div className="flex flex-col justify-center">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-kaist-darkgreen">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-kaist-darkgreen">
                 {lang === "ko" ? "페이지를 찾을 수 없음" : "Page not found"}
               </p>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
+              <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
                 {lang === "ko"
                   ? "요청한 주소에 페이지가 없습니다."
                   : "We couldn't find that page."}
@@ -35,25 +36,24 @@ export function NotFoundPage() {
               <div className="mt-7 flex flex-wrap gap-3">
                 <Link
                   to="/"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-kaist-darkgreen px-5 text-sm font-black text-white transition-colors hover:bg-kaist-darkgreen/90"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-kaist-darkgreen px-5 text-sm font-bold text-white transition-colors hover:bg-kaist-darkgreen/90"
                 >
                   <Home aria-hidden="true" className="h-4 w-4" />
                   {lang === "ko" ? "홈으로" : "Go home"}
                 </Link>
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => window.history.back()}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 transition-colors hover:bg-slate-50"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   <ArrowLeft aria-hidden="true" className="h-4 w-4" />
                   {lang === "ko" ? "이전 페이지" : "Go back"}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         </section>
       </main>
-      <Footer />
-    </div>
+    </PageShell>
   );
 }

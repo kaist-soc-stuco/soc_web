@@ -1,8 +1,14 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { createApiClient } from '@soc/api-client';
+import { nowMs } from '@soc/shared';
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/organisms/admin-layout';
 import { AuthGuard } from '@/components/guards/auth-guard';
-import { useLanguage } from '@/hooks/use-language';
+import { useCurrentSession } from '@/hooks/use-current-session';
+import { resolveApiBaseUrl } from '@/lib/api-base-url';
+import { getTemporaryAuthRequest } from '@/lib/auth-session';
+import { readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
+import { PublicOperationalContent } from '@/features/site-content/public-operational-content';
 
 const HomePage = lazy(() =>
   import('@/pages/home-page').then((module) => ({ default: module.HomePage })),
@@ -43,6 +49,9 @@ const AuditLogPage = lazy(() =>
 const FeeManagementPage = lazy(() =>
   import('@/pages/admin/fee-management-page').then((module) => ({ default: module.FeeManagementPage })),
 );
+const BoardManagementPage = lazy(() =>
+  import('@/pages/admin/board-management-page').then((module) => ({ default: module.BoardManagementPage })),
+);
 const BoardDetailPage = lazy(() =>
   import('@/pages/board-detail-page').then((module) => ({ default: module.BoardDetailPage })),
 );
@@ -67,6 +76,12 @@ const EventsSurveysPage = lazy(() =>
 const PrivacyPage = lazy(() =>
   import('@/pages/privacy-page').then((module) => ({ default: module.PrivacyPage })),
 );
+const TermsPage = lazy(() =>
+  import('@/pages/terms-page').then((module) => ({ default: module.TermsPage })),
+);
+const FaqPage = lazy(() =>
+  import('@/pages/faq-page').then((module) => ({ default: module.FaqPage })),
+);
 const SearchPage = lazy(() =>
   import('@/pages/search-page').then((module) => ({ default: module.SearchPage })),
 );
@@ -86,31 +101,111 @@ const NotFoundPage = lazy(() =>
   import('@/pages/not-found-page').then((module) => ({ default: module.NotFoundPage })),
 );
 
-function RouteFallback() {
-  const { lang } = useLanguage();
+function LegacyEventsSurveysRedirect() {
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab');
+  const destination = tab === 'survey' ? '/surveys' : tab === 'calendar' ? '/calendar' : '/events';
+  const selected = searchParams.get('selected');
+  const query = selected ? `?selected=${encodeURIComponent(selected)}` : '';
 
+  return <Navigate to={`${destination}${query}`} replace />;
+}
+
+function RouteFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-bold text-slate-400">
-      {lang === 'ko' ? '불러오는 중...' : 'Loading...'}
+    <div className="flex min-h-screen items-center justify-center bg-slate-50" aria-busy="true">
+      <div className="h-10 w-[min(22rem,70vw)] animate-pulse rounded-lg bg-slate-200/75" />
     </div>
   );
+}
+
+/**
+ * Keep an authenticated session alive while the user is actively using the site.
+ * Refresh rotation is server-side sliding expiry; this client trigger makes route
+ * changes and returning to a visible tab count as activity without refreshing
+ * continuously in the background.
+ */
+function SessionKeepAlive() {
+  const location = useLocation();
+  const { data: session } = useCurrentSession();
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
+  const lastRefreshAtRef = useRef(0);
+
+  useEffect(() => {
+    if (!session?.authenticated) return;
+
+    let cancelled = false;
+    const refreshIfNeeded = async () => {
+      if (cancelled || document.visibilityState === 'hidden') return;
+
+      const now = nowMs();
+      if (now - lastRefreshAtRef.current < 9 * 60 * 1000) return;
+
+      lastRefreshAtRef.current = now;
+      try {
+        const result = await apiClient.refreshSession(getTemporaryAuthRequest());
+        if (cancelled || !result.temporarySession) return;
+
+        writeStoredAuthState({
+          ...(readStoredAuthState() ?? {}),
+          temporarySession: result.temporarySession,
+        });
+      } catch {
+        // Normal API requests still own the expired-session redirect path.
+        // Do not interrupt navigation because a background refresh was late.
+        lastRefreshAtRef.current = 0;
+      }
+    };
+
+    void refreshIfNeeded();
+    const intervalId = window.setInterval(() => void refreshIfNeeded(), 10 * 60 * 1000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refreshIfNeeded();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [apiClient, location.pathname, location.search, session?.authenticated]);
+
+  return null;
 }
 
 export function App() {
   return (
     <BrowserRouter>
+      <SessionKeepAlive />
+      <PublicOperationalContent />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/about/roadmap" element={<RoadmapPage />} />
-          <Route path="/events-surveys" element={<EventsSurveysPage />} />
+          <Route path="/events-surveys" element={<LegacyEventsSurveysRedirect />} />
+          <Route path="/events" element={<EventsSurveysPage view="event" />} />
+          <Route path="/surveys" element={<EventsSurveysPage view="survey" />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/about/faq" element={<FaqPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/calendar" element={<Navigate to="/events-surveys?tab=calendar" replace />} />
+          <Route path="/calendar" element={<EventsSurveysPage view="calendar" />} />
           <Route path="/board" element={<BoardPage />} />
           <Route
             path="/board/write"
+            element={
+              <AuthGuard>
+                <BoardWritePage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/board/:category/write"
             element={
               <AuthGuard>
                 <BoardWritePage />
@@ -140,6 +235,7 @@ export function App() {
             <Route path="audit-logs" element={<AuditLogPage />} />
             <Route path="permissions" element={<PermissionPage />} />
             <Route path="finance" element={<FeeManagementPage />} />
+            <Route path="boards" element={<BoardManagementPage />} />
             <Route path="surveys/new" element={<SurveyEditorPage />} />
             <Route path="surveys/:id/edit" element={<SurveyEditorPage />} />
             <Route path="surveys/:id/responses" element={<SurveyResponseListPage />} />

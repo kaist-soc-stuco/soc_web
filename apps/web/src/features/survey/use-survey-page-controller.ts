@@ -7,10 +7,12 @@ import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
   answerContentToValue,
+  emptyAnswerValue,
   isAnswerFilled,
   toAnswerContent,
   type AnswerValue,
 } from "./survey-answer-utils";
+import { getVisibleSurveySectionIds } from "./survey-branching";
 
 export function useSurveyPageController(surveyId: string | undefined) {
   const apiClient = useMemo(
@@ -27,9 +29,22 @@ export function useSurveyPageController(surveyId: string | undefined) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  const allQuestions = useMemo(
+  const allSurveyQuestions = useMemo(
     () => survey?.sections.flatMap((section) => section.questions) ?? [],
     [survey],
+  );
+
+  const visibleSectionIds = useMemo(
+    () => (survey ? getVisibleSurveySectionIds(survey, answers) : new Set<string>()),
+    [answers, survey],
+  );
+
+  const allQuestions = useMemo(
+    () =>
+      survey?.sections
+        .filter((section) => visibleSectionIds.has(section.id))
+        .flatMap((section) => section.questions) ?? [],
+    [survey, visibleSectionIds],
   );
 
   const requiredQuestions = useMemo(
@@ -108,7 +123,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
       questionId: question.id,
       content: toAnswerContent(
         question.questionType,
-        answers[question.id] ?? "",
+        answers[question.id] ?? emptyAnswerValue(question.questionType),
       ),
     }));
 
@@ -155,6 +170,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
 
   return {
     allQuestions,
+    allSurveyQuestions,
     answers,
     handleAnswerChange,
     handleSubmit,
@@ -166,5 +182,6 @@ export function useSurveyPageController(surveyId: string | undefined) {
     submitted,
     submitting,
     survey,
+    visibleSectionIds,
   };
 }

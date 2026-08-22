@@ -153,7 +153,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     commentPermissionId: null,
     managePermissionId: null,
     allowComment: true,
-    allowSecret: false,
+    allowSecret: true,
     allowLike: true,
     isActive: true,
     sortOrder: 4,
@@ -201,7 +201,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     commentPermissionId: null,
     managePermissionId: null,
     allowComment: true,
-    allowSecret: false,
+    allowSecret: true,
     allowLike: true,
     isActive: true,
     sortOrder: 7,
@@ -460,6 +460,23 @@ type SurveySeed = {
   }>;
 };
 
+type EventSeed = {
+  titleKo: string;
+  titleEn: string;
+  contentKo: string;
+  contentEn: string;
+  eventDescriptionKo: string;
+  eventDescriptionEn: string;
+  eventStartDate: Date;
+  eventEndDate: Date;
+  isPinned: boolean;
+  pinOrder?: number;
+  viewCount: number;
+  postedAt: Date;
+  poster: string;
+  survey: SurveySeed;
+};
+
 type ArticleAssetSeed = {
   filename: string;
   content: string | Buffer;
@@ -478,16 +495,70 @@ function makeSeedPosterSvg(input: {
   accent: string;
   accentDark: string;
 }) {
+  const id = input.accent.replace(/[^a-z0-9]/gi, "").toLowerCase() || "seed";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
-  <title>${input.title}</title>
-  <rect width="960" height="540" rx="24" fill="${input.accent}"/>
-  <rect x="0" y="0" width="960" height="540" fill="${input.accentDark}" opacity="0.12"/>
-  <circle cx="806" cy="126" r="128" fill="#ffffff" opacity="0.14"/>
-  <circle cx="892" cy="72" r="56" fill="#ffffff" opacity="0.18"/>
-  <path d="M0 366 C180 318 302 394 462 346 C626 297 723 297 960 342 L960 540 L0 540 Z" fill="#ffffff" opacity="0.11"/>
-  <rect x="64" y="64" width="128" height="8" rx="4" fill="#ffffff" opacity="0.36"/>
-  <rect x="64" y="88" width="72" height="8" rx="4" fill="#ffffff" opacity="0.24"/>
-</svg>`;
+  <title>${input.title} visual</title>
+  <defs>
+    <linearGradient id="gradient-${id}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${input.accent}"/>
+      <stop offset="56%" stop-color="#ffffff" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="${input.accentDark}" stop-opacity="0.72"/>
+    </linearGradient>
+    <pattern id="pattern-${id}" width="72" height="72" patternUnits="userSpaceOnUse" patternTransform="rotate(24)">
+      <path d="M0 36H72M36 0V72" stroke="${input.accentDark}" stroke-opacity="0.12" stroke-width="2"/>
+      <circle cx="36" cy="36" r="8" fill="${input.accentDark}" fill-opacity="0.08"/>
+    </pattern>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="url(#gradient-${id})"/>
+  <rect width="960" height="540" rx="28" fill="url(#pattern-${id})"/>
+  <circle cx="820" cy="92" r="148" fill="#ffffff" fill-opacity="0.18"/>
+  <circle cx="120" cy="492" r="180" fill="${input.accentDark}" fill-opacity="0.1"/>
+  <rect x="36" y="36" width="888" height="468" rx="22" fill="none" stroke="#ffffff" stroke-opacity="0.52" stroke-width="2"/>
+ </svg>`;
+}
+
+function makeSimpleEventSurvey(input: {
+  titleKo: string;
+  titleEn: string;
+  descriptionKo: string;
+  descriptionEn: string;
+  openAt: Date;
+  closeAt: Date;
+  maxResponseCount?: number;
+}): SurveySeed {
+  return {
+    kind: "EVENT",
+    titleKo: input.titleKo,
+    titleEn: input.titleEn,
+    descriptionKo: input.descriptionKo,
+    descriptionEn: input.descriptionEn,
+    feeRequirementPolicy: "NONE",
+    allowMultipleResponses: false,
+    allowResponseEdit: true,
+    resultVisibility: "PRIVATE",
+    maxResponseCount: input.maxResponseCount,
+    openAt: input.openAt,
+    closeAt: input.closeAt,
+    sections: [
+      {
+        titleKo: "참가 정보",
+        titleEn: "Participation details",
+        sortOrder: 0,
+        questions: [
+          {
+            titleKo: "참여 여부를 선택해 주세요.",
+            titleEn: "Would you like to participate?",
+            questionType: "single_choice",
+            options: [
+              { value: "yes", labelKo: "참여합니다", labelEn: "Yes" },
+              { value: "maybe", labelKo: "일정을 확인해 보겠습니다", labelEn: "Maybe" },
+            ],
+            sortOrder: 0,
+          },
+        ],
+      },
+    ],
+  };
 }
 
 async function cleanupSeedContent() {
@@ -887,6 +958,97 @@ async function seedMockData() {
         accentDark: "#5b21b6",
       }),
     },
+    {
+      titleKo: "2026 여름학기 학생회실 운영 시간 안내",
+      titleEn: "Student Council Office Hours for Summer 2026",
+      contentKo: [
+        "2026 여름학기 학생회실 운영 시간과 방문 상담 방법을 안내드립니다.",
+        "",
+        "• 운영 시간: 평일 12:30 ~ 13:30, 18:00 ~ 19:00",
+        "• 장소: N1 학생회실",
+        "• 상담 내용: 과비, 물품 대여, 행사 및 게시판 이용 문의",
+        "",
+        "방문이 어려운 경우 홈페이지 문의하기를 이용해 주세요.",
+      ].join("\n"),
+      contentEn: [
+        "Student Council office hours and in-person consultation details for Summer 2026.",
+        "",
+        "• Office hours: Weekdays 12:30 ~ 13:30, 18:00 ~ 19:00",
+        "• Location: N1 Student Council Office",
+      ].join("\n"),
+      isPinned: false,
+      viewCount: 28,
+      postedAt: new Date("2026-05-14T10:00:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "OFFICE HOURS",
+        title: "학생회실 운영 시간",
+        subtitle: "방문 상담 · 물품 대여 · 문의 접수",
+        dateLine: "SUMMER 2026",
+        accent: "#0f766e",
+        accentDark: "#134e4a",
+      }),
+    },
+    {
+      titleKo: "전산학부 공용공간 이용 수칙 안내",
+      titleEn: "Shared Space Guidelines for the School of Computing",
+      contentKo: [
+        "전산학부 라운지와 공용 공간을 함께 사용하는 학우들을 위해 기본 이용 수칙을 안내드립니다.",
+        "",
+        "• 사용 후 책상과 주변을 정리해 주세요.",
+        "• 개인 물품은 장시간 방치하지 말아 주세요.",
+        "• 음식물과 쓰레기는 지정된 장소에 처리해 주세요.",
+        "• 시설물 고장은 학생회에 알려 주세요.",
+      ].join("\n"),
+      contentEn: [
+        "Please follow these basic guidelines when using shared spaces in the School of Computing.",
+        "",
+        "• Clean your desk after use.",
+        "• Do not leave personal items unattended for long periods.",
+        "• Dispose of food and waste properly.",
+      ].join("\n"),
+      isPinned: false,
+      viewCount: 24,
+      postedAt: new Date("2026-05-13T14:00:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "SHARED SPACE",
+        title: "공용공간 이용 수칙",
+        subtitle: "함께 쓰는 공간을 위한 작은 약속",
+        dateLine: "SOC COMMUNITY",
+        accent: "#2563eb",
+        accentDark: "#1e3a8a",
+      }),
+    },
+    {
+      titleKo: "여름방학 학생회 프로그램 사전 안내",
+      titleEn: "Preview of Summer Student Council Programs",
+      contentKo: [
+        "여름방학 동안 진행할 학습·교류 프로그램을 미리 안내드립니다.",
+        "",
+        "• 알고리즘 스터디 매칭",
+        "• 개발 워크숍 및 프로젝트 회고 세션",
+        "• 선후배 네트워킹 간담회",
+        "",
+        "세부 일정과 신청 방법은 각 프로그램 게시글에서 순차적으로 안내하겠습니다.",
+      ].join("\n"),
+      contentEn: [
+        "A preview of learning and networking programs planned for the summer break.",
+        "",
+        "• Algorithm study matching",
+        "• Development workshop and project retrospective",
+        "• Student networking sessions",
+      ].join("\n"),
+      isPinned: false,
+      viewCount: 19,
+      postedAt: new Date("2026-05-12T09:30:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "SUMMER PROGRAMS",
+        title: "여름방학 프로그램",
+        subtitle: "학습 · 개발 · 네트워킹",
+        dateLine: "COMING SOON",
+        accent: "#d97706",
+        accentDark: "#92400e",
+      }),
+    },
   ];
 
   for (const item of noticeItems) {
@@ -961,9 +1123,9 @@ async function seedMockData() {
 
     await attachAssetsToArticle(articleRow.articleId, seedAuthor.userId, seededAssets);
   }
-  console.log("Seeded 5 notice articles with realistic copy and attachments");
+  console.log("Seeded 8 notice articles with realistic copy and attachments");
 
-  const eventItems = [
+  const eventItems: EventSeed[] = [
     {
       titleKo: "전산인의 밤: 봄학기 네트워킹 데이",
       titleEn: "SOC Night: Spring Networking Day",
@@ -1135,91 +1297,6 @@ async function seedMockData() {
                 titleEn: "I agree to pick up my own snack and not duplicate the pickup.",
                 questionType: "single_choice",
                 options: [{ value: "agree", labelKo: "동의합니다", labelEn: "I agree" }],
-                sortOrder: 2,
-              },
-            ],
-          },
-        ],
-      } satisfies SurveySeed,
-    },
-    {
-      titleKo: "전산학부 알고리즘 스터디 매칭",
-      titleEn: "SOC Algorithm Study Matching",
-      contentKo: [
-        "방학 동안 알고리즘 문제풀이를 함께 진행할 스터디 그룹을 매칭합니다.",
-        "",
-        "참여자는 관심 난이도와 사용 언어, 가능 시간대를 기준으로 4~6명 단위의 그룹으로 배정됩니다. 스터디별 진행 방식은 첫 모임에서 조율하며, 학생회는 초기 매칭과 공용 채널 개설을 지원합니다.",
-        "",
-        "• 활동 기간: 2026.06.24 ~ 2026.08.21",
-        "• 첫 모임: 2026.06.24 19:00",
-        "• 대상: 전산학부 학생 및 복수전공 학생",
-        "• 신청 조건: 학생회비 납부자 우선 배정",
-      ].join("\n"),
-      contentEn: [
-        "We are matching students into algorithm study groups for the summer break.",
-        "",
-        "Groups will be formed based on preferred difficulty, programming language, and available time slots.",
-      ].join("\n"),
-      eventDescriptionKo: "난이도와 가능 시간대를 기준으로 여름방학 알고리즘 스터디 그룹 매칭",
-      eventDescriptionEn: "Summer algorithm study-group matching based on skill level and availability.",
-      eventStartDate: new Date("2026-06-24T19:00:00+09:00"),
-      eventEndDate: new Date("2026-08-21T22:00:00+09:00"),
-      isPinned: false,
-      viewCount: 119,
-      postedAt: new Date("2026-05-29T14:00:00+09:00"),
-      poster: makeSeedPosterSvg({
-        eyebrow: "SUMMER STUDY",
-        title: "알고리즘 스터디",
-        subtitle: "여름방학 그룹 매칭",
-        dateLine: "06.24 WED START · 온라인/오프라인 병행",
-        accent: "#2563eb",
-        accentDark: "#1d4ed8",
-      }),
-      survey: {
-        kind: "EVENT",
-        titleKo: "알고리즘 스터디 매칭 설문",
-        titleEn: "Algorithm Study Matching Survey",
-        descriptionKo: "스터디 그룹 편성을 위해 관심 난이도, 사용 언어, 가능 시간대를 조사합니다. 학생회비 납부자는 우선 배정됩니다.",
-        descriptionEn: "This survey collects your preferred difficulty, language, and available time slots for study group matching.",
-        feeRequirementPolicy: "PAID_ONLY",
-        allowMultipleResponses: false,
-        allowResponseEdit: true,
-        resultVisibility: "PRIVATE",
-        openAt: new Date("2026-05-29T14:00:00+09:00"),
-        closeAt: new Date("2026-06-16T23:59:00+09:00"),
-        sections: [
-          {
-            titleKo: "스터디 선호도",
-            titleEn: "Study preferences",
-            sortOrder: 0,
-            questions: [
-              {
-                titleKo: "희망 난이도를 선택해 주세요.",
-                titleEn: "Select your preferred difficulty level.",
-                questionType: "single_choice",
-                options: [
-                  { value: "basic", labelKo: "기초: 구현/자료구조 중심", labelEn: "Basic" },
-                  { value: "intermediate", labelKo: "중급: 그래프/DP 중심", labelEn: "Intermediate" },
-                  { value: "advanced", labelKo: "심화: 대회 준비 중심", labelEn: "Advanced" },
-                ],
-                sortOrder: 0,
-              },
-              {
-                titleKo: "주로 사용할 언어를 모두 선택해 주세요.",
-                titleEn: "Select all programming languages you plan to use.",
-                questionType: "multiple_choice",
-                options: [
-                  { value: "cpp", labelKo: "C++", labelEn: "C++" },
-                  { value: "python", labelKo: "Python", labelEn: "Python" },
-                  { value: "java", labelKo: "Java", labelEn: "Java" },
-                  { value: "other", labelKo: "기타", labelEn: "Other" },
-                ],
-                sortOrder: 1,
-              },
-              {
-                titleKo: "참여 가능한 정기 모임 시간대를 적어주세요.",
-                titleEn: "Please write your available regular meeting times.",
-                questionType: "long_text",
                 sortOrder: 2,
               },
             ],
@@ -1402,6 +1479,126 @@ async function seedMockData() {
         ],
       } satisfies SurveySeed,
     },
+    {
+      titleKo: "전산학부 커리어 밋업",
+      titleEn: "SOC Career Meetup",
+      contentKo: "현업 선배와 함께 개발자 커리어, 인턴 준비, 포트폴리오에 대해 이야기하는 소규모 밋업입니다.",
+      contentEn: "A small meetup with alumni and industry mentors about software careers, internships, and portfolios.",
+      eventDescriptionKo: "현업 선배와 개발자 커리어를 함께 이야기하는 저녁 밋업",
+      eventDescriptionEn: "An evening meetup with alumni and industry mentors about software careers.",
+      eventStartDate: new Date("2026-08-28T18:30:00+09:00"),
+      eventEndDate: new Date("2026-08-28T20:30:00+09:00"),
+      isPinned: false,
+      viewCount: 87,
+      postedAt: new Date("2026-08-21T09:00:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "CAREER MEETUP",
+        title: "커리어 밋업",
+        subtitle: "선배와 함께 찾는 다음 단계",
+        dateLine: "08.28 FRI 18:30 · N1 라운지",
+        accent: "#0f766e",
+        accentDark: "#134e4a",
+      }),
+      survey: makeSimpleEventSurvey({
+        titleKo: "전산학부 커리어 밋업 참가 신청",
+        titleEn: "SOC Career Meetup Registration",
+        descriptionKo: "좌석과 다과 준비를 위해 참석 여부를 미리 알려 주세요.",
+        descriptionEn: "Please let us know whether you will attend so we can prepare seats and refreshments.",
+        openAt: new Date("2026-08-21T09:00:00+09:00"),
+        closeAt: new Date("2026-08-27T23:59:00+09:00"),
+        maxResponseCount: 60,
+      }),
+    },
+    {
+      titleKo: "오픈소스 기여 스프린트",
+      titleEn: "Open Source Contribution Sprint",
+      contentKo: "관심 있는 오픈소스 프로젝트를 고르고 이슈 탐색부터 첫 PR까지 함께 진행합니다.",
+      contentEn: "Choose an open-source project and work together from issue discovery to your first pull request.",
+      eventDescriptionKo: "첫 PR까지 함께 진행하는 오픈소스 실습 세션",
+      eventDescriptionEn: "A hands-on session that guides participants to their first open-source pull request.",
+      eventStartDate: new Date("2026-09-03T14:00:00+09:00"),
+      eventEndDate: new Date("2026-09-04T18:00:00+09:00"),
+      isPinned: false,
+      viewCount: 63,
+      postedAt: new Date("2026-08-20T14:00:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "OPEN SOURCE",
+        title: "오픈소스 스프린트",
+        subtitle: "첫 PR을 함께 만들어 봅니다",
+        dateLine: "09.03 THU ~ 09.04 FRI · 온라인",
+        accent: "#2563eb",
+        accentDark: "#1e3a8a",
+      }),
+      survey: makeSimpleEventSurvey({
+        titleKo: "오픈소스 기여 스프린트 참가 신청",
+        titleEn: "Open Source Contribution Sprint Registration",
+        descriptionKo: "관심 프로젝트와 사용 가능한 시간을 확인합니다.",
+        descriptionEn: "Tell us which projects and time slots you are interested in.",
+        openAt: new Date("2026-08-20T14:00:00+09:00"),
+        closeAt: new Date("2026-09-01T23:59:00+09:00"),
+        maxResponseCount: 40,
+      }),
+    },
+    {
+      titleKo: "가을 학술제 발표회",
+      titleEn: "Fall Research Showcase",
+      contentKo: "학부생 연구와 캡스톤 프로젝트를 소개하고 서로의 아이디어를 나누는 발표회입니다.",
+      contentEn: "A showcase where undergraduate research and capstone teams share ideas and project results.",
+      eventDescriptionKo: "학부생 연구와 프로젝트를 소개하는 가을 발표회",
+      eventDescriptionEn: "A fall showcase for undergraduate research and project teams.",
+      eventStartDate: new Date("2026-09-11T16:00:00+09:00"),
+      eventEndDate: new Date("2026-09-11T19:00:00+09:00"),
+      isPinned: false,
+      viewCount: 52,
+      postedAt: new Date("2026-08-19T10:30:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "RESEARCH SHOWCASE",
+        title: "가을 학술제",
+        subtitle: "연구와 프로젝트를 만나는 시간",
+        dateLine: "09.11 FRI 16:00 · N1 대강당",
+        accent: "#7c3aed",
+        accentDark: "#4c1d95",
+      }),
+      survey: makeSimpleEventSurvey({
+        titleKo: "가을 학술제 발표회 참가 신청",
+        titleEn: "Fall Research Showcase Registration",
+        descriptionKo: "발표회 참석을 위한 좌석을 신청해 주세요.",
+        descriptionEn: "Register for a seat at the fall research showcase.",
+        openAt: new Date("2026-08-19T10:30:00+09:00"),
+        closeAt: new Date("2026-09-09T23:59:00+09:00"),
+        maxResponseCount: 100,
+      }),
+    },
+    {
+      titleKo: "전산학부 가을 네트워킹 데이",
+      titleEn: "SOC Fall Networking Day",
+      contentKo: "새 학기의 관심사를 나누고 동료·선배와 편하게 연결되는 네트워킹 데이를 준비했습니다.",
+      contentEn: "Meet classmates and alumni, share interests, and build new connections this fall.",
+      eventDescriptionKo: "새 학기 관심사와 진로를 나누는 가을 네트워킹 데이",
+      eventDescriptionEn: "A fall networking day for sharing interests and career paths.",
+      eventStartDate: new Date("2026-10-02T18:00:00+09:00"),
+      eventEndDate: new Date("2026-10-02T21:00:00+09:00"),
+      isPinned: false,
+      viewCount: 41,
+      postedAt: new Date("2026-08-18T11:00:00+09:00"),
+      poster: makeSeedPosterSvg({
+        eyebrow: "FALL NETWORKING",
+        title: "가을 네트워킹 데이",
+        subtitle: "함께 연결되는 새 학기",
+        dateLine: "10.02 FRI 18:00 · N1 다목적홀",
+        accent: "#b45309",
+        accentDark: "#78350f",
+      }),
+      survey: makeSimpleEventSurvey({
+        titleKo: "전산학부 가을 네트워킹 데이 참가 신청",
+        titleEn: "SOC Fall Networking Day Registration",
+        descriptionKo: "행사 준비를 위해 참석 여부를 알려 주세요.",
+        descriptionEn: "Please let us know whether you will attend so we can prepare the event.",
+        openAt: new Date("2026-08-18T11:00:00+09:00"),
+        closeAt: new Date("2026-09-30T23:59:00+09:00"),
+        maxResponseCount: 120,
+      }),
+    },
   ];
 
   for (const event of eventItems) {
@@ -1438,7 +1635,7 @@ async function seedMockData() {
 
     await createSurveyWithQuestions(event.survey, seedAuthor.userId, articleRow.articleId);
   }
-  console.log("Seeded 5 event articles with linked surveys and posters");
+  console.log(`Seeded ${eventItems.length} event articles with linked surveys and posters`);
 }
 async function main() {
   const seedMode = process.env.SEED_MODE ??

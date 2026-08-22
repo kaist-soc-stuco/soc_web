@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from './features/auth/auth.module';
 import { AuthDevModule } from "./features/auth/auth-dev.module";
@@ -20,12 +21,14 @@ import { BulkEmailModule } from "./features/email/bulk-email.module";
 import { CalendarModule } from "./features/calendar/calendar.module";
 import { AuditLogHttpModule } from "./features/audit/audit-log-http.module";
 import { SiteContentModule } from "./features/site-content/site-content.module";
+import { NotificationsModule } from "./features/notifications/notifications.module";
 
 const devOnlyModules =
   process.env.NODE_ENV === "production" ? [] : [AuthDevModule, MockModule];
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
@@ -48,6 +51,7 @@ const devOnlyModules =
     CalendarModule,
     AuditLogHttpModule,
     SiteContentModule,
+    NotificationsModule,
     RoleGroupsModule,
     HealthModule,
     ...devOnlyModules,

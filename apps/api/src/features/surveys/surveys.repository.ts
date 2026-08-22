@@ -12,6 +12,7 @@ import { surveys, surveyResponses } from "../../infrastructure/postgres/postgres
 import type { SurveyRecord } from "./entities/survey.entity";
 import type { CreateSurveyDto } from "./dto/create-survey.dto";
 import type { UpdateSurveyDto } from "./dto/update-survey.dto";
+import { sanitizeSurveyRichText } from "./survey-rich-text";
 
 interface SurveyVersionLineage {
   previousVersionId: string;
@@ -48,7 +49,6 @@ export class SurveysRepository {
       maxResponses: row.maxResponseCount,
       isAlwaysOpen: row.isAlwaysOpen,
       opensAt: row.openAt ? msToIso(row.openAt.valueOf()) : null,
-      closesAt: row.closeAt ? msToIso(row.closeAt.valueOf()) : null,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
     };
@@ -106,8 +106,8 @@ export class SurveysRepository {
         kind: dto.kind,
         titleKo: dto.titleKo,
         titleEn: dto.titleEn,
-        descriptionKo: dto.descriptionKo ?? null,
-        descriptionEn: dto.descriptionEn ?? null,
+        descriptionKo: sanitizeSurveyRichText(dto.descriptionKo),
+        descriptionEn: sanitizeSurveyRichText(dto.descriptionEn),
         feeRequirementPolicy: dto.feeRequirementPolicy ?? "NONE",
         allowMultipleResponses: dto.allowMultipleResponses ?? false,
         allowResponseEdit: dto.allowResponseEdit ?? false,
@@ -122,7 +122,6 @@ export class SurveysRepository {
         maxResponseCount: dto.maxResponseCount ?? null,
         isAlwaysOpen: dto.isAlwaysOpen ?? false,
         openAt: dto.isAlwaysOpen ? null : dto.openAt ? isoToDate(dto.openAt) : null,
-        closeAt: dto.isAlwaysOpen ? null : dto.closeAt ? isoToDate(dto.closeAt) : null,
         connectedArticleId: dto.connectedArticleId ? Number(dto.connectedArticleId) : null,
         updatedAt: nowDate(),
       })
@@ -142,8 +141,12 @@ export class SurveysRepository {
     if (dto.kind !== undefined) set.kind = dto.kind;
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;
     if (dto.titleEn !== undefined) set.titleEn = dto.titleEn;
-    if (dto.descriptionKo !== undefined) set.descriptionKo = dto.descriptionKo;
-    if (dto.descriptionEn !== undefined) set.descriptionEn = dto.descriptionEn;
+    if (dto.descriptionKo !== undefined) {
+      set.descriptionKo = sanitizeSurveyRichText(dto.descriptionKo);
+    }
+    if (dto.descriptionEn !== undefined) {
+      set.descriptionEn = sanitizeSurveyRichText(dto.descriptionEn);
+    }
     if (dto.feeRequirementPolicy !== undefined) {
       set.feeRequirementPolicy = dto.feeRequirementPolicy;
     }
@@ -162,12 +165,10 @@ export class SurveysRepository {
       set.isAlwaysOpen = dto.isAlwaysOpen;
       if (dto.isAlwaysOpen) {
         set.openAt = null;
-        set.closeAt = null;
       }
     }
     if (!dto.isAlwaysOpen) {
       if (dto.openAt !== undefined) set.openAt = dto.openAt ? isoToDate(dto.openAt) : null;
-      if (dto.closeAt !== undefined) set.closeAt = dto.closeAt ? isoToDate(dto.closeAt) : null;
     }
     if (dto.connectedArticleId !== undefined) {
       set.connectedArticleId = dto.connectedArticleId ? Number(dto.connectedArticleId) : null;

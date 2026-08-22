@@ -10,6 +10,7 @@ import {
 } from "@/features/survey/survey-state-views";
 import { SurveySummaryCard } from "@/features/survey/survey-summary-card";
 import { useSurveyPageController } from "@/features/survey/use-survey-page-controller";
+import { PageShell } from "@/components/ui/page-layout";
 
 export function SurveyPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +27,7 @@ export function SurveyPage() {
     submitted,
     submitting,
     survey,
+    visibleSectionIds,
   } = useSurveyPageController(id);
 
   const renderBody = () => {
@@ -102,19 +104,20 @@ export function SurveyPage() {
         submitError={submitError}
         submitting={submitting}
         survey={survey}
+        visibleSectionIds={visibleSectionIds}
       />
     );
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#fafafa]">
-      <Header showLogo />
+    <PageShell>
+      <Header />
       <main className="flex-1 px-4 py-10 lg:px-0">
         <div className="mx-auto max-w-[52rem]">
           {survey && <SurveySummaryCard lang={lang} survey={survey} />}
           {renderBody()}
         </div>
       </main>
-    </div>
+    </PageShell>
   );
 }

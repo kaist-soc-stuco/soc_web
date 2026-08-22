@@ -22,6 +22,7 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
     "code",
     "hr",
     "a",
+    "span",
   ],
   allowedAttributes: {
     a: [
@@ -34,10 +35,20 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
       },
     ],
     ol: ["start"],
+    span: ["style"],
   },
   allowedSchemes: ["http", "https", "mailto", "tel"],
   allowProtocolRelative: false,
-  parseStyleAttributes: false,
+  allowedStyles: {
+    span: {
+      color: [
+        /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i,
+        /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i,
+      ],
+      "font-size": [/^(?:14|16|18|22)px$/],
+    },
+  },
+  parseStyleAttributes: true,
   transformTags: {
     a: (tagName, attributes) => {
       if (attributes.target === "_blank") {

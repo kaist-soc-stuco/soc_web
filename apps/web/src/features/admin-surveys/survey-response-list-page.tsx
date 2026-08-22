@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import * as XLSX from "xlsx";
 import { createApiClient } from "@soc/api-client";
 import type {
   SurveyAnswerRecord,
@@ -10,7 +11,10 @@ import type {
 import { isoToDate, isoToMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { Pagination } from "@/components/ui/pagination";
+import { AdminFormField, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
+import { PageSearchField } from "@/components/ui/page-layout";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -20,12 +24,19 @@ import {
   ChevronLeft,
   Loader2,
   Calendar,
+  Eye,
   Users,
-  Search,
-  Filter,
-  ChevronDown,
   Download,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import {
+  AdminDataTable,
+  AdminTableBody,
+  AdminTableCell,
+  AdminTableHead,
+  AdminTableHeader,
+} from "@/components/ui/admin-data-table";
 
 function formatResponseName(response: SurveyResponseRecord) {
   return response.user?.nameKo ?? "—";
@@ -87,10 +98,8 @@ export function SurveyResponseListPage() {
   // Filter States
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isPageSizeDropdownOpen, setIsPageSizeDropdownOpen] = useState(false);
 
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
@@ -117,19 +126,13 @@ export function SurveyResponseListPage() {
     fetchSurveyAndResponses();
   }, [surveyId, client, session, sessionLoading]);
 
-  const handleExportCSV = async () => {
+  const handleExport = async () => {
     if (!surveyId) return;
     setExporting(true);
     try {
       const detail = await client.getSurveyDetail(surveyId);
       const allQuestions = detail.sections.flatMap((s) => s.questions);
       const data = await client.listResponsesWithAnswers(surveyId);
-
-      const csvCell = (val: unknown) => {
-        if (val === null || val === undefined) return '""';
-        const str = String(val);
-        return `"${str.replace(/"/g, '""')}"`;
-      };
 
       const headers = [
         "No.",
@@ -158,23 +161,23 @@ export function SurveyResponseListPage() {
         ];
       });
 
-      const csvContent = [
-        headers.map(csvCell).join(","),
-        ...rows.map((row) => row.map(csvCell).join(",")),
-      ].join("\n");
-
-      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      worksheet["!cols"] = headers.map((header) => ({ wch: header.length > 18 ? 24 : 16 }));
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "응답 목록");
+      const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `survey_responses_${surveyId}.csv`);
+      link.setAttribute("download", `survey_responses_${surveyId}.xlsx`);
       link.style.visibility = "hidden";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
       console.error(err);
-      alert("CSV 내보내기에 실패했습니다.");
+      alert("응답을 내보내지 못했습니다.");
     } finally {
       setExporting(false);
     }
@@ -204,6 +207,8 @@ export function SurveyResponseListPage() {
 
   // Total pages
   const totalPages = Math.max(1, Math.ceil(filteredResponses.length / pageSize));
+  const rangeStart = filteredResponses.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(filteredResponses.length, currentPage * pageSize);
 
   // Paginated List
   const paginatedResponses = useMemo(() => {
@@ -221,38 +226,28 @@ export function SurveyResponseListPage() {
   // Generate page items exactly as `< 1 2 3 ... 29 >`
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
-      <div className="min-h-screen bg-slate-50/50 text-kaist-black">
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-5.5 px-4 py-8 md:px-8">
+      <AdminPageShell>
+        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-5 py-7 md:px-8 xl:px-10">
           
           {/* Breadcrumb matching exact path */}
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 select-none">
             <span>설문조사 관리</span>
             <span className="text-[10px]">&gt;</span>
-            <span className="text-slate-600 font-extrabold">응답 목록</span>
+            <span className="text-slate-600 font-semibold">응답 목록</span>
           </div>
 
-          {/* Compact Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between pb-1 gap-4 select-none">
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-800">응답 목록</h1>
-              <p className="mt-1 text-[13px] font-semibold text-slate-400 leading-relaxed">
-                설문조사에 제출된 응답을 확인하고 관리할 수 있습니다.
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={() => navigate("/admin/surveys")}
-                className="px-4 py-2.5 border border-slate-200 bg-white text-slate-700 hover:text-slate-900 font-bold text-sm rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer border-1"
-              >
+          <AdminPageHeader
+            title="응답 목록"
+            actions={
+              <>
+              <Button variant="outline" onClick={() => navigate("/admin/surveys")} className="gap-1.5 text-sm font-medium">
                 <ChevronLeft className="w-4 h-4 text-slate-500" />
-                <span>설문 목록으로</span>
-              </button>
-              
-              <button
-                onClick={handleExportCSV}
+                목록으로
+              </Button>
+              <Button
+                onClick={handleExport}
                 disabled={exporting}
-                className="px-4.5 py-2.5 bg-kaist-darkgreen text-white font-extrabold text-sm rounded-xl hover:bg-[#0f5c29] transition-all flex items-center gap-2 cursor-pointer shadow-sm border-0 disabled:opacity-50"
+                className="gap-1.5 bg-brand-primary text-sm font-semibold text-white hover:bg-brand-primary/90"
               >
                 {exporting ? (
                   <>
@@ -262,12 +257,13 @@ export function SurveyResponseListPage() {
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    <span>엑셀 다운로드</span>
+                    <span>내보내기</span>
                   </>
                 )}
-              </button>
-            </div>
-          </div>
+              </Button>
+              </>
+            }
+          />
 
           {/* Survey Info Card */}
           {survey && (
@@ -281,7 +277,7 @@ export function SurveyResponseListPage() {
                   <div className="flex flex-col gap-1 truncate">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">설문조사</span>
                     <div className="flex items-center gap-2 truncate">
-                      <h4 className="text-sm font-extrabold text-slate-800 truncate" title={survey.titleKo}>
+                      <h4 className="text-sm font-semibold text-slate-800 truncate" title={survey.titleKo}>
                         {survey.titleKo}
                       </h4>
                       <SurveyStatusBadge
@@ -303,9 +299,8 @@ export function SurveyResponseListPage() {
                     <span className="text-xs font-bold text-slate-700 leading-tight">
                       {(() => {
                         const start = format24hDateTime(survey.opensAt);
-                        const end = format24hDateTime(survey.closesAt);
-                        if (!start && !end) return "전체 기간";
-                        return `${start || "—"} ~ ${end || "—"}`;
+                        if (!start) return "상시";
+                        return start;
                       })()}
                     </span>
                   </div>
@@ -318,7 +313,7 @@ export function SurveyResponseListPage() {
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">응답 수</span>
-                    <span className="text-sm font-extrabold text-slate-800 leading-tight">
+                    <span className="text-sm font-semibold text-slate-800 leading-tight">
                       {responses.length}명
                     </span>
                   </div>
@@ -327,82 +322,46 @@ export function SurveyResponseListPage() {
             </div>
           )}
 
-          {/* Search & Popover Filter Panel */}
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] select-none">
-            <div className="flex items-center justify-between gap-4">
-              {/* Left Search Bar (wide flex layout) */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="이름, 이메일 검색"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
+          {/* Search and sort filters remain visible in the toolbar. */}
+          <AdminTableCard className="overflow-visible">
+            <div className="border-b border-slate-100 p-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <AdminFormField label="검색" className="min-w-0 flex-1">
+                <PageSearchField
+                  ariaLabel="응답 검색"
+                  className="w-full lg:w-auto"
+                  onChange={(value) => {
+                    setSearchQuery(value);
                     setCurrentPage(1);
                   }}
-                  className="pl-9 pr-3 py-2.5 w-full rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-800 focus:outline-none focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10 transition-colors placeholder:text-slate-400"
+                  onClear={() => {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  placeholder="이름, 이메일 검색"
+                  value={searchQuery}
                 />
-              </div>
-
-              {/* Right Filter Popover dropdown */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 border rounded-xl text-[13px] font-bold transition-all shadow-sm cursor-pointer select-none ${
-                    isFilterDropdownOpen
-                      ? "border-kaist-darkgreen bg-[#e6f4ea]/40 text-kaist-darkgreen"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <Filter className="h-4 w-4 shrink-0" />
-                  <span>필터</span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? "rotate-180" : ""}`} />
-                </button>
-
-                {isFilterDropdownOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
-                    <div className="absolute right-0 mt-2.5 w-72 bg-white border border-slate-200 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] p-4.5 z-50 animate-in fade-in slide-in-from-top-1 duration-250 flex flex-col gap-4 select-none">
-                      {/* 1. Sort Order */}
-                      <div className="flex flex-col gap-2">
-                        <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">정렬 기준</span>
-                        <div className="bg-slate-100 p-0.5 rounded-lg flex items-stretch select-none">
-                          {([
-                            { value: "desc", label: "최신순" },
-                            { value: "asc", label: "오래된순" }
-                          ] as const).map((opt) => {
-                            const isActive = sortOrder === opt.value;
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => {
-                                  setSortOrder(opt.value);
-                                  setCurrentPage(1);
-                                }}
-                                className={`flex-1 py-1.5 px-1.5 text-[11px] font-bold rounded-md transition-all cursor-pointer text-center whitespace-nowrap border-0 ${
-                                  isActive
-                                    ? "bg-white text-kaist-darkgreen shadow-xs"
-                                    : "bg-transparent text-slate-500 hover:text-slate-800"
-                                }`}
-                              >
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+              </AdminFormField>
+              <AdminFormField label="정렬" className="flex flex-wrap items-end gap-3">
+                <SegmentedControl
+                  ariaLabel="응답 정렬"
+                  options={[
+                    { value: "desc" as const, label: "최신순" },
+                    { value: "asc" as const, label: "오래된순" },
+                  ]}
+                  value={sortOrder}
+                  onChange={(value) => {
+                    setSortOrder(value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </AdminFormField>
             </div>
           </div>
 
-          {/* Table Container Card */}
-          <div className="rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-col overflow-hidden">
+
+          {/* Table */}
+          <div className="flex min-w-0 flex-col overflow-visible">
             
             {loading && (
               <div className="bg-white">
@@ -424,19 +383,26 @@ export function SurveyResponseListPage() {
 
             {!loading && filteredResponses.length > 0 && (
               <div className="bg-white">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm divide-y divide-slate-100 border-collapse">
-                    <thead className="bg-slate-50/50 text-slate-500 text-[13px] font-extrabold border-b border-slate-100 select-none">
+                <AdminDataTable minWidth={1076}>
+                  <colgroup>
+                    <col style={{ width: 64 }} />
+                    <col style={{ width: 180 }} />
+                    <col style={{ width: 360 }} />
+                    <col style={{ width: 220 }} />
+                    <col style={{ width: 180 }} />
+                    <col style={{ width: 72 }} />
+                  </colgroup>
+                    <AdminTableHeader>
                       <tr>
-                        <th className="px-4 py-4 text-center w-20">No.</th>
-                        <th className="px-4 py-4 text-center w-28">이름</th>
-                        <th className="px-5 py-4 text-left">이메일</th>
-                        <th className="px-4 py-4 text-center w-48">소속 / 학번</th>
-                        <th className="px-4 py-4 text-center w-48">제출일시</th>
-                        <th className="px-4 py-4 text-center w-28">작업</th>
+                        <AdminTableHead className="text-center">No.</AdminTableHead>
+                        <AdminTableHead className="text-center">이름</AdminTableHead>
+                        <AdminTableHead>이메일</AdminTableHead>
+                        <AdminTableHead className="text-center">소속 / 학번</AdminTableHead>
+                        <AdminTableHead className="text-center">제출일시</AdminTableHead>
+                        <AdminTableHead className="text-center">작업</AdminTableHead>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                    </AdminTableHeader>
+                    <AdminTableBody>
                       {paginatedResponses.map((r, index) => {
                         const globalIndex = (currentPage - 1) * pageSize + index;
                         const rowNo = filteredResponses.length - globalIndex;
@@ -444,113 +410,73 @@ export function SurveyResponseListPage() {
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/30 transition-colors">
                             {/* No. (center-aligned) */}
-                            <td className="px-4 py-4 text-center text-xs font-bold text-slate-400 select-none">
+                            <AdminTableCell className="text-center tabular-nums">
                               {rowNo}
-                            </td>
+                            </AdminTableCell>
 
                             {/* 이름 (center-aligned) */}
-                            <td className="px-4 py-4 text-center text-sm font-extrabold text-slate-800">
-                              {formatResponseName(r)}
-                            </td>
+                            <AdminTableCell className="text-center">
+                              <span className="admin-table-text-emphasis">{formatResponseName(r)}</span>
+                            </AdminTableCell>
 
                             {/* 이메일 (left-aligned) */}
-                            <td className="px-5 py-4 text-left text-xs font-semibold text-slate-600 truncate max-w-[220px]" title={formatResponseEmail(r)}>
+                            <AdminTableCell truncate title={formatResponseEmail(r)}>
                               {formatResponseEmail(r)}
-                            </td>
+                            </AdminTableCell>
 
                             {/* 소속 / 학번 (center-aligned) */}
-                            <td className="px-4 py-4 text-center text-xs font-semibold text-slate-500">
+                            <AdminTableCell className="text-center">
                               {formatResponseDepartment(r)}
-                            </td>
+                            </AdminTableCell>
 
                             {/* 제출일시 (center-aligned, single line, 24h format, treated date & time equally) */}
-                            <td className="px-4 py-4 text-center text-xs font-semibold text-slate-600 select-none">
+                            <AdminTableCell className="text-center tabular-nums">
                               {r.submittedAt ? format24hDateTime(r.submittedAt) : "—"}
-                            </td>
+                            </AdminTableCell>
 
                             {/* 작업 (center-aligned) */}
-                            <td className="px-4 py-4 text-center relative">
-                              <div className="flex items-center justify-center gap-1.5 text-slate-400 select-none">
-                                {/* Details magnifying glass icon */}
-                                <button
+                            <AdminTableCell className="text-center">
+                                <IconButton
+                                  size="sm"
+                                  tone="table-action"
                                   onClick={() => navigate(`/admin/surveys/${surveyId}/responses/${r.id}`)}
+                                  aria-label="응답 상세 확인"
                                   title="응답 상세 확인"
-                                  className="p-1.5 hover:bg-slate-50 hover:text-kaist-darkgreen rounded-lg transition-colors cursor-pointer border-0 bg-transparent shrink-0"
                                 >
-                                  <Search className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
+                                  <Eye className="size-4" strokeWidth={1.5} />
+                                </IconButton>
+                            </AdminTableCell>
                           </tr>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </div>
+                    </AdminTableBody>
+                </AdminDataTable>
               </div>
             )}
 
-            {/* Premium Pagination Footer block (inside the card container, separated by a top border, styled exactly like the bulletin board) */}
-            <div className="border-t border-slate-100 bg-slate-50/10 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 select-none bg-white">
-              {/* Total count details */}
-              <div className="text-[13px] font-bold text-slate-500">
-                <span>총 <strong className="text-kaist-darkgreen font-black">{filteredResponses.length}</strong>개의 응답이 등록되어 있습니다.</span>
-              </div>
-
-              {/* Right side: standard dropdown + high-fidelity chevrons & number buttons */}
-              <div className="flex items-center gap-4 flex-wrap">
-                {/* Custom Page Size Dropdown placed inside the bottom footer bar */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsPageSizeDropdownOpen(!isPageSizeDropdownOpen)}
-                    className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-sm focus:outline-none"
-                  >
-                    <span>{pageSize}개씩 보기</span>
-                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isPageSizeDropdownOpen ? "rotate-180" : ""}`} />
-                  </button>
-
-                  {isPageSizeDropdownOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsPageSizeDropdownOpen(false)} />
-                      <div className="absolute bottom-full right-0 mb-1.5 w-28 bg-white border border-slate-200 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] py-1.5 z-50 animate-in fade-in slide-in-from-bottom-1 duration-150 select-none">
-                        {[10, 20, 50].map((size) => {
-                          const isSelected = size === pageSize;
-                          return (
-                            <button
-                              key={size}
-                              type="button"
-                              onClick={() => {
-                                setPageSize(size);
-                                setCurrentPage(1);
-                                setIsPageSizeDropdownOpen(false);
-                              }}
-                              className={`w-full text-left px-3.5 py-2 text-[12px] font-semibold transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-between ${
-                                isSelected
-                                  ? "text-kaist-darkgreen bg-[#e6f4ea]/40 font-bold"
-                                  : "text-slate-700 hover:bg-slate-50"
-                              }`}
-                            >
-                              <span>{size}개씩 보기</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
-
+            <div className="border-t border-slate-100 bg-slate-50/10 px-6 py-4 select-none bg-white">
               <Pagination
+                className="m-0 w-full"
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
+                pageSizeControl={
+                  <PageSizeSelect
+                    value={pageSize}
+                    onChange={(size) => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                  />
+                }
+                range={`총 ${filteredResponses.length}건 중 ${rangeStart}–${rangeEnd}`}
                 totalPages={totalPages}
               />
             </div>
-            </div>
 
           </div>
+          </AdminTableCard>
         </main>
-      </div>
+      </AdminPageShell>
     </AuthGuard>
   );
 }

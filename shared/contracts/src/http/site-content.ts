@@ -1,7 +1,11 @@
 import type { z } from "zod";
 
 import type {
+  ContentBlockStatusSchema,
+  ContentBlockTypeSchema,
+  CreateContentBlockSchema,
   SiteContentKeySchema,
+  UpdateContentBlockSchema,
   UpsertSiteContentSchema,
 } from "../schemas.js";
 
@@ -30,4 +34,35 @@ export interface SiteContentListResponse {
 
 export interface AdminSiteContentListResponse {
   items: SiteContentRecord[];
+}
+
+export type ContentBlockType = z.infer<typeof ContentBlockTypeSchema>;
+export type ContentBlockStatus = z.infer<typeof ContentBlockStatusSchema>;
+export type CreateContentBlockRequest = z.infer<typeof CreateContentBlockSchema>;
+export type UpdateContentBlockRequest = z.infer<typeof UpdateContentBlockSchema>;
+
+export interface ContentBlockRecord {
+  contentBlockId: string;
+  type: ContentBlockType;
+  status: ContentBlockStatus;
+  titleKo: string;
+  titleEn: string;
+  bodyKo: string | null;
+  bodyEn: string | null;
+  linkUrl: string | null;
+  imageUrl: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  sortOrder: number;
+  isEnabled: boolean;
+  createdBy: string | null;
+  updatedBy: string | null;
+  publishedBy: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentBlockListResponse {
+  items: ContentBlockRecord[];
 }

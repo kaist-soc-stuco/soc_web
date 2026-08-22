@@ -1,22 +1,23 @@
 import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
-export function Logo() {
+export function Logo({ inverse = false }: { inverse?: boolean }) {
   return (
     <Link
       to="/"
-      className="flex items-center gap-2 transition-opacity hover:opacity-90 md:gap-4"
+      className="flex items-center gap-4 transition-opacity hover:opacity-90"
     >
       <img
         src="/kaist_logo.png"
         alt="KAIST Logo"
-        className="h-6 w-auto"
+        className={cn("h-6 w-auto", inverse && "brightness-0 invert")}
       />
-      <div className="h-6 w-px bg-gray-400" />
+      <div className={cn("h-6 w-px", inverse ? "bg-white/30" : "bg-slate-300")} />
       <span className="flex flex-col leading-none" aria-label="SOC Student Council">
-        <span className="text-xl font-black tracking-[-0.04em] text-kaist-darkgreen">
+        <span className={cn("text-xl font-bold tracking-[-0.04em]", inverse ? "text-white" : "text-kaist-darkgreen")}>
           SOC
         </span>
-        <span className="mt-0.5 text-[7px] font-black uppercase tracking-[0.18em] text-kaist-grey">
+        <span className={cn("mt-0.5 whitespace-nowrap text-[7px] font-bold uppercase tracking-[0.18em]", inverse ? "text-white/70" : "text-kaist-grey")}>
           Student Council
         </span>
       </span>

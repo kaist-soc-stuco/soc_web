@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -92,6 +92,133 @@ export class AssetRepository {
         usageType: link.usageType,
       })),
     };
+  }
+
+  async findOwnedAssetByStorageKey(
+    storageKey: string,
+    uploadedBy: string,
+  ): Promise<{
+    assetId: string;
+    storageKey: string;
+    originalFilename: string;
+    mimeType: string;
+    sizeBytes: number;
+  } | null> {
+    const [asset] = await this.db
+      .select({
+        assetId: assets.assetId,
+        storageKey: assets.storageKey,
+        originalFilename: assets.originalFilename,
+        mimeType: assets.mimeType,
+        sizeBytes: assets.sizeBytes,
+      })
+      .from(assets)
+      .where(
+        and(eq(assets.storageKey, storageKey), eq(assets.uploadedBy, uploadedBy)),
+      )
+      .limit(1);
+
+    return asset
+      ? {
+          assetId: String(asset.assetId),
+          storageKey: asset.storageKey,
+          originalFilename: asset.originalFilename,
+          mimeType: asset.mimeType,
+          sizeBytes: asset.sizeBytes,
+        }
+      : null;
+  }
+
+  async findOwnedAsset(
+    assetId: string,
+    uploadedBy: string,
+  ): Promise<{ assetId: string; originalFilename: string } | null> {
+    const [asset] = await this.db
+      .select({ assetId: assets.assetId, originalFilename: assets.originalFilename })
+      .from(assets)
+      .where(
+        and(
+          eq(assets.assetId, Number(assetId)),
+          eq(assets.uploadedBy, uploadedBy),
+        ),
+      )
+      .limit(1);
+    return asset
+      ? { assetId: String(asset.assetId), originalFilename: asset.originalFilename }
+      : null;
+  }
+
+  async findOwnedAssetDetails(
+    assetId: string,
+    uploadedBy: string,
+  ): Promise<{
+    assetId: string;
+    storageKey: string;
+    originalFilename: string;
+    mimeType: string;
+    sizeBytes: number;
+  } | null> {
+    const [asset] = await this.db
+      .select({
+        assetId: assets.assetId,
+        storageKey: assets.storageKey,
+        originalFilename: assets.originalFilename,
+        mimeType: assets.mimeType,
+        sizeBytes: assets.sizeBytes,
+      })
+      .from(assets)
+      .where(
+        and(
+          eq(assets.assetId, Number(assetId)),
+          eq(assets.uploadedBy, uploadedBy),
+        ),
+      )
+      .limit(1);
+
+    return asset
+      ? {
+          assetId: String(asset.assetId),
+          storageKey: asset.storageKey,
+          originalFilename: asset.originalFilename,
+          mimeType: asset.mimeType,
+          sizeBytes: asset.sizeBytes,
+        }
+      : null;
+  }
+
+  async findLocalAssets(limit: number): Promise<
+    Array<{
+      assetId: string;
+      storageKey: string;
+      originalFilename: string;
+      mimeType: string;
+    }>
+  > {
+    const rows = await this.db
+      .select({
+        assetId: assets.assetId,
+        storageKey: assets.storageKey,
+        originalFilename: assets.originalFilename,
+        mimeType: assets.mimeType,
+      })
+      .from(assets)
+      .where(sql`${assets.storageKey} NOT LIKE 's3://%'`)
+      .orderBy(asc(assets.createdAt))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      assetId: String(row.assetId),
+      storageKey: row.storageKey,
+      originalFilename: row.originalFilename,
+      mimeType: row.mimeType,
+    }));
+  }
+
+  async updateStorageKey(assetId: string, storageKey: string): Promise<void> {
+    await this.db
+      .update(assets)
+      .set({ storageKey })
+      .where(eq(assets.assetId, Number(assetId)));
   }
 
   async findUnlinkedAssetsBefore(

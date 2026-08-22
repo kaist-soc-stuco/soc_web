@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   ParseIntPipe,
   Query,
   Req,
@@ -15,11 +16,18 @@ import type {
   CommentCreateRequest,
   CommentCreateResponse,
   CommentDeleteResponse,
+  CommentEngagementResponse,
   CommentListResponse,
+  CommentReportRequest,
+  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
-import { CommentCreateSchema, CommentUpdateSchema } from "@soc/contracts";
+import {
+  CommentCreateSchema,
+  CommentReportSchema,
+  CommentUpdateSchema,
+} from "@soc/contracts";
 import { Request } from "express";
 
 import { AuthGuard } from "../auth/guards";
@@ -110,6 +118,62 @@ export class CommentController {
       code,
       articleId,
       commentId,
+      request.user!,
+    );
+  }
+
+  @Put(":commentId/engagements/:kind")
+  @UseGuards(AuthGuard)
+  async activateCommentEngagement(
+    @Param("code") code: string,
+    @Param("articleId") articleId: string,
+    @Param("commentId") commentId: string,
+    @Param("kind") kind: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<CommentEngagementResponse> {
+    return this.commentService.setCommentEngagement(
+      code,
+      articleId,
+      commentId,
+      kind,
+      true,
+      request.user!,
+    );
+  }
+
+  @Delete(":commentId/engagements/:kind")
+  @UseGuards(AuthGuard)
+  async deactivateCommentEngagement(
+    @Param("code") code: string,
+    @Param("articleId") articleId: string,
+    @Param("commentId") commentId: string,
+    @Param("kind") kind: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<CommentEngagementResponse> {
+    return this.commentService.setCommentEngagement(
+      code,
+      articleId,
+      commentId,
+      kind,
+      false,
+      request.user!,
+    );
+  }
+
+  @Post(":commentId/report")
+  @UseGuards(AuthGuard)
+  async reportComment(
+    @Param("code") code: string,
+    @Param("articleId") articleId: string,
+    @Param("commentId") commentId: string,
+    @Body(new ZodValidationPipe(CommentReportSchema)) body: CommentReportRequest,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<CommentReportResponse> {
+    return this.commentService.reportComment(
+      code,
+      articleId,
+      commentId,
+      body,
       request.user!,
     );
   }

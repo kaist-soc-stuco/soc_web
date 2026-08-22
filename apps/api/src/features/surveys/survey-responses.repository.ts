@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -22,6 +22,10 @@ import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
 import type { QuestionOption, QuestionType } from "@soc/contracts";
 import { validateSurveyAnswers } from "./survey-answer-validation";
+import {
+  getReachableSurveyQuestions,
+  type SurveySectionWithQuestions,
+} from "./survey-branching";
 
 type SurveyResponseQueryRow = {
   id: string;
@@ -59,9 +63,6 @@ type InsertSubmissionResult =
       status: "survey_not_open_yet";
     }
   | {
-      status: "survey_closed";
-    }
-  | {
       status: "fee_payer_only";
     };
 
@@ -76,7 +77,6 @@ type UpdateSubmissionResult =
         | "survey_not_found"
         | "survey_not_published"
         | "survey_not_open_yet"
-        | "survey_closed"
         | "fee_payer_only"
         | "response_edit_not_allowed"
         | "multiple_response_edit_not_supported"
@@ -87,13 +87,11 @@ type SubmissionState = {
   isPublished: boolean;
   isAlwaysOpen: boolean;
   openAt: Date | null;
-  closeAt: Date | null;
 };
 
 type SubmissionStateFailure =
   | "survey_not_published"
-  | "survey_not_open_yet"
-  | "survey_closed";
+  | "survey_not_open_yet";
 
 const getSubmissionStateFailure = (
   survey: SubmissionState,
@@ -103,9 +101,6 @@ const getSubmissionStateFailure = (
   if (survey.isAlwaysOpen) return null;
   if (survey.openAt && survey.openAt.valueOf() > currentMs) {
     return "survey_not_open_yet";
-  }
-  if (survey.closeAt && survey.closeAt.valueOf() <= currentMs) {
-    return "survey_closed";
   }
   return null;
 };
@@ -184,20 +179,10 @@ export class SurveyResponsesRepository {
     };
   }
 
-  private async findQuestionsForSurvey(
-    tx: PostgresTransaction,
-    surveyId: string,
-  ): Promise<SurveyQuestionRecord[]> {
-    const rows = await tx
-      .select({ question: surveyQuestions })
-      .from(surveyQuestions)
-      .innerJoin(
-        surveySections,
-        eq(surveyQuestions.sectionId, surveySections.id),
-      )
-      .where(eq(surveySections.surveyId, surveyId));
-
-    return rows.map(({ question }) => ({
+  private mapQuestion(
+    question: typeof surveyQuestions.$inferSelect,
+  ): SurveyQuestionRecord {
+    return {
       id: question.id,
       sectionId: question.sectionId,
       titleKo: question.titleKo,
@@ -206,15 +191,57 @@ export class SurveyResponsesRepository {
       descriptionEn: question.descriptionEn,
       questionType: question.questionType as QuestionType,
       options: question.options as QuestionOption[] | null,
+      config: question.config as import("@soc/contracts").SurveyQuestionConfig | null,
       answerRegex: question.answerRegex,
       isRequired: question.isRequired,
-      editDeadlineAt: question.editDeadlineAt
-        ? msToIso(question.editDeadlineAt.valueOf())
-        : null,
       sortOrder: question.sortOrder,
       createdAt: msToIso(question.createdAt.valueOf()),
       updatedAt: msToIso(question.updatedAt.valueOf()),
+    };
+  }
+
+  private async findSurveySectionsForSurvey(
+    tx: PostgresTransaction,
+    surveyId: string,
+  ): Promise<SurveySectionWithQuestions[]> {
+    const [sectionRows, questionRows] = await Promise.all([
+      tx
+        .select({ section: surveySections })
+        .from(surveySections)
+        .where(eq(surveySections.surveyId, surveyId))
+        .orderBy(asc(surveySections.sortOrder), asc(surveySections.id)),
+      tx
+        .select({ question: surveyQuestions })
+        .from(surveyQuestions)
+        .innerJoin(
+          surveySections,
+          eq(surveyQuestions.sectionId, surveySections.id),
+        )
+        .where(eq(surveySections.surveyId, surveyId))
+        .orderBy(asc(surveyQuestions.sortOrder), asc(surveyQuestions.id)),
+    ]);
+
+    const questionsBySectionId = new Map<string, SurveyQuestionRecord[]>();
+    for (const { question } of questionRows) {
+      const questions = questionsBySectionId.get(question.sectionId) ?? [];
+      questions.push(this.mapQuestion(question));
+      questionsBySectionId.set(question.sectionId, questions);
+    }
+
+    return sectionRows.map(({ section }) => ({
+      id: section.id,
+      sortOrder: section.sortOrder,
+      questions: questionsBySectionId.get(section.id) ?? [],
     }));
+  }
+
+  private async findReachableQuestionsForSurvey(
+    tx: PostgresTransaction,
+    surveyId: string,
+    answers: Array<{ questionId: string; content: Record<string, unknown> }>,
+  ): Promise<SurveyQuestionRecord[]> {
+    const sections = await this.findSurveySectionsForSurvey(tx, surveyId);
+    return getReachableSurveyQuestions(sections, answers);
   }
 
   private async satisfiesFeeRequirement(
@@ -292,7 +319,6 @@ export class SurveyResponsesRepository {
             isPublished: surveys.isPublished,
             isAlwaysOpen: surveys.isAlwaysOpen,
             openAt: surveys.openAt,
-            closeAt: surveys.closeAt,
             feeRequirementPolicy: surveys.feeRequirementPolicy,
             allowMultipleResponses: surveys.allowMultipleResponses,
             maxResponseCount: surveys.maxResponseCount,
@@ -326,8 +352,12 @@ export class SurveyResponsesRepository {
           return { status: "fee_payer_only" } as const;
         }
 
-        const questions = await this.findQuestionsForSurvey(tx, input.surveyId);
-        validateSurveyAnswers(questions, input.answers, now.valueOf());
+        const questions = await this.findReachableQuestionsForSurvey(
+          tx,
+          input.surveyId,
+          input.answers,
+        );
+        validateSurveyAnswers(questions, input.answers);
 
         const singleResponseUserId = lockedSurvey.allowMultipleResponses
           ? null
@@ -441,7 +471,6 @@ export class SurveyResponsesRepository {
           isPublished: surveys.isPublished,
           isAlwaysOpen: surveys.isAlwaysOpen,
           openAt: surveys.openAt,
-          closeAt: surveys.closeAt,
           feeRequirementPolicy: surveys.feeRequirementPolicy,
           allowResponseEdit: surveys.allowResponseEdit,
           allowMultipleResponses: surveys.allowMultipleResponses,
@@ -494,8 +523,12 @@ export class SurveyResponsesRepository {
         return { status: "response_not_found" } as const;
       }
 
-      const questions = await this.findQuestionsForSurvey(tx, input.surveyId);
-      validateSurveyAnswers(questions, input.answers, now.valueOf());
+      const questions = await this.findReachableQuestionsForSurvey(
+        tx,
+        input.surveyId,
+        input.answers,
+      );
+      validateSurveyAnswers(questions, input.answers);
 
       const [updatedResponse] = await tx
         .update(surveyResponses)

@@ -8,6 +8,7 @@ import {
   type ApiClientOptions,
 } from "./core.js";
 import { createMiscApi } from "./misc.js";
+import { createNotificationsApi } from "./notifications.js";
 import { createSurveyApi } from "./survey.js";
 import { createSiteContentApi } from "./site-content.js";
 
@@ -25,5 +26,6 @@ export const createApiClient = (options: ApiClientOptions) => {
     ...createSurveyApi(context),
     ...createSiteContentApi(context),
     ...createMiscApi(context),
+    ...createNotificationsApi(context),
   };
 };

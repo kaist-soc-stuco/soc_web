@@ -1,4 +1,4 @@
-import type { QuestionType, QuestionOption } from "@soc/contracts";
+import type { QuestionType, QuestionOption, SurveyQuestionConfig } from "@soc/contracts";
 
 export interface SurveyQuestionRecord {
   id: string;
@@ -9,9 +9,9 @@ export interface SurveyQuestionRecord {
   descriptionEn: string | null;
   questionType: QuestionType;
   options: QuestionOption[] | null;
+  config: SurveyQuestionConfig | null;
   answerRegex: string | null;
   isRequired: boolean;
-  editDeadlineAt: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;

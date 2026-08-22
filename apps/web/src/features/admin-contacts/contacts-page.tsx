@@ -1,142 +1,215 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ChangeEvent,
+} from "react";
+import * as XLSX from "xlsx";
 import { createApiClient } from "@soc/api-client";
-import type {
-  BulkImportContactsRequest,
-  ContactRecord,
-  CreateContactRequest,
-} from "@soc/contracts";
-import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import type { ContactRecord, CreateContactRequest } from "@soc/contracts";
 import {
-  Download,
-  Edit2,
-  FileSpreadsheet,
-  Mail,
-  Phone,
-  Plus,
-  Save,
-  Trash2,
-  Upload,
-  User,
-  X,
-} from "lucide-react";
-import { AuthGuard } from "@/components/guards/auth-guard";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { TableSkeleton } from "@/components/ui/skeleton";
-import { Permissions } from "@/lib/permissions";
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import {
-  CONTACT_CSV_TEMPLATE,
-  parseContactCsv,
-  type ParsedContactCsvRow,
-} from "@/lib/contact-csv";
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Download, Edit2, GripVertical, Mail, Phone, Plus, Trash2, Upload, User } from "lucide-react";
 
-export function ContactsPage() {
-  return (
-    <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}>
-      <ContactsPageContent />
-    </AuthGuard>
-  );
+import { AuthGuard } from "@/components/guards/auth-guard";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { AdminEmptyState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
+import { Button } from "@/components/ui/button";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { UiInput } from "@/components/ui/form-control";
+import { IconButton } from "@/components/ui/icon-button";
+import { Modal } from "@/components/ui/modal";
+import { PageSearchField } from "@/components/ui/page-layout";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { CONTACT_XLSX_TEMPLATE_ROWS, parseContactSpreadsheet, type ParsedContactSpreadsheetRow } from "@/lib/contact-spreadsheet";
+import { Permissions } from "@/lib/permissions";
+import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./ExecutiveMemberModal";
+
+const CONTACT_LIST_PAGE_SIZE = 500;
+
+export function ExecutiveDirectoryPage() {
+  return <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}><ContactsPageContent /></AuthGuard>;
+}
+
+export const ContactsPage = ExecutiveDirectoryPage;
+
+function sortContacts(items: ContactRecord[]) {
+  return [...items].sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt));
 }
 
 function ContactsPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
-
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bulkRows, setBulkRows] = useState<ParsedContactCsvRow[]>([]);
+  const [query, setQuery] = useState("");
+  const [cohortFilter, setCohortFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [orderSaving, setOrderSaving] = useState(false);
+  const [activeContactId, setActiveContactId] = useState<string | null>(null);
+  const [bulkRows, setBulkRows] = useState<ParsedContactSpreadsheetRow[]>([]);
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
   const [bulkFileName, setBulkFileName] = useState<string | null>(null);
   const [bulkReplaceExisting, setBulkReplaceExisting] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
+  const [memberModalOpen, setMemberModalOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<ContactRecord | null>(null);
+  const [memberSaving, setMemberSaving] = useState(false);
 
-  // Form states
-  const [isEditing, setIsEditing] = useState<string | null>(null); // contact ID or 'new'
-  const [formData, setFormData] = useState<CreateContactRequest>({
-    nameKo: "",
-    nameEn: "",
-    roleKo: "",
-    roleEn: "",
-    email: "",
-    phoneNumber: "",
-    sortOrder: 0,
-  });
-
-  const loadContacts = () => {
+  const loadContacts = useCallback(async () => {
     setLoading(true);
-    apiClient
-      .getContacts()
-      .then((res) => {
-        // Sort contacts by sortOrder ascending
-        const sorted = [...res.items].sort((a, b) => a.sortOrder - b.sortOrder);
-        setContacts(sorted);
-        setError(null);
-      })
-      .catch(() => {
-        setError("연락망 정보를 불러오는 데 실패했습니다.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      const response = await apiClient.getManagedContacts({ page: 1, pageSize: CONTACT_LIST_PAGE_SIZE });
+      setContacts(sortContacts(response.items));
+      setError(null);
+    } catch {
+      setError("연락망 정보를 불러오는 데 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }, [apiClient]);
+
+  useEffect(() => { void loadContacts(); }, [loadContacts]);
+
+  const cohortOptions = useMemo(
+    () => Array.from(new Set(contacts.map((contact) => contact.cohort).filter((cohort): cohort is number => cohort !== null))).sort((a, b) => a - b),
+    [contacts],
+  );
+  const departmentOptions = useMemo(
+    () => Array.from(new Set(contacts.map((contact) => contact.roleKo.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")),
+    [contacts],
+  );
+  const filteredContacts = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    return contacts.filter((contact) => {
+      const matchesQuery = !normalizedQuery || [contact.nameKo, contact.nameEn, contact.roleKo, contact.roleEn, contact.email ?? "", contact.phoneNumber ?? ""].some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
+      const matchesCohort = !cohortFilter || String(contact.cohort ?? "") === cohortFilter;
+      const matchesDepartment = !departmentFilter || contact.roleKo === departmentFilter;
+      return matchesQuery && matchesCohort && matchesDepartment;
+    });
+  }, [cohortFilter, contacts, departmentFilter, query]);
+  const activeContact = activeContactId
+    ? contacts.find((contact) => contact.id === activeContactId) ?? null
+    : null;
+
+  const exportContacts = async () => {
+    try {
+      const spreadsheet = await apiClient.downloadContactsXlsx({ q: query, cohort: cohortFilter ? Number(cohortFilter) : undefined, department: departmentFilter || undefined });
+      const url = URL.createObjectURL(spreadsheet);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "executive_contacts.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("연락망을 내보내지 못했습니다.");
+    }
   };
 
-  useEffect(() => {
-    loadContacts();
-  }, []);
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveContactId(String(active.id));
+  };
 
-  const handleBulkFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    setActiveContactId(null);
+    if (!over || active.id === over.id || orderSaving) return;
+    const oldIndex = contacts.findIndex((contact) => contact.id === active.id);
+    const newIndex = contacts.findIndex((contact) => contact.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const previousContacts = contacts;
+    const reorderedContacts = arrayMove(contacts, oldIndex, newIndex).map((contact, index) => ({ ...contact, sortOrder: index }));
+    setContacts(reorderedContacts);
+    setOrderSaving(true);
+    setError(null);
     try {
-      const parsed = parseContactCsv(await file.text());
+      const savedContacts = await apiClient.reorderContacts({ items: reorderedContacts.map((contact, index) => ({ id: contact.id, sortOrder: index })) });
+      setContacts(sortContacts(savedContacts));
+    } catch {
+      setContacts(previousContacts);
+      setError("연락망 순서를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setOrderSaving(false);
+    }
+  };
+
+  const handleBulkFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    try {
+      const parsed = parseContactSpreadsheet(await file.arrayBuffer());
       setBulkFileName(file.name);
       setBulkRows(parsed.rows);
       setBulkErrors(parsed.errors);
     } catch {
       setBulkFileName(file.name);
       setBulkRows([]);
-      setBulkErrors(["CSV 파일을 읽지 못했습니다."]);
+      setBulkErrors(["XLSX 파일을 읽지 못했습니다."]);
     }
   };
 
+  const clearBulkImport = (force = false) => {
+    if (bulkImporting && !force) return;
+    setBulkRows([]);
+    setBulkErrors([]);
+    setBulkFileName(null);
+    setBulkReplaceExisting(false);
+  };
+
   const downloadContactTemplate = () => {
-    const blob = new Blob(["\uFEFF" + CONTACT_CSV_TEMPLATE], {
-      type: "text/csv;charset=utf-8;",
-    });
+    const worksheet = XLSX.utils.aoa_to_sheet(CONTACT_XLSX_TEMPLATE_ROWS.map((row) => [...row]));
+    worksheet["!cols"] = [
+      { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 22 }, { wch: 10 },
+      { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "executive_contacts_template.csv";
+    link.download = "executive_contacts_template.xlsx";
     link.click();
     URL.revokeObjectURL(url);
   };
 
   const handleBulkImport = async () => {
     if (bulkRows.length === 0 || bulkErrors.length > 0) return;
-
-    const payload: BulkImportContactsRequest = {
-      items: bulkRows,
-      replaceExisting: bulkReplaceExisting,
-    };
-
     try {
       setBulkImporting(true);
-      const result = await apiClient.bulkImportContacts(payload);
-      setBulkRows([]);
-      setBulkFileName(null);
-      setBulkErrors([]);
-      setBulkReplaceExisting(false);
+      const result = await apiClient.bulkImportContacts({ items: bulkRows, replaceExisting: bulkReplaceExisting });
+      clearBulkImport(true);
       await loadContacts();
-      alert(
-        `${result.importedCount}명을 가져왔습니다.${
-          result.removedCount > 0 ? ` 기존 ${result.removedCount}명은 교체되었습니다.` : ""
-        }`,
-      );
+      alert(`${result.importedCount}명을 가져왔습니다.${result.removedCount > 0 ? ` 기존 ${result.removedCount}명은 교체되었습니다.` : ""}`);
     } catch {
       setBulkErrors(["일괄 업로드에 실패했습니다. 입력값과 권한을 확인해 주세요."]);
     } finally {
@@ -144,426 +217,124 @@ function ContactsPageContent() {
     }
   };
 
-  const handleEditClick = (contact: ContactRecord) => {
-    setIsEditing(contact.id);
-    setFormData({
-      nameKo: contact.nameKo,
-      nameEn: contact.nameEn,
-      roleKo: contact.roleKo,
-      roleEn: contact.roleEn,
-      email: contact.email || "",
-      phoneNumber: contact.phoneNumber || "",
-      sortOrder: contact.sortOrder,
-    });
+  const openNewMemberModal = () => { setEditingContact(null); setMemberModalOpen(true); };
+  const openEditMemberModal = (contact: ContactRecord) => { setEditingContact(contact); setMemberModalOpen(true); };
+  const closeMemberModal = () => {
+    if (memberSaving) return;
+    setMemberModalOpen(false);
+    setEditingContact(null);
   };
 
-  const handleNewClick = () => {
-    setIsEditing("new");
-    setFormData({
-      nameKo: "",
-      nameEn: "",
-      roleKo: "",
-      roleEn: "",
-      email: "",
-      phoneNumber: "",
-      sortOrder: contacts.length > 0 ? Math.max(...contacts.map(c => c.sortOrder)) + 10 : 10,
-    });
-  };
-
-  const handleCancel = () => {
-    setIsEditing(null);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const hasAllLocalizedFields = [
-      formData.nameKo,
-      formData.nameEn,
-      formData.roleKo,
-      formData.roleEn,
-    ].every((value) => value.trim().length > 0);
-    if (!hasAllLocalizedFields) {
-      alert("한글·영문 이름과 역할/직책을 모두 입력해 주세요.");
-      return;
-    }
-
+  const handleMemberSave = async (values: ExecutiveMemberFormValues) => {
     const payload: CreateContactRequest = {
-      ...formData,
-      nameKo: formData.nameKo.trim(),
-      nameEn: formData.nameEn.trim(),
-      roleKo: formData.roleKo.trim(),
-      roleEn: formData.roleEn.trim(),
+      nameKo: values.nameKo.trim(),
+      nameEn: values.nameEn.trim(),
+      roleKo: values.roleKo.trim(),
+      roleEn: values.roleEn.trim(),
+      gender: values.gender.trim() || null,
+      cohort: values.cohort,
+      email: values.email.trim(),
+      phoneNumber: values.phoneNumber.trim(),
+      privacyConsented: true,
     };
-
     try {
-      if (isEditing === "new") {
-        await apiClient.createContact(payload);
-      } else if (isEditing) {
-        await apiClient.updateContact(isEditing, payload);
-      }
-      setIsEditing(null);
-      loadContacts();
-    } catch (err) {
-      alert("저장에 실패했습니다. 입력을 다시 확인해 주세요.");
+      setMemberSaving(true);
+      if (editingContact) await apiClient.updateContact(editingContact.id, payload);
+      else await apiClient.createContact(payload);
+      setMemberModalOpen(false);
+      setEditingContact(null);
+      await loadContacts();
+    } catch {
+      setError("저장에 실패했습니다. 입력을 다시 확인해 주세요.");
+    } finally {
+      setMemberSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    const confirmed = await requestConfirm({
-      confirmLabel: "삭제",
-      description: "About 페이지의 구성원 연락처에서 즉시 제거됩니다.",
-      title: "이 연락처를 삭제하시겠습니까?",
-      tone: "danger",
-    });
+    const confirmed = await requestConfirm({ confirmLabel: "삭제", description: "About 페이지의 구성원 연락처에서 즉시 제거됩니다.", title: "이 연락처를 삭제하시겠습니까?", tone: "danger" });
     if (!confirmed) return;
-
     try {
       await apiClient.deleteContact(id);
-      loadContacts();
+      await loadContacts();
     } catch {
-      alert("삭제에 실패했습니다.");
+      setError("삭제에 실패했습니다.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20 text-slate-950">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-8">
-      {ConfirmDialog}
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-800">집행위연락망 관리</h1>
-          <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-400">About 페이지 구성원 탭에 노출될 집행위원회 집행부원 연락망을 관리합니다.</p>
-        </div>
-        <button
-          onClick={handleNewClick}
-          className="inline-flex items-center gap-2 rounded-lg bg-kaist-darkgreen px-3.5 py-2 text-xs font-black text-white shadow-sm transition-all hover:bg-[#0f5c29] cursor-pointer border-0"
+    <AdminPageShell>
+      <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+        {ConfirmDialog}
+        <AdminPageHeader
+          title="집행위 연락망"
+          actions={<>
+            <Button type="button" variant="outline" onClick={() => void exportContacts()}><Download aria-hidden="true" />내보내기</Button>
+            <Button type="button" variant="outline" onClick={() => bulkFileInputRef.current?.click()}><Upload aria-hidden="true" />불러오기</Button>
+            <Button type="button" onClick={openNewMemberModal}><Plus aria-hidden="true" />부원 추가</Button>
+          </>}
+        />
+        <UiInput ref={bulkFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleBulkFileChange(event)} />
+        {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
+
+        <ExecutiveMemberModal open={memberModalOpen} contact={editingContact} onClose={closeMemberModal} onSave={handleMemberSave} saving={memberSaving} />
+        <Modal
+          open={bulkFileName !== null}
+          onClose={() => clearBulkImport()}
+          title="연락망 불러오기"
+          className="max-w-3xl"
+          footer={<>
+            <Button type="button" variant="ghost" onClick={downloadContactTemplate} disabled={bulkImporting}>양식 내보내기</Button>
+            <Button type="button" variant="outline" onClick={() => clearBulkImport()} disabled={bulkImporting}>취소</Button>
+            <Button type="button" onClick={() => void handleBulkImport()} disabled={bulkRows.length === 0 || bulkErrors.length > 0 || bulkImporting}>{bulkImporting ? "불러오는 중..." : "불러오기"}</Button>
+          </>}
         >
-          <Plus className="w-4 h-4" />
-          부원 추가
-        </button>
-      </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      )}
-
-      <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-          <div>
-            <div className="flex items-center gap-2 text-kaist-darkgreen">
-              <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
-              <h2 className="text-sm font-black">연락망 CSV 일괄 업로드</h2>
-            </div>
-            <p className="mt-1 text-xs font-semibold leading-5 text-emerald-900/70">
-              한글/영문 이름·직책, 이메일, 전화번호를 한 번에 등록합니다. 기존 데이터를 유지한 채
-              추가하거나, 필요할 때만 전체 교체할 수 있습니다.
-            </p>
+          <div className="space-y-4">
+            <div><p className="text-sm font-semibold text-slate-800">{bulkFileName}</p><p className="mt-1 text-xs text-slate-500">정상 행 {bulkRows.length}개 · 오류 {bulkErrors.length}개</p></div>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><UiInput type="checkbox" checked={bulkReplaceExisting} onChange={(event) => setBulkReplaceExisting(event.currentTarget.checked)} className="size-4 accent-brand-primary" />기존 연락망 전체 교체</label>
+            {bulkErrors.length > 0 ? <ul className="space-y-1 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">{bulkErrors.slice(0, 8).map((message) => <li key={message}>{message}</li>)}{bulkErrors.length > 8 ? <li>외 {bulkErrors.length - 8}건</li> : null}</ul> : null}
+            {bulkRows.length > 0 && bulkErrors.length === 0 ? <div className="overflow-hidden rounded-lg border border-slate-100"><AdminDataTable minWidth={640}><AdminTableHeader><tr><AdminTableHead>이름</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>순서</AdminTableHead></tr></AdminTableHeader><AdminTableBody>{bulkRows.slice(0, 5).map((row, index) => <tr key={`${row.email}-${index}`}><AdminTableCell><span className="admin-table-text-emphasis">{row.nameKo}</span></AdminTableCell><AdminTableCell>{row.roleKo}</AdminTableCell><AdminTableCell>{row.email || "—"}</AdminTableCell><AdminTableCell>{row.sortOrder ?? "자동"}</AdminTableCell></tr>)}</AdminTableBody></AdminDataTable></div> : null}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={downloadContactTemplate}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
-            >
-              <Download className="h-3.5 w-3.5" aria-hidden="true" />
-              양식 다운로드
-            </button>
-            <button
-              type="button"
-              onClick={() => bulkFileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3 py-2 text-xs font-black text-white transition hover:bg-[#0f5c29]"
-            >
-              <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-              CSV 선택
-            </button>
-            <input
-              ref={bulkFileInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(event) => void handleBulkFileChange(event)}
-            />
+        </Modal>
+
+        <AdminTableCard className="overflow-visible">
+          <div className="border-b border-slate-100 p-4"><div className="flex flex-wrap items-center justify-end gap-2">
+            <AdminSelectDropdown value={cohortFilter} onChange={setCohortFilter} ariaLabel="기수 필터" className="w-28 shrink-0" options={[{ value: "", label: "기수 전체" }, ...cohortOptions.map((cohort) => ({ value: String(cohort), label: `${cohort}기` }))]} />
+            <AdminSelectDropdown value={departmentFilter} onChange={setDepartmentFilter} ariaLabel="부서 필터" className="w-32 shrink-0" options={[{ value: "", label: "부서 전체" }, ...departmentOptions.map((department) => ({ value: department, label: department }))]} />
+            <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·직책·메일·전화번호 검색" value={query} />
+          </div></div>
+          <div className="min-w-0 overflow-x-auto">
+            {loading ? <TableSkeleton columns={5} rows={6} /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveContactId(null)} onDragEnd={(event) => void handleDragEnd(event)}><AdminDataTable minWidth={1060} className="text-left"><colgroup><col style={{ width: 92 }} /><col style={{ width: 300 }} /><col style={{ width: 240 }} /><col style={{ width: 320 }} /><col style={{ width: 108 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center">순서</AdminTableHead><AdminTableHead>이름 (한글/영문)</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>연락처 정보</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader><AdminTableBody><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}>{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} position={contacts.findIndex((item) => item.id === contact.id)} disabled={orderSaving} onEdit={openEditMemberModal} onDelete={handleDelete} />)}</SortableContext></AdminTableBody></AdminDataTable><DragOverlay dropAnimation={null}>{activeContact ? <ContactDragPreview contact={activeContact} /> : null}</DragOverlay></DndContext>}
           </div>
-        </div>
-
-        {bulkFileName && (
-          <div className="mt-4 rounded-xl border border-white/80 bg-white/80 p-4">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div>
-                <p className="text-xs font-black text-slate-800">{bulkFileName}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  정상 행 {bulkRows.length}개 · 오류 {bulkErrors.length}개
-                </p>
-              </div>
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={bulkReplaceExisting}
-                  onChange={(event) => setBulkReplaceExisting(event.target.checked)}
-                  className="h-4 w-4 accent-kaist-darkgreen"
-                />
-                기존 연락망 전체 교체
-              </label>
-            </div>
-
-            {bulkErrors.length > 0 && (
-              <ul className="mt-3 space-y-1 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-                {bulkErrors.slice(0, 8).map((message) => (
-                  <li key={message}>{message}</li>
-                ))}
-                {bulkErrors.length > 8 && <li>외 {bulkErrors.length - 8}건</li>}
-              </ul>
-            )}
-
-            {bulkRows.length > 0 && bulkErrors.length === 0 && (
-              <div className="mt-3 overflow-x-auto rounded-lg border border-slate-100">
-                <table className="min-w-full text-left text-xs">
-                  <thead className="bg-slate-50 font-black text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2">이름</th>
-                      <th className="px-3 py-2">직책</th>
-                      <th className="px-3 py-2">이메일</th>
-                      <th className="px-3 py-2">순서</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white font-semibold text-slate-700">
-                    {bulkRows.slice(0, 5).map((row, index) => (
-                      <tr key={`${row.email}-${index}`}>
-                        <td className="px-3 py-2">{row.nameKo}</td>
-                        <td className="px-3 py-2">{row.roleKo}</td>
-                        <td className="px-3 py-2">{row.email || "—"}</td>
-                        <td className="px-3 py-2">{row.sortOrder ?? "자동"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {bulkRows.length > 5 && (
-                  <p className="border-t border-slate-100 px-3 py-2 text-[11px] font-bold text-slate-400">
-                    미리보기는 처음 5행만 표시합니다.
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkRows([]);
-                  setBulkErrors([]);
-                  setBulkFileName(null);
-                  setBulkReplaceExisting(false);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                disabled={bulkRows.length === 0 || bulkErrors.length > 0 || bulkImporting}
-                onClick={() => void handleBulkImport()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-                {bulkImporting ? "가져오는 중..." : "일괄 등록"}
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Editor Modal/Panel */}
-      {isEditing && (
-        <form onSubmit={handleSave} className="animate-in fade-in slide-in-from-top-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] duration-200 space-y-5">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h2 className="text-base font-extrabold tracking-tight text-slate-800">
-              {isEditing === "new" ? "새 집행부원 등록" : "집행부원 정보 수정"}
-            </h2>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 cursor-pointer border-0 bg-transparent"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">이름 (한글) *</label>
-              <input
-                type="text"
-                required
-                value={formData.nameKo}
-                onChange={(e) => setFormData({ ...formData, nameKo: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-                placeholder="홍길동"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">이름 (영문) *</label>
-              <input
-                type="text"
-                required
-                value={formData.nameEn}
-                onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-                placeholder="Gildong Hong"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">역할 / 직책 (한글) *</label>
-              <input
-                type="text"
-                required
-                value={formData.roleKo}
-                onChange={(e) => setFormData({ ...formData, roleKo: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-                placeholder="회장, 기획부장 등"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">역할 / 직책 (영문) *</label>
-              <input
-                type="text"
-                required
-                value={formData.roleEn}
-                onChange={(e) => setFormData({ ...formData, roleEn: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-                placeholder="President, Head of Planning etc."
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">이메일</label>
-              <input
-                type="email"
-                value={formData.email || ""}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-                placeholder="email@kaist.ac.kr"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">전화번호</label>
-              <input
-                type="text"
-                value={formData.phoneNumber || ""}
-                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-                placeholder="010-XXXX-XXXX"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1.5">정렬 순서 (낮을수록 먼저 노출)</label>
-              <input
-                type="number"
-                value={formData.sortOrder}
-                onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })}
-                className="w-full rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-950 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/10"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition-all hover:bg-slate-50 cursor-pointer"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-kaist-darkgreen px-3 py-2 text-xs font-black text-white transition-all hover:bg-[#0f5c29] cursor-pointer border-0"
-            >
-              <Save className="w-4 h-4" />
-              저장
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* List Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
-        {loading ? (
-          <TableSkeleton columns={5} rows={6} />
-        ) : contacts.length === 0 ? (
-          <div className="p-12 text-center text-sm font-bold text-slate-400">등록된 집행부원이 없습니다.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-xs font-black text-slate-500">
-                  <th className="px-6 py-4 w-16 text-center">순서</th>
-                  <th className="px-6 py-4">이름 (한글/영문)</th>
-                  <th className="px-6 py-4">역할 / 직책</th>
-                  <th className="px-6 py-4">연락처 정보</th>
-                  <th className="px-6 py-4 w-28 text-center">관리</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {contacts.map((contact) => (
-                  <tr key={contact.id} className="transition-colors hover:bg-slate-50/60">
-                    <td className="px-6 py-4 text-center font-bold text-slate-400">
-                      {contact.sortOrder}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-kaist-lightgreen/10 flex items-center justify-center text-kaist-darkgreen shrink-0">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-extrabold text-slate-800 truncate max-w-[150px]" title={contact.nameKo}>{contact.nameKo}</div>
-                          <div className="mt-0.5 truncate max-w-[150px] text-xs font-semibold text-slate-400" title={contact.nameEn}>{contact.nameEn}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-700 truncate max-w-[180px]" title={contact.roleKo}>{contact.roleKo}</div>
-                      <div className="mt-0.5 truncate max-w-[180px] text-xs font-semibold text-slate-400" title={contact.roleEn}>{contact.roleEn}</div>
-                    </td>
-                    <td className="px-6 py-4 space-y-1 min-w-0">
-                      {contact.email && (
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                          <Mail className="w-3.5 h-3.5 text-kaist-greygreen shrink-0" />
-                          <span className="truncate max-w-[180px]" title={contact.email}>{contact.email}</span>
-                        </div>
-                      )}
-                      {contact.phoneNumber && (
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                          <Phone className="w-3.5 h-3.5 text-kaist-greygreen shrink-0" />
-                          <span className="truncate max-w-[150px]" title={contact.phoneNumber}>{contact.phoneNumber}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditClick(contact)}
-                          className="p-2 hover:bg-kaist-lightgreen/10 hover:text-kaist-darkgreen text-slate-500 rounded-lg transition-colors cursor-pointer border-0 bg-transparent"
-                          title="수정"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(contact.id)}
-                          className="p-2 hover:bg-red-50 hover:text-red-500 text-slate-500 rounded-lg transition-colors cursor-pointer border-0 bg-transparent"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
+        </AdminTableCard>
       </main>
+    </AdminPageShell>
+  );
+}
+
+function SortableContactRow({ contact, disabled, onDelete, onEdit, position }: { contact: ContactRecord; disabled: boolean; onDelete: (id: string) => Promise<void>; onEdit: (contact: ContactRecord) => void; position: number }) {
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
+  const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition, willChange: isDragging ? "transform" : undefined };
+  return <tr ref={setNodeRef} style={style} className={isDragging ? "relative z-10 opacity-30" : "transition-colors hover:bg-slate-50/60"}>
+    <AdminTableCell className="px-4 py-4"><div className="flex items-center justify-center gap-2"><button type="button" {...attributes} {...listeners} className="inline-flex size-8 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button><span className="text-xs tabular-nums text-slate-400">{position + 1}</span></div></AdminTableCell>
+    <AdminTableCell className="px-6 py-4"><div className="flex items-center gap-2.5"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-kaist-lightgreen/10 text-kaist-darkgreen"><User className="size-4" aria-hidden="true" /></div><div className="min-w-0"><div className="admin-table-text-emphasis max-w-[220px] truncate" title={contact.nameKo}>{contact.nameKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.nameEn}>{contact.nameEn}</div>{contact.cohort ? <div className="admin-table-text mt-1">{contact.cohort}기</div> : null}</div></div></AdminTableCell>
+    <AdminTableCell className="px-6 py-4"><div className="max-w-[220px] truncate" title={contact.roleKo}>{contact.roleKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.roleEn}>{contact.roleEn}</div></AdminTableCell>
+    <AdminTableCell className="min-w-0 space-y-1 px-6 py-4"><div className="admin-table-text flex items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[220px] truncate" title={contact.email ?? undefined}>{contact.email || "—"}</span></div><div className="admin-table-text flex items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[180px] truncate" title={contact.phoneNumber ?? undefined}>{contact.phoneNumber || "—"}</span></div></AdminTableCell>
+    <AdminTableCell className="px-6 py-4"><div className="flex items-center justify-center gap-1"><IconButton size="sm" tone="table-action" onClick={() => onEdit(contact)} aria-label={`${contact.nameKo} 수정`} title="수정"><Edit2 className="size-4" strokeWidth={1.5} aria-hidden="true" /></IconButton><IconButton size="sm" tone="table-action" onClick={() => void onDelete(contact.id)} aria-label={`${contact.nameKo} 삭제`} title="삭제"><Trash2 className="size-4" strokeWidth={1.5} aria-hidden="true" /></IconButton></div></AdminTableCell>
+  </tr>;
+}
+
+function ContactDragPreview({ contact }: { contact: ContactRecord }) {
+  return (
+    <div className="flex w-[min(1060px,calc(100vw-2rem))] items-center gap-4 rounded-lg border border-brand-primary/30 bg-white px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
+      <GripVertical aria-hidden="true" className="size-4 shrink-0 text-brand-primary" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p>
+        <p className="truncate text-xs text-slate-500">{contact.nameEn}{contact.cohort ? ` · ${contact.cohort}기` : ""}</p>
+      </div>
+      <div className="hidden max-w-52 truncate text-sm text-slate-700 sm:block">{contact.roleKo}</div>
+      <div className="hidden max-w-60 truncate text-xs text-slate-500 lg:block">{contact.email || contact.phoneNumber || "—"}</div>
     </div>
   );
 }

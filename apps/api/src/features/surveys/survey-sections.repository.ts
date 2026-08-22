@@ -12,6 +12,7 @@ import { surveySections } from "../../infrastructure/postgres/postgres.schema";
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
 import type { CreateSectionDto } from "./dto/create-section.dto";
 import type { UpdateSectionDto } from "./dto/update-section.dto";
+import { sanitizeSurveyRichText } from "./survey-rich-text";
 
 @Injectable()
 export class SurveySectionsRepository {
@@ -66,8 +67,8 @@ export class SurveySectionsRepository {
         surveyId,
         titleKo: dto.titleKo,
         titleEn: dto.titleEn ?? null,
-        descriptionKo: dto.descriptionKo ?? null,
-        descriptionEn: dto.descriptionEn ?? null,
+        descriptionKo: sanitizeSurveyRichText(dto.descriptionKo),
+        descriptionEn: sanitizeSurveyRichText(dto.descriptionEn),
         sortOrder: dto.sortOrder ?? 0,
       })
       .returning();
@@ -86,8 +87,12 @@ export class SurveySectionsRepository {
 
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;
     if (dto.titleEn !== undefined) set.titleEn = dto.titleEn;
-    if (dto.descriptionKo !== undefined) set.descriptionKo = dto.descriptionKo;
-    if (dto.descriptionEn !== undefined) set.descriptionEn = dto.descriptionEn;
+    if (dto.descriptionKo !== undefined) {
+      set.descriptionKo = sanitizeSurveyRichText(dto.descriptionKo);
+    }
+    if (dto.descriptionEn !== undefined) {
+      set.descriptionEn = sanitizeSurveyRichText(dto.descriptionEn);
+    }
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
 
     const db = tx ?? this.db;

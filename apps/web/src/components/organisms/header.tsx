@@ -1,6 +1,8 @@
 import { createApiClient } from "@soc/api-client";
+import type { NotificationRecord } from "@soc/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Bell,
   ChevronDown,
   Globe,
   LayoutDashboard,
@@ -11,35 +13,49 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Logo } from "@/components/atoms/logo";
-import { useCurrentSession } from "@/hooks/use-current-session";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { PopoverPanel } from "@/components/ui/popover-panel";
+import { TextInput } from "@/components/ui/text-input";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { clearStoredAuthState } from "@/lib/auth-storage";
 import { getTemporaryAuthRequest } from "@/lib/auth-session";
-import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
+import { getBoardLabelFromMetadata, isLegacyPublicBoardCode } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
 
 interface HeaderProps {
-  showLogo?: boolean;
+  variant?: "default" | "home";
 }
 
-export function Header({ showLogo = false }: HeaderProps) {
+type HeaderNavItem = {
+  megaItems: Array<{ href: string; label: string }>;
+  href: string;
+  label: string;
+};
+
+export function Header({ variant = "default" }: HeaderProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const navRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const [navLeft, setNavLeft] = useState(0);
+  const notificationRef = useRef<HTMLDivElement>(null);
   const { data: session } = useCurrentSession();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [loginStarting, setLoginStarting] = useState(false);
   const [mockLoginStarting, setMockLoginStarting] = useState(false);
   const { lang, setLanguage } = useLanguage();
@@ -68,13 +84,40 @@ export function Header({ showLogo = false }: HeaderProps) {
         Permissions.MANAGE_CONTENT,
         Permissions.MANAGE_FINANCE,
         Permissions.ADMIN,
-      )
+    )
     : false;
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadNotificationCount(0);
+      setNotificationOpen(false);
+      return;
+    }
+
+    let cancelled = false;
+    void apiClient
+      .getNotifications({ page: 1, pageSize: 5 })
+      .then((response) => {
+        if (cancelled) return;
+        setNotifications(response.items);
+        setUnreadNotificationCount(response.unreadCount);
+      })
+      .catch(() => {
+        if (!cancelled) setNotifications([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, user?.id]);
 
   const closePopovers = () => {
     setSearchOpen(false);
     setDropdownOpen(false);
+    setNotificationOpen(false);
     setMobileMenuOpen(false);
+    setHoveredIndex(null);
   };
 
   const handleSearchSubmit = (event?: FormEvent<HTMLFormElement>) => {
@@ -149,261 +192,400 @@ export function Header({ showLogo = false }: HeaderProps) {
     window.location.assign("/");
   };
 
-  const updateNavLeft = () => {
-    if (navRef.current) setNavLeft(navRef.current.offsetLeft);
-  };
-
-  useEffect(() => {
-    updateNavLeft();
-    window.addEventListener("resize", updateNavLeft);
-    return () => window.removeEventListener("resize", updateNavLeft);
-  }, [showLogo]);
-
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       const isInsideSearch = searchRef.current?.contains(target);
       const isInsideProfile = profileRef.current?.contains(target);
+      const isInsideNotifications = notificationRef.current?.contains(target);
 
       if (!isInsideSearch) setSearchOpen(false);
       if (!isInsideProfile) setDropdownOpen(false);
+      if (!isInsideNotifications) setNotificationOpen(false);
     };
 
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
-  const navItems =
+  const publicBoardItems = boardNavItems.filter(
+    (board) => !isLegacyPublicBoardCode(board.code),
+  );
+  const navItems: HeaderNavItem[] =
     lang === "ko"
       ? [
           {
             label: "게시판",
             href: "/board",
-            dropdown: boardNavItems.map((board) => board.code),
-            dropdownLabels: boardNavItems.map((board) =>
-              getBoardLabelFromMetadata(board, board.code, lang),
-            ),
-            isBoard: true,
-            hasDropdown: true,
+            megaItems: publicBoardItems.map((board) => ({
+              href: `/board/${encodeURIComponent(board.code)}`,
+              label: getBoardLabelFromMetadata(board, board.code, lang),
+            })),
           },
           {
-            label: "행사 / 설문",
-            href: "/events-surveys",
-            dropdown: ["행사", "설문 · 투표", "일정"],
-            dropdownLabels: ["행사", "설문 · 투표", "일정"],
-            hasDropdown: true,
+            label: "행사·일정",
+            href: "/events",
+            megaItems: [
+              { label: "행사", href: "/events" },
+              { label: "설문·투표", href: "/surveys" },
+              { label: "일정", href: "/calendar" },
+            ],
           },
           {
-            label: "소개",
+            label: "학생회 소개",
             href: "/about",
-            dropdown: ["집행위원회 소개", "연혁", "조직도", "구성원"],
-            dropdownLabels: ["소개", "연혁", "조직도", "구성원"],
-            hasDropdown: true,
+            megaItems: [
+              { label: "학생회 소개", href: "/about?tab=intro" },
+              { label: "당해 학생회 소개", href: "/about?tab=history" },
+              { label: "조직도", href: "/about?tab=org" },
+              { label: "Contact me", href: "/about?tab=members" },
+            ],
           },
         ]
       : [
           {
             label: "Board",
             href: "/board",
-            dropdown: boardNavItems.map((board) => board.code),
-            dropdownLabels: boardNavItems.map((board) =>
-              getBoardLabelFromMetadata(board, board.code, lang),
-            ),
-            isBoard: true,
-            hasDropdown: true,
+            megaItems: publicBoardItems.map((board) => ({
+              href: `/board/${encodeURIComponent(board.code)}`,
+              label: getBoardLabelFromMetadata(board, board.code, lang),
+            })),
           },
           {
-            label: "Events / Surveys",
-            href: "/events-surveys",
-            dropdown: ["행사", "설문 · 투표", "일정"],
-            dropdownLabels: ["Events", "Surveys & Votes", "Calendar"],
-            hasDropdown: true,
+            label: "Events & Participation",
+            href: "/events",
+            megaItems: [
+              { label: "Events", href: "/events" },
+              { label: "Surveys & Votes", href: "/surveys" },
+              { label: "Calendar", href: "/calendar" },
+            ],
           },
           {
-            label: "About",
+            label: "Student Council",
             href: "/about",
-            dropdown: ["소개", "연혁", "조직도", "구성원"],
-            dropdownLabels: ["Overview", "History", "Org Chart", "Members"],
-            hasDropdown: true,
+            megaItems: [
+              { label: "Student Council", href: "/about?tab=intro" },
+              { label: "Current Council", href: "/about?tab=history" },
+              { label: "Org Chart", href: "/about?tab=org" },
+              { label: "Contact me", href: "/about?tab=members" },
+            ],
           },
         ];
 
+  const isNavItemActive = (href: string) => {
+    if (href === "/board") {
+      return location.pathname === "/board" || location.pathname.startsWith("/board/");
+    }
+
+    if (href === "/events") {
+      return ["/events", "/surveys", "/calendar"].some(
+        (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
+      );
+    }
+
+    return location.pathname === href || location.pathname.startsWith(`${href}/`);
+  };
+
+  const activeNavIndex = navItems.findIndex((item) => isNavItemActive(item.href));
+  const indicatorIndex = hoveredIndex ?? activeNavIndex;
+  const indicatorLeft =
+    indicatorIndex <= 0
+      ? "2rem"
+      : indicatorIndex === 1
+        ? "calc(2rem + var(--ui-nav-column-width))"
+        : "calc(2rem + var(--ui-nav-column-width) + var(--ui-nav-column-width))";
+
   return (
     <header
-      className="shrink-0 z-50 bg-white border-b border-slate-100 shadow-[0_2px_15px_rgba(0,0,0,0.03)] relative"
+      className={`sticky top-0 z-50 shrink-0 ${
+        variant === "home"
+          ? "site-header-home"
+          : "border-b border-[var(--ui-menu-divider)] bg-white"
+      }`}
       onMouseLeave={() => setHoveredIndex(null)}
     >
-      <div className="flex h-14 w-full items-stretch justify-between">
+      <div className="flex h-[var(--ui-header-height)] w-full items-stretch justify-between">
         <div className="flex items-stretch">
-          {showLogo && (
-            <div className="flex items-center pl-4">
-              <Logo />
-            </div>
-          )}
+          <div className="site-header-brand flex w-[var(--ui-brand-rail-width)] shrink-0 items-center px-6">
+            <Logo inverse={variant === "home"} />
+          </div>
 
-          {!showLogo && <div className="w-12 shrink-0" />}
-
-          <nav ref={navRef} className="hidden md:flex items-stretch">
-            {navItems.map((item, index) => (
-              <div
-                key={item.label}
-                className="relative group"
-                onMouseEnter={() => setHoveredIndex(index)}
-              >
-                <Link
-                  to={item.href}
-                  className="relative flex h-full w-36 items-center justify-center text-[14px] font-semibold text-slate-900 transition-colors hover:text-kaist-darkgreen-main lg:w-40"
+          <nav
+            className="site-primary-nav hidden items-stretch md:flex"
+            aria-label={lang === "ko" ? "주요 메뉴" : "Primary navigation"}
+            onMouseMove={(event) => {
+              const item = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-index]");
+              if (!item) return;
+              const index = Number(item.dataset.navIndex);
+              if (Number.isInteger(index)) setHoveredIndex(index);
+            }}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            {navItems.map((item, index) => {
+              const active = isNavItemActive(item.href);
+              return (
+                <div
+                  key={item.label}
+                  data-nav-index={index}
+                  className="group relative flex h-full items-stretch"
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onFocus={() => setHoveredIndex(index)}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setHoveredIndex(null);
+                    }
+                  }}
                 >
-                  <span className="py-2">{item.label}</span>
-                  {item.hasDropdown && (
-                    <ChevronDown className="ml-1 h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-y-0.5" />
-                  )}
-                  <span
-                    className={`absolute bottom-0 left-5 right-5 h-0.5 rounded-t-full bg-kaist-darkgreen-main transition-transform duration-200 origin-center ${
-                      hoveredIndex === index ? "scale-x-100" : "scale-x-0"
+                  <Link
+                    to={item.href}
+                    aria-current={active ? "page" : undefined}
+                    aria-expanded={hoveredIndex === index}
+                    aria-haspopup="menu"
+                    className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center px-4 text-[15px] font-semibold transition-colors ${
+                      active || hoveredIndex === index
+                        ? "text-kaist-darkgreen-main"
+                        : "text-slate-900 hover:text-kaist-darkgreen-main"
                     }`}
-                  />
-                </Link>
-              </div>
-            ))}
+                  >
+                    <span className="py-2">{item.label}</span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`ml-1 h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ease-out ${
+                        hoveredIndex === index ? "rotate-180 text-kaist-darkgreen-main" : ""
+                      }`}
+                    />
+                  </Link>
+                </div>
+              );
+            })}
+            <span
+              aria-hidden="true"
+              className={`site-nav-indicator ${indicatorIndex >= 0 ? "opacity-100" : "opacity-0"}`}
+              style={{
+                left: indicatorLeft,
+              }}
+            />
           </nav>
         </div>
 
-        <div className="flex items-center gap-1.5 pr-3 md:gap-4 md:pr-6 relative">
+        <div className="relative flex items-center gap-1.5 pr-3 md:gap-2 md:pr-6">
           <div ref={searchRef} className="relative">
-            <button
-              type="button"
+            <IconButton
               aria-label={lang === "ko" ? "통합검색" : "Search"}
               aria-expanded={searchOpen}
-              className="text-kaist-black hover:text-kaist-darkgreen transition-colors p-1.5 rounded-lg hover:bg-gray-50 md:p-2"
               onClick={() => {
                 setSearchOpen((value) => !value);
                 setDropdownOpen(false);
+                setNotificationOpen(false);
                 setMobileMenuOpen(false);
               }}
             >
-              <Search className="h-4 w-4 md:h-5 md:w-5" />
-            </button>
+              <Search aria-hidden="true" />
+            </IconButton>
 
             {searchOpen && (
-              <div className="absolute right-0 top-full mt-2 w-[min(22rem,calc(100vw-2rem))] animate-in fade-in slide-in-from-top-1 duration-200 rounded-lg border border-kaist-grey/25 bg-white shadow-xl z-50 overflow-hidden">
-                <form className="p-3" onSubmit={handleSearchSubmit}>
-                  <div className="flex items-center gap-2 rounded-md border border-kaist-grey/25 px-3 py-2 focus-within:border-kaist-darkgreen-main">
-                    <Search className="w-4 h-4 text-kaist-greygreen shrink-0" />
-                    <input
+              <PopoverPanel className="right-0 top-full w-[min(22rem,calc(100vw-2rem))]">
+                <form className="p-3.5" onSubmit={handleSearchSubmit}>
+                  <TextInput
+                      leading={<Search aria-hidden="true" className="h-4 w-4" />}
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
-                      className="w-full min-w-0 bg-transparent text-sm font-semibold text-kaist-black outline-none placeholder:text-kaist-grey"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleSearchSubmit();
+                        }
+                      }}
                       placeholder={
                         lang === "ko"
-                          ? "검색어를 입력하세요.."
-                          : "Enter search keyword..."
+                          ? "제목, 내용 검색"
+                          : "Search titles and content"
                       }
                       autoFocus
+                      trailing={
+                        searchQuery ? (
+                          <IconButton
+                            size="sm"
+                            aria-label={lang === "ko" ? "검색어 지우기" : "Clear search"}
+                            onClick={() => setSearchQuery("")}
+                          >
+                            <X aria-hidden="true" />
+                          </IconButton>
+                        ) : null
+                      }
                     />
-                    <button
-                      type="submit"
-                      className="shrink-0 rounded-md bg-kaist-darkgreen-main px-2.5 py-1 text-[11px] font-extrabold text-white transition-colors hover:bg-kaist-darkgreen"
-                    >
-                      {lang === "ko" ? "검색" : "Search"}
-                    </button>
-                  </div>
                 </form>
-              </div>
+              </PopoverPanel>
             )}
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-            className="hidden items-center gap-1 rounded-lg border border-kaist-grey/15 bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-kaist-black transition-all hover:bg-gray-200/80 hover:text-kaist-darkgreen md:flex"
+            className="hidden h-9 gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium text-slate-700 shadow-none hover:bg-slate-100 md:flex"
             title={lang === "ko" ? "Switch to English" : "한국어로 변경"}
           >
-            <Globe className="w-3.5 h-3.5 text-kaist-greygreen" />
+            <Globe aria-hidden="true" className="text-slate-500" />
             <span>{lang === "ko" ? "KO" : "EN"}</span>
-          </button>
+          </Button>
+
+          {user && (
+            <div ref={notificationRef} className="relative">
+              <IconButton
+                aria-label={lang === "ko" ? "알림" : "Notifications"}
+                aria-expanded={notificationOpen}
+                onClick={() => {
+                  setNotificationOpen((value) => !value);
+                  setSearchOpen(false);
+                  setDropdownOpen(false);
+                }}
+                className="relative"
+              >
+                <Bell aria-hidden="true" />
+                {unreadNotificationCount > 0 && (
+                  <Badge className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full border-white bg-rose-600 px-1 text-[9px] text-white">
+                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                  </Badge>
+                )}
+              </IconButton>
+
+              {notificationOpen && (
+                <PopoverPanel className="right-0 top-full w-[min(20rem,calc(100vw-2rem))]">
+                  <div className="flex h-12 items-center justify-between border-b border-slate-100 px-4">
+                    <p className="text-[13px] font-semibold text-slate-900">
+                      {lang === "ko" ? "알림" : "Notifications"}
+                    </p>
+                    {unreadNotificationCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-[11px] font-medium text-kaist-darkgreen hover:bg-emerald-50"
+                        onClick={() => {
+                          void apiClient.markAllNotificationsRead().then(() => {
+                            setUnreadNotificationCount(0);
+                            setNotifications((items) =>
+                              items.map((item) => ({ ...item, isRead: true })),
+                            );
+                          });
+                        }}
+                      >
+                        {lang === "ko" ? "모두 읽음" : "Mark all read"}
+                      </Button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <p className="px-4 py-8 text-center text-xs font-medium text-slate-400">
+                      {lang === "ko" ? "새 알림이 없습니다." : "No new notifications."}
+                    </p>
+                  ) : (
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <Button variant="ghost"
+                          key={notification.notificationId}
+                          type="button"
+                          className={`flex min-h-14 w-full flex-col items-start gap-0.5 whitespace-normal rounded-none border-0 border-b border-slate-100 px-3.5 py-2.5 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${notification.isRead ? "bg-white" : "bg-emerald-50/45"}`}
+                          onClick={() => {
+                            void apiClient
+                              .markNotificationRead(notification.notificationId)
+                              .then(() => {
+                                setNotifications((items) =>
+                                  items.map((item) =>
+                                    item.notificationId === notification.notificationId
+                                      ? { ...item, isRead: true }
+                                      : item,
+                                  ),
+                                );
+                                setUnreadNotificationCount((count) => Math.max(0, count - (notification.isRead ? 0 : 1)));
+                                setNotificationOpen(false);
+                                if (notification.link) navigate(notification.link);
+                              });
+                          }}
+                        >
+                          <span className="text-[12.5px] font-medium text-slate-800">
+                            {notification.titleKo}
+                          </span>
+                          {notification.bodyKo && (
+                            <span className="line-clamp-2 text-[11.5px] font-normal leading-4 text-slate-500">
+                              {notification.bodyKo}
+                            </span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </PopoverPanel>
+              )}
+            </div>
+          )}
 
           {user ? (
             <div ref={profileRef} className="relative">
-              <button
-                type="button"
-                className="flex max-w-[11rem] items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 font-bold text-kaist-black hover:border-kaist-grey/15 hover:bg-gray-50 cursor-pointer transition-colors"
+              <IconButton
+                aria-label={lang === "ko" ? `${user.name} 프로필` : `${user.name} profile`}
+                title={user.name}
                 aria-expanded={dropdownOpen}
                 onClick={() => {
                   setDropdownOpen((value) => !value);
                   setSearchOpen(false);
                 }}
               >
-                <User className="w-4 h-4 shrink-0 text-kaist-greygreen" />
-                <span className="hidden sm:block truncate text-sm">
-                  {user.name}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-kaist-greygreen" />
-              </button>
+                <User aria-hidden="true" />
+              </IconButton>
 
               {dropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-60 animate-in fade-in slide-in-from-top-1 duration-200 rounded-lg border border-kaist-grey/25 bg-white shadow-xl z-50 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-kaist-grey/20">
-                    <p className="truncate text-sm font-extrabold text-kaist-black">
+                <PopoverPanel className="right-0 top-full w-52">
+                  <div className="border-b border-slate-100 px-3.5 py-3">
+                    <p className="min-w-0 truncate text-[13px] font-semibold text-slate-900">
                       {user.name}
-                    </p>
-                    <p className="mt-1 text-[11px] font-bold text-kaist-greygreen">
-                      {canUseAdminDashboard
-                        ? lang === "ko"
-                          ? "관리자"
-                          : "Administrator"
-                        : lang === "ko"
-                          ? "회원"
-                          : "Member"}
                     </p>
                   </div>
 
                   <div className="py-1">
-                    <Link
-                      to="/mypage"
-                      onClick={closePopovers}
-                      className="flex items-center gap-2 px-4 py-2.5 hover:bg-kaist-darkgreen/5 text-sm font-semibold text-kaist-black"
-                    >
-                      <User className="w-4 h-4 text-kaist-greygreen" />
-                      <span>{lang === "ko" ? "마이페이지" : "My Page"}</span>
-                    </Link>
+                    <Button asChild variant="ghost" className="h-10 w-full justify-start rounded-none px-3.5 text-[13px] font-medium text-slate-700">
+                      <Link to="/mypage" onClick={closePopovers}>
+                        <User className="text-slate-500" />
+                        <span>{lang === "ko" ? "마이페이지" : "My Page"}</span>
+                      </Link>
+                    </Button>
 
                     {canUseAdminDashboard ? (
-                      <Link
-                        to="/admin"
-                        onClick={closePopovers}
-                        className="flex items-center gap-2 px-4 py-2.5 hover:bg-kaist-darkgreen/5 text-sm font-semibold text-kaist-black"
-                      >
-                        <LayoutDashboard className="w-4 h-4 text-kaist-greygreen" />
-                        <span>
-                          {lang === "ko"
-                            ? "관리자 대시보드"
-                            : "Admin Dashboard"}
-                        </span>
-                      </Link>
+                      <Button asChild variant="ghost" className="h-10 w-full justify-start rounded-none px-3.5 text-[13px] font-medium text-slate-700">
+                        <Link to="/admin" onClick={closePopovers}>
+                          <LayoutDashboard className="text-slate-500" />
+                          <span>
+                            {lang === "ko"
+                              ? "관리자 대시보드"
+                              : "Admin Dashboard"}
+                          </span>
+                        </Link>
+                      </Button>
                     ) : null}
 
-                    <button
+                    <Button
                       type="button"
-                      className="flex w-full items-center gap-2 px-4 py-2.5 hover:bg-red-50 text-left text-sm font-semibold text-red-600"
+                      variant="ghost"
+                      className="h-10 w-full justify-start rounded-none px-3.5 text-[13px] font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
                       onClick={async () => {
                         await handleLogout();
                       }}
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut />
                       <span>{lang === "ko" ? "로그아웃" : "Logout"}</span>
-                    </button>
+                    </Button>
                   </div>
-                </div>
+                </PopoverPanel>
               )}
             </div>
           ) : (
             <>
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => void handleStartLogin()}
                 disabled={loginStarting}
-                className="group relative hidden cursor-pointer items-center whitespace-nowrap border-0 bg-transparent text-sm font-bold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base"
+                className="group relative hidden cursor-pointer items-center whitespace-nowrap border-0 bg-transparent text-sm font-semibold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base"
               >
                 <span className="py-2">
                   {loginStarting
@@ -415,26 +597,25 @@ export function Header({ showLogo = false }: HeaderProps) {
                       : "Login"}
                 </span>
                 <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
-              </button>
+              </Button>
               {import.meta.env.DEV ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => void handleMockLogin()}
                   disabled={mockLoginStarting}
-                  className="hidden rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-extrabold text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-70 lg:inline-flex"
+                  className="hidden rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-70 lg:inline-flex"
                 >
                   {mockLoginStarting
                     ? "Mock..."
                     : lang === "ko"
                       ? "Mock 로그인"
                       : "Mock Login"}
-                </button>
+                </Button>
               ) : null}
             </>
           )}
 
-          <button
-            type="button"
+          <IconButton
             aria-controls="mobile-primary-navigation"
             aria-expanded={mobileMenuOpen}
             aria-label={
@@ -451,14 +632,14 @@ export function Header({ showLogo = false }: HeaderProps) {
               setSearchOpen(false);
               setDropdownOpen(false);
             }}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-kaist-black transition-colors hover:bg-slate-100 hover:text-kaist-darkgreen md:hidden"
+            className="text-slate-700 md:hidden"
           >
             {mobileMenuOpen ? (
               <X aria-hidden="true" className="h-5 w-5" />
             ) : (
               <Menu aria-hidden="true" className="h-5 w-5" />
             )}
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -469,28 +650,54 @@ export function Header({ showLogo = false }: HeaderProps) {
         >
           <nav aria-label={lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}>
             <div className="grid grid-cols-3 gap-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={closePopovers}
-                  className="flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-2 text-center text-xs font-black text-slate-800 transition-colors hover:border-kaist-darkgreen/20 hover:bg-kaist-lightgreen/10 hover:text-kaist-darkgreen"
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const active = isNavItemActive(item.href);
+                return (
+                  <div
+                    key={item.href}
+                    className="col-span-3"
+                  >
+                    <Link
+                      to={item.href}
+                      onClick={closePopovers}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex min-h-11 items-center justify-center rounded-xl border px-2 text-center text-xs font-medium transition-colors ${
+                        active
+                          ? "border-kaist-darkgreen/30 bg-kaist-lightgreen/15 text-kaist-darkgreen"
+                          : "border-slate-200 bg-slate-50 text-slate-800 hover:border-kaist-darkgreen/20 hover:bg-kaist-lightgreen/10 hover:text-kaist-darkgreen"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                    {item.megaItems.length > 0 ? (
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {item.megaItems.map((child) => (
+                          <Link
+                            key={child.href}
+                            to={child.href}
+                            onClick={closePopovers}
+                            className="flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-center text-[11px] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           </nav>
 
           <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-black text-slate-700"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-medium text-slate-700"
             >
               <Globe aria-hidden="true" className="h-4 w-4 text-kaist-greygreen" />
               {lang === "ko" ? "English" : "한국어"}
-            </button>
+            </Button>
 
             {user ? (
               <div
@@ -503,7 +710,7 @@ export function Header({ showLogo = false }: HeaderProps) {
                 <Link
                   to="/mypage"
                   onClick={closePopovers}
-                  className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-slate-200 px-2 text-center text-xs font-black text-slate-700"
+                  className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-slate-200 px-2 text-center text-xs font-medium text-slate-700"
                 >
                   {lang === "ko" ? "마이페이지" : "My Page"}
                 </Link>
@@ -511,27 +718,27 @@ export function Header({ showLogo = false }: HeaderProps) {
                   <Link
                     to="/admin"
                     onClick={closePopovers}
-                    className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-kaist-darkgreen px-2 text-center text-xs font-black text-white"
+                    className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-kaist-darkgreen px-2 text-center text-xs font-medium text-white"
                   >
                     {lang === "ko" ? "관리자" : "Admin"}
                   </Link>
                 )}
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => void handleLogout()}
                   className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 text-red-600"
                   aria-label={lang === "ko" ? "로그아웃" : "Logout"}
                 >
                   <LogOut aria-hidden="true" className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="grid grid-cols-2 items-center gap-2">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => void handleStartLogin()}
                   disabled={loginStarting}
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-kaist-darkgreen px-4 text-xs font-black text-white disabled:opacity-60"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-kaist-darkgreen px-4 text-xs font-medium text-white disabled:opacity-60"
                 >
                   {loginStarting
                     ? lang === "ko"
@@ -540,16 +747,16 @@ export function Header({ showLogo = false }: HeaderProps) {
                     : lang === "ko"
                       ? "로그인"
                       : "Login"}
-                </button>
+                </Button>
                 {import.meta.env.DEV && (
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => void handleMockLogin()}
                     disabled={mockLoginStarting}
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-black text-emerald-700 disabled:opacity-60"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
                   >
                     {mockLoginStarting ? "Mock..." : "Mock"}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -558,84 +765,57 @@ export function Header({ showLogo = false }: HeaderProps) {
       )}
 
       <div
-        className={`absolute left-0 w-full bg-white shadow-[0_15px_30px_rgba(0,0,0,0.06)] border-t border-slate-50 overflow-hidden transition-all duration-300 ease-out ${
+        aria-hidden={hoveredIndex === null}
+        className={`site-header-mega-menu absolute left-0 top-full z-40 w-full overflow-hidden bg-white shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition-[max-height,opacity,transform] duration-300 ease-out ${
           hoveredIndex !== null
-            ? "max-h-96 opacity-100 translate-y-0"
-            : "max-h-0 opacity-0 -translate-y-4"
+            ? "pointer-events-auto max-h-[28rem] translate-y-0 opacity-100"
+            : "pointer-events-none max-h-0 -translate-y-2 opacity-0"
         }`}
-        style={{ top: "calc(100% + 1px)", zIndex: 40 }}
       >
-        <div className="flex gap-0" style={{ paddingLeft: navLeft }}>
-          {navItems.map((item, index) => {
-            if (!item.hasDropdown) {
-              return (
-                <div
-                  key={item.label}
-                  className="w-36 px-3 opacity-0 pointer-events-none lg:w-40"
-                />
-              );
-            }
-
-            return (
-              <div
-                key={item.label}
-                className={`w-36 px-3 lg:w-40 ${
-                  index === 0 ? "border-l border-kaist-grey/30" : ""
-                } border-r border-kaist-grey/30`}
-              >
-                <ul className="space-y-1">
-                  {item.dropdown.map((subItem, subIndex) => (
-                    <li
-                      key={subItem}
-                      className={`mx-2 transition-all duration-200 pb-1 ${
+        <div
+          className="flex items-stretch gap-0 pl-[calc(var(--ui-brand-rail-width)+var(--ui-nav-start-offset))]"
+          role="menu"
+          aria-label={lang === "ko" ? "메뉴 바로가기" : "Navigation shortcuts"}
+        >
+            {navItems.map((item, index) => (
+            <div
+              key={item.label}
+              className="w-[var(--ui-nav-column-width)] border-r border-[var(--ui-menu-divider)] bg-white px-5 pb-6 pt-1 first:border-l first:border-[var(--ui-menu-divider)]"
+              onMouseEnter={() => setHoveredIndex(index)}
+            >
+              <ul>
+                {item.megaItems.map((child, subIndex) => (
+                  <li
+                    key={child.href}
+                    className={`border-b border-[var(--ui-menu-divider)] last:border-b-0 transition-[opacity,transform] duration-200 ${
+                      hoveredIndex !== null
+                        ? "translate-y-0 opacity-100"
+                        : "-translate-y-1 opacity-0"
+                    }`}
+                    style={{
+                      transitionDelay:
                         hoveredIndex !== null
-                          ? "opacity-100 translate-x-0"
-                          : "opacity-0 -translate-x-2"
-                      } ${
-                        subIndex < item.dropdown.length - 1
-                          ? "border-b border-kaist-grey/30"
-                          : "pb-10"
-                      } ${subIndex === 0 ? "pt-1" : ""}`}
-                      style={{
-                        transitionDelay:
-                          hoveredIndex !== null
-                            ? `${index * 80 + subIndex * 40 + 80}ms`
-                            : "0ms",
-                      }}
+                          ? `${index * 50 + subIndex * 35}ms`
+                          : "0ms",
+                    }}
+                  >
+                    <Link
+                      to={child.href}
+                      role="menuitem"
+                      tabIndex={hoveredIndex === null ? -1 : 0}
+                      onClick={closePopovers}
+                      className="flex min-h-11 items-center justify-center px-1 text-center text-[14px] font-medium leading-5 text-[var(--ui-menu-item-text)] transition-colors hover:text-brand-primary"
                     >
-                      <Link
-                        to={
-                          item.isBoard
-                            ? `/board/${subItem}`
-                            : item.label === "행사 / 설문" ||
-                                item.label === "Events / Surveys"
-                              ? [
-                                  "/events-surveys?tab=event",
-                                  "/events-surveys?tab=survey",
-                                  "/events-surveys?tab=calendar",
-                                ][subIndex]
-                              : item.label === "소개" || item.label === "About"
-                                ? `/about?tab=${["intro", "history", "org", "members"][subIndex]}`
-                                : `${item.href}/${subItem}`
-                        }
-                        className={`block py-2 text-center text-sm font-semibold tracking-tight transition-all ${
-                          hoveredIndex === index
-                            ? "text-kaist-black hover:text-kaist-darkgreen-main hover:translate-x-1"
-                            : "text-kaist-grey"
-                        }`}
-                      >
-                        {item.dropdownLabels
-                          ? item.dropdownLabels[subIndex]
-                          : subItem}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+                      {child.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
+
     </header>
   );
 }

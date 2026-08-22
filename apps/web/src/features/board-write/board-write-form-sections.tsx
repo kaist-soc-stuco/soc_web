@@ -1,22 +1,25 @@
-import type { RefObject } from "react";
-import type { SurveyRecord } from "@soc/contracts";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import type { ArticleDraftRecord, SurveyRecord } from "@soc/contracts";
 import {
+  ArrowLeft,
   Check,
+  ChevronDown,
   FileText,
   Image,
   Loader2,
-  Settings,
   Video,
   X,
 } from "lucide-react";
-import { msToDate } from "@soc/shared";
+import { isoToMs, msToDate } from "@soc/shared";
 
 import {
   getBoardLabelFromMetadata,
   type BoardMetadata,
 } from "@/lib/board-metadata";
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
-import { RichTextEditor } from "@/components/organisms/rich-text-editor";
+import { BilingualRichTextEditor } from "@/components/organisms/rich-text-editor";
+import { Button } from "@/components/ui/button";
+import { UiInput } from "@/components/ui/form-control";
 
 export type AttachedAsset = {
   assetId: string;
@@ -37,52 +40,131 @@ function formatFileSize(sizeBytes: number) {
   return `${sizeBytes}B`;
 }
 
-interface DraftBannerProps {
-  draftTime: number;
+interface DraftControlProps {
+  count: number;
+  drafts: ArticleDraftRecord[];
   lang: string;
-  onDiscard: () => void;
-  onRestore: () => void;
+  onDelete: (draftId: string) => void | Promise<void>;
+  onRestore: (draftId: string) => void | Promise<void>;
+  onSave: () => void | Promise<void>;
+  saving?: boolean;
 }
 
-export function BoardWriteDraftBanner({
-  draftTime,
+export function BoardWriteDraftControl({
+  count,
+  drafts,
   lang,
-  onDiscard,
+  onDelete,
   onRestore,
-}: DraftBannerProps) {
+  onSave,
+  saving = false,
+}: DraftControlProps) {
+  const [open, setOpen] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
+
+  const saveDraft = async () => {
+    await onSave();
+    setToastVisible(true);
+    window.setTimeout(() => setToastVisible(false), 2200);
+  };
+
   return (
-    <div className="bg-emerald-50/50 border border-kaist-darkgreen/20 px-6 py-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-      <span className="font-semibold text-kaist-darkgreen text-xs">
-        {lang === "ko"
-          ? `이전에 작성 중이던 임시 저장글이 있습니다. (저장 시각: ${msToDate(draftTime).toLocaleTimeString()})`
-          : `You have a saved draft from a previous session. (Saved at: ${msToDate(draftTime).toLocaleTimeString()})`}
-      </span>
-      <div className="flex gap-2 w-full sm:w-auto shrink-0 justify-end">
-        <button
-          type="button"
-          onClick={onRestore}
-          className="px-4 py-2 bg-kaist-darkgreen text-white rounded-lg text-xs font-bold hover:opacity-90 transition-all cursor-pointer border-0 shadow-sm"
-        >
-          {lang === "ko" ? "불러오기" : "Restore"}
-        </button>
-        <button
-          type="button"
-          onClick={onDiscard}
-          className="px-4 py-2 bg-slate-200/80 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-300/80 transition-all cursor-pointer border-0"
-        >
-          {lang === "ko" ? "삭제" : "Discard"}
-        </button>
-      </div>
+    <div ref={containerRef} className="relative inline-flex h-[var(--ui-control-height)]">
+      <button
+        type="button"
+        className="inline-flex items-center rounded-l-[var(--ui-control-radius)] border border-r-0 border-[var(--ui-border-subtle)] bg-white px-3 text-[length:var(--ui-control-font-size)] font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={saving}
+        onClick={() => void saveDraft()}
+      >
+        {saving ? (lang === "ko" ? "저장 중..." : "Saving...") : lang === "ko" ? "임시저장" : "Save draft"}
+      </button>
+      <button
+        type="button"
+        aria-label={lang === "ko" ? "임시저장 목록" : "Saved draft list"}
+        aria-expanded={open}
+        className="inline-flex min-w-12 items-center justify-center gap-1 rounded-r-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-2 text-[length:var(--ui-control-font-size)] font-semibold tabular-nums text-slate-600 transition-colors hover:bg-slate-50"
+        onClick={() => setOpen((current) => !current)}
+      >
+        {count}
+        <ChevronDown className="size-3.5" aria-hidden="true" />
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)]">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <span className="text-xs font-semibold text-slate-800">
+              {lang === "ko" ? "저장된 초안" : "Saved drafts"}
+            </span>
+            <span className="text-[11px] font-normal tabular-nums text-slate-400">{count}</span>
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {drafts.length === 0 ? (
+              <p className="px-4 py-8 text-center text-xs font-normal text-slate-400">
+                {lang === "ko" ? "저장된 초안이 없습니다." : "No saved drafts."}
+              </p>
+            ) : (
+              drafts.map((draft) => (
+                <div key={draft.draftId} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-slate-800">
+                      {draft.titleKo || (lang === "ko" ? "제목 없는 글" : "Untitled post")}
+                    </p>
+                    <p className="mt-1 truncate text-[11px] font-normal text-slate-400">
+                      {draft.boardCode} · {msToDate(isoToMs(draft.updatedAt)).toLocaleString(lang === "ko" ? "ko-KR" : "en-US")}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setOpen(false);
+                        void onRestore(draft.draftId);
+                      }}
+                      className="h-7 rounded-md bg-brand-primary px-2 text-[11px] text-white"
+                    >
+                      {lang === "ko" ? "불러오기" : "Load"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void onDelete(draft.draftId)}
+                      className="h-7 rounded-md px-2 text-[11px] text-slate-500 hover:text-rose-600"
+                    >
+                      {lang === "ko" ? "삭제" : "Delete"}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {toastVisible ? (
+        <div className="fixed bottom-6 right-6 z-[80] rounded-lg bg-slate-900 px-3.5 py-2.5 text-xs font-medium text-white shadow-lg" role="status">
+          {lang === "ko" ? "임시저장되었습니다." : "Draft saved."}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 interface HeaderControlsProps {
-  activeTab: "ko" | "en";
   boardByCode: Map<string, BoardMetadata>;
   isKoreanOnly: boolean;
   lang: string;
-  onActiveTabChange: (tab: "ko" | "en") => void;
   onCategoryChange: (category: string) => void;
   onKoreanOnlyChange: (checked: boolean) => void;
   selectedCategory: string;
@@ -90,18 +172,16 @@ interface HeaderControlsProps {
 }
 
 export function BoardWriteHeaderControls({
-  activeTab,
   boardByCode,
   isKoreanOnly,
   lang,
-  onActiveTabChange,
   onCategoryChange,
   onKoreanOnlyChange,
   selectedCategory,
   writableBoardCodes,
 }: HeaderControlsProps) {
   return (
-    <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/40 px-4 py-3 border-b border-slate-200 select-none rounded-t-xl">
+    <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <SelectDropdown
@@ -133,64 +213,27 @@ export function BoardWriteHeaderControls({
             emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
           />
         </div>
-        <div className="h-6 w-px bg-slate-200" aria-hidden="true" />
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-          <button
-            type="button"
-            onClick={() => onActiveTabChange("ko")}
-            className={`flex items-center justify-center w-20 py-1.5 rounded-md text-xs font-bold transition-all border-0 cursor-pointer ${
-              activeTab === "ko"
-                ? "bg-kaist-darkgreen text-white shadow-xs"
-                : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700"
-            }`}
-          >
-            <span>{lang === "ko" ? "국문" : "Korean"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onActiveTabChange("en")}
-            disabled={isKoreanOnly}
-            className={`flex items-center justify-center w-20 py-1.5 rounded-md text-xs font-bold transition-all border-0 cursor-pointer ${
-              isKoreanOnly
-                ? "opacity-30 cursor-not-allowed text-slate-350"
-                : activeTab === "en"
-                  ? "bg-kaist-darkgreen text-white shadow-xs"
-                  : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700"
-            }`}
-            title={
-              isKoreanOnly
-                ? lang === "ko"
-                  ? "한국어 콘텐츠만 작성하도록 설정되어 영문 입력이 비활성화되었습니다."
-                  : "English input is disabled while Korean-only content is selected."
-                : ""
-            }
-          >
-            <span>{lang === "ko" ? "영문" : "English"}</span>
-          </button>
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
           <div
-            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+            className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
               isKoreanOnly
-                ? "bg-red-500 border-red-500 text-white"
-                : "border-slate-300 group-hover:border-kaist-darkgreen"
+                ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
+                : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
             }`}
           >
             {isKoreanOnly && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
           </div>
-          <input
+          <UiInput
             type="checkbox"
             className="hidden"
             checked={isKoreanOnly}
             onChange={(event) => onKoreanOnlyChange(event.target.checked)}
           />
           <span
-            className={`text-[11.5px] font-bold ${
-              isKoreanOnly ? "text-red-600" : "text-slate-600"
-            }`}
+            className="text-xs font-medium text-slate-600"
           >
             {lang === "ko" ? "한국어 콘텐츠만" : "Korean content only"}
           </span>
@@ -200,118 +243,21 @@ export function BoardWriteHeaderControls({
   );
 }
 
-interface ToolbarProps {
-  canWriteSelected: boolean;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  isSubmitting: boolean;
-  lang: string;
-  onSaveDraft: () => void;
-  onSubmit: () => void;
-  onUploadFiles: (files: FileList | null) => void;
-  uploading: boolean;
-}
-
-export function BoardWriteToolbar({
-  canWriteSelected,
-  fileInputRef,
-  isSubmitting,
-  lang,
-  onSaveDraft,
-  onSubmit,
-  onUploadFiles,
-  uploading,
-}: ToolbarProps) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-3 border-b border-slate-100 bg-white select-none">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="p-1.5 text-slate-500 hover:text-kaist-darkgreen hover:bg-slate-100 rounded-md transition-colors border-0 bg-transparent disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-            title={lang === "ko" ? "이미지 추가" : "Add Image"}
-          >
-            <Image className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="p-1.5 text-slate-500 hover:text-kaist-darkgreen hover:bg-slate-100 rounded-md transition-colors border-0 bg-transparent disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-            title={lang === "ko" ? "파일 첨부" : "Attach File"}
-          >
-            {uploading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-          </button>
-          <button
-            type="button"
-            className="p-1.5 text-slate-500 hover:text-kaist-darkgreen hover:bg-slate-100 rounded-md transition-colors border-0 bg-transparent cursor-pointer"
-            title={lang === "ko" ? "비디오 링크" : "Add Video"}
-          >
-            <Video className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(event) => onUploadFiles(event.target.files)}
-      />
-
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onSaveDraft}
-          disabled={isSubmitting}
-          className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer bg-white"
-        >
-          {lang === "ko" ? "임시저장" : "Save Draft"}
-        </button>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={isSubmitting || !canWriteSelected}
-          className="px-3.5 py-1.5 rounded-lg bg-kaist-darkgreen text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer border-0 shadow-xs disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {isSubmitting
-            ? lang === "ko"
-              ? "게시 중..."
-              : "Publishing..."
-            : lang === "ko"
-              ? "글 게시하기"
-              : "Publish Post"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 interface EditHeaderControlsProps {
-  activeTab: "ko" | "en";
   category: string;
   isKoreanOnly: boolean;
   lang: string;
-  onActiveTabChange: (tab: "ko" | "en") => void;
   onKoreanOnlyChange: (checked: boolean) => void;
 }
 
 export function BoardEditHeaderControls({
-  activeTab,
   category,
   isKoreanOnly,
   lang,
-  onActiveTabChange,
   onKoreanOnlyChange,
 }: EditHeaderControlsProps) {
   return (
-    <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/40 px-4 py-3 border-b border-slate-200 select-none rounded-t-xl">
+    <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <SelectDropdown
@@ -329,64 +275,27 @@ export function BoardEditHeaderControls({
             buttonClassName="h-8 rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold shadow-xs"
           />
         </div>
-        <div className="h-6 w-px bg-slate-200" aria-hidden="true" />
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-          <button
-            type="button"
-            onClick={() => onActiveTabChange("ko")}
-            className={`flex items-center justify-center w-20 py-1.5 rounded-md text-xs font-bold transition-all border-0 cursor-pointer ${
-              activeTab === "ko"
-                ? "bg-kaist-darkgreen text-white shadow-xs"
-                : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700"
-            }`}
-          >
-            <span>{lang === "ko" ? "국문" : "Korean"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onActiveTabChange("en")}
-            disabled={isKoreanOnly}
-            className={`flex items-center justify-center w-20 py-1.5 rounded-md text-xs font-bold transition-all border-0 cursor-pointer ${
-              isKoreanOnly
-                ? "opacity-30 cursor-not-allowed text-slate-350"
-                : activeTab === "en"
-                  ? "bg-kaist-darkgreen text-white shadow-xs"
-                  : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-700"
-            }`}
-            title={
-              isKoreanOnly
-                ? lang === "ko"
-                  ? "한국어 콘텐츠만 작성하도록 설정되어 영문 입력이 비활성화되었습니다."
-                  : "English input is disabled while Korean-only content is selected."
-                : ""
-            }
-          >
-            <span>{lang === "ko" ? "영문" : "English"}</span>
-          </button>
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
           <div
-            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+            className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
               isKoreanOnly
-                ? "bg-red-500 border-red-500 text-white"
-                : "border-slate-300 group-hover:border-kaist-darkgreen"
+                ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
+                : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
             }`}
           >
             {isKoreanOnly && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
           </div>
-          <input
+          <UiInput
             type="checkbox"
             className="hidden"
             checked={isKoreanOnly}
             onChange={(event) => onKoreanOnlyChange(event.target.checked)}
           />
           <span
-            className={`text-[11.5px] font-bold ${
-              isKoreanOnly ? "text-red-600" : "text-slate-600"
-            }`}
+            className="text-xs font-medium text-slate-600"
           >
             {lang === "ko" ? "한국어 콘텐츠만" : "Korean content only"}
           </span>
@@ -396,100 +305,10 @@ export function BoardEditHeaderControls({
   );
 }
 
-interface EditToolbarProps {
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  isSubmitting: boolean;
-  lang: string;
-  onCancel: () => void;
-  onSubmit: () => void;
-  onUploadFiles: (files: FileList | null) => void;
-  uploading: boolean;
-}
-
-export function BoardEditToolbar({
-  fileInputRef,
-  isSubmitting,
-  lang,
-  onCancel,
-  onSubmit,
-  onUploadFiles,
-  uploading,
-}: EditToolbarProps) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-3 border-b border-slate-100 bg-white select-none">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="p-1.5 text-slate-500 hover:text-kaist-darkgreen hover:bg-slate-100 rounded-md transition-colors border-0 bg-transparent disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-            title={lang === "ko" ? "이미지 추가" : "Add Image"}
-          >
-            <Image className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="p-1.5 text-slate-500 hover:text-kaist-darkgreen hover:bg-slate-100 rounded-md transition-colors border-0 bg-transparent disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-            title={lang === "ko" ? "파일 첨부" : "Attach File"}
-          >
-            {uploading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-          </button>
-          <button
-            type="button"
-            className="p-1.5 text-slate-500 hover:text-kaist-darkgreen hover:bg-slate-100 rounded-md transition-colors border-0 bg-transparent cursor-pointer"
-            title={lang === "ko" ? "비디오 링크" : "Add Video"}
-          >
-            <Video className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(event) => onUploadFiles(event.target.files)}
-      />
-
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer bg-white"
-        >
-          {lang === "ko" ? "취소" : "Cancel"}
-        </button>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={isSubmitting}
-          className="px-3.5 py-1.5 rounded-lg bg-kaist-darkgreen text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer border-0 shadow-xs disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {isSubmitting
-            ? lang === "ko"
-              ? "저장 중..."
-              : "Saving..."
-            : lang === "ko"
-              ? "수정 완료"
-              : "Save Changes"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 interface EditorFieldsProps {
-  activeTab: "ko" | "en";
   contentEn: string;
   contentKo: string;
+  isKoreanOnly: boolean;
   lang: string;
   onContentEnChange: (value: string) => void;
   onContentKoChange: (value: string) => void;
@@ -502,9 +321,9 @@ interface EditorFieldsProps {
 }
 
 export function BoardWriteEditorFields({
-  activeTab,
   contentEn,
   contentKo,
+  isKoreanOnly,
   lang,
   onContentEnChange,
   onContentKoChange,
@@ -516,55 +335,30 @@ export function BoardWriteEditorFields({
   uploading,
 }: EditorFieldsProps) {
   return (
-    <div className="w-full">
-      {/* Korean Tab Editor */}
-      <div className={activeTab === "ko" ? "block" : "hidden"}>
-        <RichTextEditor
-          title={titleKo}
-          onTitleChange={onTitleKoChange}
-          titlePlaceholder={
-            lang === "ko" ? "국문 제목을 입력하세요" : "Enter Korean title"
-          }
-          content={contentKo}
-          onChange={onContentKoChange}
-          placeholder={
-            lang === "ko" ? "국문 내용을 입력하세요" : "Enter Korean content"
-          }
-          fileInputRef={fileInputRef}
-          uploading={uploading}
-          lang={lang}
-        />
-      </div>
-
-      {/* English Tab Editor */}
-      <div className={activeTab === "en" ? "block" : "hidden"}>
-        <RichTextEditor
-          title={titleEn}
-          onTitleChange={onTitleEnChange}
-          titlePlaceholder={
-            lang === "ko" ? "영문 제목을 입력하세요" : "Enter English title"
-          }
-          content={contentEn}
-          onChange={onContentEnChange}
-          placeholder={
-            lang === "ko" ? "영문 내용을 입력하세요" : "Enter English content"
-          }
-          fileInputRef={fileInputRef}
-          uploading={uploading}
-          lang={lang}
-        />
-      </div>
-    </div>
+    <BilingualRichTextEditor
+      contentEn={contentEn}
+      contentKo={contentKo}
+      fileInputRef={fileInputRef}
+      isKoreanOnly={isKoreanOnly}
+      lang={lang}
+      onContentEnChange={onContentEnChange}
+      onContentKoChange={onContentKoChange}
+      onTitleEnChange={onTitleEnChange}
+      onTitleKoChange={onTitleKoChange}
+      titleEn={titleEn}
+      titleKo={titleKo}
+      uploading={uploading}
+    />
   );
 }
 
 interface EventFieldsProps {
-  activeTab: "ko" | "en";
   eventDescriptionKo: string;
   eventDescriptionEn: string;
   eventEndDate: string;
   eventStartDate: string;
   isEventAlwaysOpen: boolean;
+  isKoreanOnly: boolean;
   lang: string;
   onEventDescriptionKoChange: (value: string) => void;
   onEventDescriptionEnChange: (value: string) => void;
@@ -574,12 +368,12 @@ interface EventFieldsProps {
 }
 
 export function BoardWriteEventFields({
-  activeTab,
   eventDescriptionKo,
   eventDescriptionEn,
   eventEndDate,
   eventStartDate,
   isEventAlwaysOpen,
+  isKoreanOnly,
   lang,
   onEventAlwaysOpenChange,
   onEventDescriptionKoChange,
@@ -588,7 +382,7 @@ export function BoardWriteEventFields({
   onEventStartDateChange,
 }: EventFieldsProps) {
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4 animate-in fade-in duration-300 select-none">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4 animate-in fade-in duration-300">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
           {lang === "ko"
@@ -607,7 +401,7 @@ export function BoardWriteEventFields({
               <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
             )}
           </div>
-          <input
+          <UiInput
             type="checkbox"
             className="hidden"
             checked={isEventAlwaysOpen}
@@ -623,7 +417,7 @@ export function BoardWriteEventFields({
           <label className="block text-xs font-bold text-slate-500 mb-1">
             {lang === "ko" ? "행사 시작 일시" : "Event Start Date"}
           </label>
-          <input
+          <UiInput
             type="datetime-local"
             disabled={isEventAlwaysOpen}
             className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
@@ -635,7 +429,7 @@ export function BoardWriteEventFields({
           <label className="block text-xs font-bold text-slate-500 mb-1">
             {lang === "ko" ? "행사 마감 일시" : "Event End Date"}
           </label>
-          <input
+          <UiInput
             type="datetime-local"
             disabled={isEventAlwaysOpen}
             className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
@@ -651,75 +445,40 @@ export function BoardWriteEventFields({
             : "Always-open events are saved without fixed calendar dots."}
         </p>
       )}
-      <div>
-        <label className="block text-xs font-bold text-slate-500 mb-1">
-          {activeTab === "ko" ? "카드 노출용 간단한 설명 *" : "Card Description *"}
+      <div className="space-y-3">
+        <label className="block text-xs font-bold text-slate-500">
+          {lang === "ko" ? "카드 노출용 간단한 설명 *" : "Card Description *"}
         </label>
-        <input
+        <UiInput
           type="text"
+          aria-label={lang === "ko" ? "국문 카드 설명" : "Korean card description"}
           placeholder={
-            activeTab === "ko"
-              ? "피드에 표시될 짧은 행사 정보입니다"
-              : "Short description for card display"
+            lang === "ko"
+              ? "피드에 표시될 짧은 국문 행사 정보입니다"
+              : "Short Korean description for card display"
           }
-          className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all"
-          value={activeTab === "ko" ? eventDescriptionKo : eventDescriptionEn}
-          onChange={(event) =>
-            activeTab === "ko"
-              ? onEventDescriptionKoChange(event.target.value)
-              : onEventDescriptionEnChange(event.target.value)
-          }
+          className="w-full"
+          value={eventDescriptionKo}
+          onChange={(event) => onEventDescriptionKoChange(event.target.value)}
         />
+        {!isKoreanOnly ? (
+          <>
+            <div className="h-px bg-slate-200" aria-hidden="true" />
+            <UiInput
+              type="text"
+              aria-label={lang === "ko" ? "영문 카드 설명" : "English card description"}
+              placeholder={
+                lang === "ko"
+                  ? "피드에 표시될 짧은 영문 행사 정보입니다"
+                  : "Short English description for card display"
+              }
+              className="w-full"
+              value={eventDescriptionEn}
+              onChange={(event) => onEventDescriptionEnChange(event.target.value)}
+            />
+          </>
+        ) : null}
       </div>
-    </div>
-  );
-}
-
-interface SurveyLinkProps {
-  lang: string;
-  onSelectedSurveyIdChange: (surveyId: string) => void;
-  selectedSurveyId: string;
-  surveys: SurveyRecord[];
-}
-
-export function BoardWriteSurveyLink({
-  lang,
-  onSelectedSurveyIdChange,
-  selectedSurveyId,
-  surveys,
-}: SurveyLinkProps) {
-  return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3 select-none">
-      <div>
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-          {lang === "ko" ? "설문조사 연동" : "Linked Survey"}
-        </h3>
-        <p className="mt-1 text-[11px] font-semibold text-slate-400">
-          {lang === "ko"
-            ? "게시글 저장 후 선택한 설문조사가 이 게시글에 연결됩니다."
-            : "After publishing, the selected survey will be linked to this post."}
-        </p>
-      </div>
-      <SelectDropdown
-        value={selectedSurveyId}
-        onChange={onSelectedSurveyIdChange}
-        options={[
-          {
-            value: "",
-            label: lang === "ko" ? "연동하지 않음" : "No linked survey",
-          },
-          ...surveys.map((survey) => ({
-            value: survey.id,
-            label:
-              lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo,
-          })),
-        ]}
-        className="w-full"
-        buttonClassName="rounded-lg border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 focus:ring-kaist-darkgreen"
-        menuClassName="rounded-lg border-slate-200"
-        optionClassName="text-[12px]"
-        emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
-      />
     </div>
   );
 }
@@ -771,89 +530,16 @@ export function BoardWriteAttachmentList({
                 {formatFileSize(asset.sizeBytes)}
               </p>
             </div>
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => onRemoveAsset(asset.assetId)}
               className="rounded-lg p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 border-0 bg-transparent cursor-pointer"
               title={lang === "ko" ? "첨부 제거" : "Remove attachment"}
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-interface PostOptionsProps {
-  anonymousLabel?: string;
-  isAnonymous: boolean;
-  isPinned: boolean;
-  lang: string;
-  onAnonymousChange: (checked: boolean) => void;
-  onPinnedChange: (checked: boolean) => void;
-  pinnedLabel?: string;
-}
-
-export function BoardWritePostOptions({
-  anonymousLabel,
-  isAnonymous,
-  isPinned,
-  lang,
-  onAnonymousChange,
-  onPinnedChange,
-  pinnedLabel,
-}: PostOptionsProps) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-wrap items-center justify-between gap-6 select-none">
-      <div className="flex flex-wrap gap-10">
-        <label className="flex items-center gap-2.5 cursor-pointer group">
-          <div
-            className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
-              isAnonymous
-                ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                : "border-slate-300 group-hover:border-kaist-darkgreen"
-            }`}
-          >
-            {isAnonymous && (
-              <Check className="w-3 h-3 text-white" strokeWidth={3} />
-            )}
-          </div>
-          <input
-            type="checkbox"
-            className="hidden"
-            checked={isAnonymous}
-            onChange={(event) => onAnonymousChange(event.target.checked)}
-          />
-          <span className="text-xs font-bold text-slate-700">
-            {anonymousLabel ??
-              (lang === "ko" ? "익명으로 작성" : "Write Anonymously")}
-          </span>
-        </label>
-
-        <label className="flex items-center gap-2.5 cursor-pointer group">
-          <div
-            className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
-              isPinned
-                ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                : "border-slate-300 group-hover:border-kaist-darkgreen"
-            }`}
-          >
-            {isPinned && (
-              <Check className="w-3 h-3 text-white" strokeWidth={3} />
-            )}
-          </div>
-          <input
-            type="checkbox"
-            className="hidden"
-            checked={isPinned}
-            onChange={(event) => onPinnedChange(event.target.checked)}
-          />
-          <span className="text-xs font-bold text-slate-700">
-            {pinnedLabel ?? (lang === "ko" ? "게시글 상단 고정" : "Pin to Top")}
-          </span>
-        </label>
       </div>
     </div>
   );
@@ -869,8 +555,11 @@ interface BoardWriteSettingsProps {
   surveys: SurveyRecord[];
   isAnonymous: boolean;
   isPinned: boolean;
+  isSecret: boolean;
+  allowSecret: boolean;
   onAnonymousChange: (checked: boolean) => void;
   onPinnedChange: (checked: boolean) => void;
+  onSecretChange: (checked: boolean) => void;
   anonymousLabel?: string;
   pinnedLabel?: string;
 }
@@ -885,23 +574,17 @@ export function BoardWriteSettings({
   surveys,
   isAnonymous,
   isPinned,
+  isSecret,
+  allowSecret,
   onAnonymousChange,
   onPinnedChange,
+  onSecretChange,
   anonymousLabel,
   pinnedLabel,
 }: BoardWriteSettingsProps) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)] space-y-4 select-none">
-      <div className="flex items-center gap-2">
-        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-kaist-darkgreen/10 text-kaist-darkgreen shadow-2xs">
-          <Settings className="h-3 w-3" />
-        </span>
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-          {lang === "ko" ? "게시글 설정" : "Post Settings"}
-        </h3>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 items-start pt-2">
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+      <div className="grid grid-cols-1 items-start gap-x-8 gap-y-4 md:grid-cols-2">
         {/* Survey Selection */}
         {canConfigurePostSettings && (
           <div className="space-y-1.5 w-full">
@@ -929,9 +612,9 @@ export function BoardWriteSettings({
                 })),
               ]}
               className="w-full"
-              buttonClassName="rounded-lg border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 focus:ring-kaist-darkgreen/10 focus:ring-2"
-              menuClassName="rounded-lg border-slate-200"
-              optionClassName="text-[12px]"
+              buttonClassName="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-slate-200 bg-white px-3.5 py-0 text-xs font-normal text-slate-700 shadow-none focus:ring-kaist-darkgreen/10 focus:ring-2"
+              menuClassName="rounded-[var(--ui-control-radius)] border-slate-200 shadow-elevated"
+              optionClassName="text-[12px] !font-normal"
               emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
             />
           </div>
@@ -953,7 +636,7 @@ export function BoardWriteSettings({
                     <Check className="w-3 h-3 text-white" strokeWidth={3} />
                   )}
                 </div>
-                <input
+                <UiInput
                   type="checkbox"
                   className="hidden"
                   checked={isAnonymous}
@@ -979,7 +662,7 @@ export function BoardWriteSettings({
                     <Check className="w-3 h-3 text-white" strokeWidth={3} />
                   )}
                 </div>
-                <input
+                <UiInput
                   type="checkbox"
                   className="hidden"
                   checked={isPinned}
@@ -988,6 +671,31 @@ export function BoardWriteSettings({
                 <span className="text-xs font-bold text-slate-700">
                   {pinnedLabel ??
                     (lang === "ko" ? "게시글 상단 고정" : "Pin to Top")}
+                </span>
+              </label>
+            )}
+
+            {allowSecret && (
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <div
+                  className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
+                    isSecret
+                      ? "bg-amber-600 border-amber-600 text-white"
+                      : "border-slate-300 bg-white group-hover:border-amber-600"
+                  }`}
+                >
+                  {isSecret && (
+                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                  )}
+                </div>
+                <UiInput
+                  type="checkbox"
+                  className="hidden"
+                  checked={isSecret}
+                  onChange={(event) => onSecretChange(event.target.checked)}
+                />
+                <span className="text-xs font-bold text-slate-700">
+                  {lang === "ko" ? "비밀글로 작성" : "Write as secret"}
                 </span>
               </label>
             )}
@@ -1004,7 +712,7 @@ export function BoardWriteSettings({
                   <Check className="w-3 h-3 text-white" strokeWidth={3} />
                 )}
               </div>
-              <input
+              <UiInput
                 type="checkbox"
                 className="hidden"
                 checked={allowComment}
@@ -1022,21 +730,31 @@ export function BoardWriteSettings({
 }
 
 interface BoardWriteFooterProps {
+  draftCount?: number;
+  drafts?: ArticleDraftRecord[];
   lang: string;
   isSubmitting: boolean;
   canWriteSelected?: boolean;
+  compact?: boolean;
   onCancel: () => void;
-  onSaveDraft?: () => void;
+  onDeleteDraft?: (draftId: string) => void | Promise<void>;
+  onRestoreDraft?: (draftId: string) => void | Promise<void>;
+  onSaveDraft?: () => void | Promise<void>;
   onSubmit: () => void;
   submitLabel?: string;
   submittingLabel?: string;
 }
 
 export function BoardWriteFooter({
+  draftCount = 0,
+  drafts = [],
   lang,
   isSubmitting,
   canWriteSelected = true,
+  compact = false,
   onCancel,
+  onDeleteDraft,
+  onRestoreDraft,
   onSaveDraft,
   onSubmit,
   submitLabel,
@@ -1046,40 +764,55 @@ export function BoardWriteFooter({
   const defaultSubmittingLabel = lang === "ko" ? "게시 중..." : "Publishing...";
 
   return (
-    <div className="flex items-center justify-end gap-3 select-none">
-      <button
+    <div className={`flex items-center gap-2 ${compact ? "justify-end" : "justify-between"}`}>
+      <Button
+        variant="outline"
         type="button"
         onClick={onCancel}
         disabled={isSubmitting}
-        className="px-4 py-2 rounded-lg border border-slate-200 text-slate-500 text-xs font-bold hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+        className="text-slate-600"
       >
+        <ArrowLeft aria-hidden="true" />
         {lang === "ko" ? "취소" : "Cancel"}
-      </button>
-      {onSaveDraft && (
-        <button
+      </Button>
+      <div className="flex items-center gap-2">
+        {onSaveDraft && onRestoreDraft && onDeleteDraft ? (
+          <BoardWriteDraftControl
+            count={draftCount}
+            drafts={drafts}
+            lang={lang}
+            onDelete={onDeleteDraft}
+            onRestore={onRestoreDraft}
+            onSave={onSaveDraft}
+            saving={isSubmitting}
+          />
+        ) : onSaveDraft ? (
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => void onSaveDraft()}
+            disabled={isSubmitting}
+            className="text-slate-600"
+          >
+            {lang === "ko" ? "임시저장" : "Save Draft"}
+          </Button>
+        ) : null}
+        <Button
           type="button"
-          onClick={onSaveDraft}
-          disabled={isSubmitting}
-          className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer bg-white disabled:opacity-50"
+          onClick={onSubmit}
+          disabled={isSubmitting || !canWriteSelected}
+          className="bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
         >
-          {lang === "ko" ? "임시저장" : "Save Draft"}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onSubmit}
-        disabled={isSubmitting || !canWriteSelected}
-        className="px-5 py-2 rounded-lg bg-kaist-darkgreen text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer border-0 shadow-xs disabled:cursor-not-allowed disabled:opacity-45"
-      >
-        {isSubmitting ? (
-          <span className="flex items-center gap-1.5">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>{submittingLabel ?? defaultSubmittingLabel}</span>
-          </span>
-        ) : (
-          <span>{submitLabel ?? defaultSubmitLabel}</span>
-        )}
-      </button>
+          {isSubmitting ? (
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="size-4 animate-spin" />
+              <span>{submittingLabel ?? defaultSubmittingLabel}</span>
+            </span>
+          ) : (
+            <span>{submitLabel ?? defaultSubmitLabel}</span>
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

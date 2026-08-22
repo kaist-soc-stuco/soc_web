@@ -1,8 +1,12 @@
 import type {
   AdminSiteContentListResponse,
+  ContentBlockListResponse,
+  ContentBlockRecord,
+  CreateContentBlockRequest,
   SiteContentKey,
   SiteContentListResponse,
   SiteContentRecord,
+  UpdateContentBlockRequest,
   UpsertSiteContentRequest,
 } from "@soc/contracts";
 
@@ -45,6 +49,71 @@ export const createSiteContentApi = ({
   deleteSiteContent: async (key: SiteContentKey): Promise<void> => {
     await requestVoid(
       `${siteContentBaseUrl}/${encodeURIComponent(key)}`,
+      { method: "DELETE" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  listAdminContentBlocks: async (): Promise<ContentBlockListResponse> => {
+    return requestJson<ContentBlockListResponse>(
+      `${siteContentBaseUrl}/blocks/admin`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  listPublicContentBlocks: async (): Promise<ContentBlockListResponse> => {
+    return requestJson<ContentBlockListResponse>(`${siteContentBaseUrl}/blocks/public`, {
+      method: "GET",
+    });
+  },
+
+  createContentBlock: async (body: CreateContentBlockRequest): Promise<ContentBlockRecord> => {
+    return requestJson<ContentBlockRecord>(
+      `${siteContentBaseUrl}/blocks`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateContentBlock: async (
+    contentBlockId: string,
+    body: UpdateContentBlockRequest,
+  ): Promise<ContentBlockRecord> => {
+    return requestJson<ContentBlockRecord>(
+      `${siteContentBaseUrl}/blocks/${encodeURIComponent(contentBlockId)}`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  publishContentBlock: async (contentBlockId: string): Promise<ContentBlockRecord> => {
+    return requestJson<ContentBlockRecord>(
+      `${siteContentBaseUrl}/blocks/${encodeURIComponent(contentBlockId)}/publish`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  archiveContentBlock: async (contentBlockId: string): Promise<ContentBlockRecord> => {
+    return requestJson<ContentBlockRecord>(
+      `${siteContentBaseUrl}/blocks/${encodeURIComponent(contentBlockId)}/archive`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  deleteContentBlock: async (contentBlockId: string): Promise<void> => {
+    await requestVoid(
+      `${siteContentBaseUrl}/blocks/${encodeURIComponent(contentBlockId)}`,
       { method: "DELETE" },
       { retryOnUnauthorized: true },
     );

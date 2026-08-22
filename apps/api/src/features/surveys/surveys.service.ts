@@ -39,7 +39,6 @@ export class SurveysService {
     isPublished: boolean;
     isAlwaysOpen?: boolean;
     opensAt: string | null;
-    closesAt: string | null;
   }): ComputedSurveyState {
     if (!survey.isPublished) {
       return "closed";
@@ -54,10 +53,6 @@ export class SurveysService {
     if (survey.opensAt && isoToMs(survey.opensAt) > now) {
       return "before_open";
     }
-    if (survey.closesAt && isoToMs(survey.closesAt) <= now) {
-      return "closed";
-    }
-
     return "open";
   }
 
@@ -233,7 +228,6 @@ export class SurveysService {
           resultVisibility: "PRIVATE",
           maxResponseCount: original.maxResponses ?? undefined,
           openAt: original.opensAt ?? undefined,
-          closeAt: original.closesAt ?? undefined,
           isAlwaysOpen: original.isAlwaysOpen,
         },
         tx,
@@ -242,6 +236,12 @@ export class SurveysService {
           versionNumber: original.versionNumber + 1,
         },
       );
+
+      const copiedSectionIdBySourceId = new Map<string, string>();
+      const copiedSections = [] as Array<{
+        source: (typeof sectionsWithQuestions)[number];
+        copy: SurveySectionRecord;
+      }>;
 
       for (const section of sectionsWithQuestions) {
         const newSection = await this.sectionsRepo.insert(
@@ -256,9 +256,33 @@ export class SurveysService {
           tx,
         );
 
-        for (const question of section.questions) {
+        copiedSectionIdBySourceId.set(section.id, newSection.id);
+        copiedSections.push({ source: section, copy: newSection });
+      }
+
+      for (const { source, copy } of copiedSections) {
+        for (const question of source.questions) {
+          const sourceBranchMap = question.config?.goToSectionByValue;
+          const copiedConfig = question.config
+            ? {
+                ...question.config,
+                ...(sourceBranchMap
+                  ? {
+                      goToSectionByValue: Object.fromEntries(
+                        Object.entries(sourceBranchMap).map(([value, target]) => [
+                          value,
+                          target === "SUBMIT"
+                            ? target
+                            : copiedSectionIdBySourceId.get(target) ?? target,
+                        ]),
+                      ),
+                    }
+                  : {}),
+              }
+            : undefined;
+
           await this.questionsRepo.insert(
-            newSection.id,
+            copy.id,
             {
               titleKo: question.titleKo,
               titleEn: question.titleEn ?? undefined,
@@ -266,6 +290,7 @@ export class SurveysService {
               descriptionEn: question.descriptionEn ?? undefined,
               questionType: question.questionType,
               options: question.options ?? undefined,
+              config: copiedConfig,
               answerRegex: question.answerRegex ?? undefined,
               isRequired: question.isRequired,
               sortOrder: question.sortOrder,
@@ -405,7 +430,6 @@ export class SurveysService {
       computedState: survey.computedState,
       isAlwaysOpen: survey.isAlwaysOpen,
       opensAt: survey.opensAt,
-      closesAt: survey.closesAt,
       titleKo: survey.titleKo,
       titleEn: survey.titleEn,
       totalResponses,

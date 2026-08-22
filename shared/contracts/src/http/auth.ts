@@ -57,6 +57,17 @@ export interface CurrentUserResponse {
     studentNumber: string | null;
     departmentKo: string | null;
     departmentEn: string | null;
+    primaryMajor: string | null;
+    doubleMajor: string | null;
+    minor: string | null;
+    gender: string | null;
+    phoneNumber: string | null;
+    privacyConsentAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    lastLoginAt: string | null;
+    kaistUid: string;
+    feeStatus: "PAID" | "PARTIAL" | "UNPAID" | null;
     academicStatus: string | null;
     identityCode: string | null;
   };

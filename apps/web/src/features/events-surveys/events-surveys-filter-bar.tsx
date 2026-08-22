@@ -3,6 +3,8 @@ import type {
   EventsSurveysSortKey,
   EventsSurveysStateFilter,
 } from "@/lib/events-surveys";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { PageSearchField } from "@/components/ui/page-layout";
 
 const stateFilters: Array<{
   value: EventsSurveysStateFilter;
@@ -27,70 +29,47 @@ const sortOptions: Array<{
 interface EventsSurveysFilterBarProps {
   lang: string;
   onSortByChange: (sortBy: EventsSurveysSortKey) => void;
+  onQueryChange: (value: string) => void;
   onStateFilterChange: (filter: EventsSurveysStateFilter) => void;
+  query: string;
   sortBy: EventsSurveysSortKey;
+  stateCounts: Record<EventsSurveysStateFilter, number>;
   stateFilter: EventsSurveysStateFilter;
-  visibleCount: number;
 }
 
 export function EventsSurveysFilterBar({
   lang,
   onSortByChange,
+  onQueryChange,
   onStateFilterChange,
+  query,
   sortBy,
+  stateCounts,
   stateFilter,
-  visibleCount,
 }: EventsSurveysFilterBarProps) {
   return (
-    <div className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
+    <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-3 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0 max-w-full overflow-x-auto">
-        <div className="inline-flex min-w-max rounded-md border border-slate-200 bg-slate-50 p-0.5">
-        {stateFilters.map((filter) => {
-          const active = stateFilter === filter.value;
-          return (
-            <button
-              key={filter.value}
-              type="button"
-              onClick={() => onStateFilterChange(filter.value)}
-              className={`min-h-9 rounded-md border px-3 py-1.5 text-[12px] font-semibold transition-colors cursor-pointer ${
-                active
-                  ? "border-brand-primary bg-brand-primary text-white"
-                  : "border-transparent bg-transparent text-slate-500 hover:bg-white hover:text-brand-primary"
-              }`}
-            >
-              {lang === "ko" ? filter.labelKo : filter.labelEn}
-            </button>
-          );
-        })}
-        </div>
+        <SegmentedControl
+          ariaLabel={lang === "ko" ? "행사 상태" : "Event status"}
+          className="clean-segmented-control"
+          options={stateFilters.map((filter) => ({
+            value: filter.value,
+            label: (
+              <span className="inline-flex items-center gap-1">
+                <span>{lang === "ko" ? filter.labelKo : filter.labelEn}</span>
+                <span className="tabular-nums text-[11px] text-slate-400">
+                  {stateCounts[filter.value]}
+                </span>
+              </span>
+            ),
+          }))}
+          value={stateFilter}
+          onChange={onStateFilterChange}
+        />
       </div>
 
-      <div className="text-xs font-medium text-app-text-muted" aria-live="polite">
-        {lang === "ko" ? (
-          <span>
-            전체 <strong className="text-brand-primary">{visibleCount}</strong>
-            개
-          </span>
-        ) : (
-          <span>
-            <strong className="text-brand-primary">{visibleCount}</strong> items
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <label className="hidden">
-          <input
-            type="checkbox"
-            checked={stateFilter === "open"}
-            onChange={(event) =>
-              onStateFilterChange(event.target.checked ? "open" : "all")
-            }
-            className="h-3.5 w-3.5 rounded border-slate-300 text-brand-primary focus:ring-brand-primary/20"
-          />
-          <span>{lang === "ko" ? "진행 중인 항목만 보기" : "Ongoing only"}</span>
-        </label>
-
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
         <SelectDropdown
           value={sortBy}
           options={sortOptions.map((option) => ({
@@ -99,10 +78,19 @@ export function EventsSurveysFilterBar({
           }))}
           onChange={(value) => onSortByChange(value as EventsSurveysSortKey)}
           className="w-40"
-          buttonClassName="h-10 rounded-md border-slate-200 px-3 py-0 text-[13px] font-semibold text-slate-700 shadow-none focus:ring-brand-primary/20"
+          buttonClassName="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-slate-200 px-3 py-0 text-sm font-medium text-slate-700 shadow-none focus:ring-brand-primary/20"
           menuClassName="rounded-lg border-slate-200 shadow-elevated"
-          optionClassName="text-[12px]"
+          optionClassName="text-sm"
           emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
+        />
+
+        <PageSearchField
+          ariaLabel={lang === "ko" ? "행사·설문 검색" : "Search events and surveys"}
+          className="order-last w-full sm:w-64 lg:w-72"
+          onChange={onQueryChange}
+          onClear={() => onQueryChange("")}
+          placeholder={lang === "ko" ? "제목, 내용 검색" : "Search titles and content"}
+          value={query}
         />
       </div>
     </div>

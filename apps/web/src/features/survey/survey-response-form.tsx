@@ -5,11 +5,14 @@ import type {
 import { CheckCircle2 } from "lucide-react";
 
 import {
+  emptyAnswerValue,
   getLocalizedText,
   type AnswerValue,
 } from "./survey-answer-utils";
 import { SurveyQuestionInput } from "./survey-question-input";
 import { PreviewNoticeView } from "./survey-state-views";
+import { RichTextContent } from "@/components/ui/rich-text-content";
+import { Button } from "@/components/ui/button";
 
 interface SurveyResponseFormProps {
   allQuestions: SurveyQuestionRecord[];
@@ -22,6 +25,7 @@ interface SurveyResponseFormProps {
   submitError: string | null;
   submitting: boolean;
   survey: SurveyDetailResponse;
+  visibleSectionIds: Set<string>;
 }
 
 export function SurveyResponseForm({
@@ -35,6 +39,7 @@ export function SurveyResponseForm({
   submitError,
   submitting,
   survey,
+  visibleSectionIds,
 }: SurveyResponseFormProps) {
   return (
     <div className="animate-in fade-in slide-in-from-top-4 duration-300">
@@ -43,11 +48,11 @@ export function SurveyResponseForm({
         {isEditingExistingResponse && (
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
             {lang === "ko"
-              ? "이전에 제출한 응답을 수정하는 중입니다. 마감 전까지 다시 저장할 수 있습니다."
+              ? "이전에 제출한 응답을 수정하는 중입니다. 설문이 열려 있는 동안 다시 저장할 수 있습니다."
               : "You are editing your previous response. Changes can be saved before the survey closes."}
           </div>
         )}
-        {survey.sections.map((section) => (
+        {survey.sections.filter((section) => visibleSectionIds.has(section.id)).map((section) => (
           <section key={section.id} className="flex flex-col gap-4">
             {(getLocalizedText(lang, section.titleKo, section.titleEn) ||
               getLocalizedText(
@@ -57,7 +62,7 @@ export function SurveyResponseForm({
               )) && (
               <div className="px-1 pb-1 pt-2">
                 {getLocalizedText(lang, section.titleKo, section.titleEn) && (
-                  <h2 className="text-base font-extrabold text-slate-950">
+                  <h2 className="text-base font-semibold text-slate-950">
                     {getLocalizedText(lang, section.titleKo, section.titleEn)}
                   </h2>
                 )}
@@ -66,13 +71,14 @@ export function SurveyResponseForm({
                   section.descriptionKo,
                   section.descriptionEn,
                 ) && (
-                  <p className="mt-1.5 text-sm font-medium leading-relaxed text-slate-500">
-                    {getLocalizedText(
+                  <RichTextContent
+                    content={getLocalizedText(
                       lang,
                       section.descriptionKo,
                       section.descriptionEn,
                     )}
-                  </p>
+                    className="mt-1.5 text-sm font-medium leading-relaxed text-slate-500"
+                  />
                 )}
               </div>
             )}
@@ -87,7 +93,7 @@ export function SurveyResponseForm({
                   className="group rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)] transition-all hover:border-kaist-darkgreen/20 hover:shadow-[0_16px_40px_rgba(15,23,42,0.07)]"
                 >
                   <div className="mb-3.5 border-b border-slate-100 pb-3">
-                    <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-extrabold leading-6 text-slate-950">
+                    <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-semibold leading-6 text-slate-950">
                       <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
                         {questionIndex}.
                       </span>
@@ -98,7 +104,7 @@ export function SurveyResponseForm({
                           question.titleEn,
                         )}
                         {question.isRequired && (
-                          <span className="ml-1 inline-block translate-y-[-0.22em] text-xs font-black leading-none text-rose-500">
+                          <span className="ml-1 inline-block translate-y-[-0.22em] text-xs font-bold leading-none text-rose-500">
                             *
                           </span>
                         )}
@@ -110,20 +116,20 @@ export function SurveyResponseForm({
                     question.descriptionKo,
                     question.descriptionEn,
                   ) && (
-                    <p className="mb-4 text-sm font-medium leading-relaxed text-slate-500">
-                      {getLocalizedText(
+                    <RichTextContent
+                      content={getLocalizedText(
                         lang,
                         question.descriptionKo,
                         question.descriptionEn,
                       )}
-                    </p>
+                      className="mb-4 text-sm font-medium leading-relaxed text-slate-500"
+                    />
                   )}
                   <div>
                     <SurveyQuestionInput
                       question={question}
                       value={
-                        answers[question.id] ??
-                        (question.questionType === "multiple_choice" ? [] : "")
+                        answers[question.id] ?? emptyAnswerValue(question.questionType)
                       }
                       onChange={(value) => onAnswerChange(question.id, value)}
                       lang={lang}
@@ -143,10 +149,10 @@ export function SurveyResponseForm({
         )}
 
         <div className="flex justify-end border-t border-slate-100 pt-4">
-          <button
+          <Button variant="ghost"
             type="submit"
             disabled={submitting || isPreview}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-kaist-darkgreen/15 transition-all hover:bg-kaist-darkgreen/90 active:scale-98 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-kaist-darkgreen/15 transition-all hover:bg-kaist-darkgreen/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {submitting ? (
               <>
@@ -184,7 +190,7 @@ export function SurveyResponseForm({
                     : "Submit Response"}
               </>
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

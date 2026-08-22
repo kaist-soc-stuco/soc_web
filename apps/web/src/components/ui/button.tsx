@@ -5,21 +5,21 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*="size-"])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
+  'interaction-button inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--ui-control-radius)] text-[length:var(--ui-control-font-size)] [font-weight:600] leading-[var(--ui-control-line-height)] transition-[color,background-color,border-color,box-shadow,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*="size-"])]:size-4 shrink-0 [&_svg]:shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
-        destructive: 'bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20',
-        outline: 'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground',
-        secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/85',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        default: 'border border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+        destructive: 'border border-destructive bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20',
+        outline: 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900',
+        secondary: 'border border-transparent bg-slate-100 text-slate-700 hover:bg-slate-200/75 hover:text-slate-900',
+        ghost: 'border border-transparent bg-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-900',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-9 px-4 py-2',
-        sm: 'h-8 rounded-md gap-1.5 px-3',
-        lg: 'h-10 rounded-md px-6',
+        default: 'h-[var(--ui-control-height)] px-4 py-2',
+        sm: 'h-[var(--ui-control-height-compact)] rounded-md gap-1.5 px-3',
+        lg: 'h-[var(--ui-control-height)] rounded-md px-6',
         icon: 'size-9',
       },
     },
