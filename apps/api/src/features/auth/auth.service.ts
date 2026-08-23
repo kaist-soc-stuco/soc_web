@@ -44,6 +44,7 @@ interface LoginResultPayload {
   accessToken: string;
   refreshToken: string;
   sessionId: string;
+  ssoUserInfo?: Record<string, unknown>;
   storageMode: "persisted" | "temporary";
   userId?: string;
 }
@@ -337,6 +338,7 @@ export class AuthService {
           accessToken: issued.accessToken,
           refreshToken: issued.refreshToken,
           sessionId: issued.session.sessionId,
+          ssoUserInfo: userInfo,
           storageMode: "persisted",
           userId: existingUser.userId,
         });
@@ -359,6 +361,7 @@ export class AuthService {
         kaistUid,
         nameEn,
         nameKo,
+        ssoUserInfo: userInfo,
         ssoSubject,
         stdNo,
         primaryMajor,

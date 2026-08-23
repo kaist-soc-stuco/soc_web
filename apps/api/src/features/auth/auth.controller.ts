@@ -72,13 +72,15 @@ export class AuthController {
   @Get("login/result")
   async consumeLoginResult(
     @Query("resultToken") resultToken: string | undefined,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     // Redirect 이후 1회성 resultToken을 소비해 쿠키 세팅에 필요한 값을 회수합니다.
     const result = await this.authService.consumeLoginResult(resultToken);
-    this.authCookieService.setAuthCookies(response, result);
+    this.authCookieService.setAuthCookies(response, result, request);
 
     return {
+      ssoUserInfo: result.ssoUserInfo,
       storageMode: result.storageMode,
       userId: result.userId,
     };
@@ -91,17 +93,19 @@ export class AuthController {
   @Post("login/consent")
   async handleConsentDecision(
     @Body() body: ConsentDecisionRequestDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authSessionService.handleConsentDecision(body);
 
     if (result.storageMode === "persisted") {
-      this.authCookieService.setAuthCookies(response, result);
+      this.authCookieService.setAuthCookies(response, result, request);
     } else {
-      this.authCookieService.clearAuthCookies(response);
+      this.authCookieService.clearAuthCookies(response, request);
     }
 
     return {
+      ssoUserInfo: result.ssoUserInfo,
       storageMode: result.storageMode,
       temporarySession:
         result.storageMode === "temporary"
@@ -159,6 +163,7 @@ export class AuthController {
   async refreshSession(
     @Cookies(AUTH_REFRESH_COOKIE_NAME) cookieRefreshToken: string | undefined,
     @Body() body: RefreshSessionRequestDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authSessionService.refreshSession({
@@ -171,14 +176,14 @@ export class AuthController {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
         sessionId: result.sessionId,
-      });
+      }, request);
 
       return {
         storageMode: result.storageMode,
       };
     }
 
-    this.authCookieService.clearAuthCookies(response);
+    this.authCookieService.clearAuthCookies(response, request);
 
     return {
       storageMode: result.storageMode,
@@ -197,13 +202,14 @@ export class AuthController {
   async logout(
     @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
     @Body() body: LogoutRequestDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authSessionService.logout({
       sessionId: cookieSessionId ?? body?.sessionId,
     });
 
-    this.authCookieService.clearAuthCookies(response);
+    this.authCookieService.clearAuthCookies(response, request);
     return result;
   }
 }

@@ -11,6 +11,9 @@ import type { ConsentDecisionSchema } from "../schemas.js";
 
 export type AuthStorageMode = "temporary" | "persisted";
 
+/** The complete account object returned by the SSO provider. */
+export type SsoUserInfo = Record<string, unknown>;
+
 export interface LoginStartResponse {
   clientId: string;
   loginUrl: string;
@@ -83,6 +86,7 @@ export interface TemporarySessionPayload {
 
 export interface ConsentDecisionResponse {
   storageMode: AuthStorageMode;
+  ssoUserInfo?: SsoUserInfo;
   temporarySession?: TemporarySessionPayload;
   userId?: string;
 }

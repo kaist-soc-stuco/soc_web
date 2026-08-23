@@ -11,9 +11,10 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminCard, AdminCardHeader, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle, AdminStickyActionBar, AdminToolbarGroup } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { UiInput, UiSelect, UiTextarea } from "@/components/ui/form-control";
+import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -85,6 +86,12 @@ const statusMeta: Record<ContentBlockStatus, { label: string; tone: "neutral" | 
   DRAFT: { label: "초안", tone: "neutral" },
   PUBLISHED: { label: "게시 중", tone: "positive" },
 };
+
+const pledgeStatusOptions = [
+  { value: "PLANNED", label: "예정" },
+  { value: "IN_PROGRESS", label: "진행 중" },
+  { value: "COMPLETED", label: "이행 완료" },
+];
 
 const emptyDraft = (type: ContentBlockType = "HERO"): BlockDraft => ({
   bodyEn: "",
@@ -364,7 +371,7 @@ function SiteContentPageContent() {
                 <AdminFormField label="English title"><UiInput value={draft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField>
                 {draft.type !== "QUICK_LINK" ? <AdminFormField label="한국어 본문"><UiTextarea className="min-h-32" value={draft.bodyKo} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, bodyKo: value })); }} /></AdminFormField> : null}
                 {draft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-32" value={draft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
-                {draft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><UiSelect value={draft.pledgeStatus ?? "PLANNED"} onChange={(event) => setDraft((current) => ({ ...current, pledgeStatus: event.currentTarget.value as BlockDraft["pledgeStatus"] }))}><option value="PLANNED">예정</option><option value="IN_PROGRESS">진행 중</option><option value="COMPLETED">이행 완료</option></UiSelect></AdminFormField> : null}
+                {draft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><AdminSelectDropdown ariaLabel="이행 상태" value={draft.pledgeStatus ?? "PLANNED"} options={pledgeStatusOptions} onChange={(value) => setDraft((current) => ({ ...current, pledgeStatus: value as BlockDraft["pledgeStatus"] }))} /></AdminFormField> : null}
               </div> : null}
               <div className="grid gap-4">
                 {!isImageOnlyType(draft.type) && draft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
@@ -392,7 +399,7 @@ function SiteContentPageContent() {
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="English title"><UiInput value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="한국어 본문"><UiTextarea className="min-h-24" value={createDraft.bodyKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyKo: value })); }} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
-        {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><UiSelect value={createDraft.pledgeStatus ?? "PLANNED"} onChange={(event) => setCreateDraft((current) => ({ ...current, pledgeStatus: event.currentTarget.value as BlockDraft["pledgeStatus"] }))}><option value="PLANNED">예정</option><option value="IN_PROGRESS">진행 중</option><option value="COMPLETED">이행 완료</option></UiSelect></AdminFormField> : null}
+        {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><AdminSelectDropdown ariaLabel="이행 상태" value={createDraft.pledgeStatus ?? "PLANNED"} options={pledgeStatusOptions} onChange={(value) => setCreateDraft((current) => ({ ...current, pledgeStatus: value as BlockDraft["pledgeStatus"] }))} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
         {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
       </div>
