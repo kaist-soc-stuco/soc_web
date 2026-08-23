@@ -10,6 +10,8 @@ import {
   assets,
   boards,
   comments,
+  contentBlocks,
+  executiveContacts,
   permissions,
   roleGroupPermissions,
   roleGroups,
@@ -117,7 +119,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "홍보글",
     nameKo: "홍보글",
-    nameEn: "Promotions",
+    nameEn: "Promotional Posts",
     descriptionKo: "집행위원회 및 학회의 홍보 게시물",
     descriptionEn: "Find promotions from SOC and student organizations.",
     writePermissionId: 2,
@@ -143,7 +145,7 @@ const BOARD_SEEDS: BoardSeed[] = [
   {
     code: "연구실",
     nameKo: "연구실",
-    nameEn: "Labs",
+    nameEn: "Research Labs",
     descriptionKo: "각 연구실의 소식과 공지사항",
     descriptionEn: "Read news and announcements from research labs.",
     writePermissionId: 2,
@@ -157,7 +159,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     code: "FAQ",
     nameKo: "FAQ",
     nameEn: "FAQ",
-    descriptionKo: "자주 묻는 질문과 답변을 확인하세요",
+    descriptionKo: "FAQ와 답변을 확인하세요",
     descriptionEn: "Browse frequently asked questions and answers.",
     writePermissionId: 1,
     allowComment: false,
@@ -688,6 +690,25 @@ function makeAllQuestionTypesSurvey(): SurveySeed {
 
 async function cleanupSeedContent() {
   await db.execute(sql`
+    delete from content_block
+    where type in ('TOP_BANNER', 'QUICK_LINK', 'PLEDGE')
+      and created_by in (
+        select user_id from users
+        where kaist_uid = 'seed-council-author'
+      )
+  `);
+
+  await db.execute(sql`
+    delete from executive_contact
+    where email in (
+      'president@cs.kaist.ac.kr',
+      'planning@cs.kaist.ac.kr',
+      'welfare@cs.kaist.ac.kr',
+      'pr@cs.kaist.ac.kr'
+    )
+  `);
+
+  await db.execute(sql`
     delete from survey
     where creator_id in (
       select user_id from users
@@ -756,6 +777,134 @@ async function upsertSeedAuthor() {
     throw new Error("Failed to upsert seed author");
   }
   return seedAuthor;
+}
+
+async function seedAboutPageContent(seedAuthorId: string) {
+  await db.insert(contentBlocks).values([
+    {
+      type: "TOP_BANNER",
+      status: "PUBLISHED",
+      titleKo: "2026 봄학기 학생회 운영 안내",
+      titleEn: "Spring 2026 Student Council Operations",
+      bodyKo: "공지·행사·복지 문의를 홈페이지에서 한 번에 확인하세요.",
+      bodyEn: "Find notices, events, and welfare information in one place.",
+      linkUrl: "/board/공지",
+      sortOrder: 0,
+      createdBy: seedAuthorId,
+      updatedBy: seedAuthorId,
+      publishedBy: seedAuthorId,
+      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+    },
+    {
+      type: "QUICK_LINK",
+      status: "PUBLISHED",
+      titleKo: "행사·일정 확인",
+      titleEn: "Events & Activities",
+      bodyKo: "다가오는 행사와 학사일정을 한눈에 확인하세요.",
+      bodyEn: "See upcoming events and academic dates at a glance.",
+      linkUrl: "/events",
+      sortOrder: 0,
+      createdBy: seedAuthorId,
+      updatedBy: seedAuthorId,
+      publishedBy: seedAuthorId,
+      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+    },
+    {
+      type: "PLEDGE",
+      status: "PUBLISHED",
+      titleKo: "학생 복지 품목과 대여 절차 확대",
+      titleEn: "Expand student welfare items and lending access",
+      bodyKo: "학생회가 운영하는 복지 물품을 늘리고 대여 절차를 한눈에 확인할 수 있도록 정리합니다.",
+      bodyEn: "Expand council-managed welfare items and make the lending process easier to access.",
+      pledgeStatus: "COMPLETED",
+      sortOrder: 0,
+      createdBy: seedAuthorId,
+      updatedBy: seedAuthorId,
+      publishedBy: seedAuthorId,
+      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+    },
+    {
+      type: "PLEDGE",
+      status: "PUBLISHED",
+      titleKo: "전산학부 커뮤니티 라운지 개선",
+      titleEn: "Improve the School of Computing community lounge",
+      bodyKo: "학우들이 편하게 머물고 교류할 수 있도록 라운지 환경과 이용 프로그램을 단계적으로 개선합니다.",
+      bodyEn: "Improve the lounge environment and community programs so students can stay and connect comfortably.",
+      pledgeStatus: "IN_PROGRESS",
+      sortOrder: 1,
+      createdBy: seedAuthorId,
+      updatedBy: seedAuthorId,
+      publishedBy: seedAuthorId,
+      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+    },
+    {
+      type: "PLEDGE",
+      status: "PUBLISHED",
+      titleKo: "진로·학업 지원 프로그램 정례화",
+      titleEn: "Establish regular academic and career support programs",
+      bodyKo: "선배 초청 세션과 연구·진로 정보를 정기적으로 공유해 학업과 진로 탐색을 돕습니다.",
+      bodyEn: "Regularly share research and career information through alumni sessions and peer programs.",
+      pledgeStatus: "PLANNED",
+      sortOrder: 2,
+      createdBy: seedAuthorId,
+      updatedBy: seedAuthorId,
+      publishedBy: seedAuthorId,
+      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+    },
+  ]);
+
+  await db.insert(executiveContacts).values([
+    {
+      nameKo: "김성찬",
+      nameEn: "Seongchan Kim",
+      roleKo: "회장",
+      roleEn: "President",
+      gender: null,
+      cohort: 26,
+      email: "president@cs.kaist.ac.kr",
+      phoneNumber: null,
+      privacyConsented: true,
+      sortOrder: 0,
+    },
+    {
+      nameKo: "이서윤",
+      nameEn: "Seoyoon Lee",
+      roleKo: "기획국장",
+      roleEn: "Planning Director",
+      gender: null,
+      cohort: 25,
+      email: "planning@cs.kaist.ac.kr",
+      phoneNumber: null,
+      privacyConsented: true,
+      sortOrder: 1,
+    },
+    {
+      nameKo: "박도현",
+      nameEn: "Dohyun Park",
+      roleKo: "복지국장",
+      roleEn: "Welfare Director",
+      gender: null,
+      cohort: 25,
+      email: "welfare@cs.kaist.ac.kr",
+      phoneNumber: null,
+      privacyConsented: true,
+      sortOrder: 2,
+    },
+    {
+      nameKo: "최민아",
+      nameEn: "Mina Choi",
+      roleKo: "홍보국장",
+      roleEn: "Communications Director",
+      gender: null,
+      cohort: 26,
+      email: "pr@cs.kaist.ac.kr",
+      phoneNumber: null,
+      privacyConsented: true,
+      sortOrder: 3,
+    },
+  ]);
+
+  console.log("Seeded pledge progress and executive contacts");
 }
 
 async function attachAssetsToArticle(
@@ -888,6 +1037,7 @@ async function seedMockData() {
 
   await cleanupSeedContent();
   const seedAuthor = await upsertSeedAuthor();
+  await seedAboutPageContent(seedAuthor.userId);
 
   const detailedNoticeContent = [
     "전산학부 학생회는 학부 여러분의 의견을 반영하고 보다 나은 학부 문화를 만들어가기 위해 열정과 책임감 있는 임원분들을 모집합니다.",

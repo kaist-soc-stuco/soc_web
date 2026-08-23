@@ -38,7 +38,7 @@ export function PrivacyPage() {
       <PageMain>
         <PageHeader title={lang === 'ko' ? '개인정보처리방침' : 'Privacy Policy'} />
 
-        <section className="mx-auto w-full max-w-[1200px] px-5 pb-8 md:px-8">
+        <section className="mx-auto w-full max-w-[var(--ui-legal-max-width)] px-5 pb-8 md:px-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 md:p-7">
           <div className="divide-y divide-slate-100">
             {privacySections.map((section) => (

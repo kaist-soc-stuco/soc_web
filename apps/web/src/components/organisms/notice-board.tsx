@@ -48,7 +48,7 @@ function NoticeItem({
       <div className="flex w-full min-w-0 items-center justify-between gap-4 py-0.5">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {showCategoryBadge ? (
-            <span className="inline-flex shrink-0 items-center rounded-md border-0 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-slate-700">
+            <span className="inline-flex shrink-0 items-center rounded-md border-0 bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold tracking-tight text-slate-700">
               {categoryLabel}
             </span>
           ) : null}
@@ -61,9 +61,9 @@ function NoticeItem({
             {isNew ? (
               <span
                 className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
-                title={lang === "ko" ? "새 글" : "New"}
+              title={lang === "ko" ? "새 글" : "New post"}
               >
-                <span className="sr-only">{lang === "ko" ? "새 글" : "New"}</span>
+                <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
               </span>
             ) : null}
           </div>
@@ -122,9 +122,9 @@ export function NoticeBoard() {
   const tabs = [
     { code: "공지", labelKo: "공지", labelEn: "Notice" },
     { code: "HoC", labelKo: "HoC", labelEn: "HoC" },
-    { code: "홍보글", labelKo: "홍보글", labelEn: "Promotions" },
+    { code: "홍보글", labelKo: "홍보글", labelEn: "Promotional Posts" },
     { code: "건의사항", labelKo: "건의사항", labelEn: "Suggestions" },
-    { code: "연구실", labelKo: "연구실", labelEn: "Labs" },
+    { code: "연구실", labelKo: "연구실", labelEn: "Research Labs" },
   ];
 
   const apiClient = useMemo(
@@ -230,7 +230,7 @@ export function NoticeBoard() {
             <SegmentedControl
               ariaLabel={lang === "ko" ? "게시판 카테고리" : "Board categories"}
               className="home-board-tabs clean-segmented-control max-w-full"
-              itemClassName="!text-[12px]"
+              itemClassName="!text-xs"
               options={tabs.map((tab) => ({
                 label: lang === "ko" ? tab.labelKo : tab.labelEn,
                 value: tab.code,

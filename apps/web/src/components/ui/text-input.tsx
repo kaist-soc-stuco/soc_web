@@ -25,7 +25,7 @@ export function TextInput({
       {leading ? <span className="flex shrink-0 text-slate-400">{leading}</span> : null}
       <input
         className={cn(
-          "min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400",
+          "min-w-0 flex-1 bg-transparent text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400",
           className,
         )}
         {...props}

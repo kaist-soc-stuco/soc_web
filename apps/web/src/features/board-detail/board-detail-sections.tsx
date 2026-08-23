@@ -41,6 +41,7 @@ interface ArticleCardProps {
   categoryLabel: string;
   content: string;
   editHref?: string;
+  isAuthenticated: boolean;
   lang: string;
   onDeleteArticle: () => void;
   onShare: () => void;
@@ -61,6 +62,7 @@ export function BoardDetailArticleCard({
   categoryLabel,
   content,
   editHref,
+  isAuthenticated,
   lang,
   onDeleteArticle,
   onShare,
@@ -175,22 +177,22 @@ export function BoardDetailArticleCard({
                 <ClipboardCheck className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-[14px] font-semibold leading-snug tracking-tight text-app-text-strong">
+                <h2 className="truncate text-[length:var(--ui-text-body-size)] font-semibold leading-snug tracking-tight text-app-text-strong">
                   {surveyTitle}
                 </h2>
                 {surveyDescription && (
                   <RichTextContent
                     content={surveyDescription}
-                    className="mt-1 line-clamp-2 text-[12px] font-medium leading-relaxed text-app-text-muted"
+                    className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-app-text-muted"
                   />
                 )}
               </div>
             </div>
             <Link
               to={`/survey/${article.survey.surveyId}`}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#053b23]"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#053b23]"
             >
-              <span>{lang === "ko" ? "설문조사 참여하기" : "Open survey"}</span>
+              <span>{lang === "ko" ? "설문조사 참여하기" : "Take Survey"}</span>
               <svg
                 className="w-2.5 h-2.5 text-white"
                 fill="none"
@@ -211,6 +213,7 @@ export function BoardDetailArticleCard({
 
       <div className="mt-8 flex items-center justify-start gap-2 border-t border-slate-100 pt-4">
         <ArticleEngagementActions
+          isAuthenticated={isAuthenticated}
           lang={lang}
           likeCount={article.likeCount}
           scrapCount={article.scrapCount}
@@ -242,7 +245,7 @@ export function BoardDetailArticleCard({
                 ? "공유"
                 : "Share"
           }
-          className="rounded-md border-0 bg-transparent text-[12px] text-slate-500 active:text-brand-primary hover:border-0 hover:bg-slate-100 hover:text-slate-700"
+          className="rounded-md border-0 bg-transparent text-xs text-slate-500 active:text-brand-primary hover:border-0 hover:bg-slate-100 hover:text-slate-700"
         >
           {shareCopied ? (
             <Check className="size-3.5 text-brand-primary" aria-hidden="true" />
@@ -291,7 +294,7 @@ export function BoardDetailBackLink({
   return (
     <Link
       to={to ?? `/board/${category}`}
-      className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-md px-2.5 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+      className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-md px-2.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
     >
       <ArrowLeft className="size-4" aria-hidden="true" />
       {lang === "ko" ? "목록으로" : "Back to list"}

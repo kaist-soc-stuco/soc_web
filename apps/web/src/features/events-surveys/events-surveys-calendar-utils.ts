@@ -88,7 +88,7 @@ export function getCalendarEventStyles(
       bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
       hoverBg: "bg-brand-primary/25",
       bullet: "bg-brand-primary",
-      label: lang === "ko" ? "학생회 일정" : "Student council",
+      label: lang === "ko" ? "학생회 일정" : "Council Schedule",
     };
   }
 
@@ -98,7 +98,7 @@ export function getCalendarEventStyles(
         bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
         hoverBg: "bg-sky-200",
         bullet: "bg-sky-500",
-        label: lang === "ko" ? "투표" : "Vote",
+        label: lang === "ko" ? "투표" : "Poll",
       };
     case "EVENT":
       return {
@@ -136,8 +136,8 @@ export function getCompactKindLabel(
   if (sourceType === "MANUAL") {
     return lang === "ko" ? "일정" : "Calendar";
   }
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Vote";
-  if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Apply";
+  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
+  if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Application";
   if (kind === "EVENT") return lang === "ko" ? "행사" : "Event";
   return lang === "ko" ? "설문" : "Survey";
 }

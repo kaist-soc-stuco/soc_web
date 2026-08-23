@@ -154,9 +154,10 @@ function BoardManagementPageContent() {
     const board = boards.find((item) => item.code === editingCode);
     if (!board) return;
     const approved = await requestConfirm({
-      title: `${board.nameKo} 게시판을 영구 삭제할까요?`,
-      description: "게시판의 게시글과 초안이 함께 삭제되며 복구할 수 없습니다.",
-      confirmLabel: "게시판 삭제",
+      title: "게시판 삭제",
+      description: <>정말 <strong className="font-semibold text-slate-900">“{board.nameKo}”</strong> 게시판을 영구 삭제할까요?</>,
+      warning: "(게시판의 게시글과 초안도 함께 삭제되며 영구히 복구할 수 없습니다.)",
+      confirmLabel: "삭제하기",
       tone: "danger",
     });
     if (!approved) return;
@@ -228,11 +229,11 @@ function BoardManagementPageContent() {
           onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
         >
-          <AdminDataTable minWidth={780}>
+          <AdminDataTable minWidth={780} className={loading && boards.length > 0 ? "opacity-60 transition-opacity" : undefined}>
             <colgroup><col style={{ width: 52 }} /><col style={{ width: 360 }} /><col style={{ width: 280 }} /><col style={{ width: 100 }} /></colgroup>
             <AdminTableHeader><tr><AdminTableHead><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>게시판</AdminTableHead><AdminTableHead>운영 설정</AdminTableHead><AdminTableHead>상태</AdminTableHead></tr></AdminTableHeader>
             <AdminTableBody>
-              {loading ? <tr><AdminTableCell colSpan={4} className="py-16 text-center">불러오는 중...</AdminTableCell></tr>
+              {loading && boards.length === 0 ? <tr><AdminTableCell colSpan={4} className="py-16 text-center">불러오는 중...</AdminTableCell></tr>
                 : boards.length === 0 ? <AdminTableEmpty colSpan={4}>등록된 게시판이 없습니다.</AdminTableEmpty>
                 : <SortableContext items={boards.map((board) => board.code)} strategy={verticalListSortingStrategy}>
                   {boards.map((board) => <SortableBoardRow key={board.boardId} board={board} disabled={saving} onOpen={startEdit} />)}
@@ -241,7 +242,7 @@ function BoardManagementPageContent() {
           </AdminDataTable>
           {typeof document !== "undefined"
             ? createPortal(
-                <DragOverlay dropAnimation={null}>
+                <DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>
                   {activeBoard ? <BoardDragPreview board={activeBoard} width={activeDragWidth} /> : null}
                 </DragOverlay>,
                 document.body,
@@ -292,7 +293,7 @@ function BoardManagementPageContent() {
 
 function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; disabled: boolean; onOpen: (board: BoardSummary) => void }) {
   const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: board.code, disabled });
-  const style = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 160ms ease" };
+  const style = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease", willChange: isDragging ? "transform" : undefined };
 
   return <tr ref={setNodeRef} style={style} className={cn("transition-colors hover:bg-slate-50/60", isDragging && "relative z-0 opacity-0")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
     <AdminTableCell className="text-center"><Button ref={setActivatorNodeRef} type="button" variant="ghost" size="sm" aria-label={`${board.nameKo} 순서 이동`} title="드래그하여 순서 변경" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="size-8 touch-none cursor-grab p-0 text-slate-400 hover:text-slate-700 active:cursor-grabbing"><GripVertical aria-hidden="true" className="size-4" /></Button></AdminTableCell>
@@ -303,7 +304,7 @@ function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; di
 }
 
 function BoardDragPreview({ board, width }: { board: BoardSummary; width: number | null }) {
-  return <div style={{ width: width ?? "min(780px, calc(100vw - 2rem))" }} className="grid grid-cols-[52px_minmax(0,1.5fr)_minmax(180px,1.2fr)_100px] items-center rounded-lg border border-brand-primary/35 bg-white px-0 shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
+  return <div style={{ width: width ?? "min(780px, calc(100vw - 2rem))" }} className="relative z-50 grid cursor-grabbing grid-cols-[52px_minmax(0,1.5fr)_minmax(180px,1.2fr)_100px] items-center rounded-lg border border-brand-primary/35 bg-white px-0 shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
     <div className="flex h-16 items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
     <div className="min-w-0 px-4"><p className="truncate text-sm font-semibold text-slate-900">{board.nameKo}</p><p className="truncate text-xs text-slate-500">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</p></div>
     <div className="truncate px-4 text-sm text-slate-700">{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</div>

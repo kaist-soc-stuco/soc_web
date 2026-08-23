@@ -3,7 +3,7 @@ import { Link, type LinkProps } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
 
-const menuItemClass = "flex h-9 w-full cursor-pointer items-center justify-start gap-2 rounded-md px-2.5 text-left text-[13px] font-normal transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+const menuItemClass = "flex h-9 w-full cursor-pointer items-center justify-start gap-2 rounded-md px-2.5 text-left text-[length:var(--ui-text-body-sm-size)] font-normal transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 function menuItemToneClass(tone: "default" | "danger") {
   return tone === "danger"

@@ -43,7 +43,7 @@ export function BeforeOpenView({
         <Clock className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-bold text-kaist-black mb-3">
-        {lang === "ko" ? "설문 준비 중" : "Survey Preparing"}
+        {lang === "ko" ? "설문 준비 중" : "Not open yet"}
       </h2>
       <p className="text-sm text-kaist-grey/80 leading-relaxed mb-6">
         {lang === "ko"
@@ -55,7 +55,7 @@ export function BeforeOpenView({
           <Calendar className="w-4 h-4 text-amber-600" />
           {lang === "ko"
             ? `시작 예정: ${formatSurveyDateTime(opensAt)}`
-            : `Scheduled to open: ${formatSurveyDateTime(opensAt)}`}
+            : `Opens ${formatSurveyDateTime(opensAt)}`}
         </div>
       )}
     </div>
@@ -111,7 +111,7 @@ export function LoginRequiredView({
         {feePayersOnly
           ? lang === "ko"
             ? "이 설문은 과비 납부 회원만 응답할 수 있습니다. 로그인하여 납부 여부를 확인해 주세요."
-            : "This survey is restricted to Paid Members Only. Please log in to verify your status."
+            : "This survey is restricted to fee-paying members. Please log in to verify your status."
           : lang === "ko"
             ? "이 설문조사에 참여하기 위해서는 로그인이 필요합니다."
             : "To participate in this survey, please log in to your account first."}
@@ -165,7 +165,7 @@ export function SuccessView({
         <CheckCircle2 className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-bold text-kaist-black mb-3">
-        {lang === "ko" ? "제출이 완료되었습니다" : "Submission Completed"}
+        {lang === "ko" ? "제출이 완료되었습니다" : "Response submitted"}
       </h2>
       <p className="mb-3 text-sm leading-relaxed text-kaist-grey/80">
         {lang === "ko"
@@ -173,11 +173,11 @@ export function SuccessView({
           : "Thank you for sharing your thoughts. Your responses have been submitted successfully."}
       </p>
       <ResponseRecordedNotice lang={lang} submittedAt={submittedAt} />
-      <div className="grid w-full gap-2 sm:grid-cols-2">
+      <div className="flex w-full flex-wrap justify-center gap-2">
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+            className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
@@ -185,10 +185,10 @@ export function SuccessView({
         )}
         <Link
           to="/surveys"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+          className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
-          {lang === "ko" ? "설문 목록으로" : "Survey list"}
+          {lang === "ko" ? "설문 목록으로" : "Back to surveys"}
         </Link>
       </div>
     </div>
@@ -222,7 +222,7 @@ export function AlreadySubmittedView({
         <CheckCircle2 className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-bold text-kaist-black mb-3">
-        {lang === "ko" ? "이미 참여한 설문입니다" : "Already Participated"}
+        {lang === "ko" ? "이미 참여한 설문입니다" : "Already responded"}
       </h2>
       <p className="mb-3 text-sm leading-relaxed text-kaist-grey/80">
         {lang === "ko"
@@ -234,11 +234,11 @@ export function AlreadySubmittedView({
             : "You have already responded to this survey. Results are private."}
       </p>
       <ResponseRecordedNotice lang={lang} submittedAt={submittedAt} />
-      <div className="grid w-full gap-2 sm:grid-cols-2">
+      <div className="flex w-full flex-wrap justify-center gap-2">
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+            className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
@@ -246,10 +246,10 @@ export function AlreadySubmittedView({
         )}
         <Link
           to="/surveys"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+          className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
-          {lang === "ko" ? "설문 목록으로" : "Survey list"}
+          {lang === "ko" ? "설문 목록으로" : "Back to surveys"}
         </Link>
       </div>
     </div>

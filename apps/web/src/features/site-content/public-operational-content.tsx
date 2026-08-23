@@ -47,7 +47,7 @@ export function PublicOperationalContent() {
         const noticeText = resolveContentBlockText(notice, lang);
         return <aside key={notice.contentBlockId} className="flex items-center gap-3 rounded-xl border border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_12px_35px_rgba(15,23,42,0.12)] backdrop-blur" aria-label="상단 공지">
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-normal text-[#172033]">{noticeText.title}</p>{noticeText.body ? <p className="mt-0.5 truncate text-xs font-normal text-[#344054]">{noticeText.body}</p> : null}</div>
-          {notice.linkUrl ? <Button asChild size="sm" variant="ghost"><a href={notice.linkUrl}>{lang === "en" ? "View" : "보기"}<ExternalLink aria-hidden="true" /></a></Button> : null}
+          {notice.linkUrl ? <Button asChild size="sm" variant="ghost"><a href={notice.linkUrl} onClick={() => dismiss(notice.contentBlockId)}>{lang === "en" ? "View" : "보기"}<ExternalLink aria-hidden="true" /></a></Button> : null}
           <IconButton size="sm" aria-label={lang === "en" ? "Dismiss" : "닫기"} onClick={() => dismiss(notice.contentBlockId)}><X aria-hidden="true" /></IconButton>
         </aside>;
       })}</div> : null}

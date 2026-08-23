@@ -9,13 +9,20 @@ type ConfirmTone = "default" | "danger";
 type ConfirmOptions = {
   cancelLabel?: string;
   confirmLabel?: string;
-  description?: string;
+  description?: ReactNode;
+  warning?: ReactNode;
   title: ReactNode;
   tone?: ConfirmTone;
 };
 
-type ConfirmState = Required<Pick<ConfirmOptions, "cancelLabel" | "confirmLabel" | "title" | "tone">> &
-  Pick<ConfirmOptions, "description">;
+type ConfirmState = {
+  cancelLabel: string;
+  confirmLabel: string;
+  description?: ReactNode;
+  title: ReactNode;
+  tone: ConfirmTone;
+  warning?: ReactNode;
+};
 
 export function useConfirmDialog() {
   const { lang } = useLanguage();
@@ -39,6 +46,7 @@ export function useConfirmDialog() {
       description: options.description,
       title: options.title,
       tone: options.tone ?? "default",
+      warning: options.warning,
     });
 
     return new Promise<boolean>((resolve) => {
@@ -89,10 +97,15 @@ export function useConfirmDialog() {
             </>
           }
         >
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1">
             {state.description ? (
               <p className="break-keep text-sm font-medium leading-6 text-slate-600">
                 {state.description}
+              </p>
+            ) : null}
+            {state.warning ? (
+              <p className="break-keep text-sm font-normal leading-6 text-slate-500">
+                {state.warning}
               </p>
             ) : null}
           </div>

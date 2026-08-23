@@ -168,7 +168,7 @@ export function EventsSurveysDayDetails({
                     aria-hidden="true"
                   />
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-[13px] font-semibold leading-[18px] text-slate-800">
+                    <h4 className="text-[length:var(--ui-text-body-sm-size)] font-semibold leading-[1.125rem] text-slate-800">
                       {shortTitle}
                     </h4>
                     {event.description && (

@@ -46,7 +46,7 @@ export function AdminDrawer({
         )}
       >
         <header className="flex min-h-16 items-center justify-between gap-4 px-5">
-          <h2 className="min-w-0 truncate text-[18px] font-semibold leading-6 text-slate-950">{title}</h2>
+          <h2 className="min-w-0 truncate text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
           <IconButton size="sm" aria-label="닫기" onClick={onClose}>
             <X aria-hidden="true" />
           </IconButton>

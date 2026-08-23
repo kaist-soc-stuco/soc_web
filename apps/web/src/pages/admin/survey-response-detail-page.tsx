@@ -152,7 +152,7 @@ export function SurveyResponseDetailPage() {
                         <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-normal text-[#344054]">
                           {idx + 1}
                         </span>
-                        <p className="text-sm font-normal text-[#172033]">
+                        <p className="text-sm font-semibold text-[#172033]">
                           {match ? `[${match.sectionTitle}] ${match.question.titleKo}` : a.questionId}
                         </p>
                       </div>

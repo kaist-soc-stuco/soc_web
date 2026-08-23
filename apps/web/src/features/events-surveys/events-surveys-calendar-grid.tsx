@@ -270,7 +270,7 @@ export function EventsSurveysCalendarGrid({
   return (
     <div className="min-w-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-visible">
       <div className="min-w-[560px] lg:min-w-0">
-        <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[11px] font-semibold text-slate-400">
+        <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">
           {weekHeaders.map((header, index) => (
             <div
               className={`py-2 ${index === 0 ? "text-rose-300" : ""} ${
@@ -401,7 +401,7 @@ export function EventsSurveysCalendarGrid({
                       >
                         <span
                           aria-label={`${titleText}, ${formatCalendarEventRange(event, lang)}`}
-                          className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[10px] font-semibold leading-4 transition-[background-color,box-shadow] focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
+                          className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold leading-4 transition-[background-color,box-shadow] focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
                             isStart ? "rounded-l-md" : "rounded-l-none"
                           } ${isEnd ? "rounded-r-md" : "rounded-r-none"} ${
                             eventStyle.bg
@@ -442,7 +442,7 @@ export function EventsSurveysCalendarGrid({
                   })}
 
                   {hiddenEventCount > 0 && cell.isCurrentMonth ? (
-                    <span className="self-end pr-1 text-[10px] font-semibold leading-4 text-slate-400">
+                    <span className="self-end pr-1 text-[length:var(--ui-text-micro-size)] font-semibold leading-4 text-slate-400">
                       +{hiddenEventCount}
                     </span>
                   ) : (
@@ -462,7 +462,7 @@ export function EventsSurveysCalendarGrid({
               role="tooltip"
               style={getTooltipPosition(tooltip)}
             >
-              <span className="flex max-w-[18rem] items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-slate-800">
+              <span className="flex max-w-[18rem] items-center gap-1.5 whitespace-nowrap text-[length:var(--ui-text-caption-size)] font-semibold text-slate-800">
                 <span
                   className={`h-1.5 w-1.5 shrink-0 rounded-full ${getCalendarEventStyles(
                     tooltip.event.kind,
@@ -476,7 +476,7 @@ export function EventsSurveysCalendarGrid({
                   {stripCalendarPrefix(tooltip.event.title)}
                 </span>
               </span>
-              <span className="mt-1 whitespace-nowrap text-[10px] font-medium text-slate-400">
+              <span className="mt-1 whitespace-nowrap text-[length:var(--ui-text-micro-size)] font-medium text-slate-400">
                 {formatCalendarEventRange(tooltip.event, lang)}
               </span>
             </div>,

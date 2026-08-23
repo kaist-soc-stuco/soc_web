@@ -1,5 +1,5 @@
 import { ArrowDown, MoreHorizontal } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, CSSProperties, ReactNode } from "react";
 
 import { AdminTableViewport } from "@/components/ui/admin-page";
 import { IconButton } from "@/components/ui/icon-button";
@@ -8,14 +8,16 @@ import { cn } from "@/lib/utils";
 export function AdminDataTable({
   children,
   className,
-  minWidth = 760,
+  minWidth = "47.5rem",
   ...props
-}: ComponentProps<"table"> & { minWidth?: number }) {
+}: ComponentProps<"table"> & { minWidth?: CSSProperties["minWidth"] }) {
+  const resolvedMinWidth = typeof minWidth === "number" ? `${minWidth / 16}rem` : minWidth;
+
   return (
     <AdminTableViewport className="w-full">
       <table
         className={cn("admin-data-table w-full table-fixed text-left", className)}
-        style={{ minWidth }}
+        style={{ minWidth: resolvedMinWidth }}
         {...props}
       >
         {children}
@@ -33,7 +35,7 @@ export function AdminTableBody({ className, ...props }: ComponentProps<"tbody">)
 }
 
 export function AdminTableHead({ className, ...props }: ComponentProps<"th">) {
-  return <th className={cn("h-12 px-4 text-[14px] font-medium tracking-tight text-[var(--j-color-text-secondary)]", className)} {...props} />;
+  return <th className={cn("h-[var(--ui-table-head-height)] align-middle px-4 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-[var(--j-color-text-secondary)]", className)} {...props} />;
 }
 
 export function AdminTableCell({
@@ -72,7 +74,7 @@ export function AdminSortableHead({
         type="button"
         onClick={onClick}
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-md px-0 text-[14px] font-medium text-[var(--j-color-text-secondary)] transition-colors hover:bg-slate-100",
+          "inline-flex h-8 items-center gap-1 rounded-md px-0 text-[length:var(--ui-text-body-size)] font-medium text-[var(--j-color-text-secondary)] transition-colors hover:bg-slate-100",
         )}
       >
         {children}
@@ -110,7 +112,7 @@ export function AdminTableEmpty({
 }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-16 text-center text-[14px] font-normal text-[var(--j-color-text-secondary)]">
+      <td colSpan={colSpan} className="px-4 py-16 text-center text-[length:var(--ui-text-body-size)] font-normal text-[var(--j-color-text-secondary)]">
         {children}
       </td>
     </tr>

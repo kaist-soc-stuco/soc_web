@@ -21,11 +21,11 @@ import { PageTabButton, PageTabs, PageToolbar } from "@/components/ui/page-layou
 import { PledgesSection } from "./pledges-section";
 
 const TABS = [
-  { id: "intro", labelKo: "학생회 소개", labelEn: "Student Council", icon: Info },
+  { id: "intro", labelKo: "학생회 소개", labelEn: "About", icon: Info },
   { id: "history", labelKo: "당해 학생회 소개", labelEn: "Current Council", icon: Calendar },
-  { id: "org", labelKo: "조직도", labelEn: "Org Chart", icon: Network },
+  { id: "org", labelKo: "조직도", labelEn: "Organization Chart", icon: Network },
   { id: "pledges", labelKo: "공약 이행 현황", labelEn: "Pledge Progress", icon: Target },
-  { id: "members", labelKo: "Contact me", labelEn: "Contact me", icon: User },
+  { id: "members", labelKo: "구성원", labelEn: "Members", icon: User },
 ];
 
 export function AboutTabs({
@@ -108,7 +108,7 @@ function IntroSection({ lang }: { lang: string }) {
               : "We listen to students' needs and feedback rapidly, serving as a reliable communication channel."
           }
           icon={<Target className="h-5 w-5" />}
-          title={lang === "ko" ? "신속한 소통" : "Fast Communication"}
+          title={lang === "ko" ? "신속한 소통" : "Responsive Communication"}
         />
         <ValueCard
           description={
@@ -126,7 +126,7 @@ function IntroSection({ lang }: { lang: string }) {
               : "We build a strong community through social events such as BBQ gatherings, late-night snack events, and SOC Night."
           }
           icon={<User className="h-5 w-5" />}
-          title={lang === "ko" ? "즐거운 문화 행사" : "Enriching Culture Events"}
+          title={lang === "ko" ? "즐거운 문화 행사" : "Community Events"}
         />
       </div>
 
@@ -160,7 +160,7 @@ function IntroSection({ lang }: { lang: string }) {
       <div className="flex flex-col gap-4 border-t border-gray-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-bold text-kaist-black">
-            {lang === "ko" ? "자주 묻는 질문" : "Frequently asked questions"}
+            FAQ
           </h3>
           <p className="mt-1 text-sm leading-6 text-gray-600">
             {lang === "ko"
@@ -204,7 +204,7 @@ function HistorySection({ lang }: { lang: string }) {
   return (
     <div className="animate-in space-y-8 fade-in duration-300">
       <h2 className="mb-8 text-2xl font-bold text-kaist-black">
-        {lang === "ko" ? "당해 학생회 소개" : "Current Student Council"}
+        {lang === "ko" ? "당해 학생회 소개" : "Current Council"}
       </h2>
       <p className="max-w-2xl text-sm font-medium leading-6 text-gray-600">
         {lang === "ko"

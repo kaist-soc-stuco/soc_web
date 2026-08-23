@@ -245,7 +245,7 @@ export function SelectDropdown({
               id={menuId}
               role="listbox"
               style={menuStyle}
-              className={`ui-select-dropdown-menu fixed z-[100] max-h-60 overflow-x-hidden overflow-y-auto rounded-[9px] border border-slate-200 bg-white p-[5px] shadow-[0_2px_8px_rgb(15_23_42_/_0.08)] ${menuClassName || ""}`}
+              className={`ui-select-dropdown-menu fixed z-[100] max-h-60 overflow-x-hidden overflow-y-auto rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white p-1 shadow-[0_2px_8px_rgb(15_23_42_/_0.08)] ${menuClassName || ""}`}
             >
               {options.length === 0 ? (
                 <div className="px-2.5 py-2 text-sm font-normal text-kaist-grey/50">
@@ -265,7 +265,7 @@ export function SelectDropdown({
                       onChange(option.value);
                       setOpen(false);
                     }}
-                    className={`interaction-menu-item h-[34px] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-sm ${
+                    className={`interaction-menu-item h-[var(--ui-menu-row-height)] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-[length:var(--ui-text-body-size)] ${
                       option.value === value
                         ? "bg-brand-primary-light text-brand-primary font-medium"
                         : "text-kaist-black font-normal"

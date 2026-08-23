@@ -91,7 +91,7 @@ function formatRelativeTime(dateIso: string | null) {
 function renderTypeLabel(survey: SurveyRecord) {
   const label = survey.kind === "VOTE" ? "투표" : survey.kind === "APPLICATION" ? "신청" : "설문";
 
-  return <span className="text-[14px] font-normal text-[#344054]">{label}</span>;
+  return <span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{label}</span>;
 }
 
 export function SurveyListPage() {
@@ -121,6 +121,7 @@ export function SurveyListPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const showInitialLoading = loading && surveys.length === 0;
 
   const fetchSurveys = async () => {
     try {
@@ -157,8 +158,9 @@ export function SurveyListPage() {
     const confirmed = await requestConfirm({
       confirmLabel: "삭제하기",
       title: "설문조사 삭제",
-      description: `정말 "${survey.titleKo}" 설문을 삭제하시겠습니까? 삭제된 응답 데이터는 복구할 수 없습니다.`,
+      description: <>정말 <strong className="font-semibold text-slate-900">“{survey.titleKo}”</strong> 설문을 삭제하시겠습니까?</>,
       tone: "danger",
+      warning: "(삭제된 응답 데이터는 영구히 복구할 수 없습니다.)",
     });
     if (!confirmed) return;
 
@@ -291,7 +293,7 @@ export function SurveyListPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         {ConfirmDialog}
-        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+        <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           
           <AdminPageHeader
             title="설문조사 관리"
@@ -356,7 +358,7 @@ export function SurveyListPage() {
           </div>
 
           <div className="flex min-w-0 flex-col overflow-visible">
-            {loading ? <TableSkeleton columns={7} rows={8} /> : null}
+            {showInitialLoading ? <TableSkeleton columns={7} rows={8} /> : null}
 
             {error ? (
               <div className="m-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">
@@ -364,11 +366,11 @@ export function SurveyListPage() {
               </div>
             ) : null}
 
-            {!loading && !error && filteredSurveys.length === 0 ? (
+            {!showInitialLoading && !error && filteredSurveys.length === 0 ? (
               <AdminEmptyState message="검색 및 필터 조건에 맞는 설문조사가 없습니다." />
             ) : null}
 
-            {!loading && filteredSurveys.length > 0 ? (
+            {!showInitialLoading && filteredSurveys.length > 0 ? (
               <AdminDataTable minWidth={1152}>
                 <colgroup>
                   <col style={{ width: 360 }} />

@@ -95,6 +95,7 @@ export function SurveyResponseListPage() {
 
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
+  const showInitialLoading = loading && !survey;
 
   const fetchSurveyAndResponses = async () => {
     if (!surveyId) return;
@@ -254,15 +255,15 @@ export function SurveyResponseListPage() {
             ]}
           />
 
-          {loading ? <TableSkeleton columns={4} rows={5} /> : null}
-          {!loading && error ? <div className="rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-normal text-red-700">{error}</div> : null}
-          {!loading && !error && activeView === "summary" && analytics ? <SurveyResponseSummary analytics={analytics} responses={responses} /> : null}
-          {!loading && !error && activeView === "questions" && analytics && survey ? (
+          {showInitialLoading ? <TableSkeleton columns={4} rows={5} /> : null}
+          {!showInitialLoading && error ? <div className="rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-normal text-red-700">{error}</div> : null}
+          {!showInitialLoading && !error && activeView === "summary" && analytics ? <SurveyResponseSummary analytics={analytics} responses={responses} /> : null}
+          {!showInitialLoading && !error && activeView === "questions" && analytics && survey ? (
             <SurveyQuestionSummary analytics={analytics} questions={survey.sections.flatMap((section) => section.questions)} responses={responses} />
           ) : null}
 
           {/* Search and sort filters remain visible in the toolbar. */}
-          {!loading && !error && activeView === "individual" ? <AdminTableCard className="overflow-visible">
+          {!showInitialLoading && !error && activeView === "individual" ? <AdminTableCard className="overflow-visible">
             <div className="border-b border-slate-100 p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
               <SegmentedControl

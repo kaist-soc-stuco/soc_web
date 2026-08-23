@@ -30,7 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createPortal } from "react-dom";
-import { Download, Edit2, GripVertical, Mail, Phone, Plus, Trash2, Upload, User } from "lucide-react";
+import { Download, GripVertical, Mail, Phone, Plus, Upload } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -39,7 +39,6 @@ import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTa
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput } from "@/components/ui/form-control";
-import { IconButton } from "@/components/ui/icon-button";
 import { Modal } from "@/components/ui/modal";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { TableSkeleton } from "@/components/ui/skeleton";
@@ -252,19 +251,28 @@ function ContactsPageContent() {
   };
 
   const handleDelete = async (id: string) => {
-    const confirmed = await requestConfirm({ confirmLabel: "삭제", description: "About 페이지의 구성원 연락처에서 즉시 제거됩니다.", title: "이 연락처를 삭제하시겠습니까?", tone: "danger" });
-    if (!confirmed) return;
+    const contact = contacts.find((item) => item.id === id);
+    const confirmed = await requestConfirm({
+      confirmLabel: "삭제하기",
+      description: <>정말 <strong className="font-semibold text-slate-900">“{contact?.nameKo ?? "이 연락처"}”</strong> 연락처를 삭제하시겠습니까?</>,
+      title: "연락처 삭제",
+      tone: "danger",
+      warning: "(About 페이지의 구성원 연락처에서 즉시 제거되며 복구할 수 없습니다.)",
+    });
+    if (!confirmed) return false;
     try {
       await apiClient.deleteContact(id);
       await loadContacts();
+      return true;
     } catch {
       setError("삭제에 실패했습니다.");
+      return false;
     }
   };
 
   return (
     <AdminPageShell>
-      <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+      <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
         {ConfirmDialog}
         <AdminPageHeader
           title="집행위 연락망"
@@ -277,7 +285,7 @@ function ContactsPageContent() {
         <UiInput ref={bulkFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleBulkFileChange(event)} />
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
 
-        <ExecutiveMemberModal open={memberModalOpen} contact={editingContact} onClose={closeMemberModal} onSave={handleMemberSave} saving={memberSaving} />
+        <ExecutiveMemberModal open={memberModalOpen} contact={editingContact} onClose={closeMemberModal} onDelete={editingContact ? async () => { if (await handleDelete(editingContact.id)) closeMemberModal(); } : undefined} onSave={handleMemberSave} saving={memberSaving} />
         <Modal
           open={bulkFileName !== null}
           onClose={() => clearBulkImport()}
@@ -304,7 +312,7 @@ function ContactsPageContent() {
             <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·직책·메일·전화번호 검색" value={query} />
           </div></div>
           <div className="min-w-0 overflow-x-auto">
-            {loading ? <TableSkeleton columns={5} rows={6} /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminDataTable minWidth={1060} className="text-left"><colgroup><col style={{ width: 92 }} /><col style={{ width: 300 }} /><col style={{ width: 240 }} /><col style={{ width: 320 }} /><col style={{ width: 108 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center">순서</AdminTableHead><AdminTableHead>이름 (한글/영문)</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>연락처 정보</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader><AdminTableBody><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}>{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} position={contacts.findIndex((item) => item.id === contact.id)} disabled={orderSaving} onEdit={openEditMemberModal} onDelete={handleDelete} />)}</SortableContext></AdminTableBody></AdminDataTable>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={null}>{activeContact ? <ContactDragPreview contact={activeContact} position={contacts.findIndex((item) => item.id === activeContact.id)} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
+            {loading && contacts.length === 0 ? <TableSkeleton columns={5} rows={6} /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminDataTable minWidth={980} className={loading ? "text-left opacity-60 transition-opacity" : "text-left"}><colgroup><col style={{ width: 52 }} /><col style={{ width: 300 }} /><col style={{ width: 100 }} /><col style={{ width: 240 }} /><col style={{ width: 320 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center"><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>이름 (한글/영문)</AdminTableHead><AdminTableHead>기수</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>연락처 정보</AdminTableHead></tr></AdminTableHeader><AdminTableBody><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}>{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} disabled={orderSaving} onEdit={openEditMemberModal} />)}</SortableContext></AdminTableBody></AdminDataTable>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
           </div>
           {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
         </AdminTableCard>
@@ -313,26 +321,26 @@ function ContactsPageContent() {
   );
 }
 
-function SortableContactRow({ contact, disabled, onDelete, onEdit, position }: { contact: ContactRecord; disabled: boolean; onDelete: (id: string) => Promise<void>; onEdit: (contact: ContactRecord) => void; position: number }) {
+function SortableContactRow({ contact, disabled, onEdit }: { contact: ContactRecord; disabled: boolean; onEdit: (contact: ContactRecord) => void }) {
   const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
-  const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 160ms ease", willChange: isDragging ? "transform" : undefined };
-  return <tr ref={setNodeRef} style={style} className={isDragging ? "relative z-10 opacity-0" : "transition-colors hover:bg-slate-50/60"}>
-    <AdminTableCell className="px-4 py-4"><div className="flex items-center justify-center gap-2"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} className="inline-flex size-8 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button><span className="text-xs tabular-nums text-slate-400">{position + 1}</span></div></AdminTableCell>
-    <AdminTableCell className="px-6 py-4"><div className="flex items-center gap-2.5"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-kaist-lightgreen/10 text-kaist-darkgreen"><User className="size-4" aria-hidden="true" /></div><div className="min-w-0"><div className="admin-table-text-emphasis max-w-[220px] truncate" title={contact.nameKo}>{contact.nameKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.nameEn}>{contact.nameEn}</div>{contact.cohort ? <div className="admin-table-text mt-1">{contact.cohort}기</div> : null}</div></div></AdminTableCell>
-    <AdminTableCell className="px-6 py-4"><div className="max-w-[220px] truncate" title={contact.roleKo}>{contact.roleKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.roleEn}>{contact.roleEn}</div></AdminTableCell>
-    <AdminTableCell className="min-w-0 space-y-1 px-6 py-4"><div className="admin-table-text flex items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[220px] truncate" title={contact.email ?? undefined}>{contact.email || "—"}</span></div><div className="admin-table-text flex items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[180px] truncate" title={contact.phoneNumber ?? undefined}>{contact.phoneNumber || "—"}</span></div></AdminTableCell>
-    <AdminTableCell className="px-6 py-4"><div className="flex items-center justify-center gap-1"><IconButton size="sm" tone="table-action" onClick={() => onEdit(contact)} aria-label={`${contact.nameKo} 수정`} title="수정"><Edit2 className="size-4" strokeWidth={1.5} aria-hidden="true" /></IconButton><IconButton size="sm" tone="table-action" onClick={() => void onDelete(contact.id)} aria-label={`${contact.nameKo} 삭제`} title="삭제"><Trash2 className="size-4" strokeWidth={1.5} aria-hidden="true" /></IconButton></div></AdminTableCell>
+  const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease", willChange: isDragging ? "transform" : undefined };
+  return <tr ref={setNodeRef} style={style} className={isDragging ? "relative z-10 opacity-0" : "cursor-pointer transition-colors hover:bg-slate-50/60"} onClick={() => onEdit(contact)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEdit(contact); } }} tabIndex={0}>
+    <AdminTableCell className="px-2 py-2.5 text-center"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="inline-flex size-8 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
+    <AdminTableCell className="px-5 py-2.5"><div className="min-w-0"><div className="admin-table-text-emphasis max-w-[240px] truncate" title={contact.nameKo}>{contact.nameKo}</div><div className="admin-table-text mt-0.5 max-w-[240px] truncate" title={contact.nameEn}>{contact.nameEn}</div></div></AdminTableCell>
+    <AdminTableCell className="px-5 py-2.5 tabular-nums text-slate-700">{contact.cohort ? `${contact.cohort}기` : "—"}</AdminTableCell>
+    <AdminTableCell className="px-5 py-2.5"><div className="max-w-[220px] truncate" title={contact.roleKo}>{contact.roleKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.roleEn}>{contact.roleEn}</div></AdminTableCell>
+    <AdminTableCell className="min-w-0 space-y-1 px-5 py-2.5"><div className="admin-table-text flex items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[220px] truncate" title={contact.email ?? undefined}>{contact.email || "—"}</span></div><div className="admin-table-text flex items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[180px] truncate" title={contact.phoneNumber ?? undefined}>{contact.phoneNumber || "—"}</span></div></AdminTableCell>
   </tr>;
 }
 
-function ContactDragPreview({ contact, position, width }: { contact: ContactRecord; position: number; width: number | null }) {
+function ContactDragPreview({ contact, width }: { contact: ContactRecord; width: number | null }) {
   return (
-    <div style={{ width: width ?? "min(1060px, calc(100vw - 2rem))", gridTemplateColumns: "92px 300px 240px minmax(0, 320px) 108px" }} className="grid items-center rounded-lg border border-brand-primary/30 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
-      <div className="flex h-20 items-center justify-center gap-2"><GripVertical aria-hidden="true" className="size-4 text-brand-primary" /><span className="text-xs tabular-nums text-slate-400">{position + 1}</span></div>
-      <div className="min-w-0 px-6"><p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p><p className="truncate text-xs text-slate-500">{contact.nameEn}{contact.cohort ? ` · ${contact.cohort}기` : ""}</p></div>
-      <div className="min-w-0 px-6"><p className="truncate text-sm text-slate-700">{contact.roleKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{contact.roleEn}</p></div>
-      <div className="min-w-0 space-y-1 px-6 text-xs text-slate-500"><p className="truncate">{contact.email || "—"}</p><p className="truncate">{contact.phoneNumber || "—"}</p></div>
-      <div className="px-6 text-center text-xs text-slate-400">—</div>
+    <div style={{ width: width ?? "min(980px, calc(100vw - 2rem))", gridTemplateColumns: "52px 300px 100px 240px minmax(0, 320px)" }} className="grid items-center rounded-lg border border-brand-primary/35 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
+      <div className="flex h-16 items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
+      <div className="min-w-0 px-5"><p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p><p className="truncate text-xs text-slate-500">{contact.nameEn}</p></div>
+      <div className="px-5 text-sm tabular-nums text-slate-700">{contact.cohort ? `${contact.cohort}기` : "—"}</div>
+      <div className="min-w-0 px-5"><p className="truncate text-sm text-slate-700">{contact.roleKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{contact.roleEn}</p></div>
+      <div className="min-w-0 space-y-1 px-5 text-xs text-slate-500"><p className="truncate">{contact.email || "—"}</p><p className="truncate">{contact.phoneNumber || "—"}</p></div>
     </div>
   );
 }

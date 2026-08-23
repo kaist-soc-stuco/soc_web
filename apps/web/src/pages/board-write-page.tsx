@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { Header } from "@/components/organisms/header";
 import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
@@ -28,7 +27,6 @@ import {
 } from "@/features/board-write/event-date-utils";
 
 export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } = {}) {
-  const navigate = useNavigate();
   const {
     ConfirmDialog,
     assets,
@@ -131,6 +129,108 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setAssets(template.assets.map((asset) => ({ ...asset })));
   };
 
+  const isEvent = selectedCategory === "_EVENT";
+  const eventFields = isEvent ? (
+    <BoardWriteEventFields
+      eventDescriptionKo={eventDescriptionKo}
+      eventDescriptionEn={eventDescriptionEn}
+      eventEndDate={eventEndDate}
+      eventStartDate={eventStartDate}
+      isAllDay={isAllDay}
+      isEventAlwaysOpen={isEventAlwaysOpen}
+      isKoreanOnly={isKoreanOnly}
+      lang={lang}
+      onEventAlwaysOpenChange={(checked) => {
+        setIsEventAlwaysOpen(checked);
+        if (checked) {
+          setEventStartDate("");
+          setEventEndDate("");
+        }
+      }}
+      onEventDescriptionKoChange={setEventDescriptionKo}
+      onEventDescriptionEnChange={setEventDescriptionEn}
+      onEventEndDateChange={setEventEndDate}
+      onEventStartDateChange={setEventStartDate}
+      onThumbnailRemove={() =>
+        setAssets((current) =>
+          current.filter((item) => item.usageType !== "THUMBNAIL"),
+        )
+      }
+      onThumbnailSelect={handleUploadThumbnail}
+      thumbnail={assets.find((asset) => asset.usageType === "THUMBNAIL")}
+      uploading={uploading}
+      onAllDayChange={(checked) => {
+        setIsAllDay(checked);
+        setEventStartDate(switchEventDateInputMode(eventStartDate, checked));
+        setEventEndDate(switchEventEndDateInputMode(eventEndDate, checked));
+      }}
+    />
+  ) : null;
+  const postSettings = (
+    <BoardWriteSettings
+      allowComment={allowComment}
+      canConfigurePostSettings={canConfigurePostSettings}
+      lang={lang}
+      onAllowCommentChange={setAllowComment}
+      onSelectedSurveyIdChange={setSelectedSurveyId}
+      selectedSurveyId={selectedSurveyId}
+      surveys={surveys}
+      isAnonymous={isAnonymous}
+      isPinned={isPinned}
+      isSecret={isSecret}
+      allowSecret={selectedBoard?.allowSecret ?? false}
+      onAnonymousChange={setIsAnonymous}
+      onPinnedChange={setIsPinned}
+      onSecretChange={setIsSecret}
+      stacked={isEvent}
+    />
+  );
+  const editorCard = (includeSettings: boolean) => (
+    <DataViewCard>
+      <BoardWriteHeaderControls
+        boardByCode={boardByCode}
+        isKoreanOnly={isKoreanOnly}
+        lang={lang}
+        onCategoryChange={handleCategoryChange}
+        onKoreanOnlyChange={(checked) => {
+          setIsKoreanOnly(checked);
+        }}
+        selectedCategory={selectedCategory}
+        writableBoardCodes={writableBoardCodes}
+      />
+
+      <div className="min-h-[450px]">
+        <BoardWriteEditorFields
+          contentEn={contentEn}
+          contentKo={contentKo}
+          isKoreanOnly={isKoreanOnly}
+          lang={lang}
+          onContentEnChange={setContentEn}
+          onContentKoChange={setContentKo}
+          onTitleEnChange={setTitleEn}
+          onTitleKoChange={setTitleKo}
+          titleEn={titleEn}
+          titleKo={titleKo}
+          fileInputRef={fileInputRef}
+          uploading={uploading}
+        />
+      </div>
+
+      <div className="space-y-6 px-6 pb-6 pt-6 md:px-8">
+        <BoardWriteAttachmentList
+          assets={assets}
+          lang={lang}
+          onRemoveAsset={(assetId) =>
+            setAssets((prev) => prev.filter((item) => item.assetId !== assetId))
+          }
+          uploading={uploading}
+        />
+      </div>
+
+      {includeSettings ? postSettings : null}
+    </DataViewCard>
+  );
+
   return (
     <PageShell className="text-slate-950">
       {ConfirmDialog}
@@ -168,7 +268,6 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
               lang={lang}
               isSubmitting={isSubmitting}
               canWriteSelected={canWriteSelected}
-              onCancel={() => navigate(-1)}
               onSubmit={handleSubmit}
             />
           </div>
@@ -194,110 +293,17 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
             />
           ) : null}
 
-          {/* Unified Editor Card Container */}
-          <DataViewCard>
-            <BoardWriteHeaderControls
-              boardByCode={boardByCode}
-              isKoreanOnly={isKoreanOnly}
-              lang={lang}
-              onCategoryChange={handleCategoryChange}
-              onKoreanOnlyChange={(checked) => {
-                setIsKoreanOnly(checked);
-              }}
-              selectedCategory={selectedCategory}
-              writableBoardCodes={writableBoardCodes}
-            />
-
-            <div className="min-h-[450px] space-y-6">
-              <BoardWriteEditorFields
-                contentEn={contentEn}
-                contentKo={contentKo}
-                isKoreanOnly={isKoreanOnly}
-                lang={lang}
-                onContentEnChange={setContentEn}
-                onContentKoChange={setContentKo}
-                onTitleEnChange={setTitleEn}
-                onTitleKoChange={setTitleKo}
-                titleEn={titleEn}
-                titleKo={titleKo}
-                fileInputRef={fileInputRef}
-                uploading={uploading}
-              />
-
-              <div className="space-y-6 px-6 pb-6 md:px-8">
-                {selectedCategory === "_EVENT" && (
-                  <BoardWriteEventFields
-                    eventDescriptionKo={eventDescriptionKo}
-                    eventDescriptionEn={eventDescriptionEn}
-                    eventEndDate={eventEndDate}
-                    eventStartDate={eventStartDate}
-                    isAllDay={isAllDay}
-                    isEventAlwaysOpen={isEventAlwaysOpen}
-                    isKoreanOnly={isKoreanOnly}
-                    lang={lang}
-                    onEventAlwaysOpenChange={(checked) => {
-                      setIsEventAlwaysOpen(checked);
-                      if (checked) {
-                        setEventStartDate("");
-                        setEventEndDate("");
-                      }
-                    }}
-                    onEventDescriptionKoChange={setEventDescriptionKo}
-                    onEventDescriptionEnChange={setEventDescriptionEn}
-                    onEventEndDateChange={setEventEndDate}
-                    onEventStartDateChange={setEventStartDate}
-                    onThumbnailRemove={() =>
-                      setAssets((current) =>
-                        current.filter((item) => item.usageType !== "THUMBNAIL"),
-                      )
-                    }
-                    onThumbnailSelect={handleUploadThumbnail}
-                    thumbnail={assets.find(
-                      (asset) => asset.usageType === "THUMBNAIL",
-                    )}
-                    uploading={uploading}
-                    onAllDayChange={(checked) => {
-                      setIsAllDay(checked);
-                      setEventStartDate(
-                        switchEventDateInputMode(eventStartDate, checked),
-                      );
-                      setEventEndDate(
-                        switchEventEndDateInputMode(eventEndDate, checked),
-                      );
-                    }}
-                  />
-                )}
-
-                <BoardWriteAttachmentList
-                  assets={assets}
-                  lang={lang}
-                  onRemoveAsset={(assetId) =>
-                    setAssets((prev) =>
-                      prev.filter((item) => item.assetId !== assetId),
-                    )
-                  }
-                  uploading={uploading}
-                />
-              </div>
+          {isEvent ? (
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+              {editorCard(false)}
+              <DataViewCard className="min-w-0">
+                {eventFields}
+                {postSettings}
+              </DataViewCard>
             </div>
-          </DataViewCard>
-
-          <BoardWriteSettings
-            allowComment={allowComment}
-            canConfigurePostSettings={canConfigurePostSettings}
-            lang={lang}
-            onAllowCommentChange={setAllowComment}
-            onSelectedSurveyIdChange={setSelectedSurveyId}
-            selectedSurveyId={selectedSurveyId}
-            surveys={surveys}
-            isAnonymous={isAnonymous}
-            isPinned={isPinned}
-            isSecret={isSecret}
-            allowSecret={selectedBoard?.allowSecret ?? false}
-            onAnonymousChange={setIsAnonymous}
-            onPinnedChange={setIsPinned}
-            onSecretChange={setIsSecret}
-          />
+          ) : (
+            editorCard(true)
+          )}
 
         </PageContainer>
       </PageMain>

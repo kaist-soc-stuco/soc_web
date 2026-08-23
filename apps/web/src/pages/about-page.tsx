@@ -20,7 +20,7 @@ export function AboutPage() {
       <Header />
       <PageHeader
         containerClassName="!max-w-[var(--ui-about-max-width)]"
-        title={lang === "ko" ? "학생회 소개" : "Student Council"}
+        title={lang === "ko" ? "학생회 소개" : "About"}
       />
       <AboutTabs
         currentTab={currentTab}

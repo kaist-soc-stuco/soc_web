@@ -54,7 +54,7 @@ export function FaqPage() {
       <Header />
       <PageMain>
         <PageHeader
-          title={lang === "ko" ? "자주 묻는 질문" : "Frequently asked questions"}
+          title="FAQ"
           titleId="faq-page-title"
         />
 
@@ -91,15 +91,19 @@ export function FaqPage() {
                     const isOpen = openIndex === index;
                     const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
                     const answer = lang === "ko" ? item.snippetKo : item.snippetEn || item.snippetKo;
+                    const answerId = `faq-answer-${item.articleId}`;
+                    const questionId = `faq-question-${item.articleId}`;
 
                     return (
                       <div key={item.articleId}>
                         <UiButton
                           type="button"
                           variant="ghost"
+                          id={questionId}
                           aria-expanded={isOpen}
+                          aria-controls={answerId}
                           onClick={() => setOpenIndex(isOpen ? null : index)}
-                          className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[15px] font-medium text-slate-800 hover:bg-slate-50 sm:px-6"
+                          className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-semibold text-slate-800 hover:bg-slate-50 sm:px-6"
                         >
                           <span className="min-w-0 truncate">{title}</span>
                           <ChevronDown
@@ -109,11 +113,23 @@ export function FaqPage() {
                             aria-hidden="true"
                           />
                         </UiButton>
-                        {isOpen ? (
-                          <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 text-sm font-normal leading-6 text-slate-600 sm:px-6">
-                            <RichTextContent content={answer ?? ""} />
+                        <div
+                          id={answerId}
+                          role="region"
+                          aria-labelledby={questionId}
+                          aria-hidden={!isOpen}
+                          className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                            isOpen
+                              ? "grid-rows-[1fr] opacity-100"
+                              : "pointer-events-none grid-rows-[0fr] opacity-0"
+                          }`}
+                        >
+                          <div className="min-h-0 overflow-hidden">
+                            <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 pl-10 text-[length:var(--ui-text-body-sm-size)] font-normal leading-6 text-slate-600 sm:px-6 sm:pl-12">
+                              <RichTextContent content={answer ?? ""} />
+                            </div>
                           </div>
-                        ) : null}
+                        </div>
                       </div>
                     );
                   })}

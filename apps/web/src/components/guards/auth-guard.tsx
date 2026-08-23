@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
+import { rememberAuthReturnPath } from "@/lib/auth-storage";
 import { Permissions } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
@@ -43,6 +44,9 @@ export function AuthGuard({
     }
 
     if (!isAuthenticated) {
+      rememberAuthReturnPath(
+        window.location.pathname + window.location.search + window.location.hash,
+      );
       navigate(redirectTo, { replace: true });
       return;
     }

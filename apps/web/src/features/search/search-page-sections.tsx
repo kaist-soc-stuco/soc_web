@@ -20,7 +20,7 @@ function formatDate(value: string, lang: string) {
 }
 
 function getSurveyKindLabel(kind: string, lang: string) {
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Vote";
+  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
   if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Application";
   return lang === "ko" ? "설문" : "Survey";
 }
@@ -106,7 +106,7 @@ export function SearchFilterTabs({
           key={tab.filter}
           active={activeFilter === tab.filter}
           onClick={() => onFilterChange(tab.filter)}
-          className="!h-9 !min-h-9 gap-1.5 px-2.5 text-[13px]"
+          className="!h-9 !min-h-9 gap-1.5 px-2.5 text-[length:var(--ui-text-body-sm-size)]"
         >
           <span>{tab.label}</span>
           <span className="tabular-nums text-slate-400">{tab.count}</span>
@@ -234,7 +234,7 @@ function SectionShell({
 
   return (
     <section>
-      <h2 className="mb-3 flex items-baseline gap-2 text-[15px] font-semibold text-slate-900">
+      <h2 className="mb-3 flex items-baseline gap-2 text-[length:var(--ui-text-section-size)] font-semibold text-slate-900">
         <span>{title}</span>
         <span className="text-xs font-normal tabular-nums text-slate-400">{count}</span>
       </h2>
@@ -385,8 +385,8 @@ function SurveyResults({
         return (
           <SearchLink key={survey.id} to={`/survey/${survey.id}`}>
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-medium text-kaist-darkgreen">{getSurveyKindLabel(survey.kind, lang)}</span>
-              <span className="text-[11px] font-normal text-slate-400">· {getSurveyStateLabel(survey.computedState, lang)}</span>
+              <span className="text-[length:var(--ui-text-caption-size)] font-medium text-kaist-darkgreen">{getSurveyKindLabel(survey.kind, lang)}</span>
+              <span className="text-[length:var(--ui-text-caption-size)] font-normal text-slate-400">· {getSurveyStateLabel(survey.computedState, lang)}</span>
             </div>
             <p className="truncate text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
@@ -441,7 +441,7 @@ function SearchLink({ children, to }: { children: ReactNode; to: string }) {
 
 function Snippet({ value, query }: { value: string; query: string }) {
   return (
-    <p className="mt-1 line-clamp-2 text-[13px] font-normal leading-5 text-slate-500">
+    <p className="mt-1 line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-5 text-slate-500">
       <HighlightedText value={value} query={query} />
     </p>
   );

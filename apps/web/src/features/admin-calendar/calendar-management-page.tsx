@@ -348,7 +348,7 @@ function CalendarManagementContent() {
                   options={[
                     { value: "all", label: "전체" },
                     { value: "MANUAL", label: "학생회 일정" },
-                    { value: "KAIST_ACADEMIC", label: "KAIST 원본" },
+                    { value: "KAIST_ACADEMIC", label: "KAIST 학사일정" },
                   ]}
                 />
                 <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
@@ -397,7 +397,7 @@ function CalendarManagementContent() {
             />
           )}
         >
-          {eventsQuery.isPending ? (
+          {eventsQuery.isPending && !eventsQuery.data ? (
             <TableSkeleton columns={4} rows={10} />
           ) : eventsQuery.isError ? (
             <div className="px-5 py-16 text-center text-sm font-normal text-rose-600">일정을 불러오지 못했습니다.</div>
@@ -432,14 +432,14 @@ function CalendarManagementContent() {
                     }}
                   >
                     <AdminTableCell truncate>
-                      <span className="block max-w-full truncate text-left text-[14px] font-medium text-[#172033]">{event.titleKo}</span>
+                      <span className="block max-w-full truncate text-left text-[length:var(--ui-text-body-size)] font-medium text-[var(--ui-text-strong)]">{event.titleKo}</span>
                       {event.googleSyncStatus === "FAILED" || event.googleSyncStatus === "CONFLICT" ? (
                         <p className="mt-1 truncate text-xs font-normal text-rose-600">Google 동기화 확인 필요</p>
                       ) : null}
                     </AdminTableCell>
-                    <AdminTableCell><span className="text-[14px] font-normal text-[#344054]">{categoryLabel[event.category]}</span></AdminTableCell>
-                    <AdminTableCell><span className="text-[14px] font-normal text-[#344054]">{event.sourceType === "KAIST_ACADEMIC" ? "KAIST 원본" : "학생회 일정"}</span></AdminTableCell>
-                    <AdminTableCell><span className="text-[14px] font-normal text-[#344054]">{formatPeriod(event)}</span></AdminTableCell>
+                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{categoryLabel[event.category]}</span></AdminTableCell>
+                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{event.sourceType === "KAIST_ACADEMIC" ? "KAIST 학사일정" : "학생회 일정"}</span></AdminTableCell>
+                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{formatPeriod(event)}</span></AdminTableCell>
                   </tr>
                 ))}
               </AdminTableBody>
@@ -466,7 +466,7 @@ function CalendarManagementContent() {
           {editingEvent?.isReadOnly ? (
             <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
               <CalendarDays className="mt-0.5 size-4 shrink-0 text-[#344054]" aria-hidden="true" />
-              <p className="text-sm font-normal leading-5 text-[#344054]">KAIST 원본의 제목과 기간은 자동 동기화됩니다. 이 화면에서는 분류와 공개 여부만 변경할 수 있습니다.</p>
+              <p className="text-sm font-normal leading-5 text-[#344054]">KAIST 학사일정의 제목과 기간은 자동 동기화됩니다. 이 화면에서는 분류와 공개 여부만 변경할 수 있습니다.</p>
             </div>
           ) : null}
           <AdminFormField label="제목">

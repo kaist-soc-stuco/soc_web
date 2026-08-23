@@ -35,6 +35,7 @@ jobs:
 
     env:
       CI: "true"
+      TZ: Asia/Seoul
       DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       FEE_CONCURRENCY_TEST_DATABASE_URL: postgresql://soc_test:soc_test@localhost:5432/soc_web_test
       NODE_ENV: test

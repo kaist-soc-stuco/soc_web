@@ -12,6 +12,7 @@ import {
 } from "@/lib/events-surveys";
 
 interface EventsSurveysGridProps {
+  isAuthenticated: boolean;
   items: UnifiedItem[];
   lang: string;
   engagementSubmitting?: string | null;
@@ -95,7 +96,7 @@ function getApplicationText(item: UnifiedItem, lang: string) {
         : "Applications open";
   }
   if (item.linkedSurveyState === "before_open") {
-    return lang === "ko" ? "신청 예정" : "Registration upcoming";
+    return lang === "ko" ? "신청 예정" : "Registration opens soon";
   }
   return null;
 }
@@ -106,7 +107,7 @@ function getAudienceText(item: UnifiedItem, lang: string) {
       ? item.linkedSurveyFeePayersOnly
         ? lang === "ko"
           ? "과비 납부자만"
-          : "Paid members only"
+          : "Fee-paying members only"
         : item.visibilityScope === "STAFF_ONLY"
           ? lang === "ko"
             ? "운영진 전용"
@@ -119,7 +120,7 @@ function getAudienceText(item: UnifiedItem, lang: string) {
       : item.feePayersOnly
         ? lang === "ko"
           ? "과비 납부자만"
-          : "Paid members only"
+          : "Fee-paying members only"
         : lang === "ko"
           ? "로그인 필요"
           : "Login required";
@@ -135,6 +136,7 @@ function getAudienceText(item: UnifiedItem, lang: string) {
 }
 
 export function EventsSurveysGrid({
+  isAuthenticated,
   items,
   lang,
   engagementSubmitting,
@@ -165,11 +167,9 @@ export function EventsSurveysGrid({
         return (
           <div
             key={item.id}
-            className={`interaction-card group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-200 ease-out hover:-translate-y-1 hover:shadow-elevated ${
-              closed
-                ? "border-slate-200 opacity-50"
-                : "border-gray-200"
-            }`}
+            className={`interaction-card group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${
+              item.kind === "SURVEY" ? "min-h-[22rem]" : ""
+            } ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
           >
             {item.kind === "EVENT" ? (
               <Link
@@ -182,7 +182,7 @@ export function EventsSurveysGrid({
                     src={item.imageUrl}
                     alt=""
                     aria-hidden="true"
-                    className="h-full w-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+                    className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
@@ -203,15 +203,15 @@ export function EventsSurveysGrid({
                   className="min-w-0 flex-1"
                 >
                   {eyebrow ? (
-                    <p className="truncate text-[12px] font-medium leading-5 text-slate-500">
+                    <p className="truncate text-xs font-medium leading-5 text-slate-500">
                       {eyebrow}
                     </p>
                   ) : null}
-                  <h3 className="mt-1 line-clamp-2 text-[15px] font-semibold leading-5 text-app-text-strong">
+                  <h3 className="mt-1 line-clamp-2 text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong">
                     {title}
                   </h3>
                   {desc ? (
-                    <p className="mt-1.5 line-clamp-2 text-[13px] font-normal leading-snug text-app-text-body">
+                    <p className="mt-1.5 line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body">
                       {desc}
                     </p>
                   ) : null}
@@ -221,6 +221,7 @@ export function EventsSurveysGrid({
                   <ArticleEngagementActions
                     allowLike={false}
                     compact
+                    isAuthenticated={isAuthenticated}
                     lang={lang}
                     likeCount={item.likeCount ?? 0}
                     scrapCount={item.scrapCount ?? 0}
@@ -238,7 +239,7 @@ export function EventsSurveysGrid({
               <Link
                 aria-label={`${title} ${getCardPeriodText(item, lang)}`}
                 to={href}
-                className="mt-auto flex items-center gap-1.5 pt-4 text-[12px] font-normal text-slate-700"
+                className="mt-auto flex items-center gap-1.5 pt-4 text-xs font-normal text-slate-700"
               >
                 <Clock className="h-3.5 w-3.5 shrink-0 text-slate-600" />
                 <span className="truncate">{getCardPeriodText(item, lang)}</span>

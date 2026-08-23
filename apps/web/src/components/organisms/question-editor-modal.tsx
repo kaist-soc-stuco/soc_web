@@ -225,7 +225,7 @@ export function QuestionEditorModal({
   };
 
   const inputCls =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm placeholder:text-[14px] outline-none transition-[border-color,box-shadow] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm placeholder:text-[length:var(--ui-text-body-size)] outline-none transition-[border-color,box-shadow] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
 
   return (
     <AdminDrawer

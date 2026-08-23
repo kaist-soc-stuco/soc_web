@@ -83,7 +83,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
       <Header />
 
       <main className="flex-1 w-full mx-auto pb-28">
-        <div className="mx-auto max-w-[1040px] px-6 lg:px-8 pt-6 pb-16 flex flex-col gap-3 w-full">
+        <div className="mx-auto max-w-[var(--ui-article-max-width)] px-6 lg:px-8 pt-6 pb-16 flex flex-col gap-3 w-full">
           <BoardDetailBreadcrumb
             category={category}
             displayBoardLabel={displayBoardLabel}
@@ -99,6 +99,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             category={category}
             categoryLabel={displayBoardLabel}
             content={content}
+            isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
             lang={lang}
             onDeleteArticle={() => void handleDeleteArticle()}
             onShare={() => void handleShareArticle()}

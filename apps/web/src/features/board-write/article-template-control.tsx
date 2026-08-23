@@ -1,11 +1,9 @@
 import { useMemo, useState } from "react";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { FileText, Save, Trash2 } from "lucide-react";
 import { msToIso, nowMs } from "@soc/shared";
 
-import { AdminFormField } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { UiInput } from "@/components/ui/form-control";
 
 import type { AttachedAsset } from "./board-write-form-sections";
 
@@ -75,6 +73,17 @@ function writeTemplates(templates: StoredBoardTemplate[]) {
   }
 }
 
+function firstBodyLine(value: string) {
+  const text = value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(?:p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .trim();
+  return text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
+}
+
 export function ArticleTemplateControl({
   boardCode,
   lang,
@@ -83,9 +92,6 @@ export function ArticleTemplateControl({
 }: ArticleTemplateControlProps) {
   const [templates, setTemplates] = useState<StoredBoardTemplate[]>(readTemplates);
   const [open, setOpen] = useState(false);
-  const [saveOpen, setSaveOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const currentTemplates = useMemo(() => {
@@ -93,11 +99,13 @@ export function ArticleTemplateControl({
   }, [boardCode, templates]);
 
   const saveTemplate = () => {
-    if (!name.trim() || !snapshot.titleKo.trim() || !snapshot.contentKo.trim()) {
+    const name = snapshot.titleKo.trim();
+    const description = firstBodyLine(snapshot.contentKo);
+    if (!name || !description) {
       setError(
         lang === "ko"
-          ? "템플릿 이름과 국문 제목·본문을 입력해 주세요."
-          : "Enter a template name, Korean title, and content.",
+          ? "국문 제목과 본문을 입력해 주세요."
+          : "Enter a Korean title and content.",
       );
       return;
     }
@@ -109,17 +117,14 @@ export function ArticleTemplateControl({
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
           : `article-template-${nowMs()}`,
-      name: name.trim(),
-      description: description.trim(),
+      name,
+      description,
       updatedAt: msToIso(nowMs()),
     };
     const next = [template, ...templates];
     setTemplates(next);
     writeTemplates(next);
-    setName("");
-    setDescription("");
     setError(null);
-    setSaveOpen(false);
   };
 
   const deleteTemplate = (templateId: string) => {
@@ -137,7 +142,6 @@ export function ArticleTemplateControl({
         className="!font-medium"
         onClick={() => {
           setError(null);
-          setSaveOpen(false);
           setOpen(true);
         }}
       >
@@ -148,67 +152,29 @@ export function ArticleTemplateControl({
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="템플릿 양식 선택"
+        title="템플릿"
+        headerActions={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-[var(--ui-control-height)] !font-medium"
+            onClick={saveTemplate}
+          >
+            <Save aria-hidden="true" />
+            저장
+          </Button>
+        }
         className="max-w-2xl"
       >
         <div className="space-y-5">
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setError(null);
-                setSaveOpen((current) => !current);
-              }}
-              className="!font-medium shrink-0"
-            >
-              <Plus aria-hidden="true" />
-              현재 작성 내용을 새 템플릿으로 저장
-            </Button>
-          </div>
-
           {error ? (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-normal text-rose-700" role="alert">
               {error}
             </p>
           ) : null}
 
-          {saveOpen ? (
-            <div className="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2">
-              <AdminFormField label="템플릿 이름">
-                <UiInput
-                  spellCheck={false}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="템플릿 이름"
-                  maxLength={100}
-                  className="h-9 text-sm font-normal"
-                />
-              </AdminFormField>
-              <AdminFormField label="설명 (선택)">
-                <UiInput
-                  spellCheck={false}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="설명"
-                  maxLength={255}
-                  className="h-9 text-sm font-normal"
-                />
-              </AdminFormField>
-              <div className="flex justify-end gap-2 sm:col-span-2">
-                <Button type="button" variant="ghost" size="sm" className="!font-medium" onClick={() => setSaveOpen(false)}>
-                  취소
-                </Button>
-                <Button type="button" size="sm" className="!font-medium" onClick={saveTemplate}>
-                  저장
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-slate-800">저장된 양식</h3>
             {currentTemplates.length === 0 ? (
               <p className="py-6 text-center text-sm font-normal text-slate-500">
                 저장된 양식이 없습니다.

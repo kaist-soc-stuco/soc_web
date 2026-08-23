@@ -29,6 +29,7 @@ import {
   History,
   Plus,
   Rocket,
+  Save,
   Trash2,
   Users,
   X,
@@ -61,6 +62,17 @@ type RecipientFilterKey = keyof RecipientFilters;
 type DeliveryMode = "now" | "scheduled";
 
 const EMAIL_DRAFT_STORAGE_KEY = "soc:admin:bulk-email:draft";
+
+function firstEmailBodyLine(value: string) {
+  const text = value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(?:p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .trim();
+  return text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
+}
 
 type StoredEmailDraft = {
   content: string;
@@ -156,10 +168,6 @@ function BulkEmailPageContent() {
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [templateSaveOpen, setTemplateSaveOpen] = useState(false);
-  const [templateSearch, setTemplateSearch] = useState("");
-  const [templateName, setTemplateName] = useState("");
-  const [templateDescription, setTemplateDescription] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
 
   const [initialLocalDraft] = useState<StoredEmailDraft | null>(() => readStoredEmailDraft());
@@ -227,13 +235,6 @@ function BulkEmailPageContent() {
     add("query", "검색", filters.query, `검색: ${filters.query ?? ""}`);
     return entries;
   }, [filters]);
-  const filteredTemplates = useMemo(() => {
-    const query = templateSearch.trim().toLocaleLowerCase();
-    if (!query) return templates;
-    return templates.filter((template) =>
-      `${template.name} ${template.description ?? ""}`.toLocaleLowerCase().includes(query),
-    );
-  }, [templateSearch, templates]);
   const selectedRecipientLabel =
     RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "수신 대상";
   const previewRecipient = reviewPreview?.sample[0];
@@ -253,8 +254,6 @@ function BulkEmailPageContent() {
     setFilters(template.filters ?? {});
     setScheduledAt("");
     setAttachments([]);
-    setTemplateName("");
-    setTemplateDescription("");
     setOperationError(null);
   };
 
@@ -268,8 +267,6 @@ function BulkEmailPageContent() {
     setFilters(draft.filters ?? {});
     setScheduledAt("");
     setAttachments([]);
-    setTemplateName("");
-    setTemplateDescription("");
     setOperationError(null);
     setDraftRestored(true);
     setDraftSavedAt(draft.savedAt);
@@ -502,17 +499,19 @@ function BulkEmailPageContent() {
   };
 
   const handleSaveTemplate = async () => {
-    if (!templateName.trim() || !subject.trim() || !content.trim()) {
-      setOperationError("템플릿 이름과 제목, 본문을 입력해 주세요.");
+    const templateName = subject.trim();
+    const templateDescription = firstEmailBodyLine(content);
+    if (!templateName || !templateDescription) {
+      setOperationError("메일 제목과 본문 첫 줄을 입력해 주세요.");
       return;
     }
     try {
       setTemplateSaving(true);
       setOperationError(null);
       const templateInput = {
-        name: templateName.trim(),
-        description: templateDescription.trim() || undefined,
-        subject: subject.trim(),
+        name: templateName,
+        description: templateDescription,
+        subject: templateName,
         content,
         contentType,
         recipientType,
@@ -527,7 +526,6 @@ function BulkEmailPageContent() {
         ...previous.filter((template) => template.id !== saved.id),
         saved,
       ]);
-      setTemplateSaveOpen(false);
       setStatusNotice("템플릿을 저장했습니다.");
     } catch {
       setOperationError("템플릿 저장에 실패했습니다.");
@@ -645,8 +643,6 @@ function BulkEmailPageContent() {
               variant="outline"
               size="sm"
               onClick={() => {
-                setTemplateSaveOpen(false);
-                setTemplateSearch("");
                 setTemplateModalOpen(true);
               }}
             >
@@ -754,7 +750,7 @@ function BulkEmailPageContent() {
               maxLength={255}
               placeholder="제목을 입력하세요"
               required
-              className="!h-auto !rounded-none border-0 bg-transparent px-0 py-4 text-2xl font-bold leading-tight text-slate-800 shadow-none focus:border-0 focus:outline-none focus:ring-0 placeholder:text-slate-300 md:text-[30px]"
+              className="!h-auto !rounded-none border-0 bg-transparent px-0 py-4 text-2xl font-bold leading-tight text-slate-800 shadow-none focus:border-0 focus:outline-none focus:ring-0 placeholder:text-slate-300 md:text-[length:var(--ui-text-page-title-size)]"
             />
             {editorMode === "editor" ? (
               <div className="mt-2 min-w-0 overflow-hidden">
@@ -787,9 +783,9 @@ function BulkEmailPageContent() {
                 </div>
                 <div className="tiptap-container min-h-[400px] px-6 py-6 prose prose-slate">
                   {content.trim() ? (
-                    <RichTextContent content={previewContent} className="text-[15px] leading-7 text-slate-800" />
+                    <RichTextContent content={previewContent} className="text-[length:var(--ui-text-section-size)] leading-7 text-slate-800" />
                   ) : (
-                    <p className="text-[15px] font-normal text-slate-400">본문을 입력하세요</p>
+                    <p className="text-[length:var(--ui-text-section-size)] font-normal text-slate-400">본문을 입력하세요</p>
                   )}
                 </div>
               </>
@@ -845,49 +841,31 @@ function BulkEmailPageContent() {
       <Modal
         open={templateModalOpen}
         onClose={() => setTemplateModalOpen(false)}
-        title="템플릿 양식 선택"
+        title="템플릿"
+        headerActions={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-[var(--ui-control-height)] !font-medium"
+            onClick={() => void handleSaveTemplate()}
+            disabled={templateSaving}
+          >
+            <Save aria-hidden="true" />
+            {templateSaving ? "저장 중…" : "저장"}
+          </Button>
+        }
         className="max-w-2xl"
       >
         <div className="space-y-5">
-          <div className="flex items-center gap-2">
-            <UiInput
-              aria-label="템플릿 검색"
-              spellCheck={false}
-              value={templateSearch}
-              onChange={(event) => setTemplateSearch(event.target.value)}
-              placeholder="템플릿 검색"
-              className="h-9 min-w-0 flex-1 text-sm font-normal"
-            />
-            <Button type="button" variant="outline" size="sm" onClick={() => setTemplateSaveOpen((open) => !open)} className="shrink-0">
-              <Plus aria-hidden="true" />
-              현재 작성 내용을 새 템플릿으로 저장
-            </Button>
-          </div>
-          {templateSaveOpen ? (
-            <div className="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2">
-              <AdminFormField label="템플릿 이름">
-                <UiInput spellCheck={false} value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="템플릿 이름" maxLength={100} className="h-9 text-sm font-normal" />
-              </AdminFormField>
-              <AdminFormField label="설명 (선택)">
-                <UiInput spellCheck={false} value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} placeholder="설명" maxLength={255} className="h-9 text-sm font-normal" />
-              </AdminFormField>
-              <div className="flex justify-end gap-2 sm:col-span-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setTemplateSaveOpen(false)}>취소</Button>
-                <Button type="button" size="sm" onClick={() => void handleSaveTemplate()} disabled={templateSaving}>{templateSaving ? "저장 중…" : "저장"}</Button>
-              </div>
-            </div>
-          ) : null}
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-slate-800">저장된 양식</h3>
             {templatesLoading ? (
               <p className="py-6 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
             ) : templates.length === 0 ? (
               <p className="py-6 text-center text-sm font-normal text-slate-500">저장된 양식이 없습니다.</p>
-            ) : filteredTemplates.length === 0 ? (
-              <p className="py-6 text-center text-sm font-normal text-slate-500">검색 결과가 없습니다.</p>
             ) : (
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                {filteredTemplates.map((template) => (
+                {templates.map((template) => (
                   <div key={template.id} className="group flex items-center gap-3 px-3 py-3 transition-colors hover:bg-slate-50">
                     <button
                       type="button"
@@ -1014,7 +992,7 @@ function BulkEmailPageContent() {
 function RecipientToken({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200/80 bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-700">
-      <span aria-hidden="true" className="text-[11px] leading-none">🏷️</span>
+      <span aria-hidden="true" className="text-[length:var(--ui-text-caption-size)] leading-none">🏷️</span>
       <span className="max-w-[16rem] truncate">{label}</span>
       <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="size-5 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700">
         <X aria-hidden="true" />

@@ -6,7 +6,7 @@ import type {
   CommentItem,
 } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -146,7 +146,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   }, [apiClient, articleId, category]);
 
   useEffect(() => {
-    if (!articleId || !article) return;
+    if (!articleId || loading) return;
 
     let cancelled = false;
     setCommentsLoading(true);
@@ -173,7 +173,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, article, articleId, category, lang]);
+  }, [apiClient, articleId, category, lang, loading]);
 
   const refreshComments = async () => {
     if (!articleId) return;
@@ -227,8 +227,24 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       confirmLabel: lang === "ko" ? "삭제" : "Delete",
       description:
         lang === "ko"
-          ? "이 게시글을 영구적으로 삭제하시겠습니까? 삭제된 게시글은 되돌릴 수 없습니다."
-          : "Are you sure you want to permanently delete this post? Deleted posts cannot be restored.",
+          ? createElement(
+              "span",
+              null,
+              "정말 ",
+              createElement("strong", { className: "font-semibold text-slate-900" }, `“${article?.titleKo || "이 게시글"}”`),
+              " 게시글을 영구적으로 삭제하시겠습니까?",
+            )
+          : createElement(
+              "span",
+              null,
+              "Are you sure you want to permanently delete ",
+              createElement("strong", { className: "font-semibold text-slate-900" }, `“${article?.titleKo || "this post"}”`),
+              "?",
+            ),
+      warning:
+        lang === "ko"
+          ? "(삭제된 게시글은 영구히 복구할 수 없습니다.)"
+          : "(Deleted posts cannot be restored.)",
       title:
         lang === "ko" ? "게시글 삭제" : "Delete post",
       tone: "danger",
@@ -391,8 +407,11 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     if (!article) return;
 
     const shareUrl = window.location.href;
+    const isDesktop =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(pointer: fine)").matches;
     try {
-      if (typeof navigator.share === "function") {
+      if (!isDesktop && typeof navigator.share === "function") {
         await navigator.share({ title, url: shareUrl });
         return;
       }
@@ -401,6 +420,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         await navigator.clipboard.writeText(shareUrl);
         setShareCopied(true);
         window.setTimeout(() => setShareCopied(false), 1800);
+        toast({ message: lang === "ko" ? "링크를 복사했습니다." : "Link copied." });
         return;
       }
 

@@ -222,16 +222,16 @@ export function getLocalizedText(
 }
 
 export function getSurveyKindLabel(kind: string, lang: string) {
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Vote";
+  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
   if (kind === "APPLICATION") {
-    return lang === "ko" ? "신청서/행사 접수" : "Event application";
+    return lang === "ko" ? "신청서/행사 접수" : "Application";
   }
   return lang === "ko" ? "일반 설문" : "Survey";
 }
 
 export function getAudienceLabel(survey: SurveyDetailResponse, lang: string) {
   if (survey.feePayersOnly) {
-    return lang === "ko" ? "과비 납부자" : "Paid members";
+    return lang === "ko" ? "과비 납부자" : "Fee-paying members";
   }
   return lang === "ko" ? "로그인 필요" : "Login required";
 }

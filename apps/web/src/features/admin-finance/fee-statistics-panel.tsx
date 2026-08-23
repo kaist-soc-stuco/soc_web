@@ -3,7 +3,6 @@ import type { StudentFeeStatsResponse } from "@soc/contracts";
 import { AdminCard, AdminEmptyState } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
-import { Skeleton } from "@/components/ui/skeleton";
 
 type PeriodPreset = "30d" | "90d" | "year" | "custom";
 
@@ -80,7 +79,7 @@ export function FeeStatisticsPanel({
         </div>
       </AdminCard>
 
-      {loading || !stats ? <div className="grid gap-3 md:grid-cols-4">{[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-20 rounded-xl" />)}</div> : <AdminCard className="grid divide-y divide-[#e5eaf0] md:grid-cols-4 md:divide-x md:divide-y-0">{[
+      {!stats ? <div aria-busy="true" className="min-h-20" /> : <AdminCard className={loading ? "grid divide-y divide-[#e5eaf0] opacity-60 transition-opacity md:grid-cols-4 md:divide-x md:divide-y-0" : "grid divide-y divide-[#e5eaf0] md:grid-cols-4 md:divide-x md:divide-y-0"}>{[
         ["납부 금액", formatCurrency(stats.totals.paidAmount)],
         ["납부 건수", `${stats.totals.paymentCount.toLocaleString("ko-KR")}건`],
         ["납부 학생", `${stats.totals.paidStudentCount.toLocaleString("ko-KR")}명`],
@@ -88,11 +87,11 @@ export function FeeStatisticsPanel({
       ].map(([label, value]) => <div key={label} className="px-5 py-4"><p className="text-xs font-normal text-[#344054]">{label}</p><p className="mt-1.5 text-lg font-medium tabular-nums text-[#172033]">{value}</p></div>)}</AdminCard>}
 
       <AdminCard className="p-5">
-        <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-[15px] font-medium text-[#172033]">기간별 납부 추이</h2><span className="text-xs font-normal text-[#344054]">납부 원장 기준</span></div>
-        {loading || !stats ? <Skeleton className="h-64 rounded-lg" /> : <FeeTrendChart data={stats.trend} />}
+        <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[var(--ui-text-strong)]">기간별 납부 추이</h2><span className="text-xs font-normal text-[var(--ui-text-body)]">납부 원장 기준</span></div>
+        {!stats ? <div aria-busy="true" className="min-h-64" /> : <div className={loading ? "opacity-60 transition-opacity" : undefined}><FeeTrendChart data={stats.trend} /></div>}
       </AdminCard>
 
-      {!loading && stats && stats.majorBreakdown.length > 0 ? <AdminCard className="overflow-hidden"><div className="border-b border-[#e5eaf0] px-5 py-4"><h2 className="text-[15px] font-medium text-[#172033]">전공 구분별 현황</h2></div><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-sm"><thead className="bg-[#f8fafc] text-xs font-normal text-[#344054]"><tr><th className="px-5 py-3 text-left font-normal">구분</th><th className="px-5 py-3 text-right font-normal">대상</th><th className="px-5 py-3 text-right font-normal">납부 학생</th><th className="px-5 py-3 text-right font-normal">비율</th><th className="px-5 py-3 text-right font-normal">납부 금액</th></tr></thead><tbody className="divide-y divide-[#edf1f4]">{stats.majorBreakdown.map((item) => <tr key={item.category}><td className="px-5 py-3 font-normal text-[#172033]">{item.label}</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[#344054]">{item.totalStudents}명</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[#172033]">{item.paidStudents}명</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[#344054]">{item.paymentRate}%</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[#172033]">{formatCurrency(item.paidAmount)}</td></tr>)}</tbody></table></div></AdminCard> : null}
+      {stats && stats.majorBreakdown.length > 0 ? <AdminCard className={loading ? "overflow-hidden opacity-60 transition-opacity" : "overflow-hidden"}><div className="border-b border-[var(--ui-border-subtle)] px-5 py-4"><h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[var(--ui-text-strong)]">전공 구분별 현황</h2></div><div className="overflow-x-auto"><table className="w-full min-w-[42.5rem] text-sm"><thead className="bg-[var(--ui-surface-muted)] text-xs font-normal text-[var(--ui-text-body)]"><tr><th className="px-5 py-3 text-left font-normal">구분</th><th className="px-5 py-3 text-right font-normal">대상</th><th className="px-5 py-3 text-right font-normal">납부 학생</th><th className="px-5 py-3 text-right font-normal">비율</th><th className="px-5 py-3 text-right font-normal">납부 금액</th></tr></thead><tbody className="divide-y divide-[var(--ui-border-subtle)]">{stats.majorBreakdown.map((item) => <tr key={item.category}><td className="px-5 py-3 font-normal text-[var(--ui-text-strong)]">{item.label}</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-body)]">{item.totalStudents}명</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-strong)]">{item.paidStudents}명</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-body)]">{item.paymentRate}%</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-strong)]">{formatCurrency(item.paidAmount)}</td></tr>)}</tbody></table></div></AdminCard> : null}
     </div>
   );
 }

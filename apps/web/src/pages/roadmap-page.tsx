@@ -210,7 +210,7 @@ export function RoadmapPage() {
           className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-kaist-grey transition-colors hover:text-kaist-darkgreen"
         >
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-          {lang === "ko" ? "SOC 소개로 돌아가기" : "Back to About SOC"}
+          {lang === "ko" ? "SOC 소개로 돌아가기" : "Back to About"}
         </Link>
 
         <section className="mt-5 grid gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-[1fr_18rem] md:p-8">
@@ -286,7 +286,7 @@ export function RoadmapPage() {
                     <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: track.color }} aria-hidden="true" />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-bold text-slate-800">{copy(track.title, lang)}</span>
-                      <span className="mt-0.5 block text-[11px] font-semibold text-slate-400">{track.courses.length}{lang === "ko" ? "개 대표 과목" : " sample courses"}</span>
+                      <span className="mt-0.5 block text-[length:var(--ui-text-caption-size)] font-semibold text-slate-400">{track.courses.length}{lang === "ko" ? "개 대표 과목" : " sample courses"}</span>
                     </span>
                   </Button>
                 );
@@ -307,7 +307,7 @@ export function RoadmapPage() {
                     <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-600">{copy(selectedTrack.description, lang)}</p>
                   </div>
                   <div className="hidden rounded-2xl bg-white/80 px-3 py-2 text-right shadow-sm sm:block">
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{lang === "ko" ? "탐색 순서" : "Flow"}</span>
+                    <span className="block text-[length:var(--ui-text-micro-size)] font-bold uppercase tracking-[0.12em] text-slate-400">{lang === "ko" ? "탐색 순서" : "Flow"}</span>
                     <span className="mt-1 block text-sm font-bold text-slate-700">기초 → 핵심 → 응용</span>
                   </div>
                 </div>

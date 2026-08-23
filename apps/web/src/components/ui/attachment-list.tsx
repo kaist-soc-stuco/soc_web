@@ -20,7 +20,7 @@ export function AttachmentList({
 
   return (
     <section className={className}>
-      <h2 className="mb-3 text-[13px] font-semibold text-slate-500">
+      <h2 className="mb-3 text-[length:var(--ui-text-body-sm-size)] font-semibold text-slate-500">
         {title ??
           (lang === "ko"
             ? `첨부파일 (${assets.length})`
@@ -47,10 +47,10 @@ export function AttachmentList({
                       className="inline-flex min-w-0 items-center gap-2 transition-colors hover:text-kaist-darkgreen"
                     >
                       <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span className="truncate text-[13px] font-medium text-slate-700">
+                      <span className="truncate text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-700">
                         {asset.originalFilename}
                       </span>
-                      <span className="shrink-0 text-[11px] font-medium text-slate-400">
+                      <span className="shrink-0 text-[length:var(--ui-text-caption-size)] font-medium text-slate-400">
                         ({formatFileSize(asset.sizeBytes)})
                       </span>
                     </a>

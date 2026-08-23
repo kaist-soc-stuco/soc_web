@@ -15,6 +15,25 @@ export interface StoredAuthState {
 }
 
 const STORAGE_KEY = "soc.auth.state";
+export const AUTH_RETURN_TO_KEY = "soc.auth.return-to";
+
+export const rememberAuthReturnPath = (path: string): void => {
+  if (typeof window === "undefined" || !path.startsWith("/")) {
+    return;
+  }
+
+  window.sessionStorage.setItem(AUTH_RETURN_TO_KEY, path);
+};
+
+export const consumeAuthReturnPath = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const path = window.sessionStorage.getItem(AUTH_RETURN_TO_KEY);
+  window.sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+  return path?.startsWith("/") ? path : null;
+};
 
 export const readStoredAuthState = (): StoredAuthState | null => {
   if (typeof window === "undefined") {

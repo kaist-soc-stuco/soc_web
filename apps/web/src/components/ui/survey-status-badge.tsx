@@ -34,8 +34,8 @@ export function SurveyStatusBadge({
       className={cn(
         "inline-flex items-center justify-center rounded-md border font-semibold whitespace-nowrap",
         size === "sm"
-          ? "px-2 py-0.5 text-[10.5px]"
-          : "px-2.5 py-0.5 text-[11.5px]",
+          ? "px-2 py-0.5 text-[length:var(--home-calendar-day-size)]"
+          : "px-2.5 py-0.5 text-[length:var(--home-calendar-event-size)]",
         toneClassNames[status.tone],
         className,
       )}

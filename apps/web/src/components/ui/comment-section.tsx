@@ -7,6 +7,7 @@ import { ArrowUp, Heart, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { EngagementActionButton } from "@/components/ui/article-engagement-actions";
 import { UiTextarea } from "@/components/ui/form-control";
 import { cn } from "@/lib/utils";
 
@@ -75,9 +76,9 @@ export function CommentSection({
   return (
     <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-6 py-6 shadow-[0_8px_28px_rgba(15,23,42,0.04)] md:px-[52px] md:py-[24px]">
       <div className="flex items-center justify-between">
-        <h2 className="text-[18px] font-semibold leading-6 text-slate-800">
+        <h2 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-slate-800">
           <span>{lang === "ko" ? "댓글" : "Comments"}</span>
-          <span className="ml-1 text-[14px] text-brand-primary">{comments.length}</span>
+          <span className="ml-1 text-[length:var(--ui-text-body-size)] text-brand-primary">{comments.length}</span>
         </h2>
         {commentsLoading && (
           <Loader2 className="size-4 animate-spin text-brand-primary" />
@@ -86,7 +87,7 @@ export function CommentSection({
 
       <div className="mt-3">
         {comments.length === 0 && !commentsLoading ? (
-          <div className="py-4 text-[14px] font-medium text-slate-500">
+          <div className="py-4 text-[length:var(--ui-text-body-size)] font-medium text-slate-500">
             {lang === "ko" ? "아직 등록된 댓글이 없습니다." : "No comments yet."}
           </div>
         ) : (
@@ -103,6 +104,7 @@ export function CommentSection({
                     }
                     comment={comment}
                     commentActionSubmitting={commentActionSubmitting}
+                    isAuthenticated={isAuthenticated}
                     lang={lang}
                     onDeleteComment={onDeleteComment}
                     onSetCommentEngagement={onSetCommentEngagement}
@@ -140,6 +142,7 @@ export function CommentSection({
                       }
                       comment={reply}
                       commentActionSubmitting={commentActionSubmitting}
+                      isAuthenticated={isAuthenticated}
                       isNested
                       lang={lang}
                       onDeleteComment={onDeleteComment}
@@ -192,6 +195,7 @@ function CommentRow({
   canDelete,
   comment,
   commentActionSubmitting,
+  isAuthenticated,
   isNested = false,
   lang,
   onDeleteComment,
@@ -202,6 +206,7 @@ function CommentRow({
   canDelete: boolean;
   comment: CommentItem;
   commentActionSubmitting: string | null;
+  isAuthenticated: boolean;
   isNested?: boolean;
   lang: string;
   onDeleteComment: (commentId: string) => Promise<void>;
@@ -214,6 +219,7 @@ function CommentRow({
   showReplyButton: boolean;
 }) {
   const likeActionKey = `${comment.commentId}:LIKE`;
+  const likeActive = isAuthenticated && comment.viewerHasLiked;
   const [deletePopoverOpen, setDeletePopoverOpen] = useState(false);
 
   const handleDeleteConfirm = async () => {
@@ -240,11 +246,11 @@ function CommentRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex items-baseline gap-2">
-            <span className="truncate text-[14px] font-semibold text-slate-800">
+            <span className="truncate text-[length:var(--ui-text-body-size)] font-semibold text-slate-800">
               {comment.author.name}
             </span>
             {comment.isOfficial ? (
-              <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[11px] font-normal text-emerald-700">
+              <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-normal text-emerald-700">
                 {lang === "ko" ? "공식 답변" : "Official response"}
               </span>
             ) : null}
@@ -257,40 +263,30 @@ function CommentRow({
             </time>
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={lang === "ko" ? "댓글 좋아요" : "Like comment"}
-              aria-pressed={comment.viewerHasLiked}
-              disabled={commentActionSubmitting === likeActionKey}
-                onClick={() =>
-                  void onSetCommentEngagement(
-                    comment.commentId,
-                  "LIKE",
-                  !comment.viewerHasLiked,
-                  )
-                }
-                className={cn(
-                  "h-7 gap-1 rounded-md border-0 px-1.5 text-xs font-medium hover:bg-slate-100",
-                  comment.viewerHasLiked
-                    ? "text-rose-600 hover:text-rose-600"
-                    : "text-slate-400 hover:text-slate-400",
-                )}
-            >
-              {commentActionSubmitting === likeActionKey ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
+            <EngagementActionButton
+              active={likeActive}
+              className="h-7 gap-1 rounded-md border-0 px-1.5 text-xs font-medium"
+              count={comment.likeCount}
+              icon={
                 <Heart
                   className={cn(
                     "size-3.5",
-                    comment.viewerHasLiked ? "text-rose-600" : "text-slate-400",
+                    likeActive ? "text-rose-600" : "text-slate-400",
                   )}
-                  fill={comment.viewerHasLiked ? "currentColor" : "none"}
+                  fill={likeActive ? "currentColor" : "none"}
                 />
-              )}
-              <span className="tabular-nums">{comment.likeCount}</span>
-            </Button>
+              }
+              label={lang === "ko" ? "댓글 좋아요" : "Like comment"}
+              loading={commentActionSubmitting === likeActionKey}
+              onClick={() =>
+                void onSetCommentEngagement(
+                  comment.commentId,
+                  "LIKE",
+                  !likeActive,
+                )
+              }
+              tone="like"
+            />
             {showReplyButton ? (
               <Button
                 type="button"
@@ -322,7 +318,7 @@ function CommentRow({
                     className="absolute bottom-full right-0 z-30 mb-2 w-52 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.14)]"
                     role="dialog"
                   >
-                    <p className="text-[13px] font-medium leading-5 text-slate-700">
+                    <p className="text-[length:var(--ui-text-body-sm-size)] font-medium leading-5 text-slate-700">
                       {lang === "ko" ? "댓글을 삭제할까요?" : "Delete this comment?"}
                     </p>
                     <div className="mt-2.5 flex justify-end gap-1.5">
@@ -350,7 +346,7 @@ function CommentRow({
             )}
           </div>
         </div>
-        <p className="mt-2 whitespace-pre-line text-[14px] font-medium leading-relaxed text-slate-700">
+        <p className="mt-1 whitespace-pre-line text-[length:var(--ui-text-body-size)] font-medium leading-relaxed text-slate-700">
           {comment.content}
         </p>
       </div>
@@ -394,7 +390,8 @@ function CommentComposer({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="block min-h-[42px] w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-12 text-[14px] font-medium leading-normal text-slate-800 outline-none placeholder:text-slate-400"
+        disabled={disabled}
+        className="block min-h-[2.625rem] w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-12 text-[length:var(--ui-text-body-size)] font-medium leading-normal text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey && hasText && !disabled) {
             event.preventDefault();

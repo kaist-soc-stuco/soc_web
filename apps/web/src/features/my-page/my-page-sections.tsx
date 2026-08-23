@@ -58,7 +58,7 @@ export function MyPageSidebar({
     <aside className="hidden w-56 shrink-0 border border-slate-200 bg-white rounded-2xl p-4 shadow-[0_5px_20px_rgba(0,0,0,0.015)] md:block sticky top-6">
       <div className="flex items-center gap-2 px-2 pb-3 border-b border-slate-100 select-none">
         <User className="h-4.5 w-4.5 text-kaist-darkgreen" />
-        <span className="text-[15px] font-bold text-slate-900">
+        <span className="text-[length:var(--ui-text-section-size)] font-bold text-slate-900">
           {lang === "ko" ? "마이페이지" : "My Page"}
         </span>
       </div>
@@ -71,7 +71,7 @@ export function MyPageSidebar({
             <Button variant="ghost"
               key={item.id}
               onClick={() => onMenuChange(item.id)}
-              className={`w-full flex items-center justify-start gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold border-0 transition-colors cursor-pointer text-left ${
+              className={`w-full flex items-center justify-start gap-2.5 rounded-lg px-3.5 py-2.5 text-[length:var(--ui-text-body-sm-size)] font-semibold border-0 transition-colors cursor-pointer text-left ${
                 isActive
                   ? "bg-emerald-50/70 text-kaist-darkgreen shadow-sm shadow-emerald-500/5"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -186,16 +186,16 @@ function ActivityRows({ items, lang }: { items: ActivityItem[]; lang: string }) 
             className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-3.5 transition-colors group hover:bg-slate-50/50 px-3 -mx-3 rounded-lg"
           >
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 select-none ${badgeBg}`}
+              className={`inline-flex items-center px-2 py-0.5 rounded text-[length:var(--ui-text-micro-size)] font-bold border shrink-0 select-none ${badgeBg}`}
             >
               {item.label}
             </span>
             <span className="min-w-0 pr-2">
-              <span className="block truncate text-[13px] font-semibold text-slate-800 group-hover:text-kaist-darkgreen transition-colors">
+              <span className="block truncate text-[length:var(--ui-text-body-sm-size)] font-semibold text-slate-800 group-hover:text-kaist-darkgreen transition-colors">
                 {item.title}
               </span>
               {item.context && (
-                <span className="mt-0.5 block truncate text-[11px] font-medium text-slate-400">
+                <span className="mt-0.5 block truncate text-[length:var(--ui-text-caption-size)] font-medium text-slate-400">
                   {item.context}
                 </span>
               )}
@@ -326,7 +326,7 @@ export function MyPageProfilePanel({
         {profileRows.map(([label, value]) => (
           <div
             key={label}
-            className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-100 py-2.5 text-[13px] last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
+            className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-100 py-2.5 text-[length:var(--ui-text-body-sm-size)] last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
           >
             <span className="font-normal text-xs text-slate-400">{label}</span>
             <span className="min-w-0 break-words font-normal text-sm text-slate-800">
@@ -400,7 +400,7 @@ export function MyPageActivityPanel({
                 to={item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`}
                 className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50"
               >
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-slate-700">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold tracking-tight text-slate-700">
                   <Bookmark className="h-3 w-3" aria-hidden="true" />
                   {isEvent ? (lang === "ko" ? "행사" : "Event") : item.boardNameKo}
                 </span>
@@ -408,7 +408,7 @@ export function MyPageActivityPanel({
                   <span className="block truncate text-sm font-normal text-slate-800 group-hover:text-kaist-darkgreen">
                     {item.titleKo}
                   </span>
-                  <span className="mt-1 block truncate text-[11px] font-normal text-slate-400">
+                  <span className="mt-1 block truncate text-[length:var(--ui-text-caption-size)] font-normal text-slate-400">
                     {item.boardNameKo} · {formatRelative(item.scrapUpdatedAt, lang)}
                   </span>
                 </span>
@@ -447,7 +447,7 @@ export function MyPageActivityPanel({
               <Button variant="ghost"
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`relative flex h-8 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[13px] font-normal cursor-pointer transition-colors ${
+                className={`relative flex h-8 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[length:var(--ui-text-body-sm-size)] font-normal cursor-pointer transition-colors ${
                   isActive
                     ? "text-kaist-darkgreen"
                     : "text-slate-400 hover:text-kaist-darkgreen"

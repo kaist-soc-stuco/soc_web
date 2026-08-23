@@ -46,7 +46,7 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
       {description && (
         <RichTextContent
           content={description}
-          className="mt-4 border-t border-slate-100 pt-4 text-[15px] font-medium leading-relaxed text-slate-600"
+          className="mt-4 border-t border-slate-100 pt-4 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-600"
         />
       )}
 

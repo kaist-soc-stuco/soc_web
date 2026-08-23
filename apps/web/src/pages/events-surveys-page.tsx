@@ -61,7 +61,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             currentTab === "calendar"
               ? lang === "ko" ? "일정" : "Calendar"
               : currentTab === "survey"
-                ? lang === "ko" ? "설문·투표" : "Surveys & Votes"
+                ? lang === "ko" ? "설문·투표" : "Surveys & Polls"
                 : lang === "ko" ? "행사" : "Events"
           }
         />
@@ -118,6 +118,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
           ) : (
             <EventsSurveysGrid
               engagementSubmitting={engagementSubmitting}
+              isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
               items={visibleItems}
               lang={lang}
               onEngagementToggle={handleSetEngagement}

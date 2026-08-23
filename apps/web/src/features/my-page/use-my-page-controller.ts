@@ -199,6 +199,11 @@ export function useMyPageController() {
   }, [lang, session, user]);
 
   const userInfo = user?.user;
+  useEffect(() => {
+    if (!userInfo) return;
+    // Temporary diagnostic log: remove after inspecting the login profile in DevTools.
+    console.info("[TEMP] My Page login data:", { session, profile: userInfo });
+  }, [session, userInfo]);
   const hasLoadedMyPageData =
     user !== null ||
     articles !== null ||

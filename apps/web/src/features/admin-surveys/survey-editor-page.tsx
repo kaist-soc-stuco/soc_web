@@ -127,7 +127,7 @@ const SurveySettingsSchema = z.object({
     if (!data.titleEn?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "영문 제목은 필수입니다 (Korean Speakers Only가 아닐 경우).",
+        message: "영문 제목은 필수입니다 (한국어 사용자만 설정이 아닐 경우).",
         path: ["titleEn"],
       });
     }
@@ -191,7 +191,7 @@ function QuestionRowContent({
       <div className="flex min-w-0 items-center gap-3">
         {!isOngoing && dragHandle}
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-medium text-slate-900">
+          <span className="truncate text-sm font-semibold text-slate-900">
             {question.titleKo}
           </span>
           {question.titleEn && (
@@ -199,11 +199,11 @@ function QuestionRowContent({
               ({question.titleEn})
             </span>
           )}
-          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-medium text-slate-600">
             {QUESTION_TYPES.find((type) => type.value === question.questionType)?.label}
           </span>
           {question.isRequired && (
-            <span className="shrink-0 text-[10px] font-bold text-red-500">*필수</span>
+            <span className="shrink-0 text-[length:var(--ui-text-micro-size)] font-bold text-red-500">*필수</span>
           )}
         </div>
       </div>
@@ -623,9 +623,12 @@ export function SurveyEditorPage() {
 
   const handleDeleteSection = async (sectionId: string) => {
     if (!loadedSurveyId) return;
+    const section = sections.find((item) => item.id === sectionId);
     const confirmed = await requestConfirm({
       confirmLabel: "삭제",
-      title: "이 섹션을 삭제하시겠습니까?",
+      title: "섹션 삭제",
+      description: <>정말 <strong className="font-semibold text-slate-900">“{section?.titleKo || "이 섹션"}”</strong> 섹션을 삭제하시겠습니까?</>,
+      warning: "(삭제된 섹션과 포함된 문항은 영구히 복구할 수 없습니다.)",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -734,9 +737,14 @@ export function SurveyEditorPage() {
 
   const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
     if (!loadedSurveyId) return;
+    const question = sections
+      .find((section) => section.id === sectionId)
+      ?.questions.find((item) => item.id === questionId);
     const confirmed = await requestConfirm({
       confirmLabel: "삭제",
-      title: "이 문항을 삭제하시겠습니까?",
+      title: "문항 삭제",
+      description: <>정말 <strong className="font-semibold text-slate-900">“{question?.titleKo || "이 문항"}”</strong> 문항을 삭제하시겠습니까?</>,
+      warning: "(삭제된 문항과 응답 데이터는 영구히 복구할 수 없습니다.)",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -870,14 +878,14 @@ export function SurveyEditorPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         {ConfirmDialog}
-        <main className="admin-page__main mx-auto flex w-full max-w-[1280px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+        <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-editor-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
 
           <AdminPageHeader
             eyebrow={
               <button
                 type="button"
                 onClick={() => navigate("/admin/surveys")}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 transition-colors hover:text-brand-primary"
+                className="inline-flex items-center gap-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500 transition-colors hover:text-brand-primary"
               >
                 <ArrowLeft className="size-3.5" /> 설문조사 관리
               </button>
@@ -919,7 +927,7 @@ export function SurveyEditorPage() {
                   type="button"
                   variant="outline"
                   disabled={saving}
-                  className="gap-1.5"
+                  className="gap-1.5 bg-white"
                   onClick={() => void form.handleSubmit((values) => handleSaveSettings(values))()}
                 >
                   <Save className="size-4" /> 저장

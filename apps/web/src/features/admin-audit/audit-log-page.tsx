@@ -258,7 +258,7 @@ export function AuditLogPage() {
                       >
                         <AdminTableCell className="whitespace-nowrap text-sm tabular-nums text-slate-600">{formatDateTime(log.createdAt)}</AdminTableCell>
                         <AdminTableCell><Badge className="border-0 bg-slate-100 text-slate-700">{log.domainLabel}</Badge></AdminTableCell>
-                        <AdminTableCell className="text-[15px] font-medium text-slate-900">{log.actionLabel}</AdminTableCell>
+                        <AdminTableCell className="admin-table-text-emphasis">{log.actionLabel}</AdminTableCell>
                         <AdminTableCell className="max-w-0"><span className="block truncate text-sm font-normal text-slate-700" title={log.targetLabel}>{log.targetLabel}</span></AdminTableCell>
                         <AdminTableCell className="text-sm font-normal text-slate-600">{log.actorNameKo ?? "시스템"}</AdminTableCell>
                       </tr>
