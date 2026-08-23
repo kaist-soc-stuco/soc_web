@@ -13,6 +13,7 @@ import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateQuestionDto } from "./dto/create-question.dto";
 import type { UpdateQuestionDto } from "./dto/update-question.dto";
 import type { QuestionType, QuestionOption, SurveyQuestionConfig } from "@soc/contracts";
+import type { ReorderSurveyQuestionsRequest } from "@soc/contracts";
 import { sanitizeSurveyRichText } from "./survey-rich-text";
 
 @Injectable()
@@ -132,5 +133,21 @@ export class SurveyQuestionsRepository {
     await db
       .delete(surveyQuestions)
       .where(and(eq(surveyQuestions.id, id), eq(surveyQuestions.sectionId, sectionId)));
+  }
+
+  async reorder(
+    sectionId: string,
+    items: ReorderSurveyQuestionsRequest["items"],
+    tx?: PostgresTransaction,
+  ): Promise<SurveyQuestionRecord[]> {
+    const db = tx ?? this.db;
+    const updatedAt = nowDate();
+    for (const item of items) {
+      await db
+        .update(surveyQuestions)
+        .set({ sortOrder: item.sortOrder, updatedAt })
+        .where(and(eq(surveyQuestions.id, item.id), eq(surveyQuestions.sectionId, sectionId)));
+    }
+    return this.findBySectionId(sectionId, tx);
   }
 }

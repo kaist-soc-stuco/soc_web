@@ -71,6 +71,15 @@ export class BoardService {
     return board;
   }
 
+  async deleteBoard(code: string): Promise<BoardSummary> {
+    const board = await this.boardRepository.delete(code);
+    if (!board) {
+      throw new NotFoundException("board_not_found");
+    }
+
+    return board;
+  }
+
   async reorderBoards(input: BoardReorderRequest): Promise<BoardListResponse> {
     const codes = input.items.map((item) => item.code);
     if (new Set(codes).size !== codes.length) {
@@ -84,16 +93,14 @@ export class BoardService {
     input: Partial<
       Pick<
         BoardCreateRequest,
-        "writePermissionBit" | "commentPermissionBit" | "managePermissionBit"
+        "writePermissionBit"
       >
     >,
   ): void {
     const validBits = new Set(PERMISSION_REGISTRY.map((permission) => permission.bit));
-    const requestedBits = [
-      input.writePermissionBit,
-      input.commentPermissionBit,
-      input.managePermissionBit,
-    ].filter((bit): bit is number => bit !== undefined && bit !== 0);
+    const requestedBits = [input.writePermissionBit].filter(
+      (bit): bit is number => bit !== undefined && bit !== 0,
+    );
 
     if (requestedBits.some((bit) => !validBits.has(bit))) {
       throw new BadRequestException("unknown_board_permission_bit");

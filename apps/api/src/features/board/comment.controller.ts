@@ -18,14 +18,11 @@ import type {
   CommentDeleteResponse,
   CommentEngagementResponse,
   CommentListResponse,
-  CommentReportRequest,
-  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
 import {
   CommentCreateSchema,
-  CommentReportSchema,
   CommentUpdateSchema,
 } from "@soc/contracts";
 import { Request } from "express";
@@ -160,21 +157,4 @@ export class CommentController {
     );
   }
 
-  @Post(":commentId/report")
-  @UseGuards(AuthGuard)
-  async reportComment(
-    @Param("code") code: string,
-    @Param("articleId") articleId: string,
-    @Param("commentId") commentId: string,
-    @Body(new ZodValidationPipe(CommentReportSchema)) body: CommentReportRequest,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<CommentReportResponse> {
-    return this.commentService.reportComment(
-      code,
-      articleId,
-      commentId,
-      body,
-      request.user!,
-    );
-  }
 }

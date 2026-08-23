@@ -1,11 +1,10 @@
 import { Link } from "react-router-dom";
 import type { KoreanHolidayRecord } from "@soc/contracts";
-import { isoToDate } from "@soc/shared";
-import { ArrowRight, Clock } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
 import { getKoreanHolidayName } from "@/lib/korean-holidays";
-import { formatShortDate } from "@/lib/date-display";
+import { formatNumericDate } from "@/lib/date-display";
 import { stripCalendarPrefix, type CalendarEvent } from "@/lib/events-surveys";
 import { getCalendarEventStyles } from "./events-surveys-calendar-utils";
 
@@ -54,72 +53,46 @@ export function EventsSurveysDayDetails({
               lang,
               event.sourceType,
             );
-            const isAcademic = event.sourceType === "KAIST_ACADEMIC";
-            const eventDate = isoToDate(event.rawDate);
-            const startDate = event.startAt ?? event.date;
-            const endDate = event.endAt ?? event.date;
-            const isMultiDay = !isSameLocalDay(startDate, endDate);
-            const formattedTime = isAcademic
-              ? isMultiDay
-                ? `${formatShortDate(startDate, lang)} ～ ${formatShortDate(endDate, lang)}`
-                : lang === "ko"
-                  ? "종일"
-                  : "All day"
-              : eventDate.toLocaleTimeString(
-                  lang === "ko" ? "ko-KR" : "en-US",
-                  {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
-                  },
-                );
             const shortTitle = stripCalendarPrefix(event.title);
-
-            return (
-              <div
-                key={idx}
-                className="relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3.5"
-              >
-                <div
-                  className={`absolute inset-y-0 left-0 w-1 ${style.bullet}`}
+            const scheduleText = formatScheduleText(event, lang);
+            const eventHref = getCalendarEventHref(event);
+            const cardClassName =
+              "group block w-full relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3.5 transition hover:border-slate-300";
+            const cardContent = (
+              <div className="flex items-start gap-2.5">
+                <span
+                  className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${style.bullet}`}
                   aria-hidden="true"
                 />
-                <div className="flex items-start gap-2.5 pl-1">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="truncate text-sm font-bold leading-snug text-slate-800">
-                      {shortTitle}
-                    </h4>
-                    {event.description && (
-                      <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-slate-500">
-                        {event.description}
-                      </p>
-                    )}
-                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[11px] font-medium text-slate-400 select-none">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        <span className="truncate">{formattedTime}</span>
-                      </div>
-
-                      {event.sourceType === "ARTICLE" && event.articleId ? (
-                        <Link
-                          to={`/board/행사/${event.articleId}`}
-                          className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-brand-primary transition hover:opacity-85"
-                        >
-                          <span>{lang === "ko" ? "자세히 보기" : "View details"}</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      ) : event.sourceType === "SURVEY" && event.surveyId ? (
-                        <Link
-                          to={`/survey/${event.surveyId}`}
-                          className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-brand-primary transition hover:opacity-85"
-                        >
-                          <span>{lang === "ko" ? "자세히 보기" : "View details"}</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      ) : null}
-                    </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-[13px] font-semibold leading-[18px] text-slate-800">
+                    {shortTitle}
+                  </h4>
+                  {event.description && (
+                    <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-slate-500">
+                      {event.description}
+                    </p>
+                  )}
+                  <div className="mt-1.5 flex items-center gap-2 text-xs font-normal text-slate-400 select-none">
+                    <span className="min-w-0 truncate">{scheduleText}</span>
                   </div>
                 </div>
+                {eventHref ? (
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-400"
+                  />
+                ) : null}
+              </div>
+            );
+
+            return eventHref ? (
+              <Link key={idx} to={eventHref} className={cardClassName}>
+                {cardContent}
+              </Link>
+            ) : (
+              <div key={idx} className={cardClassName}>
+                {cardContent}
               </div>
             );
           })}
@@ -127,6 +100,55 @@ export function EventsSurveysDayDetails({
       )}
     </aside>
   );
+}
+
+function getCalendarEventHref(event: CalendarEvent) {
+  if (event.sourceType === "ARTICLE" && event.articleId) {
+    return `/board/행사/${event.articleId}`;
+  }
+  if (event.sourceType === "SURVEY" && event.surveyId) {
+    return `/survey/${event.surveyId}`;
+  }
+  return null;
+}
+
+function formatDetailDate(date: Date, lang: Language) {
+  const weekday = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
+    weekday: "short",
+  }).format(date);
+  return `${formatNumericDate(date)} (${weekday})`;
+}
+
+function formatDetailTime(date: Date, lang: Language) {
+  return new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function formatScheduleText(event: CalendarEvent, lang: Language) {
+  const startDate = event.startAt ?? event.date;
+  const endDate = event.endAt ?? event.date;
+  const sameDay = isSameLocalDay(startDate, endDate);
+  const startText = formatDetailDate(startDate, lang);
+  const endText = formatDetailDate(endDate, lang);
+
+  if (event.sourceType === "KAIST_ACADEMIC") {
+    return sameDay
+      ? `${startText} ${lang === "ko" ? "종일" : "All day"}`
+      : `${startText} ～ ${endText} ${lang === "ko" ? "종일" : "All day"}`;
+  }
+
+  const startTime = formatDetailTime(startDate, lang);
+  const endTime = formatDetailTime(endDate, lang);
+  if (sameDay) {
+    return startTime === endTime
+      ? `${startText} ${startTime}`
+      : `${startText} ${startTime} ～ ${endTime}`;
+  }
+
+  return `${startText} ${startTime} ～ ${endText} ${endTime}`;
 }
 
 function isSameLocalDay(first: Date, second: Date) {

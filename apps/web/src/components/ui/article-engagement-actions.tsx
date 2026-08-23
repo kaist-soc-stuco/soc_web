@@ -12,6 +12,7 @@ interface ArticleEngagementActionsProps {
   onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   compact?: boolean;
   allowLike?: boolean;
+  scrapIconOnly?: boolean;
 }
 
 export function ArticleEngagementActions({
@@ -21,6 +22,7 @@ export function ArticleEngagementActions({
   likeCount,
   onToggle,
   scrapCount,
+  scrapIconOnly = false,
   submitting,
   viewerHasLiked,
   viewerHasScrapped,
@@ -45,12 +47,13 @@ export function ArticleEngagementActions({
       ) : null}
       <EngagementButton
         active={viewerHasScrapped}
-        count={scrapCount}
+        count={scrapIconOnly ? null : scrapCount}
         icon={<Bookmark className="h-3.5 w-3.5" fill={viewerHasScrapped ? 'currentColor' : 'none'} />}
         label={lang === 'ko' ? '스크랩' : 'Scrap'}
         loading={submitting === 'SCRAP'}
+        showLoadingIndicator={!scrapIconOnly}
         onClick={() => onToggle('SCRAP', !viewerHasScrapped)}
-        className={buttonClass}
+        className={scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass}
         tone="scrap"
       />
     </div>
@@ -65,21 +68,25 @@ function EngagementButton({
   label,
   loading,
   onClick,
+  showLoadingIndicator,
   tone,
 }: {
   active: boolean;
   className: string;
-  count: number;
+  count: number | null;
   icon: React.ReactNode;
   label: string;
   loading: boolean;
   onClick: () => void;
+  showLoadingIndicator?: boolean;
   tone: 'like' | 'scrap';
 }) {
+  const resolvedShowLoadingIndicator = showLoadingIndicator ?? true;
   const activeClass =
     tone === 'like'
-      ? 'border-rose-200 bg-rose-50 text-rose-600'
-      : 'border-amber-200 bg-amber-50 text-amber-700';
+      ? 'text-rose-600 hover:text-rose-600'
+      : 'text-amber-600 hover:text-amber-600';
+  const inactiveClass = 'text-slate-400 hover:text-slate-700';
 
   return (
     <Button variant="ghost"
@@ -88,12 +95,12 @@ function EngagementButton({
       aria-pressed={active}
       disabled={loading}
       onClick={onClick}
-      className={`interaction-action inline-flex items-center gap-1 border font-bold transition disabled:cursor-wait disabled:opacity-60 ${className} ${
-        active ? activeClass : 'border-slate-200 bg-white text-slate-500'
+      className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-colors disabled:cursor-wait disabled:opacity-60 hover:border-0 hover:bg-transparent ${className} ${
+        active ? activeClass : inactiveClass
       }`}
     >
-      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}
-      <span className="tabular-nums">{count}</span>
+      {loading && resolvedShowLoadingIndicator ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}
+      {count !== null ? <span className="tabular-nums">{count}</span> : null}
     </Button>
   );
 }

@@ -218,10 +218,13 @@ export function getResponsePolicyLabel(
 }
 
 export function getScheduleLabel(survey: SurveyDetailResponse, lang: string) {
-  if (!survey.opensAt) {
+  if (!survey.opensAt && !survey.closesAt) {
     return lang === "ko" ? "상시 응답 가능" : "Always open";
   }
 
-  const opensAt = formatSurveyDateTime(survey.opensAt);
-  return lang === "ko" ? `${opensAt}부터` : `From ${opensAt}`;
+  const opensAt = survey.opensAt ? formatSurveyDateTime(survey.opensAt) : "";
+  const closesAt = survey.closesAt ? formatSurveyDateTime(survey.closesAt) : "";
+  if (opensAt && closesAt) return `${opensAt} – ${closesAt}`;
+  if (closesAt) return lang === "ko" ? `${closesAt} 마감` : `Closes ${closesAt}`;
+  return lang === "ko" ? `${opensAt} 시작` : `Opens ${opensAt}`;
 }

@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { useLocalizedSiteContent } from "@/features/site-content/site-content";
+import { useLocalizedSiteContent, usePublicContentBlocksByType } from "@/features/site-content/site-content";
+import { resolveAssetUrl } from "@/lib/asset-url";
 import { Button } from "@/components/ui/button";
 import { PageTabButton, PageTabs, PageToolbar } from "@/components/ui/page-layout";
 
@@ -146,7 +147,7 @@ function IntroSection({ lang }: { lang: string }) {
         </div>
         <Link
           to="/about/roadmap"
-          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-5 text-sm font-bold text-white transition-colors hover:bg-kaist-darkgreen/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kaist-darkgreen"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-5 text-sm font-bold text-white transition-colors hover:bg-kaist-darkgreen/90"
         >
           {lang === "ko" ? "로드맵 보기" : "View roadmap"}
           <ArrowRight aria-hidden="true" className="h-4 w-4" />
@@ -166,7 +167,7 @@ function IntroSection({ lang }: { lang: string }) {
         </div>
         <Link
           to="/about/faq"
-          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-kaist-darkgreen/20 bg-white px-4 text-sm font-bold text-kaist-darkgreen transition-colors hover:bg-kaist-lightgreen/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kaist-darkgreen"
+          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-kaist-darkgreen/20 bg-white px-4 text-sm font-bold text-kaist-darkgreen transition-colors hover:bg-kaist-lightgreen/10"
         >
           {lang === "ko" ? "FAQ 보기" : "View FAQ"}
           <ArrowRight aria-hidden="true" className="h-4 w-4" />
@@ -274,73 +275,33 @@ function TimelineItem({
 }
 
 function OrgSection({ lang }: { lang: string }) {
+  const organizationChart = usePublicContentBlocksByType("ORGANIZATION_CHART")[0];
+
+  if (organizationChart?.imageUrl) {
+    return (
+      <div className="animate-in space-y-6 fade-in duration-300">
+        <h2 className="text-2xl font-bold text-kaist-black">
+          {lang === "ko" ? "조직도" : "Organization Chart"}
+        </h2>
+        <figure className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-white p-4 sm:p-6">
+          <img
+            src={resolveAssetUrl(organizationChart.imageUrl)}
+            alt={lang === "ko" ? organizationChart.titleKo : organizationChart.titleEn || organizationChart.titleKo}
+            className="mx-auto h-auto max-h-[70vh] w-full object-contain"
+          />
+        </figure>
+      </div>
+    );
+  }
+
   return (
-    <div className="animate-in space-y-8 fade-in duration-300">
-      <h2 className="mb-8 text-2xl font-bold text-kaist-black">
+    <div className="animate-in space-y-6 fade-in duration-300">
+      <h2 className="text-2xl font-bold text-kaist-black">
         {lang === "ko" ? "조직도" : "Organization Chart"}
       </h2>
-      <div className="flex flex-col items-center space-y-8 pt-4">
-        <div className="max-w-xs rounded-2xl border border-kaist-darkgreen/20 bg-gradient-to-r from-kaist-darkgreen to-kaist-darkgreen/80 px-8 py-3 text-center text-white shadow-md">
-          <div className="text-xs font-semibold opacity-75">
-            {lang === "ko" ? "학생 대표단" : "Representatives"}
-          </div>
-          <div className="mt-0.5 font-bold">
-            {lang === "ko"
-              ? "집행위원회장 & 부집행위원회장"
-              : "President & Vice President"}
-          </div>
-        </div>
-        <div className="h-8 w-0.5 bg-gray-200" />
-        <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-4">
-          <DepartmentCard
-            description={
-              lang === "ko"
-                ? "간담회, 세미나, 친목 행사 등 주요 이벤트를 총괄 및 기획합니다."
-                : "Plans major events such as townhalls, seminars, and socials."
-            }
-            title={lang === "ko" ? "기획국" : "Planning"}
-          />
-          <DepartmentCard
-            description={
-              lang === "ko"
-                ? "집행위원회비 정산, 예결산 공고 등 투명한 재정을 담당합니다."
-                : "Manages student fees, budget announcements, and finances."
-            }
-            title={lang === "ko" ? "사무/재정국" : "Finance"}
-          />
-          <DepartmentCard
-            description={
-              lang === "ko"
-                ? "집행위원회 디자인 자산 제작 및 SNS 홍보 채널을 운영합니다."
-                : "Produces student council graphics and manages social media channels."
-            }
-            title={lang === "ko" ? "홍보/디자인국" : "Content & Design"}
-          />
-          <DepartmentCard
-            description={
-              lang === "ko"
-                ? "학생 커뮤니티, 챗봇, 자동화 도구 등 시스템 인프라를 운영합니다."
-                : "Maintains computing system infrastructures, community apps, and bots."
-            }
-            title={lang === "ko" ? "기술지원국" : "Technical Support"}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DepartmentCard({
-  description,
-  title,
-}: {
-  description: string;
-  title: string;
-}) {
-  return (
-    <div className="space-y-2 rounded-2xl border border-gray-100 bg-slate-50 p-5 text-center">
-      <h3 className="text-sm font-bold text-kaist-black">{title}</h3>
-      <p className="text-xs leading-relaxed text-gray-500">{description}</p>
+      <p className="rounded-xl border border-[#e5e9ec] bg-white px-5 py-12 text-center text-sm font-normal text-[#344054]">
+        {lang === "ko" ? "등록된 조직도가 없습니다." : "No organization chart has been published."}
+      </p>
     </div>
   );
 }

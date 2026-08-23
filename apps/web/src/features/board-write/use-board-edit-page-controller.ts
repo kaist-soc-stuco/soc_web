@@ -12,8 +12,10 @@ import {
 } from "@soc/shared";
 
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { hasAdminPermission } from "@/lib/permissions";
 
 import type { AttachedAsset } from "./board-write-form-sections";
 
@@ -42,6 +44,7 @@ export function useBoardEditPageController() {
   const navigate = useNavigate();
   const location = useLocation();
   const { lang } = useLanguage();
+  const { data: session } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
 
   const apiClient = useMemo(
@@ -81,9 +84,13 @@ export function useBoardEditPageController() {
   const [draftStatus, setDraftStatus] = useState<
     "idle" | "saving" | "saved" | "failed" | "conflict"
   >("idle");
+  const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
   const initialFingerprintRef = useRef<string | null>(null);
   const lastDraftFingerprintRef = useRef<string | null>(null);
+  const autoRestoredDraftRef = useRef<string | null>(null);
   const canConfigurePostSettings = !PUBLIC_WRITE_BOARD_CODES.has(category);
+  const canManageTemplates = hasAdminPermission(session?.permission);
+  const routeDraftId = new URLSearchParams(location.search).get("draftId");
 
   const backToArticle = () => {
     navigate(`/board/${category}/${articleId}`);
@@ -238,7 +245,6 @@ export function useBoardEditPageController() {
     if (!articleId) return;
 
     let cancelled = false;
-    const routeDraftId = new URLSearchParams(location.search).get("draftId");
     const listRequest = apiClient.getArticleDrafts({
       boardCode: category,
       limit: 20,
@@ -267,6 +273,7 @@ export function useBoardEditPageController() {
           setServerDraftId(draft.draftId);
           setServerDraftVersion(draft.version);
           setDraftStatus("saved");
+          setDraftRestoredAt(draft.updatedAt);
         })
         .catch(() => undefined);
     }
@@ -275,6 +282,21 @@ export function useBoardEditPageController() {
       cancelled = true;
     };
   }, [apiClient, articleId, category, location.search]);
+
+  useEffect(() => {
+    if (loading || !articleId || routeDraftId) return;
+    const draft = drafts.find(
+      (item) => item.targetArticleId === articleId,
+    );
+    if (!draft || autoRestoredDraftRef.current === draft.draftId) return;
+
+    autoRestoredDraftRef.current = draft.draftId;
+    applyDraft(draft);
+    setServerDraftId(draft.draftId);
+    setServerDraftVersion(draft.version);
+    setDraftStatus("saved");
+    setDraftRestoredAt(draft.updatedAt);
+  }, [articleId, drafts, loading, routeDraftId]);
 
   const handleSaveDraft = async () => {
     if (!articleId || (!titleKo.trim() && !contentKo.trim())) return;
@@ -314,9 +336,17 @@ export function useBoardEditPageController() {
       setServerDraftId(draft.draftId);
       setServerDraftVersion(draft.version);
       setDraftStatus("saved");
+      setDraftRestoredAt(draft.updatedAt);
     } catch {
       setDraftStatus("failed");
     }
+  };
+
+  const handleStartNewDraft = () => {
+    if (serverDraftId) {
+      void apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
+    }
+    navigate(`/board/${category}/write`);
   };
 
   const handleDeleteDraft = async (draftId: string) => {
@@ -606,11 +636,13 @@ export function useBoardEditPageController() {
     allowSecret,
     backToArticle,
     canConfigurePostSettings,
+    canManageTemplates,
     category,
     contentEn,
     contentKo,
     drafts,
     draftStatus,
+    draftRestoredAt,
     error,
     eventDescriptionKo,
     eventDescriptionEn,
@@ -620,6 +652,7 @@ export function useBoardEditPageController() {
     handleSubmit,
     handleDeleteDraft,
     handleRestoreDraft,
+    handleStartNewDraft,
     handleSaveDraft,
     handleUploadFiles,
     isAnonymous,

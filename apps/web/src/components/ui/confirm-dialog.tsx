@@ -1,9 +1,8 @@
-import { AlertTriangle, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
+import { Modal } from "@/components/ui/modal";
 import { useLanguage } from "@/hooks/use-language";
 
 type ConfirmTone = "default" | "danger";
@@ -12,7 +11,7 @@ type ConfirmOptions = {
   cancelLabel?: string;
   confirmLabel?: string;
   description?: string;
-  title: string;
+  title: ReactNode;
   tone?: ConfirmTone;
 };
 
@@ -48,19 +47,6 @@ export function useConfirmDialog() {
     });
   }, [lang]);
 
-  useEffect(() => {
-    if (!state) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        close(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [close, state]);
-
   useEffect(
     () => () => {
       resolverRef.current?.(false);
@@ -70,49 +56,19 @@ export function useConfirmDialog() {
   );
 
   const ConfirmDialog = state
-    ? createPortal(
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-6 backdrop-blur-[2px]"
-          role="dialog"
-        >
-          <Button variant="ghost"
-            type="button"
-            aria-label={lang === "ko" ? "닫기" : "Close"}
-            className="absolute inset-0 cursor-default"
-            onClick={() => close(false)}
-          />
-          <div className="relative w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
-            <div className="flex items-start gap-3">
-              <div
-                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  state.tone === "danger"
-                    ? "bg-rose-50 text-rose-600"
-                    : "bg-emerald-50 text-kaist-darkgreen"
-                }`}
-              >
-                <AlertTriangle className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-[15px] font-semibold leading-snug text-slate-900">
-                  {state.title}
-                </h2>
-                {state.description && (
-                  <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-slate-500">
-                    {state.description}
-                  </p>
-                )}
-              </div>
-              <IconButton
-                size="sm"
-                aria-label={lang === "ko" ? "닫기" : "Close"}
-                onClick={() => close(false)}
-              >
-                <X aria-hidden="true" />
-              </IconButton>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
+    ? (
+        <Modal
+          open
+          onClose={() => close(false)}
+          title={
+            <span className="text-xl font-semibold leading-7 text-slate-900">
+              {state.title}
+            </span>
+          }
+          className="max-w-md"
+          bodyClassName="px-6 py-5"
+          footer={
+            <>
               <Button
                 type="button"
                 size="sm"
@@ -133,10 +89,26 @@ export function useConfirmDialog() {
               >
                 {state.confirmLabel}
               </Button>
+            </>
+          }
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            <div
+              className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full ${
+                state.tone === "danger"
+                  ? "bg-rose-50 text-rose-600"
+                  : "bg-emerald-50 text-kaist-darkgreen"
+              }`}
+            >
+              <AlertTriangle className="size-4" aria-hidden="true" />
             </div>
+            {state.description ? (
+              <p className="min-w-0 break-keep text-sm font-medium leading-6 text-slate-600">
+                {state.description}
+              </p>
+            ) : null}
           </div>
-        </div>,
-        document.body,
+        </Modal>
       )
     : null;
 

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
-import { AdminFormField, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/data-state";
@@ -219,26 +219,22 @@ export function AuditLogPage() {
 
           <AdminTableCard className="overflow-visible">
             <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-end xl:justify-between">
+              <div className="flex flex-wrap items-end gap-2">
+                <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-36 shrink-0" />
+                <div aria-label="기간" className="flex w-full items-center gap-2 sm:w-[19rem]">
+                  <UiInput aria-label="시작일" type="date" value={dateFrom} onChange={(event) => updatePageFilter(setDateFrom, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
+                  <span className="text-sm text-slate-400">～</span>
+                  <UiInput aria-label="종료일" type="date" value={dateTo} onChange={(event) => updatePageFilter(setDateTo, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
+                </div>
+              </div>
               <PageSearchField
                 ariaLabel="운영 로그 검색"
-                className="w-full xl:max-w-[25rem]"
+                className="order-first ml-auto w-full xl:order-last xl:w-[25rem]"
                 onChange={(value) => updatePageFilter(setQuery, value)}
                 onClear={() => updatePageFilter(setQuery, "")}
                 placeholder="담당자, 대상, 액션 검색"
                 value={query}
               />
-              <div className="flex flex-wrap items-end gap-2">
-                <AdminFormField label="도메인" className="w-40">
-                  <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-full" />
-                </AdminFormField>
-                <AdminFormField label="기간" className="flex-1 sm:min-w-[19rem]">
-                  <div className="flex items-center gap-2">
-                    <UiInput aria-label="시작일" type="date" value={dateFrom} onChange={(event) => updatePageFilter(setDateFrom, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
-                    <span className="text-sm text-slate-400">～</span>
-                    <UiInput aria-label="종료일" type="date" value={dateTo} onChange={(event) => updatePageFilter(setDateTo, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
-                  </div>
-                </AdminFormField>
-              </div>
             </div>
 
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
@@ -302,7 +298,7 @@ export function AuditLogPage() {
 function SortableHead({ label, active, ascending, onClick }: { label: string; active: boolean; ascending: boolean; onClick: () => void }) {
   return (
     <AdminTableHead>
-      <button type="button" onClick={onClick} className="inline-flex h-8 items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/20">
+      <button type="button" onClick={onClick} className="inline-flex h-8 items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
         {label}
         <ArrowDown aria-hidden="true" className={`size-3 ${active ? "text-brand-primary" : "opacity-40"} ${active && ascending ? "rotate-180" : ""}`} />
       </button>

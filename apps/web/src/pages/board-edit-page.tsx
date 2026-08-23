@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Header } from "@/components/organisms/header";
@@ -10,10 +11,15 @@ import {
   BoardWriteSettings,
   BoardWriteFooter,
 } from "@/features/board-write/board-write-form-sections";
+import {
+  ArticleTemplateControl,
+  type BoardTemplateSnapshot,
+} from "@/features/board-write/article-template-control";
 import { useBoardEditPageController } from "@/features/board-write/use-board-edit-page-controller";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
+import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 
 export function BoardEditPage() {
   const {
@@ -23,10 +29,11 @@ export function BoardEditPage() {
     allowSecret,
     backToArticle,
     canConfigurePostSettings,
+    canManageTemplates,
     category,
     contentEn,
     contentKo,
-    drafts,
+    draftRestoredAt,
     error,
     eventDescriptionKo,
     eventDescriptionEn,
@@ -34,9 +41,7 @@ export function BoardEditPage() {
     eventStartDate,
     fileInputRef,
     handleSubmit,
-    handleDeleteDraft,
-    handleRestoreDraft,
-    handleSaveDraft,
+    handleStartNewDraft,
     handleUploadFiles,
     isAnonymous,
     isEventAlwaysOpen,
@@ -69,6 +74,45 @@ export function BoardEditPage() {
     uploading,
   } = useBoardEditPageController();
   const categoryLabel = getBoardLabelFromMetadata(undefined, category, lang);
+  const [dismissedDraftAt, setDismissedDraftAt] = useState<string | null>(null);
+  const showDraftRestoredBanner = Boolean(draftRestoredAt && draftRestoredAt !== dismissedDraftAt);
+  const templateSnapshot: BoardTemplateSnapshot = {
+    boardCode: category,
+    titleKo,
+    titleEn,
+    contentKo,
+    contentEn,
+    isAnonymous,
+    isPinned,
+    isSecret,
+    allowComment,
+    isKoreanOnly,
+    isEventAlwaysOpen,
+    eventStartDate,
+    eventEndDate,
+    eventDescriptionKo,
+    eventDescriptionEn,
+    selectedSurveyId,
+    assets,
+  };
+  const applyTemplate = (template: BoardTemplateSnapshot) => {
+    setTitleKo(template.titleKo);
+    setTitleEn(template.titleEn);
+    setContentKo(template.contentKo);
+    setContentEn(template.contentEn);
+    setIsAnonymous(template.isAnonymous);
+    setIsPinned(template.isPinned);
+    setIsSecret(template.isSecret);
+    setAllowComment(template.allowComment);
+    setIsKoreanOnly(template.isKoreanOnly);
+    setIsEventAlwaysOpen(template.isEventAlwaysOpen);
+    setEventStartDate(template.eventStartDate);
+    setEventEndDate(template.eventEndDate);
+    setEventDescriptionKo(template.eventDescriptionKo);
+    setEventDescriptionEn(template.eventDescriptionEn);
+    setSelectedSurveyId(template.selectedSurveyId);
+    setAssets(template.assets.map((asset) => ({ ...asset })));
+  };
 
   return (
     <PageShell className="text-slate-950">
@@ -87,20 +131,26 @@ export function BoardEditPage() {
           { label: categoryLabel },
         ]}
         actions={
-          <BoardWriteFooter
-            compact
-            draftCount={drafts.length}
-            drafts={drafts}
-            lang={lang}
-            isSubmitting={isSubmitting}
-            onCancel={backToArticle}
-            onDeleteDraft={handleDeleteDraft}
-            onRestoreDraft={handleRestoreDraft}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-            submitLabel={lang === "ko" ? "수정 완료" : "Save Changes"}
-            submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}
-          />
+          <div className="flex items-center justify-end gap-2">
+            {canManageTemplates ? (
+              <ArticleTemplateControl
+                boardCode={category}
+                boardLabel={categoryLabel}
+                lang={lang}
+                onApply={applyTemplate}
+                snapshot={templateSnapshot}
+              />
+            ) : null}
+            <BoardWriteFooter
+              compact
+              lang={lang}
+              isSubmitting={isSubmitting}
+              onCancel={backToArticle}
+              onSubmit={handleSubmit}
+              submitLabel={lang === "ko" ? "수정 완료" : "Save Changes"}
+              submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}
+            />
+          </div>
         }
       />
 
@@ -135,6 +185,14 @@ export function BoardEditPage() {
                 className="hidden"
                 onChange={(event) => void handleUploadFiles(event.target.files)}
               />
+
+              {showDraftRestoredBanner ? (
+                <DraftRestoredBanner
+                  savedAt={draftRestoredAt ?? undefined}
+                  onStartNew={handleStartNewDraft}
+                  onDismiss={() => setDismissedDraftAt(draftRestoredAt)}
+                />
+              ) : null}
 
               {/* Unified Editor Card Container */}
               <DataViewCard>

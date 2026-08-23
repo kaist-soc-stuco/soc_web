@@ -68,14 +68,16 @@ export function getCalendarEventStyles(
   if (sourceType === "KAIST_ACADEMIC") {
     return {
       bg: "bg-slate-200 text-slate-600 hover:bg-slate-300",
+      hoverBg: "bg-slate-300",
       bullet: "bg-slate-500",
-      label: lang === "ko" ? "KAIST 학사일정" : "KAIST Academic",
+      label: lang === "ko" ? "학사일정" : "Academic schedule",
     };
   }
 
   if (sourceType === "MANUAL") {
     return {
       bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
+      hoverBg: "bg-brand-primary/25",
       bullet: "bg-brand-primary",
       label: lang === "ko" ? "직접 등록" : "Manual",
     };
@@ -85,18 +87,21 @@ export function getCalendarEventStyles(
     case "VOTE":
       return {
         bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
+        hoverBg: "bg-sky-200",
         bullet: "bg-sky-500",
         label: lang === "ko" ? "투표" : "Vote",
       };
     case "EVENT":
       return {
         bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
+        hoverBg: "bg-brand-primary/25",
         bullet: "bg-brand-primary",
         label: lang === "ko" ? "행사" : "Event",
       };
     case "APPLICATION":
       return {
         bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
+        hoverBg: "bg-sky-200",
         bullet: "bg-sky-500",
         label: lang === "ko" ? "신청" : "Application",
       };
@@ -104,6 +109,7 @@ export function getCalendarEventStyles(
     default:
       return {
         bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
+        hoverBg: "bg-sky-200",
         bullet: "bg-sky-500",
         label: lang === "ko" ? "설문" : "Survey",
       };

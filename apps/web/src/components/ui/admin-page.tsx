@@ -13,7 +13,7 @@ interface AdminPageShellProps extends ComponentProps<"div"> {
 
 export function AdminPageShell({ children, className, ...props }: AdminPageShellProps) {
   return (
-    <div className={cn("admin-page min-h-full bg-[#f7f9fc] text-[#172033]", className)} {...props}>
+    <div className={cn("admin-page min-h-full max-w-full overflow-x-hidden bg-[#f7f9fc] text-[#172033]", className)} {...props}>
       {children}
     </div>
   );
@@ -187,9 +187,9 @@ export function AdminFormField({
 }) {
   return (
     <label className={cn("grid min-w-0 gap-1.5", className)} {...props}>
-      <span className={cn("text-xs font-medium leading-4 text-slate-600", labelClassName)}>{label}</span>
+      <span className={cn("text-xs font-normal leading-4 text-[#344054]", labelClassName)}>{label}</span>
       {children}
-      {hint ? <span className="text-xs font-normal leading-4 text-slate-500">{hint}</span> : null}
+      {hint ? <span className="text-xs font-normal leading-4 text-[#344054]">{hint}</span> : null}
     </label>
   );
 }

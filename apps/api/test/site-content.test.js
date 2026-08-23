@@ -8,6 +8,7 @@ const {
 const { Reflector } = require("@nestjs/core");
 const {
   Permissions,
+  CreateContentBlockSchema,
   SITE_CONTENT_KEYS,
   SiteContentKeySchema,
   UpsertSiteContentSchema,
@@ -53,6 +54,33 @@ test("site content contracts accept only finite keys and complete bilingual copy
     }).success,
     false,
   );
+});
+
+test("organization chart content requires exactly one image field per block", () => {
+  const base = {
+    type: "ORGANIZATION_CHART",
+    titleKo: "조직도",
+    titleEn: "Organization Chart",
+  };
+  assert.equal(CreateContentBlockSchema.safeParse(base).success, false);
+  assert.equal(
+    CreateContentBlockSchema.safeParse({ ...base, imageUrl: "https://example.com/org-chart.png" }).success,
+    true,
+  );
+  assert.equal(
+    CreateContentBlockSchema.safeParse({ ...base, imageUrl: "asset:42" }).success,
+    true,
+  );
+});
+
+test("hero content is an image-only operational block", () => {
+  const base = {
+    type: "HERO",
+    titleKo: "홈 히어로",
+    titleEn: "Home hero",
+  };
+  assert.equal(CreateContentBlockSchema.safeParse(base).success, false);
+  assert.equal(CreateContentBlockSchema.safeParse({ ...base, imageUrl: "asset:7" }).success, true);
 });
 
 test("public listing omits editor identity while admin listing retains audit fields", async () => {

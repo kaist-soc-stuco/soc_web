@@ -516,7 +516,6 @@ export class CalendarService {
         and(
           eq(boards.code, "행사"),
           eq(boards.isActive, true),
-          eq(boards.readScope, "PUBLIC"),
           eq(articles.status, "PUBLISHED"),
           eq(articles.visibilityScope, "PUBLIC"),
           ...(titleFilter ? [titleFilter] : []),

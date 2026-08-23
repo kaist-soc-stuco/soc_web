@@ -24,8 +24,10 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     calendarEvents,
     calendarQuery,
     currentDate,
+    engagementSubmitting,
     error,
     holidays,
+    handleSetEngagement,
     loading,
     selectedDate,
     setCurrentDate,
@@ -63,6 +65,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
         <PageContainer className="pb-8">
           {currentTab !== "calendar" && !loading && !error ? (
             <EventsSurveysFilterBar
+              isEventTab={currentTab === "event"}
               lang={lang}
               onQueryChange={setItemQuery}
               onSortByChange={setSortBy}
@@ -112,7 +115,12 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               </p>
             </div>
           ) : (
-            <EventsSurveysGrid items={visibleItems} lang={lang} />
+            <EventsSurveysGrid
+              engagementSubmitting={engagementSubmitting}
+              items={visibleItems}
+              lang={lang}
+              onEngagementToggle={handleSetEngagement}
+            />
           )}
         </PageContainer>
       </PageMain>

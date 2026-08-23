@@ -22,7 +22,6 @@ import {
   nowMs,
 } from "@soc/shared";
 import {
-  ArrowLeft,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -35,13 +34,13 @@ import {
   X,
 } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useNavigate } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { RichTextEditor } from "@/components/organisms/rich-text-editor";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { AdminFormField, AdminPageShell } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
+import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
@@ -122,9 +121,7 @@ const RECIPIENT_FILTER_GROUPS: ReadonlyArray<{
     label: "학적",
     options: [
       { kind: "filter", key: "academicStatus", value: "재학", label: "재학" },
-      { kind: "filter", key: "academicStatus", value: "휴학", label: "휴학" },
       { kind: "filter", key: "academicStatus", value: "졸업", label: "졸업" },
-      { kind: "filter", key: "academicStatus", value: "수료", label: "수료" },
     ],
   },
 ];
@@ -152,7 +149,6 @@ export function BulkEmailPage() {
 
 function BulkEmailPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
-  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
@@ -161,6 +157,7 @@ function BulkEmailPageContent() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateSaveOpen, setTemplateSaveOpen] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
@@ -168,8 +165,10 @@ function BulkEmailPageContent() {
   const [initialLocalDraft] = useState<StoredEmailDraft | null>(() => readStoredEmailDraft());
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftNoticeVisible, setDraftNoticeVisible] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
   const draftClearedRef = useRef(false);
+  const skipNextDraftSaveRef = useRef(false);
 
   const [recipientType, setRecipientType] = useState<SendBulkEmailRequest["recipientType"]>(
     "UNPAID_STUDENTS",
@@ -204,26 +203,45 @@ function BulkEmailPageContent() {
 
   const filterSignature = useMemo(() => JSON.stringify(normalizeFilters(filters)), [filters]);
   const activeFilterEntries = useMemo(() => {
-    const entries: Array<{ key: RecipientFilterKey; label: string; value: string }> = [];
-    const add = (key: RecipientFilterKey, label: string, value: string | undefined) => {
+    const entries: Array<{
+      key: RecipientFilterKey;
+      label: string;
+      tokenLabel: string;
+      value: string;
+    }> = [];
+    const add = (
+      key: RecipientFilterKey,
+      label: string,
+      value: string | undefined,
+      tokenLabel = value,
+    ) => {
       const normalized = value?.trim();
-      if (normalized) entries.push({ key, label, value: normalized });
+      if (normalized) entries.push({ key, label, tokenLabel: tokenLabel ?? normalized, value: normalized });
     };
 
     add("studentNumber", "학번", formatStudentNumberFilter(filters.studentNumber));
     add("academicStatus", "학적", filters.academicStatus);
-    add("primaryMajor", "주전공", filters.primaryMajor);
-    add("doubleMajor", "복수전공", filters.doubleMajor);
-    add("minor", "부전공", filters.minor);
-    add("query", "검색", filters.query);
+    add("primaryMajor", "주전공", filters.primaryMajor, `${filters.primaryMajor ?? ""} 주전공`);
+    add("doubleMajor", "복수전공", filters.doubleMajor, `${filters.doubleMajor ?? ""} 복수전공`);
+    add("minor", "부전공", filters.minor, `${filters.minor ?? ""} 부전공`);
+    add("query", "검색", filters.query, `검색: ${filters.query ?? ""}`);
     return entries;
   }, [filters]);
+  const filteredTemplates = useMemo(() => {
+    const query = templateSearch.trim().toLocaleLowerCase();
+    if (!query) return templates;
+    return templates.filter((template) =>
+      `${template.name} ${template.description ?? ""}`.toLocaleLowerCase().includes(query),
+    );
+  }, [templateSearch, templates]);
   const selectedRecipientLabel =
     RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "수신 대상";
-  const previewRecipientName = reviewPreview?.sample[0]?.nameKo || "학우";
+  const previewRecipient = reviewPreview?.sample[0];
   const previewContent = renderEmailTemplate(content, {
-    이름: previewRecipientName,
-    학번: reviewPreview?.sample[0]?.studentNumber ?? "",
+    이름: previewRecipient?.nameKo || "학우",
+    학번: previewRecipient?.studentNumber ?? "",
+    이메일: previewRecipient?.email ?? "",
+    전화번호: previewRecipient?.phoneNumber ?? "",
   });
 
   const applyTemplateToForm = (template: BulkEmailTemplate) => {
@@ -241,6 +259,7 @@ function BulkEmailPageContent() {
   };
 
   const applyLocalDraftToForm = (draft: StoredEmailDraft) => {
+    skipNextDraftSaveRef.current = true;
     setSelectedTemplateId("");
     setRecipientType(draft.recipientType);
     setSubject(draft.subject);
@@ -254,27 +273,34 @@ function BulkEmailPageContent() {
     setOperationError(null);
     setDraftRestored(true);
     setDraftSavedAt(draft.savedAt);
+    setDraftNoticeVisible(true);
   };
 
   useEffect(() => {
     let mounted = true;
-    const loadInitialData = async () => {
-      const templateResult = await Promise.allSettled([apiClient.getBulkEmailTemplates()]);
-      if (!mounted) return;
+    if (initialLocalDraft) applyLocalDraftToForm(initialLocalDraft);
 
-      if (templateResult.status === "fulfilled") {
-        setTemplates(templateResult.value[0].items);
+    const loadInitialData = async () => {
+      try {
+        const templateResponse = await apiClient.getBulkEmailTemplates();
+        if (!mounted) return;
+
+        setTemplates(templateResponse.items);
         const defaultTemplate =
-          templateResult.value[0].items.find((template) => template.id === "f26-unpaid-reminder") ??
-          templateResult.value[0].items[0];
-        if (initialLocalDraft) applyLocalDraftToForm(initialLocalDraft);
-        else if (defaultTemplate) applyTemplateToForm(defaultTemplate);
-      } else {
+          templateResponse.items.find((template) => template.id === "f26-unpaid-reminder") ??
+          templateResponse.items[0];
+        if (!initialLocalDraft && defaultTemplate) {
+          skipNextDraftSaveRef.current = true;
+          applyTemplateToForm(defaultTemplate);
+        }
+      } catch {
+        if (!mounted) return;
         setOperationError("템플릿을 불러오지 못했습니다.");
-        if (initialLocalDraft) applyLocalDraftToForm(initialLocalDraft);
       }
-      setTemplatesLoading(false);
-      setDraftReady(true);
+      if (mounted) {
+        setTemplatesLoading(false);
+        setDraftReady(true);
+      }
     };
     void loadInitialData();
     return () => {
@@ -297,7 +323,10 @@ function BulkEmailPageContent() {
       void apiClient
         .previewBulkEmailRecipients(request)
         .then((response) => {
-          if (active) setRecipientCount(response.recipientCount);
+          if (active) {
+            setRecipientCount(response.recipientCount);
+            setReviewPreview(response);
+          }
         })
         .catch(() => {
           if (active) setRecipientCount(null);
@@ -311,6 +340,40 @@ function BulkEmailPageContent() {
       window.clearTimeout(timer);
     };
   }, [apiClient, filterSignature, filters, recipientType]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+
+    const hasDraftContent = Boolean(
+      subject.trim() || content.trim() || Object.keys(normalizeFilters(filters)).length,
+    );
+    if (draftClearedRef.current && !hasDraftContent) return;
+    if (draftClearedRef.current) draftClearedRef.current = false;
+
+    const timer = window.setTimeout(() => {
+      const savedAt = msToIso(nowMs());
+      const draft: StoredEmailDraft = {
+        content,
+        contentType,
+        filters: normalizeFilters(filters),
+        recipientType,
+        savedAt,
+        subject,
+      };
+      try {
+        window.localStorage.setItem(EMAIL_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        if (draftRestored) setDraftSavedAt(savedAt);
+      } catch {
+        // Storage can be unavailable in private browsing; the editor remains usable.
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [content, contentType, draftReady, draftRestored, filters, recipientType, subject]);
 
   const buildRequest = (options?: {
     includeSchedule?: boolean;
@@ -356,6 +419,43 @@ function BulkEmailPageContent() {
     }
   };
 
+  const clearStoredDraft = () => {
+    try {
+      window.localStorage.removeItem(EMAIL_DRAFT_STORAGE_KEY);
+    } catch {
+      // Storage can be unavailable in private browsing; continue clearing the form.
+    }
+    draftClearedRef.current = true;
+    setDraftRestored(false);
+    setDraftSavedAt(null);
+    setDraftNoticeVisible(false);
+  };
+
+  const handleStartNew = () => {
+    clearStoredDraft();
+    setSelectedTemplateId("");
+    setRecipientType("ALL");
+    setFilters({});
+    setSubject("");
+    setContent("");
+    setContentType("html");
+    setAttachments([]);
+    setScheduledAt("");
+    setRecipientMenuOpen(false);
+    setOperationError(null);
+    setStatusNotice(null);
+  };
+
+  const handleRecipientMenuSelect = (option: RecipientFilterMenuOption) => {
+    if (option.kind === "recipientType") {
+      setRecipientType(option.value);
+    } else {
+      setFilters((previous) => ({ ...previous, [option.key]: option.value }));
+    }
+    setRecipientMenuOpen(false);
+    setOperationError(null);
+  };
+
   const handleConfirmSend = async () => {
     if (!reviewPreview) return;
     if (!validateMessage()) return;
@@ -366,10 +466,8 @@ function BulkEmailPageContent() {
       const response = await apiClient.sendBulkEmail(
         buildRequest({ idempotencyKey: idempotencyKeyRef.current }),
       );
-      if (recoveredDraftId) {
-        await apiClient.deleteBulkEmailDraft(recoveredDraftId).catch(() => undefined);
-      }
-      setRecoveredDraftId(undefined);
+      skipNextDraftSaveRef.current = true;
+      clearStoredDraft();
       setReviewOpen(false);
       setReviewPreview(null);
       setDeliveryMode("now");
@@ -523,8 +621,8 @@ function BulkEmailPageContent() {
       role="tablist"
       value={editorMode}
       onChange={setEditorMode}
-      className="!border-0 !bg-transparent !p-0 !shadow-none"
-      itemClassName="!h-8 !min-h-8 !rounded-md !px-2.5 text-xs"
+      className="email-composer-mode-tabs"
+      itemClassName="!h-8 !min-h-8 !rounded-md !px-3 !text-xs"
       options={[
         { value: "editor" as const, label: "에디터" },
         { value: "preview" as const, label: "미리보기" },
@@ -536,15 +634,8 @@ function BulkEmailPageContent() {
   return (
     <AdminPageShell className="email-composer-page min-h-screen !bg-slate-50">
       <main className="w-full px-5 pb-16 md:px-8">
-        <header className="mx-auto grid min-h-14 w-full max-w-[1180px] gap-3 border-b border-slate-200 bg-white px-4 py-3 md:grid-cols-[1fr_auto_1fr] md:items-center md:px-6 md:py-0">
-          <div className="min-w-0">
-            <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="-ml-3 text-slate-600">
-              <ArrowLeft aria-hidden="true" />
-              이메일 목록
-            </Button>
-          </div>
-          <h1 className="text-center text-sm font-semibold text-slate-800">이메일 작성</h1>
-          <div className="flex flex-wrap items-center justify-start gap-2 md:justify-end">
+        <header className="email-composer-header mx-auto mt-6 flex w-full max-w-5xl items-center justify-end gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={openHistory}>
               <History aria-hidden="true" />
               발송 이력
@@ -555,6 +646,7 @@ function BulkEmailPageContent() {
               size="sm"
               onClick={() => {
                 setTemplateSaveOpen(false);
+                setTemplateSearch("");
                 setTemplateModalOpen(true);
               }}
             >
@@ -569,18 +661,26 @@ function BulkEmailPageContent() {
         </header>
 
         {operationError ? (
-          <div className="mx-auto mt-4 w-full max-w-4xl rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700" role="alert">
+          <div className="mx-auto mt-4 w-full max-w-5xl rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700" role="alert">
             {operationError}
           </div>
         ) : null}
         {statusNotice ? (
-          <div className="mx-auto mt-4 w-full max-w-4xl rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700" role="status">
+          <div className="mx-auto mt-4 w-full max-w-5xl rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700" role="status">
             {statusNotice}
           </div>
         ) : null}
 
-        <form id="bulk-email-compose" className="mx-auto mt-6 w-full max-w-4xl" onSubmit={(event) => void handleReview(event)}>
+        <form id="bulk-email-compose" className="mx-auto mt-6 w-full max-w-5xl" onSubmit={(event) => void handleReview(event)}>
           <div className="email-composer-canvas rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            {draftRestored && draftSavedAt && draftNoticeVisible ? (
+              <DraftRestoredBanner
+                className="mb-5"
+                savedAt={draftSavedAt}
+                onStartNew={handleStartNew}
+                onDismiss={() => setDraftNoticeVisible(false)}
+              />
+            ) : null}
             <section className="border-b border-slate-100 pb-5" aria-label="수신 대상">
               <div className="flex min-h-10 items-center justify-between gap-4">
                 <div className="flex min-w-0 flex-wrap items-center gap-2.5">
@@ -589,59 +689,66 @@ function BulkEmailPageContent() {
                   {activeFilterEntries.map((entry) => (
                     <RecipientToken
                       key={entry.key}
-                      label={`${entry.label}: ${entry.value}`}
+                      label={entry.tokenLabel}
                       onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: undefined }))}
                     />
                   ))}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-expanded={recipientPopoverOpen}
-                    onClick={() => setRecipientPopoverOpen((open) => !open)}
-                    className="shrink-0 text-slate-500"
-                  >
-                    <Plus aria-hidden="true" />
-                    필터 조건
-                    <ChevronDown aria-hidden="true" className={recipientPopoverOpen ? "rotate-180" : ""} />
-                  </Button>
+                  <DropdownMenu.Root open={recipientMenuOpen} onOpenChange={setRecipientMenuOpen}>
+                    <DropdownMenu.Trigger asChild>
+                      <Button type="button" variant="ghost" size="sm" className="shrink-0 text-slate-500">
+                        <Plus aria-hidden="true" />
+                        필터 추가
+                        <ChevronDown aria-hidden="true" />
+                      </Button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        side="bottom"
+                        align="start"
+                        sideOffset={8}
+                        collisionPadding={12}
+                        className="z-[100] min-w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgb(15_23_42_/_0.14)]"
+                      >
+                        {RECIPIENT_FILTER_GROUPS.map((group) => (
+                          <DropdownMenu.Sub key={group.label}>
+                            <DropdownMenu.SubTrigger className="flex h-9 w-full items-center justify-between rounded-md px-2.5 text-sm font-normal text-slate-700 outline-none data-[highlighted]:bg-slate-100 data-[state=open]:bg-slate-100">
+                              {group.label}
+                              <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
+                            </DropdownMenu.SubTrigger>
+                            <DropdownMenu.Portal>
+                              <DropdownMenu.SubContent
+                                align="start"
+                                sideOffset={6}
+                                collisionPadding={12}
+                                className="z-[101] min-w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgb(15_23_42_/_0.14)]"
+                              >
+                                {group.options.map((option) => (
+                                  <DropdownMenu.Item
+                                    key={`${option.kind}-${option.label}`}
+                                    onSelect={() => handleRecipientMenuSelect(option)}
+                                    className="flex h-9 cursor-pointer items-center rounded-md px-2.5 text-sm font-normal text-slate-700 outline-none data-[highlighted]:bg-slate-100"
+                                  >
+                                    {option.label}
+                                  </DropdownMenu.Item>
+                                ))}
+                              </DropdownMenu.SubContent>
+                            </DropdownMenu.Portal>
+                          </DropdownMenu.Sub>
+                        ))}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
                 </div>
                 <span className="shrink-0 whitespace-nowrap text-sm font-normal text-slate-500">
                   수신 대상: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
                 </span>
               </div>
-              {recipientPopoverOpen ? (
-                <div className="mt-3 w-full max-w-sm rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm" role="region" aria-label="세부 수신 조건">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                      <SlidersHorizontal className="size-4 text-slate-500" aria-hidden="true" />
-                      세부 조건
-                    </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setFilters({})} className="text-xs font-normal text-slate-500">
-                      초기화
-                    </Button>
-                  </div>
-                  <div className="grid gap-3">
-                    {FILTER_OPTIONS.map((option) => (
-                      <AdminFormField key={option.key} label={option.label}>
-                        <AdminSelectDropdown
-                          id={`recipient-filter-${option.key}`}
-                          ariaLabel={option.label}
-                          value={filters[option.key] ?? ""}
-                          options={option.options}
-                          onChange={(value) => setFilters((previous) => ({ ...previous, [option.key]: value || undefined }))}
-                          className="w-full"
-                        />
-                      </AdminFormField>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </section>
 
           <section className="pb-8 pt-6 md:pt-7">
             <UiInput
               aria-label="메일 제목"
+              spellCheck={false}
               value={subject}
               onChange={(event) => setSubject(event.target.value)}
               maxLength={255}
@@ -661,21 +768,26 @@ function BulkEmailPageContent() {
                     setContentType("html");
                   }}
                   placeholder="본문을 입력하세요"
+                  spellCheck={false}
                   toolbarVariant="email"
                   uploading={uploading}
-                  variableLabel="치환자: {이름}"
-                  variableToken="{이름}"
+                  variableOptions={[
+                    { label: "{이름}", token: "{{이름}}" },
+                    { label: "{이메일}", token: "{{이메일}}" },
+                    { label: "{전화번호}", token: "{{전화번호}}" },
+                    { label: "{학번}", token: "{{학번}}" },
+                  ]}
                   toolbarSuffix={editorModeTabs}
                 />
               </div>
             ) : editorMode === "preview" ? (
               <>
-                <div className="mt-2 flex items-center justify-end border-y border-slate-100 py-2.5">
+                <div className="email-composer-mode-toolbar mt-2 flex items-center justify-end border-y border-slate-100">
                   {editorModeTabs}
                 </div>
                 <div className="tiptap-container min-h-[400px] px-6 py-6 prose prose-slate">
                   {content.trim() ? (
-                    <RichTextContent content={content} className="text-[15px] leading-7 text-slate-800" />
+                    <RichTextContent content={previewContent} className="text-[15px] leading-7 text-slate-800" />
                   ) : (
                     <p className="text-[15px] font-normal text-slate-400">본문을 입력하세요</p>
                   )}
@@ -683,7 +795,7 @@ function BulkEmailPageContent() {
               </>
             ) : (
               <>
-                <div className="mt-2 flex items-center justify-end border-y border-slate-100 py-2.5">
+                <div className="email-composer-mode-toolbar mt-2 flex items-center justify-end border-y border-slate-100">
                   {editorModeTabs}
                 </div>
                 <UiTextarea
@@ -735,20 +847,29 @@ function BulkEmailPageContent() {
         onClose={() => setTemplateModalOpen(false)}
         title="템플릿 양식 선택"
         className="max-w-2xl"
-        footer={<Button type="button" variant="outline" onClick={() => setTemplateModalOpen(false)}>닫기</Button>}
       >
         <div className="space-y-5">
-          <Button type="button" variant="outline" onClick={() => setTemplateSaveOpen((open) => !open)} className="w-full justify-start">
-            <Plus aria-hidden="true" />
-            현재 작성 내용을 새 템플릿으로 저장
-          </Button>
+          <div className="flex items-center gap-2">
+            <UiInput
+              aria-label="템플릿 검색"
+              spellCheck={false}
+              value={templateSearch}
+              onChange={(event) => setTemplateSearch(event.target.value)}
+              placeholder="템플릿 검색"
+              className="h-9 min-w-0 flex-1 text-sm font-normal"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={() => setTemplateSaveOpen((open) => !open)} className="shrink-0">
+              <Plus aria-hidden="true" />
+              현재 작성 내용을 새 템플릿으로 저장
+            </Button>
+          </div>
           {templateSaveOpen ? (
             <div className="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2">
               <AdminFormField label="템플릿 이름">
-                <UiInput value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="템플릿 이름" maxLength={100} className="h-9 text-sm font-normal" />
+                <UiInput spellCheck={false} value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="템플릿 이름" maxLength={100} className="h-9 text-sm font-normal" />
               </AdminFormField>
               <AdminFormField label="설명 (선택)">
-                <UiInput value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} placeholder="설명" maxLength={255} className="h-9 text-sm font-normal" />
+                <UiInput spellCheck={false} value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} placeholder="설명" maxLength={255} className="h-9 text-sm font-normal" />
               </AdminFormField>
               <div className="flex justify-end gap-2 sm:col-span-2">
                 <Button type="button" variant="ghost" size="sm" onClick={() => setTemplateSaveOpen(false)}>취소</Button>
@@ -762,17 +883,25 @@ function BulkEmailPageContent() {
               <p className="py-6 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
             ) : templates.length === 0 ? (
               <p className="py-6 text-center text-sm font-normal text-slate-500">저장된 양식이 없습니다.</p>
+            ) : filteredTemplates.length === 0 ? (
+              <p className="py-6 text-center text-sm font-normal text-slate-500">검색 결과가 없습니다.</p>
             ) : (
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                {templates.map((template) => (
-                  <div key={template.id} className="flex items-center gap-3 px-3 py-3">
-                    <div className="min-w-0 flex-1">
+                {filteredTemplates.map((template) => (
+                  <div key={template.id} className="group flex items-center gap-3 px-3 py-3 transition-colors hover:bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        applyTemplateToForm(template);
+                        setTemplateModalOpen(false);
+                      }}
+                      className="min-w-0 flex-1 text-left outline-none"
+                    >
                       <p className="truncate text-sm font-medium text-slate-800">{template.name}</p>
                       {template.description ? <p className="mt-0.5 truncate text-xs font-normal text-slate-500">{template.description}</p> : null}
-                    </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => { applyTemplateToForm(template); setTemplateModalOpen(false); }}>적용</Button>
+                    </button>
                     {template.createdBy ? (
-                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} title="템플릿 삭제" onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
                         <Trash2 aria-hidden="true" />
                       </Button>
                     ) : null}
@@ -782,30 +911,6 @@ function BulkEmailPageContent() {
             )}
           </section>
         </div>
-      </Modal>
-
-      <Modal
-        open={Boolean(recoveryDraft)}
-        onClose={() => setRecoveryDraft(null)}
-        title="이전 작성 내용"
-        className="max-w-md"
-        footer={
-          <>
-            <Button type="button" variant="ghost" onClick={() => setRecoveryDraft(null)}>나중에</Button>
-            <Button type="button" onClick={() => { if (recoveryDraft) applyRecordToForm(recoveryDraft); setRecoveryDraft(null); }}>불러오기</Button>
-          </>
-        }
-      >
-        {recoveryDraft ? (
-          <div className="space-y-2 text-sm font-normal text-slate-600">
-            <p className="truncate font-medium text-slate-800">
-              {recoveryDraft.subject && recoveryDraft.subject !== "__smoke_draft__"
-                ? recoveryDraft.subject
-                : "이전에 작성한 메일"}
-            </p>
-            <p>{formatKoreanDateTime(recoveryDraft.updatedAt)}에 작성된 내용입니다.</p>
-          </div>
-        ) : null}
       </Modal>
 
       <Modal
@@ -869,7 +974,7 @@ function BulkEmailPageContent() {
                     {recipientListOpen ? "명단 닫기" : "명단 확인"}
                   </Button>
                   {activeFilterEntries.length ? <span className="mt-1 block text-xs font-normal text-slate-500">{activeFilterEntries.map((entry) => `${entry.label}: ${entry.value}`).join(" · ")}</span> : null}
-                  {recipientListOpen && reviewPreview.sample.length ? <div className="mt-2 flex flex-wrap gap-1.5">{reviewPreview.sample.map((sample) => <span key={sample.email} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-600">{sample.nameKo} · {sample.email}</span>)}</div> : null}
+                  {recipientListOpen && reviewPreview.sample.length ? <div className="mt-2 flex flex-wrap gap-1.5">{reviewPreview.sample.map((sample) => <span key={sample.email} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-600">{sample.nameKo}{sample.studentNumber ? ` · ${sample.studentNumber}` : ""} · {sample.email}</span>)}</div> : null}
                 </dd>
               </div>
               <div className="grid grid-cols-[5rem_1fr] gap-3 py-2">
@@ -893,7 +998,7 @@ function BulkEmailPageContent() {
                 <AdminFormField label="예약 일시" className="max-w-xs">
                   <div className="relative">
                     <CalendarClock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                    <UiInput type="datetime-local" value={scheduledAt} min={isoToHtmlDatetimeLocal(msToIso(nowMs() + 60_000))} onChange={(event) => setScheduledAt(event.target.value)} className="w-full pl-9 text-sm font-normal" />
+                    <UiInput spellCheck={false} type="datetime-local" value={scheduledAt} min={isoToHtmlDatetimeLocal(msToIso(nowMs() + 60_000))} onChange={(event) => setScheduledAt(event.target.value)} className="w-full pl-9 text-sm font-normal" />
                   </div>
                 </AdminFormField>
               ) : null}
@@ -908,13 +1013,74 @@ function BulkEmailPageContent() {
 
 function RecipientToken({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800">
+    <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200/80 bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-700">
+      <span aria-hidden="true" className="text-[11px] leading-none">🏷️</span>
       <span className="max-w-[16rem] truncate">{label}</span>
-      <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="size-4 rounded text-emerald-700 hover:bg-emerald-100">
+      <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="size-5 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700">
         <X aria-hidden="true" />
       </Button>
     </span>
   );
+}
+
+function readStoredEmailDraft(): StoredEmailDraft | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(EMAIL_DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const draft = parsed as Partial<StoredEmailDraft>;
+    if (
+      typeof draft.subject !== "string" ||
+      typeof draft.content !== "string" ||
+      typeof draft.savedAt !== "string" ||
+      !isRecipientType(draft.recipientType) ||
+      !isContentType(draft.contentType) ||
+      !draft.filters ||
+      typeof draft.filters !== "object"
+    ) {
+      return null;
+    }
+
+    return {
+      subject: draft.subject,
+      content: draft.content,
+      contentType: draft.contentType,
+      recipientType: draft.recipientType,
+      filters: normalizeFilters(draft.filters as RecipientFilters),
+      savedAt: draft.savedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isRecipientType(value: unknown): value is SendBulkEmailRequest["recipientType"] {
+  return value === "ALL" || value === "PAID_STUDENTS" || value === "UNPAID_STUDENTS";
+}
+
+function isContentType(value: unknown): value is SendBulkEmailRequest["contentType"] {
+  return value === "plain" || value === "html";
+}
+
+function formatStudentNumberFilter(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (value === "2024_OR_EARLIER") return "24학번 이전";
+  if (/^20\d{2}$/.test(value)) return `${value.slice(2)}학번`;
+  return value;
+}
+
+function renderEmailTemplate(
+  content: string,
+  variables: { 이름: string; 학번: string; 이메일: string; 전화번호: string },
+): string {
+  const values: Record<string, string> = variables;
+  return content
+    .replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, key: string) => values[key.trim()] ?? match)
+    .replace(/\{(이름|학번|이메일|전화번호)\}/g, (match, key: string) => values[key] ?? match);
 }
 
 function normalizeFilters(filters: RecipientFilters): RecipientFilters {

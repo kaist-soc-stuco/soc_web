@@ -1,8 +1,4 @@
-import type {
-  ArticleDraftRecord,
-  CurrentUserResponse,
-  MyScrapItem,
-} from "@soc/contracts";
+import type { CurrentUserResponse, MyScrapItem } from "@soc/contracts";
 import { isoToMs, msToDate, nowMs } from "@soc/shared";
 import { Bookmark, Clock3, User, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -349,7 +345,6 @@ interface ActivityPanelProps {
   activityQuery: string;
   contentTab: ActivityTab;
   currentPage: number;
-  drafts: ArticleDraftRecord[];
   scraps: MyScrapItem[];
   lang: string;
   onPageChange: (page: number) => void;
@@ -364,7 +359,6 @@ export function MyPageActivityPanel({
   activityQuery,
   contentTab,
   currentPage,
-  drafts,
   lang,
   onPageChange,
   onQueryChange,
@@ -373,12 +367,6 @@ export function MyPageActivityPanel({
   totalPages,
 }: ActivityPanelProps) {
   const query = activityQuery.trim().toLocaleLowerCase();
-  const visibleDrafts = drafts.filter((draft) => {
-    if (!query) return true;
-    return `${draft.titleKo} ${draft.titleEn ?? ""} ${draft.boardCode}`
-      .toLocaleLowerCase()
-      .includes(query);
-  });
   const visibleScraps = scraps.filter((item) => {
     if (!query) return true;
     return `${item.titleKo} ${item.boardNameKo}`.toLocaleLowerCase().includes(query);
@@ -390,44 +378,9 @@ export function MyPageActivityPanel({
     { id: "post", label: lang === "ko" ? "작성한 글" : "Posts" },
     { id: "comment", label: lang === "ko" ? "작성한 댓글" : "Comments" },
     { id: "scraps", label: lang === "ko" ? "스크랩" : "Scraps" },
-    { id: "drafts", label: lang === "ko" ? "임시저장글" : "Drafts" },
   ] as const satisfies ReadonlyArray<{ id: ActivityTab; label: string }>;
 
   const renderCollection = () => {
-    if (contentTab === "drafts") {
-      if (visibleDrafts.length === 0) {
-        return (
-          <EmptyState
-            message={lang === "ko" ? "임시저장글이 없습니다." : "No saved drafts."}
-            minHeightClassName="min-h-[200px]"
-          />
-        );
-      }
-      return (
-        <div className="divide-y divide-slate-100">
-          {visibleDrafts.map((draft) => (
-            <Link
-              key={draft.draftId}
-              to={`/board/${draft.boardCode}/write?draftId=${encodeURIComponent(draft.draftId)}`}
-              className="interaction-row flex items-center justify-between gap-4 px-3 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-normal text-slate-800">
-                  {draft.titleKo || (lang === "ko" ? "제목 없는 글" : "Untitled post")}
-                </p>
-                <p className="mt-1 text-[11px] font-normal text-slate-400">
-                  {draft.boardCode} · {formatRelative(draft.updatedAt, lang)}
-                </p>
-              </div>
-              <span className="shrink-0 text-xs font-medium text-kaist-darkgreen">
-                {lang === "ko" ? "이어쓰기" : "Continue"}
-              </span>
-            </Link>
-          ))}
-        </div>
-      );
-    }
-
     if (contentTab === "scraps") {
       if (visibleScraps.length === 0) {
         return (

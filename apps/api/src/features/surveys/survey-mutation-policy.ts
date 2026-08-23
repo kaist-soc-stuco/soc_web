@@ -126,9 +126,6 @@ export class SurveyMutationPolicy {
     mutation: LockedSurveyMutation<T>,
   ): Promise<T> {
     return this.withSurveyLock(surveyId, async (tx, survey) => {
-      if (survey.lifecycleStatus === "ARCHIVED") {
-        throw new ConflictException("survey_archived_immutable");
-      }
       await this.assertNoSubmittedResponses(
         tx,
         surveyId,
@@ -142,18 +139,7 @@ export class SurveyMutationPolicy {
     surveyId: string,
     mutation: LockedSurveyMutation<T>,
   ): Promise<T> {
-    return this.withSurveyLock(surveyId, async (tx, survey) => {
-      if (survey.lifecycleStatus !== "DRAFT") {
-        throw new ConflictException("survey_delete_requires_draft");
-      }
-      await this.assertNoSubmittedResponses(
-        tx,
-        surveyId,
-        "survey_delete_blocked_after_response",
-      );
-      await this.assertNoDerivedVersions(tx, surveyId);
-      return mutation(tx, survey);
-    });
+    return this.withSurveyLock(surveyId, mutation);
   }
 
   async assertMeaningMutable(
@@ -191,17 +177,4 @@ export class SurveyMutationPolicy {
     }
   }
 
-  private async assertNoDerivedVersions(
-    tx: PostgresTransaction,
-    surveyId: string,
-  ): Promise<void> {
-    const [result] = await tx
-      .select({ count: sql<number>`count(*)::int` })
-      .from(surveys)
-      .where(eq(surveys.previousVersionId, surveyId));
-
-    if ((result?.count ?? 0) > 0) {
-      throw new ConflictException("survey_delete_blocked_by_versions");
-    }
-  }
 }

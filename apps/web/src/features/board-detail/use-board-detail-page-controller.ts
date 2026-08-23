@@ -66,22 +66,17 @@ export function useBoardDetailPageController() {
   const canManageComments = useMemo(() => {
     if (!board) return false;
     const permission = session?.permission ?? 0;
-    return (
-      board.managePermissionBit > 0 &&
-      Permissions.has(permission, board.managePermissionBit)
-    );
+    return Permissions.hasAny(permission, Permissions.MODERATOR, Permissions.ADMIN);
   }, [board, session]);
+
+  const canManageArticle = canEdit || canManageComments;
 
   const canCreateComment = useMemo(() => {
     if (!board?.allowComment) return false;
     if (!article?.allowComment) return false;
     if (!session?.canUsePersistentFeatures) return false;
 
-    const permission = session.permission ?? 0;
-    return (
-      board.commentPermissionBit <= 0 ||
-      Permissions.has(permission, board.commentPermissionBit)
-    );
+    return true;
   }, [article, board, session]);
 
   const posterAsset = useMemo(
@@ -223,7 +218,7 @@ export function useBoardDetailPageController() {
   };
 
   const handleDeleteArticle = async () => {
-    if (!articleId || !canEdit) return;
+    if (!articleId || !canManageArticle) return;
     const confirmed = await requestConfirm({
       confirmLabel: lang === "ko" ? "삭제" : "Delete",
       description:
@@ -380,7 +375,6 @@ export function useBoardDetailPageController() {
                 ...comment,
                 likeCount: response.likeCount,
                 viewerHasLiked: response.viewerHasLiked,
-                viewerHasReported: response.viewerHasReported,
               }
             : comment,
         ),
@@ -391,54 +385,6 @@ export function useBoardDetailPageController() {
         lang === "ko"
           ? "댓글 좋아요 처리에 실패했습니다."
           : "Failed to update the comment like.",
-      );
-    } finally {
-      setCommentActionSubmitting(null);
-    }
-  };
-
-  const handleReportComment = async (commentId: string) => {
-    if (!articleId) return;
-
-    if (!session?.canUsePersistentFeatures) {
-      alert(
-        lang === "ko"
-          ? "댓글 신고는 로그인 후 사용할 수 있습니다."
-          : "Comment reports are available after signing in.",
-      );
-      return;
-    }
-
-    const confirmed = await requestConfirm({
-      confirmLabel: lang === "ko" ? "신고" : "Report",
-      description:
-        lang === "ko"
-          ? "신고된 댓글은 운영진이 검토합니다."
-          : "Reported comments will be reviewed by the moderators.",
-      title: lang === "ko" ? "이 댓글을 신고하시겠습니까?" : "Report this comment?",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-
-    setCommentActionSubmitting(`${commentId}:REPORT`);
-    try {
-      const response = await apiClient.reportComment(
-        category,
-        articleId,
-        commentId,
-      );
-      setComments((current) =>
-        current.map((comment) =>
-          comment.commentId === commentId
-            ? { ...comment, viewerHasReported: response.reported }
-            : comment,
-        ),
-      );
-    } catch {
-      setCommentError(
-        lang === "ko"
-          ? "댓글 신고에 실패했습니다."
-          : "Failed to report the comment.",
       );
     } finally {
       setCommentActionSubmitting(null);
@@ -519,6 +465,7 @@ export function useBoardDetailPageController() {
     boards,
     canCreateComment,
     canEdit,
+    canManageArticle,
     canManageComments,
     category,
     commentError,
@@ -534,7 +481,6 @@ export function useBoardDetailPageController() {
     handleCreateReply,
     handleDeleteArticle,
     handleDeleteComment,
-    handleReportComment,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,

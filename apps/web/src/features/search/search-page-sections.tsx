@@ -35,7 +35,7 @@ function getSurveyKindLabel(kind: string, lang: string) {
 }
 
 function getSurveyStateLabel(state: string, lang: string) {
-  if (state === "before_open") return lang === "ko" ? "시작 전" : "Upcoming";
+  if (state === "before_open") return lang === "ko" ? "시작 예정" : "Upcoming";
   if (state === "closed") return lang === "ko" ? "마감" : "Closed";
   return lang === "ko" ? "진행 중" : "Open";
 }

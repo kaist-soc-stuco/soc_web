@@ -3,7 +3,23 @@ import { BadRequestException } from "@nestjs/common";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 
-function isEmptyAnswer(
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?:[:][0-5]\d)?$/;
+
+function isValidDateOnly(value: string): boolean {
+  if (!DATE_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  if (month < 1 || month > 12) return false;
+  const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return day >= 1 && day <= daysInMonth;
+}
+
+function hasDuplicateValues(values: readonly string[]): boolean {
+  return new Set(values).size !== values.length;
+}
+
+export function isSurveyAnswerEmpty(
   question: SurveyQuestionRecord,
   content: Record<string, unknown>,
 ): boolean {
@@ -42,11 +58,11 @@ function validateAnswerContent(
   question: SurveyQuestionRecord,
   content: Record<string, unknown>,
 ): void {
-  if (!question.isRequired && isEmptyAnswer(question, content)) {
+  if (!question.isRequired && isSurveyAnswerEmpty(question, content)) {
     return;
   }
 
-  if (question.isRequired && isEmptyAnswer(question, content)) {
+  if (question.isRequired && isSurveyAnswerEmpty(question, content)) {
     throw new BadRequestException("required_answer_missing");
   }
 
@@ -80,7 +96,8 @@ function validateAnswerContent(
     case "multiple_choice": {
       if (
         !Array.isArray(content.values) ||
-        !content.values.every((value) => typeof value === "string" && optionValues.has(value))
+        !content.values.every((value) => typeof value === "string" && optionValues.has(value)) ||
+        hasDuplicateValues(content.values as string[])
       ) {
         throw new BadRequestException("answer_option_invalid");
       }
@@ -106,48 +123,43 @@ function validateAnswerContent(
           }
         } else if (
           !Array.isArray(answer) ||
-          !answer.every((value) => typeof value === "string" && columns.has(value))
+          !answer.every((value) => typeof value === "string" && columns.has(value)) ||
+          hasDuplicateValues(answer as string[])
         ) {
           throw new BadRequestException("answer_grid_invalid");
         }
       }
-      if (question.isRequired && rows.some((row) => values[row.value] === undefined)) {
+      if (
+        question.isRequired &&
+        rows.some((row) => {
+          const answer = values[row.value];
+          return answer === undefined || (Array.isArray(answer) && answer.length === 0);
+        })
+      ) {
         throw new BadRequestException("required_answer_missing");
       }
       break;
     }
     case "file_upload": {
-      const assetIds = Array.isArray(content.assetIds)
-        ? content.assetIds
-        : typeof content.assetId === "string"
-          ? [content.assetId]
-          : [];
-      if (
-        assetIds.length === 0 ||
-        !assetIds.every((assetId) => typeof assetId === "string" && /^\d+$/.test(assetId))
-      ) {
-        throw new BadRequestException("answer_file_invalid");
-      }
-      const maxFiles = question.config?.maxFiles ?? 1;
-      if (assetIds.length > maxFiles) {
-        throw new BadRequestException("answer_file_too_many");
-      }
-      break;
+      throw new BadRequestException("survey_file_upload_temporarily_disabled");
     }
     case "date": {
-      if (typeof content.date !== "string") {
+      if (typeof content.date !== "string" || !isValidDateOnly(content.date)) {
         throw new BadRequestException("answer_content_invalid");
       }
       break;
     }
     case "time": {
-      if (typeof content.time !== "string") {
+      if (typeof content.time !== "string" || !TIME_PATTERN.test(content.time)) {
         throw new BadRequestException("answer_content_invalid");
       }
       break;
     }
     case "datetime": {
-      if (typeof content.datetime !== "string") {
+      if (
+        typeof content.datetime !== "string" ||
+        !Number.isFinite(Date.parse(content.datetime))
+      ) {
         throw new BadRequestException("answer_content_invalid");
       }
       break;
@@ -182,7 +194,7 @@ export function validateSurveyAnswers(
     if (
       question.isRequired &&
       (!answerByQuestionId.has(question.id) ||
-        isEmptyAnswer(question, answerByQuestionId.get(question.id) ?? {}))
+        isSurveyAnswerEmpty(question, answerByQuestionId.get(question.id) ?? {}))
     ) {
       throw new BadRequestException("required_answer_missing");
     }

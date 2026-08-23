@@ -29,7 +29,9 @@ export interface SelectDropdownProps {
 
 const DROPDOWN_VIEWPORT_PADDING = 8;
 const DROPDOWN_GAP = 8;
-const DROPDOWN_MAX_HEIGHT = 480;
+// Keep the menu compact while allowing the option list to scroll when the
+// viewport is short. The scrollbar is visually hidden below.
+const DROPDOWN_MAX_HEIGHT = 240;
 
 export function SelectDropdown({
   id,
@@ -53,15 +55,16 @@ export function SelectDropdown({
   const optionLabelsKey = options.map((option) => option.label).join("\u0001");
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({
     visibility: "hidden",
+    width: "max-content",
   });
 
   useLayoutEffect(() => {
     if (!isOpen || typeof window === "undefined") {
-      setMenuStyle({ visibility: "hidden" });
+      setMenuStyle({ visibility: "hidden", width: "max-content" });
       return;
     }
 
-    setMenuStyle({ visibility: "hidden" });
+    setMenuStyle({ visibility: "hidden", width: "max-content" });
 
     const updateMenuPosition = () => {
       const trigger = containerRef.current;
@@ -72,22 +75,12 @@ export function SelectDropdown({
       const spaceBelow = window.innerHeight - triggerRect.bottom - DROPDOWN_VIEWPORT_PADDING;
       const spaceAbove = triggerRect.top - DROPDOWN_VIEWPORT_PADDING;
       const naturalHeight = Math.min(menu.scrollHeight, DROPDOWN_MAX_HEIGHT);
-      const viewportHeight = Math.max(
-        96,
-        window.innerHeight - DROPDOWN_VIEWPORT_PADDING * 2,
+      const opensUp = spaceBelow < naturalHeight + DROPDOWN_GAP && spaceAbove > spaceBelow;
+      const availableHeight = Math.max(
+        120,
+        (opensUp ? spaceAbove : spaceBelow) - DROPDOWN_GAP,
       );
-      const hasRoomBelow = spaceBelow >= naturalHeight + DROPDOWN_GAP;
-      const hasRoomAbove = spaceAbove >= naturalHeight + DROPDOWN_GAP;
-      const availableHeight = hasRoomBelow
-        ? spaceBelow - DROPDOWN_GAP
-        : hasRoomAbove
-          ? spaceAbove - DROPDOWN_GAP
-          : viewportHeight;
-      const maxMenuHeight = Math.min(
-        DROPDOWN_MAX_HEIGHT,
-        viewportHeight,
-        Math.max(96, availableHeight),
-      );
+      const maxMenuHeight = Math.min(DROPDOWN_MAX_HEIGHT, availableHeight);
       const positionedHeight = Math.min(menu.scrollHeight, maxMenuHeight);
       const optionNode = menu.querySelector<HTMLElement>('[role="option"]');
       const font = optionNode ? window.getComputedStyle(optionNode).font : window.getComputedStyle(menu).font;
@@ -98,12 +91,14 @@ export function SelectDropdown({
         const labelWidth = context?.measureText(label).width ?? 0;
         return Math.max(width, labelWidth);
       }, 0);
-      const contentWidth = Math.ceil(Math.max(menu.scrollWidth, measuredLabelWidth + 58));
-      const maxMenuWidth = Math.max(
-        triggerRect.width,
+      // Measure labels directly. An auto-width fixed element can otherwise
+      // stretch to the remaining viewport width before its position is set.
+      const contentWidth = Math.min(Math.ceil(measuredLabelWidth + 58), 320);
+      const viewportWidth = Math.max(
+        DROPDOWN_VIEWPORT_PADDING * 2,
         window.innerWidth - DROPDOWN_VIEWPORT_PADDING * 2,
       );
-      const menuWidth = Math.min(Math.max(triggerRect.width, contentWidth), maxMenuWidth);
+      const menuWidth = Math.min(Math.max(triggerRect.width, contentWidth), viewportWidth);
       const left = Math.min(
         Math.max(DROPDOWN_VIEWPORT_PADDING, triggerRect.left),
         Math.max(DROPDOWN_VIEWPORT_PADDING, window.innerWidth - menuWidth - DROPDOWN_VIEWPORT_PADDING),
@@ -112,17 +107,12 @@ export function SelectDropdown({
       setMenuStyle({
         left,
         maxHeight: maxMenuHeight,
-        top: hasRoomBelow
-          ? triggerRect.bottom + DROPDOWN_GAP
-          : hasRoomAbove
-            ? Math.max(DROPDOWN_VIEWPORT_PADDING, triggerRect.top - positionedHeight - DROPDOWN_GAP)
-            : Math.max(
-                DROPDOWN_VIEWPORT_PADDING,
-                Math.min(
-                  triggerRect.bottom + DROPDOWN_GAP,
-                  window.innerHeight - positionedHeight - DROPDOWN_VIEWPORT_PADDING,
-                ),
-              ),
+        top: opensUp
+          ? Math.max(
+              DROPDOWN_VIEWPORT_PADDING,
+              triggerRect.top - positionedHeight - DROPDOWN_GAP,
+            )
+          : triggerRect.bottom + DROPDOWN_GAP,
         visibility: "visible",
         width: menuWidth,
       });
@@ -178,7 +168,7 @@ export function SelectDropdown({
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-controls={isOpen ? menuId : undefined}
-          className={`interaction-control h-[var(--ui-control-height)] w-full justify-between px-3 py-0 text-left text-[length:var(--ui-control-font-size)] [font-weight:var(--ui-control-font-weight)] ${
+        className={`interaction-control h-[var(--ui-control-height)] w-full justify-between px-3 py-0 text-left text-[length:var(--ui-control-font-size)] [font-weight:var(--ui-control-font-weight)] ${
           disabled
             ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400 opacity-50"
             : "bg-white text-gray-700"
@@ -203,7 +193,7 @@ export function SelectDropdown({
               id={menuId}
               role="listbox"
               style={menuStyle}
-              className={`fixed z-[100] overflow-x-hidden overflow-y-auto rounded-[9px] border border-slate-200 bg-white p-[5px] shadow-[0_2px_8px_rgb(15_23_42_/_0.08)] ${menuClassName || ""}`}
+              className={`ui-select-dropdown-menu fixed z-[100] max-h-60 overflow-x-hidden overflow-y-auto rounded-[9px] border border-slate-200 bg-white p-[5px] shadow-[0_2px_8px_rgb(15_23_42_/_0.08)] ${menuClassName || ""}`}
             >
               {options.length === 0 ? (
                 <div className="px-2.5 py-2 text-sm font-normal text-kaist-grey/50">

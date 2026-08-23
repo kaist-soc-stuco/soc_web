@@ -18,6 +18,7 @@ import type {
   AssetUploadResponse,
   BoardArchiveResponse,
   BoardCreateRequest,
+  BoardDeleteResponse,
   BoardListResponse,
   BoardReorderRequest,
   BoardSummary,
@@ -28,8 +29,6 @@ import type {
   CommentEngagementResponse,
   CommentDeleteResponse,
   CommentListResponse,
-  CommentReportRequest,
-  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
@@ -275,6 +274,14 @@ export const createBoardApi = ({
     );
   },
 
+  deleteBoard: async (code: string): Promise<BoardDeleteResponse> => {
+    return requestJson<BoardDeleteResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/permanent`,
+      { method: "DELETE" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   setArticleEngagement: async (
     code: string,
     articleId: string,
@@ -418,20 +425,4 @@ export const createBoardApi = ({
     );
   },
 
-  reportComment: async (
-    code: string,
-    articleId: string,
-    commentId: string,
-    input: CommentReportRequest = {},
-  ): Promise<CommentReportResponse> => {
-    return requestJson<CommentReportResponse>(
-      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}/report`,
-      {
-        body: JSON.stringify(input),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      },
-      { retryOnUnauthorized: true },
-    );
-  },
 });

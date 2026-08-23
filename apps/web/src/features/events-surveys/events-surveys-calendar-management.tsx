@@ -5,11 +5,12 @@ import type { CalendarEventCreateRequest, CalendarEventRecord } from "@soc/contr
 import {
   addMs,
   htmlDatetimeLocalToIso,
+  isoToDate,
   isoToHtmlDatetimeLocal,
   msToIso,
   nowDate,
 } from "@soc/shared";
-import { CalendarDays, Download, FileUp, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Download, FileUp, Pencil, Plus, Save, Trash2 } from "lucide-react";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
@@ -26,7 +27,7 @@ const QUERY_KEY = ["calendar", "manual-events"] as const;
 const controlClassName =
   "min-h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 hover:border-slate-300 focus-visible:border-brand-primary focus-visible:ring-2 focus-visible:ring-brand-primary/20";
 const actionClassName =
-  "inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-brand-primary";
+  "h-9 min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-normal transition-colors";
 
 interface EventForm {
   titleKo: string;
@@ -96,6 +97,7 @@ export function EventsSurveysCalendarManagement() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
       queryClient.invalidateQueries({ queryKey: ["events-surveys", "calendar-events"] }),
+      queryClient.invalidateQueries({ queryKey: ["calendar", "events"] }),
     ]);
   };
 
@@ -137,7 +139,7 @@ export function EventsSurveysCalendarManagement() {
       endAt: htmlDatetimeLocalToIso(form.endAt),
       location: form.location.trim() || undefined,
     };
-    if (Date.parse(payload.endAt) < Date.parse(payload.startAt)) {
+    if (Date.parse(payload.endAt) <= Date.parse(payload.startAt)) {
       setMessage(
         lang === "ko"
           ? "종료 시간은 시작 시간 이후여야 합니다."
@@ -277,68 +279,45 @@ export function EventsSurveysCalendarManagement() {
       {ConfirmDialog}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
-          variant="ghost"
+          variant="default"
+          size="sm"
           type="button"
           onClick={startCreate}
-          className={`${actionClassName} bg-brand-primary text-white hover:bg-brand-primary/90`}
+          className={actionClassName}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           일정 추가
         </Button>
+        <Button asChild variant="outline" size="sm" className={`${actionClassName} cursor-pointer`}>
+          <label>
+            <FileUp className="h-4 w-4" aria-hidden="true" />
+            불러오기
+            <UiInput
+              type="file"
+              accept=".ics,text/calendar"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) void handleImport(file);
+              }}
+            />
+          </label>
+        </Button>
         <Button
           variant="outline"
-          type="button"
-          onClick={() => setManagementOpen(true)}
-          className={actionClassName}
-        >
-          <CalendarDays className="h-4 w-4" aria-hidden="true" />
-          일정 관리
-        </Button>
-        <label className={`${actionClassName} cursor-pointer border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-within:outline-2`}>
-          <FileUp className="h-4 w-4" aria-hidden="true" />
-          ICS 가져오기
-          <UiInput
-            type="file"
-            accept=".ics,text/calendar"
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) void handleImport(file);
-            }}
-          />
-        </label>
-        <Button
-          variant="ghost"
+          size="sm"
           type="button"
           onClick={() => void handleExport()}
-          className={`${actionClassName} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+          className={actionClassName}
         >
           <Download className="h-4 w-4" aria-hidden="true" />
-          ICS 내보내기
+          내보내기
         </Button>
-
-        <details className="relative">
-          <summary className={`${actionClassName} cursor-pointer list-none border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 [&::-webkit-details-marker]:hidden`}>
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            동기화
-          </summary>
-          <div className="absolute right-0 top-full z-40 mt-2 flex w-44 flex-col rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
-            <button type="button" onClick={() => void handleExternalSync()} className="rounded-md px-2.5 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              외부 캘린더
-            </button>
-            <button type="button" onClick={() => void handleKaistSync()} className="rounded-md px-2.5 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              KAIST 학사일정
-            </button>
-            <button type="button" onClick={() => void handleGoogleSync()} className="rounded-md px-2.5 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              Google 캘린더
-            </button>
-          </div>
-        </details>
       </div>
 
       {message && (
-        <p className="mt-3 w-full text-right text-xs font-medium text-slate-500" role="status">
+        <p className="mt-3 w-full text-right text-xs font-normal text-[#344054]" role="status">
           {message}
         </p>
       )}
@@ -360,7 +339,7 @@ export function EventsSurveysCalendarManagement() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-normal text-[#172033]">{event.titleKo}</p>
                 <p className="mt-0.5 truncate text-xs font-normal text-[#344054]">
-                  {new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(event.startAt))}
+                  {new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(isoToDate(event.startAt))}
                   {event.location ? ` · ${event.location}` : ""}
                 </p>
               </div>

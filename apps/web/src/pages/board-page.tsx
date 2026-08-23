@@ -21,6 +21,7 @@ export function BoardPage() {
     lang,
     postsPerPage,
     searchQuery,
+    showInitialSkeleton,
     setCurrentPage,
     setPostsPerPage,
     setSearchQuery,
@@ -59,6 +60,7 @@ export function BoardPage() {
           category={category}
           currentPage={currentPage}
           isLoading={isArticleLoading}
+          showInitialSkeleton={showInitialSkeleton}
           lang={lang}
           onPageChange={handlePageChange}
           onPostsPerPageChange={(value) => {

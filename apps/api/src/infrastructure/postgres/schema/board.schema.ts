@@ -23,12 +23,7 @@ export const boards = pgTable("board", {
   nameEn: varchar("name_en", { length: 100 }),
   descriptionKo: varchar("description_ko", { length: 255 }),
   descriptionEn: varchar("description_en", { length: 255 }),
-  readScope: varchar("read_scope", { length: 20 }).notNull().default("PUBLIC"),
   writePermissionId: integer("write_permission_id")
-    .references(() => permissions.permissionId),
-  commentPermissionId: integer("comment_permission_id")
-    .references(() => permissions.permissionId),
-  managePermissionId: integer("manage_permission_id")
     .references(() => permissions.permissionId),
   allowComment: boolean("allow_comment").notNull().default(false),
   allowSecret: boolean("allow_secret").notNull().default(false),
@@ -259,35 +254,6 @@ export const commentEngagements = pgTable(
       table.userId,
       table.kind,
       table.updatedAt,
-    ),
-  ],
-);
-
-export const commentReports = pgTable(
-  "comment_report",
-  {
-    reportId: serial("report_id").primaryKey(),
-    commentId: integer("comment_id")
-      .notNull()
-      .references(() => comments.commentId, { onDelete: "cascade" }),
-    reporterUserId: uuid("reporter_user_id")
-      .notNull()
-      .references(() => users.userId, { onDelete: "cascade" }),
-    reason: varchar("reason", { length: 500 }),
-    status: varchar("status", { length: 20 }).notNull().default("OPEN"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-  },
-  (table) => [
-    uniqueIndex("comment_report_comment_reporter_idx").on(
-      table.commentId,
-      table.reporterUserId,
-    ),
-    index("comment_report_status_created_idx").on(
-      table.status,
-      table.createdAt,
     ),
   ],
 );

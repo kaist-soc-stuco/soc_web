@@ -6,7 +6,7 @@ import type { SurveyRecord } from "@soc/contracts";
 import { isoToDate, nowMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminEmptyState, AdminFormField, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminEmptyState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -36,7 +36,6 @@ import {
   type SurveyStatusFilter,
 } from "@/lib/survey-display";
 import {
-  Archive,
   Copy, 
   Edit2, 
   BarChart3, 
@@ -140,33 +139,11 @@ export function SurveyListPage() {
     fetchSurveys();
   }, [client, session, sessionLoading]);
 
-  const handleArchive = async (survey: SurveyRecord) => {
-    if (survey.lifecycleStatus === "ARCHIVED") return;
-
-    const confirmed = await requestConfirm({
-      confirmLabel: "보관하기",
-      title: `"${survey.titleKo}" 설문조사를 보관하시겠습니까?`,
-      tone: "default",
-    });
-    if (!confirmed) return;
-
-    setDeleting(survey.id);
-    try {
-      const archived = await client.archiveSurvey(survey.id);
-      setSurveys((prev) =>
-        prev.map((item) => (item.id === archived.id ? archived : item)),
-      );
-    } catch {
-      alert("보관에 실패했습니다.");
-    } finally {
-      setDeleting(null);
-    }
-  };
-
   const handleDelete = async (survey: SurveyRecord) => {
     const confirmed = await requestConfirm({
       confirmLabel: "삭제하기",
-      title: `"${survey.titleKo}" 설문조사를 삭제하시겠습니까?`,
+      title: "설문조사 삭제",
+      description: `정말 "${survey.titleKo}" 설문을 삭제하시겠습니까? 삭제된 응답 데이터는 복구할 수 없습니다.`,
       tone: "danger",
     });
     if (!confirmed) return;
@@ -315,56 +292,51 @@ export function SurveyListPage() {
           {/* Inline filters use the shared search and select controls. */}
           <AdminTableCard className="overflow-visible">
             <div className="border-b border-slate-100 p-5">
-            <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-12">
-              <AdminFormField label="검색" className="md:col-span-6">
-                <PageSearchField
-                  ariaLabel="설문 검색"
-                  className="w-full lg:w-auto"
-                  onChange={(value) => {
-                    setSearchQuery(value);
-                    setCurrentPage(1);
-                  }}
-                  onClear={() => {
-                    setSearchQuery("");
-                    setCurrentPage(1);
-                  }}
-                  placeholder="제목 검색"
-                  value={searchQuery}
-                />
-              </AdminFormField>
-              <AdminFormField label="상태" className="md:col-span-3">
-                <AdminSelectDropdown
-                  value={statusFilter}
-                  options={[
-                    { value: "all", label: "전체" },
-                    { value: "open", label: "진행중" },
-                    { value: "closed", label: "마감" },
-                    { value: "archived", label: "보관됨" },
-                    { value: "draft", label: "임시저장" },
-                  ]}
-                  onChange={(value) => {
-                    setStatusFilter(value as SurveyStatusFilter);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full"
-                />
-              </AdminFormField>
-              <AdminFormField label="유형" className="md:col-span-3">
-                <AdminSelectDropdown
-                  value={typeFilter}
-                  options={[
-                    { value: "all", label: "전체" },
-                    { value: "SURVEY", label: "설문" },
-                    { value: "VOTE", label: "투표" },
-                    { value: "APPLICATION", label: "신청" },
-                  ]}
-                  onChange={(value) => {
-                    setTypeFilter(value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full"
-                />
-              </AdminFormField>
+            <div className="flex flex-wrap items-center gap-3">
+              <AdminSelectDropdown
+                ariaLabel="설문 상태"
+                value={statusFilter}
+                options={[
+                  { value: "all", label: "전체 상태" },
+                  { value: "open", label: "진행중" },
+                  { value: "closed", label: "마감" },
+                  { value: "draft", label: "임시저장" },
+                ]}
+                onChange={(value) => {
+                  setStatusFilter(value as SurveyStatusFilter);
+                  setCurrentPage(1);
+                }}
+                className="w-32 shrink-0"
+              />
+              <AdminSelectDropdown
+                ariaLabel="설문 유형"
+                value={typeFilter}
+                options={[
+                  { value: "all", label: "전체 유형" },
+                  { value: "SURVEY", label: "설문" },
+                  { value: "VOTE", label: "투표" },
+                  { value: "APPLICATION", label: "신청" },
+                ]}
+                onChange={(value) => {
+                  setTypeFilter(value);
+                  setCurrentPage(1);
+                }}
+                className="w-28 shrink-0"
+              />
+              <PageSearchField
+                ariaLabel="설문 검색"
+                className="ml-auto w-full sm:w-72"
+                onChange={(value) => {
+                  setSearchQuery(value);
+                  setCurrentPage(1);
+                }}
+                onClear={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
+                placeholder="제목 검색"
+                value={searchQuery}
+              />
             </div>
           </div>
 
@@ -490,12 +462,11 @@ export function SurveyListPage() {
                   {(() => {
                     const target = surveys.find((survey) => survey.id === activeRowDropdown.id);
                     if (!target) return null;
-                    const isArchived = target.lifecycleStatus === "ARCHIVED";
-                    const hasResponses = Boolean(target.isPublished) && !isArchived;
+                    const hasResponses = Boolean(target.isPublished);
 
                     return (
                       <>
-                        <AdminActionMenuItem icon={<Edit2 />} onClick={() => { setActiveRowDropdown(null); navigate(`/admin/surveys/${target.id}/edit`); }}>{isArchived ? "상세 보기" : "편집"}</AdminActionMenuItem>
+                        <AdminActionMenuItem icon={<Edit2 />} onClick={() => { setActiveRowDropdown(null); navigate(`/admin/surveys/${target.id}/edit`); }}>편집</AdminActionMenuItem>
                         {hasResponses ? <AdminActionMenuItem icon={<ClipboardList />} onClick={() => { setActiveRowDropdown(null); navigate(`/admin/surveys/${target.id}/responses`); }}>응답 목록</AdminActionMenuItem> : null}
                         {hasResponses ? <AdminActionMenuItem icon={<BarChart3 />} onClick={() => { setActiveRowDropdown(null); navigate(`/survey/${target.id}/results`); }}>결과 보기</AdminActionMenuItem> : null}
                         {hasResponses ? <AdminActionMenuDivider /> : null}
@@ -512,16 +483,6 @@ export function SurveyListPage() {
                         )}
 
                         <AdminActionMenuDivider />
-                        <AdminActionMenuItem
-                          icon={<Archive />}
-                          onClick={() => {
-                            setActiveRowDropdown(null);
-                            void handleArchive(target);
-                          }}
-                          disabled={isArchived || deleting === target.id}
-                        >
-                          {isArchived ? "보관 완료" : "보관하기"}
-                        </AdminActionMenuItem>
                         <AdminActionMenuItem
                           icon={<Trash2 />}
                           tone="danger"

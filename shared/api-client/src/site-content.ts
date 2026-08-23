@@ -3,6 +3,7 @@ import type {
   ContentBlockListResponse,
   ContentBlockRecord,
   CreateContentBlockRequest,
+  ReorderContentBlocksRequest,
   SiteContentKey,
   SiteContentListResponse,
   SiteContentRecord,
@@ -95,17 +96,21 @@ export const createSiteContentApi = ({
     );
   },
 
-  publishContentBlock: async (contentBlockId: string): Promise<ContentBlockRecord> => {
-    return requestJson<ContentBlockRecord>(
-      `${siteContentBaseUrl}/blocks/${encodeURIComponent(contentBlockId)}/publish`,
-      { method: "POST" },
+  reorderContentBlocks: async (body: ReorderContentBlocksRequest): Promise<ContentBlockListResponse> => {
+    return requestJson<ContentBlockListResponse>(
+      `${siteContentBaseUrl}/blocks/reorder`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
       { retryOnUnauthorized: true },
     );
   },
 
-  archiveContentBlock: async (contentBlockId: string): Promise<ContentBlockRecord> => {
+  publishContentBlock: async (contentBlockId: string): Promise<ContentBlockRecord> => {
     return requestJson<ContentBlockRecord>(
-      `${siteContentBaseUrl}/blocks/${encodeURIComponent(contentBlockId)}/archive`,
+      `${siteContentBaseUrl}/blocks/${encodeURIComponent(contentBlockId)}/publish`,
       { method: "POST" },
       { retryOnUnauthorized: true },
     );

@@ -71,7 +71,7 @@ export function FaqPage() {
                   type="button"
                   aria-expanded={isOpen}
                   onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="interaction-button flex min-h-14 w-full items-center justify-between gap-4 px-5 py-4 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-primary"
+                  className="interaction-button flex min-h-14 w-full items-center justify-between gap-4 px-5 py-4 text-left text-sm font-bold text-slate-800 hover:bg-slate-50"
                 >
                   <span>{lang === "ko" ? item.questionKo : item.questionEn}</span>
                   <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180 text-brand-primary" : ""}`} aria-hidden="true" />

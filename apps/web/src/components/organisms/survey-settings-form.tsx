@@ -26,7 +26,7 @@ export interface SurveySettingsFormValues {
   titleEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  kind: string;
+  kind: "GENERAL" | "SURVEY" | "VOTE" | "APPLICATION" | "EVENT";
   resultVisibility: "PRIVATE" | "PUBLIC";
   feePayersOnly?: boolean;
   isKoreanOnly?: boolean;
@@ -37,13 +37,13 @@ export interface SurveySettingsFormValues {
   isAlwaysOpen?: boolean;
   maxResponseCount?: string;
   openAt: string;
+  closeAt: string;
   connectedArticleId?: string;
 }
 
 interface SurveySettingsFormProps {
   mode?: "all" | "basic" | "delivery";
   isOngoing?: boolean;
-  isArchived?: boolean;
   showArticleSearch: boolean;
   articleSearchResults: ArticleListItem[];
   selectedArticleTitle: string | null;
@@ -57,7 +57,6 @@ interface SurveySettingsFormProps {
 export function SurveySettingsForm({
   mode = "all",
   isOngoing = false,
-  isArchived = false,
   showArticleSearch,
   articleSearchResults,
   selectedArticleTitle,
@@ -95,6 +94,7 @@ export function SurveySettingsForm({
   useEffect(() => {
     if (!isAlwaysOpen) return;
     setValue("openAt", "");
+    setValue("closeAt", "");
   }, [isAlwaysOpen, setValue]);
 
   const inputCls =
@@ -104,7 +104,6 @@ export function SurveySettingsForm({
     <form onSubmit={handleSubmit(onSubmit)}>
       <fieldset
         className="m-0 min-w-0 space-y-8 border-0 p-0"
-        disabled={isArchived}
       >
       <div className={mode === "all" ? "grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3" : "grid grid-cols-1"}>
         {/* 좌측 메인 영역 */}
@@ -189,7 +188,6 @@ export function SurveySettingsForm({
                     <RichTextEditor
                       className="!mx-0 !max-w-none"
                       compact
-                      disabled={isArchived}
                       content={field.value ?? ""}
                       onChange={field.onChange}
                       lang="ko"
@@ -205,7 +203,6 @@ export function SurveySettingsForm({
                     <RichTextEditor
                       className="!mx-0 !max-w-none"
                       compact
-                      disabled={isArchived}
                       content={field.value ?? ""}
                       onChange={field.onChange}
                       lang="en"
@@ -220,16 +217,12 @@ export function SurveySettingsForm({
 
         {/* 우측 메타데이터 영역 */}
         {mode !== "basic" ? <div className={`${mode === "all" ? "lg:col-span-1" : ""} h-full space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}>
-          <div className="flex items-center justify-between border-b border-kaist-grey/10 pb-4">
-            <span className="text-sm font-normal text-[#172033]">
-              메타데이터 설정
-            </span>
-            <div className="flex items-center gap-2">
-              {isArchived ? (
-                <span className="inline-flex items-center rounded-full bg-violet-50 px-3 py-1 text-xs font-normal text-violet-700 border border-violet-200">
-                  보관됨
-                </span>
-              ) : isPublished ? (
+            <div className="flex items-center justify-between border-b border-kaist-grey/10 pb-4">
+              <span className="text-sm font-normal text-[#172033]">
+                메타데이터 설정
+              </span>
+              <div className="flex items-center gap-2">
+              {isPublished ? (
                 <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-normal text-emerald-700 border border-emerald-200">
                   게시됨
                 </span>
@@ -312,6 +305,20 @@ export function SurveySettingsForm({
               {errors.openAt && (
                 <p className="mt-1 text-xs font-normal text-red-500">
                   {errors.openAt.message as string}
+                </p>
+              )}
+            </AdminFormField>
+
+            <AdminFormField label="종료 시각 (선택)">
+              <UiInput
+                type="datetime-local"
+                className={inputCls}
+                disabled={isOngoing || isAlwaysOpen}
+                {...register("closeAt")}
+              />
+              {errors.closeAt && (
+                <p className="mt-1 text-xs font-normal text-red-500">
+                  {errors.closeAt.message as string}
                 </p>
               )}
             </AdminFormField>

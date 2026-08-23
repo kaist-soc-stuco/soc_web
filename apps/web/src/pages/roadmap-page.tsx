@@ -207,7 +207,7 @@ export function RoadmapPage() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 md:px-8 md:py-14">
         <Link
           to="/about"
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-kaist-grey transition-colors hover:text-kaist-darkgreen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kaist-darkgreen"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-kaist-grey transition-colors hover:text-kaist-darkgreen"
         >
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
           {lang === "ko" ? "SOC 소개로 돌아가기" : "Back to About SOC"}
@@ -424,14 +424,14 @@ export function RoadmapPage() {
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <Link
                 to="/board"
-                className="inline-flex min-h-11 items-center justify-between rounded-xl bg-white px-4 text-sm font-bold text-kaist-darkgreen transition-colors hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="inline-flex min-h-11 items-center justify-between rounded-xl bg-white px-4 text-sm font-bold text-kaist-darkgreen transition-colors hover:bg-white/90"
               >
                 {lang === "ko" ? "게시판 둘러보기" : "Browse boards"}
                 <ArrowRight aria-hidden="true" className="h-4 w-4" />
               </Link>
               <Link
                 to="/events"
-                className="inline-flex min-h-11 items-center justify-between rounded-xl border border-white/25 px-4 text-sm font-bold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="inline-flex min-h-11 items-center justify-between rounded-xl border border-white/25 px-4 text-sm font-bold text-white transition-colors hover:bg-white/10"
               >
                 {lang === "ko" ? "행사·설문 보기" : "Events & surveys"}
                 <ArrowRight aria-hidden="true" className="h-4 w-4" />

@@ -21,7 +21,7 @@ import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
 import type { QuestionOption, QuestionType } from "@soc/contracts";
-import { validateSurveyAnswers } from "./survey-answer-validation";
+import { isSurveyAnswerEmpty, validateSurveyAnswers } from "./survey-answer-validation";
 import {
   getReachableSurveyQuestions,
   type SurveySectionWithQuestions,
@@ -63,6 +63,9 @@ type InsertSubmissionResult =
       status: "survey_not_open_yet";
     }
   | {
+      status: "survey_closed";
+    }
+  | {
       status: "fee_payer_only";
     };
 
@@ -77,6 +80,7 @@ type UpdateSubmissionResult =
         | "survey_not_found"
         | "survey_not_published"
         | "survey_not_open_yet"
+        | "survey_closed"
         | "fee_payer_only"
         | "response_edit_not_allowed"
         | "multiple_response_edit_not_supported"
@@ -87,11 +91,13 @@ type SubmissionState = {
   isPublished: boolean;
   isAlwaysOpen: boolean;
   openAt: Date | null;
+  closeAt: Date | null;
 };
 
 type SubmissionStateFailure =
   | "survey_not_published"
-  | "survey_not_open_yet";
+  | "survey_not_open_yet"
+  | "survey_closed";
 
 const getSubmissionStateFailure = (
   survey: SubmissionState,
@@ -101,6 +107,9 @@ const getSubmissionStateFailure = (
   if (survey.isAlwaysOpen) return null;
   if (survey.openAt && survey.openAt.valueOf() > currentMs) {
     return "survey_not_open_yet";
+  }
+  if (survey.closeAt && survey.closeAt.valueOf() <= currentMs) {
+    return "survey_closed";
   }
   return null;
 };
@@ -319,6 +328,7 @@ export class SurveyResponsesRepository {
             isPublished: surveys.isPublished,
             isAlwaysOpen: surveys.isAlwaysOpen,
             openAt: surveys.openAt,
+            closeAt: surveys.closeAt,
             feeRequirementPolicy: surveys.feeRequirementPolicy,
             allowMultipleResponses: surveys.allowMultipleResponses,
             maxResponseCount: surveys.maxResponseCount,
@@ -333,7 +343,7 @@ export class SurveyResponsesRepository {
 
         // The public service performs an early check for fast feedback, but
         // this is the authoritative state check. It runs only after an
-        // archive/update that already owned the row lock has committed.
+        // The state update that already owned the row lock has committed.
         const now = nowDate();
         const stateFailure = getSubmissionStateFailure(
           lockedSurvey,
@@ -358,6 +368,11 @@ export class SurveyResponsesRepository {
           input.answers,
         );
         validateSurveyAnswers(questions, input.answers);
+        const questionById = new Map(questions.map((question) => [question.id, question]));
+        const persistedAnswers = input.answers.filter((answer) => {
+          const question = questionById.get(answer.questionId);
+          return question && !isSurveyAnswerEmpty(question, answer.content);
+        });
 
         const singleResponseUserId = lockedSurvey.allowMultipleResponses
           ? null
@@ -409,9 +424,9 @@ export class SurveyResponsesRepository {
           })
           .returning();
 
-        if (input.answers.length > 0) {
+        if (persistedAnswers.length > 0) {
           await tx.insert(surveyAnswers).values(
-            input.answers.map((answer) => ({
+            persistedAnswers.map((answer) => ({
               responseId: insertedResponse.id,
               questionId: answer.questionId,
               content: answer.content,
@@ -471,6 +486,7 @@ export class SurveyResponsesRepository {
           isPublished: surveys.isPublished,
           isAlwaysOpen: surveys.isAlwaysOpen,
           openAt: surveys.openAt,
+          closeAt: surveys.closeAt,
           feeRequirementPolicy: surveys.feeRequirementPolicy,
           allowResponseEdit: surveys.allowResponseEdit,
           allowMultipleResponses: surveys.allowMultipleResponses,
@@ -529,6 +545,11 @@ export class SurveyResponsesRepository {
         input.answers,
       );
       validateSurveyAnswers(questions, input.answers);
+      const questionById = new Map(questions.map((question) => [question.id, question]));
+      const persistedAnswers = input.answers.filter((answer) => {
+        const question = questionById.get(answer.questionId);
+        return question && !isSurveyAnswerEmpty(question, answer.content);
+      });
 
       const [updatedResponse] = await tx
         .update(surveyResponses)
@@ -548,9 +569,9 @@ export class SurveyResponsesRepository {
         .delete(surveyAnswers)
         .where(eq(surveyAnswers.responseId, input.responseId));
 
-      if (input.answers.length > 0) {
+      if (persistedAnswers.length > 0) {
         await tx.insert(surveyAnswers).values(
-          input.answers.map((answer) => ({
+          persistedAnswers.map((answer) => ({
             responseId: input.responseId,
             questionId: answer.questionId,
             content: answer.content,

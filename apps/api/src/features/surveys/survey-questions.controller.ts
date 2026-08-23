@@ -7,7 +7,8 @@ import {
   Patch,
   Post,
 } from "@nestjs/common";
-import { CreateQuestionSchema, UpdateQuestionSchema } from "@soc/contracts";
+import { CreateQuestionSchema, ReorderSurveyQuestionsSchema, UpdateQuestionSchema } from "@soc/contracts";
+import type { ReorderSurveyQuestionsRequest } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
 import { RequirePermissions } from "../auth/guards";
@@ -29,6 +30,15 @@ export class SurveyQuestionsController {
     @Body(new ZodValidationPipe(CreateQuestionSchema)) dto: CreateQuestionDto,
   ) {
     return this.questionsService.create(surveyId, sectionId, dto);
+  }
+
+  @Patch("reorder")
+  reorder(
+    @Param("surveyId", ParseUUIDPipe) surveyId: string,
+    @Param("sectionId", ParseUUIDPipe) sectionId: string,
+    @Body(new ZodValidationPipe(ReorderSurveyQuestionsSchema)) dto: ReorderSurveyQuestionsRequest,
+  ) {
+    return this.questionsService.reorder(surveyId, sectionId, dto);
   }
 
   @Patch(":questionId")

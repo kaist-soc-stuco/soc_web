@@ -9,6 +9,7 @@ import type {
 import {
   hasPermission,
   htmlDatetimeLocalToIso,
+  msToIso,
   nowMs,
   isoToHtmlDatetimeLocal,
 } from "@soc/shared";
@@ -21,6 +22,7 @@ import {
   getBoardWritePermissionBitFromMetadata,
 } from "@/lib/board-metadata";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 import type { AttachedAsset } from "./board-write-form-sections";
@@ -79,7 +81,9 @@ export function useBoardWritePageController() {
   const [drafts, setDrafts] = useState<ArticleDraftRecord[]>([]);
   const [serverDraftId, setServerDraftId] = useState<string | null>(null);
   const [serverDraftVersion, setServerDraftVersion] = useState<number>();
+  const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
   const lastDraftFingerprintRef = useRef<string | null>(null);
+  const hasWriteContentRef = useRef(false);
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -111,6 +115,7 @@ export function useBoardWritePageController() {
   }, [boardCatalogSource, boards, canUseWriteFeatures, userPermission]);
   const canWriteSelected =
     canUseWriteFeatures && writableBoardCodes.includes(selectedCategory);
+  const canManageTemplates = hasAdminPermission(userPermission);
   const canConfigurePostSettings =
     !PUBLIC_WRITE_BOARD_CODES.has(selectedCategory);
 
@@ -206,9 +211,50 @@ export function useBoardWritePageController() {
     }
   };
 
+  hasWriteContentRef.current = Boolean(
+    titleKo.trim() ||
+      titleEn.trim() ||
+      contentKo.trim() ||
+      contentEn.trim() ||
+      eventDescriptionKo.trim() ||
+      eventDescriptionEn.trim() ||
+      eventStartDate ||
+      eventEndDate,
+  );
+
+  const applyDraftToForm = (draft: ArticleDraftRecord) => {
+    setTitleKo(draft.titleKo || "");
+    setTitleEn(draft.titleEn || "");
+    setContentKo(draft.contentKo || "");
+    setContentEn(draft.contentEn || "");
+    setIsAnonymous(draft.isAnonymous);
+    setIsPinned(draft.isPinned);
+    setIsSecret(draft.isSecret);
+    setAllowComment(draft.allowComment);
+    setIsKoreanOnly(draft.isKoreanOnly);
+    setIsEventAlwaysOpen(
+      !draft.eventStartDate &&
+        !draft.eventEndDate &&
+        Boolean(draft.eventDescriptionKo),
+    );
+    setEventStartDate(
+      draft.eventStartDate ? isoToHtmlDatetimeLocal(draft.eventStartDate) : "",
+    );
+    setEventEndDate(
+      draft.eventEndDate ? isoToHtmlDatetimeLocal(draft.eventEndDate) : "",
+    );
+    setEventDescriptionKo(draft.eventDescriptionKo || "");
+    setEventDescriptionEn(draft.eventDescriptionEn || "");
+    setSelectedSurveyId(draft.linkedSurveyId || "");
+    setServerDraftId(draft.draftId);
+    setServerDraftVersion(draft.version);
+    setDraftRestoredAt(draft.updatedAt);
+  };
+
   useEffect(() => {
     setServerDraftId(null);
     setServerDraftVersion(undefined);
+    setDraftRestoredAt(null);
     if (!canUseWriteFeatures || !canWriteSelected) return;
 
     let cancelled = false;
@@ -219,7 +265,13 @@ export function useBoardWritePageController() {
     });
     draftListRequest
       .then((response) => {
-        if (!cancelled) setDrafts(response.items);
+        if (!cancelled) {
+          setDrafts(response.items);
+          if (!routeDraftId && !hasWriteContentRef.current) {
+            const latest = response.items[0];
+            if (latest) applyDraftToForm(latest);
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setDrafts([]);
@@ -235,33 +287,7 @@ export function useBoardWritePageController() {
       .getArticleDraft(routeDraftId)
       .then((latest) => {
         if (cancelled || !latest) return;
-        setTitleKo(latest.titleKo || "");
-        setTitleEn(latest.titleEn || "");
-        setContentKo(latest.contentKo || "");
-        setContentEn(latest.contentEn || "");
-        setIsAnonymous(latest.isAnonymous);
-        setIsPinned(latest.isPinned);
-        setIsSecret(latest.isSecret);
-        setAllowComment(latest.allowComment);
-        setIsKoreanOnly(latest.isKoreanOnly);
-        setIsEventAlwaysOpen(
-          !latest.eventStartDate &&
-            !latest.eventEndDate &&
-            Boolean(latest.eventDescriptionKo),
-        );
-        setEventStartDate(
-          latest.eventStartDate
-            ? isoToHtmlDatetimeLocal(latest.eventStartDate)
-            : "",
-        );
-        setEventEndDate(
-          latest.eventEndDate ? isoToHtmlDatetimeLocal(latest.eventEndDate) : "",
-        );
-        setEventDescriptionKo(latest.eventDescriptionKo || "");
-        setEventDescriptionEn(latest.eventDescriptionEn || "");
-        setSelectedSurveyId(latest.linkedSurveyId || "");
-        setServerDraftId(latest.draftId);
-        setServerDraftVersion(latest.version);
+        applyDraftToForm(latest);
       })
       .catch(() => {
         // Local storage remains a usable fallback when the server draft API is unavailable.
@@ -383,7 +409,9 @@ export function useBoardWritePageController() {
         setEventDescriptionKo(draft.eventDescriptionKo || "");
         setEventDescriptionEn(draft.eventDescriptionEn || "");
         setSelectedSurveyId(draft.linkedSurveyId || "");
+        setServerDraftId(draft.draftId);
         setServerDraftVersion(draft.version);
+        setDraftRestoredAt(draft.updatedAt);
         return;
       } catch {
         // Keep the local browser fallback below available when the API is unavailable.
@@ -411,9 +439,43 @@ export function useBoardWritePageController() {
         parsed.eventDescriptionKo || parsed.eventDescription || "",
       );
       setEventDescriptionEn(parsed.eventDescriptionEn || "");
+      if (typeof parsed.updatedAt === "number") {
+        setDraftRestoredAt(msToIso(parsed.updatedAt));
+      }
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const handleStartNewDraft = () => {
+    if (serverDraftId) {
+      void apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
+      setDrafts((current) =>
+        current.filter((draft) => draft.draftId !== serverDraftId),
+      );
+    }
+    localStorage.removeItem(`draft_${selectedCategory}`);
+    setTitleKo("");
+    setTitleEn("");
+    setContentKo("");
+    setContentEn("");
+    setIsAnonymous(false);
+    setIsPinned(false);
+    setIsSecret(false);
+    setAllowComment(true);
+    setIsKoreanOnly(false);
+    setAssets([]);
+    setEventStartDate("");
+    setEventEndDate("");
+    setEventDescriptionKo("");
+    setEventDescriptionEn("");
+    setIsEventAlwaysOpen(false);
+    setSelectedSurveyId("");
+    setServerDraftId(null);
+    setServerDraftVersion(undefined);
+    setDraftRestoredAt(null);
+    lastDraftFingerprintRef.current = null;
+    navigate(location.pathname, { replace: true, state: location.state });
   };
 
   const handleDeleteDraft = async (draftId: string) => {
@@ -665,10 +727,12 @@ export function useBoardWritePageController() {
     allowComment,
     boardByCode,
     canConfigurePostSettings,
+    canManageTemplates,
     canWriteSelected,
     contentEn,
     contentKo,
     drafts,
+    draftRestoredAt,
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
@@ -677,6 +741,7 @@ export function useBoardWritePageController() {
     handleCategoryChange,
     handleDeleteDraft,
     handleRestoreDraft,
+    handleStartNewDraft,
     handleSaveDraft,
     handleSubmit,
     handleUploadFiles,

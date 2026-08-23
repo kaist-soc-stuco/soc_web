@@ -154,7 +154,14 @@ export class UsersService {
   async listEmailRecipients(
     recipientType: "ALL" | "PAID_STUDENTS" | "UNPAID_STUDENTS",
     filters?: EmailRecipientFilters,
-  ): Promise<Array<{ email: string; nameKo: string }>> {
+  ): Promise<
+    Array<{
+      email: string;
+      nameKo: string;
+      phoneNumber: string | null;
+      studentNumber: string | null;
+    }>
+  > {
     return this.usersRepository.listEmailRecipients(recipientType, filters);
   }
 

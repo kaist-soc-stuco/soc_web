@@ -165,6 +165,35 @@ test("renders always-open survey cards as ongoing without dates", () => {
   assert.equal(getCardPeriodText(item, "en"), "Always open");
 });
 
+test("formats event card dates as all-day or timed ranges", () => {
+  const [allDayEvent] = buildUnifiedItems(
+    [],
+    [
+      article({
+        eventStartDate: "2026-07-27T00:00:00+09:00",
+        eventEndDate: "2026-07-31T00:00:00+09:00",
+      }),
+    ],
+    NOW,
+  );
+  const [timedEvent] = buildUnifiedItems(
+    [],
+    [
+      article({
+        eventStartDate: "2026-07-27T16:00:00+09:00",
+        eventEndDate: "2026-07-31T18:00:00+09:00",
+      }),
+    ],
+    NOW,
+  );
+
+  assert.match(getCardPeriodText(allDayEvent, "ko"), /07\.27 \(월\).*07\.31 \(금\).*종일/);
+  assert.equal(
+    getCardPeriodText(timedEvent, "ko"),
+    "07.27 (월) 16:00 〜 07.31 (금) 18:00",
+  );
+});
+
 test("filters by tab and sorts open items before closed items", () => {
   const items = buildUnifiedItems(
     [

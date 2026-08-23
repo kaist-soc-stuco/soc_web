@@ -1,5 +1,5 @@
 import { CONTENT_BLOCK_STATUSES, CONTENT_BLOCK_TYPES, SITE_CONTENT_KEYS } from "@soc/contracts";
-import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { index, integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 import { users } from "./auth.schema";
 
@@ -38,10 +38,7 @@ export const contentBlocks = pgTable(
     bodyEn: text("body_en"),
     linkUrl: varchar("link_url", { length: 2_000 }),
     imageUrl: varchar("image_url", { length: 2_000 }),
-    startsAt: timestamp("starts_at", { withTimezone: true }),
-    endsAt: timestamp("ends_at", { withTimezone: true }),
     sortOrder: integer("sort_order").notNull().default(0),
-    isEnabled: boolean("is_enabled").notNull().default(true),
     createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
     updatedBy: uuid("updated_by").references(() => users.userId, { onDelete: "set null" }),
     publishedBy: uuid("published_by").references(() => users.userId, { onDelete: "set null" }),
@@ -52,6 +49,5 @@ export const contentBlocks = pgTable(
   (table) => [
     index("content_block_status_order_idx").on(table.status, table.sortOrder),
     index("content_block_type_order_idx").on(table.type, table.sortOrder),
-    index("content_block_schedule_idx").on(table.startsAt, table.endsAt),
   ],
 );

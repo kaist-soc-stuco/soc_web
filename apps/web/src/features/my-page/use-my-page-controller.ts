@@ -1,5 +1,4 @@
 import type {
-  ArticleDraftListResponse,
   CurrentUserResponse,
   MyActivityListResponse,
   MyArticleListResponse,
@@ -37,8 +36,7 @@ export type ActivityTab =
   | "survey"
   | "post"
   | "comment"
-  | "scraps"
-  | "drafts";
+  | "scraps";
 export type MyPageMenu = "profile" | "activity";
 
 const MY_PAGE_LIMIT = 20;
@@ -60,7 +58,6 @@ export function useMyPageController() {
 
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
   const [articles, setArticles] = useState<MyArticleListResponse | null>(null);
-  const [drafts, setDrafts] = useState<ArticleDraftListResponse | null>(null);
   const [comments, setComments] = useState<MyCommentListResponse | null>(null);
   const [scraps, setScraps] = useState<MyScrapListResponse | null>(null);
   const [surveyResponses, setSurveyResponses] =
@@ -84,7 +81,6 @@ export function useMyPageController() {
     if (!canUseMyPage) {
       setUser(null);
       setArticles(null);
-      setDrafts(null);
       setComments(null);
       setScraps(null);
       setSurveyResponses(null);
@@ -106,7 +102,6 @@ export function useMyPageController() {
     const commentPage = activeTab === "comment" ? activeListPage : 1;
     const surveyPage = activeTab === "survey" ? activeListPage : 1;
     const scrapPage = activeTab === "scraps" ? activeListPage : 1;
-    const draftPage = activeTab === "drafts" ? activeListPage : 1;
 
     setLoading(true);
     setLoadError(null);
@@ -122,10 +117,6 @@ export function useMyPageController() {
         limit: activeTab === "post" ? activeListLimit : MY_PAGE_LIMIT,
         page: articlePage,
         q: activityQuery,
-      }),
-      apiClient.getArticleDrafts({
-        limit: activeTab === "drafts" ? ITEMS_PER_PAGE : 20,
-        page: draftPage,
       }),
       apiClient.getMyComments({
         limit: activeTab === "comment" ? activeListLimit : MY_PAGE_LIMIT,
@@ -144,7 +135,6 @@ export function useMyPageController() {
           fetchedUser,
           fetchedActivities,
           fetchedArticles,
-          fetchedDrafts,
           fetchedComments,
           fetchedSurveyResponses,
           fetchedScraps,
@@ -153,7 +143,6 @@ export function useMyPageController() {
           setUser(fetchedUser);
           setActivities(fetchedActivities);
           setArticles(fetchedArticles);
-          setDrafts(fetchedDrafts);
           setComments(fetchedComments);
           setSurveyResponses(fetchedSurveyResponses);
           setScraps(fetchedScraps);
@@ -167,7 +156,6 @@ export function useMyPageController() {
           setUser(null);
           setActivities({ items: [], limit: OVERVIEW_LIMIT, page: 1, total: 0 });
           setArticles({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
-          setDrafts({ items: [], limit: 20, page: 1, total: 0 });
           setComments({ items: [], limit: MY_PAGE_LIMIT, page: 1, total: 0 });
           setScraps({ items: [], limit: ITEMS_PER_PAGE, page: 1, total: 0 });
           setSurveyResponses({
@@ -214,7 +202,6 @@ export function useMyPageController() {
   const hasLoadedMyPageData =
     user !== null ||
     articles !== null ||
-    drafts !== null ||
     comments !== null ||
     scraps !== null ||
     surveyResponses !== null ||
@@ -224,7 +211,6 @@ export function useMyPageController() {
     sessionLoading || (canUseMyPage && loading && !hasLoadedMyPageData);
   const isAdmin = hasAdminPermission(userInfo?.permission);
   const articleItems = articles?.items ?? [];
-  const draftItems = drafts?.items ?? [];
   const commentItems = comments?.items ?? [];
   const scrapItems = scraps?.items ?? [];
   const surveyItems = surveyResponses?.items ?? [];
@@ -318,9 +304,7 @@ export function useMyPageController() {
   const selectedTotal =
     displayedActivityTab === "scraps"
       ? scraps?.total ?? scrapItems.length
-      : displayedActivityTab === "drafts"
-        ? drafts?.total ?? draftItems.length
-        : displayedActivityTab === "all"
+      : displayedActivityTab === "all"
         ? activityTotal
         : displayedActivityTab === "survey"
           ? surveyTotal
@@ -343,7 +327,6 @@ export function useMyPageController() {
     displayName,
     displayedActivityTab,
     filteredActivities,
-    drafts: draftItems,
     initialLoading,
     isAdmin,
     lang,

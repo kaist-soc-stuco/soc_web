@@ -89,8 +89,18 @@ export function QuestionEditorModal({
     set("config", nextConfig);
   };
 
+  const nextUniqueValue = (
+    items: Array<{ value: string }>,
+    prefix: string,
+  ) => {
+    const used = new Set(items.map((item) => item.value));
+    let index = 1;
+    while (used.has(`${prefix}_${index}`)) index += 1;
+    return `${prefix}_${index}`;
+  };
+
   const addOption = () => {
-    set("options", [...form.options, { value: `option_${form.options.length + 1}`, labelKo: "", labelEn: "" }]);
+    set("options", [...form.options, { value: nextUniqueValue(form.options, "option"), labelKo: "", labelEn: "" }]);
   };
 
   const removeOption = (i: number) => {
@@ -99,8 +109,17 @@ export function QuestionEditorModal({
 
   const updateOption = (i: number, field: "value" | "labelKo" | "labelEn", val: string) => {
     const next = [...form.options];
+    const previousValue = next[i]?.value;
     next[i] = { ...next[i], [field]: val };
     set("options", next);
+    if (field === "value" && previousValue && previousValue !== val) {
+      const nextMap = { ...(form.config?.goToSectionByValue ?? {}) };
+      if (nextMap[previousValue]) {
+        nextMap[val] = nextMap[previousValue];
+        delete nextMap[previousValue];
+        set("config", { ...(form.config ?? {}), goToSectionByValue: nextMap });
+      }
+    }
   };
 
   const updateGridOption = (
@@ -116,9 +135,10 @@ export function QuestionEditorModal({
 
   const addGridOption = (kind: "rows" | "columns") => {
     const prefix = kind === "rows" ? "row" : "column";
+    const items = gridConfig[kind] ?? [];
     set("config", {
       ...gridConfig,
-      [kind]: [...(gridConfig[kind] ?? []), { value: `${prefix}_${(gridConfig[kind]?.length ?? 0) + 1}`, labelKo: "", labelEn: "" }],
+      [kind]: [...items, { value: nextUniqueValue(items, prefix), labelKo: "", labelEn: "" }],
     });
   };
 
@@ -174,6 +194,11 @@ export function QuestionEditorModal({
           return;
         }
       }
+      const optionValues = form.options.map((option) => option.value.trim());
+      if (new Set(optionValues).size !== optionValues.length) {
+        setError("선택지 값은 서로 달라야 합니다.");
+        return;
+      }
     }
 
     if (isGrid) {
@@ -184,6 +209,13 @@ export function QuestionEditorModal({
       if ([...(gridConfig.rows ?? []), ...(gridConfig.columns ?? [])].some((item) => !item.value.trim() || !item.labelKo.trim())) {
         setError("그리드 행·열의 값과 국문 라벨은 모두 입력해야 합니다.");
         return;
+      }
+      for (const [label, items] of [["행", gridConfig.rows ?? []], ["열", gridConfig.columns ?? []]] as const) {
+        const values = items.map((item) => item.value.trim());
+        if (new Set(values).size !== values.length) {
+          setError(`그리드 ${label} 값은 서로 달라야 합니다.`);
+          return;
+        }
       }
     }
 

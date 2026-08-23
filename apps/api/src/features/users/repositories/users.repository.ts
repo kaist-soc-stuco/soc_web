@@ -489,7 +489,14 @@ export class UsersRepository {
   async listEmailRecipients(
     recipientType: "ALL" | "PAID_STUDENTS" | "UNPAID_STUDENTS",
     filters?: EmailRecipientFilters,
-  ): Promise<Array<{ email: string; nameKo: string }>> {
+  ): Promise<
+    Array<{
+      email: string;
+      nameKo: string;
+      phoneNumber: string | null;
+      studentNumber: string | null;
+    }>
+  > {
     const feeFilter =
       recipientType === "PAID_STUDENTS"
         ? eq(studentFeeStatus.status, "PAID")
@@ -512,14 +519,24 @@ export class UsersRepository {
       );
       if (queryFilter) conditions.push(queryFilter);
     }
-    if (filters?.studentNumber?.trim()) conditions.push(ilike(users.stdNo, `%${filters.studentNumber.trim()}%`));
+    const studentNumber = filters?.studentNumber?.trim();
+    if (studentNumber === "2024_OR_EARLIER") {
+      conditions.push(lt(users.stdNo, "20250000"));
+    } else if (studentNumber) {
+      conditions.push(ilike(users.stdNo, `%${studentNumber}%`));
+    }
     if (filters?.primaryMajor?.trim()) conditions.push(ilike(users.primaryMajor, `%${filters.primaryMajor.trim()}%`));
     if (filters?.doubleMajor?.trim()) conditions.push(ilike(users.doubleMajor, `%${filters.doubleMajor.trim()}%`));
     if (filters?.minor?.trim()) conditions.push(ilike(users.minor, `%${filters.minor.trim()}%`));
     if (filters?.academicStatus?.trim()) conditions.push(eq(users.academicStatus, filters.academicStatus.trim()));
 
     const rows = await this.db
-      .select({ email: users.email, nameKo: users.nameKo })
+      .select({
+        email: users.email,
+        nameKo: users.nameKo,
+        phoneNumber: users.phoneNumber,
+        studentNumber: users.stdNo,
+      })
       .from(users)
       .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
       .where(and(...conditions))

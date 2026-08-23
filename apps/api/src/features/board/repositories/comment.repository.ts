@@ -7,8 +7,6 @@ import type {
   CommentEngagementKind,
   CommentEngagementResponse,
   CommentItem,
-  CommentReportRequest,
-  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
@@ -20,7 +18,6 @@ import {
 import {
   articles,
   commentEngagements,
-  commentReports,
   comments,
   users,
 } from "../../../infrastructure/postgres/postgres.schema";
@@ -63,15 +60,6 @@ export class CommentRepository {
             and ${commentEngagements.kind} = 'LIKE'
         )`
       : sql<boolean>`false`;
-    const viewerHasReported = viewerUserId
-      ? sql<boolean>`exists (
-          select 1
-          from ${commentReports}
-          where ${commentReports.commentId} = ${comments.commentId}
-            and ${commentReports.reporterUserId} = ${viewerUserId}
-        )`
-      : sql<boolean>`false`;
-
     const rows = await this.db
       .select({
         commentId: comments.commentId,
@@ -85,7 +73,6 @@ export class CommentRepository {
         authorName: users.nameKo,
         likeCount,
         viewerHasLiked,
-        viewerHasReported,
       })
       .from(comments)
       .leftJoin(users, eq(comments.authorUserId, users.userId))
@@ -110,7 +97,6 @@ export class CommentRepository {
         },
         likeCount: Number(row.likeCount ?? 0),
         viewerHasLiked: Boolean(row.viewerHasLiked),
-        viewerHasReported: Boolean(row.viewerHasReported),
       })),
     };
   }
@@ -161,14 +147,13 @@ export class CommentRepository {
       active: summary.viewerHasLiked,
       likeCount: summary.likeCount,
       viewerHasLiked: summary.viewerHasLiked,
-      viewerHasReported: summary.viewerHasReported,
     };
   }
 
   async getCommentEngagementSummary(
     commentId: string,
     userId: string,
-  ): Promise<Pick<CommentEngagementResponse, "likeCount" | "viewerHasLiked" | "viewerHasReported">> {
+  ): Promise<Pick<CommentEngagementResponse, "likeCount" | "viewerHasLiked">> {
     const normalizedCommentId = Number(commentId);
     const [countResult] = await this.db
       .select({ count: sql<number>`count(*)` })
@@ -190,62 +175,9 @@ export class CommentRepository {
         ),
       )
       .limit(1);
-    const [reportResult] = await this.db
-      .select({ reportId: commentReports.reportId })
-      .from(commentReports)
-      .where(
-        and(
-          eq(commentReports.commentId, normalizedCommentId),
-          eq(commentReports.reporterUserId, userId),
-        ),
-      )
-      .limit(1);
-
     return {
       likeCount: Number(countResult?.count ?? 0),
       viewerHasLiked: Boolean(likeResult),
-      viewerHasReported: Boolean(reportResult),
-    };
-  }
-
-  async reportComment(
-    commentId: string,
-    reporterUserId: string,
-    payload: CommentReportRequest,
-  ): Promise<CommentReportResponse> {
-    const [created] = await this.db
-      .insert(commentReports)
-      .values({
-        commentId: Number(commentId),
-        reporterUserId,
-        reason: payload.reason?.trim() || null,
-      })
-      .onConflictDoNothing()
-      .returning({ reportId: commentReports.reportId });
-
-    if (created) {
-      return {
-        commentId,
-        reported: true,
-        reportId: String(created.reportId),
-      };
-    }
-
-    const [existing] = await this.db
-      .select({ reportId: commentReports.reportId })
-      .from(commentReports)
-      .where(
-        and(
-          eq(commentReports.commentId, Number(commentId)),
-          eq(commentReports.reporterUserId, reporterUserId),
-        ),
-      )
-      .limit(1);
-
-    return {
-      commentId,
-      reported: true,
-      reportId: String(existing?.reportId ?? ""),
     };
   }
 

@@ -8,9 +8,9 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { TextStyleKit } from "@tiptap/extension-text-style";
 import {
   Bold,
-  Braces,
   Code,
   Check,
+  ChevronDown,
   EllipsisVertical,
   FileText,
   Heading1,
@@ -33,6 +33,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { Button } from "@/components/ui/button";
@@ -51,10 +52,17 @@ export interface RichTextEditorProps {
   titlePlaceholder?: string;
   compact?: boolean;
   disabled?: boolean;
+  spellCheck?: boolean;
   toolbarVariant?: "default" | "email";
   toolbarSuffix?: ReactNode;
   variableLabel?: string;
   variableToken?: string;
+  variableOptions?: ReadonlyArray<RichTextVariableOption>;
+}
+
+export interface RichTextVariableOption {
+  label: string;
+  token: string;
 }
 
 export interface BilingualRichTextEditorProps {
@@ -73,12 +81,10 @@ export interface BilingualRichTextEditorProps {
   disabled?: boolean;
 }
 
-const FONT_SIZE_OPTIONS = [
-  { value: "", labelKo: "기본", labelEn: "Default" },
-  ...[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 30, 36, 50, 72, 96].map(
-    (size) => ({ value: `${size}px`, labelKo: `${size}`, labelEn: `${size}` }),
-  ),
-] as const;
+const DEFAULT_FONT_SIZE = "14px";
+const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 30, 36, 50, 72, 96].map(
+  (size) => ({ value: `${size}px`, labelKo: `${size}px`, labelEn: `${size}px` }),
+);
 
 const TEXT_COLOR_PALETTE = [
   { value: "#111827", label: "검정" },
@@ -122,12 +128,14 @@ function useTiptapEditor({
   editorMinHeight,
   onChange,
   placeholder,
+  spellCheck,
 }: {
   content: string;
   disabled: boolean;
   editorMinHeight: string;
   onChange: (content: string) => void;
   placeholder: string;
+  spellCheck: boolean;
 }) {
   const editor = useEditor({
     extensions: [
@@ -160,6 +168,7 @@ function useTiptapEditor({
     editorProps: {
       attributes: {
         class: `${editorMinHeight} text-[15px] leading-normal text-slate-800`,
+        spellcheck: spellCheck ? "true" : "false",
       },
     },
   });
@@ -284,7 +293,7 @@ function ColorPopover({
               onApply(color.value);
               onClose();
             }}
-            className="relative size-6 rounded-full border border-slate-200 outline-none transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+            className="relative size-6 rounded-full border border-slate-200 outline-none transition-transform hover:scale-105"
             style={{ backgroundColor: color.value }}
           >
             {currentValue.toLowerCase() === color.value ? (
@@ -338,17 +347,18 @@ function ColorPopover({
 function MoreFormattingMenu({
   editor,
   lang,
-  onClose,
 }: {
   editor: Editor;
   lang: string;
-  onClose: () => void;
 }) {
   return (
-    <div
-      role="menu"
-      className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
-    >
+    <DropdownMenu.Portal>
+      <DropdownMenu.Content
+        align="start"
+        sideOffset={6}
+        collisionPadding={12}
+        className="z-[200] min-w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
+      >
       {[
         {
           icon: Heading1,
@@ -396,28 +406,22 @@ function MoreFormattingMenu({
         const ItemIcon = item.icon as LucideIcon;
 
         return (
-          <Button
+          <DropdownMenu.Item
             key={item.label}
-            type="button"
-            variant="ghost"
-            size="sm"
-            role="menuitem"
-            aria-pressed={item.active}
-            onClick={() => {
-              item.run();
-              onClose();
-            }}
+            onSelect={item.run}
             className={cn(
-              "h-8 w-full justify-start rounded-md px-2.5 text-xs",
+              "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2.5 text-xs font-normal text-slate-700 outline-none",
               item.active && "bg-brand-primary-light text-brand-primary",
+              "data-[highlighted]:bg-slate-100",
             )}
           >
             <ItemIcon aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
             <span>{item.label}</span>
-          </Button>
+          </DropdownMenu.Item>
         );
       })}
-    </div>
+      </DropdownMenu.Content>
+    </DropdownMenu.Portal>
   );
 }
 
@@ -430,6 +434,7 @@ function RichTextToolbar({
   uploading,
   variableLabel,
   variableToken,
+  variableOptions,
 }: {
   editor: Editor;
   fileInputRef?: RefObject<HTMLInputElement | null>;
@@ -439,32 +444,18 @@ function RichTextToolbar({
   uploading: boolean;
   variableLabel?: string;
   variableToken?: string;
+  variableOptions?: ReadonlyArray<RichTextVariableOption>;
 }) {
   const editorId = useId().replace(/:/g, "");
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [colorPopover, setColorPopover] = useState<"text" | "background" | null>(null);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
   const currentTextColor = editor.getAttributes("textStyle").color ?? "";
   const currentBackgroundColor = editor.getAttributes("textStyle").backgroundColor ?? "";
-  const sizeValue = editor.getAttributes("textStyle").fontSize ?? "";
-
-  useEffect(() => {
-    if (!isMoreOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!moreMenuRef.current?.contains(event.target as Node)) setIsMoreOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsMoreOpen(false);
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMoreOpen]);
+  const sizeValue = editor.getAttributes("textStyle").fontSize ?? DEFAULT_FONT_SIZE;
+  const variableMenuOptions = variableOptions?.length
+    ? variableOptions
+    : variableToken
+      ? [{ label: variableLabel || variableToken, token: variableToken }]
+      : [];
 
   const setLink = () => {
     const previousUrl = editor.getAttributes("link").href;
@@ -492,8 +483,7 @@ function RichTextToolbar({
         ariaLabel={lang === "ko" ? "글자 크기" : "Font size"}
         value={sizeValue}
         onChange={(value) => {
-          if (value) editor.chain().focus().setFontSize(value).run();
-          else editor.chain().focus().unsetFontSize().run();
+          editor.chain().focus().setFontSize(value).run();
         }}
         options={FONT_SIZE_OPTIONS.map((option) => ({
           value: option.value,
@@ -528,23 +518,22 @@ function RichTextToolbar({
         <UnderlineIcon />
       </ToolbarButton>
 
-      <div ref={moreMenuRef} className="relative">
-        <ToolbarButton
-          label={lang === "ko" ? "더보기" : "More formatting"}
-          active={isMoreOpen}
-          expanded={isMoreOpen}
-          hasPopup="menu"
-          onClick={() => {
-            setColorPopover(null);
-            setIsMoreOpen((open) => !open);
-          }}
-        >
-          <EllipsisVertical />
-        </ToolbarButton>
-        {isMoreOpen ? (
-          <MoreFormattingMenu editor={editor} lang={lang} onClose={() => setIsMoreOpen(false)} />
-        ) : null}
-      </div>
+      <DropdownMenu.Root onOpenChange={(open) => { if (open) setColorPopover(null); }}>
+        <DropdownMenu.Trigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={lang === "ko" ? "더보기" : "More formatting"}
+            title={lang === "ko" ? "더보기" : "More formatting"}
+            aria-haspopup="menu"
+            className="size-8 rounded-md text-slate-500 data-[state=open]:bg-brand-primary-light data-[state=open]:text-brand-primary"
+          >
+            <EllipsisVertical />
+          </Button>
+        </DropdownMenu.Trigger>
+        <MoreFormattingMenu editor={editor} lang={lang} />
+      </DropdownMenu.Root>
 
       {toolbarVariant !== "email" ? (
         <>
@@ -556,7 +545,6 @@ function RichTextToolbar({
               expanded={colorPopover === "text"}
               hasPopup="dialog"
               onClick={() => {
-                setIsMoreOpen(false);
                 setColorPopover((open) => (open === "text" ? null : "text"));
               }}
             >
@@ -579,7 +567,6 @@ function RichTextToolbar({
               expanded={colorPopover === "background"}
               hasPopup="dialog"
               onClick={() => {
-                setIsMoreOpen(false);
                 setColorPopover((open) => (open === "background" ? null : "background"));
               }}
             >
@@ -626,13 +613,42 @@ function RichTextToolbar({
         <LinkIcon />
       </ToolbarButton>
 
-      {variableToken ? (
-        <ToolbarButton
-          label={variableLabel || variableToken}
-          onClick={() => editor.chain().focus().insertContent(variableToken).run()}
-        >
-          <Braces />
-        </ToolbarButton>
+      {variableMenuOptions.length ? (
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={lang === "ko" ? "치환자 선택" : "Choose variable"}
+              title={lang === "ko" ? "치환자 선택" : "Choose variable"}
+              className="h-8 shrink-0 rounded-md px-2 text-xs font-normal text-slate-600"
+            >
+              <span className="whitespace-nowrap">
+                {variableMenuOptions[0]?.label ?? variableLabel ?? variableToken}
+              </span>
+              <ChevronDown aria-hidden="true" className="size-3.5 text-slate-400" />
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="start"
+              sideOffset={6}
+              collisionPadding={12}
+              className="z-[200] min-w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
+            >
+              {variableMenuOptions.map((option) => (
+                <DropdownMenu.Item
+                  key={option.token}
+                  onSelect={() => editor.chain().focus().insertContent(option.token).run()}
+                  className="flex h-8 cursor-pointer items-center rounded-md px-2.5 text-xs font-normal text-slate-700 outline-none data-[highlighted]:bg-slate-100"
+                >
+                  {option.label}
+                </DropdownMenu.Item>
+              ))}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       ) : null}
 
       {fileInputRef ? (
@@ -696,6 +712,7 @@ function EditorPane({
       <h2 className="mb-3 text-xs font-semibold text-slate-600">{titleLabel}</h2>
       <input
         type="text"
+        spellCheck={false}
         aria-label={titleLabel}
         placeholder={placeholder}
         value={title}
@@ -722,10 +739,12 @@ export function RichTextEditor({
   titlePlaceholder,
   compact = false,
   disabled = false,
+  spellCheck = true,
   toolbarVariant = "default",
   toolbarSuffix,
   variableLabel,
   variableToken,
+  variableOptions,
 }: RichTextEditorProps) {
   const editor = useTiptapEditor({
     content,
@@ -733,6 +752,7 @@ export function RichTextEditor({
     editorMinHeight: compact ? "min-h-[104px]" : "min-h-[380px]",
     onChange,
     placeholder: placeholder || (lang === "ko" ? "내용을 입력하세요..." : "Enter content..."),
+    spellCheck,
   });
   const canvasMinHeight = compact ? "min-h-[120px]" : "min-h-[400px]";
 
@@ -756,6 +776,7 @@ export function RichTextEditor({
         uploading={uploading}
         variableLabel={variableLabel}
         variableToken={variableToken}
+        variableOptions={variableOptions}
       />
       <div className="flex flex-col pt-5">
         {onTitleChange ? (
@@ -805,6 +826,7 @@ export function BilingualRichTextEditor({
     editorMinHeight: "min-h-[300px]",
     onChange: onContentKoChange,
     placeholder: lang === "ko" ? "국문 내용을 입력하세요" : "Enter Korean content",
+    spellCheck: true,
   });
   const englishEditor = useTiptapEditor({
     content: contentEn,
@@ -812,6 +834,7 @@ export function BilingualRichTextEditor({
     editorMinHeight: "min-h-[300px]",
     onChange: onContentEnChange,
     placeholder: lang === "ko" ? "영문 내용을 입력하세요" : "Enter English content",
+    spellCheck: true,
   });
   const [activeLanguage, setActiveLanguage] = useState<"ko" | "en">("ko");
 
@@ -823,7 +846,7 @@ export function BilingualRichTextEditor({
     <div
       aria-disabled={disabled}
       className={cn(
-        "mx-auto w-full min-w-0 max-w-5xl bg-white",
+        "mx-auto w-full min-w-0 max-w-4xl bg-white",
         disabled && "pointer-events-none opacity-65",
       )}
     >

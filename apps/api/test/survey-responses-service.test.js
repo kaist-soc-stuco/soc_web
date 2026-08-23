@@ -142,13 +142,17 @@ test("rejects submissions before opening time", async () => {
   assert.equal(insertSubmissionCalls.length, 0);
 });
 
-test("ignores the retired closing time", async () => {
+test("rejects submissions after the closing time", async () => {
   const { insertSubmissionCalls, service } = createService({
     surveyRecord: survey({ closesAt: PAST_ISO }),
   });
 
-  await service.submit("survey-1", validDto, caller);
-  assert.equal(insertSubmissionCalls.length, 1);
+  await expectHttpError(
+    service.submit("survey-1", validDto, caller),
+    ConflictException,
+    "survey_closed",
+  );
+  assert.equal(insertSubmissionCalls.length, 0);
 });
 
 test("requires a logged-in caller", async () => {

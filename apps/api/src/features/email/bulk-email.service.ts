@@ -89,6 +89,13 @@ type EmailCompose = {
   attachmentAssetIds: string[];
 };
 
+type EmailRecipient = {
+  email: string;
+  nameKo: string;
+  phoneNumber: string | null;
+  studentNumber: string | null;
+};
+
 @Injectable()
 export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BulkEmailService.name);
@@ -268,7 +275,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       const delivery = await this.deliver({
         emailId,
         senderId,
-        recipients: recipients.map((recipient) => recipient.email),
+        recipients,
         compose: {
           subject: dto.subject,
           content: dto.content,
@@ -307,12 +314,19 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     }
 
     const attachments = await this.loadAttachments(senderId, dto.attachmentAssetIds ?? []);
+    const testRecipient: EmailRecipient = {
+      email: recipientEmail,
+      nameKo: sender?.nameKo ?? "학우",
+      phoneNumber: sender?.phoneNumber ?? null,
+      studentNumber: sender?.stdNo ?? null,
+    };
+    const subject = renderBulkEmailTemplate(`[테스트] ${dto.subject}`, testRecipient);
+    const content = renderBulkEmailTemplate(dto.content, testRecipient);
     const delivery = await this.emailDeliveryService.send({
       recipients: [recipientEmail],
-      subject: `[테스트] ${dto.subject}`,
-      content:
-        dto.contentType === "html" ? stripHtml(dto.content) : dto.content,
-      ...(dto.contentType === "html" ? { html: sanitizeHtml(dto.content) } : {}),
+      subject,
+      content: dto.contentType === "html" ? stripHtml(content) : content,
+      ...(dto.contentType === "html" ? { html: sanitizeHtml(content) } : {}),
       ...(attachments.length ? { attachments } : {}),
     });
 
@@ -380,7 +394,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       const delivery = await this.deliver({
         emailId: record.id,
         senderId,
-        recipients: recipients.map((recipient) => recipient.email),
+        recipients,
         compose: {
           subject: record.subject,
           content: record.content,
@@ -415,7 +429,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     await this.deliver({
       emailId: record.id,
       senderId: record.senderId,
-      recipients: recipients.map((recipient) => recipient.email),
+      recipients,
       compose: {
         subject: record.subject,
         content: record.content,
@@ -430,31 +444,57 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   private async deliver(input: {
     emailId: string;
     senderId: string;
-    recipients: string[];
+    recipients: EmailRecipient[];
     compose: EmailCompose;
   }): Promise<{ dryRun: boolean }> {
     const attachments = await this.loadAttachments(
       input.senderId,
       input.compose.attachmentAssetIds,
     );
-    const delivery = await this.emailDeliveryService.send({
-      recipients: input.recipients,
-      subject: input.compose.subject,
-      content:
-        input.compose.contentType === "html"
-          ? stripHtml(input.compose.content)
-          : input.compose.content,
-      ...(input.compose.contentType === "html"
-        ? { html: sanitizeHtml(input.compose.content) }
-        : {}),
-      ...(attachments.length ? { attachments } : {}),
-    });
+    const hasTemplateTokens = hasBulkEmailTemplateTokens(input.compose.subject) ||
+      hasBulkEmailTemplateTokens(input.compose.content);
+    const delivery = hasTemplateTokens
+      ? await this.deliverPersonalized(input.recipients, input.compose, attachments)
+      : await this.emailDeliveryService.send({
+          recipients: input.recipients.map((recipient) => recipient.email),
+          subject: input.compose.subject,
+          content:
+            input.compose.contentType === "html"
+              ? stripHtml(input.compose.content)
+              : input.compose.content,
+          ...(input.compose.contentType === "html"
+            ? { html: sanitizeHtml(input.compose.content) }
+            : {}),
+          ...(attachments.length ? { attachments } : {}),
+        });
 
     await this.bulkEmailRepo.updateStatus(
       input.emailId,
       delivery.dryRun ? "DRY_RUN" : "SUCCESS",
     );
     return delivery;
+  }
+
+  private async deliverPersonalized(
+    recipients: EmailRecipient[],
+    compose: EmailCompose,
+    attachments: DeliveryAttachment[],
+  ): Promise<{ dryRun: boolean }> {
+    const deliveries = await Promise.all(
+      recipients.map((recipient) => {
+        const subject = renderBulkEmailTemplate(compose.subject, recipient);
+        const content = renderBulkEmailTemplate(compose.content, recipient);
+        return this.emailDeliveryService.send({
+          recipients: [recipient.email],
+          subject,
+          content: compose.contentType === "html" ? stripHtml(content) : content,
+          ...(compose.contentType === "html" ? { html: sanitizeHtml(content) } : {}),
+          ...(attachments.length ? { attachments } : {}),
+        });
+      }),
+    );
+
+    return { dryRun: deliveries.every((delivery) => delivery.dryRun) };
   }
 
   private async loadAttachments(
@@ -519,4 +559,20 @@ function responseForExistingRecord(record: BulkEmailStoredRecord): SendBulkEmail
 
 function stripHtml(value: string): string {
   return sanitizeHtml(value, { allowedTags: [], allowedAttributes: {} }).replace(/\s+/g, " ").trim();
+}
+
+function hasBulkEmailTemplateTokens(value: string): boolean {
+  return /\{\{\s*(이름|학번|이메일|전화번호)\s*\}\}|\{(이름|학번|이메일|전화번호)\}/.test(value);
+}
+
+function renderBulkEmailTemplate(value: string, recipient: EmailRecipient): string {
+  const variables: Record<string, string> = {
+    이름: recipient.nameKo,
+    학번: recipient.studentNumber ?? "",
+    이메일: recipient.email,
+    전화번호: recipient.phoneNumber ?? "",
+  };
+  return value
+    .replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, key: string) => variables[key.trim()] ?? match)
+    .replace(/\{(이름|학번|이메일|전화번호)\}/g, (match, key: string) => variables[key] ?? match);
 }

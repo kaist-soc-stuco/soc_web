@@ -68,7 +68,7 @@ export function AdminLayout() {
           type="button"
           size="md"
           aria-label={lang === "ko" ? "알림" : "Notifications"}
-          className="rounded-md border border-transparent p-2 text-app-text-body transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+          className="rounded-md border border-transparent p-2 text-app-text-body transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-brand-primary"
           title={lang === "ko" ? "알림" : "Notifications"}
         >
           <Bell className="h-4 w-4" />
@@ -82,7 +82,7 @@ export function AdminLayout() {
               aria-expanded={dropdownOpen}
               onClick={() => setDropdownOpen((value) => !value)}
               onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
-              className="flex min-h-10 items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-app-text-strong transition-colors hover:border-slate-200 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+              className="flex min-h-10 items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-app-text-strong transition-colors hover:border-slate-200 hover:bg-slate-50"
             >
               <User className="h-4 w-4 text-kaist-greygreen" />
               <span className="hidden max-w-44 truncate sm:inline">{user.name}</span>
