@@ -88,8 +88,9 @@ function BoardManagementPageContent() {
     setLoading(true);
     try {
       const response = await apiClient.getAdminBoards();
-      setBoards(response.items);
-      setSavedOrder(response.items.map((board) => board.code));
+      const visibleBoards = response.items.filter((board) => board.code !== "_EVENT");
+      setBoards(visibleBoards);
+      setSavedOrder(visibleBoards.map((board) => board.code));
       setMessage(null);
     } catch {
       setMessage({ tone: "error", text: "게시판 목록을 불러오지 못했습니다." });
@@ -202,8 +203,9 @@ function BoardManagementPageContent() {
     setSaving(true);
     try {
       const response = await apiClient.reorderBoards({ items: boards.map((board, index) => ({ code: board.code, sortOrder: index * 10 })) });
-      setBoards(response.items);
-      setSavedOrder(response.items.map((board) => board.code));
+      const visibleBoards = response.items.filter((board) => board.code !== "_EVENT");
+      setBoards(visibleBoards);
+      setSavedOrder(visibleBoards.map((board) => board.code));
       setMessage({ tone: "success", text: "게시판 노출 순서를 저장했습니다." });
     } catch {
       setMessage({ tone: "error", text: "게시판 순서를 저장하지 못했습니다." });

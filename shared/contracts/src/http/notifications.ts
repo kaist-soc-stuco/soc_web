@@ -1,4 +1,4 @@
-export type NotificationType = "COMMENT_ON_ARTICLE" | "REPLY_TO_COMMENT" | "SYSTEM";
+export type NotificationType = "COMMENT_ON_ARTICLE" | "REPLY_TO_COMMENT" | "OFFICIAL_RESPONSE";
 
 export interface NotificationRecord {
   notificationId: string;

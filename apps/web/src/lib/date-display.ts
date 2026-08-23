@@ -51,6 +51,56 @@ export function formatNumericDate(
     : `${date.getFullYear()}.${month}.${day}`;
 }
 
+function formatNumericDatePart(date: Date, includeYear: boolean): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return includeYear
+    ? `${date.getFullYear()}.${month}.${day}`
+    : `${month}.${day}`;
+}
+
+function formatNumericTimePart(date: Date): string {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * Formats dashboard date ranges without locale punctuation drift.
+ * The end year is omitted when both dates share a year:
+ * `2026.01.05 ~ 01.09`.
+ */
+export function formatNumericDateRange(
+  startValue: DisplayDateValue,
+  endValue: DisplayDateValue,
+  options: { includeTime?: boolean } = {},
+): string {
+  const start = toLocalDate(startValue);
+  const end = toLocalDate(endValue);
+  if (!start && !end) return "";
+  if (!start) return end ? formatNumericDatePart(end, true) : "";
+  if (!end) return formatNumericDatePart(start, true);
+
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const sameDate =
+    sameYear &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+  const includeTime = options.includeTime === true;
+  const startDate = formatNumericDatePart(start, true);
+  const endDate = formatNumericDatePart(end, !sameYear);
+
+  if (!includeTime) {
+    return sameDate ? startDate : `${startDate} ~ ${endDate}`;
+  }
+
+  const startText = `${startDate} ${formatNumericTimePart(start)}`;
+  const endText = sameDate
+    ? formatNumericTimePart(end)
+    : `${endDate} ${formatNumericTimePart(end)}`;
+  return startText === endText ? startText : `${startText} ~ ${endText}`;
+}
+
 export function formatShortDateWithWeekday(
   value: DisplayDateValue,
   lang: string = "ko",

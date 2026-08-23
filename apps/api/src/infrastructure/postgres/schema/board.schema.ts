@@ -208,6 +208,7 @@ export const comments = pgTable(
       .notNull()
       .references(() => users.userId),
     content: text("content").notNull(),
+    isOfficial: boolean("is_official").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull().default("PUBLISHED"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

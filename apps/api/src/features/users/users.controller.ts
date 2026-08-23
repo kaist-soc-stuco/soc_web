@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Header, Param, Post, Put, Query, Req, StreamableFile, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 import * as XLSX from "xlsx";
 import {
@@ -275,26 +275,29 @@ export class UsersController {
       referenceSemester,
       userIds?.split(",").filter(Boolean),
     );
-    const worksheet = XLSX.utils.json_to_sheet(rows.map((row) => ({
-      사용자ID: row.userId,
-      학번: row.stdNo,
-      이름: row.nameKo,
-      이메일: row.email,
-      소속: row.departmentKo,
-      주전공: row.primaryMajor,
-      복수전공: row.doubleMajor,
-      부전공: row.minor,
-      상태: row.status,
-      적용학기수: row.coverageSemesters,
-      적용시작학기: row.coverageStartSemester,
-      수납액: row.paidAmount,
-      기준금액: row.requiredAmount,
-      납부유형: row.paymentType,
-      결제수단: row.paymentMethod,
-      혜택대상: row.eligible ? "예" : "아니오",
-      납부일: row.paidAt,
-      비고: row.note,
-    })));
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["사용자ID", "학번", "이름", "이메일", "소속", "주전공", "복수전공", "부전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "혜택대상", "납부일", "비고"],
+      ...rows.map((row) => [
+        row.userId,
+        row.stdNo,
+        row.nameKo,
+        row.email,
+        row.departmentKo,
+        row.primaryMajor,
+        row.doubleMajor,
+        row.minor,
+        row.status,
+        row.coverageSemesters,
+        row.coverageStartSemester,
+        row.paidAmount,
+        row.requiredAmount,
+        row.paymentType,
+        row.paymentMethod,
+        row.eligible ? "예" : "아니오",
+        row.paidAt,
+        row.note,
+      ]),
+    ]);
     worksheet["!cols"] = [
       { wch: 38 }, { wch: 14 }, { wch: 16 }, { wch: 32 }, { wch: 18 },
       { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
@@ -303,7 +306,8 @@ export class UsersController {
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "과비 납부");
-    return Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+    const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+    return new StreamableFile(buffer);
   }
 
   @Post("fee-status/bulk")

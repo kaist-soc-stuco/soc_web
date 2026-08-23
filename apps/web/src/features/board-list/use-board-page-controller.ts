@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, ArticleListItem } from "@soc/contracts";
 import { hasPermission, isoToMs } from "@soc/shared";
@@ -7,6 +7,7 @@ import { hasPermission, isoToMs } from "@soc/shared";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
+import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
   getBoardDescriptionFromMetadata,
@@ -41,6 +42,8 @@ export function useBoardPageController() {
   const [totalCount, setTotalCount] = useState(0);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchCriteria, setSearchCriteria] =
     useState<BoardSearchCriteria>("title_content");
   const [postsPerPage, setPostsPerPage] = useState(20);
@@ -173,11 +176,16 @@ export function useBoardPageController() {
     active: boolean,
   ) => {
     if (!session?.canUsePersistentFeatures) {
-      alert(
-        lang === "ko"
-          ? "좋아요와 스크랩은 로그인 후 사용할 수 있습니다."
-          : "Like and scrap are available after signing in.",
-      );
+      toast({
+        message:
+          lang === "ko"
+            ? "로그인이 필요한 기능입니다."
+            : "You need to sign in to use this feature.",
+        action: {
+          label: lang === "ko" ? "로그인" : "Login",
+          onClick: () => navigate("/login"),
+        },
+      });
       return;
     }
 

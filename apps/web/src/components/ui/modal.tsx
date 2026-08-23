@@ -9,17 +9,21 @@ export function Modal({
   children,
   className,
   bodyClassName,
+  dividerless = false,
   footer,
   onClose,
   open,
+  showClose = true,
   title,
 }: {
   children?: ReactNode;
   className?: string;
   bodyClassName?: string;
+  dividerless?: boolean;
   footer?: ReactNode;
   onClose: () => void;
   open: boolean;
+  showClose?: boolean;
   title: ReactNode;
 }) {
   useEffect(() => {
@@ -49,14 +53,32 @@ export function Modal({
           className,
         )}
       >
-        <div className="ui-modal__header flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-border-subtle)] px-5">
+        <div
+          className={cn(
+            "ui-modal__header flex min-h-14 shrink-0 items-center justify-between gap-3",
+            dividerless ? "px-6" : "px-5",
+          )}
+        >
           <h2 className="text-[15px] font-semibold leading-5 text-[var(--ui-text-strong)]">{title}</h2>
-          <IconButton size="sm" aria-label="닫기" onClick={onClose}>
-            <X aria-hidden="true" />
-          </IconButton>
+          {showClose ? (
+            <IconButton size="sm" aria-label="닫기" onClick={onClose}>
+              <X aria-hidden="true" />
+            </IconButton>
+          ) : null}
         </div>
-        {children ? <div className={cn("ui-modal__body min-h-0 overflow-y-auto px-5 py-5", bodyClassName)}>{children}</div> : null}
-        {footer ? <div className="ui-modal__footer flex shrink-0 justify-end gap-2 border-t border-[var(--ui-border-subtle)] bg-[color-mix(in_srgb,var(--ui-surface-muted)_30%,transparent)] px-5 py-3.5">{footer}</div> : null}
+        {children ? <div className={cn("ui-modal__body scrollbar-hidden min-h-0 overflow-y-auto px-5 py-5", bodyClassName)}>{children}</div> : null}
+        {footer ? (
+          <div
+            className={cn(
+              "ui-modal__footer flex shrink-0 justify-end gap-2",
+              dividerless
+                ? "bg-transparent px-6 pb-6 pt-0"
+                : "bg-transparent px-5 pb-5 pt-0",
+            )}
+          >
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

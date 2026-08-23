@@ -177,7 +177,7 @@ export function UserManagementPage() {
         <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           <AdminPageHeader title="유저 관리" />
 
-          <AdminTableCard aria-busy={loading}>
+          <AdminTableCard className="user-management-table" aria-busy={loading}>
             <AdminCardHeader className="items-center gap-4">
               <SegmentedControl<UserStatusFilter>
                 ariaLabel="사용자 상태"
@@ -276,7 +276,7 @@ export function UserManagementPage() {
                         }}
                       >
                         <AdminTableCell>
-                          <div className="admin-table-text-emphasis truncate" title={user.nameKo}>{user.nameKo}</div>
+                          <div className="admin-table-text-emphasis !text-[14px] !font-medium truncate" title={user.nameKo}>{user.nameKo}</div>
                           {user.nameEn ? <div className="admin-table-text mt-1 truncate" title={user.nameEn}>{user.nameEn}</div> : null}
                         </AdminTableCell>
                         <AdminTableCell className="tabular-nums text-slate-700">

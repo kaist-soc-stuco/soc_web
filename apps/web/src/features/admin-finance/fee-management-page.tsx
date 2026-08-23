@@ -52,6 +52,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
+import { downloadBlob } from "@/lib/download-blob";
 import { Permissions } from "@/lib/permissions";
 
 type FeeSortBy = "name" | "studentId" | "status" | "paidAt";
@@ -120,7 +121,7 @@ export function FeeManagementPage() {
   const [paymentNote, setPaymentNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [spreadsheetInfoOpen, setSpreadsheetInfoOpen] = useState(false);
-  const [spreadsheetMenuOpen, setSpreadsheetMenuOpen] = useState(false);
+  const [openFilterDropdown, setOpenFilterDropdown] = useState<"semester" | "major" | null>(null);
   const [spreadsheetInputKey, setSpreadsheetInputKey] = useState(0);
   const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
   const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
@@ -277,7 +278,6 @@ export function FeeManagementPage() {
 
   const handleExport = async () => {
     try {
-      setSpreadsheetMenuOpen(false);
       setOperationError(null);
       const spreadsheet = await apiClient.downloadStudentFeeXlsx({
         status: statusFilter === "ALL" ? undefined : statusFilter,
@@ -288,12 +288,7 @@ export function FeeManagementPage() {
         sortDirection,
         userIds: selectedUserIds.size > 0 ? Array.from(selectedUserIds) : undefined,
       });
-      const url = URL.createObjectURL(spreadsheet);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `student-fee-${referenceSemester}.xlsx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(spreadsheet, `student-fee-${referenceSemester}.xlsx`);
       setSuccessMessage(selectedUserIds.size > 0 ? `${selectedUserIds.size}명의 과비 정보를 내보냈습니다.` : "현재 필터의 과비 정보를 내보냈습니다.");
     } catch (err) {
       setOperationError(err instanceof Error ? err.message : "내보내기에 실패했습니다.");
@@ -400,27 +395,19 @@ export function FeeManagementPage() {
                 ]}
               />
               <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-                <AdminSelectDropdown ariaLabel="기준 학기" value={referenceSemester} options={semesterOptions} onChange={(value) => updateFilter(setReferenceSemester, value)} className="w-36 shrink-0" />
+                <AdminSelectDropdown ariaLabel="기준 학기" value={referenceSemester} options={semesterOptions} onChange={(value) => updateFilter(setReferenceSemester, value)} className="w-44 shrink-0" open={openFilterDropdown === "semester"} onOpenChange={(open) => setOpenFilterDropdown(open ? "semester" : null)} />
                 <AdminSelectDropdown
                   ariaLabel="전공 구분"
                   value={majorCategory ?? "ALL"}
                   options={[{ value: "ALL", label: "전공 전체" }, { value: "PRIMARY", label: "주전공 보유" }, { value: "DOUBLE", label: "복수전공 보유" }, { value: "MINOR", label: "부전공 보유" }]}
                   onChange={(value) => updateFilter(setMajorCategory, value === "ALL" ? undefined : value as StudentFeeListOptions["majorCategory"])}
                   className="w-32 shrink-0"
+                  open={openFilterDropdown === "major"}
+                  onOpenChange={(open) => setOpenFilterDropdown(open ? "major" : null)}
                 />
                 <PageSearchField ariaLabel="학생 검색" className="w-full min-w-[220px] sm:w-64" onChange={(value) => updateFilter(setQuery, value)} onClear={() => updateFilter(setQuery, "")} placeholder="이름·학번·전공·이메일 검색" value={query} />
-                <div className="relative shrink-0">
-                  <Button type="button" variant="outline" onClick={() => setSpreadsheetMenuOpen((value) => !value)}>데이터 <ChevronDown aria-hidden="true" className="size-4" /></Button>
-                  {spreadsheetMenuOpen ? (
-                    <>
-                      <button type="button" aria-label="데이터 메뉴 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSpreadsheetMenuOpen(false)} />
-                      <PopoverPanel className="right-0 top-full z-50 mt-2 w-44 p-1">
-                        <button type="button" className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50" onClick={() => { setSpreadsheetMenuOpen(false); void handleExport(); }}><Download aria-hidden="true" className="size-4" /> 내보내기{selectedUserIds.size > 0 ? ` (${selectedUserIds.size})` : ""}</button>
-                        <button type="button" className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50" onClick={() => { setSpreadsheetMenuOpen(false); setSpreadsheetInfoOpen(true); }}><FileUp aria-hidden="true" className="size-4" /> 불러오기</button>
-                      </PopoverPanel>
-                    </>
-                  ) : null}
-                </div>
+                <Button type="button" variant="outline" onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" /> 내보내기{selectedUserIds.size > 0 ? ` (${selectedUserIds.size})` : ""}</Button>
+                <Button type="button" variant="outline" onClick={() => setSpreadsheetInfoOpen(true)}><FileUp aria-hidden="true" className="size-4" /> 불러오기</Button>
               </div>
             </div>
 
@@ -439,7 +426,7 @@ export function FeeManagementPage() {
                             <div className="flex h-12 items-center justify-between gap-3">
                               <div className="relative">
                           <Button type="button" variant="ghost" size="sm" className="!font-medium" onClick={() => setSelectionPopoverOpen((value) => !value)}>{selectedUserIds.size}명 선택됨 <ChevronDown aria-hidden="true" className="size-4" /></Button>
-                          {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
+                          {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="scrollbar-hidden flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
                               </div>
                               <Button type="button" size="sm" onClick={openPaymentModal} disabled={saving}><CreditCard aria-hidden="true" className="size-4" /> 일괄 납부 처리</Button>
                             </div>
@@ -454,9 +441,9 @@ export function FeeManagementPage() {
                     <AdminTableBody>{students.map((student) => <tr key={student.userId} className="cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70" onClick={() => void openDetail(student)}>
                       <AdminTableCell className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${student.nameKo} 선택`} checked={selectedUserIds.has(student.userId)} onChange={() => toggleSelectedUser(student.userId)} className="size-4 accent-emerald-700" /></AdminTableCell>
                       <AdminTableCell className="py-2.5"><div className="font-medium text-slate-900">{student.nameKo}</div>{student.nameEn ? <div className="mt-0.5 text-xs font-normal text-slate-500">{student.nameEn}</div> : null}</AdminTableCell>
-                      <AdminTableCell className="py-2.5 tabular-nums text-slate-700">{student.stdNo || "—"}</AdminTableCell>
+                      <AdminTableCell className="py-2.5 tabular-nums text-slate-700">{student.stdNo || null}</AdminTableCell>
                       <AdminTableCell className="max-w-56 truncate py-2.5 text-slate-700" title={student.email}>{student.email}</AdminTableCell>
-                      <AdminTableCell className="py-2.5 text-slate-700"><div>{student.primaryMajor || "—"}</div>{student.doubleMajor ? <div className="text-xs text-slate-500">복수 {student.doubleMajor}</div> : null}{student.minor ? <div className="text-xs text-slate-500">부전공 {student.minor}</div> : null}</AdminTableCell>
+                      <AdminTableCell className="py-2.5 text-slate-700"><div>{student.primaryMajor || null}</div>{student.doubleMajor ? <div className="text-xs text-slate-500">복수 {student.doubleMajor}</div> : null}{student.minor ? <div className="text-xs text-slate-500">부전공 {student.minor}</div> : null}</AdminTableCell>
                       <AdminTableCell className="py-2.5"><AdminStatusBadge tone={student.status === "PAID" ? "positive" : "neutral"}>{student.status === "PAID" ? "완납" : "미납"}</AdminStatusBadge></AdminTableCell>
                       <AdminTableCell className="py-2.5 text-right font-medium tabular-nums text-slate-900">{formatCurrency(student.paidAmount)}</AdminTableCell>
                     </tr>)}</AdminTableBody>
@@ -476,7 +463,7 @@ export function FeeManagementPage() {
         </Modal>
 
         <Modal open={paymentModalOpen} onClose={() => !saving && setPaymentModalOpen(false)} title="과비 납부 처리" className="max-w-4xl" footer={<><Button type="button" variant="outline" disabled={saving} onClick={() => setPaymentModalOpen(false)}>취소</Button><Button type="button" disabled={saving} onClick={() => void submitPayments()}>{saving ? "반영 중" : "납부 확정"}</Button></>}>
-          <div className="space-y-5"><div className="grid gap-3 md:grid-cols-3"><AdminFormField label="납부 유형"><AdminSelectDropdown ariaLabel="납부 유형" value={paymentType} options={[{ value: "SIX_SEMESTER_LUMP_SUM", label: "6학기 일시납" }, { value: "PRIOR_PAYMENT_BALANCE", label: "기납부 차액 납부" }]} onChange={(value) => setPaymentType(value as FeePaymentType)} className="w-full" /></AdminFormField><AdminFormField label="적용 학기 수"><AdminSelectDropdown ariaLabel="적용 학기 수" value={paymentCoverage} onChange={setPaymentCoverage} className="w-full min-w-[190px]" options={[{ value: "1", label: "1학기" }, { value: "2", label: "2학기" }, { value: "4", label: "4학기" }, { value: "6", label: "6학기" }]} /></AdminFormField><AdminFormField label="결제 수단"><AdminSelectDropdown ariaLabel="결제 수단" value={paymentMethod} onChange={(value) => setPaymentMethod(value as FeePaymentMethod)} className="w-full" options={[{ value: "BANK_TRANSFER", label: "계좌이체" }, { value: "CASH", label: "현금" }, { value: "OTHER", label: "기타" }]} /></AdminFormField></div><div className="grid gap-3 md:grid-cols-2"><AdminFormField label="납부 일자"><UiInput type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.currentTarget.value)} className="w-full" /></AdminFormField><AdminFormField label="비고"><UiInput value={paymentNote} onChange={(event) => setPaymentNote(event.currentTarget.value)} placeholder="입금자명 상이, 차액 사유 등" className="w-full" /></AdminFormField></div><div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[620px] table-fixed text-left text-sm"><colgroup><col className="w-[32%]" /><col className="w-[18%]" /><col className="w-[24%]" /><col className="w-[26%]" /></colgroup><thead className="bg-slate-50 text-xs font-medium text-slate-600"><tr><th className="px-3 py-2.5">대상</th><th className="px-3 py-2.5">학번</th><th className="px-3 py-2.5 text-right">수납액</th><th className="px-3 py-2.5">현재 상태</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedStudents.map((student) => <tr key={student.userId}><td className="px-3 py-2.5 font-medium text-slate-900">{student.nameKo}</td><td className="px-3 py-2.5 tabular-nums text-slate-600">{student.stdNo || "—"}</td><td className="px-3 py-2.5"><UiInput aria-label={`${student.nameKo} 수납액`} type="number" min="0" step="1000" value={paymentAmounts[student.userId] ?? String(DEFAULT_FEE_AMOUNT)} onChange={(event) => setPaymentAmounts((current) => ({ ...current, [student.userId]: event.currentTarget.value }))} className="ml-auto w-36 text-right" /></td><td className="px-3 py-2.5 text-xs text-slate-500">{student.status === "PAID" ? "완납" : "미납"}</td></tr>)}</tbody></table></div><p className="text-xs leading-5 text-slate-500">기본 금액은 45,000원입니다. 2025년 이전 기납부자의 차액 납부는 학생별 수납액을 행 단위로 수정해 반영하세요.</p></div>
+          <div className="space-y-5"><div className="grid gap-3 md:grid-cols-3"><AdminFormField label="납부 유형"><AdminSelectDropdown ariaLabel="납부 유형" value={paymentType} options={[{ value: "SIX_SEMESTER_LUMP_SUM", label: "6학기 일시납" }, { value: "PRIOR_PAYMENT_BALANCE", label: "기납부 차액 납부" }]} onChange={(value) => setPaymentType(value as FeePaymentType)} className="w-full" /></AdminFormField><AdminFormField label="적용 학기 수"><AdminSelectDropdown ariaLabel="적용 학기 수" value={paymentCoverage} onChange={setPaymentCoverage} className="w-full min-w-[190px]" options={[{ value: "1", label: "1학기" }, { value: "2", label: "2학기" }, { value: "4", label: "4학기" }, { value: "6", label: "6학기" }]} /></AdminFormField><AdminFormField label="결제 수단"><AdminSelectDropdown ariaLabel="결제 수단" value={paymentMethod} onChange={(value) => setPaymentMethod(value as FeePaymentMethod)} className="w-full" options={[{ value: "BANK_TRANSFER", label: "계좌이체" }, { value: "CASH", label: "현금" }, { value: "OTHER", label: "기타" }]} /></AdminFormField></div><div className="grid gap-3 md:grid-cols-2"><AdminFormField label="납부 일자"><UiInput type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.currentTarget.value)} className="w-full" /></AdminFormField><AdminFormField label="비고"><UiInput value={paymentNote} onChange={(event) => setPaymentNote(event.currentTarget.value)} placeholder="입금자명 상이, 차액 사유 등" className="w-full" /></AdminFormField></div><div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[620px] table-fixed text-left text-sm"><colgroup><col className="w-[32%]" /><col className="w-[18%]" /><col className="w-[24%]" /><col className="w-[26%]" /></colgroup><thead className="bg-slate-50 text-xs font-medium text-slate-600"><tr><th className="px-3 py-2.5">대상</th><th className="px-3 py-2.5">학번</th><th className="px-3 py-2.5 text-right">수납액</th><th className="px-3 py-2.5">현재 상태</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedStudents.map((student) => <tr key={student.userId}><td className="px-3 py-2.5 font-medium text-slate-900">{student.nameKo}</td><td className="px-3 py-2.5 tabular-nums text-slate-600">{student.stdNo || null}</td><td className="px-3 py-2.5"><UiInput aria-label={`${student.nameKo} 수납액`} type="number" min="0" step="1000" value={paymentAmounts[student.userId] ?? String(DEFAULT_FEE_AMOUNT)} onChange={(event) => setPaymentAmounts((current) => ({ ...current, [student.userId]: event.currentTarget.value }))} className="ml-auto w-36 text-right" /></td><td className="px-3 py-2.5 text-xs text-slate-500">{student.status === "PAID" ? "완납" : "미납"}</td></tr>)}</tbody></table></div><p className="text-xs leading-5 text-slate-500">기본 금액은 45,000원입니다. 2025년 이전 기납부자의 차액 납부는 학생별 수납액을 행 단위로 수정해 반영하세요.</p></div>
         </Modal>
 
         <AdminDrawer open={Boolean(detailStudentId)} onClose={() => setDetailStudentId(null)} title={detail?.user ? `${detail.user.nameKo} 납부 상세` : "납부 상세"} width="max-w-2xl" footer={detail ? <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setDetailStudentId(null)}>닫기</Button><Button type="button" disabled={saving} onClick={() => void saveDetail()}>{saving ? "저장 중" : "요약 정보 저장"}</Button></div> : undefined}>

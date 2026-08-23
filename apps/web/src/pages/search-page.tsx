@@ -2,6 +2,7 @@ import { Header } from "@/components/organisms/header";
 import { PageHeader, PageShell } from "@/components/ui/page-layout";
 import {
   SearchForm,
+  SearchFilterTabs,
   SearchResults,
   SearchStatus,
 } from "@/features/search/search-page-sections";
@@ -15,12 +16,14 @@ export function SearchPage() {
     calendarEvents,
     error,
     eventArticles,
+    filter,
     handleSubmit,
     inputValue,
     lang,
     loading,
     query,
     setInputValue,
+    setFilter,
     surveys,
     totalCount,
   } = useSearchPageController();
@@ -37,6 +40,16 @@ export function SearchPage() {
           onInputValueChange={setInputValue}
           onSubmit={handleSubmit}
         />
+        <SearchFilterTabs
+          activeFilter={filter}
+          boardCount={boardArticles.length}
+          eventCount={eventArticles.length + calendarEvents.length}
+          lang={lang}
+          onFilterChange={setFilter}
+          surveyCount={surveys.length}
+          totalCount={totalCount}
+          visible={Boolean(query)}
+        />
         <SearchStatus
           lang={lang}
           loading={loading}
@@ -50,6 +63,7 @@ export function SearchPage() {
           calendarEvents={calendarEvents}
           error={error}
           eventArticles={eventArticles}
+          filter={filter}
           lang={lang}
           loading={loading}
           query={query}

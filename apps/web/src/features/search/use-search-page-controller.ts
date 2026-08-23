@@ -11,7 +11,7 @@ import type {
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
-import { ABOUT_ITEMS, includesQuery } from "./search-utils";
+import { ABOUT_ITEMS, includesQuery, type SearchFilter } from "./search-utils";
 
 export function useSearchPageController() {
   const { lang } = useLanguage();
@@ -19,6 +19,7 @@ export function useSearchPageController() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const [inputValue, setInputValue] = useState(query);
+  const [filter, setFilter] = useState<SearchFilter>("all");
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<PublicCalendarEventItem[]>([]);
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
@@ -33,6 +34,7 @@ export function useSearchPageController() {
 
   useEffect(() => {
     setInputValue(query);
+    setFilter("all");
   }, [query]);
 
   useEffect(() => {
@@ -106,12 +108,12 @@ export function useSearchPageController() {
   );
 
   const eventArticles = useMemo(
-    () => articles.filter((article) => article.boardCode === "행사"),
+    () => articles.filter((article) => article.boardCode === "_EVENT"),
     [articles],
   );
 
   const boardArticles = useMemo(
-    () => articles.filter((article) => article.boardCode !== "행사"),
+    () => articles.filter((article) => article.boardCode !== "_EVENT"),
     [articles],
   );
 
@@ -151,12 +153,14 @@ export function useSearchPageController() {
     calendarEvents,
     eventArticles,
     error,
+    filter,
     handleSubmit,
     inputValue,
     lang,
     loading,
     query,
     setInputValue,
+    setFilter,
     surveys,
     totalCount,
   };

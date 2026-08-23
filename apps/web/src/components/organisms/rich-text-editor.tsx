@@ -448,6 +448,7 @@ function RichTextToolbar({
 }) {
   const editorId = useId().replace(/:/g, "");
   const [colorPopover, setColorPopover] = useState<"text" | "background" | null>(null);
+  const [fontSizeOpen, setFontSizeOpen] = useState(false);
   const currentTextColor = editor.getAttributes("textStyle").color ?? "";
   const currentBackgroundColor = editor.getAttributes("textStyle").backgroundColor ?? "";
   const sizeValue = editor.getAttributes("textStyle").fontSize ?? DEFAULT_FONT_SIZE;
@@ -456,6 +457,14 @@ function RichTextToolbar({
     : variableToken
       ? [{ label: variableLabel || variableToken, token: variableToken }]
       : [];
+
+  useEffect(() => {
+    const closeFontSizeMenu = () => setFontSizeOpen(false);
+    editor.on("focus", closeFontSizeMenu);
+    return () => {
+      editor.off("focus", closeFontSizeMenu);
+    };
+  }, [editor]);
 
   const setLink = () => {
     const previousUrl = editor.getAttributes("link").href;
@@ -481,6 +490,8 @@ function RichTextToolbar({
       <SelectDropdown
         id={`${editorId}-font-size`}
         ariaLabel={lang === "ko" ? "글자 크기" : "Font size"}
+        open={fontSizeOpen}
+        onOpenChange={setFontSizeOpen}
         value={sizeValue}
         onChange={(value) => {
           editor.chain().focus().setFontSize(value).run();
@@ -518,7 +529,7 @@ function RichTextToolbar({
         <UnderlineIcon />
       </ToolbarButton>
 
-      <DropdownMenu.Root onOpenChange={(open) => { if (open) setColorPopover(null); }}>
+      <DropdownMenu.Root modal={false} onOpenChange={(open) => { if (open) setColorPopover(null); }}>
         <DropdownMenu.Trigger asChild>
           <Button
             type="button"
@@ -614,7 +625,7 @@ function RichTextToolbar({
       </ToolbarButton>
 
       {variableMenuOptions.length ? (
-        <DropdownMenu.Root>
+        <DropdownMenu.Root modal={false}>
           <DropdownMenu.Trigger asChild>
             <Button
               type="button"
@@ -709,7 +720,6 @@ function EditorPane({
 }) {
   return (
     <section className="min-w-0 px-4 py-4 md:px-6 md:py-5" onFocusCapture={onFocus}>
-      <h2 className="mb-3 text-xs font-semibold text-slate-600">{titleLabel}</h2>
       <input
         type="text"
         spellCheck={false}
@@ -846,7 +856,7 @@ export function BilingualRichTextEditor({
     <div
       aria-disabled={disabled}
       className={cn(
-        "mx-auto w-full min-w-0 max-w-4xl bg-white",
+        "mx-auto w-full min-w-0 max-w-none bg-white",
         disabled && "pointer-events-none opacity-65",
       )}
     >

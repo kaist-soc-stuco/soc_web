@@ -7,7 +7,6 @@ import type {
   SurveyGridAnalytics,
   SurveyQuestionAnalyticsItem,
 } from "@soc/contracts";
-import { isoToDate } from "@soc/shared";
 import {
   AlertCircle,
   Calendar,
@@ -21,6 +20,7 @@ import {
 
 import { sortChoiceResults } from "@/lib/survey-results-display";
 import { RichTextContent } from "@/components/ui/rich-text-content";
+import { formatSurveyPeriod } from "@/features/survey/survey-answer-utils";
 
 import type { SurveyResultsError } from "./use-survey-results-page-controller";
 
@@ -74,33 +74,15 @@ function isChoiceQuestion(type: QuestionType) {
   );
 }
 
-function formatSurveyDateTime(iso: string) {
-  const parsed = isoToDate(iso);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  const yyyy = parsed.getFullYear();
-  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
-  const dd = String(parsed.getDate()).padStart(2, "0");
-  const hh = String(parsed.getHours()).padStart(2, "0");
-  const min = String(parsed.getMinutes()).padStart(2, "0");
-
-  return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
-}
-
 function getScheduleLabel(analytics: SurveyAnalyticsResponse, lang: string) {
-  if (!analytics.opensAt) {
-    return lang === "ko" ? "상시 응답 가능" : "Always open";
-  }
-
-  const opensAt = formatSurveyDateTime(analytics.opensAt);
-  return lang === "ko" ? `${opensAt}부터` : `From ${opensAt}`;
+  return formatSurveyPeriod(analytics.opensAt, analytics.closesAt, lang);
 }
 
 function getAudienceLabel(analytics: SurveyAnalyticsResponse, lang: string) {
   if (analytics.feePayersOnly) {
     return lang === "ko" ? "과비 납부자" : "Paid members";
   }
-  return lang === "ko" ? "로그인 회원" : "Signed-in members";
+  return lang === "ko" ? "로그인 필요" : "Login required";
 }
 
 function getResponsePolicyLabel(
@@ -387,13 +369,12 @@ export function SurveyResultsContent({
               analytics.descriptionKo ?? "",
               analytics.descriptionEn,
             )}
-            className="mt-3 text-sm font-medium leading-relaxed text-slate-600"
+            className="mt-3 text-[15px] font-medium leading-relaxed text-slate-600"
           />
         )}
-        <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-bold text-slate-500">
+        <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-normal text-slate-500">
           <span className="inline-flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-kaist-darkgreen" />
-            {lang === "ko" ? "대상" : "Audience"}:{" "}
             {getAudienceLabel(analytics, lang)}
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -408,8 +389,8 @@ export function SurveyResultsContent({
             <span className="inline-flex items-center gap-1.5">
               <Languages className="h-3.5 w-3.5 text-kaist-darkgreen" />
               {lang === "ko"
-                ? "한국어 콘텐츠만 제공"
-                : "Content available in Korean only"}
+                ? "한국어 사용자만"
+                : "Korean Speakers Only"}
             </span>
           )}
         </div>

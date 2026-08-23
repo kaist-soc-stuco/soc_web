@@ -60,7 +60,7 @@ function NoticeItem({
             <span className="min-w-0 truncate">{title}</span>
             {isNew ? (
               <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"
+                className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
                 title={lang === "ko" ? "새 글" : "New"}
               >
                 <span className="sr-only">{lang === "ko" ? "새 글" : "New"}</span>
@@ -68,7 +68,7 @@ function NoticeItem({
             ) : null}
           </div>
         </div>
-        <div className="home-notice-meta grid w-[13.5rem] min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center text-right">
+        <div className="home-notice-meta grid w-[13.5rem] min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-1.5 text-right">
           <span className="home-meta-text min-w-0 truncate text-slate-400">
             {author}
           </span>
@@ -120,7 +120,6 @@ export function NoticeBoard() {
   const [lastLoadedNotices, setLastLoadedNotices] = useState<NoticeItemProps[]>([]);
 
   const tabs = [
-    { code: "all", labelKo: "전체", labelEn: "All" },
     { code: "공지", labelKo: "공지", labelEn: "Notice" },
     { code: "HoC", labelKo: "HoC", labelEn: "HoC" },
     { code: "홍보글", labelKo: "홍보글", labelEn: "Promotions" },
@@ -162,15 +161,11 @@ export function NoticeBoard() {
     const fetchNotices = async () => {
       setLoading(true);
       try {
-        const res =
-          activeCategory === "all"
-            ? await apiClient.getAllArticles({ limit: 20, page: 1 })
-            : await apiClient.getArticles(activeCategory, { limit: 20 });
+        const res = await apiClient.getArticles(activeCategory, { limit: 20 });
         // Filter out items with blank/empty titles
         const items = res.items
-          .filter((item) => item.boardCode !== "QnA")
           .filter(
-            (item) => item.boardCode !== "행사" && item.boardCode !== "공약",
+            (item) => item.boardCode !== "_EVENT" && item.boardCode !== "FAQ",
           )
           .filter((item) => item.titleKo && item.titleKo.trim() !== "")
           .sort((a, b) => {
@@ -181,15 +176,8 @@ export function NoticeBoard() {
           })
           .map((item, idx) => ({
             id: item.articleId,
-            category:
-              activeCategory === "all"
-                ? item.boardCode || "공지"
-                : activeCategory,
-            categoryLabel: getCategoryLabel(
-              activeCategory === "all"
-                ? item.boardCode || "공지"
-                : activeCategory,
-            ),
+            category: activeCategory,
+            categoryLabel: getCategoryLabel(activeCategory),
             lang,
             author: item.isAnonymous
               ? lang === "ko"
@@ -200,7 +188,7 @@ export function NoticeBoard() {
             date: formatDate(item.postedAt),
             isImportant: item.isPinned,
             isNew: (() => {
-              if (activeCategory !== "공지" && activeCategory !== "all") {
+              if (activeCategory !== "공지") {
                 return false;
               }
               return isoToMs(item.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
@@ -256,7 +244,7 @@ export function NoticeBoard() {
           }
           action={
             <Link
-              to={activeCategory === "all" ? "/board" : `/board/${activeCategory}`}
+              to={`/board/${activeCategory}`}
               className="home-more-link shrink-0"
             >
               <span>{lang === "ko" ? "더보기" : "More"}</span>
@@ -275,7 +263,9 @@ export function NoticeBoard() {
                 loading ? "opacity-70" : "opacity-100"
               }`}
               style={{
-                gridTemplateRows: `repeat(${renderedNotices.length}, minmax(0, 1fr))`,
+                gridTemplateRows: renderedNotices.length === 1
+                  ? "auto"
+                  : `repeat(${renderedNotices.length}, minmax(0, 1fr))`,
               }}
             >
               {renderedNotices.map((notice, index) => (
@@ -283,7 +273,7 @@ export function NoticeBoard() {
                   key={notice.id}
                   {...notice}
                   lang={lang}
-                  showCategoryBadge={activeCategory === "all"}
+                  showCategoryBadge={false}
                   showGroupDivider={
                     index > 0 &&
                     !notice.isImportant &&

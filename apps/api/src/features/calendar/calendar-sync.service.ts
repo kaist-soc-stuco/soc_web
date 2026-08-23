@@ -69,7 +69,7 @@ export class CalendarSyncService {
       .values({
         calendarEventId,
         targetCalendarId,
-        operation: row.isActive ? UPSERT_OPERATION : DELETE_OPERATION,
+        operation: row.isActive && !row.isHiddenByAdmin ? UPSERT_OPERATION : DELETE_OPERATION,
         status: PENDING_STATUS,
         attempts: 0,
         availableAt: nowDate(),
@@ -79,7 +79,7 @@ export class CalendarSyncService {
       .onConflictDoUpdate({
         target: [calendarSyncJobs.calendarEventId, calendarSyncJobs.targetCalendarId],
         set: {
-          operation: row.isActive ? UPSERT_OPERATION : DELETE_OPERATION,
+          operation: row.isActive && !row.isHiddenByAdmin ? UPSERT_OPERATION : DELETE_OPERATION,
           status: PENDING_STATUS,
           attempts: 0,
           availableAt: nowDate(),

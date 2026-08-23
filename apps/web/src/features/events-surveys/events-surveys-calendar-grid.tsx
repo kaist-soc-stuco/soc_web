@@ -19,6 +19,8 @@ import {
 } from "./events-surveys-calendar-utils";
 
 const MAX_VISIBLE_EVENTS = 4;
+const CALENDAR_WEEK_HEIGHT = 144;
+const CALENDAR_WEEK_OVERFLOW_HEIGHT = 164;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface EventRange {
@@ -242,6 +244,28 @@ export function EventsSurveysCalendarGrid({
     getVisibleEventRange(event, calendarGrid),
   );
   const weekLaneLayouts = buildWeekLaneLayouts(eventRanges, calendarGrid);
+  const weekRowHeights = Array.from(
+    { length: Math.ceil(calendarGrid.length / 7) },
+    (_, weekIndex) => {
+      const weekStart = weekIndex * 7;
+      const weekEnd = weekStart + 7;
+      const hasOverflow = calendarGrid
+        .slice(weekStart, weekEnd)
+        .some((cell) => {
+          const eventCount = calendarEvents.filter((event, eventIndex) => {
+            return (
+              eventRanges[eventIndex] !== null &&
+              isCalendarEventOnDay(event, cell.date)
+            );
+          }).length;
+          return eventCount > MAX_VISIBLE_EVENTS;
+        });
+
+      return hasOverflow
+        ? CALENDAR_WEEK_OVERFLOW_HEIGHT
+        : CALENDAR_WEEK_HEIGHT;
+    },
+  );
 
   return (
     <div className="min-w-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-visible">
@@ -259,7 +283,14 @@ export function EventsSurveysCalendarGrid({
           ))}
         </div>
 
-        <div className="grid min-h-[720px] grid-cols-7 grid-rows-6 overflow-visible">
+        <div
+          className="grid grid-cols-7 overflow-visible"
+          style={{
+            gridTemplateRows: weekRowHeights
+              .map((height) => `${height}px`)
+              .join(" "),
+          }}
+        >
           {calendarGrid.map((cell, cellIndex) => {
             const holiday = holidayMap.get(toDateKey(cell.date));
             const selected = isSameDay(cell.date, selectedDate);
@@ -286,13 +317,17 @@ export function EventsSurveysCalendarGrid({
               }
             });
 
-            const visibleLaneCount = Math.min(
-              weekLaneLayout.laneCount,
-              MAX_VISIBLE_EVENTS,
-            );
-            const hiddenEventCount = Math.max(
+            const hiddenEventCount = dayEventEntries.reduce(
+              (count, entry) => {
+                const laneIndex = weekLaneLayout.eventLanes.get(
+                  entry.eventIndex,
+                );
+                return count +
+                  (laneIndex !== undefined && laneIndex >= MAX_VISIBLE_EVENTS
+                    ? 1
+                    : 0);
+              },
               0,
-              dayEventEntries.length - MAX_VISIBLE_EVENTS,
             );
             const holidayName = holiday
               ? getKoreanHolidayName(holiday.dateName, lang)
@@ -308,7 +343,7 @@ export function EventsSurveysCalendarGrid({
                     : ""
                 }`}
                 aria-pressed={selected}
-                className={`relative flex min-h-[120px] min-w-0 flex-col overflow-visible p-1.5 text-left transition-colors duration-150 focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
+                className={`relative flex h-full min-h-0 min-w-0 flex-col overflow-visible p-1.5 text-left transition-colors duration-150 focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
                 key={toDateKey(cell.date)}
                 onClick={() => onSelectedDateChange(cell.date)}
                 title={holidayName || undefined}
@@ -324,16 +359,12 @@ export function EventsSurveysCalendarGrid({
                   {cell.day}
                 </span>
 
-                <span className="mt-2 flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-visible">
-                  {Array.from({ length: visibleLaneCount }, (_, laneIndex) => {
+                <span className="mt-2 grid min-h-0 w-full flex-1 grid-rows-[repeat(4,20px)_16px] gap-y-0.5 overflow-visible">
+                  {Array.from({ length: MAX_VISIBLE_EVENTS }, (_, laneIndex) => {
                     const entry = eventByLane.get(laneIndex);
                     if (!entry) {
                       return (
-                        <span
-                          aria-hidden="true"
-                          className="h-5 shrink-0"
-                          key={`empty-lane-${laneIndex}`}
-                        />
+                        <span aria-hidden="true" key={`empty-lane-${laneIndex}`} />
                       );
                     }
 
@@ -342,6 +373,7 @@ export function EventsSurveysCalendarGrid({
                       event.kind,
                       lang,
                       event.sourceType,
+                      event.category,
                     );
                     const isStart = isSameDay(cell.date, range.start);
                     const isEnd = isSameDay(cell.date, range.end);
@@ -364,7 +396,7 @@ export function EventsSurveysCalendarGrid({
 
                     return (
                       <span
-                        className="min-w-0 shrink-0"
+                        className="min-w-0"
                         key={`${event.id}-${event.dateType}-${laneIndex}`}
                       >
                         <span
@@ -413,7 +445,9 @@ export function EventsSurveysCalendarGrid({
                     <span className="self-end pr-1 text-[10px] font-semibold leading-4 text-slate-400">
                       +{hiddenEventCount}
                     </span>
-                  ) : null}
+                  ) : (
+                    <span aria-hidden="true" />
+                  )}
                 </span>
               </button>
             );
@@ -434,6 +468,7 @@ export function EventsSurveysCalendarGrid({
                     tooltip.event.kind,
                     lang,
                     tooltip.event.sourceType,
+                    tooltip.event.category,
                   ).bullet}`}
                   aria-hidden="true"
                 />

@@ -72,11 +72,11 @@ export function CommentSection({
     });
 
   return (
-    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-4 py-6 shadow-[0_8px_28px_rgba(15,23,42,0.04)] md:px-6 md:py-[24px]">
+    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-6 py-6 shadow-[0_8px_28px_rgba(15,23,42,0.04)] md:px-[52px] md:py-[24px]">
       <div className="flex items-center justify-between">
         <h2 className="text-[18px] font-semibold leading-6 text-slate-800">
           <span>{lang === "ko" ? "댓글" : "Comments"}</span>
-          <span className="ml-1 text-brand-primary">{comments.length}</span>
+          <span className="ml-1 text-[14px] text-brand-primary">{comments.length}</span>
         </h2>
         {commentsLoading && (
           <Loader2 className="size-4 animate-spin text-brand-primary" />
@@ -155,27 +155,23 @@ export function CommentSection({
       </div>
 
       <div className="mt-5">
-        {isAuthenticated ? (
-          <CommentComposer
-            ariaLabel={lang === "ko" ? "댓글 입력" : "Comment input"}
-            disabled={!canCreateComment}
-            isSubmitting={commentSubmitting}
-            onChange={onCommentTextChange}
-            onSubmit={onCreateComment}
-            placeholder={
-              lang === "ko" ? "댓글을 입력해 주세요." : "Write a comment..."
-            }
-            value={commentText}
-          />
-        ) : (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <p className="text-[14px] font-medium text-slate-600">
-              {lang === "ko"
-                ? "댓글 작성은 로그인이 필요합니다."
-                : "Sign in to write a comment."}
-            </p>
-          </div>
-        )}
+        <CommentComposer
+          ariaLabel={lang === "ko" ? "댓글 입력" : "Comment input"}
+          disabled={!isAuthenticated || !canCreateComment}
+          isSubmitting={commentSubmitting}
+          onChange={onCommentTextChange}
+          onSubmit={onCreateComment}
+          placeholder={
+            isAuthenticated
+              ? lang === "ko"
+                ? "댓글을 입력해 주세요."
+                : "Write a comment..."
+              : lang === "ko"
+                ? "로그인 후 댓글을 작성해 보세요."
+                : "Sign in to write a comment."
+          }
+          value={commentText}
+        />
         {!canCreateComment && isAuthenticated && (
           <p className="mt-2 text-xs font-medium text-rose-600">
             {lang === "ko"
@@ -225,7 +221,7 @@ function CommentRow({
         isNested ? "ml-9 border-l-2 border-slate-100 pl-3" : "",
       )}
     >
-      <div className="size-7 shrink-0 overflow-hidden rounded-full">
+      <div className="size-6 shrink-0 overflow-hidden rounded-full">
         <img
           src="/default-avatar.svg"
           alt=""
@@ -240,6 +236,11 @@ function CommentRow({
             <span className="truncate text-[14px] font-semibold text-slate-800">
               {comment.author.name}
             </span>
+            {comment.isOfficial ? (
+              <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[11px] font-normal text-emerald-700">
+                {lang === "ko" ? "공식 답변" : "Official response"}
+              </span>
+            ) : null}
             <time
               className="shrink-0 text-xs font-normal text-slate-400"
               dateTime={comment.createdAt}
@@ -263,18 +264,21 @@ function CommentRow({
                   !comment.viewerHasLiked,
                 )
               }
-              className={cn(
-                "h-7 gap-1 bg-transparent px-1.5 text-xs font-medium hover:bg-transparent",
-                comment.viewerHasLiked
-                  ? "text-brand-primary"
-                  : "text-slate-400 hover:text-brand-primary",
-              )}
+                className={cn(
+                  "h-7 gap-1 rounded-md border px-1.5 text-xs font-medium hover:bg-slate-100",
+                  comment.viewerHasLiked
+                   ? "border-slate-200 text-rose-600 hover:border-slate-200 hover:text-rose-600"
+                   : "border-slate-200 text-slate-400 hover:border-slate-200 hover:text-slate-400",
+                )}
             >
               {commentActionSubmitting === likeActionKey ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
                 <Heart
-                  className="size-3.5"
+                  className={cn(
+                    "size-3.5",
+                    comment.viewerHasLiked ? "text-rose-600" : "text-slate-400",
+                  )}
                   fill={comment.viewerHasLiked ? "currentColor" : "none"}
                 />
               )}
@@ -286,7 +290,7 @@ function CommentRow({
                 variant="ghost"
                 size="sm"
                 onClick={onReplyToggle}
-                className="h-7 bg-transparent px-1.5 text-xs font-medium text-slate-400 hover:bg-transparent hover:text-brand-primary"
+                className="h-7 rounded-md border-0 bg-transparent px-1.5 text-xs font-medium text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-400"
               >
                 {lang === "ko" ? "답글" : "Reply"}
               </Button>
@@ -298,7 +302,7 @@ function CommentRow({
                 size="icon"
                 aria-label={lang === "ko" ? "댓글 삭제" : "Delete comment"}
                 onClick={() => void onDeleteComment(comment.commentId)}
-                className="pointer-events-none size-7 bg-transparent text-slate-400 opacity-0 transition-opacity hover:bg-transparent hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                 title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
               >
                 <Trash2 className="size-3.5" aria-hidden="true" />
@@ -341,7 +345,7 @@ function CommentComposer({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="min-h-[42px] w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-12 text-[14px] font-medium leading-normal text-slate-800 outline-none placeholder:text-slate-400"
+        className="block min-h-[42px] w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-12 text-[14px] font-medium leading-normal text-slate-800 outline-none placeholder:text-slate-400"
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey && hasText && !disabled) {
             event.preventDefault();

@@ -1,5 +1,6 @@
 import type {
   CalendarEventCreateSchema,
+  CalendarEventPresentationUpdateSchema,
   CalendarEventUpdateSchema,
   CalendarIcsImportSchema,
 } from "../schemas.js";
@@ -12,6 +13,7 @@ export interface KoreanHolidayRecord {
 }
 
 export type CalendarEventDateType = "open" | "close";
+export type CalendarEventCategory = "EVENT" | "ACADEMIC" | "HOLIDAY";
 export type PublicCalendarEventSourceType =
   | "ARTICLE"
   | "SURVEY"
@@ -31,6 +33,8 @@ export interface PublicCalendarEventItem {
   startAt?: string;
   endAt?: string;
   location?: string | null;
+  calendarEventId?: string | null;
+  category?: CalendarEventCategory;
 }
 
 export interface PublicCalendarEventsResponse {
@@ -51,6 +55,9 @@ export interface CalendarEventRecord {
   sourceYear?: number | null;
   isReadOnly: boolean;
   isActive: boolean;
+  isHiddenByAdmin: boolean;
+  category: CalendarEventCategory;
+  categoryOverride?: CalendarEventCategory | null;
   createdByUserId?: string | null;
   googleCalendarId?: string | null;
   googleEventId?: string | null;
@@ -67,6 +74,7 @@ export interface CalendarEventListResponse {
 
 export type CalendarEventCreateRequest = z.infer<typeof CalendarEventCreateSchema>;
 export type CalendarEventUpdateRequest = z.infer<typeof CalendarEventUpdateSchema>;
+export type CalendarEventPresentationUpdateRequest = z.infer<typeof CalendarEventPresentationUpdateSchema>;
 export type CalendarIcsImportRequest = z.infer<typeof CalendarIcsImportSchema>;
 
 export interface CalendarIcsImportResponse {

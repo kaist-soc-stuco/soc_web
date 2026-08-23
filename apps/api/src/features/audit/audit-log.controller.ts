@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Query } from "@nestjs/common";
+import { Controller, Get, Header, Query, StreamableFile } from "@nestjs/common";
 import * as XLSX from "xlsx";
 import { Permissions } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
@@ -50,7 +50,7 @@ export class AuditLogController {
     @Query("targetType") targetType?: string,
     @Query("dateFrom") dateFrom?: string,
     @Query("dateTo") dateTo?: string,
-  ): Promise<Buffer> {
+  ): Promise<StreamableFile> {
     const items = await this.auditLogService.export({
       action,
       query,
@@ -63,26 +63,30 @@ export class AuditLogController {
       dateFrom: normalizeDateStart(dateFrom),
       dateTo: normalizeDateEnd(dateTo),
     });
-    const worksheet = XLSX.utils.json_to_sheet(items.map((item) => ({
-      로그번호: item.auditLogId,
-      발생시각: item.createdAt,
-      도메인: item.domainLabel,
-      이벤트유형: item.eventKind,
-      액션: item.actionLabel,
-      대상: item.targetLabel,
-      담당자: item.actorNameKo ?? "시스템",
-      대상유형: item.targetType,
-      기술액션코드: item.action,
-      접속IP: item.ipAddress ?? "",
-      기술페이로드: item.payload ?? "",
-    })));
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["로그번호", "발생시각", "도메인", "이벤트유형", "액션", "대상", "담당자", "대상유형", "기술액션코드", "접속IP", "기술페이로드"],
+      ...items.map((item) => [
+        item.auditLogId,
+        item.createdAt,
+        item.domainLabel,
+        item.eventKind,
+        item.actionLabel,
+        item.targetLabel,
+        item.actorNameKo ?? "시스템",
+        item.targetType,
+        item.action,
+        item.ipAddress ?? "",
+        item.payload ?? "",
+      ]),
+    ]);
     worksheet["!cols"] = [
       { wch: 10 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 24 },
       { wch: 32 }, { wch: 18 }, { wch: 22 }, { wch: 34 }, { wch: 18 }, { wch: 72 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "운영 로그");
-    return Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+    const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+    return new StreamableFile(buffer);
   }
 }
 

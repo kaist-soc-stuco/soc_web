@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, KoreanHolidayRecord } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
+import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import {
@@ -13,7 +15,6 @@ import {
   filterItemsByTab,
   sortVisibleItems,
   type CalendarEvent,
-  type EventsSurveysSortKey,
   type EventsSurveysStateFilter,
   type UnifiedItem,
 } from "@/lib/events-surveys";
@@ -38,7 +39,6 @@ export function useEventsSurveysPageController({
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  const [sortBy, setSortBy] = useState<EventsSurveysSortKey>("latest");
   const [stateFilter, setStateFilter] =
     useState<EventsSurveysStateFilter>("all");
   const [currentDate, setCurrentDate] = useState(() => {
@@ -63,6 +63,8 @@ export function useEventsSurveysPageController({
     Record<string, Partial<UnifiedItem>>
   >({});
   const { data: session } = useCurrentSession();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const requestedYear = calendarRequestDate.getFullYear();
   const requestedMonth = calendarRequestDate.getMonth();
@@ -100,7 +102,7 @@ export function useEventsSurveysPageController({
       const [surveysData, eventsData] = await Promise.all([
         apiClient.getPublicSurveys(),
         apiClient
-          .getArticles("행사", { page: 1, limit: 100 })
+          .getArticles("_EVENT", { page: 1, limit: 100 })
           .catch(() => ({ items: [], total: 0 })),
       ]);
 
@@ -211,8 +213,8 @@ export function useEventsSurveysPageController({
   }, [filteredItems, itemQuery]);
 
   const visibleItems = useMemo(() => {
-    return sortVisibleItems(searchedItems, sortBy, stateFilter);
-  }, [searchedItems, stateFilter, sortBy]);
+    return sortVisibleItems(searchedItems, "latest", stateFilter);
+  }, [searchedItems, stateFilter]);
 
   const stateCounts = useMemo(
     () => ({
@@ -231,11 +233,16 @@ export function useEventsSurveysPageController({
   ) => {
     if (item.kind !== "EVENT") return;
     if (!session?.canUsePersistentFeatures) {
-      alert(
-        lang === "ko"
-          ? "좋아요와 스크랩은 로그인 후 사용할 수 있습니다."
-          : "Like and scrap are available after signing in.",
-      );
+      toast({
+        message:
+          lang === "ko"
+            ? "로그인이 필요한 기능입니다."
+            : "You need to sign in to use this feature.",
+        action: {
+          label: lang === "ko" ? "로그인" : "Login",
+          onClick: () => navigate("/login"),
+        },
+      });
       return;
     }
 
@@ -271,7 +278,7 @@ export function useEventsSurveysPageController({
 
     try {
       const response = await apiClient.setArticleEngagement(
-        item.articleBoardCode ?? "행사",
+        item.articleBoardCode ?? "_EVENT",
         item.id,
         kind,
         active,
@@ -341,10 +348,8 @@ export function useEventsSurveysPageController({
     itemQuery,
     setItemQuery,
     setSelectedDate,
-    setSortBy,
     setStateFilter,
     stateCounts,
-    sortBy,
     stateFilter,
     visibleItems,
   };

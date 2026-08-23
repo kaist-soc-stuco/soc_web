@@ -6,11 +6,6 @@ import type {
   ArticleDraftSaveRequest,
   SurveyRecord,
 } from "@soc/contracts";
-import {
-  htmlDatetimeLocalToIso,
-  isoToHtmlDatetimeLocal,
-} from "@soc/shared";
-
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
@@ -18,6 +13,11 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { hasAdminPermission } from "@/lib/permissions";
 
 import type { AttachedAsset } from "./board-write-form-sections";
+import {
+  eventDateInputToIso,
+  isAllDayDateRange,
+  isoToEventDateInput,
+} from "./event-date-utils";
 
 const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항"]);
 
@@ -36,11 +36,12 @@ const getDraftFingerprint = (
   return (hash >>> 0).toString(16).padStart(8, "0");
 };
 
-export function useBoardEditPageController() {
-  const { category = "공지", articleId } = useParams<{
+export function useBoardEditPageController(forcedCategory?: string) {
+  const { category: routeCategory = "공지", articleId } = useParams<{
     category: string;
     articleId: string;
   }>();
+  const category = forcedCategory ?? routeCategory;
   const navigate = useNavigate();
   const location = useLocation();
   const { lang } = useLanguage();
@@ -70,6 +71,7 @@ export function useBoardEditPageController() {
   const [eventEndDate, setEventEndDate] = useState("");
   const [eventDescriptionKo, setEventDescriptionKo] = useState("");
   const [eventDescriptionEn, setEventDescriptionEn] = useState("");
+  const [isAllDay, setIsAllDay] = useState(false);
   const [isEventAlwaysOpen, setIsEventAlwaysOpen] = useState(false);
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState("");
@@ -93,7 +95,7 @@ export function useBoardEditPageController() {
   const routeDraftId = new URLSearchParams(location.search).get("draftId");
 
   const backToArticle = () => {
-    navigate(`/board/${category}/${articleId}`);
+    navigate(category === "_EVENT" ? `/events/${articleId}` : `/board/${category}/${articleId}`);
   };
 
   useEffect(() => {
@@ -114,19 +116,28 @@ export function useBoardEditPageController() {
         setIsKoreanOnly(
           !res.titleEn?.trim() ||
             !res.contentEn?.trim() ||
-            (category === "행사" && !res.eventDescriptionEn?.trim()),
+            (category === "_EVENT" && !res.eventDescriptionEn?.trim()),
         );
         setIsEventAlwaysOpen(
-          category === "행사" &&
+          category === "_EVENT" &&
             !res.eventStartDate &&
             !res.eventEndDate &&
             Boolean(res.eventDescriptionKo),
         );
+        const eventIsAllDay = isAllDayDateRange(
+          res.eventStartDate,
+          res.eventEndDate,
+        );
+        setIsAllDay(eventIsAllDay);
         setEventStartDate(
-          res.eventStartDate ? isoToHtmlDatetimeLocal(res.eventStartDate) : "",
+          res.eventStartDate
+            ? isoToEventDateInput(res.eventStartDate, eventIsAllDay)
+            : "",
         );
         setEventEndDate(
-          res.eventEndDate ? isoToHtmlDatetimeLocal(res.eventEndDate) : "",
+          res.eventEndDate
+            ? isoToEventDateInput(res.eventEndDate, eventIsAllDay)
+            : "",
         );
         setEventDescriptionKo(res.eventDescriptionKo || "");
         setEventDescriptionEn(res.eventDescriptionEn || "");
@@ -201,17 +212,17 @@ export function useBoardEditPageController() {
       sortOrder: index,
     })),
     eventStartDate:
-      category === "행사" && eventStartDate
-        ? htmlDatetimeLocalToIso(eventStartDate)
+      category === "_EVENT" && eventStartDate
+        ? eventDateInputToIso(eventStartDate, isAllDay)
         : null,
     eventEndDate:
-      category === "행사" && eventEndDate
-        ? htmlDatetimeLocalToIso(eventEndDate)
+      category === "_EVENT" && eventEndDate
+        ? eventDateInputToIso(eventEndDate, isAllDay, true)
         : null,
     eventDescriptionKo:
-      category === "행사" ? eventDescriptionKo || null : null,
+      category === "_EVENT" ? eventDescriptionKo || null : null,
     eventDescriptionEn:
-      category === "행사" ? eventDescriptionEn || null : null,
+      category === "_EVENT" ? eventDescriptionEn || null : null,
     linkedSurveyId: selectedSurveyId || null,
   });
 
@@ -230,11 +241,20 @@ export function useBoardEditPageController() {
         !draft.eventEndDate &&
         Boolean(draft.eventDescriptionKo),
     );
+    const draftIsAllDay = isAllDayDateRange(
+      draft.eventStartDate,
+      draft.eventEndDate,
+    );
+    setIsAllDay(draftIsAllDay);
     setEventStartDate(
-      draft.eventStartDate ? isoToHtmlDatetimeLocal(draft.eventStartDate) : "",
+      draft.eventStartDate
+        ? isoToEventDateInput(draft.eventStartDate, draftIsAllDay)
+        : "",
     );
     setEventEndDate(
-      draft.eventEndDate ? isoToHtmlDatetimeLocal(draft.eventEndDate) : "",
+      draft.eventEndDate
+        ? isoToEventDateInput(draft.eventEndDate, draftIsAllDay)
+        : "",
     );
     setEventDescriptionKo(draft.eventDescriptionKo || "");
     setEventDescriptionEn(draft.eventDescriptionEn || "");
@@ -346,7 +366,7 @@ export function useBoardEditPageController() {
     if (serverDraftId) {
       void apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
     }
-    navigate(`/board/${category}/write`);
+    navigate(category === "_EVENT" ? "/events/write" : `/board/${category}/write`);
   };
 
   const handleDeleteDraft = async (draftId: string) => {
@@ -402,6 +422,7 @@ export function useBoardEditPageController() {
     isSecret,
     allowComment,
     isKoreanOnly,
+    isAllDay,
     assets,
     eventStartDate,
     eventEndDate,
@@ -430,6 +451,7 @@ export function useBoardEditPageController() {
     isSecret,
     allowComment,
     isKoreanOnly,
+    isAllDay,
     assets,
     eventStartDate,
     eventEndDate,
@@ -491,13 +513,13 @@ export function useBoardEditPageController() {
     if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
       alert(
         lang === "ko"
-            ? "영문 제목과 내용을 입력하거나 '한국어 콘텐츠만'을 선택해 주세요."
-            : "Enter an English title and content, or select 'Korean content only'.",
+            ? "영문 제목과 내용을 입력하거나 '한국어 사용자만'을 선택해 주세요."
+            : "Enter an English title and content, or select 'Korean Speakers Only'.",
       );
       return;
     }
 
-    if (category === "행사") {
+    if (category === "_EVENT") {
       if (
         !eventDescriptionKo.trim() ||
         (!isKoreanOnly && !eventDescriptionEn.trim()) ||
@@ -529,21 +551,21 @@ export function useBoardEditPageController() {
           sortOrder: index,
         })),
         eventStartDate:
-          category === "행사"
+          category === "_EVENT"
             ? isEventAlwaysOpen
               ? null
-              : htmlDatetimeLocalToIso(eventStartDate)
+              : eventDateInputToIso(eventStartDate, isAllDay)
             : undefined,
         eventEndDate:
-          category === "행사"
+          category === "_EVENT"
             ? isEventAlwaysOpen
               ? null
-              : htmlDatetimeLocalToIso(eventEndDate)
+              : eventDateInputToIso(eventEndDate, isAllDay, true)
             : undefined,
         eventDescriptionKo:
-          category === "행사" ? eventDescriptionKo.trim() : undefined,
+          category === "_EVENT" ? eventDescriptionKo.trim() : undefined,
         eventDescriptionEn:
-          category === "행사"
+          category === "_EVENT"
             ? isKoreanOnly
               ? null
               : eventDescriptionEn.trim()
@@ -552,7 +574,7 @@ export function useBoardEditPageController() {
       if (canConfigurePostSettings && selectedSurveyId) {
         let overwriteSchedule = false;
         let overwriteAlwaysOpen = false;
-        if (category === "행사" && isEventAlwaysOpen) {
+        if (category === "_EVENT" && isEventAlwaysOpen) {
           overwriteAlwaysOpen = await requestConfirm({
             confirmLabel: lang === "ko" ? "상시로 설정" : "Set always open",
             description:
@@ -564,7 +586,7 @@ export function useBoardEditPageController() {
                 ? "설문 일정도 상시로 맞출까요?"
                 : "Set linked survey always open?",
           });
-        } else if (category === "행사" && eventStartDate && eventEndDate) {
+        } else if (category === "_EVENT" && eventStartDate && eventEndDate) {
           overwriteSchedule = await requestConfirm({
             confirmLabel: lang === "ko" ? "덮어쓰기" : "Overwrite",
             description:
@@ -580,7 +602,7 @@ export function useBoardEditPageController() {
 
         await apiClient.updateSurvey(selectedSurveyId, {
           connectedArticleId: articleId,
-          kind: category === "행사" ? "EVENT" : undefined,
+          kind: category === "_EVENT" ? "EVENT" : undefined,
           isAlwaysOpen: overwriteAlwaysOpen
             ? true
             : overwriteSchedule
@@ -589,7 +611,7 @@ export function useBoardEditPageController() {
           openAt: overwriteAlwaysOpen
             ? null
             : overwriteSchedule
-              ? htmlDatetimeLocalToIso(eventStartDate)
+              ? eventDateInputToIso(eventStartDate, isAllDay)
               : undefined,
         });
       }
@@ -656,6 +678,7 @@ export function useBoardEditPageController() {
     handleSaveDraft,
     handleUploadFiles,
     isAnonymous,
+    isAllDay,
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
@@ -673,6 +696,7 @@ export function useBoardEditPageController() {
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
+    setIsAllDay,
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,

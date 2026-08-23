@@ -45,6 +45,7 @@ import { PageSearchField } from "@/components/ui/page-layout";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { CONTACT_XLSX_TEMPLATE_ROWS, parseContactSpreadsheet, type ParsedContactSpreadsheetRow } from "@/lib/contact-spreadsheet";
+import { downloadBlob } from "@/lib/download-blob";
 import { Permissions } from "@/lib/permissions";
 import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./ExecutiveMemberModal";
 
@@ -125,12 +126,7 @@ function ContactsPageContent() {
   const exportContacts = async () => {
     try {
       const spreadsheet = await apiClient.downloadContactsXlsx({ q: query, cohort: cohortFilter ? Number(cohortFilter) : undefined, department: departmentFilter || undefined });
-      const url = URL.createObjectURL(spreadsheet);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "executive_contacts.xlsx";
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(spreadsheet, "executive_contacts.xlsx");
     } catch {
       setError("연락망을 내보내지 못했습니다.");
     }
@@ -203,12 +199,7 @@ function ContactsPageContent() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
     const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "executive_contacts_template.xlsx";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, "executive_contacts_template.xlsx");
   };
 
   const handleBulkImport = async () => {
@@ -295,7 +286,7 @@ function ContactsPageContent() {
           footer={<>
             <Button type="button" variant="ghost" onClick={downloadContactTemplate} disabled={bulkImporting}>양식 내보내기</Button>
             <Button type="button" variant="outline" onClick={() => clearBulkImport()} disabled={bulkImporting}>취소</Button>
-            <Button type="button" onClick={() => void handleBulkImport()} disabled={bulkRows.length === 0 || bulkErrors.length > 0 || bulkImporting}>{bulkImporting ? "불러오는 중..." : "불러오기"}</Button>
+            <Button type="button" onClick={() => void handleBulkImport()} disabled={bulkRows.length === 0 || bulkErrors.length > 0 || bulkImporting}>불러오기</Button>
           </>}
         >
           <div className="space-y-4">

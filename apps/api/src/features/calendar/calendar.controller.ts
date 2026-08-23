@@ -14,6 +14,7 @@ import {
 } from "@nestjs/common";
 import {
   CalendarEventCreateSchema,
+  CalendarEventPresentationUpdateSchema,
   CalendarEventUpdateSchema,
   CalendarIcsImportSchema,
   Permissions,
@@ -21,6 +22,7 @@ import {
 import type {
   CalendarEventCreateRequest,
   CalendarEventListResponse,
+  CalendarEventPresentationUpdateRequest,
   CalendarEventRecord,
   CalendarEventUpdateRequest,
   CalendarExternalSyncResponse,
@@ -78,6 +80,23 @@ export class CalendarController {
   @RequirePermissions(Permissions.MANAGE_CONTENT)
   async listManualEvents(): Promise<CalendarEventListResponse> {
     return this.calendarService.listManualEvents();
+  }
+
+  @Get("admin/events")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async listManagedEvents(): Promise<CalendarEventListResponse> {
+    return this.calendarService.listManagedEvents();
+  }
+
+  @Patch("admin/events/:id/presentation")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async updateEventPresentation(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(CalendarEventPresentationUpdateSchema))
+    body: CalendarEventPresentationUpdateRequest,
+  ): Promise<CalendarEventRecord> {
+    return this.calendarService.updateEventPresentation(request.user!.id, id, body);
   }
 
   @Get("manual/export")

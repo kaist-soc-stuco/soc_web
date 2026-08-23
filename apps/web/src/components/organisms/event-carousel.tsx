@@ -218,7 +218,7 @@ function EventCard({
   return (
     <Link
       aria-label={title}
-      to={`/board/${encodeURIComponent("행사")}/${encodeURIComponent(id)}`}
+      to={`/events/${encodeURIComponent(id)}`}
       className="block h-full w-full"
       draggable={false}
       onDragStart={(event) => event.preventDefault()}
@@ -323,7 +323,7 @@ export function EventCarousel() {
     const loadEvents = async () => {
       try {
         const referenceTime = nowMs();
-        const res = await apiClient.getArticles("행사", { limit: 12 });
+        const res = await apiClient.getArticles("_EVENT", { limit: 12 });
         const eventCards = res.items
           .filter((item) => getEventArticleState(item) !== "closed")
           .filter((item) =>

@@ -18,6 +18,7 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { downloadBlob } from "@/lib/download-blob";
 import { Permissions } from "@/lib/permissions";
 
 type SortBy = "createdAt" | "actor" | "action";
@@ -134,7 +135,6 @@ export function AuditLogPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedLog, setSelectedLog] = useState<AuditLogRecord | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   const loadLogs = useCallback(async () => {
     if (sessionLoading || !canViewAuditLogs) return;
@@ -184,7 +184,6 @@ export function AuditLogPage() {
   };
 
   const handleExport = async () => {
-    setExporting(true);
     setOperationError(null);
     try {
       const blob = await client.downloadAuditLogsXlsx({
@@ -195,16 +194,9 @@ export function AuditLogPage() {
         dateFrom,
         dateTo,
       });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `audit-logs-${dateFrom || "all"}-${dateTo || dateInputToday()}.xlsx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `audit-logs-${dateFrom || "all"}-${dateTo || dateInputToday()}.xlsx`);
     } catch (err) {
       setOperationError(err instanceof Error ? err.message : "엑셀 파일을 만들지 못했습니다.");
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -214,7 +206,7 @@ export function AuditLogPage() {
         <AdminPageMain>
           <AdminPageHeader
             title="운영 로그"
-            actions={<Button type="button" onClick={() => void handleExport()} disabled={exporting}><Download aria-hidden="true" className="size-4" /> {exporting ? "생성 중…" : "내보내기"}</Button>}
+            actions={<Button type="button" onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" />내보내기</Button>}
           />
 
           <AdminTableCard className="overflow-visible">
@@ -223,7 +215,7 @@ export function AuditLogPage() {
                 <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-36 shrink-0" />
                 <div aria-label="기간" className="flex w-full items-center gap-2 sm:w-[19rem]">
                   <UiInput aria-label="시작일" type="date" value={dateFrom} onChange={(event) => updatePageFilter(setDateFrom, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
-                  <span className="text-sm text-slate-400">～</span>
+                  <span className="text-sm text-slate-400">~</span>
                   <UiInput aria-label="종료일" type="date" value={dateTo} onChange={(event) => updatePageFilter(setDateTo, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
                 </div>
               </div>
@@ -337,7 +329,7 @@ function AuditLogDetailDrawer({ log, onClose }: { log: AuditLogRecord | null; on
           <details className="overflow-hidden rounded-xl border border-slate-200">
             <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700"><FileJson aria-hidden="true" className="size-4 text-slate-400" /> 기술 메타데이터 (JSON)</summary>
             <dl className="grid gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 text-xs sm:grid-cols-2"><div><dt className="text-slate-500">이벤트 번호</dt><dd className="mt-1 font-mono text-slate-800">{log.auditLogId}</dd></div><div><dt className="text-slate-500">접속 IP</dt><dd className="mt-1 font-mono text-slate-800">{log.ipAddress ?? "—"}</dd></div><div><dt className="text-slate-500">액션 코드</dt><dd className="mt-1 break-all font-mono text-slate-800">{log.action}</dd></div><div><dt className="text-slate-500">대상 타입/ID</dt><dd className="mt-1 break-all font-mono text-slate-800">{log.targetType} / {log.targetId ?? "—"}</dd></div></dl>
-            <pre className="max-h-[28rem] overflow-auto border-t border-slate-200 bg-slate-950 p-4 text-xs leading-5 text-slate-100">{JSON.stringify(payload, null, 2)}</pre>
+            <pre className="scrollbar-hidden max-h-[28rem] overflow-auto border-t border-slate-200 bg-slate-950 p-4 text-xs leading-5 text-slate-100">{JSON.stringify(payload, null, 2)}</pre>
           </details>
         </div>
       ) : null}

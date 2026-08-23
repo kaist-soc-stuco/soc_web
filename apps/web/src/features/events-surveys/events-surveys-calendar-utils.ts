@@ -64,7 +64,16 @@ export function getCalendarEventStyles(
   kind: CalendarEvent["kind"],
   lang: Language,
   sourceType?: CalendarEvent["sourceType"],
+  category?: CalendarEvent["category"],
 ) {
+  if (category === "HOLIDAY") {
+    return {
+      bg: "bg-rose-100 text-rose-700 hover:bg-rose-200",
+      hoverBg: "bg-rose-200",
+      bullet: "bg-rose-400",
+      label: lang === "ko" ? "공휴일" : "Public holiday",
+    };
+  }
   if (sourceType === "KAIST_ACADEMIC") {
     return {
       bg: "bg-slate-200 text-slate-600 hover:bg-slate-300",
@@ -79,7 +88,7 @@ export function getCalendarEventStyles(
       bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
       hoverBg: "bg-brand-primary/25",
       bullet: "bg-brand-primary",
-      label: lang === "ko" ? "직접 등록" : "Manual",
+      label: lang === "ko" ? "학생회 일정" : "Student council",
     };
   }
 

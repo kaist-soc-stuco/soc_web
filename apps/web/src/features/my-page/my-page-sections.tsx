@@ -397,7 +397,7 @@ export function MyPageActivityPanel({
             return (
               <Link
                 key={item.articleId}
-                to={`/board/${item.boardCode}/${item.articleId}`}
+                to={item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`}
                 className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50"
               >
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-slate-700">

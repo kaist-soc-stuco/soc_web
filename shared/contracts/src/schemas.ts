@@ -44,10 +44,15 @@ export const UpsertSiteContentSchema = z
 
 export const CONTENT_BLOCK_TYPES = [
   "HERO",
+  "LOGO",
   "TOP_BANNER",
   "QUICK_LINK",
   "ORGANIZATION_CHART",
+  "PLEDGE",
 ] as const;
+
+export const PLEDGE_STATUSES = ["PLANNED", "IN_PROGRESS", "COMPLETED"] as const;
+export const PledgeStatusSchema = z.enum(PLEDGE_STATUSES);
 
 export const CONTENT_BLOCK_STATUSES = [
   "DRAFT",
@@ -72,16 +77,25 @@ const ContentBlockFieldsSchema = z
     bodyEn: z.string().trim().max(20_000).nullable().default(null),
     linkUrl: NullableContentBlockUrlSchema.default(null),
     imageUrl: NullableContentBlockImageSchema.default(null),
+    pledgeStatus: PledgeStatusSchema.nullable().default(null),
     sortOrder: z.number().int().min(0).default(0),
   })
   .strict();
 
 const validateContentBlock = (
-  value: { type?: string; imageUrl?: string | null },
+  value: { type?: string; imageUrl?: string | null; pledgeStatus?: string | null },
   context: z.RefinementCtx,
 ) => {
-  if ((value.type === "HERO" || value.type === "ORGANIZATION_CHART") && value.imageUrl === null) {
+  if (
+    (value.type === "HERO" ||
+      value.type === "LOGO" ||
+      value.type === "ORGANIZATION_CHART") &&
+    value.imageUrl === null
+  ) {
     context.addIssue({ code: "custom", message: "content_block_image_required", path: ["imageUrl"] });
+  }
+  if (value.type === "PLEDGE" && !value.pledgeStatus) {
+    context.addIssue({ code: "custom", message: "pledge_status_required", path: ["pledgeStatus"] });
   }
 };
 
@@ -178,6 +192,14 @@ export const SsoCallbackBodySchema = z.object({
         Date.parse(value.endAt) >= Date.parse(value.startAt),
       { message: "calendar_end_before_start", path: ["endAt"] },
     );
+
+  export const CalendarEventPresentationUpdateSchema = z.object({
+    categoryOverride: z.enum(["EVENT", "ACADEMIC", "HOLIDAY"]).nullable().optional(),
+    isHiddenByAdmin: z.boolean().optional(),
+  }).refine(
+    (value) => value.categoryOverride !== undefined || value.isHiddenByAdmin !== undefined,
+    { message: "calendar_presentation_update_required" },
+  );
 
   export const CalendarIcsImportSchema = z.object({
     ics: z.string().min(1).max(2_000_000),

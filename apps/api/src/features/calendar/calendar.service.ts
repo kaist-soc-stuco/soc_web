@@ -9,7 +9,9 @@ import { ConfigService } from "@nestjs/config";
 import { and, eq, gte, ilike, inArray, lte, or } from "drizzle-orm";
 import type {
   CalendarEventCreateRequest,
+  CalendarEventCategory,
   CalendarEventListResponse,
+  CalendarEventPresentationUpdateRequest,
   CalendarEventRecord,
   CalendarEventUpdateRequest,
   CalendarExternalSyncResponse,
@@ -33,7 +35,7 @@ import {
   surveys,
 } from "../../infrastructure/postgres/postgres.schema";
 import { CalendarSyncService } from "./calendar-sync.service";
-import { addSeoulDays } from "./calendar.utils";
+import { addSeoulDays, formatSeoulDate } from "./calendar.utils";
 
 const HOLIDAY_API_URL =
   "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo";
@@ -104,8 +106,13 @@ export class CalendarService {
       .select()
       .from(calendarEvents)
       .orderBy(calendarEvents.startAt, calendarEvents.calendarEventId);
+    const holidayDates = await this.loadKoreanHolidayDates(rows);
 
-    return { items: rows.map((row) => this.mapManualEvent(row)) };
+    return { items: rows.map((row) => this.mapManualEvent(row, holidayDates)) };
+  }
+
+  async listManagedEvents(): Promise<CalendarEventListResponse> {
+    return this.listManualEvents();
   }
 
   async createManualEvent(
@@ -180,7 +187,11 @@ export class CalendarService {
     if (!current) throw new NotFoundException("calendar_event_not_found");
     const [row] = await this.db
       .update(calendarEvents)
-      .set({ isActive: false, updatedAt: nowDate() })
+      .set({
+        isHiddenByAdmin: true,
+        overrideUpdatedAt: nowDate(),
+        updatedAt: nowDate(),
+      })
       .where(
         and(
           eq(calendarEvents.calendarEventId, eventId),
@@ -193,6 +204,42 @@ export class CalendarService {
     if (!row) throw new NotFoundException("calendar_event_not_found");
     await this.calendarSyncService.enqueueEvent(eventId);
     return { ok: true, calendarEventId: String(row.calendarEventId) };
+  }
+
+  async updateEventPresentation(
+    userId: string,
+    id: string,
+    input: CalendarEventPresentationUpdateRequest,
+  ): Promise<CalendarEventRecord> {
+    const eventId = this.parseId(id);
+    const [current] = await this.db
+      .select()
+      .from(calendarEvents)
+      .where(eq(calendarEvents.calendarEventId, eventId));
+    if (!current) throw new NotFoundException("calendar_event_not_found");
+
+    const [row] = await this.db
+      .update(calendarEvents)
+      .set({
+        ...(input.categoryOverride !== undefined
+          ? { categoryOverride: input.categoryOverride }
+          : {}),
+        ...(input.isHiddenByAdmin !== undefined
+          ? { isHiddenByAdmin: input.isHiddenByAdmin }
+          : {}),
+        overrideUpdatedByUserId: userId,
+        overrideUpdatedAt: nowDate(),
+        updatedAt: nowDate(),
+      })
+      .where(eq(calendarEvents.calendarEventId, eventId))
+      .returning();
+
+    if (!row) throw new NotFoundException("calendar_event_not_found");
+    if (input.isHiddenByAdmin !== undefined) {
+      await this.calendarSyncService.enqueueEvent(row.calendarEventId);
+    }
+    const holidayDates = await this.loadKoreanHolidayDates([row]);
+    return this.mapManualEvent(row, holidayDates);
   }
 
   async importIcs(userId: string, ics: string): Promise<CalendarIcsImportResponse> {
@@ -300,7 +347,12 @@ export class CalendarService {
     const rows = await this.db
       .select()
       .from(calendarEvents)
-      .where(eq(calendarEvents.isActive, true))
+      .where(
+        and(
+          eq(calendarEvents.isActive, true),
+          eq(calendarEvents.isHiddenByAdmin, false),
+        ),
+      )
       .orderBy(calendarEvents.startAt);
 
     const lines = [
@@ -514,7 +566,7 @@ export class CalendarService {
       )
       .where(
         and(
-          eq(boards.code, "행사"),
+          eq(boards.code, "_EVENT"),
           eq(boards.isActive, true),
           eq(articles.status, "PUBLISHED"),
           eq(articles.visibilityScope, "PUBLIC"),
@@ -570,16 +622,20 @@ export class CalendarService {
       .where(
         and(
           eq(calendarEvents.isActive, true),
+          eq(calendarEvents.isHiddenByAdmin, false),
           ...(from && to
             ? [lte(calendarEvents.startAt, to), gte(calendarEvents.endAt, from)]
             : []),
           ...(titleFilter ? [titleFilter] : []),
         ),
       );
+    const holidayDates = await this.loadKoreanHolidayDates(rows);
 
     return rows.map((row) => ({
       id: `manual-${row.calendarEventId}`,
+      calendarEventId: String(row.calendarEventId),
       sourceType: row.sourceType === "KAIST_ACADEMIC" ? "KAIST_ACADEMIC" as const : "MANUAL" as const,
+      category: this.resolveCategory(row, holidayDates),
       kind: "EVENT",
       titleKo: row.titleKo,
       titleEn: row.titleEn,
@@ -605,7 +661,10 @@ export class CalendarService {
     return row ?? null;
   }
 
-  private mapManualEvent(row: typeof calendarEvents.$inferSelect): CalendarEventRecord {
+  private mapManualEvent(
+    row: typeof calendarEvents.$inferSelect,
+    holidayDates = new Set<string>(),
+  ): CalendarEventRecord {
     return {
       calendarEventId: String(row.calendarEventId),
       titleKo: row.titleKo,
@@ -620,6 +679,11 @@ export class CalendarService {
       sourceYear: row.sourceYear,
       isReadOnly: row.isReadOnly,
       isActive: row.isActive,
+      isHiddenByAdmin: row.isHiddenByAdmin,
+      category: this.resolveCategory(row, holidayDates),
+      categoryOverride: this.isCalendarCategory(row.categoryOverride)
+        ? row.categoryOverride
+        : null,
       createdByUserId: row.createdByUserId,
       googleCalendarId: row.googleCalendarId,
       googleEventId: row.googleEventId,
@@ -629,6 +693,83 @@ export class CalendarService {
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
     };
+  }
+
+  private resolveCategory(
+    row: typeof calendarEvents.$inferSelect,
+    holidayDates: ReadonlySet<string>,
+  ): CalendarEventCategory {
+    if (this.isCalendarCategory(row.categoryOverride)) return row.categoryOverride;
+    if (row.sourceType === "MANUAL") return "EVENT";
+    return this.isKoreanHolidayRange(row.startAt, row.endAt, holidayDates)
+      ? "HOLIDAY"
+      : "ACADEMIC";
+  }
+
+  private async loadKoreanHolidayDates(
+    rows: Array<typeof calendarEvents.$inferSelect>,
+  ): Promise<Set<string>> {
+    const months = new Set<string>();
+
+    for (const row of rows) {
+      if (
+        row.sourceType !== "KAIST_ACADEMIC" ||
+        this.isCalendarCategory(row.categoryOverride)
+      ) {
+        continue;
+      }
+
+      let cursor = row.startAt;
+      const endDate = formatSeoulDate(row.endAt);
+      for (let day = 0; day < 370; day += 1) {
+        const date = formatSeoulDate(cursor);
+        if (date > endDate) break;
+        months.add(date.slice(0, 7));
+        cursor = addSeoulDays(cursor, 1);
+      }
+    }
+
+    const monthlyHolidays = await Promise.all(
+      [...months].map(async (yearMonth) => {
+        const [year, month] = yearMonth.split("-").map(Number);
+        return this.listKoreanHolidays(year, month);
+      }),
+    );
+
+    return new Set(
+      monthlyHolidays
+        .flat()
+        .filter((holiday) => holiday.isHoliday)
+        .map((holiday) => [
+          holiday.locdate.slice(0, 4),
+          holiday.locdate.slice(4, 6),
+          holiday.locdate.slice(6, 8),
+        ].join("-")),
+    );
+  }
+
+  private isKoreanHolidayRange(
+    startAt: Date,
+    endAt: Date,
+    holidayDates: ReadonlySet<string>,
+  ): boolean {
+    let cursor = startAt;
+    const endDate = formatSeoulDate(endAt);
+    let dateCount = 0;
+
+    for (let day = 0; day < 370; day += 1) {
+      const date = formatSeoulDate(cursor);
+      if (date > endDate) break;
+      if (!holidayDates.has(date)) return false;
+      dateCount += 1;
+      cursor = addSeoulDays(cursor, 1);
+    }
+
+    return dateCount > 0;
+  }
+
+  private isCalendarCategory(value: string | null): value is CalendarEventCategory {
+    return value === "EVENT" || value === "ACADEMIC" || value === "HOLIDAY";
   }
 
   private parseDate(value: string): Date {

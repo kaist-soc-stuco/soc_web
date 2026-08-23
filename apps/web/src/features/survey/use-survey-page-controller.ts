@@ -27,7 +27,11 @@ export function useSurveyPageController(surveyId: string | undefined) {
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [questionErrors, setQuestionErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [responseSubmittedAt, setResponseSubmittedAt] = useState<string | null>(
+    null,
+  );
 
   const allSurveyQuestions = useMemo(
     () => survey?.sections.flatMap((section) => section.questions) ?? [],
@@ -59,6 +63,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
       .getSurveyDetail(surveyId)
       .then((data) => {
         setSurvey(data);
+        setResponseSubmittedAt(data.currentResponse?.submittedAt ?? null);
         const answerByQuestionId = new Map(
           data.currentResponse?.answers.map((answer) => [
             answer.questionId,
@@ -87,6 +92,12 @@ export function useSurveyPageController(surveyId: string | undefined) {
 
   const handleAnswerChange = (questionId: string, value: AnswerValue) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
+    setQuestionErrors((prev) => {
+      if (!prev[questionId]) return prev;
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
   };
 
   const handleSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
@@ -94,6 +105,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
     if (!survey || !surveyId) return;
     setSubmitting(true);
     setSubmitError(null);
+    setQuestionErrors({});
 
     if (survey.isPreview || !survey.isPublished) {
       setSubmitError(
@@ -110,6 +122,14 @@ export function useSurveyPageController(surveyId: string | undefined) {
         !isAnswerFilled(question.questionType, answers[question.id]),
     );
     if (missingRequired.length > 0) {
+      setQuestionErrors(
+        Object.fromEntries(
+          missingRequired.map((question) => [
+            question.id,
+            lang === "ko" ? "필수 문항입니다." : "This question is required.",
+          ]),
+        ),
+      );
       setSubmitError(
         lang === "ko"
           ? "필수 문항에 모두 응답한 뒤 제출해 주세요."
@@ -132,16 +152,20 @@ export function useSurveyPageController(surveyId: string | undefined) {
         Boolean(survey.currentResponse) &&
         survey.allowResponseEdit &&
         !survey.allowMultipleResponses;
+      let submittedAt: string | null = null;
 
       if (shouldUpdateExistingResponse) {
-        await apiClient.updateMySurveyResponse(surveyId, {
+        const response = await apiClient.updateMySurveyResponse(surveyId, {
           answers: answerInputs,
         });
+        submittedAt = response.submittedAt;
       } else {
-        await apiClient.submitSurveyResponse(surveyId, {
+        const response = await apiClient.submitSurveyResponse(surveyId, {
           answers: answerInputs,
         });
+        submittedAt = response.submittedAt;
       }
+      setResponseSubmittedAt(submittedAt);
       setSubmitted(true);
     } catch (error) {
       if (error instanceof ApiClientHttpError && error.status === 403) {
@@ -178,6 +202,8 @@ export function useSurveyPageController(surveyId: string | undefined) {
     loadError,
     session,
     sessionLoading,
+    responseSubmittedAt,
+    questionErrors,
     submitError,
     submitted,
     submitting,

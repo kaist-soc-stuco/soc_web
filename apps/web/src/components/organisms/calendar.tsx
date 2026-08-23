@@ -18,6 +18,7 @@ import { IconButton } from "@/components/ui/icon-button";
 interface CompactEvent {
   id: string;
   sourceType: PublicCalendarEventItem["sourceType"];
+  category?: PublicCalendarEventItem["category"];
   kind: string;
   cleanTitleKo: string;
   cleanTitleEn?: string | null;
@@ -30,6 +31,7 @@ interface CompactEvent {
 interface CalendarBarEvent {
   id: string;
   sourceType: PublicCalendarEventItem["sourceType"];
+  category?: PublicCalendarEventItem["category"];
   cleanTitle: string;
   kind: string;
   startAt: Date;
@@ -166,6 +168,7 @@ function buildCalendarBarEvents(
       return {
         id,
         sourceType: representative.sourceType,
+        category: representative.category,
         cleanTitle: getCompactEventTitle(representative, lang),
         kind: representative.kind,
         startAt,
@@ -286,6 +289,7 @@ export function Calendar() {
       return response.items.map((event: PublicCalendarEventItem) => ({
         id: event.id,
         sourceType: event.sourceType,
+        category: event.category,
         kind: event.kind,
         cleanTitleKo: event.titleKo,
         cleanTitleEn: event.titleEn || event.titleKo,
@@ -677,7 +681,11 @@ export function Calendar() {
                            {bar.cleanTitle}
                          </p>
                          <p className="mt-0.5 truncate text-[9.5px] font-normal leading-3 tabular-nums text-slate-400">
-                           {bar.sourceType === "KAIST_ACADEMIC"
+                            {bar.category === "HOLIDAY"
+                              ? lang === "ko"
+                                ? "공휴일"
+                                : "Public holiday"
+                              : bar.sourceType === "KAIST_ACADEMIC"
                              ? lang === "ko"
                                ? "학사 일정"
                                : "Academic"

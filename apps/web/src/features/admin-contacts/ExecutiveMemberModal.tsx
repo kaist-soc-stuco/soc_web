@@ -76,7 +76,7 @@ export function ExecutiveMemberModal({
         </>
       }
     >
-      <form id={formId} onSubmit={(event) => { event.preventDefault(); void onSave(formData); }} className="max-h-[70vh] space-y-5 overflow-y-auto">
+      <form id={formId} onSubmit={(event) => { event.preventDefault(); void onSave(formData); }} className="scrollbar-hidden max-h-[70vh] space-y-5 overflow-y-auto">
         <div className="grid gap-4 sm:grid-cols-2">
           <AdminFormField label="이름 (한글) *">
             <UiInput

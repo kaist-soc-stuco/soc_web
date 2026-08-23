@@ -13,7 +13,7 @@ import { AdminCard, AdminCardHeader, AdminFormField, AdminMetaText, AdminPageHea
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { UiInput, UiSelect, UiTextarea } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,13 +22,14 @@ import { resolveAssetUrl } from "@/lib/asset-url";
 import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
-type ContentCategory = "NOTICE" | "HERO" | "QUICK_LINK" | "ORGANIZATION";
+type ContentCategory = "NOTICE" | "HERO" | "QUICK_LINK" | "LOGO" | "ORGANIZATION" | "PLEDGE";
 
 interface BlockDraft {
   bodyEn: string;
   bodyKo: string;
   imageUrl: string;
   linkUrl: string;
+  pledgeStatus: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | null;
   sortOrder: number;
   titleEn: string;
   titleKo: string;
@@ -38,19 +39,25 @@ interface BlockDraft {
 const CONTENT_BLOCK_QUERY_KEY = ["admin", "content-blocks"] as const;
 
 const categoryMeta: Record<ContentCategory, { createLabel: string; createType: ContentBlockType; label: string; singleton: boolean; types: ContentBlockType[] }> = {
-  NOTICE: { createLabel: "새 띠배너", createType: "TOP_BANNER", label: "긴급 공지·띠배너", singleton: false, types: ["TOP_BANNER"] },
-  HERO: { createLabel: "히어로 이미지 등록", createType: "HERO", label: "홈 히어로", singleton: true, types: ["HERO"] },
-  QUICK_LINK: { createLabel: "새 퀵링크", createType: "QUICK_LINK", label: "퀵링크", singleton: false, types: ["QUICK_LINK"] },
-  ORGANIZATION: { createLabel: "조직도 이미지 등록", createType: "ORGANIZATION_CHART", label: "조직도", singleton: true, types: ["ORGANIZATION_CHART"] },
+  NOTICE: { createLabel: "등록", createType: "TOP_BANNER", label: "띠배너", singleton: false, types: ["TOP_BANNER"] },
+  HERO: { createLabel: "등록", createType: "HERO", label: "홈 히어로", singleton: true, types: ["HERO"] },
+  QUICK_LINK: { createLabel: "등록", createType: "QUICK_LINK", label: "퀵링크", singleton: false, types: ["QUICK_LINK"] },
+  LOGO: { createLabel: "등록", createType: "LOGO", label: "로고", singleton: true, types: ["LOGO"] },
+  ORGANIZATION: { createLabel: "등록", createType: "ORGANIZATION_CHART", label: "조직도", singleton: true, types: ["ORGANIZATION_CHART"] },
+  PLEDGE: { createLabel: "공약 추가", createType: "PLEDGE", label: "공약", singleton: false, types: ["PLEDGE"] },
 };
 
-const isImageOnlyType = (type: ContentBlockType) => type === "HERO" || type === "ORGANIZATION_CHART";
+const isImageOnlyType = (type: ContentBlockType) => type === "HERO" || type === "LOGO" || type === "ORGANIZATION_CHART";
 
 const draftForType = (type: ContentBlockType) => {
   const draft = emptyDraft(type);
   if (type === "HERO") {
     draft.titleKo = "홈 히어로";
     draft.titleEn = "Home hero";
+  }
+  if (type === "LOGO") {
+    draft.titleKo = "사이트 로고";
+    draft.titleEn = "Site logo";
   }
   if (type === "ORGANIZATION_CHART") {
     draft.titleKo = "조직도";
@@ -73,6 +80,7 @@ const emptyDraft = (type: ContentBlockType = "HERO"): BlockDraft => ({
   bodyKo: "",
   imageUrl: "",
   linkUrl: "",
+  pledgeStatus: type === "PLEDGE" ? "PLANNED" : null,
   sortOrder: 0,
   titleEn: "",
   titleKo: "",
@@ -84,6 +92,7 @@ const draftFromBlock = (block: ContentBlockRecord): BlockDraft => ({
   bodyKo: block.bodyKo ?? "",
   imageUrl: block.imageUrl ?? "",
   linkUrl: block.linkUrl ?? "",
+  pledgeStatus: block.pledgeStatus,
   sortOrder: block.sortOrder,
   titleEn: block.titleEn,
   titleKo: block.titleKo,
@@ -95,6 +104,7 @@ const normalizeDraft = (draft: BlockDraft): CreateContentBlockRequest => ({
   bodyKo: draft.bodyKo.trim() || null,
   imageUrl: draft.imageUrl.trim() || null,
   linkUrl: draft.linkUrl.trim() || null,
+  pledgeStatus: draft.pledgeStatus,
   sortOrder: draft.sortOrder,
   titleEn: draft.titleEn.trim() || draft.titleKo.trim(),
   titleKo: draft.titleKo.trim(),
@@ -280,7 +290,7 @@ function SiteContentPageContent() {
 
   return <AdminPageShell>
     {ConfirmDialog}
-    <AdminPageMain>
+    <AdminPageMain className="max-w-[1320px]">
       <AdminPageHeader
         title="사이트 설정"
         actions={canCreateCategory ? <Button type="button" onClick={() => { setCreateDraft(draftForCategory(category)); setCreateOpen(true); }}><Plus aria-hidden="true" /> {categoryMeta[category].createLabel}</Button> : undefined}
@@ -299,7 +309,7 @@ function SiteContentPageContent() {
       <div className="grid min-h-[680px] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <AdminCard className="self-start xl:sticky xl:top-6">
           <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
-          <div className="max-h-[680px] overflow-y-auto p-2">
+          <div className="scrollbar-hidden max-h-[680px] overflow-y-auto p-2">
             {blocksQuery.isLoading ? <div className="grid gap-2">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-lg" />)}</div>
               : filteredBlocks.length === 0 ? <div className="px-4 py-16 text-center"><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-medium text-slate-600">조건에 맞는 콘텐츠가 없습니다.</p></div>
               : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block) => <SortableContentBlockItem key={block.contentBlockId} block={block} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
@@ -321,10 +331,11 @@ function SiteContentPageContent() {
                 <AdminFormField label="English title"><UiInput value={draft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField>
                 {draft.type !== "QUICK_LINK" ? <AdminFormField label="한국어 본문"><UiTextarea className="min-h-32" value={draft.bodyKo} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, bodyKo: value })); }} /></AdminFormField> : null}
                 {draft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-32" value={draft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
+                {draft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><UiSelect value={draft.pledgeStatus ?? "PLANNED"} onChange={(event) => setDraft((current) => ({ ...current, pledgeStatus: event.currentTarget.value as BlockDraft["pledgeStatus"] }))}><option value="PLANNED">예정</option><option value="IN_PROGRESS">진행 중</option><option value="COMPLETED">이행 완료</option></UiSelect></AdminFormField> : null}
               </div> : null}
               <div className="grid gap-4">
-                {!isImageOnlyType(draft.type) ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-                {isImageOnlyType(draft.type) ? <ContentImageInput label={draft.type === "HERO" ? "히어로 이미지" : "조직도 이미지"} value={draft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+                {!isImageOnlyType(draft.type) && draft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
+                {isImageOnlyType(draft.type) ? <ContentImageInput label={draft.type === "HERO" ? "히어로 이미지" : draft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} value={draft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
               </div>
             </div>
           </AdminCard>
@@ -348,8 +359,9 @@ function SiteContentPageContent() {
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="English title"><UiInput value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="한국어 본문"><UiTextarea className="min-h-24" value={createDraft.bodyKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyKo: value })); }} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
-        {!isImageOnlyType(createDraft.type) ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-        {isImageOnlyType(createDraft.type) ? <ContentImageInput label={createDraft.type === "HERO" ? "히어로 이미지" : "조직도 이미지"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setCreateDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+        {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><UiSelect value={createDraft.pledgeStatus ?? "PLANNED"} onChange={(event) => setCreateDraft((current) => ({ ...current, pledgeStatus: event.currentTarget.value as BlockDraft["pledgeStatus"] }))}><option value="PLANNED">예정</option><option value="IN_PROGRESS">진행 중</option><option value="COMPLETED">이행 완료</option></UiSelect></AdminFormField> : null}
+        {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
+        {isImageOnlyType(createDraft.type) ? <ContentImageInput label={createDraft.type === "HERO" ? "히어로 이미지" : createDraft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setCreateDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
       </div>
     </Modal>
   </AdminPageShell>;
@@ -403,6 +415,11 @@ function ContentBlockPreview({ draft }: { draft: BlockDraft }) {
       ? <div className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-[#172033]"><img src={imageUrl} alt="" className="h-72 w-full object-cover opacity-80" /></div>
       : <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-[#e5e9ec] bg-slate-50 text-sm font-normal text-[#344054]">히어로 이미지를 선택해 주세요.</div>;
   }
+  if (draft.type === "LOGO") {
+    return imageUrl
+      ? <div className="grid min-h-28 place-items-center rounded-xl border border-[#e5e9ec] bg-white p-6"><img src={imageUrl} alt={title} className="max-h-20 max-w-[18rem] object-contain" /></div>
+      : <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[#e5e9ec] bg-slate-50 text-sm font-normal text-[#344054]">로고 이미지를 선택해 주세요.</div>;
+  }
   if (draft.type === "QUICK_LINK") {
     return <div className="flex max-w-sm items-center gap-3 rounded-xl border border-[#e5e9ec] bg-white p-4"><div className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-50"><ExternalLink aria-hidden="true" className="size-4 text-[#344054]" /></div><div className="min-w-0"><p className="truncate text-sm font-normal text-[#172033]">{title}</p><p className="truncate text-xs font-normal text-[#344054]">{body}</p></div></div>;
   }
@@ -410,6 +427,10 @@ function ContentBlockPreview({ draft }: { draft: BlockDraft }) {
     return imageUrl
       ? <div className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-white p-4"><img src={imageUrl} alt={title} className="mx-auto max-h-[420px] w-full object-contain" /></div>
       : <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-[#e5e9ec] bg-slate-50 text-sm font-normal text-[#344054]">조직도 이미지를 선택해 주세요.</div>;
+  }
+  if (draft.type === "PLEDGE") {
+    const statusLabel = draft.pledgeStatus === "COMPLETED" ? "이행 완료" : draft.pledgeStatus === "IN_PROGRESS" ? "진행 중" : "예정";
+    return <div className="rounded-xl border border-[#e5e9ec] bg-white p-5"><div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-normal text-[#172033]">{title}</h3><p className="mt-2 whitespace-pre-wrap text-sm font-normal leading-6 text-[#344054]">{body}</p></div><span className="shrink-0 rounded-md border border-[#e5e9ec] px-2 py-1 text-xs font-normal text-[#344054]">{statusLabel}</span></div></div>;
   }
   return <div className="relative min-h-64 overflow-hidden rounded-xl border border-[#e5e9ec] bg-[#172033] p-7 text-white">{image ? <div className="absolute inset-0 opacity-40">{image}</div> : null}<div className="absolute inset-0 bg-gradient-to-r from-[#172033]/90 to-[#172033]/20" /><div className="relative max-w-xl pt-16"><h3 className="text-2xl font-medium tracking-tight">{title}</h3><p className="mt-2 whitespace-pre-wrap text-sm font-normal leading-6 text-white/75">{body}</p>{draft.linkUrl ? <span className="mt-5 inline-flex rounded-lg bg-white px-3 py-2 text-sm font-normal text-[#172033]">자세히 보기</span> : null}</div></div>;
 }

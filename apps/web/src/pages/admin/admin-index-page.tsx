@@ -8,6 +8,7 @@ const ADMIN_ENTRY_ROUTES = [
   { to: "users", bit: Permissions.ADMIN },
   { to: "audit-logs", bit: Permissions.ADMIN },
   { to: "content", bit: Permissions.MANAGE_CONTENT },
+  { to: "calendar", bit: Permissions.MANAGE_CONTENT },
   { to: "contacts", bit: Permissions.MANAGE_CONTENT },
   { to: "emails", bit: Permissions.ADMIN },
   { to: "permissions", bit: Permissions.ADMIN },

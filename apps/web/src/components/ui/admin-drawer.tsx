@@ -45,14 +45,14 @@ export function AdminDrawer({
           width,
         )}
       >
-        <header className="flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 px-5">
+        <header className="flex min-h-16 items-center justify-between gap-4 px-5">
           <h2 className="min-w-0 truncate text-base font-semibold text-slate-950">{title}</h2>
           <IconButton size="sm" aria-label="닫기" onClick={onClose}>
             <X aria-hidden="true" />
           </IconButton>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
-        {footer ? <footer className="border-t border-slate-200 px-5 py-3">{footer}</footer> : null}
+        <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        {footer ? <footer className="px-5 pb-5 pt-0">{footer}</footer> : null}
       </section>
     </div>,
     document.body,

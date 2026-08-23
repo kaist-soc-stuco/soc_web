@@ -8,6 +8,7 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { IconButton } from "@/components/ui/icon-button";
 
 const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: "short_text", label: "단답형" },
@@ -224,7 +225,7 @@ export function QuestionEditorModal({
   };
 
   const inputCls =
-    "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-gray-300 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
 
   return (
     <AdminDrawer
@@ -234,9 +235,6 @@ export function QuestionEditorModal({
       width="max-w-4xl"
       footer={
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-normal text-slate-500">
-            {isGrid ? "행은 질문 항목, 열은 응답 척도로 표시됩니다." : "응답 화면에 표시될 문항을 구성합니다."}
-          </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" onClick={onCancel}>취소</Button>
             {!isOngoing ? (
@@ -263,7 +261,7 @@ export function QuestionEditorModal({
         />
 
         <div className="space-y-6">
-          <AdminFormField label="제목 *">
+          <div>
             {activeTab === "ko" ? (
               <UiInput
                 key="qTitleKo"
@@ -281,9 +279,9 @@ export function QuestionEditorModal({
                 onChange={(e) => set("titleEn", e.target.value)}
               />
             )}
-          </AdminFormField>
+          </div>
 
-          <AdminFormField label="설명">
+          <div>
             {activeTab === "ko" ? (
               <RichTextEditor
                 compact
@@ -301,7 +299,7 @@ export function QuestionEditorModal({
                 lang="en"
               />
             )}
-          </AdminFormField>
+          </div>
         </div>
 
         <div className="space-y-6 pt-4 border-t border-gray-100">
@@ -313,22 +311,19 @@ export function QuestionEditorModal({
               onChange={(val) => changeQuestionType(val as QuestionType)}
               disabled={isOngoing}
             />
-            <p className="mt-2 text-xs font-normal text-slate-500">
-              그리드 문항은 여러 항목을 동일한 척도로 빠르게 응답받을 때 사용합니다.
-            </p>
             </AdminFormField>
           </div>
 
           {needsOptions && (
             <div>
               <div className="mb-3 text-xs font-medium leading-4 text-slate-600">선택지</div>
-              <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-1">
+              <div className="scrollbar-hidden mb-4 max-h-60 space-y-3 overflow-y-auto pr-1">
                 {form.options.map((opt, i) => (
-                  <div key={i} className="flex gap-3 items-center group">
+                  <div key={i} className="flex flex-wrap items-center gap-2 group sm:flex-nowrap">
                     {activeTab === "ko" ? (
                       <UiInput
                         key={`labelKo-${i}`}
-                        className={`${inputCls} flex-1`}
+                        className={`${inputCls} min-w-0 flex-1`}
                         placeholder="선택지 라벨 (국문)"
                         value={opt.labelKo}
                         onChange={(e) => updateOption(i, "labelKo", e.target.value)}
@@ -336,19 +331,37 @@ export function QuestionEditorModal({
                     ) : (
                       <UiInput
                         key={`labelEn-${i}`}
-                        className={`${inputCls} flex-1`}
+                        className={`${inputCls} min-w-0 flex-1`}
                         placeholder="Option label (English)"
                         value={opt.labelEn}
                         onChange={(e) => updateOption(i, "labelEn", e.target.value)}
                       />
                     )}
+                    {supportsBranching && branchTargets.length > 0 && (
+                      <AdminSelectDropdown
+                        ariaLabel={`${opt.labelKo || opt.value || "선택지"} 다음 섹션`}
+                        className="w-full shrink-0 sm:w-48"
+                        value={branchMap[opt.value] ?? ""}
+                        disabled={isOngoing || !opt.value.trim()}
+                        onChange={(target) => updateBranchTarget(opt.value, target)}
+                        options={[
+                          { value: "", label: "다음 섹션" },
+                          ...branchTargets
+                            .filter((target) => target.id !== currentSectionId)
+                            .map((target) => ({ value: target.id, label: target.titleKo })),
+                          { value: "SUBMIT", label: "여기서 제출 완료" },
+                        ]}
+                      />
+                    )}
                     {!isOngoing && (
-                      <Button variant="ghost"
+                      <IconButton
+                        aria-label={`${opt.labelKo || opt.value || "선택지"} 삭제`}
+                        size="sm"
                         onClick={() => removeOption(i)}
-                        className="p-2 text-kaist-grey hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
+                        className="text-kaist-grey hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </Button>
+                      </IconButton>
                     )}
                   </div>
                 ))}
@@ -390,9 +403,14 @@ export function QuestionEditorModal({
                           onChange={(event) => updateGridOption(kind, index, activeTab === "ko" ? "labelKo" : "labelEn", event.target.value)}
                         />
                         {!isOngoing && (
-                          <Button variant="ghost" type="button" onClick={() => removeGridOption(kind, index)} className="rounded-lg p-2 text-kaist-grey transition hover:bg-red-50 hover:text-red-500">
+                          <IconButton
+                            aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 삭제`}
+                            size="sm"
+                            onClick={() => removeGridOption(kind, index)}
+                            className="text-kaist-grey hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                          >
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </IconButton>
                         )}
                       </div>
                     ))}
@@ -433,36 +451,6 @@ export function QuestionEditorModal({
               ) : null}
             </div>
           )}
-
-          {supportsBranching && branchTargets.length > 0 && (
-            <div className="space-y-3 rounded-xl border border-sky-100 bg-sky-50/60 p-4">
-              <div className="text-xs font-medium leading-4 text-slate-600">응답에 따른 다음 섹션</div>
-              <div className="space-y-2">
-                {form.options.map((option) => (
-                  <label key={option.value || option.labelKo} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center">
-                    <span className="truncate text-xs font-bold text-slate-700">
-                      {option.labelKo || option.value || "이름 없는 선택지"}
-                    </span>
-                    <AdminSelectDropdown
-                      ariaLabel={`${option.labelKo || option.value || "선택지"} 다음 섹션`}
-                      className="w-full"
-                      value={branchMap[option.value] ?? ""}
-                      disabled={isOngoing || !option.value.trim()}
-                      onChange={(value) => updateBranchTarget(option.value, value)}
-                      options={[
-                        { value: "", label: "다음 섹션" },
-                        ...branchTargets
-                          .filter((target) => target.id !== currentSectionId)
-                          .map((target) => ({ value: target.id, label: target.titleKo })),
-                        { value: "SUBMIT", label: "여기서 제출 완료" },
-                      ]}
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
 
           <div className="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-kaist-grey/5">
             <span className="text-sm font-bold text-kaist-black">필수 응답</span>

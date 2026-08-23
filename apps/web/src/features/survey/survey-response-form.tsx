@@ -22,6 +22,7 @@ interface SurveyResponseFormProps {
   lang: string;
   onAnswerChange: (questionId: string, value: AnswerValue) => void;
   onSubmit: (event: React.SyntheticEvent<HTMLFormElement>) => void;
+  questionErrors: Record<string, string>;
   submitError: string | null;
   submitting: boolean;
   survey: SurveyDetailResponse;
@@ -36,6 +37,7 @@ export function SurveyResponseForm({
   lang,
   onAnswerChange,
   onSubmit,
+  questionErrors,
   submitError,
   submitting,
   survey,
@@ -44,7 +46,7 @@ export function SurveyResponseForm({
   return (
     <div className="animate-in fade-in slide-in-from-top-4 duration-300">
       {isPreview && <PreviewNoticeView lang={lang} />}
-      <form onSubmit={onSubmit} className="flex flex-col gap-5">
+      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
         {isEditingExistingResponse && (
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
             {lang === "ko"
@@ -77,7 +79,7 @@ export function SurveyResponseForm({
                       section.descriptionKo,
                       section.descriptionEn,
                     )}
-                    className="mt-1.5 text-sm font-medium leading-relaxed text-slate-500"
+                    className="mt-1.5 text-[15px] font-medium leading-relaxed text-slate-500"
                   />
                 )}
               </div>
@@ -90,10 +92,10 @@ export function SurveyResponseForm({
               return (
                 <div
                   key={question.id}
-                  className="group rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)] transition-all hover:border-kaist-darkgreen/20 hover:shadow-[0_16px_40px_rgba(15,23,42,0.07)]"
+                  className="group rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] hover:border-kaist-darkgreen/20 hover:shadow-[0_6px_18px_rgba(15,23,42,0.05)]"
                 >
                   <div className="mb-3.5 border-b border-slate-100 pb-3">
-                    <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-semibold leading-6 text-slate-950">
+                    <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-medium leading-6 text-slate-950">
                       <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
                         {questionIndex}.
                       </span>
@@ -122,7 +124,7 @@ export function SurveyResponseForm({
                         question.descriptionKo,
                         question.descriptionEn,
                       )}
-                      className="mb-4 text-sm font-medium leading-relaxed text-slate-500"
+                      className="mb-4 text-[15px] font-medium leading-relaxed text-slate-500"
                     />
                   )}
                   <div>
@@ -134,6 +136,7 @@ export function SurveyResponseForm({
                       onChange={(value) => onAnswerChange(question.id, value)}
                       lang={lang}
                       disabled={isPreview}
+                      error={questionErrors[question.id] ?? null}
                     />
                   </div>
                 </div>
@@ -149,10 +152,11 @@ export function SurveyResponseForm({
         )}
 
         <div className="flex justify-end border-t border-slate-100 pt-4">
-          <Button variant="ghost"
+          <Button
+            variant="default"
             type="submit"
             disabled={submitting || isPreview}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-kaist-darkgreen/15 transition-all hover:bg-kaist-darkgreen/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition-all hover:bg-kaist-darkgreen/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {submitting ? (
               <>

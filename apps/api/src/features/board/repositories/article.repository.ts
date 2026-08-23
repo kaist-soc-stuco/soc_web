@@ -143,7 +143,7 @@ const articleEngagementCount = (kind: ArticleEngagementKind) => sql<number>`(
   select count(*)::int
   from ${articleEngagements}
   where ${articleEngagements.articleId} = ${articles.articleId}
-    and ${articleEngagements.kind} = ${kind}
+    and upper(${articleEngagements.kind}) = ${kind}
 )`;
 
 const viewerHasEngagement = (
@@ -156,7 +156,7 @@ const viewerHasEngagement = (
         from ${articleEngagements}
         where ${articleEngagements.articleId} = ${articles.articleId}
           and ${articleEngagements.userId} = ${userId}
-          and ${articleEngagements.kind} = ${kind}
+          and upper(${articleEngagements.kind}) = ${kind}
       )`
     : sql<boolean>`false`;
 
@@ -171,6 +171,7 @@ export class ArticleRepository {
     visibilityScopes: VisibilityScope[],
     query?: string,
     viewerUserId?: string,
+    includeContentPreview = false,
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     const offset = (page - 1) * limit;
     const normalizedQuery = query?.trim();
@@ -199,6 +200,8 @@ export class ArticleRepository {
         boardId: articles.boardId,
         titleKo: articles.titleKo,
         titleEn: articles.titleEn,
+        contentKo: articles.contentKo,
+        contentEn: articles.contentEn,
         status: articles.status,
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
@@ -278,6 +281,8 @@ export class ArticleRepository {
         viewerHasScrapped: Boolean(row.viewerHasScrapped),
         hasAttachment: Boolean(row.hasAttachment),
         thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
+        snippetKo: includeContentPreview ? row.contentKo : undefined,
+        snippetEn: includeContentPreview ? row.contentEn : undefined,
         eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
         eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
         eventDescriptionKo: row.eventDescriptionKo ?? undefined,
@@ -298,6 +303,7 @@ export class ArticleRepository {
       searchBy: "title" | "author" | "title_content";
       sortBy: "latest" | "views";
       sortDirection: "asc" | "desc";
+      includeContentPreview?: boolean;
       visibilityScopes: VisibilityScope[];
       viewerUserId?: string;
     },
@@ -360,6 +366,8 @@ export class ArticleRepository {
         boardCode: boards.code,
         titleKo: articles.titleKo,
         titleEn: articles.titleEn,
+        contentKo: articles.contentKo,
+        contentEn: articles.contentEn,
         status: articles.status,
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
@@ -442,6 +450,8 @@ export class ArticleRepository {
         viewerHasScrapped: Boolean(row.viewerHasScrapped),
         hasAttachment: Boolean(row.hasAttachment),
         thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
+        snippetKo: params.includeContentPreview ? row.contentKo : undefined,
+        snippetEn: params.includeContentPreview ? row.contentEn : undefined,
         eventStartDate: row.eventStartDate
           ? msToIso(row.eventStartDate.valueOf())
           : undefined,
@@ -592,10 +602,6 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         viewCount: articles.viewCount,
-        likeCount: articleEngagementCount("LIKE"),
-        scrapCount: articleEngagementCount("SCRAP"),
-        viewerHasLiked: viewerHasEngagement(viewerUserId, "LIKE"),
-        viewerHasScrapped: viewerHasEngagement(viewerUserId, "SCRAP"),
         commentCount: sql<number>`(
           select count(*)
           from ${comments}
@@ -622,6 +628,11 @@ export class ArticleRepository {
     if (!row[0]) {
       return null;
     }
+
+    const engagementSummary = await this.getArticleEngagementSummary(
+      articleId,
+      viewerUserId,
+    );
 
     const assetRows = await this.db
       .select({
@@ -723,10 +734,10 @@ export class ArticleRepository {
       })),
       commentCount: Number(row[0].commentCount ?? 0),
       viewCount: row[0].viewCount,
-      likeCount: Number(row[0].likeCount ?? 0),
-      scrapCount: Number(row[0].scrapCount ?? 0),
-      viewerHasLiked: Boolean(row[0].viewerHasLiked),
-      viewerHasScrapped: Boolean(row[0].viewerHasScrapped),
+      likeCount: engagementSummary.likeCount,
+      scrapCount: engagementSummary.scrapCount,
+      viewerHasLiked: engagementSummary.viewerHasLiked,
+      viewerHasScrapped: engagementSummary.viewerHasScrapped,
       eventStartDate: row[0].eventStartDate ? msToIso(row[0].eventStartDate.valueOf()) : undefined,
       eventEndDate: row[0].eventEndDate ? msToIso(row[0].eventEndDate.valueOf()) : undefined,
       eventDescriptionKo: row[0].eventDescriptionKo ?? undefined,
@@ -1150,32 +1161,31 @@ export class ArticleRepository {
   ): Promise<void> {
     const normalizedArticleId = Number(articleId);
 
-    if (active) {
-      await this.db
-        .insert(articleEngagements)
-        .values({
-          articleId: normalizedArticleId,
-          userId,
-          kind,
-        })
-        .onConflictDoNothing();
-      return;
-    }
-
     await this.db
       .delete(articleEngagements)
       .where(
         and(
           eq(articleEngagements.articleId, normalizedArticleId),
           eq(articleEngagements.userId, userId),
-          eq(articleEngagements.kind, kind),
+          sql`upper(${articleEngagements.kind}) = ${kind}`,
         ),
       );
+
+    if (!active) return;
+
+    await this.db
+      .insert(articleEngagements)
+      .values({
+        articleId: normalizedArticleId,
+        userId,
+        kind,
+      })
+      .onConflictDoNothing();
   }
 
   async getArticleEngagementSummary(
     articleId: string,
-    viewerUserId: string,
+    viewerUserId?: string,
   ): Promise<{
     likeCount: number;
     scrapCount: number;
@@ -1184,20 +1194,40 @@ export class ArticleRepository {
   }> {
     const rows = await this.db
       .select({
-        likeCount: articleEngagementCount("LIKE"),
-        scrapCount: articleEngagementCount("SCRAP"),
-        viewerHasLiked: viewerHasEngagement(viewerUserId, "LIKE"),
-        viewerHasScrapped: viewerHasEngagement(viewerUserId, "SCRAP"),
+        kind: articleEngagements.kind,
+        count: sql<number>`count(*)`,
       })
-      .from(articles)
-      .where(eq(articles.articleId, Number(articleId)))
-      .limit(1);
+      .from(articleEngagements)
+      .where(eq(articleEngagements.articleId, Number(articleId)))
+      .groupBy(articleEngagements.kind);
+
+    const viewerRows = viewerUserId
+      ? await this.db
+          .select({ kind: articleEngagements.kind })
+          .from(articleEngagements)
+          .where(
+            and(
+              eq(articleEngagements.articleId, Number(articleId)),
+              eq(articleEngagements.userId, viewerUserId),
+            ),
+          )
+      : [];
+    const countFor = (kind: ArticleEngagementKind) =>
+      rows.reduce(
+        (total, row) =>
+          row.kind.toUpperCase() === kind
+            ? total + Number(row.count ?? 0)
+            : total,
+        0,
+      );
+    const hasViewerEngagement = (kind: ArticleEngagementKind) =>
+      viewerRows.some((row) => row.kind.toUpperCase() === kind);
 
     return {
-      likeCount: Number(rows[0]?.likeCount ?? 0),
-      scrapCount: Number(rows[0]?.scrapCount ?? 0),
-      viewerHasLiked: Boolean(rows[0]?.viewerHasLiked),
-      viewerHasScrapped: Boolean(rows[0]?.viewerHasScrapped),
+      likeCount: countFor("LIKE"),
+      scrapCount: countFor("SCRAP"),
+      viewerHasLiked: hasViewerEngagement("LIKE"),
+      viewerHasScrapped: hasViewerEngagement("SCRAP"),
     };
   }
 }

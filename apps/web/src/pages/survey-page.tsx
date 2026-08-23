@@ -21,16 +21,34 @@ export function SurveyPage() {
     handleSubmit,
     lang,
     loadError,
+    questionErrors,
     session,
     sessionLoading,
     submitError,
     submitted,
+    responseSubmittedAt,
     submitting,
     survey,
     visibleSectionIds,
   } = useSurveyPageController(id);
 
-  const renderBody = () => {
+  const isPreview = Boolean(survey?.isPreview || (survey && !survey.isPublished));
+  const sessionAuthenticated = Boolean(
+    session?.authenticated && session.canUsePersistentFeatures,
+  );
+  const shouldEmbedTerminalState = Boolean(
+    survey &&
+      !sessionLoading &&
+      (submitted ||
+        (!isPreview &&
+          (survey.computedState === "closed" ||
+            (sessionAuthenticated &&
+              survey.hasSubmitted &&
+              !survey.allowMultipleResponses &&
+              !survey.allowResponseEdit)))),
+  );
+
+  const renderBody = (embedded = false) => {
     if (loadError) {
       return (
         <div className="bg-white border border-kaist-grey/15 rounded-3xl p-12 text-center text-red-500 font-bold shadow-xl">
@@ -48,14 +66,15 @@ export function SurveyPage() {
     if (submitted) {
       return (
         <SuccessView
+          embedded={embedded}
           lang={lang}
           resultVisibility={survey.resultVisibility}
           surveyId={id!}
+          submittedAt={responseSubmittedAt}
         />
       );
     }
 
-    const isPreview = Boolean(survey.isPreview || !survey.isPublished);
     if (!isPreview && survey.computedState === "before_open") {
       return <BeforeOpenView opensAt={survey.opensAt} lang={lang} />;
     }
@@ -63,9 +82,6 @@ export function SurveyPage() {
       return <ClosedView lang={lang} />;
     }
 
-    const sessionAuthenticated = Boolean(
-      session?.authenticated && session.canUsePersistentFeatures,
-    );
     if (!isPreview && !sessionAuthenticated) {
       return (
         <LoginRequiredView lang={lang} feePayersOnly={survey.feePayersOnly} />
@@ -80,9 +96,11 @@ export function SurveyPage() {
     ) {
       return (
         <AlreadySubmittedView
+          embedded={embedded}
           lang={lang}
           resultVisibility={survey.resultVisibility}
           surveyId={id!}
+          submittedAt={responseSubmittedAt}
         />
       );
     }
@@ -101,6 +119,7 @@ export function SurveyPage() {
         lang={lang}
         onAnswerChange={handleAnswerChange}
         onSubmit={handleSubmit}
+        questionErrors={questionErrors}
         submitError={submitError}
         submitting={submitting}
         survey={survey}
@@ -114,8 +133,22 @@ export function SurveyPage() {
       <Header />
       <main className="flex-1 px-4 py-10 lg:px-0">
         <div className="mx-auto max-w-[52rem]">
-          {survey && <SurveySummaryCard lang={lang} survey={survey} />}
-          {renderBody()}
+          {survey && shouldEmbedTerminalState ? (
+            <SurveySummaryCard lang={lang} survey={survey}>
+              {submitted ? (
+                renderBody(true)
+              ) : survey.computedState === "closed" ? (
+                <ClosedView embedded lang={lang} />
+              ) : (
+                renderBody(true)
+              )}
+            </SurveySummaryCard>
+          ) : (
+            <>
+              {survey && <SurveySummaryCard lang={lang} survey={survey} />}
+              {renderBody()}
+            </>
+          )}
         </div>
       </main>
     </PageShell>

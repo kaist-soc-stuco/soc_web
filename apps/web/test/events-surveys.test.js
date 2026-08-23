@@ -190,7 +190,7 @@ test("formats event card dates as all-day or timed ranges", () => {
   assert.match(getCardPeriodText(allDayEvent, "ko"), /07\.27 \(월\).*07\.31 \(금\).*종일/);
   assert.equal(
     getCardPeriodText(timedEvent, "ko"),
-    "07.27 (월) 16:00 〜 07.31 (금) 18:00",
+    "07.27 (월) 16:00 ～ 07.31 (금) 18:00",
   );
 });
 

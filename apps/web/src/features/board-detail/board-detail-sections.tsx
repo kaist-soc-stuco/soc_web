@@ -17,10 +17,7 @@ import {
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
-import {
-  getBoardLabelFromMetadata,
-  isLegacyPublicBoardCode,
-} from "@/lib/board-metadata";
+import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/page-layout";
 
@@ -43,6 +40,7 @@ interface ArticleCardProps {
   category: string;
   categoryLabel: string;
   content: string;
+  editHref?: string;
   lang: string;
   onDeleteArticle: () => void;
   onShare: () => void;
@@ -62,6 +60,7 @@ export function BoardDetailArticleCard({
   category,
   categoryLabel,
   content,
+  editHref,
   lang,
   onDeleteArticle,
   onShare,
@@ -83,7 +82,7 @@ export function BoardDetailArticleCard({
           {title}
         </h1>
         <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-x-2 text-xs font-medium text-slate-400">
+          <div className="flex flex-wrap items-center gap-x-2 text-xs font-normal text-slate-400">
             <span>
               {article.isAnonymous
                 ? lang === "ko"
@@ -100,7 +99,7 @@ export function BoardDetailArticleCard({
             </span>
           </div>
           {canManageArticle ? (
-            <DropdownMenu.Root>
+            <DropdownMenu.Root modal={false}>
               <DropdownMenu.Trigger asChild>
                 <Button
                   type="button"
@@ -119,10 +118,10 @@ export function BoardDetailArticleCard({
                   sideOffset={6}
                   collisionPadding={12}
                 >
-                  <AdminActionMenuPanel className="w-32">
+                  <AdminActionMenuPanel className="w-32 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
                     <DropdownMenu.Item asChild>
                       <AdminActionMenuLink
-                        to={`/board/${category}/${article.articleId}/edit`}
+                        to={editHref ?? `/board/${category}/${article.articleId}/edit`}
                         icon={<Edit2 className="text-slate-400" aria-hidden="true" />}
                       >
                         {lang === "ko" ? "수정" : "Edit"}
@@ -243,14 +242,14 @@ export function BoardDetailArticleCard({
                 ? "공유"
                 : "Share"
           }
-          className="border-0 bg-transparent text-slate-500 active:text-brand-primary hover:border-0 hover:bg-transparent hover:text-slate-700"
+          className="rounded-md border-0 bg-transparent text-[12px] text-slate-500 active:text-brand-primary hover:border-0 hover:bg-slate-100 hover:text-slate-700"
         >
           {shareCopied ? (
-            <Check className="size-4 text-brand-primary" aria-hidden="true" />
+            <Check className="size-3.5 text-brand-primary" aria-hidden="true" />
           ) : (
-            <Share2 className="size-4" aria-hidden="true" />
+            <Share2 className="size-3.5" aria-hidden="true" />
           )}
-          <span>{lang === "ko" ? "공유" : "Share"}</span>
+          <span className="text-[12px]">{lang === "ko" ? "공유" : "Share"}</span>
         </Button>
       </div>
     </article>
@@ -261,25 +260,22 @@ export function BoardDetailBreadcrumb({
   category,
   displayBoardLabel,
   lang,
+  publicBasePath,
 }: {
   category: string;
   displayBoardLabel: string;
   lang: string;
+  publicBasePath?: string;
 }) {
   return (
     <div className="flex items-center gap-2 select-none">
       <Breadcrumbs
         breadcrumbs={[
-          { label: lang === "ko" ? "게시판" : "Board", to: "/board" },
-          { label: displayBoardLabel, to: `/board/${category}` },
+          ...(publicBasePath ? [] : [{ label: lang === "ko" ? "게시판" : "Board", to: "/board" }]),
+          { label: displayBoardLabel, to: publicBasePath ?? `/board/${category}` },
         ]}
         homeLabel={lang === "ko" ? "홈" : "Home"}
       />
-      {isLegacyPublicBoardCode(category) && (
-        <span className="mb-1.5 rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-          {lang === "ko" ? "이전 분류" : "Legacy"}
-        </span>
-      )}
     </div>
   );
 }
@@ -287,13 +283,15 @@ export function BoardDetailBreadcrumb({
 export function BoardDetailBackLink({
   category,
   lang,
+  to,
 }: {
   category: string;
   lang: string;
+  to?: string;
 }) {
   return (
     <Link
-      to={`/board/${category}`}
+      to={to ?? `/board/${category}`}
       className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-md px-2.5 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
     >
       <ArrowLeft className="size-4" aria-hidden="true" />

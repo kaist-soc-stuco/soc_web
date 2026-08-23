@@ -10,7 +10,7 @@ import {
 import { useBoardDetailPageController } from "@/features/board-detail/use-board-detail-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
 
-export function BoardDetailPage() {
+export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCategory?: string; publicBasePath?: string } = {}) {
   const {
     ConfirmDialog,
     article,
@@ -49,7 +49,7 @@ export function BoardDetailPage() {
     surveyDescription,
     surveyTitle,
     title,
-  } = useBoardDetailPageController();
+  } = useBoardDetailPageController(forcedCategory);
 
   if (loading) {
     return (
@@ -88,12 +88,14 @@ export function BoardDetailPage() {
             category={category}
             displayBoardLabel={displayBoardLabel}
             lang={lang}
+            publicBasePath={publicBasePath}
           />
 
           <BoardDetailArticleCard
             article={article}
             attachmentAssets={attachmentAssets}
             canManageArticle={canManageArticle}
+            editHref={publicBasePath ? `${publicBasePath}/${article.articleId}/edit` : undefined}
             category={category}
             categoryLabel={displayBoardLabel}
             content={content}
@@ -138,6 +140,7 @@ export function BoardDetailPage() {
           <BoardDetailBackLink
             category={category}
             lang={lang}
+            to={publicBasePath}
           />
         </div>
       </main>

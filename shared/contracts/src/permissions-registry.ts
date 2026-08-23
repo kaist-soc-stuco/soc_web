@@ -47,9 +47,9 @@ export const PERMISSION_REGISTRY: readonly PermissionDefinition[] = [
   {
     code: PermissionCode.WRITE_NOTICE,
     bit: 1,
-    labelKo: "공지/행사 작성",
+    labelKo: "공지·행사 작성",
     labelEn: "Write Notice",
-    description: "공지, 행사 게시판에 공식 게시글을 작성할 수 있습니다.",
+    description: "공지 게시글과 행사 콘텐츠를 작성할 수 있습니다.",
   },
   {
     code: PermissionCode.WRITE_GENERAL,
@@ -63,7 +63,7 @@ export const PERMISSION_REGISTRY: readonly PermissionDefinition[] = [
     bit: 4,
     labelKo: "공식 답변",
     labelEn: "Write Reply",
-    description: "건의사항, QnA 게시판에 공식 답변을 작성하고 상태를 변경할 수 있습니다.",
+    description: "건의사항에 공식 답변을 작성하고 상태를 변경할 수 있습니다.",
   },
   {
     code: PermissionCode.MANAGE_SURVEY,

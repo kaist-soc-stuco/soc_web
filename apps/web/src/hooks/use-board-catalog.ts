@@ -23,13 +23,14 @@ export function useBoardCatalog(apiClient: BoardCatalogApiClient) {
       try {
         const response = await apiClient.getBoards();
         return {
-          // QnA는 legacy deep-link만 보존하고 신규 공개 탐색·작성 경로에서는 Channel Talk으로 대체합니다.
-          boards: response.items.filter((board) => board.code !== "QnA"),
+          boards: response.items.filter(
+            (board) => !["행사", "공약", "QnA"].includes(board.code),
+          ),
           source: "server" as const,
         };
       } catch {
         return {
-          boards: fallbackBoards.filter((board) => board.code !== "QnA"),
+          boards: fallbackBoards,
           source: "fallback" as const,
         };
       }

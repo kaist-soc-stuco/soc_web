@@ -164,6 +164,9 @@ export class CommentService {
     const created = await this.commentRepository.createComment({
       articleId,
       authorUserId: user.id,
+      isOfficial:
+        code === "건의사항" &&
+        Permissions.hasAny(user.permission, Permissions.WRITE_REPLY, Permissions.ADMIN),
       payload,
     });
 

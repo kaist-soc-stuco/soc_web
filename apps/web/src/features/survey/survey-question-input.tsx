@@ -15,6 +15,7 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 
 interface QuestionInputProps {
   disabled?: boolean;
+  error?: string | null;
   lang: string;
   onChange: (v: AnswerValue) => void;
   question: SurveyQuestionRecord;
@@ -27,6 +28,7 @@ export function SurveyQuestionInput({
   onChange,
   lang,
   disabled = false,
+  error = null,
 }: QuestionInputProps) {
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -35,7 +37,13 @@ export function SurveyQuestionInput({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const base =
-    "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen transition-all placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-gray-300";
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20";
+  const controlClass = `${base}${error ? " border-rose-500 ring-2 ring-rose-500/20" : ""}`;
+  const renderError = error ? (
+    <p className="mt-1 text-xs font-normal text-rose-600" role="alert">
+      {error}
+    </p>
+  ) : null;
 
   const getOptionLabel = (opt: QuestionOption) => {
     return lang === "ko" ? opt.labelKo : opt.labelEn || opt.labelKo;
@@ -44,73 +52,84 @@ export function SurveyQuestionInput({
   switch (question.questionType as QuestionType) {
     case "short_text":
       return (
-        <UiInput
-          className={base}
-          type="text"
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          required={question.isRequired}
-          disabled={disabled}
-          placeholder={
-            lang === "ko" ? "답변을 입력하세요" : "Enter your answer"
-          }
-        />
+        <div>
+          <UiInput
+            className={controlClass}
+            type="text"
+            value={value as string}
+            onChange={(e) => onChange(e.target.value)}
+            aria-invalid={Boolean(error)}
+            disabled={disabled}
+            placeholder={
+              lang === "ko" ? "답변을 입력하세요" : "Enter your answer"
+            }
+          />
+          {renderError}
+        </div>
       );
 
     case "long_text":
       return (
-        <UiTextarea
-          className={`${base} min-h-[100px] resize-y`}
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          required={question.isRequired}
-          disabled={disabled}
-          placeholder={
-            lang === "ko" ? "답변을 입력하세요" : "Enter your answer"
-          }
-        />
+        <div>
+          <UiTextarea
+            className={`${controlClass} min-h-[100px] resize-y`}
+            value={value as string}
+            onChange={(e) => onChange(e.target.value)}
+            aria-invalid={Boolean(error)}
+            disabled={disabled}
+            placeholder={
+              lang === "ko" ? "답변을 입력하세요" : "Enter your answer"
+            }
+          />
+          {renderError}
+        </div>
       );
 
     case "single_choice":
     case "dropdown":
       if (question.questionType === "dropdown") {
         return (
-          <SelectDropdown
-            value={value as string}
-            onChange={onChange}
-            disabled={disabled}
-            options={[
-              {
-                value: "",
-                label: lang === "ko" ? "선택하세요" : "Select an option",
-              },
-              ...(question.options ?? []).map((opt) => ({
-                value: opt.value,
-                label: getOptionLabel(opt),
-              })),
-            ]}
-            className="w-full"
-            buttonClassName={`${base} justify-between text-left`}
-            menuClassName="rounded-xl border-gray-200"
-            emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
-          />
+          <div>
+            <SelectDropdown
+              value={value as string}
+              onChange={onChange}
+              disabled={disabled}
+              ariaInvalid={Boolean(error)}
+              options={[
+                {
+                  value: "",
+                  label: lang === "ko" ? "선택하세요" : "Select an option",
+                },
+                ...(question.options ?? []).map((opt) => ({
+                  value: opt.value,
+                  label: getOptionLabel(opt),
+                })),
+              ]}
+              className="w-full"
+              buttonClassName={`${controlClass} justify-between text-left`}
+              menuClassName="rounded-xl border-gray-200"
+              emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
+            />
+            {renderError}
+          </div>
         );
       }
       return (
-        <div className="flex flex-col gap-2.5">
+        <div className={error ? "rounded-xl border border-rose-500 p-2 ring-2 ring-rose-500/20" : ""}>
+          <div className="flex flex-col gap-2.5">
           {question.options?.map((opt) => {
             const isSelected = value === opt.value;
             return (
               <label
                 key={opt.value}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all cursor-pointer ${
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 ${
                   isSelected
                     ? "border-kaist-darkgreen bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold shadow-sm shadow-kaist-darkgreen/5"
                     : "border-gray-200 hover:border-gray-300 text-kaist-black hover:bg-gray-50/50"
                 }`}
               >
                 <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
                     isSelected
                       ? "border-kaist-darkgreen bg-white"
                       : "border-kaist-grey/30"
@@ -129,31 +148,34 @@ export function SurveyQuestionInput({
                   disabled={disabled}
                   className="hidden"
                 />
-                <span className="text-sm leading-none">
+                <span className="text-[15px] leading-5">
                   {getOptionLabel(opt)}
                 </span>
               </label>
             );
           })}
+          </div>
+          {renderError}
         </div>
       );
 
     case "multiple_choice":
       return (
-        <div className="flex flex-col gap-2.5">
+        <div className={error ? "rounded-xl border border-rose-500 p-2 ring-2 ring-rose-500/20" : ""}>
+          <div className="flex flex-col gap-2.5">
           {question.options?.map((opt) => {
             const selected = (value as string[]).includes(opt.value);
             return (
               <label
                 key={opt.value}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all cursor-pointer ${
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 ${
                   selected
                     ? "border-kaist-darkgreen bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold shadow-sm shadow-kaist-darkgreen/5"
                     : "border-gray-200 hover:border-gray-300 text-kaist-black hover:bg-gray-50/50"
                 }`}
               >
                 <div
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  className={`flex h-5 w-5 items-center justify-center rounded border-2 ${
                     selected
                       ? "border-kaist-darkgreen bg-kaist-darkgreen"
                       : "border-kaist-grey/30"
@@ -179,12 +201,14 @@ export function SurveyQuestionInput({
                   disabled={disabled}
                   className="hidden"
                 />
-                <span className="text-sm leading-none">
+                <span className="text-[15px] leading-5">
                   {getOptionLabel(opt)}
                 </span>
               </label>
             );
           })}
+          </div>
+          {renderError}
         </div>
       );
 
@@ -214,13 +238,13 @@ export function SurveyQuestionInput({
       };
 
       return (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="min-w-full border-collapse text-sm">
+        <div className={error ? "overflow-x-auto rounded-xl border border-rose-500 p-1 ring-2 ring-rose-500/20" : "overflow-x-auto rounded-xl border border-slate-200"}>
+          <table className="min-w-full table-fixed border-collapse text-sm">
             <thead className="bg-slate-50 text-xs font-bold text-slate-500">
               <tr>
-                <th className="min-w-[180px] border-b border-slate-200 px-4 py-3 text-left">항목</th>
+                <th className="w-[28%] min-w-[140px] border-b border-slate-200 px-3 py-3 pr-1 text-left">항목</th>
                 {columns.map((column) => (
-                  <th key={column.value} className="min-w-[100px] border-b border-slate-200 px-3 py-3 text-center">
+                  <th key={column.value} className="min-w-[96px] border-b border-slate-200 px-2 py-3 text-center">
                     {getOptionLabel(column)}
                   </th>
                 ))}
@@ -229,13 +253,13 @@ export function SurveyQuestionInput({
             <tbody className="divide-y divide-slate-100">
               {rows.map((row) => (
                 <tr key={row.value}>
-                  <th className="border-r border-slate-100 px-4 py-3 text-left font-bold text-slate-700">{getOptionLabel(row)}</th>
+                  <th className="border-r border-slate-100 px-3 py-3 pr-1 text-left font-medium text-slate-700">{getOptionLabel(row)}</th>
                   {columns.map((column) => {
                     const selected = isMultiple
                       ? Array.isArray(gridValue[row.value]) && gridValue[row.value].includes(column.value)
                       : gridValue[row.value] === column.value;
                     return (
-                      <td key={column.value} className="px-3 py-3 text-center">
+                      <td key={column.value} className="px-2 py-3 text-center">
                         <UiInput
                           type={isMultiple ? "checkbox" : "radio"}
                           name={isMultiple ? `${question.id}-${row.value}-${column.value}` : `${question.id}-${row.value}`}
@@ -252,15 +276,12 @@ export function SurveyQuestionInput({
               ))}
             </tbody>
           </table>
+          {renderError}
         </div>
       );
     }
 
     case "file_upload": {
-      const fileValue =
-        typeof value === "object" && value !== null && "kind" in value && value.kind === "file"
-          ? value.file
-          : null;
       const maxSizeBytes = question.config?.maxSizeBytes ?? 20_000_000;
       const accept = question.config?.allowedMimeTypes?.join(",") || undefined;
       const handleFileChange = async (file: File | undefined) => {
@@ -291,55 +312,64 @@ export function SurveyQuestionInput({
         }
       };
       return (
-        <div className="space-y-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4">
+        <div className={`space-y-2 rounded-xl border border-dashed bg-slate-50/70 p-4 ${error ? "border-rose-500 ring-2 ring-rose-500/20" : "border-slate-300"}`}>
           <UiInput
             type="file"
             accept={accept}
             disabled={disabled || uploading}
+            aria-invalid={Boolean(error)}
             onChange={(event) => void handleFileChange(event.target.files?.[0])}
             className="block w-full text-sm font-semibold text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-kaist-darkgreen file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-kaist-darkgreen/90"
           />
-          {uploading && <p className="text-xs font-bold text-kaist-darkgreen">파일을 업로드하는 중입니다…</p>}
-          {fileValue && <p className="text-xs font-bold text-slate-700">첨부됨: {fileValue.fileName}</p>}
-          {uploadError && <p className="text-xs font-bold text-rose-600">{uploadError}</p>}
+          {uploadError ? <p className="text-xs font-normal text-rose-600" role="alert">{uploadError}</p> : null}
+          {renderError}
         </div>
       );
     }
 
     case "date":
       return (
-        <UiInput
-          className={base}
-          type="date"
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          required={question.isRequired}
-          disabled={disabled}
-        />
+        <div>
+          <UiInput
+            className={controlClass}
+            type="date"
+            value={value as string}
+            onChange={(e) => onChange(e.target.value)}
+            aria-invalid={Boolean(error)}
+            disabled={disabled}
+          />
+          {renderError}
+        </div>
       );
 
     case "time":
       return (
-        <UiInput
-          className={base}
-          type="time"
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          required={question.isRequired}
-          disabled={disabled}
-        />
+        <div>
+          <UiInput
+            className={controlClass}
+            type="time"
+            value={value as string}
+            onChange={(e) => onChange(e.target.value)}
+            aria-invalid={Boolean(error)}
+            disabled={disabled}
+          />
+          {renderError}
+        </div>
       );
 
     case "datetime":
       return (
-        <UiInput
-          className={base}
-          type="datetime-local"
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          required={question.isRequired}
-          disabled={disabled}
-        />
+        <div>
+          <UiInput
+            className={controlClass}
+            type="datetime-local"
+            value={value as string}
+            onChange={(e) => onChange(e.target.value)}
+            aria-invalid={Boolean(error)}
+            disabled={disabled}
+          />
+          {renderError}
+        </div>
       );
 
     default:

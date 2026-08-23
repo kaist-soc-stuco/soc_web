@@ -37,7 +37,12 @@ export function ArticleEngagementActions({
         <EngagementButton
           active={viewerHasLiked}
           count={likeCount}
-          icon={<Heart className="h-3.5 w-3.5" fill={viewerHasLiked ? 'currentColor' : 'none'} />}
+          icon={
+            <Heart
+              className={`h-3.5 w-3.5 ${viewerHasLiked ? 'text-rose-600' : 'text-slate-400'}`}
+              fill={viewerHasLiked ? 'currentColor' : 'none'}
+            />
+          }
           label={lang === 'ko' ? '좋아요' : 'Like'}
           loading={submitting === 'LIKE'}
           onClick={() => onToggle('LIKE', !viewerHasLiked)}
@@ -84,18 +89,23 @@ function EngagementButton({
   const resolvedShowLoadingIndicator = showLoadingIndicator ?? true;
   const activeClass =
     tone === 'like'
-      ? 'text-rose-600 hover:text-rose-600'
-      : 'text-amber-600 hover:text-amber-600';
-  const inactiveClass = 'text-slate-400 hover:text-slate-700';
+      ? 'border-slate-200 text-rose-600 hover:border-slate-200 hover:text-rose-600'
+      : 'text-amber-400 hover:text-amber-400';
+  const inactiveClass =
+    tone === 'like'
+      ? 'border-slate-200 text-slate-400 hover:border-slate-200 hover:text-slate-400'
+      : 'text-slate-400 hover:text-slate-400';
+  const borderClass = tone === 'like' ? 'border' : 'border-0';
 
   return (
-    <Button variant="ghost"
+    <Button
+      variant="ghost"
       type="button"
       aria-label={label}
       aria-pressed={active}
       disabled={loading}
       onClick={onClick}
-      className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-colors disabled:cursor-wait disabled:opacity-60 hover:border-0 hover:bg-transparent ${className} ${
+      className={`interaction-action inline-flex items-center justify-center gap-1 ${borderClass} bg-transparent font-bold transition-colors disabled:cursor-wait disabled:opacity-60 hover:bg-slate-100 ${className} ${
         active ? activeClass : inactiveClass
       }`}
     >
