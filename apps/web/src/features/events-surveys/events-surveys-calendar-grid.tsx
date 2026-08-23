@@ -1,5 +1,7 @@
 import type { KoreanHolidayRecord } from "@soc/contracts";
 import { localDate, msToDate } from "@soc/shared";
+import { createPortal } from "react-dom";
+import { useState, type CSSProperties } from "react";
 
 import type { Language } from "@/hooks/use-language";
 import { formatShortDate } from "@/lib/date-display";
@@ -33,6 +35,12 @@ interface CalendarEventEntry {
 interface WeekLaneLayout {
   eventLanes: Map<number, number>;
   laneCount: number;
+}
+
+interface CalendarTooltipState {
+  event: CalendarEvent;
+  x: number;
+  y: number;
 }
 
 function dayStamp(date: Date) {
@@ -128,6 +136,31 @@ function isEventLabelDay(
   return dayStamp(cell.date) === centerDay;
 }
 
+function getEventLabelSegment(
+  range: EventRange,
+  cellIndex: number,
+  calendarGrid: CalendarCell[],
+) {
+  const rangeStartIndex = calendarGrid.findIndex(
+    (gridCell) => dayStamp(gridCell.date) === dayStamp(range.start),
+  );
+  const rangeEndIndex = calendarGrid.findIndex(
+    (gridCell) => dayStamp(gridCell.date) === dayStamp(range.end),
+  );
+  const visibleRangeStartIndex = rangeStartIndex < 0 ? 0 : rangeStartIndex;
+  const visibleRangeEndIndex =
+    rangeEndIndex < 0 ? calendarGrid.length - 1 : rangeEndIndex;
+  const weekStartIndex = Math.floor(cellIndex / 7) * 7;
+  const weekEndIndex = Math.min(weekStartIndex + 6, calendarGrid.length - 1);
+  const segmentStartIndex = Math.max(weekStartIndex, visibleRangeStartIndex);
+  const segmentEndIndex = Math.min(weekEndIndex, visibleRangeEndIndex);
+
+  return {
+    dayCount: Math.max(1, segmentEndIndex - segmentStartIndex + 1),
+    offsetDays: Math.max(0, cellIndex - segmentStartIndex),
+  };
+}
+
 function getDateTextClass(
   cell: CalendarCell,
   cellIndex: number,
@@ -137,6 +170,38 @@ function getDateTextClass(
   if (holiday?.isHoliday || cellIndex % 7 === 0) return "text-rose-300";
   if (cellIndex % 7 === 6) return "text-sky-300";
   return "text-slate-700";
+}
+
+function getCalendarEventKey(event: CalendarEvent) {
+  return `${event.id}-${event.dateType}`;
+}
+
+function formatCalendarEventRange(event: CalendarEvent, lang: Language) {
+  const start = event.startAt ?? event.date;
+  const end = event.endAt ?? event.date;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
+  });
+  const formatDate = (date: Date) =>
+    lang === "ko"
+      ? `${date.getMonth() + 1}월 ${date.getDate()}일`
+      : formatter.format(date);
+  const startText = formatDate(start);
+
+  if (isSameDay(start, end)) return startText;
+
+  return `${startText} ～ ${formatDate(end)}`;
+}
+
+function getTooltipPosition({ x, y }: Pick<CalendarTooltipState, "x" | "y">) {
+  const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
+  const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
+
+  return {
+    left: Math.min(x + 14, Math.max(8, viewportWidth - 304)),
+    top: Math.min(y + 18, Math.max(8, viewportHeight - 96)),
+  };
 }
 
 export function EventsSurveysCalendarGrid({
@@ -156,6 +221,23 @@ export function EventsSurveysCalendarGrid({
   selectedDate: Date;
   weekHeaders: string[];
 }) {
+  const [hoveredEventKey, setHoveredEventKey] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<CalendarTooltipState | null>(null);
+
+  const showEventTooltip = (
+    event: CalendarEvent,
+    x: number,
+    y: number,
+  ) => {
+    setHoveredEventKey(getCalendarEventKey(event));
+    setTooltip({ event, x, y });
+  };
+
+  const clearEventTooltip = () => {
+    setHoveredEventKey(null);
+    setTooltip(null);
+  };
+
   const eventRanges = calendarEvents.map((event) =>
     getVisibleEventRange(event, calendarGrid),
   );
@@ -164,12 +246,10 @@ export function EventsSurveysCalendarGrid({
   return (
     <div className="min-w-0 overflow-x-auto lg:overflow-x-visible lg:overflow-y-visible">
       <div className="min-w-[560px] lg:min-w-0">
-        <div className="grid grid-cols-7 border-x border-b border-slate-200 text-center text-[11px] font-semibold text-slate-400">
+        <div className="grid grid-cols-7 border-b border-slate-200 text-center text-[11px] font-semibold text-slate-400">
           {weekHeaders.map((header, index) => (
             <div
-              className={`py-2 ${
-                index < weekHeaders.length - 1 ? "border-r border-slate-200" : ""
-              } ${index === 0 ? "text-rose-300" : ""} ${
+              className={`py-2 ${index === 0 ? "text-rose-300" : ""} ${
                 index === weekHeaders.length - 1 ? "text-sky-300" : ""
               }`}
               key={header}
@@ -179,7 +259,7 @@ export function EventsSurveysCalendarGrid({
           ))}
         </div>
 
-        <div className="grid min-h-[720px] grid-cols-7 grid-rows-6 overflow-visible border-x border-slate-200">
+        <div className="grid min-h-[720px] grid-cols-7 grid-rows-6 overflow-visible">
           {calendarGrid.map((cell, cellIndex) => {
             const holiday = holidayMap.get(toDateKey(cell.date));
             const selected = isSameDay(cell.date, selectedDate);
@@ -228,9 +308,7 @@ export function EventsSurveysCalendarGrid({
                     : ""
                 }`}
                 aria-pressed={selected}
-                className={`relative z-0 flex min-h-[120px] min-w-0 flex-col overflow-visible p-2 text-left transition-[background-color,z-index] duration-150 hover:z-40 focus-visible:z-50 focus:outline-none focus-visible:ring-0 ${
-                  cellIndex % 7 < 6 ? "border-r border-slate-200" : ""
-                } ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
+                className={`relative flex min-h-[120px] min-w-0 flex-col overflow-visible p-1.5 text-left transition-colors duration-150 focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${selected ? "bg-slate-100" : "bg-white hover:bg-slate-50/80"}`}
                 key={toDateKey(cell.date)}
                 onClick={() => onSelectedDateChange(cell.date)}
                 title={holidayName || undefined}
@@ -273,50 +351,59 @@ export function EventsSurveysCalendarGrid({
                       calendarGrid,
                     );
                     const titleText = stripCalendarPrefix(event.title);
-                    const widthClass =
-                      isStart && isEnd
-                        ? "w-full"
-                        : isStart || isEnd
-                          ? "w-[calc(100%+1rem)]"
-                          : "w-[calc(100%+1.5rem)]";
+                    const eventKey = getCalendarEventKey(event);
+                    const isEventHovered = hoveredEventKey === eventKey;
+                    const isWeekEnd = cellIndex % 7 === 6;
+                    const labelSegment = showLabel
+                      ? getEventLabelSegment(range, cellIndex, calendarGrid)
+                      : null;
+                    const segmentWidthClass =
+                      isEnd || isWeekEnd
+                        ? "ml-0.5 w-[calc(100%-0.25rem)]"
+                        : "ml-0.5 w-[calc(100%+0.75rem)]";
 
                     return (
                       <span
-                        className="min-w-0 shrink-0 px-1"
+                        className="min-w-0 shrink-0"
                         key={`${event.id}-${event.dateType}-${laneIndex}`}
                       >
                         <span
-                          className={`group relative z-10 flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[10px] font-semibold leading-4 transition-colors ${
-                            isStart ? "-ml-1" : "-ml-3"
-                          } ${widthClass} ${
+                          aria-label={`${titleText}, ${formatCalendarEventRange(event, lang)}`}
+                          className={`group relative ${labelSegment ? "z-30" : "z-10"} flex h-5 min-h-5 items-center overflow-visible rounded-md px-2 py-0.5 text-[10px] font-semibold leading-4 transition-[background-color,box-shadow] focus:outline-none focus-visible:outline-none ${segmentWidthClass} ${
                             isStart ? "rounded-l-md" : "rounded-l-none"
                           } ${isEnd ? "rounded-r-md" : "rounded-r-none"} ${
                             eventStyle.bg
-                          }`}
+                          } ${isEventHovered ? eventStyle.hoverBg : ""}`}
+                          data-calendar-event-key={eventKey}
+                          onBlur={clearEventTooltip}
+                          onFocus={(focusEvent) => {
+                            const rect = focusEvent.currentTarget.getBoundingClientRect();
+                            showEventTooltip(event, rect.left + rect.width / 2, rect.top);
+                          }}
+                          onMouseEnter={(mouseEvent) => {
+                            showEventTooltip(event, mouseEvent.clientX, mouseEvent.clientY);
+                          }}
+                          onMouseLeave={clearEventTooltip}
+                          onMouseMove={(mouseEvent) => {
+                            showEventTooltip(event, mouseEvent.clientX, mouseEvent.clientY);
+                          }}
                           tabIndex={0}
                         >
-                          {showLabel ? (
-                            <span className="min-w-0 truncate whitespace-nowrap">
-                              {titleText}
+                          {labelSegment ? (
+                            <span
+                              className="pointer-events-none absolute inset-y-0 flex min-w-0 items-center justify-center overflow-hidden px-2"
+                              style={{
+                                left: `calc(-${labelSegment.offsetDays * 100}%)`,
+                                width: `calc(${labelSegment.dayCount * 100}% - 1rem)`,
+                              } satisfies CSSProperties}
+                            >
+                              <span className="block min-w-0 max-w-full truncate whitespace-nowrap">
+                                {titleText}
+                              </span>
                             </span>
                           ) : (
                             <span className="block h-4 w-full" aria-hidden="true" />
                           )}
-
-                          <span className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 flex -translate-x-1/2 flex-col rounded-lg border border-slate-200 bg-white px-3 py-2 text-left opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100">
-                            <span className="flex max-w-[18rem] items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-slate-800">
-                              <span
-                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${eventStyle.bullet}`}
-                                aria-hidden="true"
-                              />
-                              <span className="max-w-[16rem] truncate">
-                                {titleText}
-                              </span>
-                            </span>
-                            <span className="mt-1 whitespace-nowrap text-[10px] font-medium text-slate-400">
-                              {formatShortDate(cell.date, lang)}
-                            </span>
-                          </span>
                         </span>
                       </span>
                     );
@@ -333,6 +420,34 @@ export function EventsSurveysCalendarGrid({
           })}
         </div>
       </div>
+      {tooltip && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-[2000] flex max-w-[calc(100vw-1rem)] -translate-y-0 flex-col rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-md"
+              data-calendar-tooltip="true"
+              role="tooltip"
+              style={getTooltipPosition(tooltip)}
+            >
+              <span className="flex max-w-[18rem] items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-slate-800">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${getCalendarEventStyles(
+                    tooltip.event.kind,
+                    lang,
+                    tooltip.event.sourceType,
+                  ).bullet}`}
+                  aria-hidden="true"
+                />
+                <span className="max-w-[16rem] truncate">
+                  {stripCalendarPrefix(tooltip.event.title)}
+                </span>
+              </span>
+              <span className="mt-1 whitespace-nowrap text-[10px] font-medium text-slate-400">
+                {formatCalendarEventRange(tooltip.event, lang)}
+              </span>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

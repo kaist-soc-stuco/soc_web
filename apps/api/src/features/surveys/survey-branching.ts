@@ -25,6 +25,7 @@ export function assertQuestionBranchConfiguration(
   question: SurveyQuestionRecord,
   sectionIds: ReadonlySet<string>,
   currentSectionId?: string,
+  forwardSectionIds?: ReadonlySet<string>,
 ): void {
   const branchMap = getBranchMap(question);
   if (Object.keys(branchMap).length === 0) return;
@@ -43,6 +44,9 @@ export function assertQuestionBranchConfiguration(
     }
     if (target === currentSectionId) {
       throw new BadRequestException("survey_branch_self_reference");
+    }
+    if (target !== SUBMIT_BRANCH_TARGET && forwardSectionIds && !forwardSectionIds.has(target)) {
+      throw new BadRequestException("survey_branch_must_target_later_section");
     }
   }
 }

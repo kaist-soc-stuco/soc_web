@@ -2,12 +2,13 @@ import { Inject, Injectable } from "@nestjs/common";
 import type {
   ContentBlockRecord,
   CreateContentBlockRequest,
+  ReorderContentBlocksRequest,
   SiteContentKey,
   SiteContentRecord,
   UpdateContentBlockRequest,
   UpsertSiteContentRequest,
 } from "@soc/contracts";
-import { isoToDate, msToIso, nowDate } from "@soc/shared";
+import { msToIso, nowDate } from "@soc/shared";
 import { asc, desc, eq } from "drizzle-orm";
 
 import {
@@ -38,14 +39,11 @@ export class SiteContentRepository {
       contentBlockId: row.contentBlockId,
       createdAt: msToIso(row.createdAt.valueOf()),
       createdBy: row.createdBy,
-      endsAt: row.endsAt ? msToIso(row.endsAt.valueOf()) : null,
       imageUrl: row.imageUrl,
-      isEnabled: row.isEnabled,
       linkUrl: row.linkUrl,
       publishedAt: row.publishedAt ? msToIso(row.publishedAt.valueOf()) : null,
       publishedBy: row.publishedBy,
       sortOrder: row.sortOrder,
-      startsAt: row.startsAt ? msToIso(row.startsAt.valueOf()) : null,
       status: row.status,
       titleEn: row.titleEn,
       titleKo: row.titleKo,
@@ -135,10 +133,8 @@ export class SiteContentRepository {
         bodyEn: input.bodyEn ?? null,
         bodyKo: input.bodyKo ?? null,
         createdBy: actorUserId,
-        endsAt: input.endsAt ? isoToDate(input.endsAt) : null,
         imageUrl: input.imageUrl ?? null,
         linkUrl: input.linkUrl ?? null,
-        startsAt: input.startsAt ? isoToDate(input.startsAt) : null,
         updatedBy: actorUserId,
       })
       .returning();
@@ -161,10 +157,7 @@ export class SiteContentRepository {
     if (input.bodyEn !== undefined) values.bodyEn = input.bodyEn;
     if (input.linkUrl !== undefined) values.linkUrl = input.linkUrl;
     if (input.imageUrl !== undefined) values.imageUrl = input.imageUrl;
-    if (input.startsAt !== undefined) values.startsAt = input.startsAt ? isoToDate(input.startsAt) : null;
-    if (input.endsAt !== undefined) values.endsAt = input.endsAt ? isoToDate(input.endsAt) : null;
     if (input.sortOrder !== undefined) values.sortOrder = input.sortOrder;
-    if (input.isEnabled !== undefined) values.isEnabled = input.isEnabled;
 
     const [row] = await this.db
       .update(contentBlocks)
@@ -172,6 +165,26 @@ export class SiteContentRepository {
       .where(eq(contentBlocks.contentBlockId, contentBlockId))
       .returning();
     return row ? this.mapBlock(row) : null;
+  }
+
+  async reorderContentBlocks(
+    items: ReorderContentBlocksRequest["items"],
+    actorUserId: string,
+  ): Promise<ContentBlockRecord[]> {
+    return this.db.transaction(async (tx) => {
+      const updatedAt = nowDate();
+      for (const item of items) {
+        await tx
+          .update(contentBlocks)
+          .set({ sortOrder: item.sortOrder, updatedAt, updatedBy: actorUserId })
+          .where(eq(contentBlocks.contentBlockId, item.contentBlockId));
+      }
+      const rows = await tx
+        .select()
+        .from(contentBlocks)
+        .orderBy(asc(contentBlocks.sortOrder), desc(contentBlocks.updatedAt));
+      return rows.map((row) => this.mapBlock(row));
+    });
   }
 
   async setContentBlockStatus(

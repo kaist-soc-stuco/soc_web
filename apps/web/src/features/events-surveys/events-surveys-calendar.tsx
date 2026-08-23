@@ -133,7 +133,7 @@ export function EventsSurveysCalendar({
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />
-                {lang === "ko" ? "KAIST 학사일정" : "KAIST academic"}
+                {lang === "ko" ? "학사일정" : "Academic schedule"}
               </span>
             </div>
             <EventsSurveysCalendarManagement />

@@ -4,6 +4,7 @@ import type {
   QuestionType,
   SurveyAnalyticsResponse,
   SurveyChoiceAnalyticsItem,
+  SurveyGridAnalytics,
   SurveyQuestionAnalyticsItem,
 } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
@@ -61,7 +62,7 @@ function getSurveyKindLabel(kind: string, lang: string) {
 
 function getStateLabel(state: string, lang: string) {
   if (state === "open") return lang === "ko" ? "진행 중" : "Open";
-  if (state === "before_open") return lang === "ko" ? "시작 전" : "Upcoming";
+  if (state === "before_open") return lang === "ko" ? "시작 예정" : "Upcoming";
   return lang === "ko" ? "마감" : "Closed";
 }
 
@@ -184,6 +185,46 @@ function ChoiceResult({
   );
 }
 
+function GridResult({ grid, lang }: { grid: SurveyGridAnalytics; lang: string }) {
+  const cellByKey = new Map(
+    grid.cells.map((cell) => [`${cell.rowValue}\u0000${cell.columnValue}`, cell]),
+  );
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <table className="w-full min-w-[560px] border-collapse text-left">
+        <thead className="bg-slate-50">
+          <tr>
+            <th className="h-11 border-b border-slate-200 px-3 text-xs font-normal text-[#344054]">항목</th>
+            {grid.columns.map((column) => (
+              <th key={column.value} className="h-11 border-b border-slate-200 px-3 text-center text-xs font-normal text-[#344054]">
+                {getLocalizedTitle(lang, column.labelKo, column.labelEn)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {grid.rows.map((row) => (
+            <tr key={row.value} className="border-b border-slate-100 last:border-b-0">
+              <th className="px-3 py-3 text-sm font-normal text-[#172033]">
+                {getLocalizedTitle(lang, row.labelKo, row.labelEn)}
+              </th>
+              {grid.columns.map((column) => {
+                const cell = cellByKey.get(`${row.value}\u0000${column.value}`);
+                return (
+                  <td key={column.value} className="px-3 py-3 text-center text-xs font-normal tabular-nums text-[#344054]">
+                    {cell?.count ?? 0}{cell?.percentage ? ` (${cell.percentage}%)` : ""}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PrivateRawAnswerResult({
   question,
   lang,
@@ -247,6 +288,8 @@ function QuestionResultCard({
 
       {isChoiceQuestion(question.questionType) ? (
         <ChoiceResult choices={question.choices ?? []} lang={lang} />
+      ) : question.grid ? (
+        <GridResult grid={question.grid} lang={lang} />
       ) : (
         <PrivateRawAnswerResult question={question} lang={lang} />
       )}

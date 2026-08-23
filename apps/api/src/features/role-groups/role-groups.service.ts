@@ -70,6 +70,10 @@ export class RoleGroupsService {
       throw new NotFoundException("role_group_not_found");
     }
 
+    if (existing.isSystem) {
+      throw new ForbiddenException("system_role_group_cannot_be_updated");
+    }
+
     const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(
       (member) => member.userId,
     );

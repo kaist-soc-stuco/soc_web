@@ -12,6 +12,7 @@ import { surveySections } from "../../infrastructure/postgres/postgres.schema";
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
 import type { CreateSectionDto } from "./dto/create-section.dto";
 import type { UpdateSectionDto } from "./dto/update-section.dto";
+import type { ReorderSurveySectionsRequest } from "@soc/contracts";
 import { sanitizeSurveyRichText } from "./survey-rich-text";
 
 @Injectable()
@@ -113,5 +114,21 @@ export class SurveySectionsRepository {
     await db
       .delete(surveySections)
       .where(and(eq(surveySections.id, id), eq(surveySections.surveyId, surveyId)));
+  }
+
+  async reorder(
+    surveyId: string,
+    items: ReorderSurveySectionsRequest["items"],
+    tx?: PostgresTransaction,
+  ): Promise<SurveySectionRecord[]> {
+    const db = tx ?? this.db;
+    const updatedAt = nowDate();
+    for (const item of items) {
+      await db
+        .update(surveySections)
+        .set({ sortOrder: item.sortOrder, updatedAt })
+        .where(and(eq(surveySections.id, item.id), eq(surveySections.surveyId, surveyId)));
+    }
+    return this.findBySurveyId(surveyId, tx);
   }
 }

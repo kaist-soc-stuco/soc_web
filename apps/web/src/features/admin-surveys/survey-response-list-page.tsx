@@ -11,25 +11,23 @@ import type {
 import { isoToDate, isoToMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminFormField, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { AdminCard, AdminEmptyState, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
-import { PageSearchField } from "@/components/ui/page-layout";
+import { Breadcrumbs, PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import { 
-  ClipboardList, 
   ChevronLeft,
   Loader2,
-  Calendar,
   Eye,
-  Users,
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { formatSurveyAnswer } from "@/lib/survey-answer-display";
 import {
   AdminDataTable,
   AdminTableBody,
@@ -71,20 +69,7 @@ function stringifyAnswerContent(
   answer: SurveyAnswerRecord | undefined,
   question: SurveyQuestionRecord,
 ) {
-  if (!answer?.content) return "";
-  const content = answer.content;
-
-  if (question.questionType === "multiple_choice") {
-    const values = content.values;
-    return Array.isArray(values) ? values.map(String).join(" | ") : "";
-  }
-
-  for (const key of ["text", "value", "date", "time", "datetime"]) {
-    const value = content[key];
-    if (value !== undefined && value !== null) return String(value);
-  }
-
-  return JSON.stringify(content);
+  return formatSurveyAnswer(answer, question);
 }
 
 export function SurveyResponseListPage() {
@@ -227,27 +212,20 @@ export function SurveyResponseListPage() {
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
-        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-5 py-7 md:px-8 xl:px-10">
-          
-          {/* Breadcrumb matching exact path */}
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 select-none">
-            <span>설문조사 관리</span>
-            <span className="text-[10px]">&gt;</span>
-            <span className="text-slate-600 font-semibold">응답 목록</span>
-          </div>
+        <AdminPageMain className="gap-5">
+          <Breadcrumbs breadcrumbs={[{ label: "설문조사 관리", to: "/admin/surveys" }, { label: "응답 목록" }]} />
 
           <AdminPageHeader
             title="응답 목록"
             actions={
               <>
-              <Button variant="outline" onClick={() => navigate("/admin/surveys")} className="gap-1.5 text-sm font-medium">
-                <ChevronLeft className="w-4 h-4 text-slate-500" />
+              <Button variant="outline" onClick={() => navigate("/admin/surveys")}>
+                <ChevronLeft className="size-4" />
                 목록으로
               </Button>
               <Button
                 onClick={handleExport}
                 disabled={exporting}
-                className="gap-1.5 bg-brand-primary text-sm font-semibold text-white hover:bg-brand-primary/90"
               >
                 {exporting ? (
                   <>
@@ -265,68 +243,21 @@ export function SurveyResponseListPage() {
             }
           />
 
-          {/* Survey Info Card */}
           {survey && (
-            <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.01)] flex flex-col md:flex-row md:items-center justify-between gap-6 select-none">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                {/* 1. Title & Status */}
-                <div className="flex items-center gap-4.5 pt-0 md:pt-0 pb-4 md:pb-0 md:pr-4">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                    <ClipboardList className="w-5 h-5 text-slate-400" />
-                  </div>
-                  <div className="flex flex-col gap-1 truncate">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">설문조사</span>
-                    <div className="flex items-center gap-2 truncate">
-                      <h4 className="text-sm font-semibold text-slate-800 truncate" title={survey.titleKo}>
-                        {survey.titleKo}
-                      </h4>
-                      <SurveyStatusBadge
-                        survey={survey}
-                        showDday={false}
-                        size="sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Duration */}
-                <div className="flex items-center gap-4.5 pt-4 md:pt-0 pb-4 md:pb-0 md:px-6">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                    <Calendar className="w-5 h-5 text-slate-400" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">기간</span>
-                    <span className="text-xs font-bold text-slate-700 leading-tight">
-                      {(() => {
-                        const start = format24hDateTime(survey.opensAt);
-                        if (!start) return "상시";
-                        return start;
-                      })()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. Response count */}
-                <div className="flex items-center gap-4.5 pt-4 md:pt-0 pb-0 md:pb-0 md:pl-6">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                    <Users className="w-5 h-5 text-slate-400" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">응답 수</span>
-                    <span className="text-sm font-semibold text-slate-800 leading-tight">
-                      {responses.length}명
-                    </span>
-                  </div>
-                </div>
+            <AdminCard className="flex min-h-16 flex-wrap items-center justify-between gap-3 px-5 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-normal text-[#172033]" title={survey.titleKo}>{survey.titleKo}</span>
+                <SurveyStatusBadge survey={survey} showDday={false} size="sm" />
               </div>
-            </div>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-normal text-[#344054]"><span>{format24hDateTime(survey.opensAt) ?? "상시"}</span><span>응답 {responses.length}건</span></div>
+            </AdminCard>
           )}
 
           {/* Search and sort filters remain visible in the toolbar. */}
           <AdminTableCard className="overflow-visible">
-            <div className="border-b border-slate-100 p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <AdminFormField label="검색" className="min-w-0 flex-1">
+            <div className="border-b border-slate-100 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0 flex-1">
                 <PageSearchField
                   ariaLabel="응답 검색"
                   className="w-full lg:w-auto"
@@ -341,8 +272,8 @@ export function SurveyResponseListPage() {
                   placeholder="이름, 이메일 검색"
                   value={searchQuery}
                 />
-              </AdminFormField>
-              <AdminFormField label="정렬" className="flex flex-wrap items-end gap-3">
+              </div>
+              <div>
                 <SegmentedControl
                   ariaLabel="응답 정렬"
                   options={[
@@ -355,7 +286,7 @@ export function SurveyResponseListPage() {
                     setCurrentPage(1);
                   }}
                 />
-              </AdminFormField>
+              </div>
             </div>
           </div>
 
@@ -370,15 +301,13 @@ export function SurveyResponseListPage() {
             )}
             
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-2xl text-sm font-semibold mb-6 select-none mx-6 mt-4">
+              <div className="m-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-normal text-red-700">
                 {error}
               </div>
             )}
 
             {!loading && !error && filteredResponses.length === 0 && (
-              <div className="text-center py-20 text-slate-400 font-bold border border-dashed border-slate-100 rounded-2xl bg-slate-50/30 select-none mx-6 my-6">
-                조건에 부합하는 응답 결과가 없습니다.
-              </div>
+              <AdminEmptyState message="조건에 맞는 응답이 없습니다." />
             )}
 
             {!loading && filteredResponses.length > 0 && (
@@ -475,7 +404,7 @@ export function SurveyResponseListPage() {
 
           </div>
           </AdminTableCard>
-        </main>
+        </AdminPageMain>
       </AdminPageShell>
     </AuthGuard>
   );

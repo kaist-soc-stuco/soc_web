@@ -2,7 +2,6 @@ import type { SurveyRecord } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
 
 export type SurveyStatusTone =
-  | "archived"
   | "draft"
   | "closed"
   | "beforeOpen"
@@ -11,7 +10,7 @@ export type SurveyStatusTone =
 export interface SurveyStatusLike {
   computedState?: "before_open" | "open" | "closed" | string | null;
   isPublished?: boolean | null;
-  lifecycleStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED" | string | null;
+  lifecycleStatus?: "DRAFT" | "PUBLISHED" | string | null;
   closesAt?: string | null;
   opensAt?: string | null;
 }
@@ -23,7 +22,6 @@ export interface SurveyStatusInfo {
 
 export type SurveyStatusFilter =
   | "all"
-  | "archived"
   | "draft"
   | "open"
   | "closed";
@@ -46,10 +44,6 @@ export function getSurveyStatusInfo(
   _showDday = true,
   _currentMs = nowMs(),
 ): SurveyStatusInfo {
-  if (survey.lifecycleStatus === "ARCHIVED") {
-    return { label: "보관됨", tone: "archived" };
-  }
-
   if (!survey.isPublished) {
     return { label: "임시저장", tone: "draft" };
   }
@@ -59,7 +53,7 @@ export function getSurveyStatusInfo(
   }
 
   if (survey.computedState === "before_open") {
-    return { label: "개시 전", tone: "beforeOpen" };
+    return { label: "시작 예정", tone: "beforeOpen" };
   }
 
   if (survey.computedState === "open") {
@@ -74,7 +68,7 @@ export function getSurveyStatusInfo(
   }
 
   if (openMs !== null && !Number.isNaN(openMs) && openMs > _currentMs) {
-    return { label: "개시 전", tone: "beforeOpen" };
+    return { label: "시작 예정", tone: "beforeOpen" };
   }
 
   return { label: "진행중", tone: "open" };
@@ -100,11 +94,8 @@ export function filterAndSortSurveys(
 
   if (options.statusFilter !== "all") {
     result = result.filter((survey) => {
-      if (options.statusFilter === "archived") {
-        return survey.lifecycleStatus === "ARCHIVED";
-      }
       if (options.statusFilter === "draft") {
-        return survey.lifecycleStatus !== "ARCHIVED" && !survey.isPublished;
+        return !survey.isPublished;
       }
       if (options.statusFilter === "closed") {
         return survey.isPublished && survey.computedState === "closed";

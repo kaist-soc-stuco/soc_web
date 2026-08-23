@@ -10,6 +10,7 @@ import {
   articles,
   assets,
   boards,
+  contentBlocks,
 } from "../../../infrastructure/postgres/postgres.schema";
 
 @Injectable()
@@ -22,6 +23,7 @@ export class AssetRepository {
     mimeType: string;
     sizeBytes: number;
     uploadedBy: string;
+    publicContentImage?: boolean;
   }): Promise<{ assetId: string }> {
     const [created] = await this.db
       .insert(assets)
@@ -45,6 +47,7 @@ export class AssetRepository {
     mimeType: string;
     sizeBytes: number;
     uploadedBy: string;
+    publicContentImage: boolean;
     links: Array<{
       articleId: string;
       boardCode: string;
@@ -79,6 +82,15 @@ export class AssetRepository {
       .innerJoin(boards, eq(articles.boardId, boards.boardId))
       .where(eq(articleAssets.assetId, Number(assetId)));
 
+    const [publicContentImage] = await this.db
+      .select({ contentBlockId: contentBlocks.contentBlockId })
+      .from(contentBlocks)
+      .where(and(
+        eq(contentBlocks.imageUrl, `asset:${assetId}`),
+        eq(contentBlocks.status, "PUBLISHED"),
+      ))
+      .limit(1);
+
     return {
       assetId: String(asset.assetId),
       storageKey: asset.storageKey,
@@ -86,6 +98,7 @@ export class AssetRepository {
       mimeType: asset.mimeType,
       sizeBytes: asset.sizeBytes,
       uploadedBy: String(asset.uploadedBy),
+      publicContentImage: Boolean(publicContentImage),
       links: links.map((link) => ({
         articleId: String(link.articleId),
         boardCode: link.boardCode,
@@ -232,8 +245,13 @@ export class AssetRepository {
       })
       .from(assets)
       .leftJoin(articleAssets, eq(articleAssets.assetId, assets.assetId))
+      .leftJoin(contentBlocks, eq(contentBlocks.imageUrl, sql`'asset:' || ${assets.assetId}::text`))
       .where(
-        and(isNull(articleAssets.articleAssetId), lt(assets.createdAt, cutoff)),
+        and(
+          isNull(articleAssets.articleAssetId),
+          isNull(contentBlocks.contentBlockId),
+          lt(assets.createdAt, cutoff),
+        ),
       )
       .orderBy(asc(assets.createdAt))
       .limit(limit);

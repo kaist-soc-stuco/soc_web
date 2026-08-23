@@ -15,7 +15,7 @@ import { Permissions } from "@/lib/permissions";
 import { useCurrentSession } from "@/hooks/use-current-session";
 
 const ADMIN_MENU = [
-  { label: "운영 콘텐츠", to: "/admin/content", bit: Permissions.MANAGE_CONTENT, icon: PanelsTopLeft },
+  { label: "사이트 설정", to: "/admin/content", bit: Permissions.MANAGE_CONTENT, icon: PanelsTopLeft },
   { label: "유저 관리", to: "/admin/users", bit: Permissions.ADMIN, icon: Users },
   { label: "권한 관리", to: "/admin/permissions", bit: Permissions.ADMIN, icon: ShieldCheck },
   { label: "과비 납부 관리", to: "/admin/finance", bit: Permissions.MANAGE_FINANCE, icon: WalletCards },

@@ -141,6 +141,7 @@ interface BoardArticleTableProps {
   category?: string;
   currentPage: number;
   isLoading: boolean;
+  showInitialSkeleton: boolean;
   lang: string;
   onPageChange: (page: number) => void;
   onPostsPerPageChange: (value: number) => void;
@@ -166,6 +167,7 @@ export function BoardArticleTable({
   category,
   currentPage,
   isLoading,
+  showInitialSkeleton,
   lang,
   onPageChange,
   onPostsPerPageChange,
@@ -288,7 +290,7 @@ export function BoardArticleTable({
               ) : null}
           </div>
 
-          {isLoading && articles.length === 0 ? (
+          {showInitialSkeleton && articles.length === 0 ? (
             <BoardTableSkeleton columns={category ? 4 : 5} />
           ) : null}
         </div>

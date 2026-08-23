@@ -21,6 +21,7 @@ import type {
   ArticleUpdateResponse,
   ArticleDeleteResponse,
   ArticleEngagementKind,
+  SurveySummary,
   VisibilityScope,
 } from "@soc/contracts";
 
@@ -37,6 +38,7 @@ import {
   comments,
   users,
   surveys,
+  surveyResponses,
   boards,
 } from "../../../infrastructure/postgres/postgres.schema";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "../board.constants";
@@ -50,9 +52,79 @@ const getConnectedSurveyState = (survey: typeof surveys.$inferSelect): "before_o
 
   const now = nowMs();
   const openAt = survey.openAt?.valueOf();
+  const closeAt = survey.closeAt?.valueOf();
 
-  if (openAt && openAt > now) return "before_open";
+  if (openAt !== undefined && openAt > now) return "before_open";
+  if (closeAt !== undefined && closeAt <= now) return "closed";
   return "open";
+};
+
+type ConnectedSurveyFields = {
+  surveyId: string | null;
+  surveyKind: string | null;
+  surveyTitleKo: string | null;
+  surveyTitleEn: string | null;
+  surveyDescriptionKo: string | null;
+  surveyDescriptionEn: string | null;
+  surveyComputedState: string | null;
+  surveyFeeRequirementPolicy: string | null;
+  surveyIsAlwaysOpen: boolean | null;
+  surveyOpenAt: Date | null;
+  surveyCloseAt: Date | null;
+  surveyMaxResponses: number | null;
+  surveyResponseCount: number | null;
+};
+
+const connectedSurveyFields = {
+  surveyId: surveys.surveyId,
+  surveyKind: surveys.kind,
+  surveyTitleKo: surveys.titleKo,
+  surveyTitleEn: surveys.titleEn,
+  surveyDescriptionKo: surveys.descriptionKo,
+  surveyDescriptionEn: surveys.descriptionEn,
+  surveyComputedState: sql<string | null>`case
+    when ${surveys.surveyId} is null then null
+    when ${surveys.isAlwaysOpen} then 'open'
+    when ${surveys.openAt} is not null and ${surveys.openAt} > now() then 'before_open'
+    when ${surveys.closeAt} is not null and ${surveys.closeAt} <= now() then 'closed'
+    else 'open'
+  end`,
+  surveyFeeRequirementPolicy: surveys.feeRequirementPolicy,
+  surveyIsAlwaysOpen: surveys.isAlwaysOpen,
+  surveyOpenAt: surveys.openAt,
+  surveyCloseAt: surveys.closeAt,
+  surveyMaxResponses: surveys.maxResponseCount,
+  surveyResponseCount: sql<number | null>`case
+    when ${surveys.surveyId} is null then null
+    else (
+      select count(*)::int
+      from ${surveyResponses}
+      where ${surveyResponses.surveyId} = ${surveys.surveyId}
+        and ${surveyResponses.status} != 'draft'
+    )
+  end`,
+};
+
+const mapConnectedSurvey = (
+  row: ConnectedSurveyFields,
+): SurveySummary | null => {
+  if (!row.surveyId) return null;
+
+  return {
+    surveyId: row.surveyId,
+    kind: row.surveyKind ?? "EVENT",
+    titleKo: row.surveyTitleKo ?? "",
+    titleEn: row.surveyTitleEn ?? undefined,
+    descriptionKo: row.surveyDescriptionKo ?? undefined,
+    descriptionEn: row.surveyDescriptionEn ?? undefined,
+    computedState: row.surveyComputedState ?? "closed",
+    feeRequirementPolicy: row.surveyFeeRequirementPolicy ?? "NONE",
+    isAlwaysOpen: Boolean(row.surveyIsAlwaysOpen),
+    openAt: row.surveyOpenAt ? msToIso(row.surveyOpenAt.valueOf()) : undefined,
+    closeAt: row.surveyCloseAt ? msToIso(row.surveyCloseAt.valueOf()) : undefined,
+    maxResponses: row.surveyMaxResponses ?? null,
+    responseCount: Number(row.surveyResponseCount ?? 0),
+  };
 };
 
 const articleThumbnailStorageKey = sql<string | null>`(
@@ -160,7 +232,7 @@ export class ArticleRepository {
         eventEndDate: articles.eventEndDate,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
-        surveyId: surveys.surveyId,
+        ...connectedSurveyFields,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -211,6 +283,7 @@ export class ArticleRepository {
         eventDescriptionKo: row.eventDescriptionKo ?? undefined,
         eventDescriptionEn: row.eventDescriptionEn ?? undefined,
         surveyId: row.surveyId ?? undefined,
+        survey: mapConnectedSurvey(row),
       })),
     };
   }
@@ -320,7 +393,7 @@ export class ArticleRepository {
         eventEndDate: articles.eventEndDate,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
-        surveyId: surveys.surveyId,
+        ...connectedSurveyFields,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -378,6 +451,7 @@ export class ArticleRepository {
         eventDescriptionKo: row.eventDescriptionKo ?? undefined,
         eventDescriptionEn: row.eventDescriptionEn ?? undefined,
         surveyId: row.surveyId ?? undefined,
+        survey: mapConnectedSurvey(row),
       })),
     };
   }
@@ -442,7 +516,7 @@ export class ArticleRepository {
         eventEndDate: articles.eventEndDate,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
-        surveyId: surveys.surveyId,
+        ...connectedSurveyFields,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -488,6 +562,7 @@ export class ArticleRepository {
       eventDescriptionKo: row.eventDescriptionKo ?? undefined,
       eventDescriptionEn: row.eventDescriptionEn ?? undefined,
       surveyId: row.surveyId ?? undefined,
+      survey: mapConnectedSurvey(row),
     }));
   }
 

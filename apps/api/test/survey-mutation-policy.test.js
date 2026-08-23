@@ -36,7 +36,6 @@ function survey(overrides = {}) {
     isKoreanOnly: false,
     isPublished: true,
     lifecycleStatus: "PUBLISHED",
-    archivedAt: null,
     previousVersionId: null,
     versionNumber: 1,
     derivedVersionCount: 0,
@@ -183,81 +182,18 @@ test("locks the survey row, checks submitted responses, and mutates in one trans
   ]);
 });
 
-test("hard deletion uses the same lock and transaction as the response check", async () => {
-  const blocked = createPolicyHarness({ responseCount: 1 });
+test("hard deletion uses the survey lock and permits response cleanup", async () => {
+  const allowed = createPolicyHarness({
+    lifecycleStatus: "PUBLISHED",
+    responseCount: 1,
+  });
   let deleted = false;
-  await expectConflict(
-    blocked.policy.withHardDelete("survey-1", async () => {
-      deleted = true;
-    }),
-    "survey_delete_blocked_after_response",
-  );
-  assert.equal(deleted, false);
-
-  const allowed = createPolicyHarness({ responseCount: 0 });
   await allowed.policy.withHardDelete("survey-1", async (tx) => {
     assert.equal(tx, allowed.tx);
     deleted = true;
   });
   assert.equal(deleted, true);
   assert.deepEqual(allowed.events, [
-    "transaction:start",
-    "lock:update",
-    "count-submitted",
-    "count-derived",
-    "transaction:end",
-  ]);
-});
-
-test("published and archived surveys must be retained through the archive lifecycle", async () => {
-  for (const lifecycleStatus of ["PUBLISHED", "ARCHIVED"]) {
-    const retained = createPolicyHarness({ lifecycleStatus });
-    let deleted = false;
-
-    await expectConflict(
-      retained.policy.withHardDelete("survey-1", async () => {
-        deleted = true;
-      }),
-      "survey_delete_requires_draft",
-    );
-    assert.equal(deleted, false);
-    assert.deepEqual(retained.events, [
-      "transaction:start",
-      "lock:update",
-      "transaction:end",
-    ]);
-  }
-});
-
-test("hard deletion preserves version lineage with an explicit conflict", async () => {
-  const linked = createPolicyHarness({ derivedVersionCount: 1 });
-  let deleted = false;
-
-  await expectConflict(
-    linked.policy.withHardDelete("survey-1", async () => {
-      deleted = true;
-    }),
-    "survey_delete_blocked_by_versions",
-  );
-  assert.equal(deleted, false);
-});
-
-test("archived surveys are terminal and reject structure changes before repository mutation", async () => {
-  const archived = createPolicyHarness({
-    lifecycleStatus: "ARCHIVED",
-    responseCount: 0,
-  });
-  let mutationCalled = false;
-
-  await expectConflict(
-    archived.policy.withStructureMutation("survey-1", async () => {
-      mutationCalled = true;
-    }),
-    "survey_archived_immutable",
-  );
-
-  assert.equal(mutationCalled, false);
-  assert.deepEqual(archived.events, [
     "transaction:start",
     "lock:update",
     "transaction:end",
@@ -303,7 +239,20 @@ test("question and section services pass the locked transaction to every reposit
     {
       insert: async (_sectionId, _dto, repositoryTx) => {
         seenTransactions.push(repositoryTx);
-        return { id: "question-1" };
+        return {
+          id: "question-1",
+          sectionId: "section-1",
+          titleKo: "Question",
+          titleEn: null,
+          descriptionKo: null,
+          descriptionEn: null,
+          questionType: "short_text",
+          options: null,
+          config: null,
+          answerRegex: null,
+          isRequired: true,
+          sortOrder: 0,
+        };
       },
     },
     {
@@ -368,85 +317,21 @@ test("submitted responses freeze question definitions used by stored answers", a
   assert.deepEqual(repositoryCalls, []);
 });
 
-test("responded surveys are archived but cannot be hard-deleted", async () => {
-  const current = survey({ derivedVersionCount: 2 });
+test("responded surveys can be hard-deleted", async () => {
   const { policy, tx } = createPolicyHarness({
     lifecycleStatus: "PUBLISHED",
     responseCount: 1,
   });
-  let archiveCalled = false;
   let hardDeleteCalled = false;
   const repo = {
-    findById: async (_id, repositoryTx) => {
-      assert.equal(repositoryTx, tx);
-      return current;
-    },
-    archive: async (_id, repositoryTx) => {
-      assert.equal(repositoryTx, tx);
-      archiveCalled = true;
-      return {
-        ...current,
-        archivedAt: NOW,
-        derivedVersionCount: 0,
-        isPublished: false,
-        lifecycleStatus: "ARCHIVED",
-        showOnCalendar: false,
-      };
-    },
     delete: async () => {
       hardDeleteCalled = true;
     },
   };
-  const responsesRepo = { countSubmitted: async () => 1 };
-  const service = new SurveysService(repo, {}, {}, responsesRepo, policy);
+  const service = new SurveysService(repo, {}, {}, {}, policy);
 
-  const archived = await service.archive("survey-1");
-
-  assert.equal(archiveCalled, true);
-  assert.equal(archived.isPublished, false);
-  assert.equal(archived.lifecycleStatus, "ARCHIVED");
-  assert.equal(archived.showOnCalendar, false);
-  assert.equal(archived.responseCount, 1);
-  assert.equal(archived.derivedVersionCount, 2);
-  assert.equal(hardDeleteCalled, false);
-
-  await expectConflict(
-    service.delete("survey-1"),
-    "survey_delete_requires_draft",
-  );
-  assert.equal(hardDeleteCalled, false);
-});
-
-test("archived survey settings cannot be changed or republished", async () => {
-  const current = survey({
-    archivedAt: NOW,
-    isPublished: false,
-    lifecycleStatus: "ARCHIVED",
-    showOnCalendar: false,
-  });
-  const { policy, tx } = createPolicyHarness({ lifecycleStatus: "ARCHIVED" });
-  let updateCalled = false;
-  const service = new SurveysService(
-    {
-      findById: async (_id, repositoryTx) => {
-        assert.equal(repositoryTx, tx);
-        return current;
-      },
-      update: async () => {
-        updateCalled = true;
-      },
-    },
-    {},
-    {},
-    {},
-    policy,
-  );
-
-  await expectConflict(
-    service.update(current.id, { isPublished: true, titleKo: "Republished" }),
-    "survey_archived_immutable",
-  );
-  assert.equal(updateCalled, false);
+  await service.delete("survey-1");
+  assert.equal(hardDeleteCalled, true);
 });
 
 test("update responses preserve the authoritative derived-version count", async () => {
@@ -481,11 +366,10 @@ test("update responses preserve the authoritative derived-version count", async 
   assert.equal(updated.derivedVersionCount, 2);
 });
 
-test("duplicates draft or archived surveys as a private, unlinked version in one transaction", async () => {
+test("duplicates draft surveys as a private, unlinked version in one transaction", async () => {
   const original = survey({
     isPublished: false,
-    lifecycleStatus: "ARCHIVED",
-    archivedAt: NOW,
+    lifecycleStatus: "DRAFT",
     connectedPostId: "42",
     resultVisibility: "PUBLIC",
     responseCount: 4,
@@ -544,7 +428,6 @@ test("duplicates draft or archived surveys as a private, unlinked version in one
         isKoreanOnly: dto.isKoreanOnly ?? false,
         isPublished: dto.isPublished ?? false,
         lifecycleStatus: "DRAFT",
-        archivedAt: null,
         previousVersionId: lineage?.previousVersionId ?? null,
         versionNumber: lineage?.versionNumber ?? 1,
         showOnCalendar: dto.showOnCalendar ?? false,

@@ -1,13 +1,13 @@
 import { ArrowUpRight } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import {
   resolveContentBlockText,
   useLocalizedSiteContent,
   usePublicContentBlocksByType,
 } from "@/features/site-content/site-content";
 import { useLanguage } from "@/hooks/use-language";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 export function Hero() {
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -15,9 +15,7 @@ export function Hero() {
   const fallbackTitle = useLocalizedSiteContent("home.hero.title");
   const hero = usePublicContentBlocksByType("HERO")[0];
   const quickLinks = usePublicContentBlocksByType("QUICK_LINK");
-  const localizedHero = hero ? resolveContentBlockText(hero, lang) : null;
-  const title = localizedHero?.title || fallbackTitle;
-  const imageUrl = hero?.imageUrl || "/hero_background_1.jpg";
+  const imageUrl = hero?.imageUrl ? resolveAssetUrl(hero.imageUrl) : "/hero_background_1.jpg";
 
   return (
     <section className="hero-image-placeholder relative h-full w-full overflow-hidden">
@@ -45,22 +43,9 @@ export function Hero() {
           <h1
             className="home-hero-title whitespace-pre-line text-white"
           >
-            {title}
+            {fallbackTitle}
           </h1>
         </div>
-        {localizedHero?.body ? (
-          <p className="mb-5 max-w-md whitespace-pre-line text-sm font-normal leading-6 text-white/75">
-            {localizedHero.body}
-          </p>
-        ) : null}
-        {hero?.linkUrl ? (
-          <Button asChild size="sm" variant="outline" className="w-fit border-white/25 bg-white/10 text-white backdrop-blur hover:bg-white/20 hover:text-white">
-            <a href={hero.linkUrl}>
-              {lang === "en" ? "Learn more" : "자세히 보기"}
-              <ArrowUpRight aria-hidden="true" />
-            </a>
-          </Button>
-        ) : null}
       </div>
       {quickLinks.length > 0 ? (
         <nav aria-label={lang === "en" ? "Quick links" : "빠른 링크"} className="absolute bottom-7 left-10 right-10 z-10 flex flex-wrap gap-x-4 gap-y-2 lg:left-14 lg:right-14">

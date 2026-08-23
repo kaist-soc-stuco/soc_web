@@ -2,8 +2,8 @@ import type {
   CommentEngagementKind,
   CommentItem,
 } from "@soc/contracts";
-import { isoToDate } from "@soc/shared";
-import { ArrowUp, Flag, Heart, Loader2 } from "lucide-react";
+import { isoToDate, nowDate } from "@soc/shared";
+import { ArrowUp, Heart, Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { UiTextarea } from "@/components/ui/form-control";
@@ -25,7 +25,6 @@ type CommentSectionProps = {
   onCreateComment: () => Promise<void>;
   onCreateReply: (parentCommentId: string) => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
-  onReportComment: (commentId: string) => Promise<void>;
   onSetCommentEngagement: (
     commentId: string,
     kind: CommentEngagementKind,
@@ -54,7 +53,6 @@ export function CommentSection({
   onCreateComment,
   onCreateReply,
   onDeleteComment,
-  onReportComment,
   onSetCommentEngagement,
   onReplyTextChange,
   onReplyTargetChange,
@@ -74,7 +72,7 @@ export function CommentSection({
     });
 
   return (
-    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-6 py-6 shadow-[0_8px_28px_rgba(15,23,42,0.04)] md:px-[40px] md:py-[24px]">
+    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-4 py-6 shadow-[0_8px_28px_rgba(15,23,42,0.04)] md:px-6 md:py-[24px]">
       <div className="flex items-center justify-between">
         <h2 className="text-[18px] font-semibold leading-6 text-slate-800">
           <span>{lang === "ko" ? "댓글" : "Comments"}</span>
@@ -104,10 +102,8 @@ export function CommentSection({
                     }
                     comment={comment}
                     commentActionSubmitting={commentActionSubmitting}
-                    isAuthenticated={isAuthenticated}
                     lang={lang}
                     onDeleteComment={onDeleteComment}
-                    onReportComment={onReportComment}
                     onSetCommentEngagement={onSetCommentEngagement}
                     onReplyToggle={() =>
                       onReplyTargetChange(
@@ -143,11 +139,9 @@ export function CommentSection({
                       }
                       comment={reply}
                       commentActionSubmitting={commentActionSubmitting}
-                      isAuthenticated={isAuthenticated}
                       isNested
                       lang={lang}
                       onDeleteComment={onDeleteComment}
-                      onReportComment={onReportComment}
                       onSetCommentEngagement={onSetCommentEngagement}
                       onReplyToggle={() => undefined}
                       showReplyButton={false}
@@ -201,11 +195,9 @@ function CommentRow({
   canDelete,
   comment,
   commentActionSubmitting,
-  isAuthenticated,
   isNested = false,
   lang,
   onDeleteComment,
-  onReportComment,
   onSetCommentEngagement,
   onReplyToggle,
   showReplyButton,
@@ -213,11 +205,9 @@ function CommentRow({
   canDelete: boolean;
   comment: CommentItem;
   commentActionSubmitting: string | null;
-  isAuthenticated: boolean;
   isNested?: boolean;
   lang: string;
   onDeleteComment: (commentId: string) => Promise<void>;
-  onReportComment: (commentId: string) => Promise<void>;
   onSetCommentEngagement: (
     commentId: string,
     kind: CommentEngagementKind,
@@ -226,24 +216,23 @@ function CommentRow({
   onReplyToggle: () => void;
   showReplyButton: boolean;
 }) {
-  const authorInitial = (
-    comment.author.name || (lang === "ko" ? "익명" : "Anonymous")
-  )
-    .trim()
-    .charAt(0)
-    .toUpperCase();
   const likeActionKey = `${comment.commentId}:LIKE`;
-  const reportActionKey = `${comment.commentId}:REPORT`;
 
   return (
     <article
       className={cn(
-        "flex items-start gap-3.5 py-3.5",
-        isNested ? "ml-11 border-l-2 border-slate-100 pl-4" : "",
+        "group flex items-start gap-2.5 py-3.5",
+        isNested ? "ml-9 border-l-2 border-slate-100 pl-3" : "",
       )}
     >
-      <div className="flex size-8 shrink-0 select-none items-center justify-center rounded-full border border-slate-200 bg-slate-100">
-        <span className="text-xs font-semibold text-slate-500">{authorInitial}</span>
+      <div className="size-7 shrink-0 overflow-hidden rounded-full">
+        <img
+          src="/default-avatar.svg"
+          alt=""
+          aria-hidden="true"
+          className="size-full object-cover"
+          draggable="false"
+        />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -251,8 +240,12 @@ function CommentRow({
             <span className="truncate text-[14px] font-semibold text-slate-800">
               {comment.author.name}
             </span>
-            <time className="shrink-0 text-xs font-normal text-slate-400">
-              {formatDateTime(comment.createdAt)}
+            <time
+              className="shrink-0 text-xs font-normal text-slate-400"
+              dateTime={comment.createdAt}
+              title={formatDateTime(comment.createdAt)}
+            >
+              {formatRelativeTime(comment.createdAt, lang)}
             </time>
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
@@ -271,7 +264,7 @@ function CommentRow({
                 )
               }
               className={cn(
-                "h-7 gap-1 px-1.5 text-xs font-medium",
+                "h-7 gap-1 bg-transparent px-1.5 text-xs font-medium hover:bg-transparent",
                 comment.viewerHasLiked
                   ? "text-brand-primary"
                   : "text-slate-400 hover:text-brand-primary",
@@ -287,46 +280,13 @@ function CommentRow({
               )}
               <span className="tabular-nums">{comment.likeCount}</span>
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={lang === "ko" ? "댓글 신고" : "Report comment"}
-              disabled={
-                !isAuthenticated ||
-                comment.viewerHasReported ||
-                commentActionSubmitting === reportActionKey
-              }
-              onClick={() => void onReportComment(comment.commentId)}
-              className={cn(
-                "h-7 gap-1 px-1.5 text-xs font-medium",
-                comment.viewerHasReported
-                  ? "text-slate-300"
-                  : "text-slate-400 hover:text-rose-600",
-              )}
-            >
-              {commentActionSubmitting === reportActionKey ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Flag className="size-3.5" />
-              )}
-              <span>
-                {comment.viewerHasReported
-                  ? lang === "ko"
-                    ? "신고됨"
-                    : "Reported"
-                  : lang === "ko"
-                    ? "신고"
-                    : "Report"}
-              </span>
-            </Button>
             {showReplyButton ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={onReplyToggle}
-                className="h-7 px-1.5 text-xs font-medium text-slate-400 hover:text-brand-primary"
+                className="h-7 bg-transparent px-1.5 text-xs font-medium text-slate-400 hover:bg-transparent hover:text-brand-primary"
               >
                 {lang === "ko" ? "답글" : "Reply"}
               </Button>
@@ -335,12 +295,13 @@ function CommentRow({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="icon"
+                aria-label={lang === "ko" ? "댓글 삭제" : "Delete comment"}
                 onClick={() => void onDeleteComment(comment.commentId)}
-                className="h-7 px-1.5 text-xs font-medium text-slate-400 hover:text-rose-600"
+                className="pointer-events-none size-7 bg-transparent text-slate-400 opacity-0 transition-opacity hover:bg-transparent hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                 title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
               >
-                {lang === "ko" ? "삭제" : "Delete"}
+                <Trash2 className="size-3.5" aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -396,10 +357,10 @@ function CommentComposer({
         onClick={() => void onSubmit()}
         disabled={disabled || isSubmitting || !hasText}
         className={cn(
-          "absolute right-2 top-1/2 size-8 -translate-y-1/2 rounded-full p-0",
+          "absolute right-2 top-1/2 size-8 -translate-y-1/2 rounded-full p-0 text-white disabled:opacity-100",
           hasText
-            ? "bg-brand-primary text-white hover:bg-brand-primary/90"
-            : "bg-slate-100 text-slate-400",
+            ? "bg-brand-primary hover:bg-brand-primary/90"
+            : "bg-brand-primary/20 hover:bg-brand-primary/20",
         )}
       >
         {isSubmitting ? (
@@ -422,4 +383,42 @@ function formatDateTime(isoString: string) {
   const hh = String(date.getHours()).padStart(2, "0");
   const mm = String(date.getMinutes()).padStart(2, "0");
   return `${yyyy}.${MM}.${dd} ${hh}:${mm}`;
+}
+
+function formatRelativeTime(isoString: string, lang: string) {
+  const date = isoToDate(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const elapsedMs = Math.max(0, nowDate().getTime() - date.getTime());
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (elapsedMs < minute) return lang === "ko" ? "방금" : "Just now";
+  if (elapsedMs < hour) {
+    const value = Math.floor(elapsedMs / minute);
+    return lang === "ko" ? `${value}분 전` : `${value}m ago`;
+  }
+  if (elapsedMs < day) {
+    const value = Math.floor(elapsedMs / hour);
+    return lang === "ko" ? `${value}시간 전` : `${value}h ago`;
+  }
+  if (elapsedMs < week) {
+    const value = Math.floor(elapsedMs / day);
+    return lang === "ko" ? `${value}일 전` : `${value}d ago`;
+  }
+  if (elapsedMs < month) {
+    const value = Math.floor(elapsedMs / week);
+    return lang === "ko" ? `${value}주 전` : `${value}w ago`;
+  }
+  if (elapsedMs < year) {
+    const value = Math.floor(elapsedMs / month);
+    return lang === "ko" ? `${value}달 전` : `${value}mo ago`;
+  }
+
+  const value = Math.floor(elapsedMs / year);
+  return lang === "ko" ? `${value}년 전` : `${value}y ago`;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, KoreanHolidayRecord } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
@@ -47,6 +47,12 @@ export function useEventsSurveysPageController({
       ? localDate(selected.getFullYear(), selected.getMonth(), 1)
       : nowDate();
   });
+  const [calendarRequestDate, setCalendarRequestDate] = useState(() => {
+    const selected = parseSelectedCalendarDate(selectedParam);
+    return selected
+      ? localDate(selected.getFullYear(), selected.getMonth(), 1)
+      : nowDate();
+  });
   const [selectedDate, setSelectedDate] = useState<Date>(
     () => parseSelectedCalendarDate(selectedParam) ?? nowDate(),
   );
@@ -58,20 +64,15 @@ export function useEventsSurveysPageController({
   >({});
   const { data: session } = useCurrentSession();
 
-  useEffect(() => {
-    const selected = parseSelectedCalendarDate(selectedParam);
-    if (!selected) return;
-    setSelectedDate(selected);
-    setCurrentDate(localDate(selected.getFullYear(), selected.getMonth(), 1));
-  }, [selectedParam]);
-
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
+  const requestedYear = calendarRequestDate.getFullYear();
+  const requestedMonth = calendarRequestDate.getMonth();
   const calendarRange = useMemo(() => {
-    const grid = buildCalendarGrid(currentYear, currentMonth);
-    const firstDate = grid[0]?.date ?? localDate(currentYear, currentMonth, 1);
+    const grid = buildCalendarGrid(requestedYear, requestedMonth);
+    const firstDate =
+      grid[0]?.date ?? localDate(requestedYear, requestedMonth, 1);
     const lastDate =
-      grid[grid.length - 1]?.date ?? localDate(currentYear, currentMonth + 1, 0);
+      grid[grid.length - 1]?.date ??
+      localDate(requestedYear, requestedMonth + 1, 0);
 
     return {
       from: localDate(
@@ -89,7 +90,7 @@ export function useEventsSurveysPageController({
         999,
       ),
     };
-  }, [currentMonth, currentYear]);
+  }, [requestedMonth, requestedYear]);
   const calendarRangeFrom = calendarRange.from.toISOString();
   const calendarRangeTo = calendarRange.to.toISOString();
 
@@ -134,25 +135,46 @@ export function useEventsSurveysPageController({
         q: calendarQuery,
       }),
     enabled: currentTab === "calendar",
+    placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
   });
 
   const holidaysQuery = useQuery<KoreanHolidayRecord[]>({
-    queryKey: ["calendar", "holidays", currentYear, currentMonth + 1],
-    queryFn: () => apiClient.getKoreanHolidays(currentYear, currentMonth + 1),
+    queryKey: ["calendar", "holidays", requestedYear, requestedMonth + 1],
+    queryFn: () => apiClient.getKoreanHolidays(requestedYear, requestedMonth + 1),
     enabled: currentTab === "calendar",
+    placeholderData: keepPreviousData,
     staleTime: 24 * 60 * 60 * 1000,
   });
 
   useEffect(() => {
-    if (selectedParam) {
-      const parsed = isoToDate(selectedParam);
-      if (!Number.isNaN(parsed.getTime())) {
-        setSelectedDate(parsed);
-        setCurrentDate(parsed);
-      }
-    }
+    const selected = parseSelectedCalendarDate(selectedParam);
+    if (!selected) return;
+    const month = localDate(selected.getFullYear(), selected.getMonth(), 1);
+    setSelectedDate(selected);
+    setCurrentDate(month);
+    setCalendarRequestDate(month);
   }, [selectedParam]);
+
+  useEffect(() => {
+    if (currentTab !== "calendar") return;
+    if (
+      calendarEventsQuery.isPending ||
+      calendarEventsQuery.isPlaceholderData ||
+      holidaysQuery.isPending ||
+      holidaysQuery.isPlaceholderData
+    ) {
+      return;
+    }
+    setCurrentDate(calendarRequestDate);
+  }, [
+    calendarEventsQuery.isPending,
+    calendarEventsQuery.isPlaceholderData,
+    calendarRequestDate,
+    currentTab,
+    holidaysQuery.isPending,
+    holidaysQuery.isPlaceholderData,
+  ]);
 
   const surveys = listQuery.data?.surveys ?? [];
   const events = listQuery.data?.events ?? [];
@@ -282,12 +304,19 @@ export function useEventsSurveysPageController({
     }
   };
 
+  const handleCurrentDateChange = (date: Date) => {
+    setCalendarRequestDate(
+      localDate(date.getFullYear(), date.getMonth(), 1),
+    );
+  };
+
   return {
     calendarEvents,
     currentDate,
     error:
       currentTab === "calendar"
         ? calendarEventsQuery.isError
+          && !calendarEventsQuery.data
           ? lang === "ko"
             ? "일정을 불러오는 중 오류가 발생했습니다."
             : "Failed to load calendar events."
@@ -301,12 +330,13 @@ export function useEventsSurveysPageController({
     loading:
       currentTab === "calendar"
         ? calendarEventsQuery.isPending
+          && !calendarEventsQuery.data
         : listQuery.isPending,
     selectedDate,
     calendarQuery,
     engagementSubmitting,
     handleSetEngagement,
-    setCurrentDate,
+    setCurrentDate: handleCurrentDateChange,
     setCalendarQuery,
     itemQuery,
     setItemQuery,

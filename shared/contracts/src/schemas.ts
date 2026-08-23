@@ -45,23 +45,23 @@ export const UpsertSiteContentSchema = z
 export const CONTENT_BLOCK_TYPES = [
   "HERO",
   "TOP_BANNER",
-  "POPUP",
-  "STATUS_NOTICE",
   "QUICK_LINK",
+  "ORGANIZATION_CHART",
 ] as const;
 
 export const CONTENT_BLOCK_STATUSES = [
   "DRAFT",
-  "SCHEDULED",
   "PUBLISHED",
-  "ARCHIVED",
 ] as const;
 
 export const ContentBlockTypeSchema = z.enum(CONTENT_BLOCK_TYPES);
 export const ContentBlockStatusSchema = z.enum(CONTENT_BLOCK_STATUSES);
 
-const NullableContentBlockDateSchema = z.string().datetime({ offset: true }).nullable();
 const NullableContentBlockUrlSchema = z.string().trim().url().max(2_000).nullable();
+const NullableContentBlockImageSchema = z.string().trim().max(2_000).refine(
+  (value) => /^asset:\d+$/.test(value) || z.string().url().safeParse(value).success,
+  "content_block_image_invalid",
+).nullable();
 
 const ContentBlockFieldsSchema = z
   .object({
@@ -71,25 +71,32 @@ const ContentBlockFieldsSchema = z
     bodyKo: z.string().trim().max(20_000).nullable().default(null),
     bodyEn: z.string().trim().max(20_000).nullable().default(null),
     linkUrl: NullableContentBlockUrlSchema.default(null),
-    imageUrl: NullableContentBlockUrlSchema.default(null),
-    startsAt: NullableContentBlockDateSchema.default(null),
-    endsAt: NullableContentBlockDateSchema.default(null),
+    imageUrl: NullableContentBlockImageSchema.default(null),
     sortOrder: z.number().int().min(0).default(0),
-    isEnabled: z.boolean().default(true),
   })
   .strict();
 
-const validateContentBlockSchedule = (
-  value: { startsAt?: string | null; endsAt?: string | null },
+const validateContentBlock = (
+  value: { type?: string; imageUrl?: string | null },
   context: z.RefinementCtx,
 ) => {
-    if (value.startsAt && value.endsAt && Date.parse(value.startsAt) >= Date.parse(value.endsAt)) {
-      context.addIssue({ code: "custom", message: "content_block_invalid_schedule", path: ["endsAt"] });
-    }
+  if ((value.type === "HERO" || value.type === "ORGANIZATION_CHART") && value.imageUrl === null) {
+    context.addIssue({ code: "custom", message: "content_block_image_required", path: ["imageUrl"] });
+  }
 };
 
-export const CreateContentBlockSchema = ContentBlockFieldsSchema.superRefine(validateContentBlockSchedule);
-export const UpdateContentBlockSchema = ContentBlockFieldsSchema.partial().superRefine(validateContentBlockSchedule);
+export const CreateContentBlockSchema = ContentBlockFieldsSchema.superRefine(validateContentBlock);
+export const UpdateContentBlockSchema = ContentBlockFieldsSchema.partial().superRefine(validateContentBlock);
+export const ReorderContentBlocksSchema = z.object({
+  items: z.array(z.object({
+    contentBlockId: z.string().uuid(),
+    sortOrder: z.number().int().min(0),
+  }).strict()).min(1).max(100),
+}).strict().superRefine((value, context) => {
+  if (new Set(value.items.map((item) => item.contentBlockId)).size !== value.items.length) {
+    context.addIssue({ code: "custom", message: "content_block_duplicate_id", path: ["items"] });
+  }
+});
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -107,8 +114,6 @@ export const SsoCallbackBodySchema = z.object({
 
   // ─── Board / Article ─────────────────────────────────────────────────────────
 
-  export const BoardReadScopeSchema = z.enum(["PUBLIC", "LOGIN", "STAFF_ONLY"]);
-
   const BoardPermissionBitSchema = z.number().int().nonnegative();
 
   export const BoardCreateSchema = z.object({
@@ -122,10 +127,7 @@ export const SsoCallbackBodySchema = z.object({
     nameEn: z.string().trim().max(100).optional(),
     descriptionKo: z.string().trim().max(255).optional(),
     descriptionEn: z.string().trim().max(255).optional(),
-    readScope: BoardReadScopeSchema.default("PUBLIC"),
     writePermissionBit: BoardPermissionBitSchema.default(0),
-    commentPermissionBit: BoardPermissionBitSchema.default(0),
-    managePermissionBit: BoardPermissionBitSchema.default(0),
     allowComment: z.boolean().default(true),
     allowSecret: z.boolean().default(false),
     allowLike: z.boolean().default(true),
@@ -277,22 +279,21 @@ export const CommentUpdateSchema = z.object({
   content: z.string().min(1).max(50_000),
 });
 
-export const CommentReportSchema = z.object({
-  reason: z.string().trim().max(500).optional(),
-});
-
 // ─── Survey ──────────────────────────────────────────────────────────────────
 
 const SurveyResultVisibilitySchema = z.enum(["PRIVATE", "PUBLIC"]);
+const SurveyKindSchema = z.enum(["GENERAL", "SURVEY", "VOTE", "APPLICATION", "EVENT"]);
+const SurveyFeeRequirementPolicySchema = z.enum(["NONE", "PAID_ONLY"]);
+const NullableSurveyDateTimeSchema = z.string().datetime({ offset: true }).nullable();
 const SurveyRichTextSchema = z.string().max(50_000).optional();
 
-export const CreateSurveySchema = z.object({
-  kind: z.string().min(1).max(20),
+const SurveyFieldsSchema = z.object({
+  kind: SurveyKindSchema,
   titleKo: z.string().min(1).max(255),
   titleEn: z.string().max(255).optional(),
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,
-  feeRequirementPolicy: z.string().max(20).optional(),
+  feeRequirementPolicy: SurveyFeeRequirementPolicySchema.optional(),
   allowMultipleResponses: z.boolean().optional(),
   allowResponseEdit: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
@@ -301,14 +302,29 @@ export const CreateSurveySchema = z.object({
   isAlwaysOpen: z.boolean().optional(),
   resultVisibility: SurveyResultVisibilitySchema.default("PRIVATE"),
   maxResponseCount: z.number().int().positive().nullable().optional(),
-  openAt: z.string().nullable().optional(),
-  connectedArticleId: z.string().nullable().optional(),
+  openAt: NullableSurveyDateTimeSchema.optional(),
+  closeAt: NullableSurveyDateTimeSchema.optional(),
+  connectedArticleId: z.string().regex(/^\d+$/).nullable().optional(),
 });
 
-export const UpdateSurveySchema = CreateSurveySchema.partial().extend({
+const validateSurveySchedule = (
+  value: { isAlwaysOpen?: boolean; openAt?: string | null; closeAt?: string | null },
+  context: z.RefinementCtx,
+) => {
+  if (value.isAlwaysOpen && (value.openAt || value.closeAt)) {
+    context.addIssue({ code: "custom", message: "always_open_cannot_have_schedule", path: ["isAlwaysOpen"] });
+  }
+  if (value.openAt && value.closeAt && Date.parse(value.openAt) >= Date.parse(value.closeAt)) {
+    context.addIssue({ code: "custom", message: "survey_invalid_schedule", path: ["closeAt"] });
+  }
+};
+
+export const CreateSurveySchema = SurveyFieldsSchema.superRefine(validateSurveySchedule);
+
+export const UpdateSurveySchema = SurveyFieldsSchema.partial().extend({
   // Do not apply the create-only default to PATCH requests.
   resultVisibility: SurveyResultVisibilitySchema.optional(),
-});
+}).superRefine(validateSurveySchedule);
 
 export const CreateSectionSchema = z.object({
   titleKo: z.string().min(1),
@@ -340,9 +356,27 @@ export const QuestionOptionSchema = z.object({
   labelEn: z.string().optional(),
 });
 
+const QuestionOptionsSchema = z
+  .array(QuestionOptionSchema)
+  .max(100)
+  .superRefine((items, context) => {
+    const seen = new Set<string>();
+    items.forEach((item, index) => {
+      const value = item.value.trim();
+      if (seen.has(value)) {
+        context.addIssue({
+          code: "custom",
+          message: "question_option_value_must_be_unique",
+          path: [index, "value"],
+        });
+      }
+      seen.add(value);
+    });
+  });
+
 export const QuestionConfigSchema = z.object({
-  rows: z.array(QuestionOptionSchema).max(100).optional(),
-  columns: z.array(QuestionOptionSchema).max(100).optional(),
+  rows: QuestionOptionsSchema.optional(),
+  columns: QuestionOptionsSchema.optional(),
   maxFiles: z.number().int().positive().max(10).optional(),
   maxSizeBytes: z.number().int().positive().max(20_000_000).optional(),
   allowedMimeTypes: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
@@ -359,7 +393,7 @@ export const CreateQuestionSchema = z.object({
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,
   questionType: QuestionTypeSchema,
-  options: z.array(QuestionOptionSchema).optional(),
+  options: QuestionOptionsSchema.optional(),
   config: QuestionConfigSchema.optional(),
   answerRegex: z.string().optional(),
   isRequired: z.boolean().optional(),
@@ -367,6 +401,25 @@ export const CreateQuestionSchema = z.object({
 });
 
 export const UpdateQuestionSchema = CreateQuestionSchema.partial();
+
+const ReorderItemSchema = z.object({
+  id: z.string().uuid(),
+  sortOrder: z.number().int().min(0),
+}).strict();
+
+const ReorderItemsSchema = z.object({
+  items: z.array(ReorderItemSchema).min(1).max(200),
+}).strict().superRefine((value, context) => {
+  if (new Set(value.items.map((item) => item.id)).size !== value.items.length) {
+    context.addIssue({ code: "custom", message: "survey_reorder_duplicate_id", path: ["items"] });
+  }
+  if (new Set(value.items.map((item) => item.sortOrder)).size !== value.items.length) {
+    context.addIssue({ code: "custom", message: "survey_reorder_duplicate_position", path: ["items"] });
+  }
+});
+
+export const ReorderSurveySectionsSchema = ReorderItemsSchema;
+export const ReorderSurveyQuestionsSchema = ReorderItemsSchema;
 
 export const SubmitResponseSchema = z.object({
   answers: z.array(

@@ -25,11 +25,7 @@ import {
   assertArticleScopeAssignable,
   getReadableArticleScopes,
 } from "./article-access";
-import {
-  assertBoardReadable,
-  canReadBoard,
-  type CurrentUserContext,
-} from "./board-access";
+import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
 import { sanitizeArticleHtml } from "./article-html-sanitizer";
 
@@ -54,16 +50,15 @@ const PUBLIC_LEGACY_BOARD_CODES = new Set(["행사", "공약", "QnA"]);
 
 const canReadSecretArticle = (
   article: Pick<ArticleListItem, "isSecret" | "author">,
-  board: { managePermissionBit: number },
   currentUser: CurrentUserContext,
 ): boolean => {
   if (!article.isSecret) return true;
   if (currentUser.user?.id === article.author.userId) return true;
-  return Boolean(
-    currentUser.user &&
-      board.managePermissionBit > 0 &&
-      Permissions.has(currentUser.user.permission, board.managePermissionBit),
-  );
+  return Boolean(currentUser.user && Permissions.hasAny(
+    currentUser.user.permission,
+    Permissions.MODERATOR,
+    Permissions.ADMIN,
+  ));
 };
 
 const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
@@ -104,8 +99,6 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
-    assertBoardReadable(board, currentUser);
-
     const page = params.page && params.page > 0 ? params.page : 1;
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
     const limit = Math.min(rawLimit, MAX_PAGE_SIZE);
@@ -121,7 +114,7 @@ export class ArticleService {
     );
 
     const visibleItems = result.items.map((item) =>
-      canReadSecretArticle(item, board, currentUser)
+      canReadSecretArticle(item, currentUser)
         ? item
         : maskSecretListItem(item),
     );
@@ -139,7 +132,6 @@ export class ArticleService {
     currentUser: CurrentUserContext,
   ): Promise<ArticleListResponse> {
     const readableBoards = (await this.boardRepository.listBoards())
-      .filter((board) => canReadBoard(board, currentUser))
       // Keep legacy boards addressable through their direct routes, but keep
       // the public aggregate feed aligned with the current IA.
       .filter((board) => !PUBLIC_LEGACY_BOARD_CODES.has(board.code));
@@ -186,7 +178,7 @@ export class ArticleService {
     );
     const visibleItems = result.items.map((item) => {
       const board = boardById.get(item.boardId);
-      return board && canReadSecretArticle(item, board, currentUser)
+      return board && canReadSecretArticle(item, currentUser)
         ? item
         : board
           ? maskSecretListItem(item)
@@ -213,8 +205,6 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
-    assertBoardReadable(board, currentUser);
-
     const article = await this.articleRepository.findDetailById(
       board.boardId,
       articleId,
@@ -226,7 +216,7 @@ export class ArticleService {
       throw new NotFoundException("article_not_found");
     }
 
-    if (!canReadSecretArticle(article, board, currentUser)) {
+    if (!canReadSecretArticle(article, currentUser)) {
       throw new ForbiddenException("secret_article_access_denied");
     }
 
@@ -363,9 +353,11 @@ export class ArticleService {
     }
 
     const isOwner = article.authorUserId === user.id;
-    const isManager =
-      board.managePermissionBit > 0 &&
-      Permissions.has(user.permission, board.managePermissionBit);
+    const isManager = Permissions.hasAny(
+      user.permission,
+      Permissions.MODERATOR,
+      Permissions.ADMIN,
+    );
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
@@ -400,9 +392,11 @@ export class ArticleService {
     }
 
     const isOwner = article.authorUserId === user.id;
-    const isManager =
-      board.managePermissionBit > 0 &&
-      Permissions.has(user.permission, board.managePermissionBit);
+    const isManager = Permissions.hasAny(
+      user.permission,
+      Permissions.MODERATOR,
+      Permissions.ADMIN,
+    );
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
@@ -428,8 +422,6 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
-    assertBoardReadable(board, { authenticated: true, user });
-
     if (kind === "LIKE" && !board.allowLike) {
       throw new ForbiddenException("like_not_allowed");
     }
@@ -444,7 +436,7 @@ export class ArticleService {
       throw new NotFoundException("article_not_found");
     }
 
-    if (!canReadSecretArticle(article, board, { authenticated: true, user })) {
+    if (!canReadSecretArticle(article, { authenticated: true, user })) {
       throw new ForbiddenException("secret_article_access_denied");
     }
 

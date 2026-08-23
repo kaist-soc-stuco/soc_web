@@ -4,6 +4,7 @@ import type {
   ContentBlockStatusSchema,
   ContentBlockTypeSchema,
   CreateContentBlockSchema,
+  ReorderContentBlocksSchema,
   SiteContentKeySchema,
   UpdateContentBlockSchema,
   UpsertSiteContentSchema,
@@ -40,6 +41,7 @@ export type ContentBlockType = z.infer<typeof ContentBlockTypeSchema>;
 export type ContentBlockStatus = z.infer<typeof ContentBlockStatusSchema>;
 export type CreateContentBlockRequest = z.infer<typeof CreateContentBlockSchema>;
 export type UpdateContentBlockRequest = z.infer<typeof UpdateContentBlockSchema>;
+export type ReorderContentBlocksRequest = z.infer<typeof ReorderContentBlocksSchema>;
 
 export interface ContentBlockRecord {
   contentBlockId: string;
@@ -51,10 +53,7 @@ export interface ContentBlockRecord {
   bodyEn: string | null;
   linkUrl: string | null;
   imageUrl: string | null;
-  startsAt: string | null;
-  endsAt: string | null;
   sortOrder: number;
-  isEnabled: boolean;
   createdBy: string | null;
   updatedBy: string | null;
   publishedBy: string | null;

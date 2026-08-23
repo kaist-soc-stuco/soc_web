@@ -10,7 +10,7 @@ import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
-import { boards, permissions } from "../../../infrastructure/postgres/postgres.schema";
+import { articleDrafts, boards, permissions } from "../../../infrastructure/postgres/postgres.schema";
 
 @Injectable()
 export class BoardRepository {
@@ -25,12 +25,10 @@ export class BoardRepository {
   ): Promise<BoardSummary[]> {
     if (rows.length === 0) return [];
 
-    // 보드에 연결된 permission FK 수집
+    // 게시글 작성에 사용되는 permission FK만 해석합니다.
     const permIds = new Set<number>();
     for (const row of rows) {
       if (row.writePermissionId) permIds.add(row.writePermissionId);
-      if (row.commentPermissionId) permIds.add(row.commentPermissionId);
-      if (row.managePermissionId) permIds.add(row.managePermissionId);
     }
 
     // FK → bitValue 맵 구축
@@ -62,15 +60,8 @@ export class BoardRepository {
       nameEn: row.nameEn ?? undefined,
       descriptionKo: row.descriptionKo ?? undefined,
       descriptionEn: row.descriptionEn ?? undefined,
-      readScope: row.readScope as BoardSummary["readScope"],
       writePermissionBit: row.writePermissionId
         ? bitMap.get(row.writePermissionId) ?? 0
-        : 0,
-      commentPermissionBit: row.commentPermissionId
-        ? bitMap.get(row.commentPermissionId) ?? 0
-        : 0,
-      managePermissionBit: row.managePermissionId
-        ? bitMap.get(row.managePermissionId) ?? 0
         : 0,
       allowComment: row.allowComment,
       allowSecret: row.allowSecret,
@@ -128,20 +119,13 @@ export class BoardRepository {
   }
 
   private async permissionIdsForInput(
-    input: Pick<BoardCreateRequest, "writePermissionBit" | "commentPermissionBit" | "managePermissionBit">,
+    input: Pick<BoardCreateRequest, "writePermissionBit">,
   ): Promise<{
     writePermissionId: number | null;
-    commentPermissionId: number | null;
-    managePermissionId: number | null;
   }> {
-    const [writePermissionId, commentPermissionId, managePermissionId] =
-      await this.resolvePermissionIds([
-        input.writePermissionBit,
-        input.commentPermissionBit,
-        input.managePermissionBit,
-      ]);
+    const [writePermissionId] = await this.resolvePermissionIds([input.writePermissionBit]);
 
-    return { writePermissionId, commentPermissionId, managePermissionId };
+    return { writePermissionId };
   }
 
   async create(input: BoardCreateRequest): Promise<BoardSummary> {
@@ -154,7 +138,6 @@ export class BoardRepository {
         nameEn: input.nameEn ?? null,
         descriptionKo: input.descriptionKo ?? null,
         descriptionEn: input.descriptionEn ?? null,
-        readScope: input.readScope,
         ...permissionIds,
         allowComment: input.allowComment,
         allowSecret: input.allowSecret,
@@ -175,24 +158,17 @@ export class BoardRepository {
     if (input.nameEn !== undefined) set.nameEn = input.nameEn;
     if (input.descriptionKo !== undefined) set.descriptionKo = input.descriptionKo;
     if (input.descriptionEn !== undefined) set.descriptionEn = input.descriptionEn;
-    if (input.readScope !== undefined) set.readScope = input.readScope;
     if (input.allowComment !== undefined) set.allowComment = input.allowComment;
     if (input.allowSecret !== undefined) set.allowSecret = input.allowSecret;
     if (input.allowLike !== undefined) set.allowLike = input.allowLike;
     if (input.sortOrder !== undefined) set.sortOrder = input.sortOrder;
     if (input.isActive !== undefined) set.isActive = input.isActive;
 
-    if (
-      input.writePermissionBit !== undefined ||
-      input.commentPermissionBit !== undefined ||
-      input.managePermissionBit !== undefined
-    ) {
+    if (input.writePermissionBit !== undefined) {
       const current = await this.findByCode(code);
       if (!current) return null;
       const permissionIds = await this.permissionIdsForInput({
         writePermissionBit: input.writePermissionBit ?? current.writePermissionBit,
-        commentPermissionBit: input.commentPermissionBit ?? current.commentPermissionBit,
-        managePermissionBit: input.managePermissionBit ?? current.managePermissionBit,
       });
       Object.assign(set, permissionIds);
     }
@@ -221,6 +197,28 @@ export class BoardRepository {
     if (!row) return null;
 
     const [result] = await this.resolveBoardWithPermissions([row]);
+    return result ?? null;
+  }
+
+  async delete(code: string): Promise<BoardSummary | null> {
+    const deleted = await this.db.transaction(async (tx) => {
+      const board = await tx.query.boards.findFirst({
+        where: eq(boards.code, code),
+      });
+      if (!board) return null;
+
+      // Drafts intentionally use a restrictive FK, so remove them explicitly
+      // before the board. Published article data is removed by its cascade FK.
+      await tx.delete(articleDrafts).where(eq(articleDrafts.boardId, board.boardId));
+      const [row] = await tx
+        .delete(boards)
+        .where(eq(boards.boardId, board.boardId))
+        .returning();
+      return row ?? null;
+    });
+
+    if (!deleted) return null;
+    const [result] = await this.resolveBoardWithPermissions([deleted]);
     return result ?? null;
   }
 

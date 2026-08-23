@@ -12,7 +12,7 @@ const stateFilters: Array<{
   labelEn: string;
 }> = [
   { value: "all", labelKo: "전체", labelEn: "All" },
-  { value: "before_open", labelKo: "시작 전", labelEn: "Upcoming" },
+  { value: "before_open", labelKo: "시작 예정", labelEn: "Upcoming" },
   { value: "open", labelKo: "진행 중", labelEn: "Ongoing" },
   { value: "closed", labelKo: "마감", labelEn: "Closed" },
 ];
@@ -27,6 +27,7 @@ const sortOptions: Array<{
 ];
 
 interface EventsSurveysFilterBarProps {
+  isEventTab: boolean;
   lang: string;
   onSortByChange: (sortBy: EventsSurveysSortKey) => void;
   onQueryChange: (value: string) => void;
@@ -38,6 +39,7 @@ interface EventsSurveysFilterBarProps {
 }
 
 export function EventsSurveysFilterBar({
+  isEventTab,
   lang,
   onSortByChange,
   onQueryChange,
@@ -70,19 +72,21 @@ export function EventsSurveysFilterBar({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
-        <SelectDropdown
-          value={sortBy}
-          options={sortOptions.map((option) => ({
-            value: option.value,
-            label: lang === "ko" ? option.labelKo : option.labelEn,
-          }))}
-          onChange={(value) => onSortByChange(value as EventsSurveysSortKey)}
-          className="w-40"
-          buttonClassName="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-slate-200 px-3 py-0 text-sm font-medium text-slate-700 shadow-none focus:ring-brand-primary/20"
-          menuClassName="rounded-lg border-slate-200 shadow-elevated"
-          optionClassName="text-sm"
-          emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
-        />
+        {!isEventTab ? (
+          <SelectDropdown
+            value={sortBy}
+            options={sortOptions.map((option) => ({
+              value: option.value,
+              label: lang === "ko" ? option.labelKo : option.labelEn,
+            }))}
+            onChange={(value) => onSortByChange(value as EventsSurveysSortKey)}
+            className="w-40"
+            buttonClassName="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-slate-200 px-3 py-0 text-sm font-medium text-slate-700 shadow-none"
+            menuClassName="rounded-lg border-slate-200 shadow-elevated"
+            optionClassName="text-sm"
+            emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
+          />
+        ) : null}
 
         <PageSearchField
           ariaLabel={lang === "ko" ? "행사·설문 검색" : "Search events and surveys"}

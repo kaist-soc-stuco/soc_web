@@ -38,7 +38,6 @@ export const surveys = pgTable("survey", {
   lifecycleStatus: varchar("lifecycle_status", { length: 20 })
     .notNull()
     .default("DRAFT"),
-  archivedAt: timestamp("archived_at", { withTimezone: true }),
   previousVersionId: uuid("previous_version_id").references(
     (): AnyPgColumn => surveys.surveyId,
     { onDelete: "restrict" },
@@ -65,15 +64,11 @@ export const surveys = pgTable("survey", {
   index("survey_creator_idx").on(table.creatorId),
   check(
     "survey_lifecycle_status_check",
-    sql`${table.lifecycleStatus} in ('DRAFT', 'PUBLISHED', 'ARCHIVED')`,
+    sql`${table.lifecycleStatus} in ('DRAFT', 'PUBLISHED')`,
   ),
   check(
     "survey_lifecycle_published_check",
     sql`(${table.lifecycleStatus} = 'PUBLISHED') = ${table.isPublished}`,
-  ),
-  check(
-    "survey_lifecycle_archived_at_check",
-    sql`(${table.lifecycleStatus} = 'ARCHIVED') = (${table.archivedAt} is not null)`,
   ),
   check("survey_version_number_check", sql`${table.versionNumber} >= 1`),
   check(

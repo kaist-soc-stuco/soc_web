@@ -1,8 +1,8 @@
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { PermissionRecord, RoleGroupCandidateListResponse, RoleGroupMemberRecord, RoleGroupRecord } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
-import { Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -62,7 +62,6 @@ const displayError = (error: unknown, fallback: string) => {
   if (error instanceof ApiClientHttpError) {
     if (error.status === 401) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
     if (error.status === 403) return "이 작업을 수행할 권한이 없습니다.";
-    if (error.status === 409) return "다른 관리자가 먼저 변경했습니다. 새로고침 후 다시 시도해 주세요.";
   }
   return fallback;
 };
@@ -90,6 +89,7 @@ export function PermissionPage() {
   const [candidateSaving, setCandidateSaving] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [editingField, setEditingField] = useState<"name" | "description" | null>(null);
+  const candidateRequestIdRef = useRef(0);
 
   const selectedRoleId = Number(searchParams.get("role")) || roles[0]?.roleGroupId || null;
   const selectedRole = roles.find((role) => role.roleGroupId === selectedRoleId) ?? null;
@@ -221,29 +221,45 @@ export function PermissionPage() {
     setDraft((current) => ({ ...current, permissionIds: allSelected ? current.permissionIds.filter((id) => !permissionIds.includes(id)) : [...new Set([...current.permissionIds, ...permissionIds])] }));
   };
 
-  const loadCandidates = async (roleId: number, page = 1, query = candidateQuery) => {
+  const loadCandidates = useCallback(async (roleId: number, page = 1, query = candidateQuery) => {
+    const requestId = ++candidateRequestIdRef.current;
     setCandidateLoading(true);
     setError(null);
     try {
       const data = await client.listRoleGroupCandidates(roleId, { q: query, page, pageSize: CANDIDATE_PAGE_SIZE });
+      if (requestId !== candidateRequestIdRef.current) return;
       setCandidateData(data);
       setCandidatePage(page);
     } catch (candidateError) {
-      setError(displayError(candidateError, "구성원 후보를 불러오지 못했습니다."));
+      if (requestId === candidateRequestIdRef.current) setError(displayError(candidateError, "구성원 후보를 불러오지 못했습니다."));
     } finally {
-      setCandidateLoading(false);
+      if (requestId === candidateRequestIdRef.current) setCandidateLoading(false);
     }
-  };
+  }, [candidateQuery, client]);
+
+  useEffect(() => {
+    if (!memberEditorOpen || !selectedRole) return;
+    const timer = window.setTimeout(() => {
+      void loadCandidates(selectedRole.roleGroupId, 1, candidateQuery);
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [candidateQuery, loadCandidates, memberEditorOpen, selectedRole?.roleGroupId]);
 
   const openMemberEditor = async () => {
     if (!selectedRole) return;
-    const currentMembers = await client.listRoleGroupMembers(selectedRole.roleGroupId);
-    setMembers(currentMembers);
-    setSelectedMemberIds(currentMembers.map((member) => member.userId));
+    try {
+      const currentMembers = await client.listRoleGroupMembers(selectedRole.roleGroupId);
+      setMembers(currentMembers);
+      setSelectedMemberIds(currentMembers.map((member) => member.userId));
+    } catch (memberError) {
+      setError(displayError(memberError, "현재 구성원을 불러오지 못했습니다."));
+      return;
+    }
     setCandidateQuery("");
+    setCandidateData(null);
+    setCandidateLoading(true);
     setCandidatePage(1);
     setMemberEditorOpen(true);
-    await loadCandidates(selectedRole.roleGroupId, 1, "");
   };
 
   const saveMembers = async () => {
@@ -270,7 +286,7 @@ export function PermissionPage() {
           <AdminPageHeader title="권한 관리" actions={<Button type="button" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" /> 역할 추가</Button>} />
           {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
 
-          <div className="grid min-h-[640px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="grid min-h-[640px] gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
             <AdminCard className="self-start lg:sticky lg:top-6">
               <AdminCardHeader>
                 <div><AdminSectionTitle>역할</AdminSectionTitle><AdminMetaText>전체 {roles.length}개</AdminMetaText></div>
@@ -298,7 +314,10 @@ export function PermissionPage() {
                         value={draft.nameKo}
                         aria-label="역할 이름"
                         className="h-9 max-w-sm text-base font-normal text-[#172033]"
-                        onChange={(event) => setDraft((current) => ({ ...current, nameKo: event.currentTarget.value }))}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          setDraft((current) => ({ ...current, nameKo: value }));
+                        }}
                         onBlur={() => setEditingField(null)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter") setEditingField(null);
@@ -323,7 +342,10 @@ export function PermissionPage() {
                       aria-label="역할 설명"
                       className="mt-1 h-9 max-w-xl text-sm font-normal text-[#344054]"
                       placeholder="역할 설명"
-                      onChange={(event) => setDraft((current) => ({ ...current, description: event.currentTarget.value }))}
+                      onChange={(event) => {
+                        const value = event.currentTarget.value;
+                        setDraft((current) => ({ ...current, description: value }));
+                      }}
                       onBlur={() => setEditingField(null)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") setEditingField(null);
@@ -340,16 +362,17 @@ export function PermissionPage() {
                     </button>
                   )}
                   <AdminMetaText className="mt-1 block text-[#344054]">{selectedRole.userCount}명의 구성원 · {draft.permissionIds.length}개 권한</AdminMetaText>
+                  {selectedRole.isSystem ? <AdminMetaText className="mt-1 block text-[#344054]">기본 시스템 역할의 이름과 권한은 변경할 수 없습니다.</AdminMetaText> : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {!selectedRole.isSystem ? <Button type="button" size="sm" variant="ghost" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" /> 삭제</Button> : null}
-                  <Button type="button" size="sm" onClick={() => void saveRole()} disabled={selectedRole.isSystem || !isDirty || saving || !draft.nameKo.trim()}>{saving ? "저장 중" : "저장"}</Button>
+                  <Button type="button" size="sm" variant={isDirty ? "default" : "outline"} onClick={() => void saveRole()} disabled={selectedRole.isSystem || !isDirty || saving || !draft.nameKo.trim()}>{saving ? "저장 중" : "저장"}</Button>
                 </div>
               </AdminCardHeader>
               <div className="border-b border-slate-100 px-5 pt-3"><SegmentedControl ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control mb-3 w-fit" options={[{ value: "permissions", label: "권한" }, { value: "members", label: `구성원 ${selectedRole.userCount}` }]} /></div>
 
               {selectedTab === "permissions" ? <div className="p-5">
-                <div className="grid items-start gap-4 xl:grid-cols-3">{groupedPermissions.map((group) => {
+                <div className="grid items-start gap-4 xl:grid-cols-2">{groupedPermissions.map((group) => {
                   const ids = group.permissions.map((permission) => permission.permissionId);
                   const allSelected = ids.length > 0 && ids.every((id) => draft.permissionIds.includes(id));
                   return <section key={group.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -377,14 +400,15 @@ export function PermissionPage() {
         </AdminPageMain>
 
         <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="새 역할 만들기" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createRole()} disabled={saving || !createDraft.nameKo.trim()}>{saving ? "만드는 중" : "역할 만들기"}</Button></>}>
-          <div className="grid gap-4"><AdminFormField label="역할 이름"><UiInput autoFocus value={createDraft.nameKo} onChange={(event) => setCreateDraft((current) => ({ ...current, nameKo: event.currentTarget.value }))} placeholder="예: 콘텐츠 관리자" /></AdminFormField><AdminFormField label="설명" hint="권한은 역할을 만든 뒤 상세 화면에서 지정합니다."><UiInput value={createDraft.description} onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.currentTarget.value }))} placeholder="이 역할이 담당하는 업무" /></AdminFormField></div>
+          <div className="grid gap-4"><AdminFormField label="역할 이름"><UiInput autoFocus value={createDraft.nameKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, nameKo: value })); }} placeholder="예: 콘텐츠 관리자" /></AdminFormField><AdminFormField label="설명" hint="권한은 역할을 만든 뒤 상세 화면에서 지정합니다."><UiInput value={createDraft.description} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, description: value })); }} placeholder="이 역할이 담당하는 업무" /></AdminFormField></div>
         </Modal>
 
-        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="max-w-4xl" footer={<><span className="mr-auto self-center text-sm font-normal text-[#344054]">선택 {selectedMemberIds.length}명</span><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button type="button" onClick={() => void saveMembers()} disabled={candidateSaving}>{candidateSaving ? "적용 중" : "구성원 적용"}</Button></>}>
-          <div className="space-y-4">
-            <form className="flex items-end gap-2" onSubmit={(event) => { event.preventDefault(); if (selectedRole) void loadCandidates(selectedRole.roleGroupId, 1); }}><AdminFormField label="구성원 검색" className="min-w-0 flex-1"><div className="relative"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput className="w-full pl-9" value={candidateQuery} onChange={(event) => setCandidateQuery(event.currentTarget.value)} placeholder="이름, 학번, 이메일, 소속 검색" /></div></AdminFormField><Button type="submit" variant="outline" disabled={candidateLoading}>검색</Button></form>
-            <div className="overflow-hidden rounded-xl border border-slate-200"><AdminDataTable minWidth={788}><colgroup><col style={{ width: 48 }} /><col style={{ width: 240 }} /><col style={{ width: 150 }} /><col style={{ width: 250 }} /><col style={{ width: 100 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center"><UiInput type="checkbox" aria-label="현재 페이지 전체 선택" checked={Boolean(candidateData?.items.length && candidateData.items.every((item) => selectedMemberIds.includes(item.userId)))} onChange={(event) => { const pageIds = candidateData?.items.map((item) => item.userId) ?? []; setSelectedMemberIds((current) => event.currentTarget.checked ? [...new Set([...current, ...pageIds])] : current.filter((id) => !pageIds.includes(id))); }} /></AdminTableHead><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>선택</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
-              {candidateLoading ? Array.from({ length: 5 }).map((_, index) => <tr key={index}>{Array.from({ length: 5 }).map((__, cell) => <AdminTableCell key={cell}><Skeleton className="h-4 w-20" /></AdminTableCell>)}</tr>)
+        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="h-[min(720px,calc(100dvh-3rem))] max-w-4xl" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><span className="mr-auto self-center text-sm font-normal text-[#344054]">전체 {candidateData?.total ?? 0}명 · 선택 {selectedMemberIds.length}명</span><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button type="button" onClick={() => void saveMembers()} disabled={candidateSaving}>{candidateSaving ? "적용 중" : "구성원 적용"}</Button></>}>
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="grid shrink-0 gap-1.5"><span className="text-xs font-normal leading-4 text-[#344054]">구성원 검색</span><AdminSearchField aria-label="구성원 검색" value={candidateQuery} onValueChange={setCandidateQuery} placeholder="이름, 학번, 이메일, 소속 검색" /></div>
+            <div className={cn("min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 transition-opacity duration-150", candidateLoading && candidateData ? "opacity-60" : "opacity-100")} aria-busy={candidateLoading}>
+              <AdminDataTable minWidth={788}><colgroup><col style={{ width: 48 }} /><col style={{ width: 240 }} /><col style={{ width: 150 }} /><col style={{ width: 250 }} /><col style={{ width: 100 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center"><UiInput type="checkbox" aria-label="현재 페이지 전체 선택" checked={Boolean(candidateData?.items.length && candidateData.items.every((item) => selectedMemberIds.includes(item.userId)))} onChange={(event) => { const pageIds = candidateData?.items.map((item) => item.userId) ?? []; const checked = event.currentTarget.checked; setSelectedMemberIds((current) => checked ? [...new Set([...current, ...pageIds])] : current.filter((id) => !pageIds.includes(id))); }} /></AdminTableHead><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>선택</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
+              {!candidateData && candidateLoading ? Array.from({ length: 5 }).map((_, index) => <tr key={index}>{Array.from({ length: 5 }).map((__, cell) => <AdminTableCell key={cell}><Skeleton className="h-4 w-20" /></AdminTableCell>)}</tr>)
                 : (candidateData?.items.length ?? 0) === 0 ? <AdminTableEmpty colSpan={5}>조건에 맞는 사용자가 없습니다.</AdminTableEmpty>
                 : candidateData?.items.map((candidate) => { const checked = selectedMemberIds.includes(candidate.userId); return <tr key={candidate.userId}><AdminTableCell className="text-center"><UiInput type="checkbox" checked={checked} onChange={() => setSelectedMemberIds((current) => checked ? current.filter((id) => id !== candidate.userId) : [...current, candidate.userId])} aria-label={`${candidate.nameKo} 선택`} /></AdminTableCell><AdminTableCell truncate className="admin-table-text-emphasis">{candidate.nameKo}</AdminTableCell><AdminTableCell truncate>{candidate.stdNo ?? candidate.kaistUid}</AdminTableCell><AdminTableCell truncate>{candidate.email}</AdminTableCell><AdminTableCell>{checked ? <AdminStatusBadge tone="positive">포함</AdminStatusBadge> : <AdminStatusBadge>미포함</AdminStatusBadge>}</AdminTableCell></tr>; })}
             </AdminTableBody></AdminDataTable></div>

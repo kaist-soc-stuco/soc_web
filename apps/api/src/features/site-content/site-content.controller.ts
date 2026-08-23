@@ -14,6 +14,7 @@ import {
 import {
   CreateContentBlockSchema,
   Permissions,
+  ReorderContentBlocksSchema,
   SiteContentKeySchema,
   UpdateContentBlockSchema,
   UpsertSiteContentSchema,
@@ -23,6 +24,7 @@ import type {
   ContentBlockListResponse,
   ContentBlockRecord,
   CreateContentBlockRequest,
+  ReorderContentBlocksRequest,
   SiteContentKey,
   SiteContentListResponse,
   SiteContentRecord,
@@ -72,6 +74,20 @@ export class SiteContentController {
     });
   }
 
+  @Patch("blocks/reorder")
+  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  async reorderContentBlocks(
+    @Body(new ZodValidationPipe(ReorderContentBlocksSchema)) body: ReorderContentBlocksRequest,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ContentBlockListResponse> {
+    return {
+      items: await this.siteContentService.reorderContentBlocks(body, {
+        actorUserId: request.user!.id,
+        ipAddress: request.ip,
+      }),
+    };
+  }
+
   @Patch("blocks/:contentBlockId")
   @RequirePermissions(Permissions.MANAGE_CONTENT)
   async updateContentBlock(
@@ -91,19 +107,7 @@ export class SiteContentController {
     @Param("contentBlockId", ParseUUIDPipe) contentBlockId: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<ContentBlockRecord> {
-    return this.siteContentService.setContentBlockStatus(contentBlockId, "PUBLISHED", {
-      actorUserId: request.user!.id,
-      ipAddress: request.ip,
-    });
-  }
-
-  @Post("blocks/:contentBlockId/archive")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
-  async archiveContentBlock(
-    @Param("contentBlockId", ParseUUIDPipe) contentBlockId: string,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<ContentBlockRecord> {
-    return this.siteContentService.setContentBlockStatus(contentBlockId, "ARCHIVED", {
+    return this.siteContentService.publishContentBlock(contentBlockId, {
       actorUserId: request.user!.id,
       ipAddress: request.ip,
     });

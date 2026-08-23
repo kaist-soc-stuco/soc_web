@@ -50,7 +50,12 @@ export interface SendBulkEmailTestResponse {
 
 export interface BulkEmailPreviewResponse {
   recipientCount: number;
-  sample: Array<{ nameKo: string; email: string }>;
+  sample: Array<{
+    nameKo: string;
+    email: string;
+    phoneNumber: string | null;
+    studentNumber: string | null;
+  }>;
 }
 
 export interface BulkEmailListResponse {

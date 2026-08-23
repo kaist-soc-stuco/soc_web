@@ -98,6 +98,8 @@ export class SurveyResponsesService {
     const now = nowMs();
     if (survey.opensAt && isoToMs(survey.opensAt) > now)
       throw new ConflictException("survey_not_open_yet");
+    if (survey.closesAt && isoToMs(survey.closesAt) <= now)
+      throw new ConflictException("survey_closed");
 
     if (!caller) {
       throw new ForbiddenException("login_required");
@@ -129,6 +131,9 @@ export class SurveyResponsesService {
     }
     if (submission.status === "survey_not_open_yet") {
       throw new ConflictException("survey_not_open_yet");
+    }
+    if (submission.status === "survey_closed") {
+      throw new ConflictException("survey_closed");
     }
     if (submission.status === "fee_payer_only") {
       throw new ForbiddenException("fee_payer_only");
@@ -182,6 +187,9 @@ export class SurveyResponsesService {
     if (survey.opensAt && isoToMs(survey.opensAt) > now) {
       throw new ConflictException("survey_not_open_yet");
     }
+    if (survey.closesAt && isoToMs(survey.closesAt) <= now) {
+      throw new ConflictException("survey_closed");
+    }
 
     if (survey.feePayersOnly) {
       const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
@@ -216,6 +224,9 @@ export class SurveyResponsesService {
     }
     if (update.status === "survey_not_open_yet") {
       throw new ConflictException("survey_not_open_yet");
+    }
+    if (update.status === "survey_closed") {
+      throw new ConflictException("survey_closed");
     }
     if (update.status === "fee_payer_only") {
       throw new ForbiddenException("fee_payer_only");

@@ -19,7 +19,6 @@ export function MyPage() {
     currentPage,
     displayName,
     displayedActivityTab,
-    drafts,
     filteredActivities,
     initialLoading,
     isAdmin,
@@ -83,7 +82,6 @@ export function MyPage() {
                   activityQuery={activityQuery}
                   contentTab={displayedActivityTab}
                   currentPage={currentPage}
-                  drafts={drafts}
                   scraps={scraps}
                   onPageChange={setCurrentPage}
                   onQueryChange={(query) => {

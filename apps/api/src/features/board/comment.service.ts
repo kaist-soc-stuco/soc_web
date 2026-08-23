@@ -11,8 +11,6 @@ import type {
   CommentEngagementKind,
   CommentEngagementResponse,
   CommentListResponse,
-  CommentReportRequest,
-  CommentReportResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
@@ -22,7 +20,7 @@ import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import { CommentRepository } from "./repositories/comment.repository";
 import { getReadableArticleScopes } from "./article-access";
-import { assertBoardReadable, type CurrentUserContext } from "./board-access";
+import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "./board.constants";
 import { NotificationsService } from "../notifications/notifications.service";
 
@@ -59,8 +57,6 @@ export class CommentService {
     if (!board || !board.isActive) {
       throw new NotFoundException("board_not_found");
     }
-
-    assertBoardReadable(board, currentUser);
 
     const articleReadable = await this.articleRepository.isReadableArticle(
       board.boardId,
@@ -113,17 +109,6 @@ export class CommentService {
     );
   }
 
-  async reportComment(
-    code: string,
-    articleId: string,
-    commentId: string,
-    payload: CommentReportRequest,
-    user: AuthenticatedUser,
-  ): Promise<CommentReportResponse> {
-    await this.assertCommentActionAllowed(code, articleId, commentId, user);
-    return this.commentRepository.reportComment(commentId, user.id, payload);
-  }
-
   async createComment(
     code: string,
     articleId: string,
@@ -156,13 +141,6 @@ export class CommentService {
 
     if (!article.allowComment) {
       throw new ForbiddenException("comment_not_allowed");
-    }
-
-    if (
-      board.commentPermissionBit > 0 &&
-      !Permissions.has(user.permission, board.commentPermissionBit)
-    ) {
-      throw new ForbiddenException("insufficient_permission");
     }
 
     if (payload.parentCommentId) {
@@ -241,9 +219,11 @@ export class CommentService {
     }
 
     const isOwner = comment.authorUserId === user.id;
-    const isManager =
-      board.managePermissionBit > 0 &&
-      Permissions.has(user.permission, board.managePermissionBit);
+    const isManager = Permissions.hasAny(
+      user.permission,
+      Permissions.MODERATOR,
+      Permissions.ADMIN,
+    );
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");
@@ -285,9 +265,11 @@ export class CommentService {
     }
 
     const isOwner = comment.authorUserId === user.id;
-    const isManager =
-      board.managePermissionBit > 0 &&
-      Permissions.has(user.permission, board.managePermissionBit);
+    const isManager = Permissions.hasAny(
+      user.permission,
+      Permissions.MODERATOR,
+      Permissions.ADMIN,
+    );
 
     if (!isOwner && !isManager) {
       throw new ForbiddenException("insufficient_permission");

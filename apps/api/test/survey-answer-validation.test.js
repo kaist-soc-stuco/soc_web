@@ -152,3 +152,51 @@ test("ignores the retired question edit deadline", () => {
     ),
   );
 });
+
+test("rejects duplicate values in multiple-choice answers", () => {
+  const multiple = question({
+    questionType: "multiple_choice",
+    options: [{ value: "a", labelKo: "A" }, { value: "b", labelKo: "B" }],
+  });
+  expectHttpError(
+    () => validateSurveyAnswers([multiple], [{ questionId: multiple.id, content: { values: ["a", "a"] } }]),
+    BadRequestException,
+    "answer_option_invalid",
+  );
+});
+
+test("requires every row of a required checkbox grid to contain a selection", () => {
+  const grid = question({
+    questionType: "grid_multiple",
+    config: {
+      rows: [{ value: "row-1", labelKo: "1행" }],
+      columns: [{ value: "col-1", labelKo: "1열" }, { value: "col-2", labelKo: "2열" }],
+    },
+  });
+  expectHttpError(
+    () => validateSurveyAnswers([grid], [{ questionId: grid.id, content: { grid: { "row-1": [] } } }]),
+    BadRequestException,
+    "required_answer_missing",
+  );
+});
+
+test("validates date and time answer formats", () => {
+  expectHttpError(
+    () => validateSurveyAnswers([question({ questionType: "date" })], [{ questionId: "question-1", content: { date: "2026-02-31" } }]),
+    BadRequestException,
+    "answer_content_invalid",
+  );
+  expectHttpError(
+    () => validateSurveyAnswers([question({ questionType: "time" })], [{ questionId: "question-1", content: { time: "25:80" } }]),
+    BadRequestException,
+    "answer_content_invalid",
+  );
+});
+
+test("rejects file-upload answers while durable survey asset links are disabled", () => {
+  expectHttpError(
+    () => validateSurveyAnswers([question({ questionType: "file_upload" })], [{ questionId: "question-1", content: { assetId: "1" } }]),
+    BadRequestException,
+    "survey_file_upload_temporarily_disabled",
+  );
+});

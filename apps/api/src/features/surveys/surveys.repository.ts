@@ -41,7 +41,6 @@ export class SurveysRepository {
       isKoreanOnly: row.isKoreanOnly,
       isPublished: row.isPublished,
       lifecycleStatus: row.lifecycleStatus as SurveyRecord["lifecycleStatus"],
-      archivedAt: row.archivedAt ? msToIso(row.archivedAt.valueOf()) : null,
       previousVersionId: row.previousVersionId,
       versionNumber: row.versionNumber,
       derivedVersionCount: 0,
@@ -49,6 +48,7 @@ export class SurveysRepository {
       maxResponses: row.maxResponseCount,
       isAlwaysOpen: row.isAlwaysOpen,
       opensAt: row.openAt ? msToIso(row.openAt.valueOf()) : null,
+      closesAt: row.closeAt ? msToIso(row.closeAt.valueOf()) : null,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
     };
@@ -114,7 +114,6 @@ export class SurveysRepository {
         isKoreanOnly: dto.isKoreanOnly ?? false,
         isPublished: dto.isPublished ?? false,
         lifecycleStatus: dto.isPublished ? "PUBLISHED" : "DRAFT",
-        archivedAt: null,
         previousVersionId: lineage?.previousVersionId ?? null,
         versionNumber: lineage?.versionNumber ?? 1,
         showOnCalendar: dto.showOnCalendar ?? false,
@@ -122,6 +121,7 @@ export class SurveysRepository {
         maxResponseCount: dto.maxResponseCount ?? null,
         isAlwaysOpen: dto.isAlwaysOpen ?? false,
         openAt: dto.isAlwaysOpen ? null : dto.openAt ? isoToDate(dto.openAt) : null,
+        closeAt: dto.isAlwaysOpen ? null : dto.closeAt ? isoToDate(dto.closeAt) : null,
         connectedArticleId: dto.connectedArticleId ? Number(dto.connectedArticleId) : null,
         updatedAt: nowDate(),
       })
@@ -156,7 +156,6 @@ export class SurveysRepository {
     if (dto.isPublished !== undefined) {
       set.isPublished = dto.isPublished;
       set.lifecycleStatus = dto.isPublished ? "PUBLISHED" : "DRAFT";
-      set.archivedAt = null;
     }
     if (dto.showOnCalendar !== undefined) set.showOnCalendar = dto.showOnCalendar;
     if (dto.resultVisibility !== undefined) set.resultVisibility = dto.resultVisibility;
@@ -165,10 +164,12 @@ export class SurveysRepository {
       set.isAlwaysOpen = dto.isAlwaysOpen;
       if (dto.isAlwaysOpen) {
         set.openAt = null;
+        set.closeAt = null;
       }
     }
     if (!dto.isAlwaysOpen) {
       if (dto.openAt !== undefined) set.openAt = dto.openAt ? isoToDate(dto.openAt) : null;
+      if (dto.closeAt !== undefined) set.closeAt = dto.closeAt ? isoToDate(dto.closeAt) : null;
     }
     if (dto.connectedArticleId !== undefined) {
       set.connectedArticleId = dto.connectedArticleId ? Number(dto.connectedArticleId) : null;
@@ -183,28 +184,12 @@ export class SurveysRepository {
     return row ? this.map(row) : null;
   }
 
-  async archive(
-    id: string,
-    tx?: PostgresTransaction,
-  ): Promise<SurveyRecord | null> {
-    const db = tx ?? this.db;
-    const archivedAt = nowDate();
-    const [row] = await db
-      .update(surveys)
-      .set({
-        archivedAt,
-        isPublished: false,
-        lifecycleStatus: "ARCHIVED",
-        showOnCalendar: false,
-        updatedAt: archivedAt,
-      })
-      .where(eq(surveys.surveyId, id))
-      .returning();
-    return row ? this.map(row) : null;
-  }
-
   async delete(id: string, tx?: PostgresTransaction): Promise<void> {
     const db = tx ?? this.db;
+    await db
+      .update(surveys)
+      .set({ previousVersionId: null, updatedAt: nowDate() })
+      .where(eq(surveys.previousVersionId, id));
     await db.delete(surveys).where(eq(surveys.surveyId, id));
   }
 

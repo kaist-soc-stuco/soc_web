@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export function Modal({
   children,
   className,
+  bodyClassName,
   footer,
   onClose,
   open,
@@ -15,6 +16,7 @@ export function Modal({
 }: {
   children?: ReactNode;
   className?: string;
+  bodyClassName?: string;
   footer?: ReactNode;
   onClose: () => void;
   open: boolean;
@@ -53,7 +55,7 @@ export function Modal({
             <X aria-hidden="true" />
           </IconButton>
         </div>
-        {children ? <div className="ui-modal__body min-h-0 overflow-y-auto px-5 py-5">{children}</div> : null}
+        {children ? <div className={cn("ui-modal__body min-h-0 overflow-y-auto px-5 py-5", bodyClassName)}>{children}</div> : null}
         {footer ? <div className="ui-modal__footer flex shrink-0 justify-end gap-2 border-t border-[var(--ui-border-subtle)] bg-[color-mix(in_srgb,var(--ui-surface-muted)_30%,transparent)] px-5 py-3.5">{footer}</div> : null}
       </div>
     </div>,

@@ -17,6 +17,7 @@ import {
 import type {
   BoardArchiveResponse,
   BoardCreateRequest,
+  BoardDeleteResponse,
   BoardListResponse,
   BoardReorderRequest,
   BoardSummary,
@@ -70,6 +71,14 @@ export class BoardController {
     @Body(new ZodValidationPipe(BoardUpdateSchema)) body: BoardUpdateRequest,
   ): Promise<BoardSummary> {
     return this.boardService.updateBoard(code, body);
+  }
+
+  @Delete(":code/permanent")
+  @HttpCode(200)
+  @RequirePermissions(Permissions.ADMIN)
+  async deleteBoard(@Param("code") code: string): Promise<BoardDeleteResponse> {
+    const board = await this.boardService.deleteBoard(code);
+    return { ok: true, boardId: board.boardId };
   }
 
   @Delete(":code")

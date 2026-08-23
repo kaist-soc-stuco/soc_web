@@ -3,11 +3,17 @@ import type {
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { ArrowLeft, Check, ClipboardCheck, Edit2, Eye, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ClipboardCheck, Edit2, EllipsisVertical, Eye, Share2, Trash2 } from "lucide-react";
 import { isoToDate } from "@soc/shared";
 import { Link } from "react-router-dom";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { AttachmentList } from "@/components/ui/attachment-list";
+import {
+  AdminActionMenuLink,
+  AdminActionMenuItem,
+  AdminActionMenuPanel,
+} from "@/components/ui/admin-action-menu";
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
@@ -33,30 +39,38 @@ function formatDate(isoString: string) {
 interface ArticleCardProps {
   article: ArticleDetailResponse;
   attachmentAssets: ArticleAssetItem[];
-  canEdit: boolean;
+  canManageArticle: boolean;
   category: string;
   categoryLabel: string;
   content: string;
   lang: string;
   onDeleteArticle: () => void;
+  onShare: () => void;
+  onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   posterAsset?: ArticleAssetItem;
+  shareCopied: boolean;
   surveyDescription: string;
   surveyTitle: string;
+  submitting: ArticleEngagementKind | null;
   title: string;
 }
 
 export function BoardDetailArticleCard({
   article,
   attachmentAssets,
-  canEdit,
+  canManageArticle,
   category,
   categoryLabel,
   content,
   lang,
   onDeleteArticle,
+  onShare,
+  onToggle,
   posterAsset,
+  shareCopied,
   surveyDescription,
   surveyTitle,
+  submitting,
   title,
 }: ArticleCardProps) {
   return (
@@ -68,7 +82,7 @@ export function BoardDetailArticleCard({
         <h1 className="mt-3 text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
           {title}
         </h1>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3 flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-x-2 text-xs font-medium text-slate-400">
             <span>
               {article.isAnonymous
@@ -85,37 +99,50 @@ export function BoardDetailArticleCard({
               {article.viewCount}
             </span>
           </div>
+          {canManageArticle ? (
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={lang === "ko" ? "게시글 더보기" : "More post actions"}
+                  className="size-8 bg-transparent text-slate-400 hover:bg-transparent hover:text-slate-700"
+                >
+                  <EllipsisVertical className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  asChild
+                  align="end"
+                  sideOffset={6}
+                  collisionPadding={12}
+                >
+                  <AdminActionMenuPanel className="w-32">
+                    <DropdownMenu.Item asChild>
+                      <AdminActionMenuLink
+                        to={`/board/${category}/${article.articleId}/edit`}
+                        icon={<Edit2 className="text-slate-400" aria-hidden="true" />}
+                      >
+                        {lang === "ko" ? "수정" : "Edit"}
+                      </AdminActionMenuLink>
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item asChild>
+                      <AdminActionMenuItem
+                        icon={<Trash2 />}
+                        tone="danger"
+                        onClick={onDeleteArticle}
+                      >
+                        {lang === "ko" ? "삭제" : "Delete"}
+                      </AdminActionMenuItem>
+                    </DropdownMenu.Item>
+                  </AdminActionMenuPanel>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          ) : null}
         </div>
-
-        {canEdit && (
-          <div className="mt-2 flex justify-end gap-1">
-            <Button
-              asChild
-              variant="ghost"
-              size="icon"
-              className="size-8 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            >
-              <Link
-                to={`/board/${category}/${article.articleId}/edit`}
-                aria-label={lang === "ko" ? "게시글 수정" : "Edit post"}
-                title={lang === "ko" ? "수정" : "Edit"}
-              >
-                <Edit2 className="size-4" aria-hidden="true" />
-              </Link>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              type="button"
-              onClick={onDeleteArticle}
-              aria-label={lang === "ko" ? "게시글 삭제" : "Delete post"}
-              title={lang === "ko" ? "삭제" : "Delete"}
-              className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-            >
-              <Trash2 className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-        )}
       </header>
 
       <div className="pt-5">
@@ -182,80 +209,51 @@ export function BoardDetailArticleCard({
           </div>
         </section>
       )}
+
+      <div className="mt-8 flex items-center justify-start gap-2 border-t border-slate-100 pt-4">
+        <ArticleEngagementActions
+          lang={lang}
+          likeCount={article.likeCount}
+          scrapCount={article.scrapCount}
+          viewerHasLiked={article.viewerHasLiked}
+          viewerHasScrapped={article.viewerHasScrapped}
+          submitting={submitting}
+          onToggle={onToggle}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onShare}
+          aria-label={
+            shareCopied
+              ? lang === "ko"
+                ? "공유 링크가 복사되었습니다"
+                : "Share link copied"
+              : lang === "ko"
+                ? "게시글 공유"
+                : "Share post"
+          }
+          title={
+            shareCopied
+              ? lang === "ko"
+                ? "링크 복사됨"
+                : "Link copied"
+              : lang === "ko"
+                ? "공유"
+                : "Share"
+          }
+          className="border-0 bg-transparent text-slate-500 active:text-brand-primary hover:border-0 hover:bg-transparent hover:text-slate-700"
+        >
+          {shareCopied ? (
+            <Check className="size-4 text-brand-primary" aria-hidden="true" />
+          ) : (
+            <Share2 className="size-4" aria-hidden="true" />
+          )}
+          <span>{lang === "ko" ? "공유" : "Share"}</span>
+        </Button>
+      </div>
     </article>
-  );
-}
-
-interface BoardDetailFloatingActionsProps {
-  lang: string;
-  likeCount: number;
-  scrapCount: number;
-  viewerHasLiked: boolean;
-  viewerHasScrapped: boolean;
-  submitting: ArticleEngagementKind | null;
-  shareCopied: boolean;
-  onShare: () => void;
-  onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
-}
-
-export function BoardDetailFloatingActions({
-  lang,
-  likeCount,
-  scrapCount,
-  viewerHasLiked,
-  viewerHasScrapped,
-  submitting,
-  shareCopied,
-  onShare,
-  onToggle,
-}: BoardDetailFloatingActionsProps) {
-  return (
-    <aside
-      aria-label={lang === "ko" ? "게시글 액션" : "Post actions"}
-      className="fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200/90 bg-white/95 p-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.14)] backdrop-blur"
-    >
-      <ArticleEngagementActions
-        lang={lang}
-        likeCount={likeCount}
-        scrapCount={scrapCount}
-        viewerHasLiked={viewerHasLiked}
-        viewerHasScrapped={viewerHasScrapped}
-        submitting={submitting}
-        onToggle={onToggle}
-        compact
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={onShare}
-        aria-label={
-          shareCopied
-            ? lang === "ko"
-              ? "공유 링크가 복사되었습니다"
-              : "Share link copied"
-            : lang === "ko"
-              ? "게시글 공유"
-              : "Share post"
-        }
-        title={
-          shareCopied
-            ? lang === "ko"
-              ? "링크 복사됨"
-              : "Link copied"
-            : lang === "ko"
-              ? "공유"
-              : "Share"
-        }
-        className="size-8 rounded-full text-slate-500 hover:text-brand-primary"
-      >
-        {shareCopied ? (
-          <Check className="size-4 text-brand-primary" aria-hidden="true" />
-        ) : (
-          <Share2 className="size-4" aria-hidden="true" />
-        )}
-      </Button>
-    </aside>
   );
 }
 

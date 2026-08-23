@@ -287,7 +287,7 @@ export class UsersController {
       상태: row.status,
       적용학기수: row.coverageSemesters,
       적용시작학기: row.coverageStartSemester,
-      실납부액: row.paidAmount,
+      수납액: row.paidAmount,
       기준금액: row.requiredAmount,
       납부유형: row.paymentType,
       결제수단: row.paymentMethod,

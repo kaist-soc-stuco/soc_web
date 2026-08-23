@@ -122,6 +122,25 @@ test("an unlinked upload is visible only to its uploader", async () => {
   );
 });
 
+test("a published site-content image is readable without an article link", async () => {
+  const { service } = createService({
+    asset: {
+      assetId: "1",
+      links: [],
+      mimeType: "image/webp",
+      originalFilename: "hero.webp",
+      publicContentImage: true,
+      sizeBytes: 12,
+      storageKey: "/uploads/assets/hero.webp",
+      uploadedBy: "owner-1",
+    },
+  });
+
+  const file = await service.getFile("1", { authenticated: false });
+  assert.equal(file.inline, true);
+  assert.equal(file.buffer.toString(), "file-content");
+});
+
 test("active or mislabeled documents are forced to download with nosniff", () => {
   const headers = buildAssetResponseHeaders({
     inline: true,

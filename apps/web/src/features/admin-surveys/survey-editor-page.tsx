@@ -1,17 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
   ArticleListItem,
   SurveyDetailResponse,
+  CreateSurveyRequest,
   SurveySectionRecord,
   SurveyQuestionRecord,
 } from "@soc/contracts";
 import { z } from "zod";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { htmlDatetimeLocalToIso, isoToDate, isoToHtmlDatetimeLocal } from "@soc/shared";
+import { htmlDatetimeLocalToIso, isoToDate, isoToHtmlDatetimeLocal, isoToMs } from "@soc/shared";
 import {
   closestCenter,
   DndContext,
@@ -48,7 +49,9 @@ import {
 } from "@/components/organisms/section-editor-modal";
 import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { UiInput } from "@/components/ui/form-control";
+import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
 
@@ -74,7 +77,6 @@ const QUESTION_TYPES = [
   { value: "dropdown", label: "드롭다운" },
   { value: "grid_single", label: "객관식 그리드" },
   { value: "grid_multiple", label: "체크박스 그리드" },
-  { value: "file_upload", label: "파일 업로드" },
   { value: "date", label: "날짜" },
   { value: "time", label: "시간" },
   { value: "datetime", label: "날짜+시간" },
@@ -85,7 +87,7 @@ const SurveySettingsSchema = z.object({
   titleEn: z.string().max(255).optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
-  kind: z.string().min(1).max(20),
+  kind: z.enum(["GENERAL", "SURVEY", "VOTE", "APPLICATION", "EVENT"]),
   resultVisibility: z.enum(["PRIVATE", "PUBLIC"]),
   feePayersOnly: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
@@ -101,6 +103,7 @@ const SurveySettingsSchema = z.object({
       message: "숫자만 입력하세요.",
     }),
   openAt: z.string(),
+  closeAt: z.string(),
   connectedArticleId: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (!data.isKoreanOnly) {
@@ -119,6 +122,13 @@ const SurveySettingsSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: "시작 시각을 입력해주세요.",
         path: ["openAt"],
+      });
+    }
+    if (data.openAt && data.closeAt && isoToMs(data.openAt) >= isoToMs(data.closeAt)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "종료 시각은 시작 시각 이후여야 합니다.",
+        path: ["closeAt"],
       });
     }
   }
@@ -317,6 +327,7 @@ export function SurveyEditorPage() {
       isAlwaysOpen: false,
       maxResponseCount: "",
       openAt: "",
+      closeAt: "",
       connectedArticleId: "",
     },
   });
@@ -326,8 +337,10 @@ export function SurveyEditorPage() {
   const [loadedLifecycleStatus, setLoadedLifecycleStatus] = useState<
     SurveyDetailResponse["lifecycleStatus"] | null
   >(null);
-  const isArchived = loadedLifecycleStatus === "ARCHIVED";
-  const isOngoing = isEdit && (isPublished || isArchived);
+  const [loadedResponseCount, setLoadedResponseCount] = useState(0);
+  // Publishing alone must not freeze the form. As in Typeform/Tally, a
+  // published survey remains editable until the first submitted response.
+  const isOngoing = loadedResponseCount > 0;
 
   const [articleSearchResults, setArticleSearchResults] = useState<ArticleListItem[]>([]);
   const [showArticleSearch, setShowArticleSearch] = useState(false);
@@ -343,6 +356,8 @@ export function SurveyEditorPage() {
   const [tab, setTab] = useState<"settings" | "content" | "delivery">("settings");
 
   const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
+  const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
+  const [draftBannerVisible, setDraftBannerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "creating" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -360,6 +375,14 @@ export function SurveyEditorPage() {
     sectionId: string;
     initial: SectionFormState;
   } | null>(null);
+  const branchTargetsForEditing = useMemo(() => {
+    if (!editingQuestion) return [];
+    const currentIndex = sections.findIndex((section) => section.id === editingQuestion.sectionId);
+    return sections.slice(currentIndex >= 0 ? currentIndex + 1 : 0).map((section) => ({
+      id: section.id,
+      titleKo: section.titleKo,
+    }));
+  }, [editingQuestion, sections]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -391,7 +414,9 @@ export function SurveyEditorPage() {
             titleEn: detail.titleEn ?? "",
             descriptionKo: detail.descriptionKo ?? "",
             descriptionEn: detail.descriptionEn ?? "",
-            kind: detail.kind ?? "SURVEY",
+            kind: (["GENERAL", "SURVEY", "VOTE", "APPLICATION", "EVENT"] as const).includes(
+              detail.kind as SurveySettingsFormValues["kind"],
+            ) ? detail.kind as SurveySettingsFormValues["kind"] : "SURVEY",
             resultVisibility:
               detail.resultVisibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
             feePayersOnly: detail.feePayersOnly,
@@ -404,11 +429,17 @@ export function SurveyEditorPage() {
             maxResponseCount:
               detail.maxResponses != null ? String(detail.maxResponses) : "",
             openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
+            closeAt: detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "",
             connectedArticleId: detail.connectedPostId ?? "",
           });
           setSections(detail.sections);
           setLoadedSurveyId(surveyId);
           setLoadedLifecycleStatus(detail.lifecycleStatus);
+          setLoadedResponseCount(detail.responseCount ?? 0);
+          if (detail.lifecycleStatus === "DRAFT") {
+            setDraftRestoredAt(detail.updatedAt);
+            setDraftBannerVisible(true);
+          }
 
           if (detail.connectedPostId) {
             client.searchArticles(detail.connectedPostId, 1).then(results => {
@@ -427,7 +458,7 @@ export function SurveyEditorPage() {
   const buildSurveyBody = (
     values: SurveySettingsFormValues,
     options?: { allowPlaceholder?: boolean; publish?: boolean },
-  ) => {
+  ): CreateSurveyRequest => {
     const allowPlaceholder = options?.allowPlaceholder ?? false;
     const maxResponseCount = values.maxResponseCount?.trim()
       ? Number(values.maxResponseCount)
@@ -453,6 +484,9 @@ export function SurveyEditorPage() {
         : values.openAt
           ? htmlDatetimeLocalToIso(values.openAt)
           : undefined,
+      closeAt: values.isAlwaysOpen || !values.closeAt
+        ? null
+        : htmlDatetimeLocalToIso(values.closeAt),
       connectedArticleId: values.connectedArticleId?.trim() || undefined,
     };
   };
@@ -475,6 +509,7 @@ export function SurveyEditorPage() {
         const detail = await client.getSurveyDetail(created.id);
         setLoadedSurveyId(created.id);
         setLoadedLifecycleStatus(detail.lifecycleStatus);
+        setLoadedResponseCount(detail.responseCount ?? 0);
         setSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
         form.setValue("isPublished", false);
         setSaveState("saved");
@@ -496,10 +531,6 @@ export function SurveyEditorPage() {
     values: SurveySettingsFormValues,
     options?: { publish?: boolean },
   ) => {
-    if (isArchived) {
-      setError("보관된 설문은 수정하거나 다시 게시할 수 없습니다.");
-      return;
-    }
     setSaving(true);
     setSaveState("saving");
     setError(null);
@@ -694,13 +725,9 @@ export function SurveyEditorPage() {
     if (!loadedSurveyId) return;
 
     try {
-      await Promise.all(
-        questions.map((q, idx) =>
-          client.updateQuestion(loadedSurveyId, sectionId, q.id, {
-            sortOrder: idx,
-          }),
-        ),
-      );
+      await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {
+        items: questions.map((question, sortOrder) => ({ id: question.id, sortOrder })),
+      });
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "순서 변경 실패"));
@@ -786,7 +813,7 @@ export function SurveyEditorPage() {
 
   const handleConfirmOverwrite = (yes: boolean) => {
     if (!overwriteTarget) return;
-    const { articleId, title, eventStartDate } = overwriteTarget;
+    const { articleId, title, eventStartDate, eventEndDate } = overwriteTarget;
 
     form.setValue("connectedArticleId", articleId);
     setSelectedArticleTitle(title);
@@ -794,6 +821,7 @@ export function SurveyEditorPage() {
     if (yes) {
       form.setValue("isAlwaysOpen", false);
       form.setValue("openAt", isoToHtmlDatetimeLocal(eventStartDate));
+      form.setValue("closeAt", isoToHtmlDatetimeLocal(eventEndDate));
     }
     
     setOverwriteTarget(null);
@@ -838,11 +866,13 @@ export function SurveyEditorPage() {
                     : saveState === "saving"
                       ? "저장 중"
                       : saveState === "error"
-                        ? "저장 실패"
-                        : saveState === "saved"
+                      ? "저장 실패"
+                      : saveState === "saved"
                           ? "저장됨"
                           : loadedSurveyId
-                            ? "초안"
+                            ? loadedLifecycleStatus === "PUBLISHED"
+                              ? "게시 중"
+                              : "초안"
                             : "입력 중"}
                 </span>
                 {loadedSurveyId ? (
@@ -855,18 +885,16 @@ export function SurveyEditorPage() {
                     <Eye className="size-4" /> 미리보기
                   </Button>
                 ) : null}
-                {!isArchived ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={saving}
-                    className="gap-1.5"
-                    onClick={() => void form.handleSubmit((values) => handleSaveSettings(values))()}
-                  >
-                    <Save className="size-4" /> 저장
-                  </Button>
-                ) : null}
-                {!isArchived && !isPublished ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={saving}
+                  className="gap-1.5"
+                  onClick={() => void form.handleSubmit((values) => handleSaveSettings(values))()}
+                >
+                  <Save className="size-4" /> 저장
+                </Button>
+                {!isPublished ? (
                   <Button
                     type="button"
                     disabled={saving}
@@ -880,11 +908,13 @@ export function SurveyEditorPage() {
             }
           />
 
-          {isArchived && (
-            <div className="inline-flex w-fit rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-normal text-violet-800">
-              보관됨 · 읽기 전용
-            </div>
-          )}
+          {isEdit && draftBannerVisible && loadedLifecycleStatus === "DRAFT" ? (
+            <DraftRestoredBanner
+              savedAt={draftRestoredAt}
+              onStartNew={() => navigate("/admin/surveys/new")}
+              onDismiss={() => setDraftBannerVisible(false)}
+            />
+          ) : null}
 
           <SegmentedControl
             ariaLabel="설문 편집 단계"
@@ -910,7 +940,6 @@ export function SurveyEditorPage() {
               <SurveySettingsForm
                 mode={tab === "settings" ? "basic" : "delivery"}
                 isOngoing={isOngoing}
-                isArchived={isArchived}
                 showArticleSearch={showArticleSearch}
                 articleSearchResults={articleSearchResults}
                 selectedArticleTitle={selectedArticleTitle}
@@ -1076,10 +1105,7 @@ export function SurveyEditorPage() {
             isKoreanOnly={isKoreanOnly}
             isOngoing={isOngoing}
             currentSectionId={editingQuestion.sectionId}
-            branchTargets={sections.map((section) => ({
-              id: section.id,
-              titleKo: section.titleKo,
-            }))}
+            branchTargets={branchTargetsForEditing}
             onSave={handleSaveQuestion}
             onCancel={() => setEditingQuestion(null)}
           />
@@ -1096,44 +1122,48 @@ export function SurveyEditorPage() {
         )}
 
         {overwriteTarget && (
-          <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200 select-none">
-            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-500/20 flex flex-col gap-4 text-center animate-in zoom-in-95 duration-200 text-kaist-black">
-              <div className="w-12 h-12 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center mx-auto text-kaist-darkgreen animate-bounce">
-                <CalendarIcon className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-semibold text-slate-800 leading-snug">
-                일정 정보 덮어쓰기
-              </h3>
-              
-              <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4.5 text-left text-xs font-bold text-slate-600 flex flex-col gap-2 shadow-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">행사 시작:</span>
-                  <span className="text-slate-700">{formatCompactDateTime(overwriteTarget.eventStartDate)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">행사 마감:</span>
-                  <span className="text-slate-700">{formatCompactDateTime(overwriteTarget.eventEndDate)}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-2">
-                <Button variant="ghost"
+          <Modal
+            open
+            onClose={() => handleConfirmOverwrite(false)}
+            title="일정 정보 덮어쓰기"
+            className="max-w-md"
+            bodyClassName="space-y-4 px-6 py-5"
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleConfirmOverwrite(false)}
+                >
+                  유지하기
+                </Button>
+                <Button
                   type="button"
                   onClick={() => handleConfirmOverwrite(true)}
-                  className="flex-1 px-4 py-2.5 bg-kaist-darkgreen text-white font-bold rounded-xl text-xs hover:opacity-95 transition-all shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0"
+                  className="bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
                 >
-                  덮어쓰기 (Yes)
+                  덮어쓰기
                 </Button>
-                <Button variant="ghost"
-                  type="button"
-                  onClick={() => handleConfirmOverwrite(false)}
-                  className="flex-1 px-4 py-2.5 bg-slate-200 text-slate-750 font-bold rounded-xl text-xs hover:bg-slate-350 transition-all cursor-pointer border-0"
-                >
-                  유지하기 (No)
-                </Button>
+              </>
+            }
+          >
+            <div className="flex items-start gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-slate-700">
+              <CalendarIcon className="mt-0.5 size-4 shrink-0 text-kaist-darkgreen" aria-hidden="true" />
+              <p className="break-keep leading-6">
+                선택한 행사 일정의 시작·마감 시간을 설문에 적용하시겠습니까?
+              </p>
+            </div>
+            <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-400">행사 시작</span>
+                <span className="text-right font-medium text-slate-700">{formatCompactDateTime(overwriteTarget.eventStartDate)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-400">행사 마감</span>
+                <span className="text-right font-medium text-slate-700">{formatCompactDateTime(overwriteTarget.eventEndDate)}</span>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </AdminPageShell>
     </AuthGuard>

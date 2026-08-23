@@ -20,7 +20,6 @@ export interface SurveyRecord {
   isKoreanOnly: boolean;
   isPublished: boolean;
   lifecycleStatus: SurveyLifecycleStatus;
-  archivedAt: string | null;
   previousVersionId: string | null;
   versionNumber: number;
   derivedVersionCount: number;
@@ -28,6 +27,7 @@ export interface SurveyRecord {
   maxResponses: number | null;
   isAlwaysOpen: boolean;
   opensAt: string | null;
+  closesAt: string | null;
   createdAt: string;
   updatedAt: string;
   responseCount?: number;

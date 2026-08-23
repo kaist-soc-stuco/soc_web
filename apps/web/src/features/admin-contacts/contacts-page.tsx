@@ -29,6 +29,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { createPortal } from "react-dom";
 import { Download, Edit2, GripVertical, Mail, Phone, Plus, Trash2, Upload, User } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -74,6 +75,7 @@ function ContactsPageContent() {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [orderSaving, setOrderSaving] = useState(false);
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
+  const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
   const [bulkRows, setBulkRows] = useState<ParsedContactSpreadsheetRow[]>([]);
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
   const [bulkFileName, setBulkFileName] = useState<string | null>(null);
@@ -136,10 +138,17 @@ function ContactsPageContent() {
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveContactId(String(active.id));
+    setActiveDragWidth(active.rect.current.initial?.width ?? null);
+  };
+
+  const handleDragCancel = () => {
+    setActiveContactId(null);
+    setActiveDragWidth(null);
   };
 
   const handleDragEnd = async ({ active, over }: DragEndEvent) => {
     setActiveContactId(null);
+    setActiveDragWidth(null);
     if (!over || active.id === over.id || orderSaving) return;
     const oldIndex = contacts.findIndex((contact) => contact.id === active.id);
     const newIndex = contacts.findIndex((contact) => contact.id === over.id);
@@ -304,7 +313,7 @@ function ContactsPageContent() {
             <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·직책·메일·전화번호 검색" value={query} />
           </div></div>
           <div className="min-w-0 overflow-x-auto">
-            {loading ? <TableSkeleton columns={5} rows={6} /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={() => setActiveContactId(null)} onDragEnd={(event) => void handleDragEnd(event)}><AdminDataTable minWidth={1060} className="text-left"><colgroup><col style={{ width: 92 }} /><col style={{ width: 300 }} /><col style={{ width: 240 }} /><col style={{ width: 320 }} /><col style={{ width: 108 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center">순서</AdminTableHead><AdminTableHead>이름 (한글/영문)</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>연락처 정보</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader><AdminTableBody><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}>{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} position={contacts.findIndex((item) => item.id === contact.id)} disabled={orderSaving} onEdit={openEditMemberModal} onDelete={handleDelete} />)}</SortableContext></AdminTableBody></AdminDataTable><DragOverlay dropAnimation={null}>{activeContact ? <ContactDragPreview contact={activeContact} /> : null}</DragOverlay></DndContext>}
+            {loading ? <TableSkeleton columns={5} rows={6} /> : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminDataTable minWidth={1060} className="text-left"><colgroup><col style={{ width: 92 }} /><col style={{ width: 300 }} /><col style={{ width: 240 }} /><col style={{ width: 320 }} /><col style={{ width: 108 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center">순서</AdminTableHead><AdminTableHead>이름 (한글/영문)</AdminTableHead><AdminTableHead>직책</AdminTableHead><AdminTableHead>연락처 정보</AdminTableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr></AdminTableHeader><AdminTableBody><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}>{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} position={contacts.findIndex((item) => item.id === contact.id)} disabled={orderSaving} onEdit={openEditMemberModal} onDelete={handleDelete} />)}</SortableContext></AdminTableBody></AdminDataTable>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={null}>{activeContact ? <ContactDragPreview contact={activeContact} position={contacts.findIndex((item) => item.id === activeContact.id)} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
           </div>
           {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
         </AdminTableCard>
@@ -314,10 +323,10 @@ function ContactsPageContent() {
 }
 
 function SortableContactRow({ contact, disabled, onDelete, onEdit, position }: { contact: ContactRecord; disabled: boolean; onDelete: (id: string) => Promise<void>; onEdit: (contact: ContactRecord) => void; position: number }) {
-  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
-  const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition, willChange: isDragging ? "transform" : undefined };
-  return <tr ref={setNodeRef} style={style} className={isDragging ? "relative z-10 opacity-30" : "transition-colors hover:bg-slate-50/60"}>
-    <AdminTableCell className="px-4 py-4"><div className="flex items-center justify-center gap-2"><button type="button" {...attributes} {...listeners} className="inline-flex size-8 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button><span className="text-xs tabular-nums text-slate-400">{position + 1}</span></div></AdminTableCell>
+  const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
+  const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 160ms ease", willChange: isDragging ? "transform" : undefined };
+  return <tr ref={setNodeRef} style={style} className={isDragging ? "relative z-10 opacity-0" : "transition-colors hover:bg-slate-50/60"}>
+    <AdminTableCell className="px-4 py-4"><div className="flex items-center justify-center gap-2"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} className="inline-flex size-8 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button><span className="text-xs tabular-nums text-slate-400">{position + 1}</span></div></AdminTableCell>
     <AdminTableCell className="px-6 py-4"><div className="flex items-center gap-2.5"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-kaist-lightgreen/10 text-kaist-darkgreen"><User className="size-4" aria-hidden="true" /></div><div className="min-w-0"><div className="admin-table-text-emphasis max-w-[220px] truncate" title={contact.nameKo}>{contact.nameKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.nameEn}>{contact.nameEn}</div>{contact.cohort ? <div className="admin-table-text mt-1">{contact.cohort}기</div> : null}</div></div></AdminTableCell>
     <AdminTableCell className="px-6 py-4"><div className="max-w-[220px] truncate" title={contact.roleKo}>{contact.roleKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.roleEn}>{contact.roleEn}</div></AdminTableCell>
     <AdminTableCell className="min-w-0 space-y-1 px-6 py-4"><div className="admin-table-text flex items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[220px] truncate" title={contact.email ?? undefined}>{contact.email || "—"}</span></div><div className="admin-table-text flex items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[180px] truncate" title={contact.phoneNumber ?? undefined}>{contact.phoneNumber || "—"}</span></div></AdminTableCell>
@@ -325,16 +334,14 @@ function SortableContactRow({ contact, disabled, onDelete, onEdit, position }: {
   </tr>;
 }
 
-function ContactDragPreview({ contact }: { contact: ContactRecord }) {
+function ContactDragPreview({ contact, position, width }: { contact: ContactRecord; position: number; width: number | null }) {
   return (
-    <div className="flex w-[min(1060px,calc(100vw-2rem))] items-center gap-4 rounded-lg border border-brand-primary/30 bg-white px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
-      <GripVertical aria-hidden="true" className="size-4 shrink-0 text-brand-primary" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p>
-        <p className="truncate text-xs text-slate-500">{contact.nameEn}{contact.cohort ? ` · ${contact.cohort}기` : ""}</p>
-      </div>
-      <div className="hidden max-w-52 truncate text-sm text-slate-700 sm:block">{contact.roleKo}</div>
-      <div className="hidden max-w-60 truncate text-xs text-slate-500 lg:block">{contact.email || contact.phoneNumber || "—"}</div>
+    <div style={{ width: width ?? "min(1060px, calc(100vw - 2rem))", gridTemplateColumns: "92px 300px 240px minmax(0, 320px) 108px" }} className="grid items-center rounded-lg border border-brand-primary/30 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
+      <div className="flex h-20 items-center justify-center gap-2"><GripVertical aria-hidden="true" className="size-4 text-brand-primary" /><span className="text-xs tabular-nums text-slate-400">{position + 1}</span></div>
+      <div className="min-w-0 px-6"><p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p><p className="truncate text-xs text-slate-500">{contact.nameEn}{contact.cohort ? ` · ${contact.cohort}기` : ""}</p></div>
+      <div className="min-w-0 px-6"><p className="truncate text-sm text-slate-700">{contact.roleKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{contact.roleEn}</p></div>
+      <div className="min-w-0 space-y-1 px-6 text-xs text-slate-500"><p className="truncate">{contact.email || "—"}</p><p className="truncate">{contact.phoneNumber || "—"}</p></div>
+      <div className="px-6 text-center text-xs text-slate-400">—</div>
     </div>
   );
 }

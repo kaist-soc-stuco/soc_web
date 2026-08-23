@@ -37,6 +37,7 @@ export function useBoardPageController() {
   const [currentPage, setCurrentPage] = useState(1);
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [isArticleLoading, setIsArticleLoading] = useState(true);
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
@@ -120,6 +121,7 @@ export function useBoardPageController() {
       .finally(() => {
         if (!cancelled) {
           setIsArticleLoading(false);
+          setHasCompletedInitialLoad(true);
         }
       });
 
@@ -275,6 +277,7 @@ export function useBoardPageController() {
     handleSetEngagement,
     engagementSubmitting,
     isArticleLoading,
+    showInitialSkeleton: isArticleLoading && !hasCompletedInitialLoad,
     lang,
     postsPerPage,
     searchCriteria,

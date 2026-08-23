@@ -13,7 +13,6 @@ import type {
 } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
 import {
-  ArrowRight,
   Check,
   ChevronDown,
   CreditCard,
@@ -116,7 +115,6 @@ export function FeeManagementPage() {
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
   const [paymentType, setPaymentType] = useState<FeePaymentType>("SIX_SEMESTER_LUMP_SUM");
   const [paymentMethod, setPaymentMethod] = useState<FeePaymentMethod>("BANK_TRANSFER");
-  const [paymentStartSemester, setPaymentStartSemester] = useState(currentSemester());
   const [paymentCoverage, setPaymentCoverage] = useState(String(DEFAULT_COVERAGE_SEMESTERS));
   const [paymentDate, setPaymentDate] = useState(nowIso().slice(0, 10));
   const [paymentNote, setPaymentNote] = useState("");
@@ -228,7 +226,6 @@ export function FeeManagementPage() {
     setPaymentAmounts(Object.fromEntries(selectedStudents.map((student) => [student.userId, String(DEFAULT_FEE_AMOUNT)])));
     setPaymentType("SIX_SEMESTER_LUMP_SUM");
     setPaymentMethod("BANK_TRANSFER");
-    setPaymentStartSemester(referenceSemester);
     setPaymentCoverage(String(DEFAULT_COVERAGE_SEMESTERS));
     setPaymentDate(nowIso().slice(0, 10));
     setPaymentNote("");
@@ -240,7 +237,7 @@ export function FeeManagementPage() {
     if (selectedStudents.length === 0) return;
     const coverageSemesters = Number(paymentCoverage);
     if (!Number.isInteger(coverageSemesters) || coverageSemesters < 1 || coverageSemesters > 6) {
-      setOperationError("적용 학기 수는 1~6 사이에서 선택해 주세요.");
+      setOperationError("적용 학기 수는 1～6 사이에서 선택해 주세요.");
       return;
     }
     const payments: BulkProcessStudentFeePaymentsRequest["payments"] = [];
@@ -255,7 +252,7 @@ export function FeeManagementPage() {
         amount,
         paymentType,
         paymentMethod,
-        effectiveStartSemester: paymentStartSemester,
+        effectiveStartSemester: referenceSemester,
         coverageSemesters,
         paidAt: isoToDate(`${paymentDate}T00:00:00.000+09:00`).toISOString(),
         note: paymentNote.trim() || null,
@@ -429,18 +426,30 @@ export function FeeManagementPage() {
 
             <div className="min-w-0">
               <div className={loading && !initialLoading ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
-                {initialLoading ? <TableSkeleton columns={8} rows={7} /> : students.length === 0 ? <EmptyState message="등록된 학생이 없습니다." className="border-0 py-20" /> : (
-                  <AdminDataTable minWidth={1080}>
-                    <colgroup><col className="w-12" /><col className="w-44" /><col className="w-28" /><col className="w-56" /><col /><col className="w-24" /><col className="w-32" /><col className="w-20" /></colgroup>
+                {initialLoading ? <TableSkeleton columns={7} rows={7} /> : students.length === 0 ? <EmptyState message="등록된 학생이 없습니다." className="border-0 py-20" /> : (
+                  <AdminDataTable minWidth={980}>
+                    <colgroup><col className="w-12" /><col className="w-44" /><col className="w-28" /><col className="w-56" /><col /><col className="w-24" /><col className="w-32" /></colgroup>
                     <AdminTableHeader>
-                      {selectedUserIds.size > 0 ? (
-                        <tr><th colSpan={8} className="px-4 py-2.5"><div className="flex items-center justify-between gap-3"><div className="relative">
+                      <tr className="h-12">
+                        <AdminTableHead className="w-12 px-4 py-0 align-middle">
+                          <input type="checkbox" aria-label="현재 페이지 전체 선택" checked={allVisibleSelected} onChange={toggleVisibleUsers} className="size-4 accent-emerald-700" />
+                        </AdminTableHead>
+                        {selectedUserIds.size > 0 ? (
+                          <th colSpan={6} className="h-12 px-4 py-0 align-middle">
+                            <div className="flex h-12 items-center justify-between gap-3">
+                              <div className="relative">
                           <Button type="button" variant="ghost" size="sm" className="!font-medium" onClick={() => setSelectionPopoverOpen((value) => !value)}>{selectedUserIds.size}명 선택됨 <ChevronDown aria-hidden="true" className="size-4" /></Button>
                           {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
-                        </div><Button type="button" size="sm" onClick={openPaymentModal} disabled={saving}><CreditCard aria-hidden="true" className="size-4" /> 일괄 납부 처리</Button></div></th></tr>
-                      ) : (
-                        <tr><AdminTableHead className="px-4"><input type="checkbox" aria-label="현재 페이지 전체 선택" checked={allVisibleSelected} onChange={toggleVisibleUsers} className="size-4 accent-emerald-700" /></AdminTableHead><AdminSortableHead active={sortBy === "name"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("name")}>이름(영문명)</AdminSortableHead><AdminSortableHead active={sortBy === "studentId"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("studentId")}>학번</AdminSortableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>전공</AdminTableHead><AdminSortableHead active={sortBy === "status"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("status")}>상태</AdminSortableHead><AdminSortableHead className="text-right" active={sortBy === "paidAt"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("paidAt")}>실납부액</AdminSortableHead><AdminTableHead className="text-center">작업</AdminTableHead></tr>
-                      )}
+                              </div>
+                              <Button type="button" size="sm" onClick={openPaymentModal} disabled={saving}><CreditCard aria-hidden="true" className="size-4" /> 일괄 납부 처리</Button>
+                            </div>
+                          </th>
+                        ) : (
+                          <>
+                            <AdminSortableHead active={sortBy === "name"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("name")}>이름(영문명)</AdminSortableHead><AdminSortableHead active={sortBy === "studentId"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("studentId")}>학번</AdminSortableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>전공</AdminTableHead><AdminSortableHead active={sortBy === "status"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("status")}>상태</AdminSortableHead><AdminSortableHead className="text-right" active={sortBy === "paidAt"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("paidAt")}>수납액</AdminSortableHead>
+                          </>
+                        )}
+                      </tr>
                     </AdminTableHeader>
                     <AdminTableBody>{students.map((student) => <tr key={student.userId} className="cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70" onClick={() => void openDetail(student)}>
                       <AdminTableCell className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${student.nameKo} 선택`} checked={selectedUserIds.has(student.userId)} onChange={() => toggleSelectedUser(student.userId)} className="size-4 accent-emerald-700" /></AdminTableCell>
@@ -450,7 +459,6 @@ export function FeeManagementPage() {
                       <AdminTableCell className="py-2.5 text-slate-700"><div>{student.primaryMajor || "—"}</div>{student.doubleMajor ? <div className="text-xs text-slate-500">복수 {student.doubleMajor}</div> : null}{student.minor ? <div className="text-xs text-slate-500">부전공 {student.minor}</div> : null}</AdminTableCell>
                       <AdminTableCell className="py-2.5"><AdminStatusBadge tone={student.status === "PAID" ? "positive" : "neutral"}>{student.status === "PAID" ? "완납" : "미납"}</AdminStatusBadge></AdminTableCell>
                       <AdminTableCell className="py-2.5 text-right font-medium tabular-nums text-slate-900">{formatCurrency(student.paidAmount)}</AdminTableCell>
-                      <AdminTableCell className="py-2.5 text-center"><ArrowRight aria-hidden="true" className="mx-auto size-4 text-slate-400" /></AdminTableCell>
                     </tr>)}</AdminTableBody>
                   </AdminDataTable>
                 )}
@@ -468,11 +476,11 @@ export function FeeManagementPage() {
         </Modal>
 
         <Modal open={paymentModalOpen} onClose={() => !saving && setPaymentModalOpen(false)} title="과비 납부 처리" className="max-w-4xl" footer={<><Button type="button" variant="outline" disabled={saving} onClick={() => setPaymentModalOpen(false)}>취소</Button><Button type="button" disabled={saving} onClick={() => void submitPayments()}>{saving ? "반영 중" : "납부 확정"}</Button></>}>
-          <div className="space-y-5"><div className="grid gap-3 md:grid-cols-4"><AdminFormField label="납부 유형"><AdminSelectDropdown ariaLabel="납부 유형" value={paymentType} options={[{ value: "SIX_SEMESTER_LUMP_SUM", label: "6학기 일시납" }, { value: "PRIOR_PAYMENT_BALANCE", label: "기납부 차액 납부" }]} onChange={(value) => setPaymentType(value as FeePaymentType)} className="w-full" /></AdminFormField><AdminFormField label="적용 시작 학기"><AdminSelectDropdown ariaLabel="적용 시작 학기" value={paymentStartSemester} options={semesterOptions} onChange={setPaymentStartSemester} className="w-full" /></AdminFormField><AdminFormField label="적용 학기 수"><AdminSelectDropdown ariaLabel="적용 학기 수" value={paymentCoverage} onChange={setPaymentCoverage} className="w-full" options={[{ value: "1", label: "1학기" }, { value: "2", label: "2학기" }, { value: "4", label: "4학기" }, { value: "6", label: "6학기" }]} /></AdminFormField><AdminFormField label="결제 수단"><AdminSelectDropdown ariaLabel="결제 수단" value={paymentMethod} onChange={(value) => setPaymentMethod(value as FeePaymentMethod)} className="w-full" options={[{ value: "BANK_TRANSFER", label: "계좌이체" }, { value: "CASH", label: "현금" }, { value: "OTHER", label: "기타" }]} /></AdminFormField></div><div className="grid gap-3 md:grid-cols-2"><AdminFormField label="납부 일자"><UiInput type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.currentTarget.value)} className="w-full" /></AdminFormField><AdminFormField label="비고"><UiInput value={paymentNote} onChange={(event) => setPaymentNote(event.currentTarget.value)} placeholder="입금자명 상이, 차액 사유 등" className="w-full" /></AdminFormField></div><div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-slate-50 text-xs font-medium text-slate-600"><tr><th className="px-3 py-2.5">대상</th><th className="px-3 py-2.5">학번</th><th className="px-3 py-2.5 text-right">실제 수납액</th><th className="px-3 py-2.5">현재 적용</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedStudents.map((student) => <tr key={student.userId}><td className="px-3 py-2.5 font-medium text-slate-900">{student.nameKo}</td><td className="px-3 py-2.5 tabular-nums text-slate-600">{student.stdNo || "—"}</td><td className="px-3 py-2.5"><UiInput aria-label={`${student.nameKo} 실제 수납액`} type="number" min="0" step="1000" value={paymentAmounts[student.userId] ?? String(DEFAULT_FEE_AMOUNT)} onChange={(event) => setPaymentAmounts((current) => ({ ...current, [student.userId]: event.currentTarget.value }))} className="ml-auto w-36 text-right" /></td><td className="px-3 py-2.5 text-xs text-slate-500">{student.status === "PAID" ? `${student.coverageStartSemester ?? "기록 있음"}부터 ${student.coverageSemesters}학기` : "미납"}</td></tr>)}</tbody></table></div><p className="text-xs leading-5 text-slate-500">기본 금액은 45,000원입니다. 2025년 이전 기납부자의 차액 납부는 학생별 실제 수납액을 행 단위로 수정해 반영하세요.</p></div>
+          <div className="space-y-5"><div className="grid gap-3 md:grid-cols-3"><AdminFormField label="납부 유형"><AdminSelectDropdown ariaLabel="납부 유형" value={paymentType} options={[{ value: "SIX_SEMESTER_LUMP_SUM", label: "6학기 일시납" }, { value: "PRIOR_PAYMENT_BALANCE", label: "기납부 차액 납부" }]} onChange={(value) => setPaymentType(value as FeePaymentType)} className="w-full" /></AdminFormField><AdminFormField label="적용 학기 수"><AdminSelectDropdown ariaLabel="적용 학기 수" value={paymentCoverage} onChange={setPaymentCoverage} className="w-full min-w-[190px]" options={[{ value: "1", label: "1학기" }, { value: "2", label: "2학기" }, { value: "4", label: "4학기" }, { value: "6", label: "6학기" }]} /></AdminFormField><AdminFormField label="결제 수단"><AdminSelectDropdown ariaLabel="결제 수단" value={paymentMethod} onChange={(value) => setPaymentMethod(value as FeePaymentMethod)} className="w-full" options={[{ value: "BANK_TRANSFER", label: "계좌이체" }, { value: "CASH", label: "현금" }, { value: "OTHER", label: "기타" }]} /></AdminFormField></div><div className="grid gap-3 md:grid-cols-2"><AdminFormField label="납부 일자"><UiInput type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.currentTarget.value)} className="w-full" /></AdminFormField><AdminFormField label="비고"><UiInput value={paymentNote} onChange={(event) => setPaymentNote(event.currentTarget.value)} placeholder="입금자명 상이, 차액 사유 등" className="w-full" /></AdminFormField></div><div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[620px] table-fixed text-left text-sm"><colgroup><col className="w-[32%]" /><col className="w-[18%]" /><col className="w-[24%]" /><col className="w-[26%]" /></colgroup><thead className="bg-slate-50 text-xs font-medium text-slate-600"><tr><th className="px-3 py-2.5">대상</th><th className="px-3 py-2.5">학번</th><th className="px-3 py-2.5 text-right">수납액</th><th className="px-3 py-2.5">현재 상태</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedStudents.map((student) => <tr key={student.userId}><td className="px-3 py-2.5 font-medium text-slate-900">{student.nameKo}</td><td className="px-3 py-2.5 tabular-nums text-slate-600">{student.stdNo || "—"}</td><td className="px-3 py-2.5"><UiInput aria-label={`${student.nameKo} 수납액`} type="number" min="0" step="1000" value={paymentAmounts[student.userId] ?? String(DEFAULT_FEE_AMOUNT)} onChange={(event) => setPaymentAmounts((current) => ({ ...current, [student.userId]: event.currentTarget.value }))} className="ml-auto w-36 text-right" /></td><td className="px-3 py-2.5 text-xs text-slate-500">{student.status === "PAID" ? "완납" : "미납"}</td></tr>)}</tbody></table></div><p className="text-xs leading-5 text-slate-500">기본 금액은 45,000원입니다. 2025년 이전 기납부자의 차액 납부는 학생별 수납액을 행 단위로 수정해 반영하세요.</p></div>
         </Modal>
 
         <AdminDrawer open={Boolean(detailStudentId)} onClose={() => setDetailStudentId(null)} title={detail?.user ? `${detail.user.nameKo} 납부 상세` : "납부 상세"} width="max-w-2xl" footer={detail ? <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setDetailStudentId(null)}>닫기</Button><Button type="button" disabled={saving} onClick={() => void saveDetail()}>{saving ? "저장 중" : "요약 정보 저장"}</Button></div> : undefined}>
-          {detailLoading ? <div className="space-y-3"><Skeleton className="h-20 w-full" /><Skeleton className="h-28 w-full" /></div> : detail ? <div className="space-y-6"><div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700"><p className="font-medium text-slate-900">{detail.user.nameKo}{detail.user.nameEn ? ` · ${detail.user.nameEn}` : ""}</p><p className="mt-1">{detail.user.stdNo || "학번 없음"} · {detail.user.email}</p><p className="mt-1 text-xs text-slate-500">{[detail.user.primaryMajor, detail.user.doubleMajor && `복수 ${detail.user.doubleMajor}`, detail.user.minor && `부전공 ${detail.user.minor}`].filter(Boolean).join(" · ") || "전공 정보 없음"}</p></div><section className="space-y-3"><h3 className="text-sm font-semibold text-slate-900">현재 요약</h3><div className="grid gap-3 md:grid-cols-2"><AdminFormField label="상태"><AdminSelectDropdown ariaLabel="상태" value={detailStatus} onChange={(value) => setDetailStatus(value as FeeStatus)} className="w-full" options={[{ value: "PAID", label: "완납" }, { value: "UNPAID", label: "미납" }]} /></AdminFormField><AdminFormField label="실납부액"><UiInput type="number" min="0" step="1000" value={detailAmount} onChange={(event) => setDetailAmount(event.currentTarget.value)} className="w-full" /></AdminFormField></div><AdminFormField label="관리자 메모"><UiInput value={detailNote} onChange={(event) => setDetailNote(event.currentTarget.value)} placeholder="차액 사유, 입금자명 상이 등" className="w-full" /></AdminFormField></section><section><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-900">학기별 납부 이력</h3><span className="text-xs text-slate-500">{detail.history.length}건</span></div>{detail.history.length === 0 ? <p className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">등록된 납부 이력이 없습니다.</p> : <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">{detail.history.map((payment) => <div key={payment.paymentId} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_auto]"><div><p className="font-medium text-slate-900">{formatCurrency(payment.amount)} · {payment.effectiveStartSemester}부터 {payment.coverageSemesters}학기</p><p className="mt-1 text-xs text-slate-500">{payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"} · {payment.paymentMethod === "BANK_TRANSFER" ? "계좌이체" : payment.paymentMethod === "CASH" ? "현금" : "기타"}{payment.note ? ` · ${payment.note}` : ""}</p></div><time className="text-xs tabular-nums text-slate-500">{formatDateTime(payment.paidAt)}</time></div>)}</div>}<p className="mt-2 text-xs leading-5 text-slate-500">납부 원장 이력은 회계 추적을 위해 보존됩니다. 정정이 필요한 경우 새 납부 내역과 사유를 추가해 기록하세요.</p></section></div> : <p className="text-sm text-slate-500">납부 상세를 불러오지 못했습니다.</p>}
+          {detailLoading ? <div className="space-y-3"><Skeleton className="h-20 w-full" /><Skeleton className="h-28 w-full" /></div> : detail ? <div className="space-y-6"><div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700"><p className="font-medium text-slate-900">{detail.user.nameKo}{detail.user.nameEn ? ` · ${detail.user.nameEn}` : ""}</p><p className="mt-1">{detail.user.stdNo || "학번 없음"} · {detail.user.email}</p><p className="mt-1 text-xs text-slate-500">{[detail.user.primaryMajor, detail.user.doubleMajor && `복수 ${detail.user.doubleMajor}`, detail.user.minor && `부전공 ${detail.user.minor}`].filter(Boolean).join(" · ") || "전공 정보 없음"}</p></div><section className="space-y-3"><h3 className="text-sm font-semibold text-slate-900">현재 요약</h3><div className="grid gap-3 md:grid-cols-2"><AdminFormField label="상태"><AdminSelectDropdown ariaLabel="상태" value={detailStatus} onChange={(value) => setDetailStatus(value as FeeStatus)} className="w-full" options={[{ value: "PAID", label: "완납" }, { value: "UNPAID", label: "미납" }]} /></AdminFormField><AdminFormField label="수납액"><UiInput type="number" min="0" step="1000" value={detailAmount} onChange={(event) => setDetailAmount(event.currentTarget.value)} className="w-full" /></AdminFormField></div><AdminFormField label="관리자 메모"><UiInput value={detailNote} onChange={(event) => setDetailNote(event.currentTarget.value)} placeholder="차액 사유, 입금자명 상이 등" className="w-full" /></AdminFormField></section><section><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-900">학기별 납부 이력</h3><span className="text-xs text-slate-500">{detail.history.length}건</span></div>{detail.history.length === 0 ? <p className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">등록된 납부 이력이 없습니다.</p> : <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">{detail.history.map((payment) => <div key={payment.paymentId} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_auto]"><div><p className="font-medium text-slate-900">{formatCurrency(payment.amount)} · {payment.effectiveStartSemester}부터 {payment.coverageSemesters}학기</p><p className="mt-1 text-xs text-slate-500">{payment.paymentType === "PRIOR_PAYMENT_BALANCE" ? "기납부 차액" : "6학기 일시납"} · {payment.paymentMethod === "BANK_TRANSFER" ? "계좌이체" : payment.paymentMethod === "CASH" ? "현금" : "기타"}{payment.note ? ` · ${payment.note}` : ""}</p></div><time className="text-xs tabular-nums text-slate-500">{formatDateTime(payment.paidAt)}</time></div>)}</div>}<p className="mt-2 text-xs leading-5 text-slate-500">납부 원장 이력은 회계 추적을 위해 보존됩니다. 정정이 필요한 경우 새 납부 내역과 사유를 추가해 기록하세요.</p></section></div> : <p className="text-sm text-slate-500">납부 상세를 불러오지 못했습니다.</p>}
         </AdminDrawer>
       </AdminPageShell>
     </AuthGuard>
@@ -500,7 +508,7 @@ function parseFeeSpreadsheet(input: ArrayBuffer): { updates: BulkUpdateStudentFe
   if (rows.length < 2) return { updates: [], errors: ["헤더와 한 개 이상의 데이터 행이 필요합니다."] };
   const headers = rows[0].map(normalizeFeeSpreadsheetHeader);
   const indexOf = (...aliases: string[]) => headers.findIndex((header) => aliases.includes(header));
-  const indexes = { userId: indexOf("userid", "사용자id"), stdNo: indexOf("stdno", "학번"), status: indexOf("status", "상태", "납부여부"), paidAmount: indexOf("paidamount", "납부금액", "실납부액", "금액"), coverageSemesters: indexOf("coveragesemesters", "적용학기", "적용학기수"), note: indexOf("note", "비고", "메모") };
+  const indexes = { userId: indexOf("userid", "사용자id"), stdNo: indexOf("stdno", "학번"), status: indexOf("status", "상태", "납부여부"), paidAmount: indexOf("paidamount", "납부금액", "실납부액", "수납액", "금액"), coverageSemesters: indexOf("coveragesemesters", "적용학기", "적용학기수"), note: indexOf("note", "비고", "메모") };
   if (indexes.userId < 0 && indexes.stdNo < 0) return { updates: [], errors: ["userId 또는 학번 열이 필요합니다."] };
   const errors: string[] = [];
   const updates: BulkUpdateStudentFeeStatusRequest["updates"] = [];
@@ -516,7 +524,7 @@ function parseFeeSpreadsheet(input: ArrayBuffer): { updates: BulkUpdateStudentFe
     if (!value(indexes.userId) && !value(indexes.stdNo)) errors.push(`${rowLabel}: userId 또는 학번이 없습니다.`);
     if (rawStatus && !status) errors.push(`${rowLabel}: 상태 값이 올바르지 않습니다.`);
     if (amount !== undefined && (!Number.isInteger(amount) || amount < 0)) errors.push(`${rowLabel}: 납부 금액은 0 이상의 정수여야 합니다.`);
-    if (coverageSemesters !== undefined && (!Number.isInteger(coverageSemesters) || coverageSemesters < 1 || coverageSemesters > 6)) errors.push(`${rowLabel}: 적용 학기 수는 1~6 사이여야 합니다.`);
+    if (coverageSemesters !== undefined && (!Number.isInteger(coverageSemesters) || coverageSemesters < 1 || coverageSemesters > 6)) errors.push(`${rowLabel}: 적용 학기 수는 1～6 사이여야 합니다.`);
     if (!status && amount === undefined && coverageSemesters === undefined && indexes.note < 0) errors.push(`${rowLabel}: 변경할 값이 없습니다.`);
     if (errors.some((error) => error.startsWith(`${rowLabel}:`))) return;
     updates.push({ ...(value(indexes.userId) ? { userId: value(indexes.userId) } : {}), ...(value(indexes.stdNo) ? { stdNo: value(indexes.stdNo) } : {}), ...(status ? { status } : {}), ...(amount !== undefined ? { paidAmount: amount } : {}), ...(coverageSemesters !== undefined ? { coverageSemesters } : {}), ...(indexes.note >= 0 ? { note: value(indexes.note) || null } : {}) });

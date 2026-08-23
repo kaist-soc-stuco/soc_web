@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
 
 import { RichTextEditor } from "./rich-text-editor";
 import { Button } from "@/components/ui/button";
 import { AdminFormField } from "@/components/ui/admin-page";
 import { UiInput } from "@/components/ui/form-control";
+import { Modal } from "@/components/ui/modal";
 
 export interface SectionFormState {
   titleKo: string;
@@ -57,22 +57,28 @@ export function SectionEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col gap-6 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl md:p-8">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div>
-            <h3 className="text-xl font-bold text-slate-950">섹션 편집</h3>
-          </div>
-          <Button variant="ghost"
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/35"
-            aria-label="섹션 편집 닫기"
-          >
-            <X className="h-5 w-5" />
+    <Modal
+      open
+      onClose={onCancel}
+      title="섹션 편집"
+      className="max-w-2xl"
+      bodyClassName="space-y-6 px-6 py-6 md:px-8"
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            취소
           </Button>
-        </div>
-
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isOngoing}
+            className="bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
+          >
+            저장
+          </Button>
+        </>
+      }
+    >
         <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
           <Button variant="ghost"
             type="button"
@@ -149,24 +155,6 @@ export function SectionEditorModal({
           </p>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-          <Button variant="ghost"
-            type="button"
-            onClick={onCancel}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/25"
-          >
-            취소
-          </Button>
-          <Button variant="ghost"
-            type="button"
-            onClick={handleSave}
-            disabled={isOngoing}
-            className="rounded-xl bg-kaist-darkgreen px-5 py-2.5 text-sm font-bold text-white transition hover:bg-kaist-darkgreen/90 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/35"
-          >
-            저장
-          </Button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

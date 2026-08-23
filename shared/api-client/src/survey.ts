@@ -3,6 +3,8 @@ import type {
   CreateSectionRequest,
   CreateSurveyRequest,
   ResponseDetailResponse,
+  ReorderSurveyQuestionsRequest,
+  ReorderSurveySectionsRequest,
   SubmitResponseRequest,
   SurveyAnalyticsResponse,
   SurveyDetailResponse,
@@ -111,14 +113,6 @@ export const createSurveyApi = ({
     );
   },
 
-  archiveSurvey: async (surveyId: string): Promise<SurveyRecord> => {
-    return requestJson<SurveyRecord>(
-      `${surveyBaseUrl}/${surveyId}/archive`,
-      { method: "POST" },
-      { retryOnUnauthorized: true },
-    );
-  },
-
   duplicateSurvey: async (surveyId: string): Promise<SurveyRecord> => {
     return requestJson<SurveyRecord>(
       `${surveyBaseUrl}/${surveyId}/duplicate`,
@@ -168,6 +162,21 @@ export const createSurveyApi = ({
     );
   },
 
+  reorderSurveySections: async (
+    surveyId: string,
+    body: ReorderSurveySectionsRequest,
+  ): Promise<SurveySectionRecord[]> => {
+    return requestJson<SurveySectionRecord[]>(
+      `${surveyBaseUrl}/${surveyId}/sections/reorder`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   createQuestion: async (
     surveyId: string,
     sectionId: string,
@@ -209,6 +218,22 @@ export const createSurveyApi = ({
     await requestVoid(
       `${surveyBaseUrl}/${surveyId}/sections/${sectionId}/questions/${questionId}`,
       { method: "DELETE" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  reorderSurveyQuestions: async (
+    surveyId: string,
+    sectionId: string,
+    body: ReorderSurveyQuestionsRequest,
+  ): Promise<SurveyQuestionRecord[]> => {
+    return requestJson<SurveyQuestionRecord[]>(
+      `${surveyBaseUrl}/${surveyId}/sections/${sectionId}/questions/reorder`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
       { retryOnUnauthorized: true },
     );
   },

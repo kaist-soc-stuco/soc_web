@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Header } from "@/components/organisms/header";
@@ -14,8 +15,13 @@ import {
   BoardWriteSettings,
   BoardWriteFooter,
 } from "@/features/board-write/board-write-form-sections";
+import {
+  ArticleTemplateControl,
+  type BoardTemplateSnapshot,
+} from "@/features/board-write/article-template-control";
 import { useBoardWritePageController } from "@/features/board-write/use-board-write-page-controller";
 import { UiInput } from "@/components/ui/form-control";
+import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 
 export function BoardWritePage() {
   const navigate = useNavigate();
@@ -25,19 +31,18 @@ export function BoardWritePage() {
     allowComment,
     boardByCode,
     canConfigurePostSettings,
+    canManageTemplates,
     canWriteSelected,
     contentEn,
     contentKo,
-    drafts,
+    draftRestoredAt,
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
     eventStartDate,
     fileInputRef,
     handleCategoryChange,
-    handleDeleteDraft,
-    handleRestoreDraft,
-    handleSaveDraft,
+    handleStartNewDraft,
     handleSubmit,
     handleUploadFiles,
     isAnonymous,
@@ -72,6 +77,45 @@ export function BoardWritePage() {
     uploading,
     writableBoardCodes,
   } = useBoardWritePageController();
+  const [dismissedDraftAt, setDismissedDraftAt] = useState<string | null>(null);
+  const showDraftRestoredBanner = Boolean(draftRestoredAt && draftRestoredAt !== dismissedDraftAt);
+  const templateSnapshot: BoardTemplateSnapshot = {
+    boardCode: selectedCategory,
+    titleKo,
+    titleEn,
+    contentKo,
+    contentEn,
+    isAnonymous,
+    isPinned,
+    isSecret,
+    allowComment,
+    isKoreanOnly,
+    isEventAlwaysOpen,
+    eventStartDate,
+    eventEndDate,
+    eventDescriptionKo,
+    eventDescriptionEn,
+    selectedSurveyId,
+    assets,
+  };
+  const applyTemplate = (template: BoardTemplateSnapshot) => {
+    setTitleKo(template.titleKo);
+    setTitleEn(template.titleEn);
+    setContentKo(template.contentKo);
+    setContentEn(template.contentEn);
+    setIsAnonymous(template.isAnonymous);
+    setIsPinned(template.isPinned);
+    setIsSecret(template.isSecret);
+    setAllowComment(template.allowComment);
+    setIsKoreanOnly(template.isKoreanOnly);
+    setIsEventAlwaysOpen(template.isEventAlwaysOpen);
+    setEventStartDate(template.eventStartDate);
+    setEventEndDate(template.eventEndDate);
+    setEventDescriptionKo(template.eventDescriptionKo);
+    setEventDescriptionEn(template.eventDescriptionEn);
+    setSelectedSurveyId(template.selectedSurveyId);
+    setAssets(template.assets.map((asset) => ({ ...asset })));
+  };
 
   return (
     <PageShell className="text-slate-950">
@@ -104,19 +148,25 @@ export function BoardWritePage() {
           },
         ]}
         actions={
-          <BoardWriteFooter
-            compact
-            draftCount={drafts.length}
-            drafts={drafts}
-            lang={lang}
-            isSubmitting={isSubmitting}
-            canWriteSelected={canWriteSelected}
-            onCancel={() => navigate(-1)}
-            onDeleteDraft={handleDeleteDraft}
-            onRestoreDraft={(draftId) => handleRestoreDraft(draftId)}
-            onSaveDraft={() => handleSaveDraft()}
-            onSubmit={handleSubmit}
-          />
+          <div className="flex items-center justify-end gap-2">
+            {canManageTemplates ? (
+              <ArticleTemplateControl
+                boardCode={selectedCategory}
+                boardLabel={getBoardLabelFromMetadata(selectedBoard, selectedCategory, lang)}
+                lang={lang}
+                onApply={applyTemplate}
+                snapshot={templateSnapshot}
+              />
+            ) : null}
+            <BoardWriteFooter
+              compact
+              lang={lang}
+              isSubmitting={isSubmitting}
+              canWriteSelected={canWriteSelected}
+              onCancel={() => navigate(-1)}
+              onSubmit={handleSubmit}
+            />
+          </div>
         }
       />
 
@@ -130,6 +180,14 @@ export function BoardWritePage() {
             className="hidden"
             onChange={(event) => void handleUploadFiles(event.target.files)}
           />
+
+          {showDraftRestoredBanner ? (
+            <DraftRestoredBanner
+              savedAt={draftRestoredAt ?? undefined}
+              onStartNew={handleStartNewDraft}
+              onDismiss={() => setDismissedDraftAt(draftRestoredAt)}
+            />
+          ) : null}
 
           {/* Unified Editor Card Container */}
           <DataViewCard>

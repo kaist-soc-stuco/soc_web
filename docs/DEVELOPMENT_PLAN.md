@@ -271,12 +271,12 @@ AWS에서 사용자가 해야 할 작업:
 #### 5.3 과비 납부 관리
 
 - 이 화면은 총무 계좌 입금 내역을 기준으로 수납 상태와 간식·복지 혜택 자격, 미납자 알림 대상을 결정하는 **단일 원장(Single Source of Truth)** 작업대다.
-- 2026년 기본 체계는 6학기 일시납 45,000원이지만, 2025년 이전 기납부자의 차액과 향후 변동 금액을 처리해야 하므로 정액을 하드코딩하지 않는다. 납부 원장에는 학생별 실제 수납액, 적용 시작 학기, 적용 학기 수, 납부 유형·수단, 납부일, 비고를 저장한다.
+- 2026년 기본 체계는 6학기 일시납 45,000원이지만, 2025년 이전 기납부자의 차액과 향후 변동 금액을 처리해야 하므로 정액을 하드코딩하지 않는다. 납부 원장에는 학생별 수납액, 기준 학기에서 자동 결정되는 적용 시작 학기, 적용 학기 수, 납부 유형·수단, 납부일, 비고를 저장한다.
 - 별도 학생/통계 탭을 두지 않고 3칸 KPI(총 수납 금액, 기준 학기 납부율, 미납 인원)와 기준 학기·전공·검색·`전체/완납/미납` 상태 control을 한 화면에 둔다. 6학기 유효기간이 지난 학생은 기준 학기에서 자동 미납으로 분류한다.
 - 툴바·학생 table·pagination은 하나의 white container 안에 통합한다. 내보내기는 현재 필터 또는 선택 대상의 파일을 확인 모달 없이 즉시 다운로드하고, 불러오기는 형식 검증 모달을 거친다.
 - 체크박스 선택으로 별도 행을 삽입하지 않는다. 선택 수와 `일괄 납부 처리` action이 table header 영역을 부드럽게 교체하며, 검색·필터·페이지 이동 후에도 선택 Set을 보존한다. 선택 수를 누르면 선택 학생 태그와 개별 제거 popover를 연다. 내보내기 라벨은 선택 수를 반영한다.
-- `PaymentModal`은 선택 학생별 금액 input을 제공하고 기본값 45,000원을 채운다. 관리자는 학생별 차액을 수정할 수 있으며 납부 유형, 적용 시작 학기, 적용 학기 수, 결제 수단, 납부일, 입금자명 차이 등 비고를 함께 기록한다.
-- table은 체크박스·이름(영문명)·학번·이메일·전공·상태·실납부액·작업 컬럼을 사용한다. 행 클릭은 우측 detail sheet로 연결하며, 학기별 납부 이력·차액/감면 사유·관리자 메모를 보여준다. 원장 이력은 감사 추적을 위해 보존하고 정정은 새 기록과 사유로 남긴다.
+- `PaymentModal`은 선택 학생별 금액 input을 제공하고 기본값 45,000원을 채운다. 관리자는 학생별 차액을 수정할 수 있으며 납부 유형, 기준 학기에서 자동 결정되는 적용 시작 학기, 적용 학기 수, 결제 수단, 납부일, 입금자명 차이 등 비고를 함께 기록한다. 적용 시작 학기를 별도 UI로 중복 입력하지 않는다.
+- table은 체크박스·이름(영문명)·학번·이메일·전공·상태·수납액 컬럼을 사용한다. 작업 컬럼이나 행 끝 아이콘은 두지 않으며 행 클릭은 우측 detail sheet로 연결한다. 학기별 납부 이력·차액/감면 사유·관리자 메모를 보여주고, 원장 이력은 감사 추적을 위해 보존하며 정정은 새 기록과 사유로 남긴다.
 - 첫 진입에만 skeleton을 표시한다. 검색·필터·정렬 중에는 기존 rows를 유지하고 새 응답 도착 시 교체하며, 150ms opacity transition만 사용하고 “불러오는 중입니다” spinner/문구는 사용하지 않는다.
 
 현재 구현 상태: `student_fee_payment` 원장과 6학기 coverage 계산, 기준 학기 기반 `완납/미납` 조회, 3 KPI, 단일 table container, persistent bulk selection, PaymentModal, XLSX import/export, detail sheet, API audit action을 연결했다. 기존 legacy 상태는 호환 조회하되 신규 납부는 원장에 기록한다. Toss 결제 연동과 자동 계좌 대사는 이번 범위에 포함하지 않는다.
@@ -592,3 +592,37 @@ AWS_SECRET_ACCESS_KEY=<local-or-ci-only-secret>
 - 적용 migration: `apps/api/drizzle/0021_dizzy_wallop.sql`. `pnpm db:migrate`와 Docker API/Web 재빌드를 완료했다.
 
 검증: 공유 contracts/api-client build, API typecheck/lint, Web lint/build 통과. `GET /health` 200 및 댓글 목록 API의 `likeCount`, `viewerHasLiked`, `viewerHasReported` 계약을 확인했다. 댓글 좋아요/신고는 테스트 데이터 변조를 피하기 위해 실제 클릭 등록까지 수행하지 않았다.
+
+## 13. 권한 관리 화면 안정화 및 공통 초안 복구 — 2026-08-23
+
+### 직접 요청 반영
+
+- 권한 관리의 역할 추가 모달과 운영 콘텐츠 편집/생성 폼에서 input 이벤트 값을 functional state updater 안에서 읽지 않도록 수정했다. 이벤트 핸들러에서 `value`/`checked`를 먼저 추출해 입력 중 페이지가 깨지는 React `currentTarget` 수명 문제를 차단했다.
+- 구성원 편집 modal의 별도 `검색` 버튼을 제거하고 220ms debounce 검색으로 변경했다. 첫 진입에 데이터가 없을 때만 skeleton을 보여주고, 검색/페이지 이동 중에는 기존 rows를 150ms opacity transition으로 유지한 뒤 최신 응답으로 교체한다.
+- 구성원 후보 요청에 최신 request id guard를 두어 빠르게 검색어를 바꿀 때 늦게 도착한 이전 응답이 현재 결과를 덮지 못하게 했다.
+- 구성원 선택 Set은 검색어·페이지 변경에도 유지하며, select-all은 현재 페이지 ID만 추가/제거한다. 공통 `Pagination`은 유지하고 modal footer에 누적 선택 수를 표시한다.
+- `DraftRestoredBanner` 공통 컴포넌트를 추가했다. 게시글 작성/수정, 설문 편집, 메일 작성에서 저장 시각·`새로 쓰기`·X 닫기와 `role=status`를 공유한다. X는 배너만 닫고 내용을 지우지 않으며, 새로 쓰기는 editor별 초기화 또는 새 route를 사용한다.
+
+### 비판적 검토 결과
+
+- 현재 권한 화면의 핵심 위험은 색상이나 카드 외형보다 `역할/권한/구성원`의 상태 구분과 변경 피드백이다. 시스템 역할 disabled 상태, 부분 선택, dirty 저장 상태를 checkbox 색상만으로 전달하지 않도록 한다.
+- 구성원 검색에서 결과를 통째로 skeleton으로 바꾸면 체크 대상이 사라지고 사용자가 요청이 끝났는지 판단할 수 없다. old rows 보존과 selection persistence를 기본 규칙으로 고정한다.
+- 검색 버튼과 상시 로딩 문구는 작업대의 흐름을 끊으므로 제거한다. 초기 진입 skeleton과 이후의 미세한 pending opacity를 구분한다.
+- 첨부 캡처의 강한 blur/어두운 배경/ASCII 프레임/임의 권한 항목은 기존 디자인 철학과 도메인 계약을 확인하지 않고 이식하지 않는다. 화면 구조를 확장하기보다 재현 가능한 크래시와 상태 전달부터 해결한다.
+
+### 검증 계획
+
+- `pnpm --filter @soc/web typecheck`, lint, build를 실행한다.
+- 역할 추가 모달에서 역할명·설명 입력, 운영 콘텐츠에서 제목·본문·URL·날짜·checkbox 입력을 각각 수행하고 페이지 예외가 없는지 확인한다.
+- 구성원 modal에서 최초 skeleton → 검색어 입력 → 이전 rows 유지/opacity → 최신 rows 교체, 페이지 이동 후 선택 유지, select-all 해제를 확인한다.
+- 작성/수정·설문·메일 editor에서 배너 X가 안내만 닫고, `새로 쓰기`가 의도된 초기화/route 동작을 수행하는지 확인한다.
+
+## 14. 과비·권한 화면 최신 정정 — 2026-08-23
+
+- 구성원 편집 modal은 `h-[min(720px,calc(100dvh-3rem))]` 고정 surface와 내부 결과 scroll을 사용한다. footer에는 `전체 n명 · 선택 n명`을 한 줄로 표시하고 검색 debounce 안내 문구는 제거한다.
+- 과비 목록은 `체크박스 | 이름(영문명) | 학번 | 이메일 | 전공 | 상태 | 수납액` 7개 컬럼으로 정리한다. `작업` 컬럼과 행 끝 화살표를 삭제하고 행 click만 상세 드로어 진입점으로 유지한다.
+- 선택 상태에서도 table header의 첫 셀과 현재 페이지 전체선택 checkbox는 유지한다. 나머지 header 영역만 선택 수·일괄 납부 action으로 교체해 header 높이와 column alignment가 변하지 않도록 한다.
+- 납부 modal에서는 `적용 시작 학기`를 제거하고 화면의 기준 학기를 원장 적용 시작 학기로 자동 사용한다. `적용 학기 수` dropdown 폭을 확보하고, 납부 table 용어를 `수납액`, `현재 상태`로 정리한다. XLSX 내보내기 컬럼도 `수납액`으로 통일한다.
+- 납부 상세 502는 API 기능 오류와 Docker 재기동 중 nginx upstream stale IP를 분리해 확인한다. 로컬 nginx는 Docker DNS resolver로 `api` service를 재조회하고 `/api/...`를 `/v1/...`로 rewrite하도록 하여 API container 재생성 후에도 새 IP로 복귀하게 한다.
+
+검증: permission/finance web typecheck·lint·build, API typecheck·lint, `git diff --check`, Docker API/Web/nginx 재빌드 후 `/health`와 인증된 과비 상세 GET을 확인한다. 첨부 이미지는 기존 문제를 파악하는 참고 자료이며, 최신 직접 지시와 확정 디자인 원칙에 충돌하는 표현은 이식하지 않는다.

@@ -10,12 +10,14 @@ import type {
   UpdateQuestionSchema,
   UpdateSectionSchema,
   UpdateSurveySchema,
+  ReorderSurveyQuestionsSchema,
+  ReorderSurveySectionsSchema,
 } from "../schemas.js";
 
 export type ResponseStatus = 'submitted';
 export type QuestionType = z.infer<typeof QuestionTypeSchema>;
 export type ComputedSurveyState = 'before_open' | 'open' | 'closed';
-export type SurveyLifecycleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type SurveyLifecycleStatus = 'DRAFT' | 'PUBLISHED';
 
 export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
 export type SurveyQuestionConfig = z.infer<typeof QuestionConfigSchema>;
@@ -38,7 +40,6 @@ export interface SurveyRecord {
   isKoreanOnly: boolean;
   isPublished: boolean;
   lifecycleStatus: SurveyLifecycleStatus;
-  archivedAt: string | null;
   previousVersionId: string | null;
   versionNumber: number;
   derivedVersionCount: number;
@@ -46,6 +47,7 @@ export interface SurveyRecord {
   maxResponses: number | null;
   isAlwaysOpen: boolean;
   opensAt: string | null;
+  closesAt: string | null;
   createdAt: string;
   updatedAt: string;
   responseCount?: number;
@@ -120,6 +122,8 @@ export type UpdateSectionRequest = z.infer<typeof UpdateSectionSchema>;
 export type CreateQuestionRequest = z.infer<typeof CreateQuestionSchema>;
 
 export type UpdateQuestionRequest = z.infer<typeof UpdateQuestionSchema>;
+export type ReorderSurveySectionsRequest = z.infer<typeof ReorderSurveySectionsSchema>;
+export type ReorderSurveyQuestionsRequest = z.infer<typeof ReorderSurveyQuestionsSchema>;
 
 export type SubmitResponseRequest = z.infer<typeof SubmitResponseSchema>;
 
@@ -150,6 +154,19 @@ export interface SurveyChoiceAnalyticsItem {
   percentage: number;
 }
 
+export interface SurveyGridAnalyticsCell {
+  rowValue: string;
+  columnValue: string;
+  count: number;
+  percentage: number;
+}
+
+export interface SurveyGridAnalytics {
+  rows: QuestionOption[];
+  columns: QuestionOption[];
+  cells: SurveyGridAnalyticsCell[];
+}
+
 export interface SurveyQuestionAnalyticsItem {
   questionId: string;
   questionType: QuestionType;
@@ -157,6 +174,7 @@ export interface SurveyQuestionAnalyticsItem {
   titleEn: string | null;
   totalAnswers: number;
   choices?: SurveyChoiceAnalyticsItem[];
+  grid?: SurveyGridAnalytics;
   rawAnswersHidden: boolean;
 }
 
@@ -172,6 +190,7 @@ export interface SurveyAnalyticsResponse {
   computedState: ComputedSurveyState;
   isAlwaysOpen: boolean;
   opensAt: string | null;
+  closesAt: string | null;
   titleKo: string;
   titleEn: string | null;
   totalResponses: number;

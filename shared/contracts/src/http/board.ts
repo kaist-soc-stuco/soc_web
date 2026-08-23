@@ -8,11 +8,8 @@ import type {
   BoardReorderSchema,
   BoardUpdateSchema,
   CommentCreateSchema,
-  CommentReportSchema,
   CommentUpdateSchema,
 } from "../schemas.js";
-
-export type BoardReadScope = "PUBLIC" | "LOGIN" | "STAFF_ONLY";
 
 export interface BoardSummary {
   boardId: number;
@@ -21,13 +18,8 @@ export interface BoardSummary {
   nameEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  readScope: BoardReadScope;
   /** 글쓰기에 필요한 permission bit 값. 0이면 제한 없음. */
   writePermissionBit: number;
-  /** 댓글에 필요한 permission bit 값. 0이면 제한 없음. */
-  commentPermissionBit: number;
-  /** 관리에 필요한 permission bit 값. 0이면 제한 없음. */
-  managePermissionBit: number;
   allowComment: boolean;
   allowSecret: boolean;
   allowLike: boolean;
@@ -47,6 +39,11 @@ export interface BoardArchiveResponse {
   ok: boolean;
   boardId: number;
   isActive: false;
+}
+
+export interface BoardDeleteResponse {
+  ok: boolean;
+  boardId: number;
 }
 
 export type ArticleStatus = "DRAFT" | "PUBLISHED" | "HIDDEN" | "DELETED";
@@ -85,6 +82,7 @@ export interface ArticleListItem {
   eventDescriptionKo?: string | null;
   eventDescriptionEn?: string | null;
   surveyId?: string | null;
+  survey?: SurveySummary | null;
   boardCode?: string;
 }
 
@@ -116,6 +114,9 @@ export interface SurveySummary {
   feeRequirementPolicy: string;
   isAlwaysOpen: boolean;
   openAt?: string;
+  closeAt?: string;
+  maxResponses?: number | null;
+  responseCount?: number;
 }
 
 export interface ArticleDetailResponse {
@@ -236,7 +237,6 @@ export interface CommentItem {
   author: ArticleAuthorSummary;
   likeCount: number;
   viewerHasLiked: boolean;
-  viewerHasReported: boolean;
 }
 
 export interface CommentListResponse {
@@ -248,8 +248,6 @@ export interface CommentListResponse {
 
 export type CommentCreateRequest = z.infer<typeof CommentCreateSchema>;
 
-export type CommentReportRequest = z.infer<typeof CommentReportSchema>;
-
 export type CommentEngagementKind = "LIKE";
 
 export interface CommentEngagementResponse {
@@ -258,13 +256,6 @@ export interface CommentEngagementResponse {
   active: boolean;
   likeCount: number;
   viewerHasLiked: boolean;
-  viewerHasReported: boolean;
-}
-
-export interface CommentReportResponse {
-  commentId: string;
-  reported: boolean;
-  reportId: string;
 }
 
 export interface CommentCreateResponse {

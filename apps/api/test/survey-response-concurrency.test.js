@@ -45,7 +45,6 @@ const USER_TWO = "00000000-0000-4000-8000-000000000002";
 const SINGLE_SURVEY = "10000000-0000-4000-8000-000000000001";
 const MULTIPLE_SURVEY = "10000000-0000-4000-8000-000000000002";
 const CAPACITY_SURVEY = "10000000-0000-4000-8000-000000000003";
-const ARCHIVE_SURVEY = "10000000-0000-4000-8000-000000000004";
 const DELETE_SURVEY = "10000000-0000-4000-8000-000000000005";
 const STRUCTURE_SURVEY = "10000000-0000-4000-8000-000000000006";
 const STATE_SURVEY = "10000000-0000-4000-8000-000000000007";
@@ -289,54 +288,10 @@ test(
 );
 
 test(
-  "archive commits before a stale submission and the authoritative check rejects it",
-  integrationOptions,
-  async () => {
-    await insertSurvey({ id: ARCHIVE_SURVEY, showOnCalendar: true });
-    const entered = deferred();
-    const release = deferred();
-    const pausingPolicy = {
-      withSurveyLock: (surveyId, mutation) =>
-        mutationPolicy.withSurveyLock(surveyId, async (tx) => {
-          entered.resolve();
-          await release.promise;
-          return mutation(tx);
-        }),
-    };
-    const surveysService = createSurveysService(pausingPolicy);
-
-    const archivePromise = surveysService.archive(ARCHIVE_SURVEY);
-    await entered.promise;
-    const submissionPromise = submit(ARCHIVE_SURVEY, USER_ONE);
-
-    try {
-      await assertStillPending(submissionPromise);
-    } finally {
-      release.resolve();
-    }
-
-    const [archived, submission] = await Promise.all([
-      archivePromise,
-      submissionPromise,
-    ]);
-    assert.equal(archived.isPublished, false);
-    assert.equal(archived.lifecycleStatus, "ARCHIVED");
-    assert.ok(archived.archivedAt);
-    assert.equal(archived.showOnCalendar, false);
-    assert.equal(submission.status, "survey_not_published");
-    const { rows } = await pool.query(
-      "SELECT count(*)::int AS count FROM survey_responses WHERE survey_id = $1",
-      [ARCHIVE_SURVEY],
-    );
-    assert.equal(rows[0].count, 0);
-  },
-);
-
-test(
   "hard deletion commits before a stale submission and leaves no orphan response",
   integrationOptions,
   async () => {
-    await insertSurvey({ id: DELETE_SURVEY, isPublished: false });
+    await insertSurvey({ id: DELETE_SURVEY, isPublished: true });
     const entered = deferred();
     const release = deferred();
     const pausingPolicy = {
@@ -617,7 +572,7 @@ test(
 );
 
 test(
-  "duplicates an archived survey as a private unlinked version and rolls back partial copies",
+  "duplicates a survey as a private unlinked version and rolls back partial copies",
   integrationOptions,
   async () => {
     const { rows: boardRows } = await pool.query(
@@ -657,8 +612,6 @@ test(
     );
 
     const surveysService = createSurveysService();
-    const archived = await surveysService.archive(DUPLICATE_SURVEY);
-    assert.equal(archived.lifecycleStatus, "ARCHIVED");
     const duplicated = await surveysService.duplicate(
       DUPLICATE_SURVEY,
       USER_TWO,
@@ -697,14 +650,6 @@ test(
       "DELETE FROM survey_responses WHERE survey_id = $1",
       [DUPLICATE_SURVEY],
     );
-    await assert.rejects(
-      surveysService.delete(DUPLICATE_SURVEY),
-      (error) => {
-        assert.ok(error instanceof ConflictException);
-        assert.equal(error.message, "survey_delete_requires_draft");
-        return true;
-      },
-    );
 
     const { rows: beforeFailureRows } = await pool.query(
       "SELECT count(*)::int AS count FROM survey",
@@ -728,5 +673,12 @@ test(
       "SELECT count(*)::int AS count FROM survey",
     );
     assert.equal(afterFailureRows[0].count, beforeFailureRows[0].count);
+
+    await surveysService.delete(DUPLICATE_SURVEY);
+    const { rows: afterDeleteRows } = await pool.query(
+      "SELECT count(*)::int AS count FROM survey WHERE survey_id = $1",
+      [DUPLICATE_SURVEY],
+    );
+    assert.equal(afterDeleteRows[0].count, 0);
   },
 );

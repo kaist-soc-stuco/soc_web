@@ -1,5 +1,5 @@
 import {
-  ConflictException,
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,6 +12,7 @@ import { SurveySectionsRepository } from "./survey-sections.repository";
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveyResponsesRepository } from "./survey-responses.repository";
 import { SurveyMutationPolicy } from "./survey-mutation-policy";
+import { assertPublishableSurveyDefinition } from "./survey-definition-validation";
 
 import type { SurveyRecordWithState } from "./entities/survey.entity";
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
@@ -39,6 +40,7 @@ export class SurveysService {
     isPublished: boolean;
     isAlwaysOpen?: boolean;
     opensAt: string | null;
+    closesAt?: string | null;
   }): ComputedSurveyState {
     if (!survey.isPublished) {
       return "closed";
@@ -52,6 +54,9 @@ export class SurveysService {
 
     if (survey.opensAt && isoToMs(survey.opensAt) > now) {
       return "before_open";
+    }
+    if (survey.closesAt && isoToMs(survey.closesAt) <= now) {
+      return "closed";
     }
     return "open";
   }
@@ -140,6 +145,9 @@ export class SurveysService {
   }
 
   async create(creatorId: string, dto: CreateSurveyDto): Promise<SurveyRecordWithState> {
+    if (dto.isPublished) {
+      throw new BadRequestException("survey_publish_requires_saved_definition");
+    }
     const survey = await this.surveysRepo.insert(creatorId, dto);
     const computedState = this.computeState(survey);
     return { ...survey, computedState, responseCount: 0 };
@@ -149,10 +157,29 @@ export class SurveysService {
     return this.mutationPolicy.withSurveyLock(id, async (tx) => {
       const current = await this.surveysRepo.findById(id, tx);
       if (!current) throw new NotFoundException("survey_not_found");
-      if (current.lifecycleStatus === "ARCHIVED") {
-        throw new ConflictException("survey_archived_immutable");
-      }
       await this.mutationPolicy.assertMeaningMutable(tx, id, current, dto);
+
+      const isAlwaysOpen = dto.isAlwaysOpen ?? current.isAlwaysOpen;
+      const opensAt = isAlwaysOpen ? null : dto.openAt === undefined ? current.opensAt : dto.openAt;
+      const closesAt = isAlwaysOpen ? null : dto.closeAt === undefined ? current.closesAt : dto.closeAt;
+      if (opensAt && closesAt && isoToMs(opensAt) >= isoToMs(closesAt)) {
+        throw new BadRequestException("survey_invalid_schedule");
+      }
+
+      if (dto.isPublished === true) {
+        const sections = await this.sectionsRepo.findBySurveyId(id, tx);
+        const withQuestions = await Promise.all(sections.map(async (section) => ({
+          ...section,
+          questions: await this.questionsRepo.findBySectionId(section.id, tx),
+        })));
+        assertPublishableSurveyDefinition(
+          {
+            isKoreanOnly: dto.isKoreanOnly ?? current.isKoreanOnly,
+            titleEn: dto.titleEn === undefined ? current.titleEn : dto.titleEn ?? null,
+          },
+          withQuestions,
+        );
+      }
 
       const survey = await this.surveysRepo.update(id, dto, tx);
       if (!survey) throw new NotFoundException("survey_not_found");
@@ -172,35 +199,9 @@ export class SurveysService {
     );
   }
 
-  async archive(id: string): Promise<SurveyRecordWithState> {
-    return this.mutationPolicy.withSurveyLock(id, async (tx) => {
-      const current = await this.surveysRepo.findById(id, tx);
-      if (!current) throw new NotFoundException("survey_not_found");
-
-      if (current.lifecycleStatus === "ARCHIVED") {
-        return {
-          ...current,
-          computedState: this.computeState(current),
-          responseCount: current.responseCount ?? 0,
-        };
-      }
-
-      const survey = await this.surveysRepo.archive(id, tx);
-      if (!survey) throw new NotFoundException("survey_not_found");
-
-      return {
-        ...survey,
-        computedState: this.computeState(survey),
-        responseCount: current.responseCount ?? 0,
-        derivedVersionCount: current.derivedVersionCount,
-      };
-    });
-  }
-
   async duplicate(id: string, creatorId: string): Promise<SurveyRecordWithState> {
     return this.mutationPolicy.withSurveyLock(id, async (tx) => {
-      // Duplication is a manager operation and must be able to read drafts and
-      // archived surveys without going through the public detail access gate.
+      // Duplication is a manager operation and reads the saved survey directly.
       const original = await this.surveysRepo.findById(id, tx);
       if (!original) throw new NotFoundException("survey_not_found");
 
@@ -215,7 +216,7 @@ export class SurveysService {
       const newSurvey = await this.surveysRepo.insert(
         creatorId,
         {
-          kind: original.kind,
+          kind: original.kind as CreateSurveyDto["kind"],
           titleKo: `${original.titleKo} (복사본)`,
           titleEn: original.titleEn ? `${original.titleEn} (Copy)` : undefined,
           descriptionKo: original.descriptionKo ?? undefined,
@@ -228,6 +229,7 @@ export class SurveysService {
           resultVisibility: "PRIVATE",
           maxResponseCount: original.maxResponses ?? undefined,
           openAt: original.opensAt ?? undefined,
+          closeAt: original.closesAt ?? undefined,
           isAlwaysOpen: original.isAlwaysOpen,
         },
         tx,
@@ -402,6 +404,53 @@ export class SurveysService {
               };
             }
 
+            if (q.questionType === "grid_single" || q.questionType === "grid_multiple") {
+              const rows = q.config?.rows ?? [];
+              const columns = q.config?.columns ?? [];
+              const counts = new Map<string, number>();
+              const rowAnswerCounts = new Map<string, number>();
+
+              for (const answer of questionAnswers) {
+                const grid = answer.content?.grid;
+                if (!grid || typeof grid !== "object") continue;
+                for (const [rowValue, selected] of Object.entries(grid as Record<string, unknown>)) {
+                  const selectedValues = Array.isArray(selected) ? selected : [selected];
+                  if (selectedValues.some((value) => typeof value === "string")) {
+                    rowAnswerCounts.set(rowValue, (rowAnswerCounts.get(rowValue) ?? 0) + 1);
+                  }
+                  for (const columnValue of selectedValues) {
+                    if (typeof columnValue !== "string") continue;
+                    const key = `${rowValue}\u0000${columnValue}`;
+                    counts.set(key, (counts.get(key) ?? 0) + 1);
+                  }
+                }
+              }
+
+              return {
+                questionId: q.id,
+                questionType: q.questionType,
+                titleKo: q.titleKo,
+                titleEn: q.titleEn,
+                totalAnswers,
+                grid: {
+                  rows,
+                  columns,
+                  cells: rows.flatMap((row) => columns.map((column) => {
+                    const count = counts.get(`${row.value}\u0000${column.value}`) ?? 0;
+                    return {
+                      rowValue: row.value,
+                      columnValue: column.value,
+                      count,
+                      percentage: (rowAnswerCounts.get(row.value) ?? 0) > 0
+                        ? Math.round((count / (rowAnswerCounts.get(row.value) ?? 1)) * 1_000) / 10
+                        : 0,
+                    };
+                  })),
+                },
+                rawAnswersHidden: false,
+              };
+            }
+
             // Free text and temporal values are intentionally never part of
             // the analytics DTO. Managers can review raw responses through
             // the permission-protected response endpoints instead.
@@ -430,6 +479,7 @@ export class SurveysService {
       computedState: survey.computedState,
       isAlwaysOpen: survey.isAlwaysOpen,
       opensAt: survey.opensAt,
+      closesAt: survey.closesAt,
       titleKo: survey.titleKo,
       titleEn: survey.titleEn,
       totalResponses,

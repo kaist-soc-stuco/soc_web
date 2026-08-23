@@ -6,7 +6,6 @@ import {
   BoardDetailArticleCard,
   BoardDetailBackLink,
   BoardDetailBreadcrumb,
-  BoardDetailFloatingActions,
 } from "@/features/board-detail/board-detail-sections";
 import { useBoardDetailPageController } from "@/features/board-detail/use-board-detail-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
@@ -17,7 +16,7 @@ export function BoardDetailPage() {
     article,
     attachmentAssets,
     canCreateComment,
-    canEdit,
+    canManageArticle,
     canManageComments,
     category,
     commentActionSubmitting,
@@ -33,7 +32,6 @@ export function BoardDetailPage() {
     handleCreateReply,
     handleDeleteArticle,
     handleDeleteComment,
-    handleReportComment,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,
@@ -95,15 +93,21 @@ export function BoardDetailPage() {
           <BoardDetailArticleCard
             article={article}
             attachmentAssets={attachmentAssets}
-            canEdit={canEdit}
+            canManageArticle={canManageArticle}
             category={category}
             categoryLabel={displayBoardLabel}
             content={content}
             lang={lang}
             onDeleteArticle={() => void handleDeleteArticle()}
+            onShare={() => void handleShareArticle()}
+            onToggle={(kind, active) =>
+              void handleSetArticleEngagement(kind, active)
+            }
             posterAsset={posterAsset}
+            shareCopied={shareCopied}
             surveyDescription={surveyDescription}
             surveyTitle={surveyTitle}
+            submitting={engagementSubmitting}
             title={title}
           />
 
@@ -123,7 +127,6 @@ export function BoardDetailPage() {
             onCreateComment={handleCreateComment}
             onCreateReply={handleCreateReply}
             onDeleteComment={handleDeleteComment}
-            onReportComment={handleReportComment}
             onSetCommentEngagement={handleSetCommentEngagement}
             onReplyTextChange={setReplyText}
             onReplyTargetChange={setReplyTargetId}
@@ -138,20 +141,6 @@ export function BoardDetailPage() {
           />
         </div>
       </main>
-
-      <BoardDetailFloatingActions
-        lang={lang}
-        likeCount={article.likeCount}
-        scrapCount={article.scrapCount}
-        viewerHasLiked={article.viewerHasLiked}
-        viewerHasScrapped={article.viewerHasScrapped}
-        submitting={engagementSubmitting}
-        shareCopied={shareCopied}
-        onShare={() => void handleShareArticle()}
-        onToggle={(kind, active) =>
-          void handleSetArticleEngagement(kind, active)
-        }
-      />
 
     </PageShell>
   );

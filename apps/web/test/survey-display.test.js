@@ -25,7 +25,6 @@ function survey(overrides = {}) {
     isKoreanOnly: false,
     isPublished: true,
     lifecycleStatus: "PUBLISHED",
-    archivedAt: null,
     previousVersionId: null,
     versionNumber: 1,
     derivedVersionCount: 0,
@@ -44,33 +43,6 @@ test("returns draft status for unpublished surveys", () => {
   assert.deepEqual(
     getSurveyStatusInfo(survey({ isPublished: false }), true, NOW),
     { label: "임시저장", tone: "draft" },
-  );
-});
-
-test("keeps archived surveys distinct from editable drafts", () => {
-  const archived = survey({
-    archivedAt: "2026-05-30T00:00:00.000Z",
-    isPublished: false,
-    lifecycleStatus: "ARCHIVED",
-  });
-
-  assert.deepEqual(getSurveyStatusInfo(archived, true, NOW), {
-    label: "보관됨",
-    tone: "archived",
-  });
-  assert.deepEqual(
-    filterAndSortSurveys(
-      [archived, survey({ id: "draft", isPublished: false, lifecycleStatus: "DRAFT" })],
-      {
-        periodFilter: "all",
-        searchQuery: "",
-        sortBy: "updatedAt",
-        statusFilter: "draft",
-        typeFilter: "all",
-      },
-      NOW,
-    ).map((item) => item.id),
-    ["draft"],
   );
 });
 
@@ -103,7 +75,7 @@ test("falls back to open and close timestamps when computed state is absent", ()
       true,
       NOW,
     ),
-    { label: "개시 전", tone: "beforeOpen" },
+    { label: "시작 예정", tone: "beforeOpen" },
   );
 });
 

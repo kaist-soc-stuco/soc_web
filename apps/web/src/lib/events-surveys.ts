@@ -44,6 +44,10 @@ export interface UnifiedItem {
   viewerHasLiked?: boolean;
   viewerHasScrapped?: boolean;
   allowLike?: boolean;
+  linkedSurveyState?: ComputedSurveyState | null;
+  linkedSurveyFeePayersOnly?: boolean;
+  linkedSurveyMaxResponses?: number | null;
+  linkedSurveyResponseCount?: number;
 }
 
 export interface CalendarEvent {
@@ -134,7 +138,7 @@ export const getPeriodText = (item: UnifiedItem) => {
   const start = formatCompactDateTime(item.opensAt);
   const end = formatCompactDateTime(item.closesAt);
 
-  if (start && end) return `${start} ～ ${end}`;
+  if (start && end) return start === end ? start : `${start} ～ ${end}`;
   return start || end || "";
 };
 
@@ -143,12 +147,97 @@ export const getCardPeriodText = (item: UnifiedItem, lang: "ko" | string = "ko")
     return lang === "ko" ? "상시" : "Always open";
   }
 
+  if (item.kind === "EVENT") {
+    return formatEventCardPeriod(item.opensAt, item.closesAt, lang);
+  }
+
   const start = formatCardDate(item.opensAt);
   const end = formatCardDate(item.closesAt);
 
-  if (start && end) return `${start} ～ ${end}`;
+  if (start && end) return start === end ? start : `${start} ～ ${end}`;
   return start || end || "";
 };
+
+function formatEventCardPeriod(
+  startValue: string | null,
+  endValue: string | null,
+  lang: string,
+) {
+  const startDate = startValue ? isoToDate(startValue) : null;
+  const endDate = endValue ? isoToDate(endValue) : startDate;
+  if (!startDate || Number.isNaN(startDate.getTime())) return "";
+  if (!endDate || Number.isNaN(endDate.getTime())) {
+    return formatEventCardDate(startDate, lang);
+  }
+
+  const startText = formatEventCardDate(startDate, lang);
+  const endText = formatEventCardDate(endDate, lang);
+  const sameDay = isSameLocalDay(startDate, endDate);
+
+  if (isAllDayRange(startDate, endDate)) {
+    return sameDay
+      ? `${startText} ${lang === "ko" ? "종일" : "All day"}`
+      : `${startText} 〜 ${endText} ${lang === "ko" ? "종일" : "All day"}`;
+  }
+
+  const startTime = formatEventCardTime(startDate, lang);
+  const endTime = formatEventCardTime(endDate, lang);
+  if (sameDay) {
+    return startTime === endTime
+      ? `${startText} ${startTime}`
+      : `${startText} ${startTime} 〜 ${endTime}`;
+  }
+
+  return `${startText} ${startTime} 〜 ${endText} ${endTime}`;
+}
+
+function formatEventCardDate(date: Date, lang: string) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const weekday = new Intl.DateTimeFormat(
+    lang === "ko" ? "ko-KR" : "en-US",
+    { weekday: "short" },
+  ).format(date);
+
+  return lang === "ko"
+    ? `${month}.${day} (${weekday})`
+    : `${month}/${day} (${weekday})`;
+}
+
+function formatEventCardTime(date: Date, lang: string) {
+  return new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function isAllDayRange(startDate: Date, endDate: Date) {
+  const startsAtDayBoundary =
+    startDate.getHours() === 0 &&
+    startDate.getMinutes() === 0 &&
+    startDate.getSeconds() === 0 &&
+    startDate.getMilliseconds() === 0;
+  const endsAtDayBoundary =
+    endDate.getHours() === 0 &&
+    endDate.getMinutes() === 0 &&
+    endDate.getSeconds() === 0 &&
+    endDate.getMilliseconds() === 0;
+  const endsAtDayClose =
+    endDate.getHours() === 23 &&
+    endDate.getMinutes() === 59 &&
+    endDate.getSeconds() === 59;
+
+  return startsAtDayBoundary && (endsAtDayBoundary || endsAtDayClose);
+}
+
+function isSameLocalDay(first: Date, second: Date) {
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
+}
 
 export const buildUnifiedItems = (
   surveys: SurveyRecordWithState[],
@@ -166,7 +255,7 @@ export const buildUnifiedItems = (
     descriptionEn: survey.descriptionEn,
     computedState: survey.computedState,
     opensAt: survey.opensAt,
-    closesAt: null,
+    closesAt: survey.closesAt,
     feePayersOnly: survey.feePayersOnly,
     isKoreanOnly: survey.isKoreanOnly,
     resultVisibility: survey.resultVisibility,
@@ -178,36 +267,56 @@ export const buildUnifiedItems = (
     isAlwaysOpen: survey.isAlwaysOpen,
   }));
 
-  const mappedEvents: UnifiedItem[] = events.map((event) => ({
-    id: event.articleId,
-    kind: "EVENT",
-    titleKo: event.titleKo,
-    titleEn: event.titleEn ?? null,
-    descriptionKo: event.eventDescriptionKo ?? null,
-    descriptionEn: event.eventDescriptionEn ?? null,
-    computedState: getEventArticleState(event, currentMs),
-    opensAt: event.eventStartDate ?? null,
-    closesAt: event.eventEndDate ?? null,
-    surveyId: event.surveyId,
-    feePayersOnly: false,
-    // Article visibility controls who may read an event; it is not a language flag.
-    isKoreanOnly:
-      !event.titleEn?.trim() || !event.eventDescriptionEn?.trim(),
-    resultVisibility: "PRIVATE",
-    maxResponses: null,
-    responseCount: 0,
-    visibilityScope: event.visibilityScope,
-    isPinned: event.isPinned,
-    pinOrder: event.pinOrder ?? null,
-    isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
-    imageUrl: event.imageUrl ?? null,
-    articleBoardCode: event.boardCode ?? "행사",
-    likeCount: event.likeCount,
-    scrapCount: event.scrapCount,
-    viewerHasLiked: event.viewerHasLiked,
-    viewerHasScrapped: event.viewerHasScrapped,
-    allowLike: true,
-  }));
+  const mappedEvents: UnifiedItem[] = events.map((event) => {
+    const linkedSurvey =
+      event.survey ??
+      (event.surveyId
+        ? surveys.find((survey) => survey.id === event.surveyId)
+        : undefined);
+
+    return {
+      id: event.articleId,
+      kind: "EVENT",
+      titleKo: event.titleKo,
+      titleEn: event.titleEn ?? null,
+      descriptionKo: event.eventDescriptionKo ?? null,
+      descriptionEn: event.eventDescriptionEn ?? null,
+      computedState: getEventArticleState(event, currentMs),
+      opensAt: event.eventStartDate ?? null,
+      closesAt: event.eventEndDate ?? null,
+      surveyId: event.surveyId ?? event.survey?.surveyId ?? null,
+      linkedSurveyState:
+        (linkedSurvey?.computedState as ComputedSurveyState | undefined) ?? null,
+      linkedSurveyFeePayersOnly:
+        event.survey
+          ? event.survey.feeRequirementPolicy === "PAID_ONLY"
+          : linkedSurvey && "feePayersOnly" in linkedSurvey
+            ? linkedSurvey.feePayersOnly
+            : false,
+      linkedSurveyMaxResponses:
+        event.survey?.maxResponses ?? linkedSurvey?.maxResponses ?? null,
+      linkedSurveyResponseCount:
+        event.survey?.responseCount ?? linkedSurvey?.responseCount ?? 0,
+      feePayersOnly: false,
+      // Article visibility controls who may read an event; it is not a language flag.
+      isKoreanOnly:
+        !event.titleEn?.trim() || !event.eventDescriptionEn?.trim(),
+      resultVisibility: "PRIVATE",
+      maxResponses: null,
+      responseCount: 0,
+      visibilityScope: event.visibilityScope,
+      isPinned: event.isPinned,
+      pinOrder: event.pinOrder ?? null,
+      isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
+      imageUrl: event.imageUrl ?? null,
+      articleBoardCode: event.boardCode ?? "행사",
+      likeCount: event.likeCount,
+      scrapCount: event.scrapCount,
+      viewerHasLiked: event.viewerHasLiked,
+      viewerHasScrapped: event.viewerHasScrapped,
+      allowLike: true,
+    };
+  });
 
   return [...mappedSurveys, ...mappedEvents];
 };
@@ -239,6 +348,23 @@ export const sortVisibleItems = (
           : item.computedState === stateFilter,
     )
     .sort((a, b) => {
+      const stateOrder = { open: 0, before_open: 1, closed: 2 };
+      if (a.computedState !== b.computedState) {
+        return stateOrder[a.computedState] - stateOrder[b.computedState];
+      }
+
+      const aAreEvents = a.kind === "EVENT" && b.kind === "EVENT";
+      if (aAreEvents) {
+        if (a.computedState === "before_open") {
+          return getItemStartTime(a) - getItemStartTime(b);
+        }
+        if (a.computedState === "closed") {
+          return getItemDeadlineTime(b) - getItemDeadlineTime(a);
+        }
+
+        return getItemDeadlineTime(a) - getItemDeadlineTime(b);
+      }
+
       if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
         return a.isPinned ? -1 : 1;
       }
@@ -246,10 +372,6 @@ export const sortVisibleItems = (
         const aPinOrder = a.pinOrder ?? Number.MAX_SAFE_INTEGER;
         const bPinOrder = b.pinOrder ?? Number.MAX_SAFE_INTEGER;
         if (aPinOrder !== bPinOrder) return aPinOrder - bPinOrder;
-      }
-      const stateOrder = { before_open: 0, open: 1, closed: 2 };
-      if (a.computedState !== b.computedState) {
-        return stateOrder[a.computedState] - stateOrder[b.computedState];
       }
       if (sortBy === "deadline") {
         return getItemDeadlineTime(a) - getItemDeadlineTime(b);
