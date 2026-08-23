@@ -22,6 +22,15 @@ interface QuestionInputProps {
   value: AnswerValue;
 }
 
+function normalizeDatetimeLocalValue(value: unknown) {
+  if (typeof value !== "string" || value.length === 0) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00`;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+    return value.slice(0, 16);
+  }
+  return "";
+}
+
 export function SurveyQuestionInput({
   question,
   value,
@@ -37,7 +46,7 @@ export function SurveyQuestionInput({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const base =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-[14px] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20";
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20";
   const controlClass = `${base}${error ? " border-rose-500 ring-2 ring-rose-500/20" : ""}`;
   const renderError = error ? (
     <p className="mt-1 text-xs font-normal text-rose-600" role="alert">
@@ -148,7 +157,7 @@ export function SurveyQuestionInput({
                   disabled={disabled}
                   className="hidden"
                 />
-                <span className="text-[14px] leading-5">
+                <span className="text-[length:var(--ui-text-body-size)] leading-5">
                   {getOptionLabel(opt)}
                 </span>
               </label>
@@ -201,7 +210,7 @@ export function SurveyQuestionInput({
                   disabled={disabled}
                   className="hidden"
                 />
-                <span className="text-[14px] leading-5">
+                <span className="text-[length:var(--ui-text-body-size)] leading-5">
                   {getOptionLabel(opt)}
                 </span>
               </label>
@@ -363,7 +372,7 @@ export function SurveyQuestionInput({
           <UiInput
             className={controlClass}
             type="datetime-local"
-            value={value as string}
+            value={normalizeDatetimeLocalValue(value)}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={Boolean(error)}
             disabled={disabled}

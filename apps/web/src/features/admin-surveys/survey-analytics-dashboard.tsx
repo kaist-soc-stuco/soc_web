@@ -74,15 +74,15 @@ function ResponseTrend({ responses }: { responses: SurveyResponseWithAnswers[] }
   return (
     <AdminCard className="p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h2 className="text-[15px] font-medium text-[#172033]">최근 14일 응답 추이</h2>
+        <h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[#172033]">최근 14일 응답 추이</h2>
         <span className="text-xs font-normal text-[#344054]">제출 완료 기준</span>
       </div>
       <div className="grid h-52 items-end gap-2 border-b border-[#e5eaf0] px-1" style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}>
         {trend.map((item, index) => (
           <div key={item.key} className="flex h-full min-w-0 flex-col justify-end gap-2" title={`${item.label} · ${item.count}건`}>
-            <span className="text-center text-[11px] font-normal tabular-nums text-[#344054]">{item.count || ""}</span>
+            <span className="text-center text-[length:var(--ui-text-caption-size)] font-normal tabular-nums text-[#344054]">{item.count || ""}</span>
             <div className="mx-auto w-full max-w-8 rounded-t bg-[#75b69d]" style={{ height: `${Math.max(item.count > 0 ? 8 : 2, (item.count / maximum) * 128)}px`, opacity: item.count > 0 ? 1 : 0.2 }} />
-            <span className="truncate pb-2 text-center text-[10px] font-normal tabular-nums text-[#344054]">{index % 2 === 0 || index === trend.length - 1 ? item.label : ""}</span>
+            <span className="truncate pb-2 text-center text-[length:var(--ui-text-micro-size)] font-normal tabular-nums text-[#344054]">{index % 2 === 0 || index === trend.length - 1 ? item.label : ""}</span>
           </div>
         ))}
       </div>
@@ -141,7 +141,7 @@ export function SurveyQuestionSummary({ analytics, questions, responses }: { ana
         return (
           <AdminCard key={question.id} className="p-5">
             <div className="mb-4 flex items-start justify-between gap-4 border-b border-[#edf1f4] pb-4">
-              <div className="min-w-0"><p className="text-xs font-normal text-[#344054]">문항 {index + 1}</p><h2 className="mt-1 text-[15px] font-medium leading-6 text-[#172033]">{question.titleKo}</h2></div>
+              <div className="min-w-0"><p className="text-xs font-normal text-[#344054]">문항 {index + 1}</p><h2 className="mt-1 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-[#172033]">{question.titleKo}</h2></div>
               <span className="shrink-0 text-xs font-normal tabular-nums text-[#344054]">응답 {result?.totalAnswers ?? 0}건</span>
             </div>
             {result?.choices ? <ChoiceBreakdown question={result} /> : result?.grid ? <GridBreakdown question={result} /> : <RawAnswers question={question} responses={responses} />}

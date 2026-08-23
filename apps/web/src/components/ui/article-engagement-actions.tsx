@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 
 interface ArticleEngagementActionsProps {
+  isAuthenticated: boolean;
   lang: string;
   likeCount: number;
   scrapCount: number;
@@ -19,6 +20,7 @@ interface ArticleEngagementActionsProps {
 export function ArticleEngagementActions({
   allowLike = true,
   compact = false,
+  isAuthenticated,
   lang,
   likeCount,
   onToggle,
@@ -28,48 +30,44 @@ export function ArticleEngagementActions({
   viewerHasLiked,
   viewerHasScrapped,
 }: ArticleEngagementActionsProps) {
-  const [bouncingKind, setBouncingKind] = useState<ArticleEngagementKind | null>(null);
-
-  const handleToggle = (kind: ArticleEngagementKind, active: boolean) => {
-    setBouncingKind(null);
-    window.requestAnimationFrame(() => setBouncingKind(kind));
-    window.setTimeout(() => setBouncingKind(null), 150);
-    onToggle(kind, active);
-  };
-
+  const likeActive = isAuthenticated && viewerHasLiked;
+  const scrapActive = isAuthenticated && viewerHasScrapped;
   const buttonClass = compact
-    ? 'min-h-8 rounded-md px-2 text-[11px]'
+    ? 'min-h-8 rounded-md px-2 text-[length:var(--ui-text-caption-size)]'
     : 'min-h-9 rounded-lg px-3 text-xs';
 
   return (
     <div className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
       {allowLike ? (
-        <EngagementButton
-          active={viewerHasLiked}
+        <EngagementActionButton
+          active={likeActive}
           count={likeCount}
           icon={
             <Heart
-              className={`h-3.5 w-3.5 ${viewerHasLiked ? 'text-rose-600' : 'text-slate-400'}`}
-              fill={viewerHasLiked ? 'currentColor' : 'none'}
+              className={`h-3.5 w-3.5 ${likeActive ? 'text-rose-600' : 'text-slate-400'}`}
+              fill={likeActive ? 'currentColor' : 'none'}
             />
           }
           label={lang === 'ko' ? '좋아요' : 'Like'}
           loading={submitting === 'LIKE'}
-          onClick={() => handleToggle('LIKE', !viewerHasLiked)}
-          iconClassName={bouncingKind === 'LIKE' ? 'engagement-icon-bounce' : undefined}
+          onClick={() => onToggle('LIKE', !likeActive)}
           className={buttonClass}
           tone="like"
         />
       ) : null}
-      <EngagementButton
-        active={viewerHasScrapped}
+      <EngagementActionButton
+        active={scrapActive}
         count={scrapIconOnly ? null : scrapCount}
-        icon={<Bookmark className="h-3.5 w-3.5" fill={viewerHasScrapped ? 'currentColor' : 'none'} />}
+        icon={
+          <Bookmark
+            className={`h-3.5 w-3.5 ${scrapActive ? 'text-amber-400' : 'text-slate-400'}`}
+            fill={scrapActive ? 'currentColor' : 'none'}
+          />
+        }
         label={lang === 'ko' ? '스크랩' : 'Scrap'}
         loading={submitting === 'SCRAP'}
         showLoadingIndicator={!scrapIconOnly}
-        onClick={() => handleToggle('SCRAP', !viewerHasScrapped)}
-        iconClassName={bouncingKind === 'SCRAP' ? 'engagement-icon-bounce' : undefined}
+        onClick={() => onToggle('SCRAP', !scrapActive)}
         className={scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass}
         tone="scrap"
       />
@@ -77,7 +75,7 @@ export function ArticleEngagementActions({
   );
 }
 
-function EngagementButton({
+export function EngagementActionButton({
   active,
   className,
   count,
@@ -87,7 +85,6 @@ function EngagementButton({
   onClick,
   showLoadingIndicator,
   tone,
-  iconClassName,
 }: {
   active: boolean;
   className: string;
@@ -98,17 +95,14 @@ function EngagementButton({
   onClick: () => void;
   showLoadingIndicator?: boolean;
   tone: 'like' | 'scrap';
-  iconClassName?: string;
 }) {
+  const [isBouncing, setIsBouncing] = useState(false);
   const resolvedShowLoadingIndicator = showLoadingIndicator ?? true;
   const activeClass =
     tone === 'like'
-      ? 'text-rose-600 hover:text-rose-600'
-      : 'text-amber-400 hover:text-amber-400';
-  const inactiveClass =
-    tone === 'like'
-      ? 'text-slate-400 hover:text-slate-400'
-      : 'text-slate-400 hover:text-slate-400';
+      ? 'text-rose-600'
+      : 'text-amber-400';
+  const inactiveClass = 'text-slate-400';
 
   return (
     <Button
@@ -117,12 +111,23 @@ function EngagementButton({
       aria-label={label}
       aria-pressed={active}
       disabled={loading}
-      onClick={onClick}
-      className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-colors disabled:cursor-wait disabled:opacity-60 hover:bg-slate-100 ${className} ${
+      onClick={() => {
+        setIsBouncing(false);
+        window.requestAnimationFrame(() => setIsBouncing(true));
+        window.setTimeout(() => setIsBouncing(false), 220);
+        onClick();
+      }}
+      className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-[background-color,opacity] duration-200 ease-out disabled:cursor-wait disabled:opacity-60 hover:bg-slate-100 hover:text-current ${className} ${
         active ? activeClass : inactiveClass
       }`}
     >
-      {loading && resolvedShowLoadingIndicator ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : iconClassName ? <span className={iconClassName}>{icon}</span> : icon}
+      {loading && resolvedShowLoadingIndicator ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : isBouncing ? (
+        <span className="engagement-icon-bounce">{icon}</span>
+      ) : (
+        icon
+      )}
       {count !== null ? <span className="tabular-nums">{count}</span> : null}
     </Button>
   );

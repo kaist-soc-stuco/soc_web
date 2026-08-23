@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import type { ContactRecord } from "@soc/contracts";
 
 import { AdminFormField } from "@/components/ui/admin-page";
+import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
 import { UiInput } from "@/components/ui/form-control";
 
 export interface ExecutiveMemberFormValues {
@@ -20,6 +20,7 @@ export interface ExecutiveMemberFormValues {
 interface ExecutiveMemberModalProps {
   contact: ContactRecord | null;
   onClose: () => void;
+  onDelete?: () => void | Promise<void>;
   onSave: (values: ExecutiveMemberFormValues) => Promise<void>;
   open: boolean;
   saving?: boolean;
@@ -41,6 +42,7 @@ function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormVal
 export function ExecutiveMemberModal({
   contact,
   onClose,
+  onDelete,
   onSave,
   open,
   saving = false,
@@ -60,13 +62,13 @@ export function ExecutiveMemberModal({
   };
 
   return (
-    <Modal
+    <AdminDrawer
       open={open}
       onClose={onClose}
       title={contact ? "집행부원 정보 수정" : "새 집행부원 등록"}
-      className="max-w-2xl"
       footer={
         <>
+          {contact && onDelete ? <Button type="button" variant="outline" onClick={() => void onDelete()} disabled={saving} className="mr-auto border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700">삭제</Button> : null}
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             취소
           </Button>
@@ -150,6 +152,6 @@ export function ExecutiveMemberModal({
           개인정보 제공에 동의한 집행부원만 등록해 주세요. 등록된 연락처는 권한이 있는 관리자에게만 표시됩니다.
         </p>
       </form>
-    </Modal>
+    </AdminDrawer>
   );
 }

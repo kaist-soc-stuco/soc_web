@@ -79,6 +79,8 @@ export function SurveySettingsForm({
   const isAlwaysOpen = Boolean(watch("isAlwaysOpen"));
   const isAllDay = Boolean(watch("isAllDay"));
   const connectedArticleId = watch("connectedArticleId") ?? "";
+  const openAt = watch("openAt") ?? "";
+  const closeAt = watch("closeAt") ?? "";
 
   const articleOptions = useMemo(() => {
     const options = articleSearchResults.map((article) => ({
@@ -110,9 +112,17 @@ export function SurveySettingsForm({
     setValue("closeAt", "");
   }, [isAlwaysOpen, setValue]);
 
-  const toDateOnly = (value: string) => value.split("T")[0] ?? "";
-  const toDateTime = (value: string, time: string) =>
-    value ? (value.includes("T") ? value : `${value}T${time}`) : "";
+  const toDateOnly = (value: string) =>
+    /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : "";
+  const toDateTime = (value: string, time: string) => {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+      return value.slice(0, 16);
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return `${value}T${time}`;
+    }
+    return "";
+  };
 
   const handleAllDayChange = (checked: boolean) => {
     setValue("isAllDay", checked);
@@ -364,6 +374,7 @@ export function SurveySettingsForm({
                   className={inputCls}
                   disabled={isOngoing || isAlwaysOpen}
                   {...register("openAt")}
+                  value={isAllDay ? toDateOnly(openAt) : toDateTime(openAt, "09:00")}
                 />
                 {errors.openAt && (
                   <p className="mt-1 text-xs font-normal text-red-500">
@@ -378,6 +389,7 @@ export function SurveySettingsForm({
                   className={inputCls}
                   disabled={isOngoing || isAlwaysOpen}
                   {...register("closeAt")}
+                  value={isAllDay ? toDateOnly(closeAt) : toDateTime(closeAt, "18:00")}
                 />
                 {errors.closeAt && (
                   <p className="mt-1 text-xs font-normal text-red-500">

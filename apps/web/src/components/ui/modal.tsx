@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -11,6 +11,7 @@ export function Modal({
   bodyClassName,
   dividerless = false,
   footer,
+  headerActions,
   onClose,
   open,
   showClose = true,
@@ -21,11 +22,15 @@ export function Modal({
   bodyClassName?: string;
   dividerless?: boolean;
   footer?: ReactNode;
+  headerActions?: ReactNode;
   onClose: () => void;
   open: boolean;
   showClose?: boolean;
   title: ReactNode;
 }) {
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -34,6 +39,23 @@ export function Modal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    previousActiveElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = window.requestAnimationFrame(() => {
+      surfaceRef.current?.focus({ preventScroll: true });
+    });
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      const previous = previousActiveElementRef.current;
+      previousActiveElementRef.current = null;
+      if (previous && document.contains(previous)) {
+        window.requestAnimationFrame(() => previous.focus({ preventScroll: true }));
+      }
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -46,8 +68,10 @@ export function Modal({
         onClick={onClose}
       />
       <div
+        ref={surfaceRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         className={cn(
           "ui-modal__surface relative flex max-h-[calc(100vh-3rem)] w-full max-w-md flex-col overflow-hidden rounded-[var(--ui-panel-radius)] border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_24px_80px_rgba(15,23,42,0.18)]",
           className,
@@ -59,12 +83,15 @@ export function Modal({
             dividerless ? "px-6" : "px-5",
           )}
         >
-          <h2 className="text-[18px] font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
-          {showClose ? (
-            <IconButton size="sm" aria-label="닫기" onClick={onClose}>
-              <X aria-hidden="true" />
-            </IconButton>
-          ) : null}
+          <h2 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {headerActions}
+            {showClose ? (
+              <IconButton size="sm" aria-label="닫기" onClick={onClose}>
+                <X aria-hidden="true" />
+              </IconButton>
+            ) : null}
+          </div>
         </div>
         {children ? <div className={cn("ui-modal__body scrollbar-hidden min-h-0 overflow-y-auto px-5 py-5", bodyClassName)}>{children}</div> : null}
         {footer ? (

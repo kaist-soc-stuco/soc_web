@@ -51,7 +51,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             role={isTablist ? "tab" : undefined}
             className={cn(
-              "!h-[34px] !min-h-[34px] !font-normal",
+              "!h-[var(--ui-page-tab-height)] !min-h-[var(--ui-page-tab-height)] !font-normal",
               itemClassName,
               active && "is-active",
             )}

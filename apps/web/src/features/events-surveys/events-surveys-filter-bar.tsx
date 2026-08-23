@@ -43,7 +43,7 @@ export function EventsSurveysFilterBar({
             label: (
               <span className="inline-flex items-center gap-1">
                 <span>{lang === "ko" ? filter.labelKo : filter.labelEn}</span>
-                <span className="tabular-nums text-[11px] text-slate-400">
+                <span className="tabular-nums text-[length:var(--ui-text-caption-size)] text-slate-400">
                   {stateCounts[filter.value]}
                 </span>
               </span>

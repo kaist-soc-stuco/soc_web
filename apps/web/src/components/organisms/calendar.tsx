@@ -232,7 +232,7 @@ function CalendarGridSkeleton() {
       {Array.from({ length: 42 }).map((_, index) => (
         <div
           key={index}
-          className="flex h-[24px] flex-col items-center justify-start rounded-lg py-0.5"
+          className="flex h-6 flex-col items-center justify-start rounded-lg py-0.5"
         >
           <div
             className={`home-loading-surface rounded-full ${
@@ -470,7 +470,7 @@ export function Calendar() {
           ).map((day, index) => (
             <div key={index}>
               <span
-                    className={`text-[10.5px] font-normal tracking-tight ${
+                    className={`text-[length:var(--home-calendar-day-size)] font-normal tracking-tight ${
                   index === 0
                     ? "text-red-500"
                     : index === 6
@@ -647,14 +647,14 @@ export function Calendar() {
            <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
              <div className="flex shrink-0 items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
                <div className="min-w-0">
-                 <p className="text-[10px] font-normal text-slate-400">
+                 <p className="text-[length:var(--ui-text-micro-size)] font-normal text-slate-400">
                    {lang === "ko" ? "선택한 날짜" : "Selected date"}
                  </p>
-                 <h4 className="home-calendar-body-text mt-0.5 truncate text-[13px] font-normal tabular-nums text-slate-800">
+                 <h4 className="home-calendar-body-text mt-0.5 truncate text-[length:var(--ui-text-body-sm-size)] font-normal tabular-nums text-slate-800">
                    {selectedDate ? formatShortDate(selectedDate, lang) : "—"}
                  </h4>
                </div>
-               <span className="home-calendar-body-text shrink-0 text-[10px] font-normal tabular-nums text-slate-400">
+               <span className="home-calendar-body-text shrink-0 text-[length:var(--ui-text-micro-size)] font-normal tabular-nums text-slate-400">
                  {lang === "ko"
                    ? `${selectedDateBars.length}개 일정`
                    : `${selectedDateBars.length} event${selectedDateBars.length === 1 ? "" : "s"}`}
@@ -675,12 +675,12 @@ export function Calendar() {
                        />
                        <div className="min-w-0 flex-1">
                          <p
-                           className="home-calendar-body-text line-clamp-2 overflow-hidden text-[11.5px] font-normal leading-4 text-slate-700"
+                           className="home-calendar-body-text line-clamp-2 overflow-hidden text-[length:var(--home-calendar-event-size)] font-normal leading-4 text-slate-700"
                            title={bar.cleanTitle}
                          >
                            {bar.cleanTitle}
                          </p>
-                         <p className="mt-0.5 truncate text-[9.5px] font-normal leading-3 tabular-nums text-slate-400">
+                         <p className="mt-0.5 truncate text-[length:var(--home-calendar-detail-size)] font-normal leading-3 tabular-nums text-slate-400">
                             {bar.category === "HOLIDAY"
                               ? lang === "ko"
                                 ? "공휴일"
@@ -700,7 +700,7 @@ export function Calendar() {
                    ))}
                  </ul>
                ) : (
-                 <p className="px-1 py-2 text-[11px] font-normal leading-4 text-slate-400">
+                 <p className="px-1 py-2 text-[length:var(--ui-text-caption-size)] font-normal leading-4 text-slate-400">
                    {lang === "ko"
                      ? "선택한 날짜에 일정이 없습니다."
                      : "No schedules on this date."}

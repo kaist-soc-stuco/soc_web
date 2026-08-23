@@ -53,9 +53,9 @@ function getQuestionTypeLabel(type: QuestionType, lang: string) {
 }
 
 function getSurveyKindLabel(kind: string, lang: string) {
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Vote";
+  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
   if (kind === "APPLICATION") {
-    return lang === "ko" ? "신청서/행사 접수" : "Event application";
+    return lang === "ko" ? "신청서/행사 접수" : "Application";
   }
   return lang === "ko" ? "일반 설문" : "Survey";
 }
@@ -80,7 +80,7 @@ function getScheduleLabel(analytics: SurveyAnalyticsResponse, lang: string) {
 
 function getAudienceLabel(analytics: SurveyAnalyticsResponse, lang: string) {
   if (analytics.feePayersOnly) {
-    return lang === "ko" ? "과비 납부자" : "Paid members";
+    return lang === "ko" ? "과비 납부자" : "Fee-paying members";
   }
   return lang === "ko" ? "로그인 필요" : "Login required";
 }
@@ -250,16 +250,16 @@ function QuestionResultCard({
       <div className="mb-3.5 flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <span className="inline-flex rounded-md bg-kaist-lightgreen/20 px-1.5 py-0.5 text-[10px] font-bold text-kaist-darkgreen">
+            <span className="inline-flex rounded-md bg-kaist-lightgreen/20 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-bold text-kaist-darkgreen">
               {getQuestionTypeLabel(question.questionType, lang)}
             </span>
-            <span className="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+            <span className="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-bold text-slate-500">
               {lang === "ko"
                 ? `응답 ${question.totalAnswers}개`
                 : `${question.totalAnswers} answers`}
             </span>
           </div>
-          <h2 className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-medium leading-6 text-slate-950">
+          <h2 className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-slate-950">
             <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
               {idx + 1}.
             </span>
@@ -314,9 +314,9 @@ export function SurveyResultsContent({
         </p>
         <Link
           to="/surveys"
-          className="inline-flex w-full items-center justify-center rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
+          className="mx-auto inline-flex w-fit items-center justify-center rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
         >
-          {lang === "ko" ? "설문 목록으로" : "Survey list"}
+          {lang === "ko" ? "설문 목록으로" : "Back to surveys"}
         </Link>
       </ResultShell>
     );
@@ -369,7 +369,7 @@ export function SurveyResultsContent({
               analytics.descriptionKo ?? "",
               analytics.descriptionEn,
             )}
-            className="mt-3 text-[15px] font-medium leading-relaxed text-slate-600"
+            className="mt-3 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-600"
           />
         )}
         <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-normal text-slate-500">

@@ -1,17 +1,31 @@
 :root {
+  /* Unit contract
+     - rem: typography, controls, spacing, radii, fixed content geometry
+     - px: 1px hairlines, raster/SVG precision and viewport collision math only
+     - %: genuinely parent-relative tracks and data visualization ratios
+     - dvh/vw/clamp(): viewport-driven surfaces and responsive type only
+     Do not add local text-[Npx] values in TSX; add or reuse a semantic role here. */
   /* Shared geometry: inputs, selects, buttons and filter controls use these values. */
   --ui-control-height: 2.5rem;
   --ui-control-height-compact: 2.25rem;
+  --ui-control-height-dense: 1.875rem;
   --ui-control-radius: 0.5rem;
   --ui-control-font-size: 0.875rem;
   --ui-control-font-weight: 400;
   --ui-control-line-height: 1.25rem;
+  --ui-menu-row-height: 2.125rem;
   --ui-segmented-height: 2.5rem;
   --ui-segmented-item-height: 2rem;
   --ui-page-tab-height: 2.125rem;
+  --ui-table-head-height: 3rem;
+  --ui-table-row-min-height: 3.5rem;
   --ui-card-radius: 0.75rem;
   --ui-panel-radius: 1rem;
   --ui-page-max-width: 88rem;
+  --ui-admin-page-max-width: 90rem;
+  --ui-admin-editor-max-width: 80rem;
+  --ui-article-max-width: 65rem;
+  --ui-legal-max-width: 75rem;
   --ui-about-max-width: 55rem;
   --ui-space-page-x: 1.25rem;
   --ui-space-page-x-wide: 2rem;
@@ -41,6 +55,17 @@
   --j-color-text-primary: #172033;
   --j-color-text-secondary: #344054;
 
+  /* Semantic type scale. Components reference roles instead of local px values. */
+  --ui-text-micro-size: 0.625rem;
+  --ui-text-caption-size: 0.6875rem;
+  --ui-text-body-sm-size: 0.8125rem;
+  --ui-text-body-size: 0.875rem;
+  --ui-text-section-size: 0.9375rem;
+  --ui-text-title-sm-size: 1.125rem;
+  --ui-text-page-title-mobile-size: 1.75rem;
+  --ui-text-page-title-size: 1.875rem;
+  --ui-text-logo-mark-size: 0.4375rem;
+
   /* A visible, but intentionally softer, keyboard focus ring. */
   --ui-focus-ring: 0 0 0 3px rgb(0 110 63 / 0.14);
 
@@ -57,9 +82,13 @@
   --home-hero-title-size: clamp(2.125rem, 2.8vw, 2.625rem);
   --home-event-title-size: 1rem;
   --home-event-description-size: 0.78125rem;
-  --home-board-title-size: 0.8125rem;
+  --home-board-title-size: 0.875rem;
   --home-calendar-title-size: 0.9375rem;
-  --home-meta-size: 0.8125rem;
+  --home-meta-size: 0.875rem;
+  --home-calendar-day-size: 0.65625rem;
+  --home-calendar-event-size: 0.71875rem;
+  --home-calendar-detail-size: 0.59375rem;
+  --home-board-tab-height: 1.75rem;
   --home-weight-title: 700;
   --home-weight-hero: 800;
   --home-weight-body: 400;

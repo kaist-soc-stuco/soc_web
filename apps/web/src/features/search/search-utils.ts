@@ -14,7 +14,7 @@ export const ABOUT_ITEMS: AboutSearchItem[] = [
   {
     id: "intro",
     titleKo: "집행위원회 소개",
-    titleEn: "Student Council Overview",
+    titleEn: "About SOC",
     descriptionKo: "전산학부 학생회 SOC의 역할과 주요 활동을 확인합니다.",
     descriptionEn: "Learn what SOC does for School of Computing students.",
     href: "/about?tab=intro",

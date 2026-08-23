@@ -25,7 +25,7 @@ import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { clearStoredAuthState } from "@/lib/auth-storage";
+import { clearStoredAuthState, rememberAuthReturnPath } from "@/lib/auth-storage";
 import { getTemporaryAuthRequest } from "@/lib/auth-session";
 import { getBoardLabelFromMetadata, isLegacyPublicBoardCode } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
@@ -133,6 +133,9 @@ export function Header({ variant = "default" }: HeaderProps) {
 
     setLoginStarting(true);
     try {
+      rememberAuthReturnPath(
+        `${location.pathname}${location.search}${location.hash}`,
+      );
       const payload = await apiClient.getLoginStartPayload();
       if (
         !payload.loginUrl ||
@@ -251,7 +254,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               { label: "당해 학생회 소개", href: "/about?tab=history" },
               { label: "조직도", href: "/about?tab=org" },
               { label: "공약 이행 현황", href: "/about/pledges" },
-              { label: "Contact me", href: "/about?tab=members" },
+              { label: "구성원", href: "/about?tab=members" },
             ],
           },
         ]
@@ -265,23 +268,23 @@ export function Header({ variant = "default" }: HeaderProps) {
             })),
           },
           {
-            label: "Events & Participation",
+            label: "Events & Activities",
             href: "/events",
             megaItems: [
               { label: "Events", href: "/events" },
-              { label: "Surveys & Votes", href: "/surveys" },
+              { label: "Surveys & Polls", href: "/surveys" },
               { label: "Calendar", href: "/calendar" },
             ],
           },
           {
-            label: "Student Council",
+            label: "About",
             href: "/about",
             megaItems: [
-              { label: "Student Council", href: "/about?tab=intro" },
+              { label: "About", href: "/about?tab=intro" },
               { label: "Current Council", href: "/about?tab=history" },
-              { label: "Org Chart", href: "/about?tab=org" },
-              { label: "Pledge progress", href: "/about/pledges" },
-              { label: "Contact me", href: "/about?tab=members" },
+              { label: "Organization Chart", href: "/about?tab=org" },
+              { label: "Pledge Progress", href: "/about/pledges" },
+              { label: "Members", href: "/about?tab=members" },
             ],
           },
         ];
@@ -355,7 +358,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     aria-current={active ? "page" : undefined}
                     aria-expanded={hoveredIndex === index}
                     aria-haspopup="menu"
-                    className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center px-4 text-[15px] font-semibold transition-colors ${
+                    className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center px-4 text-[length:var(--ui-text-section-size)] font-semibold transition-colors ${
                       active || hoveredIndex === index
                         ? "text-kaist-darkgreen-main"
                         : "text-slate-900 hover:text-kaist-darkgreen-main"
@@ -459,41 +462,43 @@ export function Header({ variant = "default" }: HeaderProps) {
               >
                 <Bell aria-hidden="true" />
                 {unreadNotificationCount > 0 && (
-                  <Badge className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full border-white bg-rose-600 px-1 text-[9px] text-white">
+                  <Badge className="absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full border-white bg-rose-600 px-1 text-[length:var(--home-calendar-detail-size)] text-white">
                     {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
                   </Badge>
                 )}
               </IconButton>
 
               {notificationOpen && (
-                <PopoverPanel className="right-0 top-full w-[min(20rem,calc(100vw-2rem))]">
-                  <div className="flex h-12 items-center justify-between border-b border-slate-100 px-4">
-                    <p className="text-[13px] font-semibold text-slate-900">
+                <PopoverPanel className="right-0 top-full w-[min(25rem,calc(100vw-2rem))]">
+                  <div className="flex h-14 items-center justify-between border-b border-slate-100 px-4">
+                    <p className="text-base font-bold text-slate-900">
                       {lang === "ko" ? "알림" : "Notifications"}
                     </p>
-                    {unreadNotificationCount > 0 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-[11px] font-medium text-kaist-darkgreen hover:bg-emerald-50"
-                        onClick={() => {
-                          void apiClient.markAllNotificationsRead().then(() => {
-                            setUnreadNotificationCount(0);
-                            setNotifications((items) =>
-                              items.map((item) => ({ ...item, isRead: true })),
-                            );
-                          });
-                        }}
-                      >
-                        {lang === "ko" ? "모두 읽음" : "Mark all read"}
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={unreadNotificationCount === 0}
+                      className="h-8 rounded-md border-0 bg-transparent px-2 text-xs font-medium text-slate-400 shadow-none hover:bg-slate-100 hover:text-slate-600 disabled:pointer-events-none disabled:opacity-60"
+                      onClick={() => {
+                        void apiClient.markAllNotificationsRead().then(() => {
+                          setUnreadNotificationCount(0);
+                          setNotifications((items) =>
+                            items.map((item) => ({ ...item, isRead: true })),
+                          );
+                        });
+                      }}
+                    >
+                      {lang === "ko" ? "모두 읽음으로 표시" : "Mark all as read"}
+                    </Button>
                   </div>
                   {notifications.length === 0 ? (
-                    <p className="px-4 py-8 text-center text-xs font-medium text-slate-400">
-                      {lang === "ko" ? "새 알림이 없습니다." : "No new notifications."}
-                    </p>
+                    <div className="flex min-h-36 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+                      <Bell aria-hidden="true" className="size-5 text-slate-400" />
+                      <p className="text-sm font-normal text-slate-400">
+                        {lang === "ko" ? "새로운 알림이 없습니다." : "There are no new notifications."}
+                      </p>
+                    </div>
                   ) : (
                     <div className="scrollbar-hidden max-h-80 overflow-y-auto">
                       {notifications.map((notification) => (
@@ -518,11 +523,11 @@ export function Header({ variant = "default" }: HeaderProps) {
                               });
                           }}
                         >
-                          <span className="text-[12.5px] font-medium text-slate-800">
+                          <span className="text-[length:var(--home-event-description-size)] font-medium text-slate-800">
                             {notification.titleKo}
                           </span>
                           {notification.bodyKo && (
-                            <span className="line-clamp-2 text-[11.5px] font-normal leading-4 text-slate-500">
+                            <span className="line-clamp-2 text-[length:var(--home-calendar-event-size)] font-normal leading-4 text-slate-500">
                               {notification.bodyKo}
                             </span>
                           )}
@@ -552,13 +557,13 @@ export function Header({ variant = "default" }: HeaderProps) {
               {dropdownOpen && (
                 <PopoverPanel className="right-0 top-full w-52">
                   <div className="border-b border-slate-100 px-3.5 py-3">
-                    <p className="min-w-0 truncate text-[13px] font-semibold text-slate-900">
+                    <p className="min-w-0 truncate text-[length:var(--ui-text-body-sm-size)] font-semibold text-slate-900">
                       {user.name}
                     </p>
                   </div>
 
                   <div className="py-1">
-                    <Button asChild variant="ghost" className="h-10 w-full justify-start rounded-none px-3.5 text-[13px] font-medium text-slate-700">
+                    <Button asChild variant="ghost" className="h-10 w-full justify-start rounded-none px-3.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-700">
                       <Link to="/mypage" onClick={closePopovers}>
                         <User className="text-slate-500" />
                         <span>{lang === "ko" ? "마이페이지" : "My Page"}</span>
@@ -566,7 +571,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     </Button>
 
                     {canUseAdminDashboard ? (
-                      <Button asChild variant="ghost" className="h-10 w-full justify-start rounded-none px-3.5 text-[13px] font-medium text-slate-700">
+                      <Button asChild variant="ghost" className="h-10 w-full justify-start rounded-none px-3.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-700">
                         <Link to="/admin" onClick={closePopovers}>
                           <LayoutDashboard className="text-slate-500" />
                           <span>
@@ -581,7 +586,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     <Button
                       type="button"
                       variant="ghost"
-                      className="h-10 w-full justify-start rounded-none px-3.5 text-[13px] font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
+                      className="h-10 w-full justify-start rounded-none px-3.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
                       onClick={async () => {
                         await handleLogout();
                       }}
@@ -687,7 +692,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                             key={child.href}
                             to={child.href}
                             onClick={closePopovers}
-                            className="flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-center text-[11px] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
+                            className="flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-center text-[length:var(--ui-text-caption-size)] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
                           >
                             {child.label}
                           </Link>
@@ -764,7 +769,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     type="button"
                     onClick={() => void handleMockLogin()}
                     disabled={mockLoginStarting}
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[length:var(--ui-text-caption-size)] font-medium text-emerald-700 disabled:opacity-60"
                   >
                     {mockLoginStarting ? "Mock..." : "Mock"}
                   </Button>
@@ -776,7 +781,6 @@ export function Header({ variant = "default" }: HeaderProps) {
       )}
 
       <div
-        aria-hidden={hoveredIndex === null}
         className={`site-header-mega-menu absolute left-0 top-full z-40 w-full overflow-hidden bg-white shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition-[max-height,opacity,transform] duration-300 ease-out ${
           hoveredIndex !== null
             ? "pointer-events-auto max-h-[28rem] translate-y-0 opacity-100"
@@ -815,7 +819,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                       role="menuitem"
                       tabIndex={hoveredIndex === null ? -1 : 0}
                       onClick={closePopovers}
-                      className="flex min-h-11 items-center justify-center px-1 text-center text-[14px] font-medium leading-5 text-[var(--ui-menu-item-text)] transition-colors hover:text-brand-primary"
+                      className="flex min-h-11 items-center justify-center px-1 text-center text-[length:var(--ui-text-body-size)] font-medium leading-5 text-[var(--ui-menu-item-text)] transition-colors hover:text-brand-primary"
                     >
                       {child.label}
                     </Link>

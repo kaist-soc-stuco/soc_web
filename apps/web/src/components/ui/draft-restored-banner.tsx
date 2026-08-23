@@ -31,7 +31,7 @@ export function DraftRestoredBanner({
   return (
     <div
       className={cn(
-        "flex min-h-10 items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-slate-50 px-3.5 py-2 text-sm text-slate-600",
+        "flex min-h-10 items-center justify-between gap-3 rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-3.5 py-2 text-sm text-emerald-900",
         className,
       )}
       role="status"
@@ -48,7 +48,7 @@ export function DraftRestoredBanner({
             variant="ghost"
             size="sm"
             onClick={onStartNew}
-            className="text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+            className="text-emerald-700 hover:bg-emerald-100/80 hover:text-emerald-800"
           >
             새로 쓰기
           </Button>
@@ -60,7 +60,7 @@ export function DraftRestoredBanner({
             size="icon"
             aria-label="초안 복구 안내 닫기"
             onClick={onDismiss}
-            className="size-8 rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            className="size-8 rounded-md text-emerald-600 hover:bg-emerald-100/80 hover:text-emerald-800"
           >
             <X aria-hidden="true" className="size-4" />
           </Button>

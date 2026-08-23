@@ -167,7 +167,7 @@ function useTiptapEditor({
     },
     editorProps: {
       attributes: {
-        class: `${editorMinHeight} text-[15px] leading-normal text-slate-800`,
+        class: `${editorMinHeight} text-[length:var(--ui-text-section-size)] leading-normal text-slate-800`,
         spellcheck: spellCheck ? "true" : "false",
       },
     },

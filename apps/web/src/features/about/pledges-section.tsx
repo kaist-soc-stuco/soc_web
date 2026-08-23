@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, Target } from "lucide-react";
 
 import {
   resolveContentBlockText,
@@ -17,9 +17,12 @@ export function PledgesSection({ lang }: { lang: string }) {
   return (
     <div className="animate-in space-y-6 fade-in duration-300">
       {pledges.length === 0 ? (
-        <p className="rounded-xl border border-[#e5e9ec] bg-white px-6 py-16 text-center text-sm font-normal text-[#344054]">
-          {lang === "ko" ? "등록된 공약이 없습니다." : "No pledges have been published."}
-        </p>
+        <div className="flex min-h-48 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <Target aria-hidden="true" className="size-5 text-slate-300" />
+          <p className="text-sm font-normal text-[#344054]">
+            {lang === "ko" ? "등록된 공약이 없습니다." : "No pledges have been published."}
+          </p>
+        </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-white">
           {pledges.map((pledge) => {
@@ -38,7 +41,7 @@ export function PledgesSection({ lang }: { lang: string }) {
                 className="grid gap-4 border-b border-[#e5e9ec] px-6 py-5 last:border-b-0 md:grid-cols-[1fr_auto] md:items-start"
               >
                 <div className="min-w-0">
-                  <h2 className="text-[15px] font-normal leading-6 text-[#172033]">
+                  <h2 className="text-[length:var(--ui-text-section-size)] font-normal leading-6 text-[var(--ui-text-strong)]">
                     {text.title}
                   </h2>
                   {text.body ? (

@@ -174,7 +174,7 @@ export function UserManagementPage() {
   return (
     <AuthGuard requirePermission={Permissions.ADMIN}>
       <AdminPageShell>
-        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+        <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           <AdminPageHeader title="유저 관리" />
 
           <AdminTableCard className="user-management-table" aria-busy={loading}>
@@ -230,7 +230,6 @@ export function UserManagementPage() {
                   <col style={{ width: 140 }} />
                   <col style={{ width: 260 }} />
                   <col style={{ width: 240 }} />
-                  <col style={{ width: 110 }} />
                   <col style={{ width: 150 }} />
                 </colgroup>
                 <AdminTableHeader>
@@ -245,7 +244,6 @@ export function UserManagementPage() {
                     <AdminTableHead>학번</AdminTableHead>
                     <AdminTableHead>이메일</AdminTableHead>
                     <AdminTableHead>소속 · 전공</AdminTableHead>
-                    <AdminTableHead>상태</AdminTableHead>
                     <AdminSortableHead
                       active={sortBy === "lastLoginAt"}
                       ascending={sortBy === "lastLoginAt" && sortDirection === "asc"}
@@ -266,7 +264,7 @@ export function UserManagementPage() {
                         key={user.userId}
                         tabIndex={0}
                         aria-label={`${user.nameKo} 사용자 상세 정보 열기`}
-                        className="cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none"
+                        className={`cursor-pointer transition-colors hover:bg-slate-50/60 focus-visible:bg-slate-50 focus-visible:outline-none ${user.isActive ? "" : "bg-slate-50/80 opacity-60"}`}
                         onClick={() => setSelectedUser(user)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -275,24 +273,19 @@ export function UserManagementPage() {
                           }
                         }}
                       >
-                        <AdminTableCell>
-                          <div className="admin-table-text-emphasis !text-[14px] !font-medium truncate" title={user.nameKo}>{user.nameKo}</div>
-                          {user.nameEn ? <div className="admin-table-text mt-1 truncate" title={user.nameEn}>{user.nameEn}</div> : null}
+                        <AdminTableCell className="py-2.5">
+                          <div className="truncate text-sm font-medium text-slate-900" title={user.nameKo}>{user.nameKo}</div>
+                          {user.nameEn && user.nameEn.trim() !== user.nameKo.trim() ? <div className="mt-0.5 truncate text-xs font-normal text-slate-500" title={user.nameEn}>{user.nameEn}</div> : null}
                         </AdminTableCell>
-                        <AdminTableCell className="tabular-nums text-slate-700">
+                        <AdminTableCell className="py-2.5 tabular-nums text-sm text-slate-700">
                           {displayStudentId(user)}
                         </AdminTableCell>
-                        <AdminTableCell className="truncate" title={user.email}>{user.email}</AdminTableCell>
-                        <AdminTableCell>
+                        <AdminTableCell className="py-2.5 truncate text-sm" title={user.email}>{user.email}</AdminTableCell>
+                        <AdminTableCell className="py-2.5 text-sm">
                           {user.departmentKo ? <div className="truncate">{user.departmentKo}</div> : null}
-                          {major ? <div className="admin-table-text mt-1 truncate">{major}</div> : null}
+                          {major ? <div className="mt-0.5 truncate text-xs text-slate-500">{major}</div> : null}
                         </AdminTableCell>
-                        <AdminTableCell>
-                          <AdminStatusBadge tone={user.isActive ? "positive" : "danger"}>
-                            {user.isActive ? "활성" : "비활성"}
-                          </AdminStatusBadge>
-                        </AdminTableCell>
-                        <AdminTableCell>
+                        <AdminTableCell className="py-2.5 text-sm">
                           <time dateTime={user.lastLoginAt ?? undefined} title={formatShortDateTime(user.lastLoginAt)}>
                             {formatRelativeTime(user.lastLoginAt)}
                           </time>

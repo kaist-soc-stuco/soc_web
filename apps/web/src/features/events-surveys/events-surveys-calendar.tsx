@@ -120,16 +120,16 @@ export function EventsSurveysCalendar({
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div
-              className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-slate-500"
+              className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500"
               aria-label={lang === "ko" ? "캘린더 공급원 안내" : "Calendar sources"}
             >
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-brand-primary" aria-hidden="true" />
-                {lang === "ko" ? "학생회 행사·일정" : "Student council events"}
+                {lang === "ko" ? "학생회 행사·일정" : "Council Schedule"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />
-                {lang === "ko" ? "설문·투표" : "Surveys and votes"}
+                {lang === "ko" ? "설문·투표" : "Surveys & Polls"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />

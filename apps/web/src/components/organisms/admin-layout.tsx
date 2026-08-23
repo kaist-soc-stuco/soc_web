@@ -29,6 +29,11 @@ export function AdminLayout() {
   const { lang } = useLanguage();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const hasLoadedSessionRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading) hasLoadedSessionRef.current = true;
+  }, [isLoading]);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -123,7 +128,7 @@ export function AdminLayout() {
     <AuthGuard
       requireAnyPermission={ADMIN_ACCESS_PERMISSIONS}
       fallback={
-        <div className="flex min-h-screen flex-col bg-[#f7f9fc]">
+        <div className="flex min-h-screen max-w-full flex-col overflow-x-hidden bg-[#f7f9fc]">
           {adminHeader}
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
             <AdminSidebar />
@@ -132,12 +137,12 @@ export function AdminLayout() {
         </div>
       }
     >
-      <div className="flex min-h-screen flex-col bg-[#f7f9fc]">
+      <div className="flex min-h-screen max-w-full flex-col overflow-x-hidden bg-[#f7f9fc]">
         {adminHeader}
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <AdminSidebar />
           <div className="relative min-w-0 flex-1 bg-[#f7f9fc]">
-            {isLoading ? loadingOverlay : <Outlet context={{ session }} />}
+            {isLoading && !hasLoadedSessionRef.current ? loadingOverlay : <Outlet context={{ session }} />}
           </div>
         </div>
       </div>

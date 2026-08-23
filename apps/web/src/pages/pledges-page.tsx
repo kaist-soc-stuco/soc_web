@@ -15,8 +15,8 @@ export function PledgesPage() {
       <Header />
       <PageHeader
         containerClassName="!max-w-3xl"
-        breadcrumbs={[{ label: lang === "ko" ? "학생회 소개" : "Student Council", to: "/about" }]}
-        title={lang === "ko" ? "공약 이행 현황" : "Pledge progress"}
+        breadcrumbs={[{ label: lang === "ko" ? "학생회 소개" : "About", to: "/about" }]}
+        title={lang === "ko" ? "공약 이행 현황" : "Pledge Progress"}
       />
       <AboutTabs
         currentTab="pledges"

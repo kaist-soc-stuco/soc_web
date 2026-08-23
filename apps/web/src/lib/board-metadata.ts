@@ -64,7 +64,7 @@ const BOARD_FALLBACK_METADATA: Record<
   홍보글: {
     descriptionKo: "집행위원회 및 학회 홍보 게시물을 확인하세요.",
     descriptionEn: "Promotional posts from the Student Council and societies.",
-    labelEn: "Promotions",
+    labelEn: "Promotional Posts",
     titleKo: "홍보글",
   },
   건의사항: {
@@ -76,11 +76,11 @@ const BOARD_FALLBACK_METADATA: Record<
   연구실: {
     descriptionKo: "각 연구실의 소식과 공지사항을 확인하세요.",
     descriptionEn: "News and announcements from research labs.",
-    labelEn: "Labs",
+    labelEn: "Research Labs",
     titleKo: "연구실",
   },
   FAQ: {
-    descriptionKo: "자주 묻는 질문과 답변을 확인하세요.",
+    descriptionKo: "FAQ와 답변을 확인하세요.",
     descriptionEn: "Browse frequently asked questions and answers.",
     labelEn: "FAQ",
     titleKo: "FAQ",

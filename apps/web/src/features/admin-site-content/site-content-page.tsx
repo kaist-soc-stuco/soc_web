@@ -14,6 +14,7 @@ import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput, UiSelect, UiTextarea } from "@/components/ui/form-control";
+import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,7 +48,17 @@ const categoryMeta: Record<ContentCategory, { createLabel: string; createType: C
   PLEDGE: { createLabel: "공약 추가", createType: "PLEDGE", label: "공약", singleton: false, types: ["PLEDGE"] },
 };
 
-const isImageOnlyType = (type: ContentBlockType) => type === "HERO" || type === "LOGO" || type === "ORGANIZATION_CHART";
+type ImageContentBlockType = "HERO" | "LOGO" | "ORGANIZATION_CHART";
+
+const isImageOnlyType = (type: ContentBlockType): type is ImageContentBlockType => type === "HERO" || type === "LOGO" || type === "ORGANIZATION_CHART";
+
+const IMAGE_SPECS: Record<"HERO" | "LOGO" | "ORGANIZATION_CHART", { height: number; label: string; width: number }> = {
+  HERO: { height: 600, label: "히어로 이미지", width: 1600 },
+  LOGO: { height: 100, label: "로고 이미지", width: 400 },
+  ORGANIZATION_CHART: { height: 900, label: "조직도 이미지", width: 1600 },
+};
+
+const getImageSpec = (type: ContentBlockType) => isImageOnlyType(type) ? IMAGE_SPECS[type] : null;
 
 const draftForType = (type: ContentBlockType) => {
   const draft = emptyDraft(type);
@@ -135,6 +146,7 @@ function SiteContentPageContent() {
   const [orderedBlocks, setOrderedBlocks] = useState<ContentBlockRecord[]>([]);
   const [orderSaving, setOrderSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const [cropRequest, setCropRequest] = useState<{ file: File; target: "create" | "draft"; type: "HERO" | "LOGO" | "ORGANIZATION_CHART" } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const blocksQuery = useQuery({
@@ -189,6 +201,21 @@ function SiteContentPageContent() {
     } finally {
       setImageUploading(false);
     }
+  };
+
+  const requestImageCrop = (target: "create" | "draft", type: ContentBlockType, file: File) => {
+    if (!isImageOnlyType(type)) return;
+    setCropRequest({ file, target, type });
+  };
+
+  const applyCroppedImage = async (file: File) => {
+    if (!cropRequest) return;
+    const target = cropRequest.target;
+    setCropRequest(null);
+    await uploadImage(file, (imageReference) => {
+      if (target === "draft") setDraft((current) => ({ ...current, imageUrl: imageReference }));
+      else setCreateDraft((current) => ({ ...current, imageUrl: imageReference }));
+    });
   };
 
   const handleDragEnd = async ({ active, over }: DragEndEvent) => {
@@ -272,7 +299,13 @@ function SiteContentPageContent() {
 
   const deleteBlock = async () => {
     if (!selectedBlock) return;
-    const approved = await confirm({ title: `‘${selectedBlock.titleKo}’을 완전히 삭제할까요?`, confirmLabel: "완전히 삭제", tone: "danger" });
+    const approved = await confirm({
+      title: "콘텐츠 삭제",
+      description: <>정말 <strong className="font-semibold text-slate-900">“{selectedBlock.titleKo}”</strong> 콘텐츠를 완전히 삭제할까요?</>,
+      warning: "(삭제된 콘텐츠는 영구히 복구할 수 없습니다.)",
+      confirmLabel: "삭제하기",
+      tone: "danger",
+    });
     if (!approved) return;
     setSaving(true);
     try {
@@ -290,7 +323,7 @@ function SiteContentPageContent() {
 
   return <AdminPageShell>
     {ConfirmDialog}
-    <AdminPageMain className="max-w-[1320px]">
+    <AdminPageMain className="max-w-[var(--ui-admin-page-max-width)]">
       <AdminPageHeader
         title="사이트 설정"
         actions={canCreateCategory ? <Button type="button" onClick={() => { setCreateDraft(draftForCategory(category)); setCreateOpen(true); }}><Plus aria-hidden="true" /> {categoryMeta[category].createLabel}</Button> : undefined}
@@ -310,7 +343,7 @@ function SiteContentPageContent() {
         <AdminCard className="self-start xl:sticky xl:top-6">
           <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
           <div className="scrollbar-hidden max-h-[680px] overflow-y-auto p-2">
-            {blocksQuery.isLoading ? <div className="grid gap-2">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-lg" />)}</div>
+            {blocksQuery.isLoading && !blocksQuery.data ? <div className="grid gap-2">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-lg" />)}</div>
               : filteredBlocks.length === 0 ? <div className="px-4 py-16 text-center"><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-medium text-slate-600">조건에 맞는 콘텐츠가 없습니다.</p></div>
               : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block) => <SortableContentBlockItem key={block.contentBlockId} block={block} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
             {orderSaving ? <p className="px-3 pb-3 pt-2 text-xs font-normal text-[#344054]">노출 순서를 저장하는 중입니다.</p> : null}
@@ -335,7 +368,7 @@ function SiteContentPageContent() {
               </div> : null}
               <div className="grid gap-4">
                 {!isImageOnlyType(draft.type) && draft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-        {isImageOnlyType(draft.type) ? <ContentImageInput label={draft.type === "HERO" ? "히어로 이미지" : draft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={draft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+                {isImageOnlyType(draft.type) ? <ContentImageInput spec={getImageSpec(draft.type)!} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={draft.imageUrl} uploading={imageUploading} onSelect={(file) => requestImageCrop("draft", draft.type, file)} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
               </div>
             </div>
           </AdminCard>
@@ -361,21 +394,22 @@ function SiteContentPageContent() {
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
         {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><UiSelect value={createDraft.pledgeStatus ?? "PLANNED"} onChange={(event) => setCreateDraft((current) => ({ ...current, pledgeStatus: event.currentTarget.value as BlockDraft["pledgeStatus"] }))}><option value="PLANNED">예정</option><option value="IN_PROGRESS">진행 중</option><option value="COMPLETED">이행 완료</option></UiSelect></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-        {isImageOnlyType(createDraft.type) ? <ContentImageInput label={createDraft.type === "HERO" ? "히어로 이미지" : createDraft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setCreateDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+        {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
       </div>
     </Modal>
+    {cropRequest ? <ImageCropModal aspectRatio={cropRequest.type === "HERO" ? 1600 / 600 : cropRequest.type === "LOGO" ? 400 / 100 : 1600 / 900} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
   </AdminPageShell>;
 }
 
-function ContentImageInput({ label, onRemove, onSelect, previewBorderless = false, uploading, value }: {
-  label: string;
+function ContentImageInput({ onRemove, onSelect, previewBorderless = false, spec, uploading, value }: {
   onRemove: () => void;
   onSelect: (file: File) => void;
   previewBorderless?: boolean;
+  spec: { height: number; label: string; width: number };
   uploading: boolean;
   value: string;
 }) {
-  return <AdminFormField label={`${label} *`}>
+  return <AdminFormField label={`${spec.label} (${spec.width} × ${spec.height}) *`}>
     <div className="space-y-3">
       {value ? <div className={cn("overflow-hidden rounded-lg", previewBorderless ? "bg-white" : "border border-[#e5e9ec] bg-slate-50")}><img src={resolveAssetUrl(value)} alt="" className={cn("block h-36 w-full object-contain", previewBorderless && "h-auto max-h-[420px]")} /></div> : null}
       <div className="flex flex-wrap gap-2">
@@ -386,7 +420,7 @@ function ContentImageInput({ label, onRemove, onSelect, previewBorderless = fals
         </label>
         {value ? <Button type="button" variant="ghost" onClick={onRemove} disabled={uploading}>이미지 제거</Button> : null}
       </div>
-      <p className="text-xs font-normal text-[#344054]">JPG, PNG 또는 WebP 이미지 파일을 선택하세요.</p>
+      <p className="text-xs font-normal text-[#344054]">JPG, PNG 또는 WebP 이미지 파일을 선택하면 지정한 크기로 자를 수 있습니다.</p>
     </div>
   </AdminFormField>;
 }

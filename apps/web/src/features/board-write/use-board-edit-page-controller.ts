@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
@@ -370,12 +370,29 @@ export function useBoardEditPageController(forcedCategory?: string) {
   };
 
   const handleDeleteDraft = async (draftId: string) => {
+    const draft = drafts.find((item) => item.draftId === draftId);
     const confirmed = await requestConfirm({
       confirmLabel: lang === "ko" ? "삭제" : "Delete",
       description:
         lang === "ko"
-          ? "선택한 임시저장글을 삭제합니다."
-          : "Delete this saved draft.",
+          ? createElement(
+              "span",
+              null,
+              "정말 ",
+              createElement("strong", { className: "font-semibold text-slate-900" }, `“${draft?.titleKo || "제목 없는 임시저장글"}”`),
+              " 임시저장글을 삭제하시겠습니까?",
+            )
+          : createElement(
+              "span",
+              null,
+              "Are you sure you want to delete ",
+              createElement("strong", { className: "font-semibold text-slate-900" }, `“${draft?.titleKo || "this saved draft"}”`),
+              "?",
+            ),
+      warning:
+        lang === "ko"
+          ? "(삭제된 임시저장글은 영구히 복구할 수 없습니다.)"
+          : "(Deleted saved drafts cannot be restored.)",
       title:
         lang === "ko" ? "임시저장글을 삭제하시겠습니까?" : "Delete saved draft?",
       tone: "danger",

@@ -202,7 +202,7 @@ export function FeeManagementPage() {
   }, [loadData]);
 
   const loadStats = useCallback(async () => {
-    if (activeSection !== "stats" || sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
+    if (sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
     setStatsLoading(true);
     try {
       const spanDays = Math.max(1, Math.ceil((isoToDate(`${statsDateTo}T00:00:00.000+09:00`).getTime() - isoToDate(`${statsDateFrom}T00:00:00.000+09:00`).getTime()) / 86_400_000));
@@ -218,7 +218,7 @@ export function FeeManagementPage() {
     } finally {
       setStatsLoading(false);
     }
-  }, [activeSection, apiClient, session, sessionLoading, statsDateFrom, statsDateTo]);
+  }, [apiClient, session, sessionLoading, statsDateFrom, statsDateTo]);
 
   useEffect(() => {
     void loadStats();
@@ -449,7 +449,7 @@ export function FeeManagementPage() {
                 ]}
               />
               <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-                <AdminSelectDropdown ariaLabel="기준 학기" value={referenceSemester} options={semesterOptions} onChange={(value) => updateFilter(setReferenceSemester, value)} className="w-44 shrink-0" open={openFilterDropdown === "semester"} onOpenChange={(open) => setOpenFilterDropdown(open ? "semester" : null)} />
+                <AdminSelectDropdown ariaLabel="기준 학기" value={referenceSemester} options={semesterOptions} onChange={(value) => updateFilter(setReferenceSemester, value)} className="w-56 shrink-0" open={openFilterDropdown === "semester"} onOpenChange={(open) => setOpenFilterDropdown(open ? "semester" : null)} />
                 <AdminSelectDropdown
                   ariaLabel="전공 구분"
                   value={majorCategory ?? "ALL"}
@@ -472,11 +472,11 @@ export function FeeManagementPage() {
                     <colgroup><col className="w-12" /><col className="w-44" /><col className="w-28" /><col className="w-56" /><col /><col className="w-24" /><col className="w-32" /></colgroup>
                     <AdminTableHeader>
                       <tr className="h-12">
-                        <AdminTableHead className="w-12 px-4 py-0 align-middle">
-                          <input type="checkbox" aria-label="현재 페이지 전체 선택" checked={allVisibleSelected} onChange={toggleVisibleUsers} className="size-4 accent-emerald-700" />
+                        <AdminTableHead className="h-12 w-12 px-4 py-0 align-middle">
+                          <input type="checkbox" aria-label="현재 페이지 전체 선택" checked={allVisibleSelected} onChange={toggleVisibleUsers} className="block size-4 accent-emerald-700" />
                         </AdminTableHead>
                         {selectedUserIds.size > 0 ? (
-                          <th colSpan={6} className="h-12 px-4 py-0 align-middle">
+                          <th colSpan={6} className="h-12 min-h-12 px-4 py-0 align-middle">
                             <div className="flex h-12 items-center justify-between gap-3">
                               <div className="relative">
                           <Button type="button" variant="ghost" size="sm" className="!font-medium" onClick={() => setSelectionPopoverOpen((value) => !value)}>{selectedUserIds.size}명 선택됨 <ChevronDown aria-hidden="true" className="size-4" /></Button>

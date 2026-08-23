@@ -98,13 +98,13 @@ function ToastCard({
   return (
     <div
       role="status"
-      className={`pointer-events-auto inline-flex max-w-full items-center gap-3 rounded-lg border border-slate-800/10 bg-slate-900 px-3.5 py-2.5 text-[13px] font-medium leading-5 text-white shadow-[0_10px_28px_rgba(15,23,42,0.18)] ${isLeaving ? "toast-exit" : "toast-enter"}`}
+      className={`pointer-events-auto inline-flex max-w-full items-center gap-3 rounded-lg border border-slate-800/10 bg-slate-900 px-3.5 py-2.5 text-[length:var(--ui-text-body-sm-size)] font-medium leading-5 text-white shadow-[0_10px_28px_rgba(15,23,42,0.18)] ${isLeaving ? "toast-exit" : "toast-enter"}`}
     >
       <span className="min-w-0">{item.message}</span>
       {item.action ? (
         <button
           type="button"
-          className="shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold text-emerald-300 outline-none hover:bg-white/10 hover:text-emerald-200 focus-visible:bg-white/10"
+          className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-emerald-300 outline-none hover:bg-white/10 hover:text-emerald-200 focus-visible:bg-white/10"
           onClick={() => {
             requestDismiss();
             item.action?.onClick();

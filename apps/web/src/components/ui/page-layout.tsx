@@ -87,7 +87,7 @@ export function PageHeader({
           ) : null}
           <h1
             id={titleId}
-            className="truncate text-[30px] font-bold leading-9 tracking-[-0.025em] text-app-text-strong"
+            className="truncate text-[length:var(--ui-text-page-title-size)] font-bold leading-9 tracking-[-0.025em] text-app-text-strong"
           >
             {title}
           </h1>
@@ -101,7 +101,7 @@ export function PageHeader({
 export function AdminPageTitle({ children, className, ...props }: ComponentProps<"h1">) {
   return (
     <h1
-      className={cn("text-[30px] font-bold leading-9 tracking-[-0.025em] text-slate-900", className)}
+      className={cn("text-[length:var(--ui-text-page-title-size)] font-bold leading-9 tracking-[-0.025em] text-slate-900", className)}
       {...props}
     >
       {children}
@@ -187,7 +187,8 @@ export function PageTabs({
   );
 }
 
-const pageTabClassName = "interaction-link !h-[34px] !min-h-[34px] !font-normal";
+const pageTabClassName =
+  "interaction-link !h-[var(--ui-page-tab-height)] !min-h-[var(--ui-page-tab-height)] !font-normal";
 const pageActionClassName =
   "interaction-button inline-flex h-[var(--ui-control-height)] shrink-0 items-center justify-center gap-1.5 rounded-[var(--ui-control-radius)] border px-3.5 text-[length:var(--ui-control-font-size)] font-semibold tracking-tight";
 

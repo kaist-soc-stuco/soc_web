@@ -32,7 +32,7 @@ export function TermsPage() {
       <PageMain>
         <PageHeader title={lang === 'ko' ? '이용약관' : 'Terms of Service'} />
 
-        <section className="mx-auto w-full max-w-[1200px] px-5 pb-8 md:px-8">
+        <section className="mx-auto w-full max-w-[var(--ui-legal-max-width)] px-5 pb-8 md:px-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 md:p-7">
           <div className="divide-y divide-slate-100">
             {termsSections.map((section) => (

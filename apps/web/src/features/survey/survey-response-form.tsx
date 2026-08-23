@@ -79,7 +79,7 @@ export function SurveyResponseForm({
                       section.descriptionKo,
                       section.descriptionEn,
                     )}
-                    className="mt-1.5 text-[15px] font-medium leading-relaxed text-slate-500"
+                    className="mt-1.5 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-500"
                   />
                 )}
               </div>
@@ -95,7 +95,7 @@ export function SurveyResponseForm({
                   className="group rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] hover:border-kaist-darkgreen/20 hover:shadow-[0_6px_18px_rgba(15,23,42,0.05)]"
                 >
                   <div className="mb-3.5 border-b border-slate-100 pb-3">
-                    <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-medium leading-6 text-slate-950">
+                    <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-slate-950">
                       <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
                         {questionIndex}.
                       </span>
@@ -124,7 +124,7 @@ export function SurveyResponseForm({
                         question.descriptionKo,
                         question.descriptionEn,
                       )}
-                      className="mb-4 text-[15px] font-medium leading-relaxed text-slate-500"
+                      className="mb-4 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-500"
                     />
                   )}
                   <div>

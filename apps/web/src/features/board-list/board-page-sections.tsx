@@ -96,7 +96,7 @@ export function BoardDataControls({
   return (
       <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
         <span
-          className="shrink-0 text-[14px] font-normal text-[rgb(102,102,102)]"
+          className="shrink-0 text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-muted)]"
           aria-live="polite"
         >
           {lang === "ko" ? (
@@ -204,43 +204,43 @@ export function BoardArticleTable({
         >
           {!category ? (
             <div className="flex shrink-0 justify-start text-left md:justify-center md:text-center">
-              <span className="inline-flex items-center rounded-md border-0 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-slate-700 select-none">
+              <span className="inline-flex items-center rounded-md border-0 bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold tracking-tight text-slate-700 select-none">
                 {getBoardLabelFromMetadata(postBoard, postCategory, lang)}
               </span>
             </div>
           ) : null}
-          <div className={`flex min-w-0 items-center gap-2 text-left text-[15px] leading-5 tracking-tight text-app-text-strong md:pl-1 ${pinned ? "font-semibold" : "font-medium"}`}>
+          <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong md:pl-1 ${pinned ? "font-semibold" : "font-medium"}`}>
             <span className="line-clamp-2 min-w-0 md:truncate">
               {lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}
             </span>
             {isNew ? (
               <span
                 className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
-                title={lang === "ko" ? "새 글" : "New"}
+                title={lang === "ko" ? "새 글" : "New post"}
               >
-                <span className="sr-only">{lang === "ko" ? "새 글" : "New"}</span>
+                <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
               </span>
             ) : null}
             {(post.hasAttachment ?? false) && (
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             )}
           </div>
-          <div className="flex items-center gap-2 text-[14px] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:hidden">
+          <div className="flex items-center gap-2 text-[length:var(--ui-text-body-size)] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:hidden">
             <span>{authorLabel(post)}</span>
             <span aria-hidden="true">·</span>
             <time dateTime={post.postedAt} className="tabular-nums">
               {formatBoardListDate(post.postedAt)}
             </time>
           </div>
-          <div className="hidden shrink-0 text-center text-[14px] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:block">
+          <div className="hidden shrink-0 text-center text-[length:var(--ui-text-body-size)] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:block">
             {authorLabel(post)}
           </div>
-          <div className="hidden shrink-0 text-center text-[14px] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:block">
+          <div className="hidden shrink-0 text-center text-[length:var(--ui-text-body-size)] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:block">
             <time dateTime={post.postedAt} className="tabular-nums">
               {formatBoardListDate(post.postedAt)}
             </time>
           </div>
-          <div className="hidden shrink-0 justify-end pr-1 text-[14px] font-normal tabular-nums tracking-tight text-[var(--j-color-text-secondary)] md:flex">
+          <div className="hidden shrink-0 justify-end pr-1 text-[length:var(--ui-text-body-size)] font-normal tabular-nums tracking-tight text-[var(--j-color-text-secondary)] md:flex">
             <span className="w-10 text-right">{post.viewCount}</span>
           </div>
         </Link>
@@ -253,7 +253,7 @@ export function BoardArticleTable({
       <DataViewCard aria-label={lang === "ko" ? "게시글 목록" : "Article list"}>
         <DataViewToolbar>{toolbar}</DataViewToolbar>
         <DataViewBody>
-        <div className={`hidden h-12 ${tableGridClass} items-center gap-3 border-b border-[var(--ui-border-subtle)] border-t-2 border-t-brand-primary bg-slate-50/70 px-6 text-[14px] font-medium tracking-tight text-slate-500 md:grid`}>
+        <div className={`hidden h-[var(--ui-table-head-height)] ${tableGridClass} items-center gap-3 border-b border-[var(--ui-border-subtle)] border-t-2 border-t-brand-primary bg-slate-50/70 px-6 text-[length:var(--ui-text-body-size)] font-medium tracking-tight text-slate-500 md:grid`}>
           {!category ? (
             <div className="shrink-0 text-center">
               {lang === "ko" ? "분류" : "Category"}
@@ -266,7 +266,7 @@ export function BoardArticleTable({
             {lang === "ko" ? "작성자" : "Author"}
           </div>
           <div className="shrink-0 text-center">
-            {lang === "ko" ? "작성일" : "Date"}
+            {lang === "ko" ? "작성일" : "Date posted"}
           </div>
           <div className="hidden shrink-0 justify-end pr-1 text-right md:flex">
             {lang === "ko" ? "조회수" : "Views"}

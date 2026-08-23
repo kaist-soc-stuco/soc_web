@@ -4,7 +4,9 @@ import type {
   PublicCalendarEventItem,
   SurveyRecord,
 } from "@soc/contracts";
-import { isoToDate, isoToMs, localDate, nowDate, nowMs } from "@soc/shared";
+import { isoToDate, isoToMs, localDate, msToTimeObj, nowDate, nowMs } from "@soc/shared";
+
+const EVENT_TIME_ZONE = "Asia/Seoul";
 
 export type EventsSurveysTab = "event" | "survey" | "calendar";
 export type EventsSurveysSortKey = "latest" | "deadline";
@@ -113,25 +115,24 @@ export const isOpenItem = (item: UnifiedItem) =>
 
 export const formatCompactDateTime = (value: string | null) => {
   if (!value) return "";
-  const date = isoToDate(value);
-  if (Number.isNaN(date.getTime())) return "";
+  const ms = isoToMs(value);
+  if (Number.isNaN(ms)) return "";
+  const date = msToTimeObj(ms, EVENT_TIME_ZONE);
+  const month = String(date.month).padStart(2, "0");
+  const day = String(date.day).padStart(2, "0");
+  const hour = String(date.hour).padStart(2, "0");
+  const minute = String(date.minute).padStart(2, "0");
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
-
-  return `${year}.${month}.${day} ${hour}:${minute}`;
+  return `${date.year}.${month}.${day} ${hour}:${minute}`;
 };
 
 export const formatCardDate = (value: string | null) => {
   if (!value) return "";
-  const date = isoToDate(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const ms = isoToMs(value);
+  if (Number.isNaN(ms)) return "";
+  const date = msToTimeObj(ms, EVENT_TIME_ZONE);
+  const month = String(date.month).padStart(2, "0");
+  const day = String(date.day).padStart(2, "0");
 
   return `${month}.${day}`;
 };
@@ -187,15 +188,17 @@ function formatEventCardPeriod(
 }
 
 function formatEventCardDate(date: Date, lang: string, referenceDate: Date) {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const dateParts = msToTimeObj(date.getTime(), EVENT_TIME_ZONE);
+  const referenceParts = msToTimeObj(referenceDate.getTime(), EVENT_TIME_ZONE);
+  const month = String(dateParts.month).padStart(2, "0");
+  const day = String(dateParts.day).padStart(2, "0");
   const yearPrefix =
-    date.getFullYear() === referenceDate.getFullYear()
+    dateParts.year === referenceParts.year
       ? ""
-      : `${date.getFullYear()}.`;
+      : `${dateParts.year}.`;
   const weekday = new Intl.DateTimeFormat(
     lang === "ko" ? "ko-KR" : "en-US",
-    { weekday: "short" },
+    { timeZone: EVENT_TIME_ZONE, weekday: "short" },
   ).format(date);
 
   return lang === "ko"
@@ -208,33 +211,30 @@ function formatEventCardTime(date: Date, lang: string) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone: EVENT_TIME_ZONE,
   }).format(date);
 }
 
 function isAllDayRange(startDate: Date, endDate: Date) {
+  const start = msToTimeObj(startDate.getTime(), EVENT_TIME_ZONE);
+  const end = msToTimeObj(endDate.getTime(), EVENT_TIME_ZONE);
   const startsAtDayBoundary =
-    startDate.getHours() === 0 &&
-    startDate.getMinutes() === 0 &&
-    startDate.getSeconds() === 0 &&
-    startDate.getMilliseconds() === 0;
+    start.hour === 0 && start.minute === 0 && start.second === 0 && start.millisecond === 0;
   const endsAtDayBoundary =
-    endDate.getHours() === 0 &&
-    endDate.getMinutes() === 0 &&
-    endDate.getSeconds() === 0 &&
-    endDate.getMilliseconds() === 0;
+    end.hour === 0 && end.minute === 0 && end.second === 0 && end.millisecond === 0;
   const endsAtDayClose =
-    endDate.getHours() === 23 &&
-    endDate.getMinutes() === 59 &&
-    endDate.getSeconds() === 59;
+    end.hour === 23 && end.minute === 59 && end.second === 59;
 
   return startsAtDayBoundary && (endsAtDayBoundary || endsAtDayClose);
 }
 
 function isSameLocalDay(first: Date, second: Date) {
+  const firstParts = msToTimeObj(first.getTime(), EVENT_TIME_ZONE);
+  const secondParts = msToTimeObj(second.getTime(), EVENT_TIME_ZONE);
   return (
-    first.getFullYear() === second.getFullYear() &&
-    first.getMonth() === second.getMonth() &&
-    first.getDate() === second.getDate()
+    firstParts.year === secondParts.year &&
+    firstParts.month === secondParts.month &&
+    firstParts.day === secondParts.day
   );
 }
 

@@ -23,7 +23,7 @@ export function AdminPageMain({ className, ...props }: ComponentProps<"main">) {
   return (
     <main
       className={cn(
-        "admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10",
+        "admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10",
         className,
       )}
       {...props}
@@ -42,11 +42,11 @@ export function AdminPageHeader({ actions, eyebrow, title }: AdminPageHeaderProp
     <header className="admin-page__header flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0">
         {eyebrow ? (
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-primary">
+          <div className="mb-1.5 flex items-center gap-2 text-[length:var(--ui-text-caption-size)] font-semibold uppercase tracking-[0.14em] text-brand-primary">
             {eyebrow}
           </div>
         ) : null}
-        <AdminPageTitle className="truncate text-[28px] leading-8 md:text-[30px] md:leading-9">
+        <AdminPageTitle className="truncate text-[length:var(--ui-text-page-title-mobile-size)] leading-8 md:text-[length:var(--ui-text-page-title-size)] md:leading-9">
           {title}
         </AdminPageTitle>
       </div>
@@ -161,7 +161,7 @@ export function AdminSearchField({
 export function AdminSectionTitle({ className, ...props }: ComponentProps<"h2">) {
   return (
     <h2
-      className={cn("text-[15px] font-medium tracking-[-0.01em] text-[#172033]", className)}
+      className={cn("text-[length:var(--ui-text-section-size)] font-medium tracking-[-0.01em] text-[var(--ui-text-strong)]", className)}
       {...props}
     />
   );
