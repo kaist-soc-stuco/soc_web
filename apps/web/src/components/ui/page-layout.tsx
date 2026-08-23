@@ -67,18 +67,20 @@ export function PageHeader({
   actions,
   breadcrumbs = [],
   className,
+  containerClassName,
   title,
   titleId,
 }: {
   actions?: ReactNode;
   breadcrumbs?: PageBreadcrumb[];
   className?: string;
+  containerClassName?: string;
   title: ReactNode;
   titleId?: string;
 }) {
   return (
     <section className={cn("mb-6 bg-[var(--ui-surface-canvas)]", className)} aria-labelledby={titleId}>
-      <PageContainer className="flex items-end justify-between gap-4 pb-4 pt-6">
+      <PageContainer className={cn("flex items-end justify-between gap-4 pb-4 pt-6", containerClassName)}>
         <div className="min-w-0">
           {breadcrumbs.length > 0 ? (
             <Breadcrumbs breadcrumbs={breadcrumbs} />
@@ -107,11 +109,11 @@ export function AdminPageTitle({ children, className, ...props }: ComponentProps
   );
 }
 
-export function PageToolbar({ className, ...props }: ComponentProps<"div">) {
+export function PageToolbar({ className, containerClassName, ...props }: ComponentProps<"div"> & { containerClassName?: string }) {
   return (
     <div className={cn("mb-5 bg-[var(--ui-surface-canvas)]", className)}>
       <PageContainer
-        className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+        className={cn("grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center", containerClassName)}
         {...props}
       />
     </div>

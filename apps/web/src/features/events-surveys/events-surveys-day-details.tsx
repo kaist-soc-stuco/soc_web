@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,6 @@ import { formatNumericDate } from "@/lib/date-display";
 import { stripCalendarPrefix, type CalendarEvent } from "@/lib/events-surveys";
 import { getCalendarEventStyles } from "./events-surveys-calendar-utils";
 import { AdminActionMenuDivider, AdminActionMenuItem, AdminActionMenuPanel } from "@/components/ui/admin-action-menu";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -35,16 +34,46 @@ export function EventsSurveysDayDetails({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: session } = useCurrentSession();
-  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const canManage = Permissions.has(session?.permission ?? 0, Permissions.MANAGE_CONTENT);
 
+  useEffect(() => {
+    if (!openMenuId) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const element = event.target instanceof Element ? event.target : null;
+      const trigger = element?.closest("[data-calendar-menu-trigger]");
+      const menu = element?.closest("[data-calendar-menu]");
+      if (
+        trigger?.getAttribute("data-calendar-menu-trigger") === openMenuId ||
+        menu?.getAttribute("data-calendar-menu") === openMenuId
+      ) {
+        return;
+      }
+      setOpenMenuId(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpenMenuId(null);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenuId]);
+
   const updatePresentation = async (
     event: CalendarEvent,
     input: { isHiddenByAdmin?: boolean },
-  ) => {
-    if (!event.calendarEventId) return;
+    successMessage?: string,
+    notify = true,
+  ): Promise<boolean> => {
+    if (!event.calendarEventId) return false;
     try {
       await apiClient.updateCalendarEventPresentation(event.calendarEventId, input);
       setOpenMenuId(null);
@@ -53,24 +82,42 @@ export function EventsSurveysDayDetails({
         queryClient.invalidateQueries({ queryKey: ["calendar", "events"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "calendar-events"] }),
       ]);
-      toast({ message: input.isHiddenByAdmin ? "일정을 숨겼습니다." : "일정 분류를 변경했습니다." });
+      if (notify) {
+        toast({ message: successMessage ?? (input.isHiddenByAdmin ? "일정을 숨겼습니다." : "일정 분류를 변경했습니다.") });
+      }
+      return true;
     } catch {
       toast({ message: "일정 설정을 변경하지 못했습니다." });
+      return false;
     }
   };
 
   const hideEvent = async (event: CalendarEvent) => {
-    const approved = await confirm({
-      title: "캘린더에서 숨길까요?",
-      description: "관리자 일정 목록에서 다시 표시할 수 있습니다.",
-      confirmLabel: "숨기기",
+    const title = stripCalendarPrefix(event.title).trim() || event.title;
+    const updated = await updatePresentation(
+      event,
+      { isHiddenByAdmin: true },
+      undefined,
+      false,
+    );
+    if (!updated) return;
+    toast({
+      message: `${title} 일정이 숨겨졌습니다.`,
+      action: {
+        label: "실행 취소",
+        onClick: () => {
+          void updatePresentation(
+            event,
+            { isHiddenByAdmin: false },
+            `${title} 일정이 다시 표시되었습니다.`,
+          );
+        },
+      },
     });
-    if (approved) await updatePresentation(event, { isHiddenByAdmin: true });
   };
 
   return (
     <>
-      {ConfirmDialog}
       <aside className="sticky top-24 flex h-full min-h-[500px] flex-col rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:col-span-1">
       <div className="shrink-0 border-b border-slate-100 pb-4 select-none">
         <h3 className="text-lg font-bold text-slate-800">{selectedDateStr}</h3>
@@ -142,6 +189,7 @@ export function EventsSurveysDayDetails({
                     <IconButton
                       size="sm"
                       aria-label={`${shortTitle} 관리`}
+                      data-calendar-menu-trigger={event.calendarEventId}
                       onClick={() => setOpenMenuId((current) => current === event.calendarEventId ? null : event.calendarEventId ?? null)}
                     >
                       <MoreHorizontal aria-hidden="true" />
@@ -149,7 +197,7 @@ export function EventsSurveysDayDetails({
                   ) : null}
                 </div>
                 {showAdminMenu ? (
-                  <AdminActionMenuPanel className="absolute right-3 top-12 z-50 w-44">
+                  <AdminActionMenuPanel data-calendar-menu={event.calendarEventId} className="absolute right-3 top-12 z-50 w-44">
                     <AdminActionMenuItem
                       icon={<Pencil aria-hidden="true" />}
                       onClick={() => navigate(`/admin/calendar?event=${encodeURIComponent(event.calendarEventId ?? "")}`)}

@@ -264,7 +264,19 @@ export function SurveyResponseListPage() {
           {/* Search and sort filters remain visible in the toolbar. */}
           {!loading && !error && activeView === "individual" ? <AdminTableCard className="overflow-visible">
             <div className="border-b border-slate-100 p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <SegmentedControl
+                ariaLabel="응답 정렬"
+                options={[
+                  { value: "desc" as const, label: "최신순" },
+                  { value: "asc" as const, label: "오래된순" },
+                ]}
+                value={sortOrder}
+                onChange={(value) => {
+                  setSortOrder(value);
+                  setCurrentPage(1);
+                }}
+              />
               <div className="min-w-0 flex-1">
                 <PageSearchField
                   ariaLabel="응답 검색"
@@ -279,20 +291,6 @@ export function SurveyResponseListPage() {
                   }}
                   placeholder="이름, 이메일 검색"
                   value={searchQuery}
-                />
-              </div>
-              <div>
-                <SegmentedControl
-                  ariaLabel="응답 정렬"
-                  options={[
-                    { value: "desc" as const, label: "최신순" },
-                    { value: "asc" as const, label: "오래된순" },
-                  ]}
-                  value={sortOrder}
-                  onChange={(value) => {
-                    setSortOrder(value);
-                    setCurrentPage(1);
-                  }}
                 />
               </div>
             </div>

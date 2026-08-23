@@ -246,8 +246,17 @@ function ColorPopover({
     const handlePointerDown = (event: PointerEvent) => {
       if (!popoverRef.current?.contains(event.target as Node)) onClose();
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
     document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [onClose]);
 
   const applyHex = () => {

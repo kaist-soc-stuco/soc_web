@@ -16,7 +16,9 @@ import {
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { BilingualRichTextEditor } from "@/components/organisms/rich-text-editor";
 import { Button } from "@/components/ui/button";
-import { UiInput } from "@/components/ui/form-control";
+import { UiFormField, UiInput } from "@/components/ui/form-control";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 export type AttachedAsset = {
   assetId: string;
@@ -94,7 +96,7 @@ export function BoardWriteHeaderControls({
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
           <div
-            className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+            className={`flex h-4 w-4 items-center justify-center rounded border ${
               isKoreanOnly
                 ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
                 : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
@@ -156,7 +158,7 @@ export function BoardEditHeaderControls({
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
           <div
-            className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+            className={`flex h-4 w-4 items-center justify-center rounded border ${
               isKoreanOnly
                 ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
                 : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
@@ -243,6 +245,10 @@ interface EventFieldsProps {
   onEventStartDateChange: (value: string) => void;
   onAllDayChange: (checked: boolean) => void;
   onEventAlwaysOpenChange: (checked: boolean) => void;
+  onThumbnailRemove: () => void;
+  onThumbnailSelect: (file: File) => void | Promise<void>;
+  thumbnail?: AttachedAsset;
+  uploading: boolean;
 }
 
 export function BoardWriteEventFields({
@@ -260,6 +266,10 @@ export function BoardWriteEventFields({
   onEventDescriptionEnChange,
   onEventEndDateChange,
   onEventStartDateChange,
+  onThumbnailRemove,
+  onThumbnailSelect,
+  thumbnail,
+  uploading,
 }: EventFieldsProps) {
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4 animate-in fade-in duration-300">
@@ -309,31 +319,33 @@ export function BoardWriteEventFields({
           </span>
         </label>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">
-            {lang === "ko" ? "행사 시작 일시" : "Event Start"}
-          </label>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <UiFormField
+          htmlFor="event-start-date"
+          label={lang === "ko" ? "행사 시작 일시" : "Event Start"}
+        >
           <UiInput
+            id="event-start-date"
             type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            className="w-full"
             value={eventStartDate}
             onChange={(event) => onEventStartDateChange(event.target.value)}
           />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">
-            {lang === "ko" ? "행사 종료 일시" : "Event End"}
-          </label>
+        </UiFormField>
+        <UiFormField
+          htmlFor="event-end-date"
+          label={lang === "ko" ? "행사 종료 일시" : "Event End"}
+        >
           <UiInput
+            id="event-end-date"
             type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            className="w-full"
             value={eventEndDate}
             onChange={(event) => onEventEndDateChange(event.target.value)}
           />
-        </div>
+        </UiFormField>
       </div>
       {isEventAlwaysOpen && (
         <p className="rounded-lg bg-brand-primary-light px-3 py-2 text-[11px] font-semibold text-brand-primary">
@@ -342,10 +354,40 @@ export function BoardWriteEventFields({
             : "Always-open events are saved without fixed calendar dots."}
         </p>
       )}
-      <div className="space-y-3">
-        <label className="block text-xs font-bold text-slate-500">
-          {lang === "ko" ? "카드 노출용 간단한 설명 *" : "Card Description *"}
-        </label>
+      <UiFormField
+        label={lang === "ko" ? "행사 썸네일" : "Event thumbnail"}
+        hint={
+          lang === "ko"
+            ? "홈과 행사 목록 카드에 표시됩니다. 권장 비율 16:9, JPG·PNG·WebP"
+            : "Shown on home and event cards. Recommended ratio 16:9; JPG, PNG, or WebP."
+        }
+      >
+        <ImageUploadField
+          alt={lang === "ko" ? "행사 썸네일 미리보기" : "Event thumbnail preview"}
+          disabled={uploading}
+          emptyText={
+            lang === "ko"
+              ? "16:9 비율의 대표 이미지를 선택하세요"
+              : "Choose a 16:9 cover image"
+          }
+          imageUrl={thumbnail ? resolveAssetUrl(thumbnail.storageKey) : undefined}
+          onRemove={onThumbnailRemove}
+          onSelect={onThumbnailSelect}
+          removeLabel={lang === "ko" ? "제거" : "Remove"}
+          selectLabel={
+            lang === "ko"
+              ? thumbnail
+                ? "이미지 변경"
+                : "썸네일 선택"
+              : thumbnail
+                ? "Change image"
+                : "Choose thumbnail"
+          }
+        />
+      </UiFormField>
+      <UiFormField
+        label={lang === "ko" ? "카드 노출용 간단한 설명 *" : "Card Description *"}
+      >
         <div className={isKoreanOnly ? "grid" : "grid gap-4 sm:grid-cols-2"}>
           <UiInput
             type="text"
@@ -374,7 +416,7 @@ export function BoardWriteEventFields({
             />
           ) : null}
         </div>
-      </div>
+      </UiFormField>
     </div>
   );
 }
@@ -392,7 +434,11 @@ export function BoardWriteAttachmentList({
   onRemoveAsset,
   uploading,
 }: AttachmentListProps) {
-  if (assets.length === 0) {
+  const attachmentAssets = assets.filter(
+    (asset) => asset.usageType !== "THUMBNAIL",
+  );
+
+  if (attachmentAssets.length === 0) {
     return null;
   }
 
@@ -401,8 +447,8 @@ export function BoardWriteAttachmentList({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-xs font-bold text-slate-800">
           {lang === "ko"
-            ? `첨부파일 ${assets.length}`
-            : `${assets.length} attachments`}
+            ? `첨부파일 ${attachmentAssets.length}`
+            : `${attachmentAssets.length} attachments`}
         </h3>
         {uploading && (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-kaist-darkgreen">
@@ -412,7 +458,7 @@ export function BoardWriteAttachmentList({
         )}
       </div>
       <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {assets.map((asset) => (
+        {attachmentAssets.map((asset) => (
           <div
             key={asset.assetId}
             className="flex items-center justify-between gap-3 px-4 py-2.5"
@@ -646,8 +692,8 @@ export function BoardWriteFooter({
   submitLabel,
   submittingLabel,
 }: BoardWriteFooterProps) {
-  const defaultSubmitLabel = lang === "ko" ? "글 게시하기" : "Publish Post";
-  const defaultSubmittingLabel = lang === "ko" ? "게시 중..." : "Publishing...";
+  const defaultSubmitLabel = lang === "ko" ? "등록" : "Publish Post";
+  const defaultSubmittingLabel = lang === "ko" ? "등록 중..." : "Publishing...";
 
   return (
     <div className={`flex items-center gap-2 ${compact ? "justify-end" : "justify-between"}`}>
@@ -656,7 +702,7 @@ export function BoardWriteFooter({
         type="button"
         onClick={onCancel}
         disabled={isSubmitting}
-        className="text-slate-600"
+        className="!font-medium text-slate-600"
       >
         <ArrowLeft aria-hidden="true" />
         {lang === "ko" ? "취소" : "Cancel"}
@@ -666,7 +712,7 @@ export function BoardWriteFooter({
           type="button"
           onClick={onSubmit}
           disabled={isSubmitting || !canWriteSelected}
-          className="bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
+          className="!font-medium bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-1.5">

@@ -45,6 +45,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     eventStartDate,
     fileInputRef,
     handleSubmit,
+    handleUploadThumbnail,
     handleStartNewDraft,
     handleUploadFiles,
     isAnonymous,
@@ -147,7 +148,6 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
             {canManageTemplates ? (
               <ArticleTemplateControl
                 boardCode={category}
-                boardLabel={categoryLabel}
                 lang={lang}
                 onApply={applyTemplate}
                 snapshot={templateSnapshot}
@@ -255,6 +255,18 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
                         onEventDescriptionEnChange={setEventDescriptionEn}
                         onEventEndDateChange={setEventEndDate}
                         onEventStartDateChange={setEventStartDate}
+                        onThumbnailRemove={() =>
+                          setAssets((current) =>
+                            current.filter(
+                              (item) => item.usageType !== "THUMBNAIL",
+                            ),
+                          )
+                        }
+                        onThumbnailSelect={handleUploadThumbnail}
+                        thumbnail={assets.find(
+                          (asset) => asset.usageType === "THUMBNAIL",
+                        )}
+                        uploading={uploading}
                         onAllDayChange={(checked) => {
                           setIsAllDay(checked);
                           setEventStartDate(

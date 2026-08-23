@@ -249,7 +249,6 @@ export function BoardDetailArticleCard({
           ) : (
             <Share2 className="size-3.5" aria-hidden="true" />
           )}
-          <span className="text-[12px]">{lang === "ko" ? "공유" : "Share"}</span>
         </Button>
       </div>
     </article>

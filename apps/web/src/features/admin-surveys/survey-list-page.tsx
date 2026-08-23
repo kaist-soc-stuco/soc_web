@@ -140,6 +140,19 @@ export function SurveyListPage() {
     fetchSurveys();
   }, [client, session, sessionLoading]);
 
+  useEffect(() => {
+    if (!activeRowDropdown) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setActiveRowDropdown(null);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [activeRowDropdown]);
+
   const handleDelete = async (survey: SurveyRecord) => {
     const confirmed = await requestConfirm({
       confirmLabel: "삭제하기",

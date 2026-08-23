@@ -18,11 +18,13 @@ import { useLocalizedSiteContent, usePublicContentBlocksByType } from "@/feature
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { Button } from "@/components/ui/button";
 import { PageTabButton, PageTabs, PageToolbar } from "@/components/ui/page-layout";
+import { PledgesSection } from "./pledges-section";
 
 const TABS = [
   { id: "intro", labelKo: "학생회 소개", labelEn: "Student Council", icon: Info },
   { id: "history", labelKo: "당해 학생회 소개", labelEn: "Current Council", icon: Calendar },
   { id: "org", labelKo: "조직도", labelEn: "Org Chart", icon: Network },
+  { id: "pledges", labelKo: "공약 이행 현황", labelEn: "Pledge Progress", icon: Target },
   { id: "members", labelKo: "Contact me", labelEn: "Contact me", icon: User },
 ];
 
@@ -36,7 +38,7 @@ export function AboutTabs({
   onTabChange: (tab: string) => void;
 }) {
   return (
-    <PageToolbar>
+    <PageToolbar containerClassName="!max-w-[var(--ui-about-max-width)]">
       <PageTabs aria-label={lang === "ko" ? "학생회 소개 분류" : "Student council sections"}>
         {TABS.map((tab) => {
           const isActive = currentTab === tab.id;
@@ -67,11 +69,12 @@ export function AboutTabContent({
   lang: string;
 }) {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-0 py-12">
+    <main className="mx-auto w-full max-w-[var(--ui-about-max-width)] flex-1 px-[var(--ui-space-page-x)] py-12 md:px-[var(--ui-space-page-x-wide)]">
       <div className="w-full min-h-[400px] rounded-3xl border border-gray-200 bg-white p-6 shadow-xs md:p-12">
         {currentTab === "intro" && <IntroSection lang={lang} />}
         {currentTab === "history" && <HistorySection lang={lang} />}
         {currentTab === "org" && <OrgSection lang={lang} />}
+        {currentTab === "pledges" && <PledgesSection lang={lang} />}
         {currentTab === "members" && (
           <MembersSection
             contacts={contacts}
@@ -283,11 +286,11 @@ function OrgSection({ lang }: { lang: string }) {
         <h2 className="text-2xl font-bold text-kaist-black">
           {lang === "ko" ? "조직도" : "Organization Chart"}
         </h2>
-        <figure className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-white p-4 sm:p-6">
+        <figure className="overflow-hidden rounded-xl bg-white">
           <img
             src={resolveAssetUrl(organizationChart.imageUrl)}
             alt={lang === "ko" ? organizationChart.titleKo : organizationChart.titleEn || organizationChart.titleKo}
-            className="mx-auto h-auto max-h-[70vh] w-full object-contain"
+            className="block h-auto max-h-[70vh] w-full object-contain"
           />
         </figure>
       </div>

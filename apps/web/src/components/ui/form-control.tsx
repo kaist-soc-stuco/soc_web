@@ -70,3 +70,32 @@ export const UiSelect = React.forwardRef<
 ));
 
 UiSelect.displayName = "UiSelect";
+
+export function UiFormField({
+  children,
+  className,
+  hint,
+  htmlFor,
+  label,
+}: React.ComponentProps<"div"> & {
+  hint?: React.ReactNode;
+  htmlFor?: string;
+  label: React.ReactNode;
+}) {
+  return (
+    <div className={cn("grid min-w-0 gap-1.5", className)}>
+      <label
+        className="text-xs font-normal leading-4 text-[#344054]"
+        htmlFor={htmlFor}
+      >
+        {label}
+      </label>
+      {children}
+      {hint ? (
+        <span className="text-xs font-normal leading-4 text-[#344054]">
+          {hint}
+        </span>
+      ) : null}
+    </div>
+  );
+}

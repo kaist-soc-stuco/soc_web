@@ -1,5 +1,6 @@
 import type { ArticleEngagementKind } from '@soc/contracts';
 import { Bookmark, Heart, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 
 interface ArticleEngagementActionsProps {
@@ -27,6 +28,15 @@ export function ArticleEngagementActions({
   viewerHasLiked,
   viewerHasScrapped,
 }: ArticleEngagementActionsProps) {
+  const [bouncingKind, setBouncingKind] = useState<ArticleEngagementKind | null>(null);
+
+  const handleToggle = (kind: ArticleEngagementKind, active: boolean) => {
+    setBouncingKind(null);
+    window.requestAnimationFrame(() => setBouncingKind(kind));
+    window.setTimeout(() => setBouncingKind(null), 150);
+    onToggle(kind, active);
+  };
+
   const buttonClass = compact
     ? 'min-h-8 rounded-md px-2 text-[11px]'
     : 'min-h-9 rounded-lg px-3 text-xs';
@@ -45,7 +55,8 @@ export function ArticleEngagementActions({
           }
           label={lang === 'ko' ? '좋아요' : 'Like'}
           loading={submitting === 'LIKE'}
-          onClick={() => onToggle('LIKE', !viewerHasLiked)}
+          onClick={() => handleToggle('LIKE', !viewerHasLiked)}
+          iconClassName={bouncingKind === 'LIKE' ? 'engagement-icon-bounce' : undefined}
           className={buttonClass}
           tone="like"
         />
@@ -57,7 +68,8 @@ export function ArticleEngagementActions({
         label={lang === 'ko' ? '스크랩' : 'Scrap'}
         loading={submitting === 'SCRAP'}
         showLoadingIndicator={!scrapIconOnly}
-        onClick={() => onToggle('SCRAP', !viewerHasScrapped)}
+        onClick={() => handleToggle('SCRAP', !viewerHasScrapped)}
+        iconClassName={bouncingKind === 'SCRAP' ? 'engagement-icon-bounce' : undefined}
         className={scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass}
         tone="scrap"
       />
@@ -75,6 +87,7 @@ function EngagementButton({
   onClick,
   showLoadingIndicator,
   tone,
+  iconClassName,
 }: {
   active: boolean;
   className: string;
@@ -85,17 +98,17 @@ function EngagementButton({
   onClick: () => void;
   showLoadingIndicator?: boolean;
   tone: 'like' | 'scrap';
+  iconClassName?: string;
 }) {
   const resolvedShowLoadingIndicator = showLoadingIndicator ?? true;
   const activeClass =
     tone === 'like'
-      ? 'border-slate-200 text-rose-600 hover:border-slate-200 hover:text-rose-600'
+      ? 'text-rose-600 hover:text-rose-600'
       : 'text-amber-400 hover:text-amber-400';
   const inactiveClass =
     tone === 'like'
-      ? 'border-slate-200 text-slate-400 hover:border-slate-200 hover:text-slate-400'
+      ? 'text-slate-400 hover:text-slate-400'
       : 'text-slate-400 hover:text-slate-400';
-  const borderClass = tone === 'like' ? 'border' : 'border-0';
 
   return (
     <Button
@@ -105,11 +118,11 @@ function EngagementButton({
       aria-pressed={active}
       disabled={loading}
       onClick={onClick}
-      className={`interaction-action inline-flex items-center justify-center gap-1 ${borderClass} bg-transparent font-bold transition-colors disabled:cursor-wait disabled:opacity-60 hover:bg-slate-100 ${className} ${
+      className={`interaction-action inline-flex items-center justify-center gap-1 border-0 bg-transparent font-bold transition-colors disabled:cursor-wait disabled:opacity-60 hover:bg-slate-100 ${className} ${
         active ? activeClass : inactiveClass
       }`}
     >
-      {loading && resolvedShowLoadingIndicator ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}
+      {loading && resolvedShowLoadingIndicator ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : iconClassName ? <span className={iconClassName}>{icon}</span> : icon}
       {count !== null ? <span className="tabular-nums">{count}</span> : null}
     </Button>
   );

@@ -216,7 +216,7 @@ function PrivateRawAnswerResult({
 }) {
   if (question.totalAnswers === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-medium text-slate-400">
         {lang === "ko" ? "제출된 응답이 없습니다." : "No responses submitted."}
       </div>
     );
@@ -259,7 +259,7 @@ function QuestionResultCard({
                 : `${question.totalAnswers} answers`}
             </span>
           </div>
-          <h2 className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-semibold leading-6 text-slate-950">
+          <h2 className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[15px] font-medium leading-6 text-slate-950">
             <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
               {idx + 1}.
             </span>

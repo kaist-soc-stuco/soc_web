@@ -273,7 +273,7 @@ export function BoardArticleTable({
           </div>
         </div>
 
-        <div className={isLoading || articles.length === 0 ? "relative min-h-48" : "relative"}>
+        <div className="relative min-h-48">
           <div
             className={`divide-y divide-slate-100 transition-opacity duration-150 ${
               isLoading && articles.length > 0 ? "opacity-70" : "opacity-100"

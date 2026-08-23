@@ -41,7 +41,6 @@ interface StoredBoardTemplate extends BoardTemplateSnapshot {
 
 interface ArticleTemplateControlProps {
   boardCode: string;
-  boardLabel: string;
   lang: string;
   snapshot: BoardTemplateSnapshot;
   onApply: (snapshot: BoardTemplateSnapshot) => void;
@@ -78,7 +77,6 @@ function writeTemplates(templates: StoredBoardTemplate[]) {
 
 export function ArticleTemplateControl({
   boardCode,
-  boardLabel,
   lang,
   snapshot,
   onApply,
@@ -86,23 +84,13 @@ export function ArticleTemplateControl({
   const [templates, setTemplates] = useState<StoredBoardTemplate[]>(readTemplates);
   const [open, setOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const currentTemplates = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return templates
-      .filter((template) => template.boardCode === boardCode)
-      .filter((template) =>
-        !query
-          ? true
-          : `${template.name} ${template.description}`
-              .toLocaleLowerCase()
-              .includes(query),
-      );
-  }, [boardCode, search, templates]);
+    return templates.filter((template) => template.boardCode === boardCode);
+  }, [boardCode, templates]);
 
   const saveTemplate = () => {
     if (!name.trim() || !snapshot.titleKo.trim() || !snapshot.contentKo.trim()) {
@@ -146,9 +134,9 @@ export function ArticleTemplateControl({
         type="button"
         variant="outline"
         size="sm"
+        className="!font-medium"
         onClick={() => {
           setError(null);
-          setSearch("");
           setSaveOpen(false);
           setOpen(true);
         }}
@@ -164,15 +152,7 @@ export function ArticleTemplateControl({
         className="max-w-2xl"
       >
         <div className="space-y-5">
-          <div className="flex items-center gap-2">
-            <UiInput
-              aria-label="템플릿 검색"
-              spellCheck={false}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="템플릿 검색"
-              className="h-9 min-w-0 flex-1 text-sm font-normal"
-            />
+          <div className="flex justify-end">
             <Button
               type="button"
               variant="outline"
@@ -181,16 +161,12 @@ export function ArticleTemplateControl({
                 setError(null);
                 setSaveOpen((current) => !current);
               }}
-              className="shrink-0"
+              className="!font-medium shrink-0"
             >
               <Plus aria-hidden="true" />
               현재 작성 내용을 새 템플릿으로 저장
             </Button>
           </div>
-
-          <p className="text-xs font-normal text-slate-500">
-            {boardLabel} 게시판에서 사용할 관리자 전용 템플릿입니다.
-          </p>
 
           {error ? (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-normal text-rose-700" role="alert">
@@ -221,10 +197,10 @@ export function ArticleTemplateControl({
                 />
               </AdminFormField>
               <div className="flex justify-end gap-2 sm:col-span-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setSaveOpen(false)}>
+                <Button type="button" variant="ghost" size="sm" className="!font-medium" onClick={() => setSaveOpen(false)}>
                   취소
                 </Button>
-                <Button type="button" size="sm" onClick={saveTemplate}>
+                <Button type="button" size="sm" className="!font-medium" onClick={saveTemplate}>
                   저장
                 </Button>
               </div>

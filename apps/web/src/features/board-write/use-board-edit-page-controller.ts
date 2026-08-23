@@ -498,6 +498,43 @@ export function useBoardEditPageController(forcedCategory?: string) {
     }
   };
 
+  const handleUploadThumbnail = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      alert(
+        lang === "ko"
+          ? "썸네일은 이미지 파일만 선택할 수 있습니다."
+          : "The thumbnail must be an image file.",
+      );
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const asset = await apiClient.uploadAsset(file);
+      const thumbnail = {
+        assetId: asset.assetId,
+        mimeType: asset.mimeType,
+        originalFilename: asset.originalFilename,
+        sizeBytes: asset.sizeBytes,
+        storageKey: asset.storageKey,
+        usageType: "THUMBNAIL",
+      } satisfies AttachedAsset;
+      setAssets((current) => [
+        ...current.filter((item) => item.usageType !== "THUMBNAIL"),
+        thumbnail,
+      ]);
+    } catch (error) {
+      console.error(error);
+      alert(
+        lang === "ko"
+          ? "썸네일 업로드에 실패했습니다."
+          : "Failed to upload the thumbnail.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!articleId) return;
 
@@ -676,6 +713,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     handleRestoreDraft,
     handleStartNewDraft,
     handleSaveDraft,
+    handleUploadThumbnail,
     handleUploadFiles,
     isAnonymous,
     isAllDay,

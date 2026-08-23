@@ -59,7 +59,7 @@ export function Modal({
             dividerless ? "px-6" : "px-5",
           )}
         >
-          <h2 className="text-[15px] font-semibold leading-5 text-[var(--ui-text-strong)]">{title}</h2>
+          <h2 className="text-[18px] font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
           {showClose ? (
             <IconButton size="sm" aria-label="닫기" onClick={onClose}>
               <X aria-hidden="true" />
