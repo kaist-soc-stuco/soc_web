@@ -111,7 +111,7 @@ export function BoardWriteHeaderControls({
           <span
             className="text-xs font-medium text-slate-600"
           >
-            {lang === "ko" ? "한국어 콘텐츠만" : "Korean content only"}
+            {lang === "ko" ? "한국어 사용자만" : "Korean Speakers Only"}
           </span>
         </label>
       </div>
@@ -173,7 +173,7 @@ export function BoardEditHeaderControls({
           <span
             className="text-xs font-medium text-slate-600"
           >
-            {lang === "ko" ? "한국어 콘텐츠만" : "Korean content only"}
+            {lang === "ko" ? "한국어 사용자만" : "Korean Speakers Only"}
           </span>
         </label>
       </div>
@@ -233,6 +233,7 @@ interface EventFieldsProps {
   eventDescriptionEn: string;
   eventEndDate: string;
   eventStartDate: string;
+  isAllDay: boolean;
   isEventAlwaysOpen: boolean;
   isKoreanOnly: boolean;
   lang: string;
@@ -240,6 +241,7 @@ interface EventFieldsProps {
   onEventDescriptionEnChange: (value: string) => void;
   onEventEndDateChange: (value: string) => void;
   onEventStartDateChange: (value: string) => void;
+  onAllDayChange: (checked: boolean) => void;
   onEventAlwaysOpenChange: (checked: boolean) => void;
 }
 
@@ -248,8 +250,10 @@ export function BoardWriteEventFields({
   eventDescriptionEn,
   eventEndDate,
   eventStartDate,
+  isAllDay,
   isEventAlwaysOpen,
   isKoreanOnly,
+  onAllDayChange,
   lang,
   onEventAlwaysOpenChange,
   onEventDescriptionKoChange,
@@ -259,12 +263,29 @@ export function BoardWriteEventFields({
 }: EventFieldsProps) {
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4 animate-in fade-in duration-300">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-          {lang === "ko"
-            ? "행사 일정 및 추가 정보"
-            : "Event Schedule & Extra Info"}
-        </h3>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <label className="flex items-center gap-2.5 cursor-pointer group rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+          <div
+            className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
+              isAllDay
+                ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
+                : "border-slate-300 group-hover:border-kaist-darkgreen"
+            }`}
+          >
+            {isAllDay && (
+              <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+            )}
+          </div>
+          <UiInput
+            type="checkbox"
+            className="hidden"
+            checked={isAllDay}
+            onChange={(event) => onAllDayChange(event.target.checked)}
+          />
+          <span className="text-[11px] font-bold text-slate-700">
+            {lang === "ko" ? "종일" : "All day"}
+          </span>
+        </label>
         <label className="flex items-center gap-2.5 cursor-pointer group rounded-lg border border-slate-200 bg-white px-3 py-1.5">
           <div
             className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
@@ -284,17 +305,17 @@ export function BoardWriteEventFields({
             onChange={(event) => onEventAlwaysOpenChange(event.target.checked)}
           />
           <span className="text-[11px] font-bold text-slate-700">
-            {lang === "ko" ? "일정 상시" : "Always open"}
+            {lang === "ko" ? "상시 진행" : "Always open"}
           </span>
         </label>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-bold text-slate-500 mb-1">
-            {lang === "ko" ? "행사 시작 일시" : "Event Start Date"}
+            {lang === "ko" ? "행사 시작 일시" : "Event Start"}
           </label>
           <UiInput
-            type="datetime-local"
+            type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
             className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             value={eventStartDate}
@@ -303,10 +324,10 @@ export function BoardWriteEventFields({
         </div>
         <div>
           <label className="block text-xs font-bold text-slate-500 mb-1">
-            {lang === "ko" ? "행사 마감 일시" : "Event End Date"}
+            {lang === "ko" ? "행사 종료 일시" : "Event End"}
           </label>
           <UiInput
-            type="datetime-local"
+            type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
             className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             value={eventEndDate}
@@ -325,21 +346,20 @@ export function BoardWriteEventFields({
         <label className="block text-xs font-bold text-slate-500">
           {lang === "ko" ? "카드 노출용 간단한 설명 *" : "Card Description *"}
         </label>
-        <UiInput
-          type="text"
-          aria-label={lang === "ko" ? "국문 카드 설명" : "Korean card description"}
-          placeholder={
-            lang === "ko"
-              ? "피드에 표시될 짧은 국문 행사 정보입니다"
-              : "Short Korean description for card display"
-          }
-          className="w-full"
-          value={eventDescriptionKo}
-          onChange={(event) => onEventDescriptionKoChange(event.target.value)}
-        />
-        {!isKoreanOnly ? (
-          <>
-            <div className="h-px bg-slate-200" aria-hidden="true" />
+        <div className={isKoreanOnly ? "grid" : "grid gap-4 sm:grid-cols-2"}>
+          <UiInput
+            type="text"
+            aria-label={lang === "ko" ? "국문 카드 설명" : "Korean card description"}
+            placeholder={
+              lang === "ko"
+                ? "피드에 표시될 짧은 국문 행사 정보입니다"
+                : "Short Korean description for card display"
+            }
+            className="w-full"
+            value={eventDescriptionKo}
+            onChange={(event) => onEventDescriptionKoChange(event.target.value)}
+          />
+          {!isKoreanOnly ? (
             <UiInput
               type="text"
               aria-label={lang === "ko" ? "영문 카드 설명" : "English card description"}
@@ -352,8 +372,8 @@ export function BoardWriteEventFields({
               value={eventDescriptionEn}
               onChange={(event) => onEventDescriptionEnChange(event.target.value)}
             />
-          </>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   );

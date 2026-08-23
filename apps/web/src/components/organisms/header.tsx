@@ -238,6 +238,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               { label: "학생회 소개", href: "/about?tab=intro" },
               { label: "당해 학생회 소개", href: "/about?tab=history" },
               { label: "조직도", href: "/about?tab=org" },
+              { label: "공약 이행 현황", href: "/about/pledges" },
               { label: "Contact me", href: "/about?tab=members" },
             ],
           },
@@ -267,6 +268,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               { label: "Student Council", href: "/about?tab=intro" },
               { label: "Current Council", href: "/about?tab=history" },
               { label: "Org Chart", href: "/about?tab=org" },
+              { label: "Pledge progress", href: "/about/pledges" },
               { label: "Contact me", href: "/about?tab=members" },
             ],
           },
@@ -481,7 +483,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                       {lang === "ko" ? "새 알림이 없습니다." : "No new notifications."}
                     </p>
                   ) : (
-                    <div className="max-h-80 overflow-y-auto">
+                    <div className="scrollbar-hidden max-h-80 overflow-y-auto">
                       {notifications.map((notification) => (
                         <Button variant="ghost"
                           key={notification.notificationId}
@@ -585,18 +587,15 @@ export function Header({ variant = "default" }: HeaderProps) {
                 type="button"
                 onClick={() => void handleStartLogin()}
                 disabled={loginStarting}
-                className="group relative hidden cursor-pointer items-center whitespace-nowrap border-0 bg-transparent text-sm font-semibold tracking-tight text-kaist-black transition-colors hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base"
+                className="hidden cursor-pointer items-center whitespace-nowrap rounded-md border-0 bg-transparent px-2.5 py-1.5 text-sm font-semibold tracking-tight text-kaist-black transition-none hover:bg-slate-100 hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base"
               >
-                <span className="py-2">
-                  {loginStarting
-                    ? lang === "ko"
-                      ? "로그인 중"
-                      : "Signing in"
-                    : lang === "ko"
-                      ? "로그인"
-                      : "Login"}
-                </span>
-                <span className="absolute bottom-0 left-0 right-0 h-1 scale-x-0 bg-kaist-darkgreen-main transition-transform duration-200 origin-center group-hover:scale-x-100" />
+                {loginStarting
+                  ? lang === "ko"
+                    ? "로그인 중"
+                    : "Signing in"
+                  : lang === "ko"
+                    ? "로그인"
+                    : "Login"}
               </Button>
               {import.meta.env.DEV ? (
                 <Button variant="ghost"

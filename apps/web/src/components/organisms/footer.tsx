@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Instagram } from "lucide-react";
 
 const OFFICIAL_INSTAGRAM_URL = "https://www.instagram.com/in.cs.tagram/";
 
@@ -17,17 +18,17 @@ export function Footer() {
         <Link to="/privacy" className="rounded-sm transition-colors hover:text-brand-primary">
           개인정보처리방침
         </Link>
-        <span aria-hidden="true" className="text-slate-300">|</span>
+        <span className="text-slate-500">Copyright © KAIST SOC. All rights reserved.</span>
         <a
           href={OFFICIAL_INSTAGRAM_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-sm transition-colors hover:text-brand-primary"
+          aria-label="Instagram"
+          title="Instagram"
+          className="ml-2 inline-flex size-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200 hover:text-brand-primary"
         >
-          instagram
+          <Instagram className="size-3.5" aria-hidden="true" />
         </a>
-        <span aria-hidden="true" className="text-slate-300">|</span>
-        <span className="text-slate-500">Copyright © KAIST SOC. All rights reserved.</span>
       </div>
     </footer>
   );

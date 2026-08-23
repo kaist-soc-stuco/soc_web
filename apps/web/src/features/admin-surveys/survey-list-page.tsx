@@ -13,6 +13,7 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   AdminDataTable,
   AdminRowActions,
@@ -293,11 +294,13 @@ export function SurveyListPage() {
           <AdminTableCard className="overflow-visible">
             <div className="border-b border-slate-100 p-5">
             <div className="flex flex-wrap items-center gap-3">
-              <AdminSelectDropdown
+              <SegmentedControl
                 ariaLabel="설문 상태"
+                role="tablist"
+                className="shrink-0"
                 value={statusFilter}
                 options={[
-                  { value: "all", label: "전체 상태" },
+                  { value: "all", label: "전체" },
                   { value: "open", label: "진행중" },
                   { value: "closed", label: "마감" },
                   { value: "draft", label: "임시저장" },
@@ -306,7 +309,6 @@ export function SurveyListPage() {
                   setStatusFilter(value as SurveyStatusFilter);
                   setCurrentPage(1);
                 }}
-                className="w-32 shrink-0"
               />
               <AdminSelectDropdown
                 ariaLabel="설문 유형"

@@ -6,21 +6,14 @@ import type {
   PublicCalendarEventItem,
   SurveyRecord,
 } from "@soc/contracts";
-import {
-  ArrowRight,
-  CalendarDays,
-  ClipboardList,
-  FileText,
-  Info,
-  Loader2,
-} from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 
+import { PageActionButton, PageSearchField, PageTabButton, PageTabs } from "@/components/ui/page-layout";
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { formatShortDate } from "@/lib/date-display";
-import { stripRichText } from "@/components/ui/rich-text-content";
 
-import type { AboutSearchItem } from "./search-utils";
-import { PageActionButton, PageSearchField } from "@/components/ui/page-layout";
+import type { AboutSearchItem, SearchFilter } from "./search-utils";
 
 function formatDate(value: string, lang: string) {
   return formatShortDate(value, lang);
@@ -28,9 +21,7 @@ function formatDate(value: string, lang: string) {
 
 function getSurveyKindLabel(kind: string, lang: string) {
   if (kind === "VOTE") return lang === "ko" ? "투표" : "Vote";
-  if (kind === "APPLICATION") {
-    return lang === "ko" ? "신청" : "Application";
-  }
+  if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Application";
   return lang === "ko" ? "설문" : "Survey";
 }
 
@@ -65,15 +56,63 @@ export function SearchForm({
           onClear={() => onInputValueChange("")}
           placeholder={lang === "ko" ? "검색어를 입력하세요" : "Enter a search term"}
         />
-        <PageActionButton
-          type="submit"
-          tone="primary"
-          className="px-5"
-        >
+        <PageActionButton type="submit" tone="primary" className="px-5">
           {lang === "ko" ? "검색" : "Search"}
         </PageActionButton>
       </div>
     </form>
+  );
+}
+
+export function SearchFilterTabs({
+  activeFilter,
+  boardCount,
+  eventCount,
+  lang,
+  onFilterChange,
+  surveyCount,
+  totalCount,
+  visible,
+}: {
+  activeFilter: SearchFilter;
+  boardCount: number;
+  eventCount: number;
+  lang: string;
+  onFilterChange: (filter: SearchFilter) => void;
+  surveyCount: number;
+  totalCount: number;
+  visible: boolean;
+}) {
+  if (!visible) return null;
+
+  const tabs: Array<{ count: number; filter: SearchFilter; label: string }> = [
+    { count: totalCount, filter: "all", label: lang === "ko" ? "전체" : "All" },
+    { count: boardCount, filter: "board", label: lang === "ko" ? "게시판" : "Board" },
+    { count: eventCount, filter: "event", label: lang === "ko" ? "행사" : "Events" },
+    {
+      count: surveyCount,
+      filter: "survey",
+      label: lang === "ko" ? "설문·투표" : "Surveys · Votes",
+    },
+  ];
+
+  return (
+    <PageTabs
+      variant="trackless"
+      aria-label={lang === "ko" ? "검색 결과 필터" : "Search result filters"}
+    >
+      {tabs.map((tab) => (
+        <PageTabButton
+          key={tab.filter}
+          active={activeFilter === tab.filter}
+          onClick={() => onFilterChange(tab.filter)}
+          className="!h-9 !min-h-9 gap-1.5 px-2.5 text-[13px]"
+        >
+          <span>{tab.label}</span>
+          <span className="tabular-nums text-slate-400">{tab.count}</span>
+        </PageTabButton>
+      ))}
+    </PageTabs>
   );
 }
 
@@ -90,20 +129,26 @@ export function SearchStatus({
 }) {
   if (!query) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center text-sm font-semibold text-slate-500">
+      <p className="px-1 text-sm font-normal text-slate-500">
         {lang === "ko"
-          ? "검색어를 입력하면 게시판, 행사, 설문·투표, 일정, 소개 결과가 함께 표시됩니다."
-          : "Enter a query to search board posts, events, surveys, calendar, and about pages."}
-      </div>
+          ? "검색어를 입력하면 게시판, 행사, 설문·투표, 일정 결과를 확인할 수 있습니다."
+          : "Enter a query to search board posts, events, surveys, and calendar items."}
+      </p>
     );
   }
 
   return (
-    <div className="flex items-center justify-between px-1 text-sm font-bold text-slate-500">
-      <span>{lang === "ko" ? `"${query}" 검색 결과` : `Results for "${query}"`}</span>
-      {!loading && (
-        <span>{lang === "ko" ? `총 ${totalCount}건` : `${totalCount} results`}</span>
-      )}
+    <div className="flex items-center justify-between gap-4 px-1 text-sm font-normal text-slate-500">
+      <span>
+        {lang === "ko" ? (
+          <>
+            <HighlightedText value={`"${query}"`} query={query} /> 검색 결과
+          </>
+        ) : (
+          <>Results for &quot;{query}&quot;</>
+        )}
+      </span>
+      {!loading ? <span>{lang === "ko" ? `총 ${totalCount}건` : `${totalCount} results`}</span> : null}
     </div>
   );
 }
@@ -115,6 +160,7 @@ export function SearchResults({
   calendarEvents,
   error,
   eventArticles,
+  filter,
   lang,
   loading,
   query,
@@ -127,6 +173,7 @@ export function SearchResults({
   calendarEvents: PublicCalendarEventItem[];
   error: string | null;
   eventArticles: ArticleListItem[];
+  filter: SearchFilter;
   lang: string;
   loading: boolean;
   query: string;
@@ -135,7 +182,7 @@ export function SearchResults({
 }) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white py-12 text-sm font-bold text-slate-400 shadow-card">
+      <div className="flex items-center justify-center gap-2 py-10 text-sm font-normal text-slate-400">
         <Loader2 className="h-4 w-4 animate-spin text-kaist-darkgreen" />
         <span>{lang === "ko" ? "검색 중..." : "Searching..."}</span>
       </div>
@@ -143,28 +190,33 @@ export function SearchResults({
   }
 
   if (error) {
-    return (
-      <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm font-bold text-red-600">
-        {error}
-      </div>
-    );
+    return <p className="px-1 py-4 text-sm font-normal text-red-600">{error}</p>;
   }
 
   if (query && totalCount === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-12 text-center text-sm font-semibold text-slate-500">
+      <p className="px-1 py-10 text-center text-sm font-normal text-slate-500">
         {lang === "ko" ? "검색 결과가 없습니다." : "No results found."}
-      </div>
+      </p>
     );
   }
 
+  const showAll = filter === "all";
   return (
-    <div className="space-y-5">
-      <ArticleResults articles={boardArticles} boardById={boardById} lang={lang} />
-      <EventResults articles={eventArticles} lang={lang} />
-      <SurveyResults lang={lang} surveys={surveys} />
-      <CalendarResults events={calendarEvents} lang={lang} />
-      <AboutResults items={aboutResults} lang={lang} />
+    <div className="space-y-9">
+      {filter === "board" || showAll ? (
+        <ArticleResults articles={boardArticles} boardById={boardById} lang={lang} query={query} />
+      ) : null}
+      {filter === "event" || showAll ? (
+        <>
+          <EventResults articles={eventArticles} lang={lang} query={query} />
+          <CalendarResults events={calendarEvents} lang={lang} query={query} />
+        </>
+      ) : null}
+      {filter === "survey" || showAll ? (
+        <SurveyResults lang={lang} query={query} surveys={surveys} />
+      ) : null}
+      {showAll ? <AboutResults items={aboutResults} lang={lang} query={query} /> : null}
     </div>
   );
 }
@@ -172,22 +224,21 @@ export function SearchResults({
 function SectionShell({
   children,
   count,
-  icon,
   title,
 }: {
   children: ReactNode;
   count: number;
-  icon: ReactNode;
   title: string;
 }) {
+  if (count === 0) return null;
+
   return (
-    <section className="rounded-2xl border border-card-border-subtle bg-white p-5 shadow-card">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-slate-950">
-        {icon}
+    <section>
+      <h2 className="mb-3 flex items-baseline gap-2 text-[15px] font-semibold text-slate-900">
         <span>{title}</span>
-        <span className="text-xs font-bold text-slate-400">({count})</span>
+        <span className="text-xs font-normal tabular-nums text-slate-400">{count}</span>
       </h2>
-      {children}
+      <div className="border-t border-slate-200">{children}</div>
     </section>
   );
 }
@@ -196,43 +247,38 @@ function ArticleResults({
   articles,
   boardById,
   lang,
+  query,
 }: {
   articles: ArticleListItem[];
   boardById: Map<number, BoardSummary>;
   lang: string;
+  query: string;
 }) {
   return (
-    <SectionShell
-      count={articles.length}
-      icon={<FileText className="h-4 w-4 text-kaist-darkgreen" />}
-      title={lang === "ko" ? "게시판" : "Board"}
-    >
-      {articles.length === 0 ? (
-        <p className="py-5 text-sm font-semibold text-slate-400">
-          {lang === "ko" ? "게시글 결과가 없습니다." : "No board posts found."}
-        </p>
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {articles.map((article) => {
-            const board = boardById.get(article.boardId);
-            const boardCode = article.boardCode ?? board?.code ?? "공지";
-            return (
-              <SearchLink key={article.articleId} to={`/board/${boardCode}/${article.articleId}`}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
-                    {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
-                  </p>
-                  <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
-                    <span>{getBoardLabelFromMetadata(board, boardCode, lang)}</span>
-                    <span>·</span>
-                    <span>{formatDate(article.postedAt, lang)}</span>
-                  </p>
-                </div>
-              </SearchLink>
-            );
-          })}
-        </div>
-      )}
+    <SectionShell count={articles.length} title={lang === "ko" ? "게시판" : "Board"}>
+      {articles.map((article) => {
+        const board = boardById.get(article.boardId);
+        const boardCode = article.boardCode ?? board?.code ?? "공지";
+        const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
+        const snippet = getSnippet(
+          lang === "ko" ? article.snippetKo : article.snippetEn || article.snippetKo,
+          query,
+        );
+
+        return (
+          <SearchLink key={article.articleId} to={`/board/${boardCode}/${article.articleId}`}>
+            <p className="truncate text-sm font-medium text-slate-900">
+              <HighlightedText value={title} query={query} />
+            </p>
+            {snippet ? <Snippet value={snippet} query={query} /> : null}
+            <p className="mt-1 flex items-center gap-2 text-xs font-normal text-slate-400">
+              <span>{getBoardLabelFromMetadata(board, boardCode, lang)}</span>
+              <span>·</span>
+              <span>{formatDate(article.postedAt, lang)}</span>
+            </p>
+          </SearchLink>
+        );
+      })}
     </SectionShell>
   );
 }
@@ -240,52 +286,36 @@ function ArticleResults({
 function EventResults({
   articles,
   lang,
+  query,
 }: {
   articles: ArticleListItem[];
   lang: string;
+  query: string;
 }) {
   return (
-    <SectionShell
-      count={articles.length}
-      icon={<CalendarDays className="h-4 w-4 text-kaist-darkgreen" />}
-      title={lang === "ko" ? "행사" : "Events"}
-    >
-      {articles.length === 0 ? (
-        <p className="py-5 text-sm font-semibold text-slate-400">
-          {lang === "ko" ? "행사 결과가 없습니다." : "No event posts found."}
-        </p>
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {articles.map((article) => {
-            const start = formatDate(article.eventStartDate ?? article.postedAt, lang);
-            const end = article.eventEndDate ? formatDate(article.eventEndDate, lang) : "";
-            const period = end && end !== start ? `${start} ～ ${end}` : start;
-            const description = lang === "ko"
-              ? article.eventDescriptionKo
-              : article.eventDescriptionEn || article.eventDescriptionKo;
+    <SectionShell count={articles.length} title={lang === "ko" ? "행사" : "Events"}>
+      {articles.map((article) => {
+        const start = formatDate(article.eventStartDate ?? article.postedAt, lang);
+        const end = article.eventEndDate ? formatDate(article.eventEndDate, lang) : "";
+        const period = end && end !== start ? `${start} ～ ${end}` : start;
+        const description = lang === "ko" ? article.eventDescriptionKo : article.eventDescriptionEn || article.eventDescriptionKo;
+        const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
+        const snippet = getSnippet(description, query);
 
-            return (
-              <SearchLink key={article.articleId} to={`/board/행사/${article.articleId}`}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
-                    {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
-                  </p>
-                  <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
-                    <span>{period}</span>
-                    <span>·</span>
-                    <span>{lang === "ko" ? "행사 게시글" : "Event post"}</span>
-                  </p>
-                  {description ? (
-                    <p className="mt-1 line-clamp-1 text-xs font-medium text-slate-500">
-                      {stripRichText(description)}
-                    </p>
-                  ) : null}
-                </div>
-              </SearchLink>
-            );
-          })}
-        </div>
-      )}
+        return (
+          <SearchLink key={article.articleId} to={`/events/${article.articleId}`}>
+            <p className="truncate text-sm font-medium text-slate-900">
+              <HighlightedText value={title} query={query} />
+            </p>
+            {snippet ? <Snippet value={snippet} query={query} /> : null}
+            <p className="mt-1 flex items-center gap-2 text-xs font-normal text-slate-400">
+              <span>{period}</span>
+              <span>·</span>
+              <span>{lang === "ko" ? "행사 게시글" : "Event post"}</span>
+            </p>
+          </SearchLink>
+        );
+      })}
     </SectionShell>
   );
 }
@@ -293,109 +323,78 @@ function EventResults({
 function CalendarResults({
   events,
   lang,
+  query,
 }: {
   events: PublicCalendarEventItem[];
   lang: string;
+  query: string;
 }) {
   return (
-    <SectionShell
-      count={events.length}
-      icon={<CalendarDays className="h-4 w-4 text-kaist-darkgreen" />}
-      title={lang === "ko" ? "일정" : "Calendar"}
-    >
-      {events.length === 0 ? (
-        <p className="py-5 text-sm font-semibold text-slate-400">
-          {lang === "ko" ? "일정 결과가 없습니다." : "No calendar results found."}
-        </p>
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {events.map((event) => {
-            const start = event.startAt ?? event.date;
-            const end = event.endAt && event.endAt !== start ? formatDate(event.endAt, lang) : "";
-            const period = end
-              ? `${formatDate(start, lang)} ～ ${end}`
-              : formatDate(start, lang);
-            const href = event.articleId
-              ? `/board/행사/${event.articleId}`
-              : event.surveyId
-                ? `/survey/${event.surveyId}`
-                : `/calendar?selected=${encodeURIComponent(event.date)}`;
+    <SectionShell count={events.length} title={lang === "ko" ? "일정" : "Calendar"}>
+      {events.map((event) => {
+        const start = event.startAt ?? event.date;
+        const end = event.endAt && event.endAt !== start ? formatDate(event.endAt, lang) : "";
+        const period = end ? `${formatDate(start, lang)} ～ ${end}` : formatDate(start, lang);
+        const title = lang === "ko" ? event.titleKo : event.titleEn || event.titleKo;
+        const href = event.articleId
+          ? `/events/${event.articleId}`
+          : event.surveyId
+            ? `/survey/${event.surveyId}`
+            : `/calendar?selected=${encodeURIComponent(event.date)}`;
 
-            return (
-              <SearchLink key={`${event.sourceType}-${event.id}`} to={href}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
-                    {lang === "ko" ? event.titleKo : event.titleEn || event.titleKo}
-                  </p>
-                  <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
-                    <span>{period}</span>
-                    <span>·</span>
-                    <span>
-                      {event.sourceType === "KAIST_ACADEMIC"
-                        ? lang === "ko" ? "KAIST 학사일정" : "KAIST Academic"
-                        : lang === "ko" ? "학생회 일정" : "Council calendar"}
-                    </span>
-                  </p>
-                  {event.location ? (
-                    <p className="mt-1 truncate text-xs font-medium text-slate-500">{event.location}</p>
-                  ) : null}
-                </div>
-              </SearchLink>
-            );
-          })}
-        </div>
-      )}
+        return (
+          <SearchLink key={`${event.sourceType}-${event.id}`} to={href}>
+            <p className="truncate text-sm font-medium text-slate-900">
+              <HighlightedText value={title} query={query} />
+            </p>
+            {event.location ? <Snippet value={event.location} query={query} /> : null}
+            <p className="mt-1 flex items-center gap-2 text-xs font-normal text-slate-400">
+              <span>{period}</span>
+              <span>·</span>
+              <span>
+                {event.category === "HOLIDAY"
+                  ? lang === "ko" ? "공휴일" : "Public holiday"
+                  : event.sourceType === "KAIST_ACADEMIC"
+                    ? lang === "ko" ? "KAIST 학사일정" : "KAIST Academic"
+                    : lang === "ko" ? "학생회 일정" : "Council calendar"}
+              </span>
+            </p>
+          </SearchLink>
+        );
+      })}
     </SectionShell>
   );
 }
 
 function SurveyResults({
   lang,
+  query,
   surveys,
 }: {
   lang: string;
+  query: string;
   surveys: SurveyRecord[];
 }) {
   return (
-    <SectionShell
-      count={surveys.length}
-      icon={<ClipboardList className="h-4 w-4 text-kaist-darkgreen" />}
-      title={lang === "ko" ? "설문 / 투표" : "Surveys / Votes"}
-    >
-      {surveys.length === 0 ? (
-        <p className="py-5 text-sm font-semibold text-slate-400">
-          {lang === "ko" ? "설문 결과가 없습니다." : "No surveys found."}
-        </p>
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {surveys.map((survey) => (
-            <SearchLink key={survey.id} to={`/survey/${survey.id}`}>
-              <div className="min-w-0">
-                <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-md bg-kaist-lightgreen/20 px-1.5 py-0.5 text-[10px] font-bold text-kaist-darkgreen">
-                    {getSurveyKindLabel(survey.kind, lang)}
-                  </span>
-                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
-                    {getSurveyStateLabel(survey.computedState, lang)}
-                  </span>
-                </div>
-                <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
-                  {lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo}
-                </p>
-                {(survey.descriptionKo || survey.descriptionEn) && (
-                  <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">
-                    {stripRichText(
-                      lang === "ko"
-                        ? survey.descriptionKo
-                        : survey.descriptionEn || survey.descriptionKo,
-                    )}
-                  </p>
-                )}
-              </div>
-            </SearchLink>
-          ))}
-        </div>
-      )}
+    <SectionShell count={surveys.length} title={lang === "ko" ? "설문·투표" : "Surveys · Votes"}>
+      {surveys.map((survey) => {
+        const title = lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo;
+        const description = lang === "ko" ? survey.descriptionKo : survey.descriptionEn || survey.descriptionKo;
+        const snippet = getSnippet(description, query);
+
+        return (
+          <SearchLink key={survey.id} to={`/survey/${survey.id}`}>
+            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-medium text-kaist-darkgreen">{getSurveyKindLabel(survey.kind, lang)}</span>
+              <span className="text-[11px] font-normal text-slate-400">· {getSurveyStateLabel(survey.computedState, lang)}</span>
+            </div>
+            <p className="truncate text-sm font-medium text-slate-900">
+              <HighlightedText value={title} query={query} />
+            </p>
+            {snippet ? <Snippet value={snippet} query={query} /> : null}
+          </SearchLink>
+        );
+      })}
     </SectionShell>
   );
 }
@@ -403,54 +402,90 @@ function SurveyResults({
 function AboutResults({
   items,
   lang,
+  query,
 }: {
   items: AboutSearchItem[];
   lang: string;
+  query: string;
 }) {
   return (
-    <SectionShell
-      count={items.length}
-      icon={<Info className="h-4 w-4 text-kaist-darkgreen" />}
-      title={lang === "ko" ? "소개" : "About"}
-    >
-      {items.length === 0 ? (
-        <p className="py-5 text-sm font-semibold text-slate-400">
-          {lang === "ko" ? "소개 결과가 없습니다." : "No about pages found."}
-        </p>
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {items.map((item) => (
-            <SearchLink key={item.id} to={item.href}>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900 transition-colors group-hover:text-kaist-darkgreen">
-                  {lang === "ko" ? item.titleKo : item.titleEn}
-                </p>
-                <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500">
-                  {lang === "ko" ? item.descriptionKo : item.descriptionEn}
-                </p>
-              </div>
-            </SearchLink>
-          ))}
-        </div>
-      )}
+    <SectionShell count={items.length} title={lang === "ko" ? "소개" : "About"}>
+      {items.map((item) => {
+        const title = lang === "ko" ? item.titleKo : item.titleEn;
+        const description = lang === "ko" ? item.descriptionKo : item.descriptionEn;
+
+        return (
+          <SearchLink key={item.id} to={item.href}>
+            <p className="truncate text-sm font-medium text-slate-900">
+              <HighlightedText value={title} query={query} />
+            </p>
+            <Snippet value={description} query={query} />
+          </SearchLink>
+        );
+      })}
     </SectionShell>
   );
 }
 
-function SearchLink({
-  children,
-  to,
-}: {
-  children: ReactNode;
-  to: string;
-}) {
+function SearchLink({ children, to }: { children: ReactNode; to: string }) {
   return (
     <Link
       to={to}
-      className="group flex items-center justify-between gap-4 py-3"
+      className="group flex items-start justify-between gap-4 border-b border-slate-100 px-1 py-4 transition-colors hover:bg-slate-50"
     >
-      {children}
-      <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-kaist-darkgreen" />
+      <div className="min-w-0 flex-1">{children}</div>
+      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
+}
+
+function Snippet({ value, query }: { value: string; query: string }) {
+  return (
+    <p className="mt-1 line-clamp-2 text-[13px] font-normal leading-5 text-slate-500">
+      <HighlightedText value={value} query={query} />
+    </p>
+  );
+}
+
+function getSnippet(value: string | null | undefined, query: string) {
+  const text = stripRichText(value);
+  if (!text) return "";
+
+  const normalizedText = text.toLocaleLowerCase();
+  const normalizedQuery = query.toLocaleLowerCase();
+  const matchIndex = normalizedQuery ? normalizedText.indexOf(normalizedQuery) : -1;
+  const maxLength = 180;
+  if (text.length <= maxLength || matchIndex < 0) return text.slice(0, maxLength);
+
+  const start = Math.max(0, matchIndex - 42);
+  const end = Math.min(text.length, start + maxLength);
+  return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+}
+
+function HighlightedText({ value, query }: { value: string; query: string }) {
+  if (!query) return value;
+
+  const normalizedValue = value.toLocaleLowerCase();
+  const normalizedQuery = query.toLocaleLowerCase();
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  let matchIndex = normalizedValue.indexOf(normalizedQuery, cursor);
+
+  while (matchIndex >= 0) {
+    if (matchIndex > cursor) nodes.push(value.slice(cursor, matchIndex));
+    nodes.push(
+      <mark
+        key={`${matchIndex}-${cursor}`}
+        className="rounded-sm bg-emerald-50 px-0.5 font-medium text-emerald-700"
+      >
+        {value.slice(matchIndex, matchIndex + query.length)}
+      </mark>,
+    );
+    cursor = matchIndex + query.length;
+    matchIndex = normalizedValue.indexOf(normalizedQuery, cursor);
+  }
+
+  if (cursor === 0) return value;
+  if (cursor < value.length) nodes.push(value.slice(cursor));
+  return nodes;
 }

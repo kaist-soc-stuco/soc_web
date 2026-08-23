@@ -4,6 +4,7 @@ import { CalendarDays, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
+import { stripRichText } from "@/components/ui/rich-text-content";
 import {
   getCardPeriodText,
   isClosedItem,
@@ -23,7 +24,7 @@ interface EventsSurveysGridProps {
 
 const getItemHref = (item: UnifiedItem) => {
   if (item.kind === "EVENT") {
-    return `/board/행사/${item.id}`;
+    return `/events/${item.id}`;
   }
   return isClosedItem(item) && item.resultVisibility === "PUBLIC"
     ? `/survey/${item.id}/results`
@@ -112,22 +113,22 @@ function getAudienceText(item: UnifiedItem, lang: string) {
             : "Staff only"
           : item.visibilityScope === "MEMBERS"
             ? lang === "ko"
-              ? "로그인 회원"
-              : "Signed-in members"
+              ? "로그인 필요"
+              : "Login required"
             : ""
       : item.feePayersOnly
         ? lang === "ko"
           ? "과비 납부자만"
           : "Paid members only"
         : lang === "ko"
-          ? "로그인 회원"
-          : "Signed-in members";
+          ? "로그인 필요"
+          : "Login required";
 
   const audienceText = audience ? `🔒 ${audience}` : "";
   const languageText = item.isKoreanOnly
     ? lang === "ko"
-      ? "한국어 콘텐츠"
-      : "Korean content only"
+      ? "한국어 사용자만"
+      : "Korean Speakers Only"
     : "";
 
   return [audienceText, languageText].filter(Boolean).join(" · ");
@@ -143,10 +144,11 @@ export function EventsSurveysGrid({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => {
         const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
-        const desc =
+        const desc = stripRichText(
           lang === "ko"
             ? item.descriptionKo
-            : item.descriptionEn || item.descriptionKo;
+            : item.descriptionEn || item.descriptionKo,
+        );
         const closed = isClosedItem(item);
         const href = getItemHref(item);
         const eyebrow = [

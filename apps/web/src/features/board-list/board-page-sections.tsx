@@ -215,7 +215,7 @@ export function BoardArticleTable({
             </span>
             {isNew ? (
               <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"
+                className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
                 title={lang === "ko" ? "새 글" : "New"}
               >
                 <span className="sr-only">{lang === "ko" ? "새 글" : "New"}</span>
@@ -265,7 +265,7 @@ export function BoardArticleTable({
           <div className="hidden shrink-0 text-center md:block">
             {lang === "ko" ? "작성자" : "Author"}
           </div>
-          <div className="shrink-0 text-right">
+          <div className="shrink-0 text-center">
             {lang === "ko" ? "작성일" : "Date"}
           </div>
           <div className="hidden shrink-0 justify-end pr-1 text-right md:flex">

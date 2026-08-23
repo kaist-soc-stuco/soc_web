@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
@@ -21,11 +22,12 @@ import {
 import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
-export function useBoardDetailPageController() {
-  const { category = "공지", articleId } = useParams<{
+export function useBoardDetailPageController(forcedCategory?: string) {
+  const { category: routeCategory = "공지", articleId } = useParams<{
     category: string;
     articleId: string;
   }>();
+  const category = forcedCategory ?? routeCategory;
   const [article, setArticle] = useState<ArticleDetailResponse | null>(null);
   const [board, setBoard] = useState<BoardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,20 @@ export function useBoardDetailPageController() {
   const { data: session } = useCurrentSession();
   const navigate = useNavigate();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
+
+  const showLoginRequiredToast = () => {
+    toast({
+      message:
+        lang === "ko"
+          ? "로그인이 필요한 기능입니다."
+          : "You need to sign in to use this feature.",
+      action: {
+        label: lang === "ko" ? "로그인" : "Login",
+        onClick: () => navigate("/login"),
+      },
+    });
+  };
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -196,10 +212,10 @@ export function useBoardDetailPageController() {
       confirmLabel: lang === "ko" ? "삭제" : "Delete",
       description:
         lang === "ko"
-          ? "삭제한 댓글은 되돌릴 수 없습니다."
-          : "A deleted comment cannot be restored.",
+          ? "이 댓글을 영구적으로 삭제하시겠습니까? 삭제된 댓글은 되돌릴 수 없습니다."
+          : "Are you sure you want to permanently delete this comment? Deleted comments cannot be restored.",
       title:
-        lang === "ko" ? "댓글을 삭제하시겠습니까?" : "Delete this comment?",
+        lang === "ko" ? "댓글 삭제" : "Delete comment",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -223,17 +239,17 @@ export function useBoardDetailPageController() {
       confirmLabel: lang === "ko" ? "삭제" : "Delete",
       description:
         lang === "ko"
-          ? "게시글과 연결된 댓글 정보가 함께 삭제됩니다."
-          : "Comments linked to this post will also be deleted.",
+          ? "이 게시글을 영구적으로 삭제하시겠습니까? 삭제된 게시글은 되돌릴 수 없습니다."
+          : "Are you sure you want to permanently delete this post? Deleted posts cannot be restored.",
       title:
-        lang === "ko" ? "게시글을 삭제하시겠습니까?" : "Delete this post?",
+        lang === "ko" ? "게시글 삭제" : "Delete post",
       tone: "danger",
     });
     if (!confirmed) return;
 
     try {
       await apiClient.deleteArticle(category, articleId);
-      navigate(`/board/${category}`, { replace: true });
+      navigate(category === "_EVENT" ? "/events" : `/board/${category}`, { replace: true });
     } catch {
       alert(
         lang === "ko"
@@ -274,11 +290,7 @@ export function useBoardDetailPageController() {
     if (!articleId || !article) return;
 
     if (!session?.canUsePersistentFeatures) {
-      alert(
-        lang === "ko"
-          ? "좋아요와 스크랩은 로그인 후 사용할 수 있습니다."
-          : "Like and scrap are available after signing in.",
-      );
+      showLoginRequiredToast();
       return;
     }
 
@@ -335,11 +347,7 @@ export function useBoardDetailPageController() {
     if (!articleId) return;
 
     if (!session?.canUsePersistentFeatures) {
-      alert(
-        lang === "ko"
-          ? "댓글 좋아요는 로그인 후 사용할 수 있습니다."
-          : "Comment likes are available after signing in.",
-      );
+      showLoginRequiredToast();
       return;
     }
 
@@ -419,7 +427,9 @@ export function useBoardDetailPageController() {
     }
   };
 
-  const displayBoardLabel = getBoardLabelFromMetadata(
+  const displayBoardLabel = category === "_EVENT"
+    ? (lang === "ko" ? "행사" : "Events")
+    : getBoardLabelFromMetadata(
     board ?? catalogBoard,
     category,
     lang,

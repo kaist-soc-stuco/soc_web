@@ -1,6 +1,6 @@
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, ChevronDown, LogOut, User } from "lucide-react";
+import { ChevronDown, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 
@@ -14,7 +14,7 @@ import { clearStoredAuthState } from "@/lib/auth-storage";
 import { getTemporaryAuthRequest } from "@/lib/auth-session";
 import { Permissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
+import { PopoverPanel } from "@/components/ui/popover-panel";
 
 const ADMIN_ACCESS_PERMISSIONS = [
   Permissions.MANAGE_SURVEY,
@@ -55,7 +55,7 @@ export function AdminLayout() {
   );
 
   const adminHeader = (
-    <header className="z-50 flex h-16 shrink-0 items-center justify-between border-b border-[#e5eaf0] bg-white/95 px-3 backdrop-blur sm:px-5 md:px-7">
+    <header className="z-50 flex h-16 shrink-0 items-center justify-between border-b border-[#e5eaf0] bg-white/95 px-6 backdrop-blur">
       <div className="flex min-w-0 shrink-0 items-center gap-6">
         <Logo />
         <span className="hidden border-l border-slate-200 pl-6 text-sm font-semibold text-slate-800 md:inline">
@@ -64,16 +64,6 @@ export function AdminLayout() {
       </div>
 
       <div className="flex items-center gap-3">
-        <IconButton
-          type="button"
-          size="md"
-          aria-label={lang === "ko" ? "알림" : "Notifications"}
-          className="rounded-md border border-transparent p-2 text-app-text-body transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-brand-primary"
-          title={lang === "ko" ? "알림" : "Notifications"}
-        >
-          <Bell className="h-4 w-4" />
-        </IconButton>
-
         {user && (
           <div className="relative">
             <Button variant="ghost"
@@ -90,16 +80,16 @@ export function AdminLayout() {
             </Button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 z-50 mt-2 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-elevated">
+              <PopoverPanel className="right-0 top-full w-44 rounded-lg p-1">
                 <Button variant="ghost"
                   type="button"
-                  className="flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                  className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                   onClick={() => void handleLogout()}
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   <span>{lang === "ko" ? "로그아웃" : "Logout"}</span>
                 </Button>
-              </div>
+              </PopoverPanel>
             )}
           </div>
         )}

@@ -77,6 +77,8 @@ export interface ArticleListItem {
   viewerHasScrapped: boolean;
   hasAttachment?: boolean;
   thumbnailStorageKey?: string | null;
+  snippetKo?: string | null;
+  snippetEn?: string | null;
   eventStartDate?: string | null;
   eventEndDate?: string | null;
   eventDescriptionKo?: string | null;
@@ -237,6 +239,7 @@ export interface CommentItem {
   author: ArticleAuthorSummary;
   likeCount: number;
   viewerHasLiked: boolean;
+  isOfficial: boolean;
 }
 
 export interface CommentListResponse {

@@ -8,6 +8,8 @@ export type AboutSearchItem = {
   keywords: string[];
 };
 
+export type SearchFilter = "all" | "board" | "event" | "survey";
+
 export const ABOUT_ITEMS: AboutSearchItem[] = [
   {
     id: "intro",

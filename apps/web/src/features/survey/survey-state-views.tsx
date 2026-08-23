@@ -11,6 +11,25 @@ import {
 
 import { formatSurveyDateTime } from "./survey-answer-utils";
 
+function ResponseRecordedNotice({
+  lang,
+  submittedAt,
+}: {
+  lang: string;
+  submittedAt?: string | null;
+}) {
+  if (!submittedAt) return null;
+
+  return (
+    <p className="mb-8 text-sm font-normal text-slate-500">
+      {formatSurveyDateTime(submittedAt)}{" "}
+      {lang === "ko"
+        ? "응답이 정상 기록되었습니다."
+        : "Your response was recorded successfully."}
+    </p>
+  );
+}
+
 export function BeforeOpenView({
   opensAt,
   lang,
@@ -19,7 +38,7 @@ export function BeforeOpenView({
   lang: string;
 }) {
   return (
-    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-xl text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
+    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-md text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
       <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 mb-6 border border-amber-100">
         <Clock className="w-8 h-8" />
       </div>
@@ -43,9 +62,21 @@ export function BeforeOpenView({
   );
 }
 
-export function ClosedView({ lang }: { lang: string }) {
+export function ClosedView({
+  embedded = false,
+  lang,
+}: {
+  embedded?: boolean;
+  lang: string;
+}) {
   return (
-    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-xl text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
+    <div
+      className={`${
+        embedded
+          ? "flex flex-col items-center text-center"
+          : "mx-auto my-12 flex max-w-md flex-col items-center rounded-3xl border border-kaist-grey/15 bg-white p-12 text-center shadow-md"
+      } animate-in fade-in zoom-in-95 duration-300`}
+    >
       <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 mb-6 border border-red-100">
         <Lock className="w-8 h-8" />
       </div>
@@ -69,7 +100,7 @@ export function LoginRequiredView({
   feePayersOnly?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-xl text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
+    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-md text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
       <div className="w-16 h-16 rounded-2xl bg-kaist-lightgreen/20 flex items-center justify-center text-kaist-darkgreen mb-6 border border-kaist-lightgreen/30">
         <UserCheck className="w-8 h-8" />
       </div>
@@ -87,7 +118,7 @@ export function LoginRequiredView({
       </p>
       <a
         href="/login"
-        className="w-full py-3 bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold rounded-xl transition-all shadow-md shadow-kaist-darkgreen/15 text-center text-sm"
+        className="w-full py-3 bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold rounded-xl transition-all shadow-sm shadow-kaist-darkgreen/10 text-center text-sm"
       >
         {lang === "ko" ? "로그인 하러 가기" : "Go to Login"}
       </a>
@@ -108,34 +139,45 @@ export function PreviewNoticeView({ lang }: { lang: string }) {
 }
 
 export function SuccessView({
+  embedded = false,
   lang,
   resultVisibility,
   surveyId,
+  submittedAt,
 }: {
+  embedded?: boolean;
   lang: string;
   resultVisibility: string;
   surveyId: string;
+  submittedAt?: string | null;
 }) {
   const canViewResults = resultVisibility === "PUBLIC";
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-[0_14px_45px_rgba(15,23,42,0.08)] text-center flex w-full flex-col items-center mx-auto my-10 animate-in fade-in zoom-in-95 duration-300">
+    <div
+      className={`${
+        embedded
+          ? "flex w-full flex-col items-center text-center"
+          : "mx-auto my-10 flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.05)] sm:p-10"
+      } animate-in fade-in zoom-in-95 duration-300`}
+    >
       <div className="w-14 h-14 rounded-2xl bg-kaist-lightgreen/20 flex items-center justify-center text-kaist-darkgreen mb-5 border border-kaist-lightgreen/30">
         <CheckCircle2 className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-bold text-kaist-black mb-3">
         {lang === "ko" ? "제출이 완료되었습니다" : "Submission Completed"}
       </h2>
-      <p className="text-sm text-kaist-grey/80 leading-relaxed mb-8">
+      <p className="mb-3 text-sm leading-relaxed text-kaist-grey/80">
         {lang === "ko"
           ? "소중한 의견을 보내주셔서 감사합니다. 응답이 성공적으로 제출되었습니다."
           : "Thank you for sharing your thoughts. Your responses have been submitted successfully."}
       </p>
+      <ResponseRecordedNotice lang={lang} submittedAt={submittedAt} />
       <div className="grid w-full gap-2 sm:grid-cols-2">
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
@@ -143,7 +185,7 @@ export function SuccessView({
         )}
         <Link
           to="/surveys"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
           {lang === "ko" ? "설문 목록으로" : "Survey list"}
@@ -154,25 +196,35 @@ export function SuccessView({
 }
 
 export function AlreadySubmittedView({
+  embedded = false,
   lang,
   resultVisibility,
   surveyId,
+  submittedAt,
 }: {
+  embedded?: boolean;
   lang: string;
   resultVisibility: string;
   surveyId: string;
+  submittedAt?: string | null;
 }) {
   const canViewResults = resultVisibility === "PUBLIC";
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-[0_14px_45px_rgba(15,23,42,0.08)] text-center flex w-full flex-col items-center mx-auto my-10 animate-in fade-in zoom-in-95 duration-300">
+    <div
+      className={`${
+        embedded
+          ? "flex w-full flex-col items-center text-center"
+          : "mx-auto my-10 flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.05)] sm:p-10"
+      } animate-in fade-in zoom-in-95 duration-300`}
+    >
       <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 mb-5 border border-blue-100">
         <CheckCircle2 className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-bold text-kaist-black mb-3">
         {lang === "ko" ? "이미 참여한 설문입니다" : "Already Participated"}
       </h2>
-      <p className="text-sm text-kaist-grey/80 leading-relaxed mb-8">
+      <p className="mb-3 text-sm leading-relaxed text-kaist-grey/80">
         {lang === "ko"
           ? canViewResults
             ? "이 설문조사는 1회만 응답할 수 있습니다. 공개된 결과를 확인하거나 다른 설문 목록으로 이동할 수 있습니다."
@@ -181,11 +233,12 @@ export function AlreadySubmittedView({
             ? "You have already responded to this survey. You can view public results or return to the survey list."
             : "You have already responded to this survey. Results are private."}
       </p>
+      <ResponseRecordedNotice lang={lang} submittedAt={submittedAt} />
       <div className="grid w-full gap-2 sm:grid-cols-2">
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
@@ -193,7 +246,7 @@ export function AlreadySubmittedView({
         )}
         <Link
           to="/surveys"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
           {lang === "ko" ? "설문 목록으로" : "Survey list"}

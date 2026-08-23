@@ -89,9 +89,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 0,
   },
   {
-    code: "행사",
-    nameKo: "행사",
-    nameEn: "Events",
+    code: "_EVENT",
+    nameKo: "행사 콘텐츠",
+    nameEn: "Event content",
     descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요",
     descriptionEn: "Discover events for School of Computing students.",
     writePermissionId: 1,
@@ -154,30 +154,17 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 5,
   },
   {
-    code: "QnA",
-    nameKo: "QnA",
-    nameEn: "Q&A",
-    descriptionKo: "궁금한 점을 자유롭게 질문하세요",
-    descriptionEn: "Ask questions and share answers with the community.",
-    writePermissionId: null,
-    allowComment: true,
+    code: "FAQ",
+    nameKo: "FAQ",
+    nameEn: "FAQ",
+    descriptionKo: "자주 묻는 질문과 답변을 확인하세요",
+    descriptionEn: "Browse frequently asked questions and answers.",
+    writePermissionId: 1,
+    allowComment: false,
     allowSecret: false,
-    allowLike: true,
+    allowLike: false,
     isActive: true,
     sortOrder: 6,
-  },
-  {
-    code: "공약",
-    nameKo: "공약",
-    nameEn: "Pledges",
-    descriptionKo: "집행위원회의 약속과 진행 상황을 투명하게 공유합니다",
-    descriptionEn: "Track the council's pledges and progress transparently.",
-    writePermissionId: 2,
-    allowComment: true,
-    allowSecret: true,
-    allowLike: true,
-    isActive: true,
-    sortOrder: 7,
   },
 ];
 async function seedPermissions() {
@@ -388,6 +375,20 @@ async function writeSeedAsset(filename: string, content: string | Buffer): Promi
   };
 }
 
+type QuestionOptionSeed = {
+  value: string;
+  labelKo: string;
+  labelEn?: string;
+};
+
+type QuestionConfigSeed = {
+  rows?: QuestionOptionSeed[];
+  columns?: QuestionOptionSeed[];
+  maxFiles?: number;
+  maxSizeBytes?: number;
+  allowedMimeTypes?: string[];
+};
+
 type QuestionSeed = {
   titleKo: string;
   titleEn?: string;
@@ -399,10 +400,14 @@ type QuestionSeed = {
     | "single_choice"
     | "multiple_choice"
     | "dropdown"
+    | "grid_single"
+    | "grid_multiple"
+    | "file_upload"
     | "date"
     | "time"
     | "datetime";
-  options?: Array<{ value: string; labelKo: string; labelEn?: string }>;
+  options?: QuestionOptionSeed[];
+  config?: QuestionConfigSeed;
   isRequired?: boolean;
   sortOrder: number;
 };
@@ -531,6 +536,156 @@ function makeSimpleEventSurvey(input: {
   };
 }
 
+function makeAllQuestionTypesSurvey(): SurveySeed {
+  return {
+    kind: "SURVEY",
+    titleKo: "설문 문항 유형 종합 테스트",
+    titleEn: "Survey Question Types Showcase",
+    descriptionKo:
+      "설문 응답 화면에서 지원하는 모든 문항 유형을 한 번에 확인할 수 있는 테스트 설문입니다.",
+    descriptionEn:
+      "A demo survey that showcases every question type supported by the response form.",
+    feeRequirementPolicy: "NONE",
+    allowMultipleResponses: true,
+    allowResponseEdit: true,
+    resultVisibility: "PRIVATE",
+    openAt: new Date("2026-08-20T09:00:00+09:00"),
+    closeAt: new Date("2026-12-31T23:59:00+09:00"),
+    sections: [
+      {
+        titleKo: "기본 입력",
+        titleEn: "Basic inputs",
+        descriptionKo: "텍스트, 날짜, 시간 입력 문항을 확인해 보세요.",
+        descriptionEn: "Try the text, date, and time input questions.",
+        sortOrder: 0,
+        questions: [
+          {
+            titleKo: "이름 또는 닉네임을 입력해 주세요.",
+            titleEn: "Enter your name or nickname.",
+            questionType: "short_text",
+            sortOrder: 0,
+          },
+          {
+            titleKo: "이번 테스트에서 확인하고 싶은 점을 자유롭게 적어 주세요.",
+            titleEn: "Tell us what you would like to test in this survey.",
+            questionType: "long_text",
+            isRequired: false,
+            sortOrder: 1,
+          },
+          {
+            titleKo: "가장 좋아하는 개발 언어를 선택해 주세요.",
+            titleEn: "Choose your favorite programming language.",
+            questionType: "single_choice",
+            options: [
+              { value: "typescript", labelKo: "TypeScript", labelEn: "TypeScript" },
+              { value: "python", labelKo: "Python", labelEn: "Python" },
+              { value: "rust", labelKo: "Rust", labelEn: "Rust" },
+            ],
+            sortOrder: 2,
+          },
+          {
+            titleKo: "관심 있는 분야를 모두 선택해 주세요.",
+            titleEn: "Select all areas you are interested in.",
+            questionType: "multiple_choice",
+            options: [
+              { value: "frontend", labelKo: "프론트엔드", labelEn: "Frontend" },
+              { value: "backend", labelKo: "백엔드", labelEn: "Backend" },
+              { value: "data", labelKo: "데이터", labelEn: "Data" },
+              { value: "security", labelKo: "보안", labelEn: "Security" },
+            ],
+            sortOrder: 3,
+          },
+          {
+            titleKo: "현재 학년을 선택해 주세요.",
+            titleEn: "Choose your current year.",
+            questionType: "dropdown",
+            options: [
+              { value: "undergraduate", labelKo: "학부생", labelEn: "Undergraduate" },
+              { value: "graduate", labelKo: "대학원생", labelEn: "Graduate student" },
+              { value: "other", labelKo: "기타", labelEn: "Other" },
+            ],
+            sortOrder: 4,
+          },
+          {
+            titleKo: "가장 기억에 남는 날짜를 선택해 주세요.",
+            titleEn: "Choose a memorable date.",
+            questionType: "date",
+            sortOrder: 5,
+          },
+          {
+            titleKo: "선호하는 연락 시간을 선택해 주세요.",
+            titleEn: "Choose your preferred contact time.",
+            questionType: "time",
+            sortOrder: 6,
+          },
+          {
+            titleKo: "다음 모임에 참여 가능한 일시를 선택해 주세요.",
+            titleEn: "Choose a date and time when you can attend the next meetup.",
+            questionType: "datetime",
+            sortOrder: 7,
+          },
+        ],
+      },
+      {
+        titleKo: "그리드와 파일",
+        titleEn: "Grids and file upload",
+        descriptionKo: "행렬형 선택지와 파일 업로드 문항을 확인해 보세요.",
+        descriptionEn: "Try the grid and file upload questions.",
+        sortOrder: 1,
+        questions: [
+          {
+            titleKo: "관심 분야별 선호도를 평가해 주세요.",
+            titleEn: "Rate your interest in each area.",
+            questionType: "grid_single",
+            config: {
+              rows: [
+                { value: "class", labelKo: "수업", labelEn: "Classes" },
+                { value: "research", labelKo: "연구", labelEn: "Research" },
+                { value: "community", labelKo: "커뮤니티", labelEn: "Community" },
+              ],
+              columns: [
+                { value: "low", labelKo: "낮음", labelEn: "Low" },
+                { value: "medium", labelKo: "보통", labelEn: "Medium" },
+                { value: "high", labelKo: "높음", labelEn: "High" },
+              ],
+            },
+            sortOrder: 0,
+          },
+          {
+            titleKo: "참여하고 싶은 프로그램을 분야별로 모두 선택해 주세요.",
+            titleEn: "Select all programs you want to join by area.",
+            questionType: "grid_multiple",
+            config: {
+              rows: [
+                { value: "semester", labelKo: "학기 중", labelEn: "During semester" },
+                { value: "break", labelKo: "방학", labelEn: "During break" },
+              ],
+              columns: [
+                { value: "study", labelKo: "스터디", labelEn: "Study group" },
+                { value: "workshop", labelKo: "워크숍", labelEn: "Workshop" },
+                { value: "networking", labelKo: "네트워킹", labelEn: "Networking" },
+              ],
+            },
+            sortOrder: 1,
+          },
+          {
+            titleKo: "참고 파일을 업로드해 주세요.",
+            titleEn: "Upload a reference file.",
+            questionType: "file_upload",
+            config: {
+              maxFiles: 2,
+              maxSizeBytes: 5_000_000,
+              allowedMimeTypes: ["application/pdf", "image/png", "image/jpeg"],
+            },
+            isRequired: false,
+            sortOrder: 2,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 async function cleanupSeedContent() {
   await db.execute(sql`
     delete from survey
@@ -644,7 +799,7 @@ async function attachAssetsToArticle(
 async function createSurveyWithQuestions(
   seed: SurveySeed,
   creatorId: string,
-  connectedArticleId: number,
+  connectedArticleId: number | null,
 ) {
   const [surveyRow] = await db
     .insert(surveys)
@@ -699,6 +854,7 @@ async function createSurveyWithQuestions(
         descriptionEn: question.descriptionEn,
         questionType: question.questionType,
         options: question.options,
+        config: question.config,
         isRequired: question.isRequired ?? true,
         sortOrder: question.sortOrder,
       })),
@@ -716,13 +872,13 @@ async function seedMockData() {
   const [eventBoard] = await db
     .select({ boardId: boards.boardId })
     .from(boards)
-    .where(eq(boards.code, "행사"))
+    .where(eq(boards.code, "_EVENT"))
     .limit(1);
 
-  const [pledgeBoard] = await db
+  const [faqBoard] = await db
     .select({ boardId: boards.boardId })
     .from(boards)
-    .where(eq(boards.code, "공약"))
+    .where(eq(boards.code, "FAQ"))
     .limit(1);
 
   if (!noticeBoard || !eventBoard) {
@@ -732,39 +888,6 @@ async function seedMockData() {
 
   await cleanupSeedContent();
   const seedAuthor = await upsertSeedAuthor();
-
-  if (pledgeBoard) {
-    await db.insert(articles).values({
-      boardId: pledgeBoard.boardId,
-      authorUserId: seedAuthor.userId,
-      titleKo: "2026 전산학부 학생회 공약과 진행 상황",
-      titleEn: "2026 SOC Student Council Pledges and Progress",
-      contentKo: [
-        "학생회가 약속한 변화를 한 곳에서 확인하고, 진행 상황을 함께 점검해 주세요.",
-        "",
-        "1. 소통: 공지·건의·문의 창구 통합 운영 — 진행 중",
-        "2. 복지: 시험 기간 간식과 학부 생활 지원 확대 — 예정",
-        "3. 학습: 전공 로드맵과 선후배 네트워킹 자료 정리 — 진행 중",
-        "4. 투명성: 회비 사용 내역과 사업 결과 정기 공개 — 예정",
-        "",
-        "공약에 대한 의견은 건의사항 게시판 또는 채널톡으로 남겨 주세요.",
-      ].join("\n"),
-      contentEn: [
-        "Review the council's commitments and follow their progress in one place.",
-        "",
-        "1. Communication: unified notice, feedback, and inquiry channels — In progress",
-        "2. Welfare: expanded exam-period and student-life support — Planned",
-        "3. Learning: degree roadmap and peer networking resources — In progress",
-        "4. Transparency: regular publication of fee use and project outcomes — Planned",
-      ].join("\n"),
-      visibilityScope: "PUBLIC",
-      isPinned: true,
-      pinOrder: 0,
-      viewCount: 58,
-      postedAt: new Date("2026-06-01T09:00:00+09:00"),
-      isAnonymous: false,
-    });
-  }
 
   const detailedNoticeContent = [
     "전산학부 학생회는 학부 여러분의 의견을 반영하고 보다 나은 학부 문화를 만들어가기 위해 열정과 책임감 있는 임원분들을 모집합니다.",
@@ -1094,6 +1217,31 @@ async function seedMockData() {
     await attachAssetsToArticle(articleRow.articleId, seedAuthor.userId, seededAssets);
   }
   console.log("Seeded 8 notice articles with realistic copy and attachments");
+
+  if (faqBoard) {
+    const faqItems = [
+      ["로그인은 어떻게 하나요?", "How do I sign in?", "상단 프로필 아이콘에서 KAIST 계정으로 로그인할 수 있습니다.", "Use the profile icon in the header to sign in with your KAIST account."],
+      ["게시글이나 댓글은 누가 작성할 수 있나요?", "Who can create posts and comments?", "게시판별 운영 권한과 로그인 상태에 따라 작성 가능 범위가 달라집니다.", "Posting permissions depend on the board and your signed-in account."],
+      ["행사와 학사 일정은 어디서 확인하나요?", "Where can I find events and academic dates?", "행사·일정 메뉴에서 행사, 설문·투표, 캘린더를 각각 확인할 수 있습니다.", "Use Events & Calendar to browse events, surveys, and the calendar."],
+      ["건의사항 답변은 어떻게 확인하나요?", "How do I track an official response?", "건의사항에 공식 답변이 등록되면 상단 알림에서 바로 확인할 수 있습니다.", "You will receive a header notification when an official response is posted."],
+      ["개인정보 수정은 어디에서 하나요?", "Where can I update my profile?", "마이페이지에서 연락처와 선택 정보를 확인하고 수정할 수 있습니다.", "Review and update supported profile details on My Page."],
+    ] as const;
+    await db.insert(articles).values(faqItems.map(([titleKo, titleEn, contentKo, contentEn], index) => ({
+      boardId: faqBoard.boardId,
+      authorUserId: seedAuthor.userId,
+      titleKo,
+      titleEn,
+      contentKo,
+      contentEn,
+      visibilityScope: "PUBLIC" as const,
+      isPinned: false,
+      viewCount: 0,
+      postedAt: new Date(`2026-03-${String(index + 1).padStart(2, "0")}T09:00:00+09:00`),
+      isAnonymous: false,
+      allowComment: false,
+    })));
+    console.log(`Seeded ${faqItems.length} FAQ articles`);
+  }
 
   const eventItems: EventSeed[] = [
     {
@@ -1606,6 +1754,13 @@ async function seedMockData() {
     await createSurveyWithQuestions(event.survey, seedAuthor.userId, articleRow.articleId);
   }
   console.log(`Seeded ${eventItems.length} event articles with linked surveys and posters`);
+
+  await createSurveyWithQuestions(
+    makeAllQuestionTypesSurvey(),
+    seedAuthor.userId,
+    null,
+  );
+  console.log("Seeded one survey containing every question type");
 }
 async function main() {
   const seedMode = process.env.SEED_MODE ??

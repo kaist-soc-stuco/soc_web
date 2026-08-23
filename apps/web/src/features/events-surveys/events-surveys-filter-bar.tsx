@@ -1,6 +1,4 @@
-import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import type {
-  EventsSurveysSortKey,
   EventsSurveysStateFilter,
 } from "@/lib/events-surveys";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -17,35 +15,20 @@ const stateFilters: Array<{
   { value: "closed", labelKo: "마감", labelEn: "Closed" },
 ];
 
-const sortOptions: Array<{
-  value: EventsSurveysSortKey;
-  labelKo: string;
-  labelEn: string;
-}> = [
-  { value: "latest", labelKo: "최신순", labelEn: "Newest" },
-  { value: "deadline", labelKo: "마감 임박순", labelEn: "Deadline" },
-];
-
 interface EventsSurveysFilterBarProps {
-  isEventTab: boolean;
   lang: string;
-  onSortByChange: (sortBy: EventsSurveysSortKey) => void;
   onQueryChange: (value: string) => void;
   onStateFilterChange: (filter: EventsSurveysStateFilter) => void;
   query: string;
-  sortBy: EventsSurveysSortKey;
   stateCounts: Record<EventsSurveysStateFilter, number>;
   stateFilter: EventsSurveysStateFilter;
 }
 
 export function EventsSurveysFilterBar({
-  isEventTab,
   lang,
-  onSortByChange,
   onQueryChange,
   onStateFilterChange,
   query,
-  sortBy,
   stateCounts,
   stateFilter,
 }: EventsSurveysFilterBarProps) {
@@ -72,22 +55,6 @@ export function EventsSurveysFilterBar({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
-        {!isEventTab ? (
-          <SelectDropdown
-            value={sortBy}
-            options={sortOptions.map((option) => ({
-              value: option.value,
-              label: lang === "ko" ? option.labelKo : option.labelEn,
-            }))}
-            onChange={(value) => onSortByChange(value as EventsSurveysSortKey)}
-            className="w-40"
-            buttonClassName="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-slate-200 px-3 py-0 text-sm font-medium text-slate-700 shadow-none"
-            menuClassName="rounded-lg border-slate-200 shadow-elevated"
-            optionClassName="text-sm"
-            emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
-          />
-        ) : null}
-
         <PageSearchField
           ariaLabel={lang === "ko" ? "행사·설문 검색" : "Search events and surveys"}
           className="order-last w-full sm:w-64 lg:w-72"

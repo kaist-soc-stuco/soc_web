@@ -3,7 +3,9 @@ import type {
   SurveyAnswerRecord,
   SurveyDetailResponse,
 } from "@soc/contracts";
-import { isoToDate } from "@soc/shared";
+import { isoToDate, nowDate } from "@soc/shared";
+
+import { formatNumericDate } from "@/lib/date-display";
 
 export type GridAnswer = Record<string, string | string[]>;
 export interface FileAnswer {
@@ -171,6 +173,46 @@ export function formatSurveyDateTime(iso: string) {
   return `${year}.${month}.${day} ${hour}:${minute}`;
 }
 
+function formatSurveyDateWithTime(
+  iso: string,
+  lang: string,
+  referenceDate: Date,
+) {
+  const date = isoToDate(iso);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const dateText = formatNumericDate(date, referenceDate);
+  const weekday = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
+    weekday: "short",
+  }).format(date);
+  const time = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+
+  return `${dateText} (${weekday}) ${time}`;
+}
+
+export function formatSurveyPeriod(
+  opensAt: string | null | undefined,
+  closesAt: string | null | undefined,
+  lang: string,
+  referenceDate: Date = nowDate(),
+) {
+  const start = opensAt
+    ? formatSurveyDateWithTime(opensAt, lang, referenceDate)
+    : "";
+  const end = closesAt
+    ? formatSurveyDateWithTime(closesAt, lang, referenceDate)
+    : "";
+
+  if (start && end) return `${start} ～ ${end}`;
+  if (end) return lang === "ko" ? `${end} 마감` : `Closes ${end}`;
+  if (start) return lang === "ko" ? `${start} 시작` : `Opens ${start}`;
+  return lang === "ko" ? "상시 응답 가능" : "Always open";
+}
+
 export function getLocalizedText(
   lang: string,
   ko: string | null | undefined,
@@ -191,7 +233,7 @@ export function getAudienceLabel(survey: SurveyDetailResponse, lang: string) {
   if (survey.feePayersOnly) {
     return lang === "ko" ? "과비 납부자" : "Paid members";
   }
-  return lang === "ko" ? "로그인 회원" : "Signed-in members";
+  return lang === "ko" ? "로그인 필요" : "Login required";
 }
 
 export function getResponsePolicyLabel(
@@ -218,13 +260,5 @@ export function getResponsePolicyLabel(
 }
 
 export function getScheduleLabel(survey: SurveyDetailResponse, lang: string) {
-  if (!survey.opensAt && !survey.closesAt) {
-    return lang === "ko" ? "상시 응답 가능" : "Always open";
-  }
-
-  const opensAt = survey.opensAt ? formatSurveyDateTime(survey.opensAt) : "";
-  const closesAt = survey.closesAt ? formatSurveyDateTime(survey.closesAt) : "";
-  if (opensAt && closesAt) return `${opensAt} – ${closesAt}`;
-  if (closesAt) return lang === "ko" ? `${closesAt} 마감` : `Closes ${closesAt}`;
-  return lang === "ko" ? `${opensAt} 시작` : `Opens ${opensAt}`;
+  return formatSurveyPeriod(survey.opensAt, survey.closesAt, lang);
 }

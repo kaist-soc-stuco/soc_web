@@ -82,6 +82,9 @@ const TermsPage = lazy(() =>
 const FaqPage = lazy(() =>
   import('@/pages/faq-page').then((module) => ({ default: module.FaqPage })),
 );
+const PledgesPage = lazy(() =>
+  import('@/pages/pledges-page').then((module) => ({ default: module.PledgesPage })),
+);
 const SearchPage = lazy(() =>
   import('@/pages/search-page').then((module) => ({ default: module.SearchPage })),
 );
@@ -90,6 +93,9 @@ const ContactsPage = lazy(() =>
 );
 const SiteContentPage = lazy(() =>
   import('@/pages/admin/site-content-page').then((module) => ({ default: module.SiteContentPage })),
+);
+const CalendarManagementPage = lazy(() =>
+  import('@/pages/admin/calendar-management-page').then((module) => ({ default: module.CalendarManagementPage })),
 );
 const BulkEmailPage = lazy(() =>
   import('@/pages/admin/bulk-email-page').then((module) => ({ default: module.BulkEmailPage })),
@@ -189,13 +195,20 @@ export function App() {
           <Route path="/about/roadmap" element={<RoadmapPage />} />
           <Route path="/events-surveys" element={<LegacyEventsSurveysRedirect />} />
           <Route path="/events" element={<EventsSurveysPage view="event" />} />
+          <Route path="/events/:articleId" element={<BoardDetailPage forcedCategory="_EVENT" publicBasePath="/events" />} />
+          <Route path="/events/write" element={<AuthGuard><BoardWritePage forcedCategory="_EVENT" /></AuthGuard>} />
+          <Route path="/events/:articleId/edit" element={<AuthGuard><BoardEditPage forcedCategory="_EVENT" /></AuthGuard>} />
           <Route path="/surveys" element={<EventsSurveysPage view="survey" />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/about/faq" element={<FaqPage />} />
+          <Route path="/about/pledges" element={<PledgesPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/calendar" element={<EventsSurveysPage view="calendar" />} />
           <Route path="/board" element={<BoardPage />} />
+          <Route path="/board/FAQ" element={<Navigate to="/about/faq" replace />} />
+          <Route path="/board/_EVENT" element={<Navigate to="/events" replace />} />
+          <Route path="/board/_EVENT/write" element={<Navigate to="/events/write" replace />} />
           <Route
             path="/board/write"
             element={
@@ -241,6 +254,7 @@ export function App() {
             <Route path="surveys/:id/responses" element={<SurveyResponseListPage />} />
             <Route path="surveys/:id/responses/:responseId" element={<SurveyResponseDetailPage />} />
             <Route path="content" element={<SiteContentPage />} />
+            <Route path="calendar" element={<CalendarManagementPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="emails" element={<BulkEmailPage />} />
           </Route>

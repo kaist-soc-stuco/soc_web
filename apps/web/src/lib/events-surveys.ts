@@ -4,7 +4,7 @@ import type {
   PublicCalendarEventItem,
   SurveyRecord,
 } from "@soc/contracts";
-import { isoToDate, isoToMs, localDate, nowMs } from "@soc/shared";
+import { isoToDate, isoToMs, localDate, nowDate, nowMs } from "@soc/shared";
 
 export type EventsSurveysTab = "event" | "survey" | "calendar";
 export type EventsSurveysSortKey = "latest" | "deadline";
@@ -52,7 +52,9 @@ export interface UnifiedItem {
 
 export interface CalendarEvent {
   id: string;
+  calendarEventId?: string | null;
   sourceType?: PublicCalendarEventItem["sourceType"];
+  category?: PublicCalendarEventItem["category"];
   kind: UnifiedItemKind;
   title: string;
   description: string;
@@ -147,15 +149,7 @@ export const getCardPeriodText = (item: UnifiedItem, lang: "ko" | string = "ko")
     return lang === "ko" ? "상시" : "Always open";
   }
 
-  if (item.kind === "EVENT") {
-    return formatEventCardPeriod(item.opensAt, item.closesAt, lang);
-  }
-
-  const start = formatCardDate(item.opensAt);
-  const end = formatCardDate(item.closesAt);
-
-  if (start && end) return start === end ? start : `${start} ～ ${end}`;
-  return start || end || "";
+  return formatEventCardPeriod(item.opensAt, item.closesAt, lang);
 };
 
 function formatEventCardPeriod(
@@ -165,19 +159,20 @@ function formatEventCardPeriod(
 ) {
   const startDate = startValue ? isoToDate(startValue) : null;
   const endDate = endValue ? isoToDate(endValue) : startDate;
+  const referenceDate = nowDate();
   if (!startDate || Number.isNaN(startDate.getTime())) return "";
   if (!endDate || Number.isNaN(endDate.getTime())) {
-    return formatEventCardDate(startDate, lang);
+    return formatEventCardDate(startDate, lang, referenceDate);
   }
 
-  const startText = formatEventCardDate(startDate, lang);
-  const endText = formatEventCardDate(endDate, lang);
+  const startText = formatEventCardDate(startDate, lang, referenceDate);
+  const endText = formatEventCardDate(endDate, lang, referenceDate);
   const sameDay = isSameLocalDay(startDate, endDate);
 
   if (isAllDayRange(startDate, endDate)) {
     return sameDay
       ? `${startText} ${lang === "ko" ? "종일" : "All day"}`
-      : `${startText} 〜 ${endText} ${lang === "ko" ? "종일" : "All day"}`;
+      : `${startText} ～ ${endText} ${lang === "ko" ? "종일" : "All day"}`;
   }
 
   const startTime = formatEventCardTime(startDate, lang);
@@ -185,23 +180,27 @@ function formatEventCardPeriod(
   if (sameDay) {
     return startTime === endTime
       ? `${startText} ${startTime}`
-      : `${startText} ${startTime} 〜 ${endTime}`;
+      : `${startText} ${startTime} ～ ${endTime}`;
   }
 
-  return `${startText} ${startTime} 〜 ${endText} ${endTime}`;
+  return `${startText} ${startTime} ～ ${endText} ${endTime}`;
 }
 
-function formatEventCardDate(date: Date, lang: string) {
+function formatEventCardDate(date: Date, lang: string, referenceDate: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
+  const yearPrefix =
+    date.getFullYear() === referenceDate.getFullYear()
+      ? ""
+      : `${date.getFullYear()}.`;
   const weekday = new Intl.DateTimeFormat(
     lang === "ko" ? "ko-KR" : "en-US",
     { weekday: "short" },
   ).format(date);
 
   return lang === "ko"
-    ? `${month}.${day} (${weekday})`
-    : `${month}/${day} (${weekday})`;
+    ? `${yearPrefix}${month}.${day} (${weekday})`
+    : `${yearPrefix}${month}/${day} (${weekday})`;
 }
 
 function formatEventCardTime(date: Date, lang: string) {
@@ -309,7 +308,7 @@ export const buildUnifiedItems = (
       pinOrder: event.pinOrder ?? null,
       isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
       imageUrl: event.imageUrl ?? null,
-      articleBoardCode: event.boardCode ?? "행사",
+      articleBoardCode: event.boardCode ?? "_EVENT",
       likeCount: event.likeCount,
       scrapCount: event.scrapCount,
       viewerHasLiked: event.viewerHasLiked,
@@ -485,7 +484,9 @@ export const buildCalendarEventsFromPublicItems = (
 
     return {
       id: item.id,
+      calendarEventId: item.calendarEventId,
       sourceType: item.sourceType,
+      category: item.category,
       articleId: item.articleId,
       surveyId: item.surveyId,
       kind: item.kind as UnifiedItemKind,

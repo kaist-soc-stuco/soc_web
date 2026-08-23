@@ -2,19 +2,17 @@ import type { BoardSummary } from "@soc/contracts";
 
 export const BOARD_CODES = [
   "공지",
-  "행사",
   "HoC",
   "홍보글",
   "건의사항",
   "연구실",
-  "QnA",
-  "공약",
+  "FAQ",
 ] as const;
 
 // These boards remain addressable for legacy links and data, but they are not
 // part of the current public board navigation. Events have their own landing
 // page and pledges/legacy Q&A have dedicated replacement paths.
-export const LEGACY_PUBLIC_BOARD_CODES = ["행사", "공약", "QnA"] as const;
+export const LEGACY_PUBLIC_BOARD_CODES = ["_EVENT", "행사", "공약", "QnA"] as const;
 
 export const isLegacyPublicBoardCode = (code: string) =>
   LEGACY_PUBLIC_BOARD_CODES.includes(
@@ -57,12 +55,6 @@ const BOARD_FALLBACK_METADATA: Record<
     labelEn: "Notice",
     titleKo: "공지",
   },
-  행사: {
-    descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요.",
-    descriptionEn: "Discover events organized by the School of Computing.",
-    labelEn: "Events",
-    titleKo: "행사",
-  },
   HoC: {
     descriptionKo: "Hall of Code 프로젝트 및 활동 내역을 확인하세요.",
     descriptionEn: "Hall of Code projects and activity logs.",
@@ -87,17 +79,11 @@ const BOARD_FALLBACK_METADATA: Record<
     labelEn: "Labs",
     titleKo: "연구실",
   },
-  QnA: {
-    descriptionKo: "궁금한 점을 자유롭게 질문하세요.",
-    descriptionEn: "Ask questions and get answers freely.",
-    labelEn: "Q&A",
-    titleKo: "QnA",
-  },
-  공약: {
-    descriptionKo: "집행위원회의 약속과 진행 상황을 투명하게 공유합니다.",
-    descriptionEn: "Track the council's pledges and progress transparently.",
-    labelEn: "Pledges",
-    titleKo: "공약",
+  FAQ: {
+    descriptionKo: "자주 묻는 질문과 답변을 확인하세요.",
+    descriptionEn: "Browse frequently asked questions and answers.",
+    labelEn: "FAQ",
+    titleKo: "FAQ",
   },
 };
 

@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFormContext, Controller } from "react-hook-form";
-import { Check, Search, X } from "lucide-react";
+import { Check } from "lucide-react";
 import type { ArticleListItem } from "@soc/contracts";
 import { RichTextEditor } from "./rich-text-editor";
-import { Button } from "@/components/ui/button";
 import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
@@ -35,6 +34,7 @@ export interface SurveySettingsFormValues {
   isPublished?: boolean;
   showOnCalendar?: boolean;
   isAlwaysOpen?: boolean;
+  isAllDay?: boolean;
   maxResponseCount?: string;
   openAt: string;
   closeAt: string;
@@ -44,26 +44,20 @@ export interface SurveySettingsFormValues {
 interface SurveySettingsFormProps {
   mode?: "all" | "basic" | "delivery";
   isOngoing?: boolean;
-  showArticleSearch: boolean;
   articleSearchResults: ArticleListItem[];
   selectedArticleTitle: string | null;
-  onToggleArticleSearch: () => void;
   onFetchArticles: () => Promise<void>;
   onSelectArticle: (articleId: string, title: string) => void;
-  onConnectedArticleChange: () => void;
   onSubmit: (values: SurveySettingsFormValues) => void;
 }
 
 export function SurveySettingsForm({
   mode = "all",
   isOngoing = false,
-  showArticleSearch,
   articleSearchResults,
   selectedArticleTitle,
-  onToggleArticleSearch,
   onFetchArticles,
   onSelectArticle,
-  onConnectedArticleChange,
   onSubmit,
 }: SurveySettingsFormProps) {
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
@@ -83,7 +77,26 @@ export function SurveySettingsForm({
   const isPublished = Boolean(watch("isPublished"));
   const showOnCalendar = Boolean(watch("showOnCalendar"));
   const isAlwaysOpen = Boolean(watch("isAlwaysOpen"));
+  const isAllDay = Boolean(watch("isAllDay"));
   const connectedArticleId = watch("connectedArticleId") ?? "";
+
+  const articleOptions = useMemo(() => {
+    const options = articleSearchResults.map((article) => ({
+      value: String(article.articleId),
+      label: `#${article.articleId} · ${article.titleKo}`,
+    }));
+    if (
+      connectedArticleId &&
+      selectedArticleTitle &&
+      !options.some((option) => option.value === connectedArticleId)
+    ) {
+      options.unshift({
+        value: connectedArticleId,
+        label: `#${connectedArticleId} · ${selectedArticleTitle}`,
+      });
+    }
+    return [{ value: "", label: "연결 게시글 없음" }, ...options];
+  }, [articleSearchResults, connectedArticleId, selectedArticleTitle]);
 
   useEffect(() => {
     if (isKoreanOnly && activeTab === "en") {
@@ -96,6 +109,21 @@ export function SurveySettingsForm({
     setValue("openAt", "");
     setValue("closeAt", "");
   }, [isAlwaysOpen, setValue]);
+
+  const toDateOnly = (value: string) => value.split("T")[0] ?? "";
+  const toDateTime = (value: string, time: string) =>
+    value ? (value.includes("T") ? value : `${value}T${time}`) : "";
+
+  const handleAllDayChange = (checked: boolean) => {
+    setValue("isAllDay", checked);
+    if (checked) {
+      setValue("openAt", toDateOnly(watch("openAt") ?? ""));
+      setValue("closeAt", toDateOnly(watch("closeAt") ?? ""));
+    } else {
+      setValue("openAt", toDateTime(watch("openAt") ?? "", "09:00"));
+      setValue("closeAt", toDateTime(watch("closeAt") ?? "", "18:00"));
+    }
+  };
 
   const inputCls =
     "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-[#172033] outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60";
@@ -235,98 +263,134 @@ export function SurveySettingsForm({
           </div>
 
           <div className="space-y-5">
-            <AdminFormField label="유형 *">
-              <Controller
-                name="kind"
-                control={control}
-                render={({ field }) => (
-                  <AdminSelectDropdown
-                    value={field.value}
-                    options={SURVEY_KINDS}
-                    onChange={field.onChange}
-                    disabled={isOngoing}
-                  />
-                )}
-              />
-            </AdminFormField>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <AdminFormField label="유형 *">
+                <Controller
+                  name="kind"
+                  control={control}
+                  render={({ field }) => (
+                    <AdminSelectDropdown
+                      value={field.value}
+                      options={SURVEY_KINDS}
+                      onChange={field.onChange}
+                      disabled={isOngoing}
+                    />
+                  )}
+                />
+              </AdminFormField>
 
-            <AdminFormField label="결과 공개 범위 *">
-              <Controller
-                name="resultVisibility"
-                control={control}
-                render={({ field }) => (
-                  <AdminSelectDropdown
-                    value={field.value}
-                    options={SURVEY_VISIBILITIES}
-                    onChange={field.onChange}
-                    disabled={isOngoing}
-                  />
-                )}
-              />
-            </AdminFormField>
+              <AdminFormField label="결과 공개 범위 *">
+                <Controller
+                  name="resultVisibility"
+                  control={control}
+                  render={({ field }) => (
+                    <AdminSelectDropdown
+                      value={field.value}
+                      options={SURVEY_VISIBILITIES}
+                      onChange={field.onChange}
+                      disabled={isOngoing}
+                    />
+                  )}
+                />
+              </AdminFormField>
+            </div>
 
-            <label
-              className={`flex items-start gap-3 group ${
-                isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
-            >
-              <div
-                className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
-                  isAlwaysOpen
-                    ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
-                    : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label
+                className={`flex items-center gap-3 group ${
+                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
                 }`}
               >
-                {isAlwaysOpen && (
-                  <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                <div
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
+                    isAlwaysOpen
+                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-sm shadow-kaist-darkgreen/10"
+                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
+                  }`}
+                >
+                  {isAlwaysOpen && (
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                  )}
+                </div>
+                <UiInput
+                  type="checkbox"
+                  className="hidden"
+                  checked={isAlwaysOpen}
+                  disabled={isOngoing}
+                  onChange={(e) =>
+                    !isOngoing && setValue("isAlwaysOpen", e.target.checked)
+                  }
+                />
+                <span className="text-sm font-normal text-[#172033]">
+                  상시 진행
+                </span>
+              </label>
+
+              <label
+                className={`flex items-center gap-3 group ${
+                  isOngoing || isAlwaysOpen
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer"
+                }`}
+              >
+                <div
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
+                    isAllDay
+                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-sm shadow-kaist-darkgreen/10"
+                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
+                  }`}
+                >
+                  {isAllDay && (
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                  )}
+                </div>
+                <UiInput
+                  type="checkbox"
+                  className="hidden"
+                  checked={isAllDay}
+                  disabled={isOngoing || isAlwaysOpen}
+                  onChange={(e) =>
+                    !isOngoing && !isAlwaysOpen && handleAllDayChange(e.target.checked)
+                  }
+                />
+                <span className="text-sm font-normal text-[#172033]">종일</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <AdminFormField label={isAllDay ? "시작 날짜 *" : "시작 시각 (Asia/Seoul) *"}>
+                <UiInput
+                  type={isAllDay ? "date" : "datetime-local"}
+                  className={inputCls}
+                  disabled={isOngoing || isAlwaysOpen}
+                  {...register("openAt")}
+                />
+                {errors.openAt && (
+                  <p className="mt-1 text-xs font-normal text-red-500">
+                    {errors.openAt.message as string}
+                  </p>
                 )}
-              </div>
-              <UiInput
-                type="checkbox"
-                className="hidden"
-                checked={isAlwaysOpen}
-                disabled={isOngoing}
-                onChange={(e) =>
-                  !isOngoing && setValue("isAlwaysOpen", e.target.checked)
-                }
-              />
-              <span className="text-sm font-normal text-[#172033]">
-                상시 진행
-              </span>
-            </label>
+              </AdminFormField>
 
-            <AdminFormField label="시작 시각 (Asia/Seoul) *">
-              <UiInput
-                type="datetime-local"
-                className={inputCls}
-                disabled={isOngoing || isAlwaysOpen}
-                {...register("openAt")}
-              />
-              {errors.openAt && (
-                <p className="mt-1 text-xs font-normal text-red-500">
-                  {errors.openAt.message as string}
-                </p>
-              )}
-            </AdminFormField>
-
-            <AdminFormField label="종료 시각 (선택)">
-              <UiInput
-                type="datetime-local"
-                className={inputCls}
-                disabled={isOngoing || isAlwaysOpen}
-                {...register("closeAt")}
-              />
-              {errors.closeAt && (
-                <p className="mt-1 text-xs font-normal text-red-500">
-                  {errors.closeAt.message as string}
-                </p>
-              )}
-            </AdminFormField>
+              <AdminFormField label={isAllDay ? "종료 날짜 (선택)" : "종료 시각 (선택)"}>
+                <UiInput
+                  type={isAllDay ? "date" : "datetime-local"}
+                  className={inputCls}
+                  disabled={isOngoing || isAlwaysOpen}
+                  {...register("closeAt")}
+                />
+                {errors.closeAt && (
+                  <p className="mt-1 text-xs font-normal text-red-500">
+                    {errors.closeAt.message as string}
+                  </p>
+                )}
+              </AdminFormField>
+            </div>
 
             <AdminFormField label="최대 응답 수 (선택)">
               <UiInput
                 type="number"
-                className={inputCls}
+                className={`${inputCls} w-1/2 min-w-[160px]`}
                 placeholder="제한 없음"
                 disabled={isOngoing}
                 {...register("maxResponseCount")}
@@ -340,7 +404,7 @@ export function SurveySettingsForm({
 
             <div className="pt-2 border-t border-kaist-grey/10" />
 
-            <div className="flex flex-col gap-3 py-1">
+            <div className="grid grid-cols-1 gap-3 py-1 sm:grid-cols-2">
               <label
                 className={`flex items-center gap-3 group ${
                   isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
@@ -464,76 +528,30 @@ export function SurveySettingsForm({
 
             <div className="pt-2 border-t border-kaist-grey/10" />
 
-            <AdminFormField label="연결 게시글 (선택)" className="space-y-2">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <UiInput
-                    className={inputCls}
-                    placeholder="ID 또는 제목 검색"
-                    value={connectedArticleId}
-                    onChange={(event) => {
-                      setValue("connectedArticleId", event.target.value);
-                      onConnectedArticleChange();
-                    }}
-                  />
-                  {selectedArticleTitle && (
-                    <div className="absolute right-3 top-1/2 max-w-[100px] -translate-y-1/2 truncate rounded-md bg-emerald-50 px-2.5 py-1 text-[10px] font-normal text-brand-primary">
-                      {selectedArticleTitle}
-                    </div>
-                  )}
-                </div>
-                <Button variant="ghost"
-                  type="button"
-                  onClick={async () => {
-                    await onFetchArticles();
-                    onToggleArticleSearch();
-                  }}
-                  className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-[#344054] transition-colors hover:bg-slate-50"
-                >
-                  <Search className="h-3.5 w-3.5 text-[#344054]" />
-                  {showArticleSearch ? "닫기" : "찾기"}
-                </Button>
-              </div>
-              <div className="relative z-20">
-                {showArticleSearch && (
-                  <div className="mt-2 border border-gray-200 rounded-xl bg-white shadow-xl max-h-60 overflow-y-auto absolute w-full top-0">
-                    <div className="p-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0">
-                      <span className="text-[11px] font-normal text-[#344054]">
-                        최근 게시글 (최대 30개)
-                      </span>
-                      <Button variant="ghost"
-                        type="button"
-                        onClick={onToggleArticleSearch}
-                        className="text-[#344054] transition-colors hover:text-[#172033]"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                    {articleSearchResults.length === 0 && (
-                      <div className="p-4 text-center text-xs font-normal text-[#344054]">
-                        불러온 게시글이 없습니다.
-                      </div>
-                    )}
-                    {articleSearchResults.map((art) => (
-                      <Button variant="ghost"
-                        key={art.articleId}
-                        type="button"
-                        onClick={() =>
-                          onSelectArticle(String(art.articleId), art.titleKo)
-                        }
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-kaist-lightgreen/10 border-b border-gray-100 last:border-0 transition-colors group flex items-center gap-2"
-                      >
-                        <span className="shrink-0 font-normal text-[#344054] transition-colors group-hover:text-brand-primary">
-                          #{art.articleId}
-                        </span>
-                        <span className="truncate font-normal text-[#172033]">
-                          {art.titleKo}
-                        </span>
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <AdminFormField label="연결 게시글 (선택)">
+              <AdminSelectDropdown
+                ariaLabel="연결 게시글"
+                value={connectedArticleId}
+                options={articleOptions}
+                onChange={(articleId) => {
+                  const option = articleOptions.find((item) => item.value === articleId);
+                  const article = articleSearchResults.find(
+                    (item) => String(item.articleId) === articleId,
+                  );
+                  onSelectArticle(
+                    articleId,
+                    article?.titleKo ??
+                      (articleId === connectedArticleId
+                        ? selectedArticleTitle ?? ""
+                        : option?.label ?? ""),
+                  );
+                }}
+                onOpenChange={(open) => {
+                  if (open && articleSearchResults.length === 0) void onFetchArticles();
+                }}
+                emptyLabel="불러온 게시글이 없습니다."
+                className="w-full"
+              />
             </AdminFormField>
           </div>
         </div> : null}

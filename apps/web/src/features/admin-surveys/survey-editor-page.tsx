@@ -69,6 +69,22 @@ const formatCompactDateTime = (value: string | null) => {
   return `${year}.${month}.${day} ${hour}:${minute}`;
 };
 
+const isoToHtmlDate = (value: string) => isoToHtmlDatetimeLocal(value).slice(0, 10);
+
+const isAllDayRange = (openAt: string | null, closeAt: string | null) => {
+  if (!openAt || !closeAt) return false;
+  const start = isoToDate(openAt);
+  const end = isoToDate(closeAt);
+  return (
+    !Number.isNaN(start.getTime()) &&
+    !Number.isNaN(end.getTime()) &&
+    start.getHours() === 0 &&
+    start.getMinutes() === 0 &&
+    end.getHours() === 23 &&
+    end.getMinutes() === 59
+  );
+};
+
 const QUESTION_TYPES = [
   { value: "short_text", label: "단답형" },
   { value: "long_text", label: "장문형" },
@@ -96,6 +112,7 @@ const SurveySettingsSchema = z.object({
   isPublished: z.boolean().optional(),
   showOnCalendar: z.boolean().optional(),
   isAlwaysOpen: z.boolean().optional(),
+  isAllDay: z.boolean().optional(),
   maxResponseCount: z
     .string()
     .optional()
@@ -285,7 +302,7 @@ function QuestionDragOverlayRow({
   return (
     <div
       style={{ width: width ?? undefined }}
-      className={`${QUESTION_ROW_CLASS} relative z-50 rotate-2 cursor-grabbing border-brand-primary/45 shadow-2xl`}
+      className={`${QUESTION_ROW_CLASS} relative z-50 cursor-grabbing border-brand-primary/45 shadow-lg`}
     >
       <QuestionRowContent
         question={question}
@@ -323,8 +340,9 @@ export function SurveyEditorPage() {
       allowMultipleResponses: false,
       allowResponseEdit: false,
       isPublished: false,
-      showOnCalendar: false,
-      isAlwaysOpen: false,
+  showOnCalendar: false,
+  isAlwaysOpen: false,
+  isAllDay: false,
       maxResponseCount: "",
       openAt: "",
       closeAt: "",
@@ -343,7 +361,6 @@ export function SurveyEditorPage() {
   const isOngoing = loadedResponseCount > 0;
 
   const [articleSearchResults, setArticleSearchResults] = useState<ArticleListItem[]>([]);
-  const [showArticleSearch, setShowArticleSearch] = useState(false);
   const [selectedArticleTitle, setSelectedArticleTitle] = useState<string | null>(null);
   const [overwriteTarget, setOverwriteTarget] = useState<{
     articleId: string;
@@ -409,6 +426,7 @@ export function SurveyEditorPage() {
       if (isEdit && surveyId) {
         try {
           const detail: SurveyDetailResponse = await client.getSurveyDetail(surveyId);
+          const allDay = isAllDayRange(detail.opensAt, detail.closesAt);
           form.reset({
             titleKo: detail.titleKo,
             titleEn: detail.titleEn ?? "",
@@ -426,10 +444,19 @@ export function SurveyEditorPage() {
             isPublished: detail.isPublished ?? false,
             showOnCalendar: detail.showOnCalendar ?? false,
             isAlwaysOpen: detail.isAlwaysOpen ?? false,
+            isAllDay: allDay,
             maxResponseCount:
               detail.maxResponses != null ? String(detail.maxResponses) : "",
-            openAt: detail.opensAt ? isoToHtmlDatetimeLocal(detail.opensAt) : "",
-            closeAt: detail.closesAt ? isoToHtmlDatetimeLocal(detail.closesAt) : "",
+            openAt: detail.opensAt
+              ? allDay
+                ? isoToHtmlDate(detail.opensAt)
+                : isoToHtmlDatetimeLocal(detail.opensAt)
+              : "",
+            closeAt: detail.closesAt
+              ? allDay
+                ? isoToHtmlDate(detail.closesAt)
+                : isoToHtmlDatetimeLocal(detail.closesAt)
+              : "",
             connectedArticleId: detail.connectedPostId ?? "",
           });
           setSections(detail.sections);
@@ -482,11 +509,19 @@ export function SurveyEditorPage() {
       openAt: values.isAlwaysOpen || (allowPlaceholder && !values.openAt)
         ? null
         : values.openAt
-          ? htmlDatetimeLocalToIso(values.openAt)
+          ? htmlDatetimeLocalToIso(
+              values.isAllDay && !values.openAt.includes("T")
+                ? `${values.openAt}T00:00`
+                : values.openAt,
+            )
           : undefined,
       closeAt: values.isAlwaysOpen || !values.closeAt
         ? null
-        : htmlDatetimeLocalToIso(values.closeAt),
+        : htmlDatetimeLocalToIso(
+            values.isAllDay && !values.closeAt.includes("T")
+              ? `${values.closeAt}T23:59`
+              : values.closeAt,
+          ),
       connectedArticleId: values.connectedArticleId?.trim() || undefined,
     };
   };
@@ -794,7 +829,7 @@ export function SurveyEditorPage() {
     const selectedArticle = articleSearchResults.find(a => a.articleId === articleId);
     if (
       selectedArticle &&
-      selectedArticle.boardCode === "행사" &&
+      selectedArticle.boardCode === "_EVENT" &&
       selectedArticle.eventStartDate &&
       selectedArticle.eventEndDate
     ) {
@@ -806,8 +841,7 @@ export function SurveyEditorPage() {
       });
     } else {
       form.setValue("connectedArticleId", articleId);
-      setSelectedArticleTitle(title);
-      setShowArticleSearch(false);
+      setSelectedArticleTitle(title || null);
     }
   };
 
@@ -820,27 +854,23 @@ export function SurveyEditorPage() {
     
     if (yes) {
       form.setValue("isAlwaysOpen", false);
+      form.setValue("isAllDay", false);
       form.setValue("openAt", isoToHtmlDatetimeLocal(eventStartDate));
       form.setValue("closeAt", isoToHtmlDatetimeLocal(eventEndDate));
     }
     
     setOverwriteTarget(null);
-    setShowArticleSearch(false);
   };
 
   const activeQuestion = activeQuestionId
     ? sections.flatMap((section) => section.questions).find((question) => question.id === activeQuestionId) ?? null
     : null;
 
-  const handleConnectedArticleChange = () => {
-    setSelectedArticleTitle(null);
-  };
-
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         {ConfirmDialog}
-        <main className="admin-page__main mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+        <main className="admin-page__main mx-auto flex w-full max-w-[1280px] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
 
           <AdminPageHeader
             eyebrow={
@@ -940,13 +970,10 @@ export function SurveyEditorPage() {
               <SurveySettingsForm
                 mode={tab === "settings" ? "basic" : "delivery"}
                 isOngoing={isOngoing}
-                showArticleSearch={showArticleSearch}
                 articleSearchResults={articleSearchResults}
                 selectedArticleTitle={selectedArticleTitle}
-                onToggleArticleSearch={() => setShowArticleSearch((prev) => !prev)}
                 onFetchArticles={handleFetchArticles}
                 onSelectArticle={handleSelectArticle}
-                onConnectedArticleChange={handleConnectedArticleChange}
                 onSubmit={handleSaveSettings}
               />
             </FormProvider>

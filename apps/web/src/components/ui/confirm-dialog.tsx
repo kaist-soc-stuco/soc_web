@@ -60,8 +60,10 @@ export function useConfirmDialog() {
         <Modal
           open
           onClose={() => close(false)}
+          showClose={state.tone !== "danger"}
+          dividerless={state.tone === "danger"}
           title={
-            <span className="text-xl font-semibold leading-7 text-slate-900">
+            <span className="text-lg font-semibold leading-6 text-slate-900">
               {state.title}
             </span>
           }
@@ -92,15 +94,15 @@ export function useConfirmDialog() {
             </>
           }
         >
-          <div className="flex min-w-0 items-start gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div
-              className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full ${
+              className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
                 state.tone === "danger"
                   ? "bg-rose-50 text-rose-600"
                   : "bg-emerald-50 text-kaist-darkgreen"
               }`}
             >
-              <AlertTriangle className="size-4" aria-hidden="true" />
+              <AlertTriangle className="size-3.5" aria-hidden="true" />
             </div>
             {state.description ? (
               <p className="min-w-0 break-keep text-sm font-medium leading-6 text-slate-600">

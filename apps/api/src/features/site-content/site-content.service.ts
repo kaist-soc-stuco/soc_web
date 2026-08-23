@@ -99,6 +99,15 @@ export class SiteContentService {
     if (input.type === "HERO" && !input.imageUrl) {
       throw new BadRequestException("hero_image_required");
     }
+    if (input.type === "LOGO" && !input.imageUrl) {
+      throw new BadRequestException("logo_image_required");
+    }
+    if (input.type === "LOGO") {
+      const existing = await this.siteContentRepository.listContentBlocks();
+      if (existing.some((block) => block.type === "LOGO")) {
+        throw new ConflictException("logo_already_exists");
+      }
+    }
     if (input.type === "ORGANIZATION_CHART") {
       if (!input.imageUrl) throw new BadRequestException("organization_chart_image_required");
       const existing = await this.siteContentRepository.listContentBlocks();
@@ -129,6 +138,18 @@ export class SiteContentService {
     const nextImageUrl = input.imageUrl === undefined ? before.imageUrl : input.imageUrl;
     if (nextType === "HERO" && !nextImageUrl) {
       throw new BadRequestException("hero_image_required");
+    }
+    if (nextType === "LOGO" && !nextImageUrl) {
+      throw new BadRequestException("logo_image_required");
+    }
+    if (nextType === "LOGO") {
+      const existing = await this.siteContentRepository.listContentBlocks();
+      if (existing.some((block) =>
+        block.contentBlockId !== contentBlockId &&
+        block.type === "LOGO",
+      )) {
+        throw new ConflictException("logo_already_exists");
+      }
     }
     if (nextType === "ORGANIZATION_CHART") {
       if (!nextImageUrl) throw new BadRequestException("organization_chart_image_required");

@@ -41,6 +41,7 @@ export class SiteContentRepository {
       createdBy: row.createdBy,
       imageUrl: row.imageUrl,
       linkUrl: row.linkUrl,
+      pledgeStatus: row.pledgeStatus as ContentBlockRecord["pledgeStatus"],
       publishedAt: row.publishedAt ? msToIso(row.publishedAt.valueOf()) : null,
       publishedBy: row.publishedBy,
       sortOrder: row.sortOrder,
@@ -135,6 +136,7 @@ export class SiteContentRepository {
         createdBy: actorUserId,
         imageUrl: input.imageUrl ?? null,
         linkUrl: input.linkUrl ?? null,
+        pledgeStatus: input.pledgeStatus ?? null,
         updatedBy: actorUserId,
       })
       .returning();
@@ -157,6 +159,7 @@ export class SiteContentRepository {
     if (input.bodyEn !== undefined) values.bodyEn = input.bodyEn;
     if (input.linkUrl !== undefined) values.linkUrl = input.linkUrl;
     if (input.imageUrl !== undefined) values.imageUrl = input.imageUrl;
+    if (input.pledgeStatus !== undefined) values.pledgeStatus = input.pledgeStatus;
     if (input.sortOrder !== undefined) values.sortOrder = input.sortOrder;
 
     const [row] = await this.db

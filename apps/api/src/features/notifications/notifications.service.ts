@@ -56,6 +56,7 @@ export class NotificationsService {
     articleAuthorUserId: string;
     parentCommentAuthorUserId?: string | null;
     isReply: boolean;
+    isOfficial: boolean;
   }): Promise<void> {
     const recipients = new Set(
       [input.articleAuthorUserId, input.parentCommentAuthorUserId]
@@ -64,17 +65,22 @@ export class NotificationsService {
     );
 
     for (const userId of recipients) {
+      const isOfficial = input.isOfficial && userId === input.articleAuthorUserId;
       const isReply =
         input.isReply && userId === input.parentCommentAuthorUserId;
       try {
         await this.notificationsRepository.create({
           actorUserId: input.actorUserId,
-          bodyKo: isReply
+          bodyKo: isOfficial
+            ? `건의사항에 학생회의 공식 답변이 등록되었습니다: ${input.articleTitleKo}`
+            : isReply
             ? `회원님의 댓글에 새 답글이 달렸습니다: ${input.articleTitleKo}`
             : `회원님의 게시글에 새 댓글이 달렸습니다: ${input.articleTitleKo}`,
-          link: `/board/${input.boardCode}/${input.articleId}#comment-${input.commentId}`,
-          titleKo: isReply ? "내 댓글에 답글이 달렸습니다" : "내 게시글에 댓글이 달렸습니다",
-          type: isReply ? ("REPLY_TO_COMMENT" as NotificationType) : ("COMMENT_ON_ARTICLE" as NotificationType),
+          link: input.boardCode === "_EVENT"
+            ? `/events/${input.articleId}#comment-${input.commentId}`
+            : `/board/${input.boardCode}/${input.articleId}#comment-${input.commentId}`,
+          titleKo: isOfficial ? "건의사항에 공식 답변이 등록되었습니다" : isReply ? "내 댓글에 답글이 달렸습니다" : "내 게시글에 댓글이 달렸습니다",
+          type: isOfficial ? ("OFFICIAL_RESPONSE" as NotificationType) : isReply ? ("REPLY_TO_COMMENT" as NotificationType) : ("COMMENT_ON_ARTICLE" as NotificationType),
           userId,
         });
       } catch (error) {

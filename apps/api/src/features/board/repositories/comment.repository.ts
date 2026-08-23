@@ -66,6 +66,7 @@ export class CommentRepository {
         articleId: comments.articleId,
         parentCommentId: comments.parentCommentId,
         content: comments.content,
+        isOfficial: comments.isOfficial,
         status: comments.status,
         createdAt: comments.createdAt,
         updatedAt: comments.updatedAt,
@@ -97,6 +98,7 @@ export class CommentRepository {
         },
         likeCount: Number(row.likeCount ?? 0),
         viewerHasLiked: Boolean(row.viewerHasLiked),
+        isOfficial: row.isOfficial,
       })),
     };
   }
@@ -246,6 +248,7 @@ export class CommentRepository {
     articleId: string;
     authorUserId: string;
     payload: CommentCreateRequest;
+    isOfficial: boolean;
   }): Promise<CommentCreateResponse> {
     const now = nowDate();
     const [created] = await this.db
@@ -255,6 +258,7 @@ export class CommentRepository {
         authorUserId: input.authorUserId,
         parentCommentId: input.payload.parentCommentId ? Number(input.payload.parentCommentId) : null,
         content: input.payload.content,
+        isOfficial: input.isOfficial,
         status: COMMENT_STATUS.PUBLISHED,
         createdAt: now,
         updatedAt: now,
@@ -277,11 +281,13 @@ export class CommentRepository {
     boardCode: string;
     parentCommentAuthorUserId: string | null;
     isReply: boolean;
+    isOfficial: boolean;
   } | null> {
     const [comment] = await this.db
       .select({
         articleId: comments.articleId,
         parentCommentId: comments.parentCommentId,
+        isOfficial: comments.isOfficial,
       })
       .from(comments)
       .where(eq(comments.commentId, Number(commentId)))
@@ -321,6 +327,7 @@ export class CommentRepository {
       boardCode: article.boardCode,
       parentCommentAuthorUserId,
       isReply: Boolean(comment.parentCommentId),
+      isOfficial: comment.isOfficial,
     };
   }
 

@@ -37,6 +37,7 @@ interface ArticleQueryParams {
   searchBy?: "title" | "author" | "title_content";
   sortBy?: "latest" | "views";
   sortDirection?: "asc" | "desc";
+  includeContentPreview?: boolean;
 }
 
 interface AuthenticatedUser {
@@ -46,7 +47,7 @@ interface AuthenticatedUser {
 
 const MAX_CONTENT_LENGTH = 50_000;
 const MAX_PAGE_SIZE = 100;
-const PUBLIC_LEGACY_BOARD_CODES = new Set(["행사", "공약", "QnA"]);
+const PUBLIC_NON_AGGREGATE_BOARD_CODES = new Set(["_EVENT", "FAQ"]);
 
 const canReadSecretArticle = (
   article: Pick<ArticleListItem, "isSecret" | "author">,
@@ -74,6 +75,8 @@ const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
   viewerHasScrapped: false,
   hasAttachment: false,
   thumbnailStorageKey: undefined,
+  snippetKo: undefined,
+  snippetEn: undefined,
   eventStartDate: undefined,
   eventEndDate: undefined,
   eventDescriptionKo: undefined,
@@ -111,6 +114,7 @@ export class ArticleService {
       getReadableArticleScopes(currentUser),
       query,
       currentUser.user?.id,
+      params.includeContentPreview,
     );
 
     const visibleItems = result.items.map((item) =>
@@ -134,7 +138,7 @@ export class ArticleService {
     const readableBoards = (await this.boardRepository.listBoards())
       // Keep legacy boards addressable through their direct routes, but keep
       // the public aggregate feed aligned with the current IA.
-      .filter((board) => !PUBLIC_LEGACY_BOARD_CODES.has(board.code));
+      .filter((board) => !PUBLIC_NON_AGGREGATE_BOARD_CODES.has(board.code));
 
     const page = params.page && params.page > 0 ? params.page : 1;
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
@@ -168,6 +172,7 @@ export class ArticleService {
         searchBy,
         sortBy,
         sortDirection,
+        includeContentPreview: params.includeContentPreview,
         visibilityScopes: getReadableArticleScopes(currentUser),
         viewerUserId: currentUser.user?.id,
       },
@@ -268,10 +273,6 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
-    if (board.code === "QnA") {
-      throw new ForbiddenException("qna_replaced_by_channel_talk");
-    }
-
     if (payload.isSecret && !board.allowSecret) {
       throw new ForbiddenException("secret_post_not_allowed");
     }
@@ -333,10 +334,6 @@ export class ArticleService {
 
     if (!board || !board.isActive) {
       throw new NotFoundException("board_not_found");
-    }
-
-    if (board.code === "QnA") {
-      throw new ForbiddenException("qna_replaced_by_channel_talk");
     }
 
     if (payload.isSecret && !board.allowSecret) {
@@ -472,6 +469,7 @@ export class ArticleService {
         searchBy: "title_content",
         sortBy: "latest",
         sortDirection: "desc",
+        includeContentPreview: true,
       },
       currentUser,
     );

@@ -6,6 +6,10 @@ import { EventsSurveysFilterBar } from "@/features/events-surveys/events-surveys
 import { EventsSurveysGrid } from "@/features/events-surveys/events-surveys-grid";
 import { useEventsSurveysPageController } from "@/features/events-surveys/use-events-surveys-page-controller";
 import { AlertCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { Permissions } from "@/lib/permissions";
 import {
   PageHeader,
   PageContainer,
@@ -18,6 +22,7 @@ export type EventsSurveysView = "event" | "survey" | "calendar";
 export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
   const [searchParams] = useSearchParams();
   const { lang } = useLanguage();
+  const { data: session } = useCurrentSession();
   const currentTab = view ?? (searchParams.get("tab") as EventsSurveysView | null) ?? "event";
   const selectedParam = searchParams.get("selected");
   const {
@@ -35,10 +40,8 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     itemQuery,
     setItemQuery,
     setSelectedDate,
-    setSortBy,
     setStateFilter,
     stateCounts,
-    sortBy,
     stateFilter,
     visibleItems,
   } = useEventsSurveysPageController({
@@ -53,6 +56,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
 
       <PageMain>
         <PageHeader
+          actions={currentTab === "event" && Permissions.has(session?.permission ?? 0, Permissions.WRITE_NOTICE) ? <Button asChild><Link to="/events/write">{lang === "ko" ? "행사 등록" : "Create event"}</Link></Button> : undefined}
           title={
             currentTab === "calendar"
               ? lang === "ko" ? "일정" : "Calendar"
@@ -65,13 +69,10 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
         <PageContainer className="pb-8">
           {currentTab !== "calendar" && !loading && !error ? (
             <EventsSurveysFilterBar
-              isEventTab={currentTab === "event"}
               lang={lang}
               onQueryChange={setItemQuery}
-              onSortByChange={setSortBy}
               onStateFilterChange={setStateFilter}
               query={itemQuery}
-              sortBy={sortBy}
               stateCounts={stateCounts}
               stateFilter={stateFilter}
             />

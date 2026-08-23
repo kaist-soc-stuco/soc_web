@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Query, Req, StreamableFile } from "@nestjs/common";
 import type { Request } from "express";
 import * as XLSX from "xlsx";
 import {
@@ -46,30 +46,34 @@ export class ContactsController {
     @Query("cohort") cohort?: string,
     @Query("department") department?: string,
     @Query("privacyConsented") privacyConsented?: string,
-  ): Promise<Buffer> {
+  ): Promise<StreamableFile> {
     const items = await this.contactsService.exportManaged(
       parseContactListOptions({ query, gender, cohort, department, privacyConsented }),
       request.user?.id,
     );
-    const worksheet = XLSX.utils.json_to_sheet(items.map((item) => ({
-      이름: item.nameKo,
-      영문명: item.nameEn,
-      직책: item.roleKo,
-      영문직책: item.roleEn,
-      성별: item.gender,
-      기수: item.cohort,
-      이메일: item.email,
-      전화번호: item.phoneNumber,
-      개인정보동의: item.privacyConsented ? "동의" : "미동의",
-      표시순서: item.sortOrder,
-    })));
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["이름", "영문명", "직책", "영문직책", "성별", "기수", "이메일", "전화번호", "개인정보동의", "표시순서"],
+      ...items.map((item) => [
+        item.nameKo,
+        item.nameEn,
+        item.roleKo,
+        item.roleEn,
+        item.gender,
+        item.cohort,
+        item.email,
+        item.phoneNumber,
+        item.privacyConsented ? "동의" : "미동의",
+        item.sortOrder,
+      ]),
+    ]);
     worksheet["!cols"] = [
       { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 10 },
       { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
-    return Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+    const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+    return new StreamableFile(buffer);
   }
 
   @Get("manage")

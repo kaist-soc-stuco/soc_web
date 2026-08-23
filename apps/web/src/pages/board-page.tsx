@@ -34,7 +34,7 @@ export function BoardPage() {
     <PageShell>
       <Header />
 
-      <PageMain>
+      <PageMain className="board-page-main">
         <PageHeader title={boardTitle} titleId="board-page-title" />
 
         <BoardCategoryNavigation

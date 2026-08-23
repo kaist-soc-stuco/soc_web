@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,11 @@ export interface SelectDropdownProps {
   buttonClassName?: string;
   disabled?: boolean;
   autoFocus?: boolean;
+  open?: boolean;
+  ariaInvalid?: boolean;
   emptyLabel?: string;
   menuClassName?: string;
+  onOpenChange?: (open: boolean) => void;
   optionClassName?: string;
 }
 
@@ -32,6 +35,8 @@ const DROPDOWN_GAP = 8;
 // Keep the menu compact while allowing the option list to scroll when the
 // viewport is short. The scrollbar is visually hidden below.
 const DROPDOWN_MAX_HEIGHT = 240;
+
+const openDropdownListeners = new Set<(instanceId: string) => void>();
 
 export function SelectDropdown({
   id,
@@ -44,12 +49,18 @@ export function SelectDropdown({
   buttonClassName,
   disabled = false,
   autoFocus = false,
+  open,
+  ariaInvalid = false,
   emptyLabel,
   menuClassName,
+  onOpenChange,
   optionClassName,
 }: SelectDropdownProps) {
   const { lang } = useLanguage();
-  const [isOpen, setIsOpen] = useState(false);
+  const instanceId = useId();
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = open ?? internalIsOpen;
+  const onOpenChangeRef = useRef(onOpenChange);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const optionLabelsKey = options.map((option) => option.label).join("\u0001");
@@ -57,6 +68,30 @@ export function SelectDropdown({
     visibility: "hidden",
     width: "max-content",
   });
+  const setOpen = (open: boolean) => {
+    if (open === isOpen || (open && disabled)) return;
+    if (open) {
+      openDropdownListeners.forEach((listener) => listener(instanceId));
+    }
+    if (open === false || open === true) setInternalIsOpen(open);
+    onOpenChange?.(open);
+  };
+
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
+  useEffect(() => {
+    const closeWhenAnotherOpens = (openedInstanceId: string) => {
+      if (openedInstanceId === instanceId) return;
+      setInternalIsOpen(false);
+      onOpenChangeRef.current?.(false);
+    };
+    openDropdownListeners.add(closeWhenAnotherOpens);
+    return () => {
+      openDropdownListeners.delete(closeWhenAnotherOpens);
+    };
+  }, [instanceId]);
 
   useLayoutEffect(() => {
     if (!isOpen || typeof window === "undefined") {
@@ -137,7 +172,7 @@ export function SelectDropdown({
         !containerRef.current.contains(target) &&
         !menuRef.current?.contains(target)
       ) {
-        setIsOpen(false);
+        setOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -155,19 +190,20 @@ export function SelectDropdown({
         variant="outline"
         disabled={disabled}
         autoFocus={autoFocus}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => !disabled && setOpen(!isOpen)}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
-            setIsOpen(false);
+            setOpen(false);
           } else if (event.key === "ArrowDown") {
             event.preventDefault();
-            setIsOpen(true);
+            setOpen(true);
           }
         }}
         aria-expanded={isOpen}
         aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-controls={isOpen ? menuId : undefined}
+          aria-haspopup="listbox"
+          aria-controls={isOpen ? menuId : undefined}
+          aria-invalid={ariaInvalid ? "true" : undefined}
         className={`interaction-control h-[var(--ui-control-height)] w-full justify-between px-3 py-0 text-left text-[length:var(--ui-control-font-size)] [font-weight:var(--ui-control-font-weight)] ${
           disabled
             ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400 opacity-50"
@@ -211,7 +247,7 @@ export function SelectDropdown({
                     aria-selected={option.value === value}
                     onClick={() => {
                       onChange(option.value);
-                      setIsOpen(false);
+                      setOpen(false);
                     }}
                     className={`interaction-menu-item h-[34px] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-sm ${
                       option.value === value

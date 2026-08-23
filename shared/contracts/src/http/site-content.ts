@@ -53,6 +53,7 @@ export interface ContentBlockRecord {
   bodyEn: string | null;
   linkUrl: string | null;
   imageUrl: string | null;
+  pledgeStatus: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | null;
   sortOrder: number;
   createdBy: string | null;
   updatedBy: string | null;

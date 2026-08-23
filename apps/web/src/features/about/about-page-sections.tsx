@@ -67,8 +67,8 @@ export function AboutTabContent({
   lang: string;
 }) {
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-12">
-      <div className="min-h-[400px] rounded-3xl border border-gray-200 bg-white p-6 shadow-xs md:p-12">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-0 py-12">
+      <div className="w-full min-h-[400px] rounded-3xl border border-gray-200 bg-white p-6 shadow-xs md:p-12">
         {currentTab === "intro" && <IntroSection lang={lang} />}
         {currentTab === "history" && <HistorySection lang={lang} />}
         {currentTab === "org" && <OrgSection lang={lang} />}

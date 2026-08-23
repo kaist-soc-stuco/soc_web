@@ -22,8 +22,12 @@ import {
 import { useBoardWritePageController } from "@/features/board-write/use-board-write-page-controller";
 import { UiInput } from "@/components/ui/form-control";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
+import {
+  switchEventDateInputMode,
+  switchEventEndDateInputMode,
+} from "@/features/board-write/event-date-utils";
 
-export function BoardWritePage() {
+export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } = {}) {
   const navigate = useNavigate();
   const {
     ConfirmDialog,
@@ -46,6 +50,7 @@ export function BoardWritePage() {
     handleSubmit,
     handleUploadFiles,
     isAnonymous,
+    isAllDay,
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
@@ -64,6 +69,7 @@ export function BoardWritePage() {
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
+    setIsAllDay,
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
@@ -76,9 +82,10 @@ export function BoardWritePage() {
     titleKo,
     uploading,
     writableBoardCodes,
-  } = useBoardWritePageController();
+  } = useBoardWritePageController(forcedCategory);
   const [dismissedDraftAt, setDismissedDraftAt] = useState<string | null>(null);
   const showDraftRestoredBanner = Boolean(draftRestoredAt && draftRestoredAt !== dismissedDraftAt);
+  const boardLabel = selectedCategory === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : getBoardLabelFromMetadata(selectedBoard, selectedCategory, lang);
   const templateSnapshot: BoardTemplateSnapshot = {
     boardCode: selectedCategory,
     titleKo,
@@ -90,6 +97,7 @@ export function BoardWritePage() {
     isSecret,
     allowComment,
     isKoreanOnly,
+    isAllDay,
     isEventAlwaysOpen,
     eventStartDate,
     eventEndDate,
@@ -108,9 +116,14 @@ export function BoardWritePage() {
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
     setIsKoreanOnly(template.isKoreanOnly);
+    setIsAllDay(Boolean(template.isAllDay));
     setIsEventAlwaysOpen(template.isEventAlwaysOpen);
-    setEventStartDate(template.eventStartDate);
-    setEventEndDate(template.eventEndDate);
+    setEventStartDate(
+      switchEventDateInputMode(template.eventStartDate, Boolean(template.isAllDay)),
+    );
+    setEventEndDate(
+      switchEventEndDateInputMode(template.eventEndDate, Boolean(template.isAllDay)),
+    );
     setEventDescriptionKo(template.eventDescriptionKo);
     setEventDescriptionEn(template.eventDescriptionEn);
     setSelectedSurveyId(template.selectedSurveyId);
@@ -126,25 +139,17 @@ export function BoardWritePage() {
         className="board-write-page-header"
         title={
           lang === "ko"
-            ? `${getBoardTitleFromMetadata(
+            ? `${selectedCategory === "_EVENT" ? "행사" : getBoardTitleFromMetadata(
                 selectedBoard,
                 selectedCategory,
                 lang,
               )} 글 작성`
-            : `${getBoardLabelFromMetadata(
-                selectedBoard,
-                selectedCategory,
-                lang,
-              )} - Write Post`
+            : `${boardLabel} - Write Post`
         }
         breadcrumbs={[
-          { label: lang === "ko" ? "게시판" : "Board", to: "/board" },
+          { label: selectedCategory === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : (lang === "ko" ? "게시판" : "Board"), to: selectedCategory === "_EVENT" ? "/events" : "/board" },
           {
-            label: getBoardLabelFromMetadata(
-              selectedBoard,
-              selectedCategory,
-              lang,
-            ),
+            label: boardLabel,
           },
         ]}
         actions={
@@ -152,7 +157,7 @@ export function BoardWritePage() {
             {canManageTemplates ? (
               <ArticleTemplateControl
                 boardCode={selectedCategory}
-                boardLabel={getBoardLabelFromMetadata(selectedBoard, selectedCategory, lang)}
+                boardLabel={boardLabel}
                 lang={lang}
                 onApply={applyTemplate}
                 snapshot={templateSnapshot}
@@ -171,7 +176,7 @@ export function BoardWritePage() {
       />
 
       <PageMain className="pb-20">
-        <PageContainer className="flex max-w-none flex-col gap-4 pb-16 pt-4">
+        <PageContainer className="flex flex-col gap-4 pb-16 pt-4">
           {/* Hidden file input for editor uploads */}
           <UiInput
             ref={fileInputRef}
@@ -220,12 +225,13 @@ export function BoardWritePage() {
               />
 
               <div className="space-y-6 px-6 pb-6 md:px-8">
-                {selectedCategory === "행사" && (
+                {selectedCategory === "_EVENT" && (
                   <BoardWriteEventFields
                     eventDescriptionKo={eventDescriptionKo}
                     eventDescriptionEn={eventDescriptionEn}
                     eventEndDate={eventEndDate}
                     eventStartDate={eventStartDate}
+                    isAllDay={isAllDay}
                     isEventAlwaysOpen={isEventAlwaysOpen}
                     isKoreanOnly={isKoreanOnly}
                     lang={lang}
@@ -240,6 +246,15 @@ export function BoardWritePage() {
                     onEventDescriptionEnChange={setEventDescriptionEn}
                     onEventEndDateChange={setEventEndDate}
                     onEventStartDateChange={setEventStartDate}
+                    onAllDayChange={(checked) => {
+                      setIsAllDay(checked);
+                      setEventStartDate(
+                        switchEventDateInputMode(eventStartDate, checked),
+                      );
+                      setEventEndDate(
+                        switchEventEndDateInputMode(eventEndDate, checked),
+                      );
+                    }}
                   />
                 )}
 

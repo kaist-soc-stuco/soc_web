@@ -22,6 +22,7 @@ export interface BoardTemplateSnapshot {
   isSecret: boolean;
   allowComment: boolean;
   isKoreanOnly: boolean;
+  isAllDay: boolean;
   isEventAlwaysOpen: boolean;
   eventStartDate: string;
   eventEndDate: string;

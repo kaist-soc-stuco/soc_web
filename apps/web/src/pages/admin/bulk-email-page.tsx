@@ -693,7 +693,7 @@ function BulkEmailPageContent() {
                       onRemove={() => setFilters((previous) => ({ ...previous, [entry.key]: undefined }))}
                     />
                   ))}
-                  <DropdownMenu.Root open={recipientMenuOpen} onOpenChange={setRecipientMenuOpen}>
+                  <DropdownMenu.Root modal={false} open={recipientMenuOpen} onOpenChange={setRecipientMenuOpen}>
                     <DropdownMenu.Trigger asChild>
                       <Button type="button" variant="ghost" size="sm" className="shrink-0 text-slate-500">
                         <Plus aria-hidden="true" />
@@ -927,7 +927,7 @@ function BulkEmailPageContent() {
         ) : history.length === 0 ? (
           <p className="py-8 text-center text-sm font-normal text-slate-500">발송 이력이 없습니다.</p>
         ) : (
-          <ol className="scrollbar-thin max-h-[min(60vh,36rem)] overflow-y-auto pr-2">
+          <ol className="scrollbar-hidden max-h-[min(60vh,36rem)] overflow-y-auto pr-2">
             {history.map((record) => (
               <li key={record.id} className="flex gap-3 border-b border-slate-100 py-4 first:pt-0 last:border-b-0">
                 <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
@@ -984,7 +984,7 @@ function BulkEmailPageContent() {
             </dl>
             <section>
               <h3 className="mb-2 text-xs font-medium text-slate-500">치환자 미리보기</h3>
-              <div className="max-h-48 overflow-y-auto rounded-lg bg-slate-50 px-3 py-3">
+              <div className="scrollbar-hidden max-h-48 overflow-y-auto rounded-lg bg-slate-50 px-3 py-3">
                 <RichTextContent content={previewContent} className="text-sm leading-6 text-slate-700" />
               </div>
             </section>

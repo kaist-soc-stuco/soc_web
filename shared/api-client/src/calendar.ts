@@ -1,6 +1,7 @@
 import type {
   CalendarEventCreateRequest,
   CalendarEventListResponse,
+  CalendarEventPresentationUpdateRequest,
   CalendarEventRecord,
   CalendarEventUpdateRequest,
   CalendarExternalSyncResponse,
@@ -53,6 +54,29 @@ export const createCalendarApi = ({
     return requestJson<CalendarEventListResponse>(
       `${calendarBaseUrl}/manual`,
       { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getManagedCalendarEvents: async (): Promise<CalendarEventListResponse> => {
+    return requestJson<CalendarEventListResponse>(
+      `${calendarBaseUrl}/admin/events`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateCalendarEventPresentation: async (
+    id: string,
+    input: CalendarEventPresentationUpdateRequest,
+  ): Promise<CalendarEventRecord> => {
+    return requestJson<CalendarEventRecord>(
+      `${calendarBaseUrl}/admin/events/${encodeURIComponent(id)}/presentation`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
       { retryOnUnauthorized: true },
     );
   },

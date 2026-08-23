@@ -20,8 +20,12 @@ import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
+import {
+  switchEventDateInputMode,
+  switchEventEndDateInputMode,
+} from "@/features/board-write/event-date-utils";
 
-export function BoardEditPage() {
+export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = {}) {
   const {
     ConfirmDialog,
     assets,
@@ -44,6 +48,7 @@ export function BoardEditPage() {
     handleStartNewDraft,
     handleUploadFiles,
     isAnonymous,
+    isAllDay,
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
@@ -61,6 +66,7 @@ export function BoardEditPage() {
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
+    setIsAllDay,
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
@@ -72,8 +78,8 @@ export function BoardEditPage() {
     titleEn,
     titleKo,
     uploading,
-  } = useBoardEditPageController();
-  const categoryLabel = getBoardLabelFromMetadata(undefined, category, lang);
+  } = useBoardEditPageController(forcedCategory);
+  const categoryLabel = category === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : getBoardLabelFromMetadata(undefined, category, lang);
   const [dismissedDraftAt, setDismissedDraftAt] = useState<string | null>(null);
   const showDraftRestoredBanner = Boolean(draftRestoredAt && draftRestoredAt !== dismissedDraftAt);
   const templateSnapshot: BoardTemplateSnapshot = {
@@ -87,6 +93,7 @@ export function BoardEditPage() {
     isSecret,
     allowComment,
     isKoreanOnly,
+    isAllDay,
     isEventAlwaysOpen,
     eventStartDate,
     eventEndDate,
@@ -105,9 +112,14 @@ export function BoardEditPage() {
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
     setIsKoreanOnly(template.isKoreanOnly);
+    setIsAllDay(Boolean(template.isAllDay));
     setIsEventAlwaysOpen(template.isEventAlwaysOpen);
-    setEventStartDate(template.eventStartDate);
-    setEventEndDate(template.eventEndDate);
+    setEventStartDate(
+      switchEventDateInputMode(template.eventStartDate, Boolean(template.isAllDay)),
+    );
+    setEventEndDate(
+      switchEventEndDateInputMode(template.eventEndDate, Boolean(template.isAllDay)),
+    );
     setEventDescriptionKo(template.eventDescriptionKo);
     setEventDescriptionEn(template.eventDescriptionEn);
     setSelectedSurveyId(template.selectedSurveyId);
@@ -127,7 +139,7 @@ export function BoardEditPage() {
             : `${categoryLabel} - Edit Post`
         }
         breadcrumbs={[
-          { label: lang === "ko" ? "게시판" : "Board", to: "/board" },
+          { label: category === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : (lang === "ko" ? "게시판" : "Board"), to: category === "_EVENT" ? "/events" : "/board" },
           { label: categoryLabel },
         ]}
         actions={
@@ -222,12 +234,13 @@ export function BoardEditPage() {
                   />
 
                   <div className="space-y-6 px-6 pb-6 md:px-8">
-                    {category === "행사" && (
+                    {category === "_EVENT" && (
                       <BoardWriteEventFields
                         eventDescriptionKo={eventDescriptionKo}
                         eventDescriptionEn={eventDescriptionEn}
                         eventEndDate={eventEndDate}
                         eventStartDate={eventStartDate}
+                        isAllDay={isAllDay}
                         isEventAlwaysOpen={isEventAlwaysOpen}
                         isKoreanOnly={isKoreanOnly}
                         lang={lang}
@@ -242,6 +255,15 @@ export function BoardEditPage() {
                         onEventDescriptionEnChange={setEventDescriptionEn}
                         onEventEndDateChange={setEventEndDate}
                         onEventStartDateChange={setEventStartDate}
+                        onAllDayChange={(checked) => {
+                          setIsAllDay(checked);
+                          setEventStartDate(
+                            switchEventDateInputMode(eventStartDate, checked),
+                          );
+                          setEventEndDate(
+                            switchEventEndDateInputMode(eventEndDate, checked),
+                          );
+                        }}
                       />
                     )}
 

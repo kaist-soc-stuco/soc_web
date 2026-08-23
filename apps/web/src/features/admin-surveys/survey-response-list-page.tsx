@@ -10,6 +10,7 @@ import type {
 } from "@soc/contracts";
 import { isoToDate, isoToMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
+import { downloadBlob } from "@/lib/download-blob";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminCard, AdminEmptyState, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
@@ -21,7 +22,6 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import { 
   ChevronLeft,
-  Loader2,
   Eye,
   Download,
 } from "lucide-react";
@@ -88,7 +88,6 @@ export function SurveyResponseListPage() {
 
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
-  const [exporting, setExporting] = useState(false);
 
   const fetchSurveyAndResponses = async () => {
     if (!surveyId) return;
@@ -113,7 +112,6 @@ export function SurveyResponseListPage() {
 
   const handleExport = async () => {
     if (!surveyId) return;
-    setExporting(true);
     try {
       const detail = await client.getSurveyDetail(surveyId);
       const allQuestions = detail.sections.flatMap((s) => s.questions);
@@ -152,19 +150,10 @@ export function SurveyResponseListPage() {
       XLSX.utils.book_append_sheet(workbook, worksheet, "응답 목록");
       const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `survey_responses_${surveyId}.xlsx`);
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadBlob(blob, `survey_responses_${surveyId}.xlsx`);
     } catch (err) {
       console.error(err);
       alert("응답을 내보내지 못했습니다.");
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -223,21 +212,9 @@ export function SurveyResponseListPage() {
                 <ChevronLeft className="size-4" />
                 목록으로
               </Button>
-              <Button
-                onClick={handleExport}
-                disabled={exporting}
-              >
-                {exporting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>내보내는 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    <span>내보내기</span>
-                  </>
-                )}
+              <Button onClick={handleExport}>
+                <Download className="size-4" />
+                <span>내보내기</span>
               </Button>
               </>
             }

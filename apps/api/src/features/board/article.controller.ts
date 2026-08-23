@@ -63,6 +63,7 @@ export class ArticleController {
         page,
         limit,
         q,
+        includeContentPreview: code === "FAQ",
       },
       currentUser,
     );
