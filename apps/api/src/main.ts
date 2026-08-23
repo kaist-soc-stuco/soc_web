@@ -9,6 +9,9 @@ import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  // Preserve the browser-facing protocol when the API is behind nginx so
+  // request-aware cookie flags work for both HTTP and HTTPS deployments.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   const configService = app.get(ConfigService);
 
   const corsOrigin = configService.get<string>('CORS_ORIGIN');

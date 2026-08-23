@@ -343,6 +343,7 @@ export class AuthSessionService {
     accessToken?: string;
     refreshToken?: string;
     sessionId?: string;
+    ssoUserInfo?: Record<string, unknown>;
     storageMode: "temporary" | "persisted";
     userId?: string;
   }> {
@@ -390,6 +391,7 @@ export class AuthSessionService {
         accessToken: issued.accessToken,
         refreshToken: issued.refreshToken,
         sessionId: issued.session.sessionId,
+        ssoUserInfo: pendingUser.ssoUserInfo,
         storageMode: "persisted",
         userId: persistedUser.userId,
       };
@@ -405,6 +407,7 @@ export class AuthSessionService {
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
       sessionId: issued.session.sessionId,
+      ssoUserInfo: pendingUser.ssoUserInfo,
       storageMode: "temporary",
     };
   }
