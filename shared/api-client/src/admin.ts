@@ -41,6 +41,7 @@ import type {
   StudentFeeListOptions,
   StudentFeeDetailResponse,
   StudentFeeStatsResponse,
+  StudentFeeStatsOptions,
   StudentFeeStatusRecord,
   UpdateContactRequest,
   UpdateRoleGroupRequest,
@@ -479,8 +480,13 @@ export const createAdminApi = ({
     );
   },
 
-  getStudentFeeStats: async (paymentYear?: number): Promise<StudentFeeStatsResponse> => {
-    const params = paymentYear === undefined ? "" : `?paymentYear=${paymentYear}`;
+  getStudentFeeStats: async (options: StudentFeeStatsOptions = {}): Promise<StudentFeeStatsResponse> => {
+    const search = new URLSearchParams();
+    if (options.dateFrom) search.set("dateFrom", options.dateFrom);
+    if (options.dateTo) search.set("dateTo", options.dateTo);
+    if (options.bucket) search.set("bucket", options.bucket);
+    if (options.referenceSemester) search.set("referenceSemester", options.referenceSemester);
+    const params = search.size > 0 ? `?${search.toString()}` : "";
     return requestJson<StudentFeeStatsResponse>(
       `${usersBaseUrl}/fee-status/stats${params}`,
       { method: "GET" },

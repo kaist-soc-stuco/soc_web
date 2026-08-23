@@ -10,16 +10,10 @@ import type {
   StudentFeeDetailResponse,
   StudentFeeListOptions,
   StudentFeeListResponse,
+  StudentFeeStatsResponse,
 } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
-import {
-  Check,
-  ChevronDown,
-  CreditCard,
-  Download,
-  FileUp,
-  Users,
-} from "lucide-react";
+import { ChevronDown, CreditCard, Download, FileUp } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -32,7 +26,6 @@ import {
   AdminTableHeader,
 } from "@/components/ui/admin-data-table";
 import {
-  AdminCard,
   AdminFormField,
   AdminPageHeader,
   AdminPageMain,
@@ -54,6 +47,7 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { downloadBlob } from "@/lib/download-blob";
 import { Permissions } from "@/lib/permissions";
+import { FeeStatisticsPanel, type PeriodPreset } from "./fee-statistics-panel";
 
 type FeeSortBy = "name" | "studentId" | "status" | "paidAt";
 type SortDirection = "asc" | "desc";
@@ -62,6 +56,16 @@ type StudentFeeRow = StudentFeeListResponse["students"][number];
 
 const DEFAULT_FEE_AMOUNT = 45_000;
 const DEFAULT_COVERAGE_SEMESTERS = 6;
+
+const toDateInput = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const periodRange = (preset: Exclude<PeriodPreset, "custom">) => {
+  const end = isoToDate(nowIso());
+  const start = isoToDate(end.toISOString());
+  if (preset === "30d") start.setDate(start.getDate() - 29);
+  if (preset === "90d") start.setDate(start.getDate() - 89);
+  if (preset === "year") start.setMonth(0, 1);
+  return { dateFrom: toDateInput(start), dateTo: toDateInput(end) };
+};
 
 const formatCurrency = (value: number) => `${value.toLocaleString("ko-KR")}원`;
 
@@ -130,6 +134,13 @@ export function FeeManagementPage() {
   const [detailStatus, setDetailStatus] = useState<FeeStatus>("UNPAID");
   const [detailAmount, setDetailAmount] = useState("");
   const [detailNote, setDetailNote] = useState("");
+  const initialStatsRange = useMemo(() => periodRange("30d"), []);
+  const [activeSection, setActiveSection] = useState<"ledger" | "stats">("ledger");
+  const [statsPreset, setStatsPreset] = useState<PeriodPreset>("30d");
+  const [statsDateFrom, setStatsDateFrom] = useState(initialStatsRange.dateFrom);
+  const [statsDateTo, setStatsDateTo] = useState(initialStatsRange.dateTo);
+  const [stats, setStats] = useState<StudentFeeStatsResponse | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const semesterOptions = useMemo(buildSemesterOptions, []);
   const students = feeData?.students ?? [];
@@ -137,15 +148,6 @@ export function FeeManagementPage() {
     () => Array.from(selectedUserIds).map((id) => studentCache[id]).filter(Boolean),
     [selectedUserIds, studentCache],
   );
-  const summary = feeData?.summary ?? {
-    totalStudents: 0,
-    paidStudents: 0,
-    partialStudents: 0,
-    unpaidStudents: 0,
-    paymentRate: 0,
-    paidAmount: 0,
-    referenceSemester,
-  };
   const totalCount = feeData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -186,6 +188,29 @@ export function FeeManagementPage() {
     void loadData();
   }, [loadData]);
 
+  const loadStats = useCallback(async () => {
+    if (activeSection !== "stats" || sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
+    setStatsLoading(true);
+    try {
+      const spanDays = Math.max(1, Math.ceil((isoToDate(`${statsDateTo}T00:00:00.000+09:00`).getTime() - isoToDate(`${statsDateFrom}T00:00:00.000+09:00`).getTime()) / 86_400_000));
+      const response = await apiClient.getStudentFeeStats({
+        dateFrom: statsDateFrom,
+        dateTo: statsDateTo,
+        bucket: spanDays <= 45 ? "day" : spanDays <= 180 ? "week" : "month",
+      });
+      setStats(response);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "납부 통계를 불러오지 못했습니다.");
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [activeSection, apiClient, session, sessionLoading, statsDateFrom, statsDateTo]);
+
+  useEffect(() => {
+    void loadStats();
+  }, [loadStats]);
+
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -193,6 +218,14 @@ export function FeeManagementPage() {
   const updateFilter = <T,>(setter: (value: T) => void, value: T) => {
     setter(value);
     setCurrentPage(1);
+  };
+
+  const changeStatsPreset = (preset: PeriodPreset) => {
+    setStatsPreset(preset);
+    if (preset === "custom") return;
+    const range = periodRange(preset);
+    setStatsDateFrom(range.dateFrom);
+    setStatsDateTo(range.dateTo);
   };
 
   const handleSortChange = (nextSortBy: FeeSortBy) => {
@@ -365,23 +398,31 @@ export function FeeManagementPage() {
         <AdminPageMain className="gap-5">
           <AdminPageHeader title="과비 납부 관리" />
 
-          {initialLoading ? (
-            <div className="grid gap-3 md:grid-cols-3">
-              {[0, 1, 2].map((item) => <Skeleton key={item} className="h-24 rounded-xl" />)}
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-3">
-              <FeeKpiCard icon={<CreditCard aria-hidden="true" />} label="총 수납 금액" value={formatCurrency(summary.paidAmount)} />
-              <FeeKpiCard icon={<Check aria-hidden="true" />} label={`${summary.referenceSemester ?? referenceSemester} 납부율`} value={`${summary.paymentRate}%`} />
-              <FeeKpiCard icon={<Users aria-hidden="true" />} label="미납 인원" value={`${summary.unpaidStudents.toLocaleString("ko-KR")}명`} />
-            </div>
-          )}
+          <SegmentedControl
+            ariaLabel="과비 관리 보기"
+            role="tablist"
+            value={activeSection}
+            onChange={setActiveSection}
+            className="w-fit"
+            options={[{ value: "ledger", label: "납부 원장" }, { value: "stats", label: "통계" }]}
+          />
 
           {successMessage ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-800">{successMessage}</div> : null}
           {operationError ? <div className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{operationError}</div> : null}
           {error ? <div className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">{error}</div> : null}
 
-          <AdminTableCard className="overflow-visible">
+          {activeSection === "stats" ? (
+            <FeeStatisticsPanel
+              dateFrom={statsDateFrom}
+              dateTo={statsDateTo}
+              loading={statsLoading}
+              onDateFromChange={(value) => { setStatsPreset("custom"); setStatsDateFrom(value); }}
+              onDateToChange={(value) => { setStatsPreset("custom"); setStatsDateTo(value); }}
+              onPresetChange={changeStatsPreset}
+              preset={statsPreset}
+              stats={stats}
+            />
+          ) : <AdminTableCard className="overflow-visible">
             <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
               <SegmentedControl
                 ariaLabel="납부 상태"
@@ -453,7 +494,7 @@ export function FeeManagementPage() {
             </div>
 
             {!initialLoading ? <div className="border-t border-slate-100 px-4 py-3"><Pagination className="m-0 w-full" currentPage={currentPage} onPageChange={setCurrentPage} pageSizeControl={<PageSizeSelect value={pageSize} options={[20, 50, 100]} onChange={(value) => { setPageSize(value); setCurrentPage(1); }} />} range={<span>총 {totalCount.toLocaleString("ko-KR")}건 중 {rangeStart}-{rangeEnd}</span>} totalPages={totalPages} /></div> : null}
-          </AdminTableCard>
+          </AdminTableCard>}
         </AdminPageMain>
 
         <input key={spreadsheetInputKey} ref={spreadsheetInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleSpreadsheetUpload(event.target.files?.[0])} />
@@ -472,10 +513,6 @@ export function FeeManagementPage() {
       </AdminPageShell>
     </AuthGuard>
   );
-}
-
-function FeeKpiCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <AdminCard className="flex min-h-24 items-center gap-3 px-4 py-3"><span className="grid size-9 place-items-center rounded-lg bg-emerald-50 text-emerald-700">{icon}</span><div className="min-w-0"><p className="text-xs font-normal text-slate-500">{label}</p><p className="mt-1 truncate text-lg font-semibold tabular-nums text-slate-950">{value}</p></div></AdminCard>;
 }
 
 function normalizeFeeSpreadsheetHeader(value: unknown) {

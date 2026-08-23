@@ -15,6 +15,7 @@ import { UsersService } from "./users.service";
 import type {
   FeeStatus,
   FeeMajorCategory,
+  StudentFeeStatsBucket,
   BulkUpdateStudentFeeStatusRequest,
   BulkProcessStudentFeePaymentsRequest,
   UpdateStudentFeeStatusRequest,
@@ -234,9 +235,21 @@ export class UsersController {
 
   @Get("fee-status/stats")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
-  async getStudentFeeStats(@Query("paymentYear") paymentYear?: string) {
-    const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
-    return this.usersService.getStudentFeeStats(year);
+  async getStudentFeeStats(
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("bucket") bucket?: string,
+    @Query("referenceSemester") referenceSemester?: string,
+    @Query("paymentYear") paymentYear?: string,
+  ) {
+    const legacyYear = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
+    const normalizedBucket: StudentFeeStatsBucket = bucket === "week" || bucket === "month" ? bucket : "day";
+    return this.usersService.getStudentFeeStats({
+      dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(dateFrom ?? "") ? dateFrom : legacyYear ? `${legacyYear}-01-01` : undefined,
+      dateTo: /^\d{4}-\d{2}-\d{2}$/.test(dateTo ?? "") ? dateTo : legacyYear ? `${legacyYear}-12-31` : undefined,
+      bucket: normalizedBucket,
+      referenceSemester: /^\d{4}-[12]$/.test(referenceSemester ?? "") ? referenceSemester : undefined,
+    });
   }
 
   @Get("fee-status/export.xlsx")

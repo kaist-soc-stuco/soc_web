@@ -25,6 +25,7 @@ import type {
   MySurveyResponseListResponse,
   StudentFeeListResponse,
   StudentFeeStatsResponse,
+  StudentFeeStatsOptions,
   StudentFeeStatusRecord,
   StudentFeeDetailResponse,
 } from "@soc/contracts";
@@ -330,8 +331,8 @@ export class UsersService {
     );
   }
 
-  async getStudentFeeStats(paymentYear?: number): Promise<StudentFeeStatsResponse> {
-    return this.usersRepository.getStudentFeeStats(paymentYear);
+  async getStudentFeeStats(options: StudentFeeStatsOptions = {}): Promise<StudentFeeStatsResponse> {
+    return this.usersRepository.getStudentFeeStats(options);
   }
 
   async exportStudentsByFeeStatus(
