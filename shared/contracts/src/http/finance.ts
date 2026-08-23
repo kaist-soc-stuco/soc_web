@@ -132,6 +132,8 @@ export interface StudentFeeStatsResponse {
   totals: {
     totalStudents: number;
     paidStudents: number;
+    paidStudentCount: number;
+    paymentCount: number;
     partialStudents: number;
     unpaidStudents: number;
     paymentRate: number;
@@ -141,6 +143,9 @@ export interface StudentFeeStatsResponse {
     period: string;
     paidAmount: number;
     paidStudents: number;
+    paymentCount: number;
+    cumulativeAmount: number;
+    cumulativeStudents: number;
   }>;
   majorBreakdown: Array<{
     category: FeeMajorCategory;
@@ -152,6 +157,15 @@ export interface StudentFeeStatsResponse {
     paymentRate: number;
     paidAmount: number;
   }>;
+}
+
+export type StudentFeeStatsBucket = "day" | "week" | "month";
+
+export interface StudentFeeStatsOptions {
+  dateFrom?: string;
+  dateTo?: string;
+  bucket?: StudentFeeStatsBucket;
+  referenceSemester?: string;
 }
 
 export interface BulkUpdateStudentFeeStatusResponse {

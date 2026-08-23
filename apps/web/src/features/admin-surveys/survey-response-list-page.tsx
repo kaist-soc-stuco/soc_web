@@ -4,9 +4,11 @@ import * as XLSX from "xlsx";
 import { createApiClient } from "@soc/api-client";
 import type {
   SurveyAnswerRecord,
+  SurveyAnalyticsResponse,
   SurveyDetailResponse,
   SurveyQuestionRecord,
   SurveyResponseRecord,
+  SurveyResponseWithAnswers,
 } from "@soc/contracts";
 import { isoToDate, isoToMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
@@ -35,6 +37,9 @@ import {
   AdminTableHead,
   AdminTableHeader,
 } from "@/components/ui/admin-data-table";
+import { SurveyQuestionSummary, SurveyResponseSummary } from "./survey-analytics-dashboard";
+
+type ResponseView = "summary" | "questions" | "individual";
 
 function formatResponseName(response: SurveyResponseRecord) {
   return response.user?.nameKo ?? "—";
@@ -76,7 +81,9 @@ export function SurveyResponseListPage() {
   const navigate = useNavigate();
   const { id: surveyId } = useParams<{ id: string }>();
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
-  const [responses, setResponses] = useState<SurveyResponseRecord[]>([]);
+  const [responses, setResponses] = useState<SurveyResponseWithAnswers[]>([]);
+  const [analytics, setAnalytics] = useState<SurveyAnalyticsResponse | null>(null);
+  const [activeView, setActiveView] = useState<ResponseView>("summary");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,10 +99,14 @@ export function SurveyResponseListPage() {
   const fetchSurveyAndResponses = async () => {
     if (!surveyId) return;
     try {
-      const surveyData = await client.getSurveyDetail(surveyId);
+      const [surveyData, responsesData, analyticsData] = await Promise.all([
+        client.getSurveyDetail(surveyId),
+        client.listResponsesWithAnswers(surveyId),
+        client.getSurveyAnalytics(surveyId),
+      ]);
       setSurvey(surveyData);
-      const responsesData = await client.listResponses(surveyId);
       setResponses(responsesData);
+      setAnalytics(analyticsData);
     } catch {
       setError("데이터를 불러오지 못했습니다.");
     } finally {
@@ -202,10 +213,10 @@ export function SurveyResponseListPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         <AdminPageMain className="gap-5">
-          <Breadcrumbs breadcrumbs={[{ label: "설문조사 관리", to: "/admin/surveys" }, { label: "응답 목록" }]} />
+          <Breadcrumbs breadcrumbs={[{ label: "설문조사 관리", to: "/admin/surveys" }, { label: "설문 응답" }]} />
 
           <AdminPageHeader
-            title="응답 목록"
+            title="설문 응답"
             actions={
               <>
               <Button variant="outline" onClick={() => navigate("/admin/surveys")}>
@@ -230,8 +241,28 @@ export function SurveyResponseListPage() {
             </AdminCard>
           )}
 
+          <SegmentedControl
+            ariaLabel="설문 응답 보기"
+            role="tablist"
+            value={activeView}
+            onChange={setActiveView}
+            className="w-fit"
+            options={[
+              { value: "summary", label: "요약" },
+              { value: "questions", label: "문항별" },
+              { value: "individual", label: "개별 응답" },
+            ]}
+          />
+
+          {loading ? <TableSkeleton columns={4} rows={5} /> : null}
+          {!loading && error ? <div className="rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-normal text-red-700">{error}</div> : null}
+          {!loading && !error && activeView === "summary" && analytics ? <SurveyResponseSummary analytics={analytics} responses={responses} /> : null}
+          {!loading && !error && activeView === "questions" && analytics && survey ? (
+            <SurveyQuestionSummary analytics={analytics} questions={survey.sections.flatMap((section) => section.questions)} responses={responses} />
+          ) : null}
+
           {/* Search and sort filters remain visible in the toolbar. */}
-          <AdminTableCard className="overflow-visible">
+          {!loading && !error && activeView === "individual" ? <AdminTableCard className="overflow-visible">
             <div className="border-b border-slate-100 p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0 flex-1">
@@ -271,23 +302,11 @@ export function SurveyResponseListPage() {
           {/* Table */}
           <div className="flex min-w-0 flex-col overflow-visible">
             
-            {loading && (
-              <div className="bg-white">
-                <TableSkeleton columns={6} rows={8} />
-              </div>
-            )}
-            
-            {error && (
-              <div className="m-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-normal text-red-700">
-                {error}
-              </div>
-            )}
-
-            {!loading && !error && filteredResponses.length === 0 && (
+            {filteredResponses.length === 0 && (
               <AdminEmptyState message="조건에 맞는 응답이 없습니다." />
             )}
 
-            {!loading && filteredResponses.length > 0 && (
+            {filteredResponses.length > 0 && (
               <div className="bg-white">
                 <AdminDataTable minWidth={1076}>
                   <colgroup>
@@ -380,7 +399,7 @@ export function SurveyResponseListPage() {
             </div>
 
           </div>
-          </AdminTableCard>
+          </AdminTableCard> : null}
         </AdminPageMain>
       </AdminPageShell>
     </AuthGuard>

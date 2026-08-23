@@ -43,6 +43,7 @@ import type {
   ResponseStatus,
   StudentFeeListResponse,
   StudentFeeStatsResponse,
+  StudentFeeStatsOptions,
   StudentFeeStatusRecord,
   StudentFeeDetailResponse,
   StudentFeePaymentRecord,
@@ -1193,111 +1194,121 @@ export class UsersRepository {
     };
   }
 
-  async getStudentFeeStats(paymentYear?: number): Promise<StudentFeeStatsResponse> {
-    const hasYear = paymentYear !== undefined;
-    const start = hasYear
-      ? isoToDate(`${paymentYear}-01-01T00:00:00.000Z`)
-      : undefined;
-    const end = hasYear
-      ? isoToDate(`${paymentYear! + 1}-01-01T00:00:00.000Z`)
-      : undefined;
-    const paidInPeriod = hasYear
-      ? sql`${studentFeeStatus.paidAt} >= ${start} AND ${studentFeeStatus.paidAt} < ${end}`
-      : sql`TRUE`;
-    const paidStatusInPeriod = sql`(${studentFeeStatus.status} IN ('PAID', 'PARTIAL') AND ${paidInPeriod})`;
+  async getStudentFeeStats(options: StudentFeeStatsOptions = {}): Promise<StudentFeeStatsResponse> {
+    const start = options.dateFrom ? isoToDate(`${options.dateFrom}T00:00:00.000+09:00`) : undefined;
+    const end = options.dateTo ? isoToDate(`${options.dateTo}T00:00:00.000+09:00`) : undefined;
+    if (end) end.setDate(end.getDate() + 1);
+    const conditions: SQL[] = [];
+    if (start) conditions.push(gte(studentFeePayments.paidAt, start));
+    if (end) conditions.push(lt(studentFeePayments.paidAt, end));
+    if (options.referenceSemester) conditions.push(eq(studentFeePayments.effectiveStartSemester, options.referenceSemester));
 
-    const totalsPromise = this.db
-      .select({
-        totalStudents: sql<number>`COUNT(*)`,
-        paidStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PAID' AND ${paidInPeriod})`,
-        partialStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PARTIAL' AND ${paidInPeriod})`,
-        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${paidStatusInPeriod} THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
-      })
-      .from(users)
-      .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId));
-
-    const trendPromise = this.db
-      .select({
-        period: sql<string>`TO_CHAR(${studentFeeStatus.paidAt}, 'YYYY-MM')`,
-        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${studentFeeStatus.status} IN ('PAID', 'PARTIAL') THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
-        paidStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} IN ('PAID', 'PARTIAL'))`,
-      })
-      .from(studentFeeStatus)
-      .where(
-        and(
-          isNotNull(studentFeeStatus.paidAt),
-          ...(hasYear ? [gte(studentFeeStatus.paidAt, start!), lt(studentFeeStatus.paidAt, end!)] : []),
-        ),
-      )
-      .groupBy(sql`TO_CHAR(${studentFeeStatus.paidAt}, 'YYYY-MM')`)
-      .orderBy(sql`TO_CHAR(${studentFeeStatus.paidAt}, 'YYYY-MM')`);
-
-    const categoryFields: Array<{
-      category: FeeMajorCategory;
-      label: string;
-      field:
-        | typeof users.primaryMajor
-        | typeof users.doubleMajor
-        | typeof users.minor;
-    }> = [
-      { category: "PRIMARY", label: "주전공", field: users.primaryMajor },
-      { category: "DOUBLE", label: "복수전공", field: users.doubleMajor },
-      { category: "MINOR", label: "부전공", field: users.minor },
-    ];
-    const categoryPromises = categoryFields.map(({ category, label, field }) =>
+    const [paymentRows, userRows] = await Promise.all([
       this.db
         .select({
-          totalStudents: sql<number>`COUNT(*)`,
-          paidStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PAID' AND ${paidInPeriod})`,
-          partialStudents: sql<number>`COUNT(*) FILTER (WHERE ${studentFeeStatus.status} = 'PARTIAL' AND ${paidInPeriod})`,
-          paidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${paidStatusInPeriod} THEN ${studentFeeStatus.paidAmount} ELSE 0 END), 0)`,
+          amount: studentFeePayments.amount,
+          paidAt: studentFeePayments.paidAt,
+          userId: studentFeePayments.userId,
         })
-        .from(users)
-        .leftJoin(studentFeeStatus, eq(users.userId, studentFeeStatus.userId))
-        .where(isNotNull(field))
-        .then((rows) => ({ category, label, row: rows[0] })),
-    );
-
-    const [totalsRows, trendRows, categoryRows] = await Promise.all([
-      totalsPromise,
-      trendPromise,
-      Promise.all(categoryPromises),
+        .from(studentFeePayments)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(asc(studentFeePayments.paidAt)),
+      this.db.select({
+        userId: users.userId,
+        primaryMajor: users.primaryMajor,
+        doubleMajor: users.doubleMajor,
+        minor: users.minor,
+      }).from(users),
     ]);
-    const totalsRow = totalsRows[0];
-    const totalStudents = Number(totalsRow?.totalStudents ?? 0);
-    const paidStudents = Number(totalsRow?.paidStudents ?? 0);
-    const partialStudents = Number(totalsRow?.partialStudents ?? 0);
+
+    const bucket = options.bucket ?? "day";
+    const koreanDateFormatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const koreanDate = (date: Date) => {
+      const parts = Object.fromEntries(koreanDateFormatter.formatToParts(date).map((part) => [part.type, part.value]));
+      return `${parts.year}-${parts.month}-${parts.day}`;
+    };
+    const isoWeek = (day: string) => {
+      const date = isoToDate(`${day}T00:00:00.000Z`);
+      const weekday = date.getUTCDay() || 7;
+      date.setUTCDate(date.getUTCDate() + 4 - weekday);
+      const yearStart = isoToDate(`${date.getUTCFullYear()}-01-01T00:00:00.000Z`);
+      const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
+      return `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+    };
+    const periodKey = (date: Date) => {
+      const day = koreanDate(date);
+      if (bucket === "month") return day.slice(0, 7);
+      if (bucket === "week") return isoWeek(day);
+      return day;
+    };
+
+    const grouped = new Map<string, { paidAmount: number; paymentCount: number; userIds: Set<string> }>();
+    paymentRows.forEach((payment) => {
+      const period = periodKey(payment.paidAt);
+      const current = grouped.get(period) ?? { paidAmount: 0, paymentCount: 0, userIds: new Set<string>() };
+      current.paidAmount += Number(payment.amount);
+      current.paymentCount += 1;
+      current.userIds.add(payment.userId);
+      grouped.set(period, current);
+    });
+
+    const cumulativeUsers = new Set<string>();
+    let cumulativeAmount = 0;
+    const trend = Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([period, value]) => {
+      cumulativeAmount += value.paidAmount;
+      value.userIds.forEach((userId) => cumulativeUsers.add(userId));
+      return {
+        period,
+        paidAmount: value.paidAmount,
+        paidStudents: value.userIds.size,
+        paymentCount: value.paymentCount,
+        cumulativeAmount,
+        cumulativeStudents: cumulativeUsers.size,
+      };
+    });
+
+    const paidUserIds = new Set(paymentRows.map((payment) => payment.userId));
+    const paidAmount = paymentRows.reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const totalStudents = userRows.length;
+    const paidStudents = paidUserIds.size;
+    const categoryDefinitions = [
+      { category: "PRIMARY" as const, label: "주전공", field: "primaryMajor" as const },
+      { category: "DOUBLE" as const, label: "복수전공", field: "doubleMajor" as const },
+      { category: "MINOR" as const, label: "부전공", field: "minor" as const },
+    ];
 
     return {
       totals: {
         totalStudents,
         paidStudents,
-        partialStudents,
-        unpaidStudents: Math.max(0, totalStudents - paidStudents - partialStudents),
-        paymentRate:
-          totalStudents > 0
-            ? Math.round(((paidStudents + partialStudents) / totalStudents) * 1000) / 10
-            : 0,
-        paidAmount: Number(totalsRow?.paidAmount ?? 0),
+        paidStudentCount: paidStudents,
+        paymentCount: paymentRows.length,
+        partialStudents: 0,
+        unpaidStudents: Math.max(0, totalStudents - paidStudents),
+        paymentRate: totalStudents > 0 ? Math.round((paidStudents / totalStudents) * 1_000) / 10 : 0,
+        paidAmount,
       },
-      trend: trendRows.map((row) => ({
-        period: row.period,
-        paidAmount: Number(row.paidAmount ?? 0),
-        paidStudents: Number(row.paidStudents ?? 0),
-      })),
-      majorBreakdown: categoryRows.map(({ category, label, row }) => {
-        const total = Number(row?.totalStudents ?? 0);
-        const paid = Number(row?.paidStudents ?? 0);
-        const partial = Number(row?.partialStudents ?? 0);
+      trend,
+      majorBreakdown: categoryDefinitions.map(({ category, label, field }) => {
+        const eligibleIds = new Set(userRows.filter((user) => Boolean(user[field])).map((user) => user.userId));
+        const categoryPayments = paymentRows.filter((payment) => eligibleIds.has(payment.userId));
+        const categoryPaidIds = new Set(categoryPayments.map((payment) => payment.userId));
+        const total = eligibleIds.size;
+        const paid = categoryPaidIds.size;
         return {
           category,
           label,
           totalStudents: total,
           paidStudents: paid,
-          partialStudents: partial,
-          unpaidStudents: Math.max(0, total - paid - partial),
-          paymentRate: total > 0 ? Math.round(((paid + partial) / total) * 1000) / 10 : 0,
-          paidAmount: Number(row?.paidAmount ?? 0),
+          partialStudents: 0,
+          unpaidStudents: Math.max(0, total - paid),
+          paymentRate: total > 0 ? Math.round((paid / total) * 1_000) / 10 : 0,
+          paidAmount: categoryPayments.reduce((sum, payment) => sum + Number(payment.amount), 0),
         };
       }),
     };
