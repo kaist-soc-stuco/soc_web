@@ -1,7 +1,7 @@
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, LogOut, User } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 
 import { Logo } from "@/components/atoms/logo";
@@ -142,7 +142,11 @@ export function AdminLayout() {
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <AdminSidebar />
           <div className="relative min-w-0 flex-1 bg-[#f7f9fc]">
-            {isLoading && !hasLoadedSessionRef.current ? loadingOverlay : <Outlet context={{ session }} />}
+            {isLoading && !hasLoadedSessionRef.current ? loadingOverlay : (
+              <Suspense fallback={null}>
+                <Outlet context={{ session }} />
+              </Suspense>
+            )}
           </div>
         </div>
       </div>
