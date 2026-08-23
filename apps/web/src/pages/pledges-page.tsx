@@ -1,54 +1,32 @@
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
+import { AboutTabs } from "@/features/about/about-page-sections";
+import { PledgesSection } from "@/features/about/pledges-section";
 import { Header } from "@/components/organisms/header";
 import { PageHeader, PageShell } from "@/components/ui/page-layout";
 import { useLanguage } from "@/hooks/use-language";
-import {
-  resolveContentBlockText,
-  usePublicContentBlocksByType,
-} from "@/features/site-content/site-content";
-
-const statusMeta = {
-  PLANNED: { ko: "예정", en: "Planned" },
-  IN_PROGRESS: { ko: "진행 중", en: "In progress" },
-  COMPLETED: { ko: "이행 완료", en: "Completed" },
-} as const;
 
 export function PledgesPage() {
   const { lang } = useLanguage();
-  const pledges = usePublicContentBlocksByType("PLEDGE");
+  const navigate = useNavigate();
 
   return (
     <PageShell>
       <Header />
       <PageHeader
+        containerClassName="!max-w-3xl"
         breadcrumbs={[{ label: lang === "ko" ? "학생회 소개" : "Student Council", to: "/about" }]}
         title={lang === "ko" ? "공약 이행 현황" : "Pledge progress"}
       />
-      <main className="mx-auto w-full max-w-[1040px] flex-1 px-6 pb-20 pt-8 lg:px-8">
-        <div className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-white">
-          {pledges.length === 0 ? (
-            <p className="px-6 py-16 text-center text-sm font-normal text-[#344054]">
-              {lang === "ko" ? "등록된 공약이 없습니다." : "No pledges have been published."}
-            </p>
-          ) : pledges.map((pledge) => {
-            const text = resolveContentBlockText(pledge, lang);
-            const status = pledge.pledgeStatus ?? "PLANNED";
-            const StatusIcon = status === "COMPLETED" ? CheckCircle2 : status === "IN_PROGRESS" ? Loader2 : Circle;
-            return (
-              <article key={pledge.contentBlockId} className="grid gap-4 border-b border-[#e5e9ec] px-6 py-5 last:border-b-0 md:grid-cols-[1fr_auto] md:items-start">
-                <div className="min-w-0">
-                  <h2 className="text-[15px] font-normal leading-6 text-[#172033]">{text.title}</h2>
-                  {text.body ? <p className="mt-1.5 whitespace-pre-wrap text-sm font-normal leading-6 text-[#344054]">{text.body}</p> : null}
-                </div>
-                <span className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[#e5e9ec] bg-white px-2.5 py-1.5 text-xs font-normal text-[#344054]">
-                  <StatusIcon aria-hidden="true" className="size-3.5 text-brand-primary" />
-                  {statusMeta[status][lang]}
-                </span>
-              </article>
-            );
-          })}
-        </div>
+      <AboutTabs
+        currentTab="pledges"
+        lang={lang}
+        onTabChange={(tab) => {
+          navigate(tab === "pledges" ? "/about/pledges" : `/about?tab=${tab}`);
+        }}
+      />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-[var(--ui-space-page-x)] pb-20 pt-8 md:px-[var(--ui-space-page-x-wide)]">
+        <PledgesSection lang={lang} />
       </main>
     </PageShell>
   );

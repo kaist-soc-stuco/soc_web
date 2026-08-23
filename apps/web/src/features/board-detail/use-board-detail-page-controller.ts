@@ -208,18 +208,6 @@ export function useBoardDetailPageController(forcedCategory?: string) {
 
   const handleDeleteComment = async (commentId: string) => {
     if (!articleId) return;
-    const confirmed = await requestConfirm({
-      confirmLabel: lang === "ko" ? "삭제" : "Delete",
-      description:
-        lang === "ko"
-          ? "이 댓글을 영구적으로 삭제하시겠습니까? 삭제된 댓글은 되돌릴 수 없습니다."
-          : "Are you sure you want to permanently delete this comment? Deleted comments cannot be restored.",
-      title:
-        lang === "ko" ? "댓글 삭제" : "Delete comment",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-
     setCommentError(null);
     try {
       await apiClient.deleteComment(category, articleId, commentId);

@@ -203,9 +203,21 @@ export function Header({ variant = "default" }: HeaderProps) {
       if (!isInsideProfile) setDropdownOpen(false);
       if (!isInsideNotifications) setNotificationOpen(false);
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setSearchOpen(false);
+      setDropdownOpen(false);
+      setNotificationOpen(false);
+      setMobileMenuOpen(false);
+      setHoveredIndex(null);
+    };
 
     document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   const publicBoardItems = boardNavItems.filter(

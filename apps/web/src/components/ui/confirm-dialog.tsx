@@ -1,4 +1,3 @@
-import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -82,30 +81,17 @@ export function useConfirmDialog() {
               <Button
                 type="button"
                 size="sm"
+                variant={state.tone === "danger" ? "destructive" : "default"}
                 onClick={() => close(true)}
-                className={`text-white ${
-                  state.tone === "danger"
-                    ? "bg-rose-600 hover:bg-rose-700"
-                    : "bg-kaist-darkgreen hover:bg-[#0f5c29]"
-                }`}
               >
                 {state.confirmLabel}
               </Button>
             </>
           }
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                state.tone === "danger"
-                  ? "bg-rose-50 text-rose-600"
-                  : "bg-emerald-50 text-kaist-darkgreen"
-              }`}
-            >
-              <AlertTriangle className="size-3.5" aria-hidden="true" />
-            </div>
+          <div className="min-w-0">
             {state.description ? (
-              <p className="min-w-0 break-keep text-sm font-medium leading-6 text-slate-600">
+              <p className="break-keep text-sm font-medium leading-6 text-slate-600">
                 {state.description}
               </p>
             ) : null}

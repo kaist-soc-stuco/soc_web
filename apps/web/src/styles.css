@@ -610,13 +610,30 @@
   }
 
   .interaction-card {
-    transition-property: border-color, box-shadow, opacity;
+    transition-property: border-color, box-shadow, opacity, transform;
     transition-duration: var(--app-motion-fast);
     transition-timing-function: var(--app-motion-ease);
   }
 
   .interaction-card:focus {
     outline: none;
+  }
+
+  .engagement-icon-bounce {
+    display: inline-flex;
+    animation: engagement-icon-bounce 150ms ease-out;
+  }
+
+  @keyframes engagement-icon-bounce {
+    0% {
+      transform: scale(1);
+    }
+    45% {
+      transform: scale(1.16);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 
   .interaction-link:focus-visible {
@@ -1129,6 +1146,7 @@
 
   .channel-talk-safe-area {
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+    padding-right: 0 !important;
   }
 
   .board-page-main.channel-talk-safe-area {
@@ -1136,23 +1154,19 @@
   }
 
   @media (max-width: 767px) {
-    /* Keep the SDK-provided launcher in a small right rail so it cannot cover
-       the last pagination control, calendar bar, or card action. */
+    /* Keep page containers centered; the launcher is protected vertically. */
     .channel-talk-safe-area {
-      padding-right: max(6rem, env(safe-area-inset-right)) !important;
+      padding-right: 0 !important;
     }
   }
 
   @media (min-width: 1024px) {
     .channel-talk-safe-area {
-      padding-right: max(5rem, env(safe-area-inset-right)) !important;
+      padding-right: 0 !important;
     }
 
-    /* Keep the home content wide. The launcher is protected by bottom spacing;
-       reserving a large horizontal popup rail leaves the calendar needlessly
-       narrow when the popup is closed. */
     .home-page-shell .channel-talk-safe-area {
-      padding-right: max(5rem, env(safe-area-inset-right)) !important;
+      padding-right: 0 !important;
       padding-bottom: 1rem !important;
     }
   }

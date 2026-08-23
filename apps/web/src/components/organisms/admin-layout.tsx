@@ -1,7 +1,7 @@
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, LogOut, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 
 import { Logo } from "@/components/atoms/logo";
@@ -28,6 +28,29 @@ export function AdminLayout() {
   const queryClient = useQueryClient();
   const { lang } = useLanguage();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setDropdownOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [dropdownOpen]);
 
   const handleLogout = async () => {
     const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
@@ -65,13 +88,12 @@ export function AdminLayout() {
 
       <div className="flex items-center gap-3">
         {user && (
-          <div className="relative">
+          <div ref={profileRef} className="relative">
             <Button variant="ghost"
               type="button"
               aria-label={lang === "ko" ? `${user.name} 관리자 메뉴` : `${user.name} admin menu`}
               aria-expanded={dropdownOpen}
               onClick={() => setDropdownOpen((value) => !value)}
-              onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
               className="flex min-h-10 items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-app-text-strong transition-colors hover:border-slate-200 hover:bg-slate-50"
             >
               <User className="h-4 w-4 text-kaist-greygreen" />

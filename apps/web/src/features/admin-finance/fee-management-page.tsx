@@ -142,6 +142,19 @@ export function FeeManagementPage() {
   const [stats, setStats] = useState<StudentFeeStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
+  useEffect(() => {
+    if (!selectionPopoverOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setSelectionPopoverOpen(false);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [selectionPopoverOpen]);
+
   const semesterOptions = useMemo(buildSemesterOptions, []);
   const students = feeData?.students ?? [];
   const selectedStudents = useMemo(

@@ -335,7 +335,7 @@ function SiteContentPageContent() {
               </div> : null}
               <div className="grid gap-4">
                 {!isImageOnlyType(draft.type) && draft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-                {isImageOnlyType(draft.type) ? <ContentImageInput label={draft.type === "HERO" ? "히어로 이미지" : draft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} value={draft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+        {isImageOnlyType(draft.type) ? <ContentImageInput label={draft.type === "HERO" ? "히어로 이미지" : draft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={draft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
               </div>
             </div>
           </AdminCard>
@@ -361,22 +361,23 @@ function SiteContentPageContent() {
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
         {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><UiSelect value={createDraft.pledgeStatus ?? "PLANNED"} onChange={(event) => setCreateDraft((current) => ({ ...current, pledgeStatus: event.currentTarget.value as BlockDraft["pledgeStatus"] }))}><option value="PLANNED">예정</option><option value="IN_PROGRESS">진행 중</option><option value="COMPLETED">이행 완료</option></UiSelect></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-        {isImageOnlyType(createDraft.type) ? <ContentImageInput label={createDraft.type === "HERO" ? "히어로 이미지" : createDraft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setCreateDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+        {isImageOnlyType(createDraft.type) ? <ContentImageInput label={createDraft.type === "HERO" ? "히어로 이미지" : createDraft.type === "LOGO" ? "로고 이미지" : "조직도 이미지"} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => void uploadImage(file, (imageReference) => setCreateDraft((current) => ({ ...current, imageUrl: imageReference })))} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
       </div>
     </Modal>
   </AdminPageShell>;
 }
 
-function ContentImageInput({ label, onRemove, onSelect, uploading, value }: {
+function ContentImageInput({ label, onRemove, onSelect, previewBorderless = false, uploading, value }: {
   label: string;
   onRemove: () => void;
   onSelect: (file: File) => void;
+  previewBorderless?: boolean;
   uploading: boolean;
   value: string;
 }) {
   return <AdminFormField label={`${label} *`}>
     <div className="space-y-3">
-      {value ? <div className="overflow-hidden rounded-lg border border-[#e5e9ec] bg-slate-50"><img src={resolveAssetUrl(value)} alt="" className="h-36 w-full object-contain" /></div> : null}
+      {value ? <div className={cn("overflow-hidden rounded-lg", previewBorderless ? "bg-white" : "border border-[#e5e9ec] bg-slate-50")}><img src={resolveAssetUrl(value)} alt="" className={cn("block h-36 w-full object-contain", previewBorderless && "h-auto max-h-[420px]")} /></div> : null}
       <div className="flex flex-wrap gap-2">
         <label className={cn("inline-flex h-[var(--ui-control-height)] cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-[length:var(--ui-control-font-size)] font-normal text-[#172033] transition-colors hover:bg-slate-50", uploading && "pointer-events-none opacity-60")}>
           <ImageUp aria-hidden="true" className="size-4" />
@@ -425,7 +426,7 @@ function ContentBlockPreview({ draft }: { draft: BlockDraft }) {
   }
   if (draft.type === "ORGANIZATION_CHART") {
     return imageUrl
-      ? <div className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-white p-4"><img src={imageUrl} alt={title} className="mx-auto max-h-[420px] w-full object-contain" /></div>
+      ? <div className="overflow-hidden rounded-xl bg-white"><img src={imageUrl} alt={title} className="block max-h-[420px] w-full object-contain" /></div>
       : <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-[#e5e9ec] bg-slate-50 text-sm font-normal text-[#344054]">조직도 이미지를 선택해 주세요.</div>;
   }
   if (draft.type === "PLEDGE") {

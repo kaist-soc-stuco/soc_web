@@ -244,7 +244,7 @@ export function LoginCallbackPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-kaist-greygreen">
               {lang === "ko" ? "개인정보 동의" : "Privacy Consent"}
             </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-kaist-black">
+            <h1 className="mt-2 text-[18px] font-semibold leading-6 text-kaist-black">
               {lang === "ko" ? "개인정보 제공 동의" : "Personal Data Consent"}
             </h1>
             <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-600">

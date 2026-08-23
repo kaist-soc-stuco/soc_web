@@ -4,6 +4,7 @@ import type {
 } from "@soc/contracts";
 import { isoToDate, nowDate } from "@soc/shared";
 import { ArrowUp, Heart, Loader2, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { UiTextarea } from "@/components/ui/form-control";
@@ -213,6 +214,12 @@ function CommentRow({
   showReplyButton: boolean;
 }) {
   const likeActionKey = `${comment.commentId}:LIKE`;
+  const [deletePopoverOpen, setDeletePopoverOpen] = useState(false);
+
+  const handleDeleteConfirm = async () => {
+    setDeletePopoverOpen(false);
+    await onDeleteComment(comment.commentId);
+  };
 
   return (
     <article
@@ -257,18 +264,18 @@ function CommentRow({
               aria-label={lang === "ko" ? "댓글 좋아요" : "Like comment"}
               aria-pressed={comment.viewerHasLiked}
               disabled={commentActionSubmitting === likeActionKey}
-              onClick={() =>
-                void onSetCommentEngagement(
-                  comment.commentId,
+                onClick={() =>
+                  void onSetCommentEngagement(
+                    comment.commentId,
                   "LIKE",
                   !comment.viewerHasLiked,
-                )
-              }
+                  )
+                }
                 className={cn(
-                  "h-7 gap-1 rounded-md border px-1.5 text-xs font-medium hover:bg-slate-100",
+                  "h-7 gap-1 rounded-md border-0 px-1.5 text-xs font-medium hover:bg-slate-100",
                   comment.viewerHasLiked
-                   ? "border-slate-200 text-rose-600 hover:border-slate-200 hover:text-rose-600"
-                   : "border-slate-200 text-slate-400 hover:border-slate-200 hover:text-slate-400",
+                    ? "text-rose-600 hover:text-rose-600"
+                    : "text-slate-400 hover:text-slate-400",
                 )}
             >
               {commentActionSubmitting === likeActionKey ? (
@@ -296,17 +303,50 @@ function CommentRow({
               </Button>
             ) : null}
             {canDelete && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={lang === "ko" ? "댓글 삭제" : "Delete comment"}
-                onClick={() => void onDeleteComment(comment.commentId)}
-                className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
-              >
-                <Trash2 className="size-3.5" aria-hidden="true" />
-              </Button>
+              <div className="relative">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={lang === "ko" ? "댓글 삭제" : "Delete comment"}
+                  aria-expanded={deletePopoverOpen}
+                  onClick={() => setDeletePopoverOpen((open) => !open)}
+                  className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                </Button>
+                {deletePopoverOpen ? (
+                  <div
+                    aria-label={lang === "ko" ? "댓글 삭제 확인" : "Confirm comment deletion"}
+                    className="absolute bottom-full right-0 z-30 mb-2 w-52 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.14)]"
+                    role="dialog"
+                  >
+                    <p className="text-[13px] font-medium leading-5 text-slate-700">
+                      {lang === "ko" ? "댓글을 삭제할까요?" : "Delete this comment?"}
+                    </p>
+                    <div className="mt-2.5 flex justify-end gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDeletePopoverOpen(false)}
+                      >
+                        {lang === "ko" ? "취소" : "Cancel"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={commentActionSubmitting === comment.commentId}
+                        onClick={() => void handleDeleteConfirm()}
+                      >
+                        {lang === "ko" ? "삭제" : "Delete"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             )}
           </div>
         </div>
@@ -336,9 +376,18 @@ function CommentComposer({
   value: string;
 }) {
   const hasText = Boolean(value.trim());
+  const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <div className="relative w-full">
+    <div
+      className="relative w-full"
+      onFocus={() => setIsFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsFocused(false);
+        }
+      }}
+    >
       <UiTextarea
         rows={1}
         value={value}
@@ -353,26 +402,28 @@ function CommentComposer({
           }
         }}
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={ariaLabel.replace("입력", "등록")}
-        onClick={() => void onSubmit()}
-        disabled={disabled || isSubmitting || !hasText}
-        className={cn(
-          "absolute right-2 top-1/2 size-8 -translate-y-1/2 rounded-full p-0 text-white disabled:opacity-100",
-          hasText
-            ? "bg-brand-primary hover:bg-brand-primary/90"
-            : "bg-brand-primary/20 hover:bg-brand-primary/20",
-        )}
-      >
-        {isSubmitting ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <ArrowUp className="size-4" aria-hidden="true" />
-        )}
-      </Button>
+      {isFocused ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={ariaLabel.replace("입력", "등록")}
+          onClick={() => void onSubmit()}
+          disabled={disabled || isSubmitting || !hasText}
+          className={cn(
+            "animate-in fade-in zoom-in-95 absolute right-2 top-1/2 size-8 -translate-y-1/2 rounded-full p-0 text-white duration-200",
+            hasText
+              ? "bg-brand-primary hover:bg-brand-primary/90"
+              : "bg-brand-primary/20 hover:bg-brand-primary/20",
+          )}
+        >
+          {isSubmitting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ArrowUp className="size-4" aria-hidden="true" />
+          )}
+        </Button>
+      ) : null}
     </div>
   );
 }

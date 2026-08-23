@@ -18,7 +18,10 @@ export function AboutPage() {
   return (
     <PageShell>
       <Header />
-      <PageHeader title={lang === "ko" ? "학생회 소개" : "Student Council"} />
+      <PageHeader
+        containerClassName="!max-w-[var(--ui-about-max-width)]"
+        title={lang === "ko" ? "학생회 소개" : "Student Council"}
+      />
       <AboutTabs
         currentTab={currentTab}
         lang={lang}

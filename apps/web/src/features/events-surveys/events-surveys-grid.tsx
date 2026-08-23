@@ -165,9 +165,9 @@ export function EventsSurveysGrid({
         return (
           <div
             key={item.id}
-            className={`interaction-card group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card ${
+            className={`interaction-card group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-200 ease-out hover:-translate-y-1 hover:shadow-elevated ${
               closed
-                ? "border-slate-200 opacity-70 transition-opacity hover:opacity-100"
+                ? "border-slate-200 opacity-50"
                 : "border-gray-200"
             }`}
           >
@@ -182,7 +182,7 @@ export function EventsSurveysGrid({
                     src={item.imageUrl}
                     alt=""
                     aria-hidden="true"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02]"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">

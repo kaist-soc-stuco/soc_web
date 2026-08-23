@@ -48,7 +48,7 @@ export function FilterSheet({ children, onClose, open, title }: FilterSheetProps
         className="scrollbar-hidden absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-[18px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 shadow-elevated"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
-          <h2 id="mobile-filter-sheet-title" className="text-base font-bold text-app-text-strong">
+          <h2 id="mobile-filter-sheet-title" className="text-[18px] font-semibold leading-6 text-app-text-strong">
             {title}
           </h2>
           <IconButton size="sm" tone="navigation" aria-label="필터 닫기" onClick={onClose}>
