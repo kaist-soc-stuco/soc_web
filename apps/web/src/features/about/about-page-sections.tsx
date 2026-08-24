@@ -279,8 +279,13 @@ function TimelineItem({
 
 function OrgSection({ lang }: { lang: string }) {
   const organizationChart = usePublicContentBlocksByType("ORGANIZATION_CHART")[0];
+  const organizationImage = organizationChart
+    ? lang === "en"
+      ? organizationChart.imageUrlEn || organizationChart.imageUrl
+      : organizationChart.imageUrl
+    : null;
 
-  if (organizationChart?.imageUrl) {
+  if (organizationImage) {
     return (
       <div className="animate-in space-y-6 fade-in duration-300">
         <h2 className="text-2xl font-bold text-kaist-black">
@@ -288,7 +293,7 @@ function OrgSection({ lang }: { lang: string }) {
         </h2>
         <figure className="overflow-hidden rounded-xl bg-white">
           <img
-            src={resolveAssetUrl(organizationChart.imageUrl)}
+            src={resolveAssetUrl(organizationImage)}
             alt={lang === "ko" ? organizationChart.titleKo : organizationChart.titleEn || organizationChart.titleKo}
             className="block h-auto max-h-[70vh] w-full object-contain"
           />

@@ -40,6 +40,7 @@ export class SiteContentRepository {
       createdAt: msToIso(row.createdAt.valueOf()),
       createdBy: row.createdBy,
       imageUrl: row.imageUrl,
+      imageUrlEn: row.imageUrlEn,
       linkUrl: row.linkUrl,
       pledgeStatus: row.pledgeStatus as ContentBlockRecord["pledgeStatus"],
       publishedAt: row.publishedAt ? msToIso(row.publishedAt.valueOf()) : null,
@@ -135,6 +136,7 @@ export class SiteContentRepository {
         bodyKo: input.bodyKo ?? null,
         createdBy: actorUserId,
         imageUrl: input.imageUrl ?? null,
+        imageUrlEn: input.imageUrlEn ?? null,
         linkUrl: input.linkUrl ?? null,
         pledgeStatus: input.pledgeStatus ?? null,
         updatedBy: actorUserId,
@@ -159,6 +161,7 @@ export class SiteContentRepository {
     if (input.bodyEn !== undefined) values.bodyEn = input.bodyEn;
     if (input.linkUrl !== undefined) values.linkUrl = input.linkUrl;
     if (input.imageUrl !== undefined) values.imageUrl = input.imageUrl;
+    if (input.imageUrlEn !== undefined) values.imageUrlEn = input.imageUrlEn;
     if (input.pledgeStatus !== undefined) values.pledgeStatus = input.pledgeStatus;
     if (input.sortOrder !== undefined) values.sortOrder = input.sortOrder;
 

@@ -421,7 +421,7 @@ export function Calendar() {
   }, [holidays]);
 
   return (
-    <section className="home-bento-card flex h-full min-h-0 min-w-0 flex-col overflow-visible px-4 pb-3 pt-2.5 md:px-5">
+    <section className="home-bento-card flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-4 pb-3 pt-2.5 md:px-5">
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
         <div className="mb-1.5 flex h-9 shrink-0 items-center justify-between">
@@ -488,7 +488,7 @@ export function Calendar() {
              {loading ? (
                <CalendarGridSkeleton />
              ) : (
-               <div className="grid min-h-[12rem] flex-1 grid-rows-6 gap-y-1 overflow-visible bg-white">
+               <div className="calendar-month-grid grid min-h-0 flex-1 grid-rows-6 gap-y-1 overflow-hidden bg-white">
                  {Array.from({ length: 6 }).map((_, weekIndex) => {
                    const weekDays = days.slice(weekIndex * 7, weekIndex * 7 + 7);
                    const weekStart = weekDays[0]?.date;
@@ -497,14 +497,20 @@ export function Calendar() {
                      weekStart && weekEnd
                        ? calendarBars.filter(
                            (bar) =>
-                             bar.lane < 3 &&
                              startOfDay(bar.startAt) <= endOfDay(weekEnd) &&
                              endOfDay(bar.endAt) >= startOfDay(weekStart),
                          )
                        : [];
+                   const visibleWeekBars = weekBars.filter((bar) => bar.lane < 3);
+                   const desktopHiddenBarCount = weekBars.filter(
+                     (bar) => bar.lane >= 3,
+                   ).length;
+                   const compactHiddenBarCount = weekBars.filter(
+                     (bar) => bar.lane >= 2,
+                   ).length;
 
                    return (
-                     <div key={weekIndex} className="relative grid min-h-[2.75rem] grid-cols-7">
+                     <div key={weekIndex} className="relative grid min-h-0 grid-cols-7 overflow-hidden">
                        {weekDays.map((item, dayIndex) => {
                          const absoluteIndex = weekIndex * 7 + dayIndex;
                          const cellDateKey = item.date
@@ -540,7 +546,7 @@ export function Calendar() {
                              onClick={() => {
                                if (item.date) setSelectedDateKey(cellDateKey);
                              }}
-                             className={`calendar-day-button relative z-10 flex h-full min-h-[2.75rem] cursor-pointer flex-col items-center justify-start rounded-md border px-0 py-0 font-normal transition-colors ${
+                             className={`calendar-day-button relative z-10 flex h-full min-h-0 cursor-pointer flex-col items-center justify-start rounded-md border px-0 py-0 font-normal transition-colors ${
                                isSelected
                                  ? "border-[#cedbd3] bg-[#f5f8f6]"
                                  : "border-transparent bg-white hover:bg-slate-50/80"
@@ -571,7 +577,7 @@ export function Calendar() {
                        })}
 
                        <div className="calendar-week-bars" aria-hidden="true">
-                         {weekBars.map((bar) => {
+                         {visibleWeekBars.map((bar) => {
                            if (!weekStart || !weekEnd) return null;
                            const visibleStart =
                              startOfDay(bar.startAt) < startOfDay(weekStart)
@@ -616,7 +622,7 @@ export function Calendar() {
                            return monthSegments.map((segment, segmentIndex) => (
                              <span
                                key={`${bar.id}-${weekIndex}-${segmentIndex}`}
-                               className={`calendar-week-event-bar ${getCalendarToneClass(bar)} ${
+                               className={`calendar-week-event-bar calendar-week-event-bar-lane-${bar.lane} ${getCalendarToneClass(bar)} ${
                                  !segment.isCurrentMonth
                                    ? "calendar-week-event-bar-outside-month"
                                    : ""
@@ -637,6 +643,16 @@ export function Calendar() {
                            ));
                          })}
                        </div>
+                       {desktopHiddenBarCount > 0 ? (
+                         <span className="calendar-week-more calendar-week-more-desktop">
+                           +{desktopHiddenBarCount}
+                         </span>
+                       ) : null}
+                       {compactHiddenBarCount > 0 ? (
+                         <span className="calendar-week-more calendar-week-more-compact">
+                           +{compactHiddenBarCount}
+                         </span>
+                       ) : null}
                      </div>
                    );
                  })}

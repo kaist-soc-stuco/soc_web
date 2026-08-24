@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -87,7 +87,10 @@ export class AssetRepository {
       .select({ contentBlockId: contentBlocks.contentBlockId })
       .from(contentBlocks)
       .where(and(
-        eq(contentBlocks.imageUrl, `asset:${assetId}`),
+        or(
+          eq(contentBlocks.imageUrl, `asset:${assetId}`),
+          eq(contentBlocks.imageUrlEn, `asset:${assetId}`),
+        ),
         eq(contentBlocks.status, "PUBLISHED"),
       ))
       .limit(1);
@@ -252,7 +255,10 @@ export class AssetRepository {
       })
       .from(assets)
       .leftJoin(articleAssets, eq(articleAssets.assetId, assets.assetId))
-      .leftJoin(contentBlocks, eq(contentBlocks.imageUrl, sql`'asset:' || ${assets.assetId}::text`))
+      .leftJoin(contentBlocks, or(
+        eq(contentBlocks.imageUrl, sql`'asset:' || ${assets.assetId}::text`),
+        eq(contentBlocks.imageUrlEn, sql`'asset:' || ${assets.assetId}::text`),
+      ))
       .leftJoin(executiveContacts, eq(executiveContacts.avatarStorageKey, sql`'asset:' || ${assets.assetId}::text`))
       .where(
         and(

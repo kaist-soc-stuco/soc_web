@@ -77,6 +77,7 @@ const ContentBlockFieldsSchema = z
     bodyEn: z.string().trim().max(20_000).nullable().default(null),
     linkUrl: NullableContentBlockUrlSchema.default(null),
     imageUrl: NullableContentBlockImageSchema.default(null),
+    imageUrlEn: NullableContentBlockImageSchema.default(null),
     pledgeStatus: PledgeStatusSchema.nullable().default(null),
     sortOrder: z.number().int().min(0).default(0),
   })

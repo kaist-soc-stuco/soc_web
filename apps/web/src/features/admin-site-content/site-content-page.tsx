@@ -30,6 +30,7 @@ interface BlockDraft {
   bodyEn: string;
   bodyKo: string;
   imageUrl: string;
+  imageUrlEn: string;
   linkUrl: string;
   pledgeStatus: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | null;
   sortOrder: number;
@@ -97,6 +98,7 @@ const emptyDraft = (type: ContentBlockType = "HERO"): BlockDraft => ({
   bodyEn: "",
   bodyKo: "",
   imageUrl: "",
+  imageUrlEn: "",
   linkUrl: "",
   pledgeStatus: type === "PLEDGE" ? "PLANNED" : null,
   sortOrder: 0,
@@ -109,6 +111,7 @@ const draftFromBlock = (block: ContentBlockRecord): BlockDraft => ({
   bodyEn: block.bodyEn ?? "",
   bodyKo: block.bodyKo ?? "",
   imageUrl: block.imageUrl ?? "",
+  imageUrlEn: block.imageUrlEn ?? "",
   linkUrl: block.linkUrl ?? "",
   pledgeStatus: block.pledgeStatus,
   sortOrder: block.sortOrder,
@@ -121,6 +124,7 @@ const normalizeDraft = (draft: BlockDraft): CreateContentBlockRequest => ({
   bodyEn: draft.bodyEn.trim() || null,
   bodyKo: draft.bodyKo.trim() || null,
   imageUrl: draft.imageUrl.trim() || null,
+  imageUrlEn: draft.imageUrlEn.trim() || null,
   linkUrl: draft.linkUrl.trim() || null,
   pledgeStatus: draft.pledgeStatus,
   sortOrder: draft.sortOrder,
@@ -153,7 +157,7 @@ function SiteContentPageContent() {
   const [orderedBlocks, setOrderedBlocks] = useState<ContentBlockRecord[]>([]);
   const [orderSaving, setOrderSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const [cropRequest, setCropRequest] = useState<{ file: File; target: "create" | "draft"; type: "HERO" | "LOGO" | "ORGANIZATION_CHART" } | null>(null);
+  const [cropRequest, setCropRequest] = useState<{ file: File; field: "ko" | "en"; target: "create" | "draft"; type: "HERO" | "LOGO" | "ORGANIZATION_CHART" } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const blocksQuery = useQuery({
@@ -210,18 +214,20 @@ function SiteContentPageContent() {
     }
   };
 
-  const requestImageCrop = (target: "create" | "draft", type: ContentBlockType, file: File) => {
+  const requestImageCrop = (target: "create" | "draft", type: ContentBlockType, file: File, field: "ko" | "en" = "ko") => {
     if (!isImageOnlyType(type)) return;
-    setCropRequest({ file, target, type });
+    setCropRequest({ file, field, target, type });
   };
 
   const applyCroppedImage = async (file: File) => {
     if (!cropRequest) return;
     const target = cropRequest.target;
+    const field = cropRequest.field;
     setCropRequest(null);
     await uploadImage(file, (imageReference) => {
-      if (target === "draft") setDraft((current) => ({ ...current, imageUrl: imageReference }));
-      else setCreateDraft((current) => ({ ...current, imageUrl: imageReference }));
+      const key = field === "en" ? "imageUrlEn" : "imageUrl";
+      if (target === "draft") setDraft((current) => ({ ...current, [key]: imageReference }));
+      else setCreateDraft((current) => ({ ...current, [key]: imageReference }));
     });
   };
 
@@ -375,7 +381,7 @@ function SiteContentPageContent() {
               </div> : null}
               <div className="grid gap-4">
                 {!isImageOnlyType(draft.type) && draft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={draft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-                {isImageOnlyType(draft.type) ? <ContentImageInput spec={getImageSpec(draft.type)!} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={draft.imageUrl} uploading={imageUploading} onSelect={(file) => requestImageCrop("draft", draft.type, file)} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+                {isImageOnlyType(draft.type) ? <ContentImageInput spec={getImageSpec(draft.type)!} previewBorderless={draft.type === "ORGANIZATION_CHART"} value={draft.imageUrl} secondaryValue={draft.type === "ORGANIZATION_CHART" ? draft.imageUrlEn : undefined} secondaryLabel={draft.type === "ORGANIZATION_CHART" ? "English organization chart" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("draft", draft.type, file)} onSecondarySelect={(file) => requestImageCrop("draft", draft.type, file, "en")} onRemove={() => setDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
               </div>
             </div>
           </AdminCard>
@@ -401,32 +407,45 @@ function SiteContentPageContent() {
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
         {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><AdminSelectDropdown ariaLabel="이행 상태" value={createDraft.pledgeStatus ?? "PLANNED"} options={pledgeStatusOptions} onChange={(value) => setCreateDraft((current) => ({ ...current, pledgeStatus: value as BlockDraft["pledgeStatus"] }))} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
-        {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
+        {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} secondaryValue={createDraft.type === "ORGANIZATION_CHART" ? createDraft.imageUrlEn : undefined} secondaryLabel={createDraft.type === "ORGANIZATION_CHART" ? "English organization chart" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onSecondarySelect={(file) => requestImageCrop("create", createDraft.type, file, "en")} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setCreateDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
       </div>
     </Modal>
     {cropRequest ? <ImageCropModal aspectRatio={getImageSpec(cropRequest.type)!.width / getImageSpec(cropRequest.type)!.height} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
   </AdminPageShell>;
 }
 
-function ContentImageInput({ onRemove, onSelect, previewBorderless = false, spec, uploading, value }: {
+function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onSelect, previewBorderless = false, secondaryLabel, secondaryValue, spec, uploading, value }: {
   onRemove: () => void;
+  onSecondaryRemove?: () => void;
+  onSecondarySelect?: (file: File) => void;
   onSelect: (file: File) => void;
   previewBorderless?: boolean;
+  secondaryLabel?: string;
+  secondaryValue?: string;
   spec: { height: number; label: string; width: number };
   uploading: boolean;
   value: string;
 }) {
-  return <AdminFormField label={`${spec.label} (${spec.width} × ${spec.height}) *`}>
+  const renderSlot = (label: string, slotValue: string, select: (file: File) => void, remove: (() => void) | undefined) => (
     <div className="space-y-3">
-      {value ? <div className={cn("overflow-hidden rounded-lg", previewBorderless ? "bg-white" : "border border-[#e5e9ec] bg-slate-50")}><img src={resolveAssetUrl(value)} alt="" className={cn("block h-36 w-full object-contain", previewBorderless && "h-auto max-h-[420px]")} /></div> : null}
+      <p className="text-sm font-medium text-slate-700">{label} <span className="text-xs font-normal text-slate-400">({spec.width} × {spec.height})</span></p>
+      {slotValue ? <div className={cn("overflow-hidden rounded-lg", previewBorderless ? "bg-white" : "border border-[#e5e9ec] bg-slate-50")}><img src={resolveAssetUrl(slotValue)} alt="" className={cn("block h-36 w-full object-contain", previewBorderless && "h-auto max-h-[420px]")} /></div> : null}
       <div className="flex flex-wrap gap-2">
         <label className={cn("inline-flex h-[var(--ui-control-height)] cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-[length:var(--ui-control-font-size)] font-normal text-[#172033] transition-colors hover:bg-slate-50", uploading && "pointer-events-none opacity-60")}>
           <ImageUp aria-hidden="true" className="size-4" />
-          {uploading ? "업로드 중" : value ? "이미지 교체" : "이미지 선택"}
-          <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) onSelect(file); }} />
+          {uploading ? "업로드 중" : slotValue ? "이미지 교체" : "이미지 선택"}
+          <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
         </label>
-        {value ? <Button type="button" variant="ghost" onClick={onRemove} disabled={uploading}>이미지 제거</Button> : null}
+        {slotValue && remove ? <Button type="button" variant="ghost" onClick={remove} disabled={uploading}>이미지 제거</Button> : null}
       </div>
+    </div>
+  );
+
+  const hasSecondary = Boolean(secondaryLabel && onSecondarySelect);
+  return <AdminFormField label={hasSecondary ? "조직도 이미지" : `${spec.label} (${spec.width} × ${spec.height}) *`}>
+    <div className="grid gap-5">
+      {renderSlot(hasSecondary ? "한국어 조직도" : spec.label, value, onSelect, onRemove)}
+      {hasSecondary ? renderSlot(secondaryLabel!, secondaryValue ?? "", onSecondarySelect!, onSecondaryRemove) : null}
       <p className="text-xs font-normal text-[#344054]">JPG, PNG 또는 WebP 이미지 파일을 선택하면 지정한 크기로 자를 수 있습니다.</p>
     </div>
   </AdminFormField>;
@@ -466,8 +485,9 @@ function ContentBlockPreview({ draft }: { draft: BlockDraft }) {
     return <div className="flex max-w-sm items-center gap-3 rounded-xl border border-[#e5e9ec] bg-white p-4"><div className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-50"><ExternalLink aria-hidden="true" className="size-4 text-[#344054]" /></div><div className="min-w-0"><p className="truncate text-sm font-normal text-[#172033]">{title}</p><p className="truncate text-xs font-normal text-[#344054]">{body}</p></div></div>;
   }
   if (draft.type === "ORGANIZATION_CHART") {
+    const imageUrlEn = draft.imageUrlEn ? resolveAssetUrl(draft.imageUrlEn) : "";
     return imageUrl
-      ? <div className="overflow-hidden rounded-xl bg-white"><img src={imageUrl} alt={title} className="block max-h-[420px] w-full object-contain" /></div>
+      ? <div className="grid gap-4 sm:grid-cols-2"><div className="min-w-0"><p className="mb-2 text-xs font-medium text-slate-500">한국어</p><div className="overflow-hidden rounded-xl bg-white"><img src={imageUrl} alt={title} className="block max-h-[420px] w-full object-contain" /></div></div>{imageUrlEn ? <div className="min-w-0"><p className="mb-2 text-xs font-medium text-slate-500">English</p><div className="overflow-hidden rounded-xl bg-white"><img src={imageUrlEn} alt={draft.titleEn || title} className="block max-h-[420px] w-full object-contain" /></div></div> : null}</div>
       : <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-[#e5e9ec] bg-slate-50 text-sm font-normal text-[#344054]">조직도 이미지를 선택해 주세요.</div>;
   }
   if (draft.type === "PLEDGE") {
