@@ -45,7 +45,10 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
           memberId: config.memberId,
           pluginKey,
           profile: config.profile,
-          zIndex: 40,
+          // Keep the SDK-owned launcher and messenger above page chrome
+          // (headers, sticky toolbars, and footers), while leaving app modals
+          // on their higher z-index layer.
+          zIndex: 90,
         });
         hasBootedRef.current = true;
       } catch (error) {
