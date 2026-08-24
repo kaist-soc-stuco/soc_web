@@ -213,6 +213,21 @@ export function BoardArticleTable({
             <span className="line-clamp-2 min-w-0 md:truncate">
               {lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}
             </span>
+            {post.commentCount > 0 ? (
+              <span
+                aria-label={
+                  lang === "ko"
+                    ? `댓글 ${post.commentCount}개`
+                    : `${post.commentCount} comments`
+                }
+                className="shrink-0 self-end text-xs font-normal leading-4 text-[#1769AA]"
+              >
+                [{post.commentCount}]
+              </span>
+            ) : null}
+            {(post.hasAttachment ?? false) && (
+              <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            )}
             {isNew ? (
               <span
                 className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
@@ -221,9 +236,6 @@ export function BoardArticleTable({
                 <span className="sr-only">{lang === "ko" ? "새 글" : "New post"}</span>
               </span>
             ) : null}
-            {(post.hasAttachment ?? false) && (
-              <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            )}
           </div>
           <div className="flex items-center gap-2 text-[length:var(--ui-text-body-size)] font-normal tracking-tight text-[var(--j-color-text-secondary)] md:hidden">
             <span>{authorLabel(post)}</span>

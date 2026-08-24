@@ -212,7 +212,7 @@ export function AuditLogPage() {
           <AdminTableCard className="overflow-visible">
             <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-end xl:justify-between">
               <div className="flex flex-wrap items-end gap-2">
-                <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-36 shrink-0" />
+                <AdminSelectDropdown ariaLabel="로그 도메인" value={targetType} options={domainOptions} onChange={(value) => updatePageFilter(setTargetType, value)} className="w-36 shrink-0" buttonClassName="h-[var(--ui-control-height)]" />
                 <div aria-label="기간" className="flex w-full items-center gap-2 sm:w-[19rem]">
                   <UiInput aria-label="시작일" type="date" value={dateFrom} onChange={(event) => updatePageFilter(setDateFrom, event.currentTarget.value)} className="min-w-0 flex-1 text-sm font-normal" />
                   <span className="text-sm text-slate-400">~</span>

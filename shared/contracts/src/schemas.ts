@@ -551,8 +551,11 @@ const RequiredContactTextSchema = z.string().trim().min(1).max(100);
 const ContactFieldsSchema = z.object({
   nameKo: RequiredContactTextSchema,
   nameEn: RequiredContactTextSchema,
+  departmentKo: z.string().trim().max(100).nullable().optional(),
+  departmentEn: z.string().trim().max(100).nullable().optional(),
   roleKo: RequiredContactTextSchema,
   roleEn: RequiredContactTextSchema,
+  avatarStorageKey: z.string().regex(/^asset:\d+$/).nullable().optional(),
   gender: z.string().trim().max(20).nullable().optional(),
   cohort: z.number().int().positive().max(100).nullable().optional(),
   email: z.string().email().or(z.literal("")).nullable().optional(),

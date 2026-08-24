@@ -56,43 +56,51 @@ export function SurveyResponseForm({
         )}
         {survey.sections.filter((section) => visibleSectionIds.has(section.id)).map((section) => (
           <section key={section.id} className="flex flex-col gap-4">
-            {(getLocalizedText(lang, section.titleKo, section.titleEn) ||
-              getLocalizedText(
+            {(() => {
+              const sectionTitle = getLocalizedText(
+                lang,
+                section.titleKo,
+                section.titleEn,
+              );
+              const sectionDescription = getLocalizedText(
                 lang,
                 section.descriptionKo,
                 section.descriptionEn,
-              )) && (
-              <div className="px-1 pb-1 pt-2">
-                {getLocalizedText(lang, section.titleKo, section.titleEn) && (
-                  <h2 className="text-base font-semibold text-slate-950">
-                    {getLocalizedText(lang, section.titleKo, section.titleEn)}
-                  </h2>
-                )}
-                {getLocalizedText(
-                  lang,
-                  section.descriptionKo,
-                  section.descriptionEn,
-                ) && (
-                  <RichTextContent
-                    content={getLocalizedText(
-                      lang,
-                      section.descriptionKo,
-                      section.descriptionEn,
-                    )}
-                    className="mt-1.5 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-500"
-                  />
-                )}
-              </div>
-            )}
+              );
+
+              if (!sectionTitle && !sectionDescription) return null;
+
+              return (
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
+                  {sectionTitle ? (
+                    <h2 className="text-base font-semibold leading-6 text-slate-950">
+                      {sectionTitle}
+                    </h2>
+                  ) : null}
+                  {sectionDescription ? (
+                    <RichTextContent
+                      content={sectionDescription}
+                      className={`${sectionTitle ? "mt-1.5" : ""} text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-500`}
+                    />
+                  ) : null}
+                </div>
+              );
+            })()}
 
             {section.questions.map((question) => {
               const questionIndex =
                 allQuestions.findIndex((item) => item.id === question.id) + 1;
+              const questionError = questionErrors[question.id] ?? null;
 
               return (
                 <div
                   key={question.id}
-                  className="group rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] hover:border-kaist-darkgreen/20 hover:shadow-[0_6px_18px_rgba(15,23,42,0.05)]"
+                  id={`survey-question-${question.id}`}
+                  className={`group scroll-mt-24 rounded-2xl border bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] ${
+                    questionError
+                      ? "border-rose-300 bg-rose-50/10 hover:border-rose-400"
+                      : "border-slate-200 hover:border-kaist-darkgreen/20"
+                  } hover:shadow-[0_6px_18px_rgba(15,23,42,0.05)]`}
                 >
                   <div className="mb-3.5 border-b border-slate-100 pb-3">
                     <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-slate-950">
@@ -136,7 +144,7 @@ export function SurveyResponseForm({
                       onChange={(value) => onAnswerChange(question.id, value)}
                       lang={lang}
                       disabled={isPreview}
-                      error={questionErrors[question.id] ?? null}
+                      error={questionError}
                     />
                   </div>
                 </div>
@@ -146,7 +154,7 @@ export function SurveyResponseForm({
         ))}
 
         {submitError && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-semibold">
+          <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
             {submitError}
           </div>
         )}

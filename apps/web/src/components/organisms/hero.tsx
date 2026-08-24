@@ -48,11 +48,11 @@ export function Hero() {
         </div>
       </div>
       {quickLinks.length > 0 ? (
-        <nav aria-label={lang === "en" ? "Quick links" : "빠른 링크"} className="absolute bottom-7 left-10 right-10 z-10 flex flex-wrap gap-x-4 gap-y-2 lg:left-14 lg:right-14">
+        <nav aria-label={lang === "en" ? "Quick links" : "빠른 링크"} className="absolute bottom-7 left-10 right-10 z-10 flex flex-wrap gap-2 lg:left-14 lg:right-14">
           {quickLinks.map((block) => {
             const text = resolveContentBlockText(block, lang);
             return block.linkUrl ? (
-              <a key={block.contentBlockId} href={block.linkUrl} className="inline-flex items-center gap-1 text-xs font-medium text-white/75 underline-offset-4 transition-colors hover:text-white hover:underline">
+              <a key={block.contentBlockId} href={block.linkUrl} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm transition-all hover:bg-white/20">
                 {text.title}
                 <ArrowUpRight aria-hidden="true" className="size-3" />
               </a>

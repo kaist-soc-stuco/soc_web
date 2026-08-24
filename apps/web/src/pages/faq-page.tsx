@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
+import { hasPermission } from "@soc/shared";
 import { useQuery } from "@tanstack/react-query";
 
 import { Header } from "@/components/organisms/header";
@@ -17,7 +18,10 @@ import {
 } from "@/components/ui/page-layout";
 import { useLanguage } from "@/hooks/use-language";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { getBoardWritePermissionBitFromMetadata } from "@/lib/board-metadata";
+import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 import {
   BoardCategoryNavigation,
   BoardDataControls,
@@ -28,18 +32,29 @@ export function FaqPage() {
   const { lang } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const { data: session } = useCurrentSession();
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  const { boards } = useBoardCatalog(apiClient);
+  const { boards, source: boardCatalogSource } = useBoardCatalog(apiClient);
+  const faqBoard = boards.find((board) => board.code === "FAQ");
+  const faqWritePermissionBit = faqBoard
+    ? getBoardWritePermissionBitFromMetadata(faqBoard, "FAQ")
+    : Number.MAX_SAFE_INTEGER;
+  const canWriteFaq =
+    boardCatalogSource === "server" &&
+    hasPersistedProfile(session ?? null) &&
+    (faqWritePermissionBit === 0 ||
+      hasPermission(session?.permission ?? 0, faqWritePermissionBit));
   const faqQuery = useQuery({
     queryKey: ["faq-articles"],
     queryFn: () => apiClient.getArticles("FAQ", { page: 1, limit: 100 }),
   });
   const items = faqQuery.data?.items ?? [];
   const filteredItems = useMemo(() => {
-    const query = searchQuery.trim().toLocaleLowerCase();
+    const query = deferredSearchQuery.trim().toLocaleLowerCase();
     if (!query) return items;
 
     return items.filter((item) =>
@@ -47,7 +62,7 @@ export function FaqPage() {
         .filter(Boolean)
         .some((value) => value!.toLocaleLowerCase().includes(query)),
     );
-  }, [items, searchQuery]);
+  }, [deferredSearchQuery, items]);
 
   return (
     <PageShell>
@@ -58,18 +73,19 @@ export function FaqPage() {
           titleId="faq-page-title"
         />
 
-        <BoardCategoryNavigation boards={boards} lang={lang} />
+        <BoardCategoryNavigation boards={boards} category="FAQ" lang={lang} />
 
         <PageContainer className="pb-8">
           <DataViewCard aria-label={lang === "ko" ? "FAQ 목록" : "FAQ list"}>
             <DataViewToolbar>
               <BoardDataControls
-                canWrite={false}
+                canWrite={canWriteFaq}
                 lang={lang}
                 onCurrentPageChange={() => undefined}
                 onSearchQueryChange={setSearchQuery}
                 searchQuery={searchQuery}
                 totalCount={filteredItems.length}
+                writeState={{ initialCategory: "FAQ" }}
               />
             </DataViewToolbar>
             <DataViewBody>
@@ -82,7 +98,15 @@ export function FaqPage() {
               ) : filteredItems.length === 0 ? (
                 <EmptyState
                   className="min-h-48 rounded-none border-0 bg-transparent"
-                  message={lang === "ko" ? "등록된 FAQ가 없습니다." : "No FAQ available."}
+                  message={
+                    deferredSearchQuery.trim()
+                      ? lang === "ko"
+                        ? "검색 결과가 없습니다."
+                        : "No search results."
+                      : lang === "ko"
+                        ? "등록된 FAQ가 없습니다."
+                        : "No FAQ available."
+                  }
                   minHeightClassName="min-h-48"
                 />
               ) : (
@@ -103,7 +127,7 @@ export function FaqPage() {
                           aria-expanded={isOpen}
                           aria-controls={answerId}
                           onClick={() => setOpenIndex(isOpen ? null : index)}
-                          className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-semibold text-slate-800 hover:bg-slate-50 sm:px-6"
+                          className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-medium text-slate-800 hover:bg-slate-50 sm:px-6"
                         >
                           <span className="min-w-0 truncate">{title}</span>
                           <ChevronDown

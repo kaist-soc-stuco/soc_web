@@ -1,16 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ContactRecord } from "@soc/contracts";
+import { Image } from "lucide-react";
 
 import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 export interface ExecutiveMemberFormValues {
   nameKo: string;
   nameEn: string;
+  departmentKo: string;
+  departmentEn: string;
   roleKo: string;
   roleEn: string;
+  avatarStorageKey: string | null;
   gender: string;
   cohort: number | null;
   email: string;
@@ -21,6 +26,7 @@ interface ExecutiveMemberModalProps {
   contact: ContactRecord | null;
   onClose: () => void;
   onDelete?: () => void | Promise<void>;
+  onUploadAvatar?: (file: File) => Promise<string>;
   onSave: (values: ExecutiveMemberFormValues) => Promise<void>;
   open: boolean;
   saving?: boolean;
@@ -30,8 +36,11 @@ function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormVal
   return {
     nameKo: contact?.nameKo ?? "",
     nameEn: contact?.nameEn ?? "",
+    departmentKo: contact?.departmentKo ?? "",
+    departmentEn: contact?.departmentEn ?? "",
     roleKo: contact?.roleKo ?? "",
     roleEn: contact?.roleEn ?? "",
+    avatarStorageKey: contact?.avatarStorageKey ?? null,
     gender: contact?.gender ?? "",
     cohort: contact?.cohort ?? null,
     email: contact?.email ?? "",
@@ -43,15 +52,22 @@ export function ExecutiveMemberModal({
   contact,
   onClose,
   onDelete,
+  onUploadAvatar,
   onSave,
   open,
   saving = false,
 }: ExecutiveMemberModalProps) {
   const [formData, setFormData] = useState<ExecutiveMemberFormValues>(() => getInitialValues(contact));
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const formId = "executive-member-form";
 
   useEffect(() => {
-    if (open) setFormData(getInitialValues(contact));
+    if (open) {
+      setFormData(getInitialValues(contact));
+      setAvatarError(null);
+    }
   }, [contact, open]);
 
   const updateField = <K extends keyof ExecutiveMemberFormValues>(
@@ -61,90 +77,112 @@ export function ExecutiveMemberModal({
     setFormData((current) => ({ ...current, [field]: value }));
   };
 
+  const handleAvatarChange = async (file: File | undefined) => {
+    if (!file || !onUploadAvatar) return;
+    setAvatarError(null);
+    setAvatarUploading(true);
+    try {
+      updateField("avatarStorageKey", await onUploadAvatar(file));
+    } catch {
+      setAvatarError("프로필 이미지를 업로드하지 못했습니다.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   return (
     <AdminDrawer
       open={open}
       onClose={onClose}
       title={contact ? "집행부원 정보 수정" : "새 집행부원 등록"}
       footer={
-        <>
-          {contact && onDelete ? <Button type="button" variant="outline" onClick={() => void onDelete()} disabled={saving} className="mr-auto border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700">삭제</Button> : null}
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-            취소
-          </Button>
-          <Button type="submit" form={formId} disabled={saving}>
-            {saving ? "저장 중..." : "저장"}
-          </Button>
-        </>
+        <div className="flex items-center justify-between gap-3">
+          {contact && onDelete ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void onDelete()}
+              disabled={saving || avatarUploading}
+              className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+            >
+              삭제
+            </Button>
+          ) : <span />}
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving || avatarUploading}>취소</Button>
+            <Button type="submit" form={formId} disabled={saving || avatarUploading}>{saving ? "저장 중..." : "저장"}</Button>
+          </div>
+        </div>
       }
     >
-      <form id={formId} onSubmit={(event) => { event.preventDefault(); void onSave(formData); }} className="scrollbar-hidden max-h-[70vh] space-y-5 overflow-y-auto">
+      <form
+        id={formId}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSave(formData);
+        }}
+        className="scrollbar-hidden max-h-[70vh] space-y-5 overflow-y-auto"
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <AdminFormField label="이름 (한글) *">
-            <UiInput
-              required
-              value={formData.nameKo}
-              onChange={(event) => updateField("nameKo", event.currentTarget.value)}
-              placeholder="홍길동"
-            />
+            <UiInput required value={formData.nameKo} onChange={(event) => updateField("nameKo", event.currentTarget.value)} placeholder="예: 김성찬" />
           </AdminFormField>
           <AdminFormField label="이름 (영문) *">
-            <UiInput
-              required
-              value={formData.nameEn}
-              onChange={(event) => updateField("nameEn", event.currentTarget.value)}
-              placeholder="Gildong Hong"
-            />
+            <UiInput required value={formData.nameEn} onChange={(event) => updateField("nameEn", event.currentTarget.value)} placeholder="예: Seongchan Kim" />
+          </AdminFormField>
+          <AdminFormField label="부서 (한글)">
+            <UiInput value={formData.departmentKo} onChange={(event) => updateField("departmentKo", event.currentTarget.value)} placeholder="예: 회장단" />
+          </AdminFormField>
+          <AdminFormField label="부서 (영문)">
+            <UiInput value={formData.departmentEn} onChange={(event) => updateField("departmentEn", event.currentTarget.value)} placeholder="예: Presidium" />
           </AdminFormField>
           <AdminFormField label="직책 (한글) *">
-            <UiInput
-              required
-              value={formData.roleKo}
-              onChange={(event) => updateField("roleKo", event.currentTarget.value)}
-              placeholder="회장, 기획부장 등"
-            />
+            <UiInput required value={formData.roleKo} onChange={(event) => updateField("roleKo", event.currentTarget.value)} placeholder="예: 회장" />
           </AdminFormField>
           <AdminFormField label="직책 (영문) *">
-            <UiInput
-              required
-              value={formData.roleEn}
-              onChange={(event) => updateField("roleEn", event.currentTarget.value)}
-              placeholder="President, Head of Planning"
-            />
+            <UiInput required value={formData.roleEn} onChange={(event) => updateField("roleEn", event.currentTarget.value)} placeholder="예: President" />
           </AdminFormField>
+        </div>
+
+        <div className="flex items-center gap-3 border-t border-slate-100 pt-5">
+          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-slate-400">
+            {formData.avatarStorageKey ? (
+              <img src={resolveAssetUrl(formData.avatarStorageKey)} alt="" className="size-full object-cover" />
+            ) : <Image aria-hidden="true" className="size-5" />}
+          </div>
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={() => avatarInputRef.current?.click()} disabled={!onUploadAvatar || avatarUploading}>
+                {avatarUploading ? "업로드 중..." : "프로필 이미지 선택"}
+              </Button>
+              <UiInput
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(event) => {
+                  void handleAvatarChange(event.currentTarget.files?.[0]);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </div>
+            <p className="text-xs text-slate-500">JPG, PNG, WebP, GIF 이미지를 선택할 수 있습니다.</p>
+            {avatarError ? <p className="text-xs font-medium text-rose-600">{avatarError}</p> : null}
+          </div>
         </div>
 
         <div className="grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
           <AdminFormField label="이메일">
-            <UiInput
-              type="email"
-              value={formData.email}
-              onChange={(event) => updateField("email", event.currentTarget.value)}
-              placeholder="email@kaist.ac.kr"
-            />
+            <UiInput type="email" value={formData.email} onChange={(event) => updateField("email", event.currentTarget.value)} placeholder="name@kaist.ac.kr" />
           </AdminFormField>
           <AdminFormField label="전화번호">
-            <UiInput
-              value={formData.phoneNumber}
-              onChange={(event) => updateField("phoneNumber", event.currentTarget.value)}
-              placeholder="010-XXXX-XXXX"
-            />
+            <UiInput value={formData.phoneNumber} onChange={(event) => updateField("phoneNumber", event.currentTarget.value)} placeholder="010-0000-0000" />
           </AdminFormField>
           <AdminFormField label="성별">
-            <UiInput
-              value={formData.gender}
-              onChange={(event) => updateField("gender", event.currentTarget.value)}
-              placeholder="선택 입력"
-            />
+            <UiInput value={formData.gender} onChange={(event) => updateField("gender", event.currentTarget.value)} placeholder="예: 여성" />
           </AdminFormField>
           <AdminFormField label="기수">
-            <UiInput
-              type="number"
-              min="1"
-              value={formData.cohort ?? ""}
-              onChange={(event) => updateField("cohort", event.currentTarget.value ? Number(event.currentTarget.value) : null)}
-              placeholder="예: 26"
-            />
+            <UiInput type="number" min="1" value={formData.cohort ?? ""} onChange={(event) => updateField("cohort", event.currentTarget.value ? Number(event.currentTarget.value) : null)} placeholder="예: 26" />
           </AdminFormField>
         </div>
 

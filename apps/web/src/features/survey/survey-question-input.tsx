@@ -47,7 +47,7 @@ export function SurveyQuestionInput({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const base =
     "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20";
-  const controlClass = `${base}${error ? " border-rose-500 ring-2 ring-rose-500/20" : ""}`;
+  const controlClass = base;
   const renderError = error ? (
     <p className="mt-1 text-xs font-normal text-rose-600" role="alert">
       {error}
@@ -124,7 +124,7 @@ export function SurveyQuestionInput({
         );
       }
       return (
-        <div className={error ? "rounded-xl border border-rose-500 p-2 ring-2 ring-rose-500/20" : ""}>
+        <div>
           <div className="flex flex-col gap-2.5">
           {question.options?.map((opt) => {
             const isSelected = value === opt.value;
@@ -170,7 +170,7 @@ export function SurveyQuestionInput({
 
     case "multiple_choice":
       return (
-        <div className={error ? "rounded-xl border border-rose-500 p-2 ring-2 ring-rose-500/20" : ""}>
+        <div>
           <div className="flex flex-col gap-2.5">
           {question.options?.map((opt) => {
             const selected = (value as string[]).includes(opt.value);
@@ -247,7 +247,7 @@ export function SurveyQuestionInput({
       };
 
       return (
-        <div className={error ? "overflow-x-auto rounded-xl border border-rose-500 p-1 ring-2 ring-rose-500/20" : "overflow-x-auto rounded-xl border border-slate-200"}>
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="min-w-full table-fixed border-collapse text-sm">
             <thead className="bg-slate-50 text-xs font-bold text-slate-500">
               <tr>
@@ -321,7 +321,7 @@ export function SurveyQuestionInput({
         }
       };
       return (
-        <div className={`space-y-2 rounded-xl border border-dashed bg-slate-50/70 p-4 ${error ? "border-rose-500 ring-2 ring-rose-500/20" : "border-slate-300"}`}>
+        <div className="space-y-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4">
           <UiInput
             type="file"
             accept={accept}

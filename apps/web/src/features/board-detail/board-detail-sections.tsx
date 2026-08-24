@@ -17,9 +17,7 @@ import {
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
-import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { Button } from "@/components/ui/button";
-import { Breadcrumbs } from "@/components/ui/page-layout";
 
 function formatDate(isoString: string) {
   const date = isoToDate(isoString);
@@ -38,7 +36,6 @@ interface ArticleCardProps {
   attachmentAssets: ArticleAssetItem[];
   canManageArticle: boolean;
   category: string;
-  categoryLabel: string;
   content: string;
   editHref?: string;
   isAuthenticated: boolean;
@@ -59,7 +56,6 @@ export function BoardDetailArticleCard({
   attachmentAssets,
   canManageArticle,
   category,
-  categoryLabel,
   content,
   editHref,
   isAuthenticated,
@@ -77,10 +73,7 @@ export function BoardDetailArticleCard({
   return (
     <article className="w-full rounded-xl border border-card-border-subtle bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]">
       <header>
-        <span className="inline-flex rounded-md bg-brand-primary-light px-2 py-1 text-xs font-bold text-brand-primary">
-          {categoryLabel}
-        </span>
-        <h1 className="mt-3 text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
+        <h1 className="text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
           {title}
         </h1>
         <div className="mt-3 flex items-center justify-between gap-3">
@@ -255,30 +248,6 @@ export function BoardDetailArticleCard({
         </Button>
       </div>
     </article>
-  );
-}
-
-export function BoardDetailBreadcrumb({
-  category,
-  displayBoardLabel,
-  lang,
-  publicBasePath,
-}: {
-  category: string;
-  displayBoardLabel: string;
-  lang: string;
-  publicBasePath?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 select-none">
-      <Breadcrumbs
-        breadcrumbs={[
-          ...(publicBasePath ? [] : [{ label: lang === "ko" ? "게시판" : "Board", to: "/board" }]),
-          { label: displayBoardLabel, to: publicBasePath ?? `/board/${category}` },
-        ]}
-        homeLabel={lang === "ko" ? "홈" : "Home"}
-      />
-    </div>
   );
 }
 

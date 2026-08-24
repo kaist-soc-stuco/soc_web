@@ -128,7 +128,7 @@ export function EngagementActionButton({
       ) : (
         icon
       )}
-      {count !== null ? <span className="tabular-nums">{count}</span> : null}
+      {count !== null ? <span className="tabular-nums text-black">{count}</span> : null}
     </Button>
   );
 }

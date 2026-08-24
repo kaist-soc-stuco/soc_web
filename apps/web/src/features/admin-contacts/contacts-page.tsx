@@ -64,7 +64,7 @@ function ContactsPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
@@ -106,15 +106,15 @@ function ContactsPageContent() {
     [contacts],
   );
   const departmentOptions = useMemo(
-    () => Array.from(new Set(contacts.map((contact) => contact.roleKo.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")),
+    () => Array.from(new Set(contacts.map((contact) => contact.departmentKo?.trim()).filter((department): department is string => Boolean(department)))).sort((a, b) => a.localeCompare(b, "ko")),
     [contacts],
   );
   const filteredContacts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return contacts.filter((contact) => {
-      const matchesQuery = !normalizedQuery || [contact.nameKo, contact.nameEn, contact.roleKo, contact.roleEn, contact.email ?? "", contact.phoneNumber ?? ""].some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
+      const matchesQuery = !normalizedQuery || [contact.nameKo, contact.nameEn, contact.departmentKo ?? "", contact.departmentEn ?? "", contact.roleKo, contact.roleEn, contact.email ?? "", contact.phoneNumber ?? ""].some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
       const matchesCohort = !cohortFilter || String(contact.cohort ?? "") === cohortFilter;
-      const matchesDepartment = !departmentFilter || contact.roleKo === departmentFilter;
+      const matchesDepartment = !departmentFilter || contact.departmentKo === departmentFilter;
       return matchesQuery && matchesCohort && matchesDepartment;
     });
   }, [cohortFilter, contacts, departmentFilter, query]);
@@ -191,8 +191,8 @@ function ContactsPageContent() {
   const downloadContactTemplate = () => {
     const worksheet = XLSX.utils.aoa_to_sheet(CONTACT_XLSX_TEMPLATE_ROWS.map((row) => [...row]));
     worksheet["!cols"] = [
-      { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 22 }, { wch: 10 },
-      { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
+      { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 22 },
+      { wch: 10 }, { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
@@ -228,8 +228,11 @@ function ContactsPageContent() {
     const payload: CreateContactRequest = {
       nameKo: values.nameKo.trim(),
       nameEn: values.nameEn.trim(),
+      departmentKo: values.departmentKo.trim() || null,
+      departmentEn: values.departmentEn.trim() || null,
       roleKo: values.roleKo.trim(),
       roleEn: values.roleEn.trim(),
+      avatarStorageKey: values.avatarStorageKey,
       gender: values.gender.trim() || null,
       cohort: values.cohort,
       email: values.email.trim(),
@@ -285,7 +288,7 @@ function ContactsPageContent() {
         <UiInput ref={bulkFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleBulkFileChange(event)} />
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
 
-        <ExecutiveMemberModal open={memberModalOpen} contact={editingContact} onClose={closeMemberModal} onDelete={editingContact ? async () => { if (await handleDelete(editingContact.id)) closeMemberModal(); } : undefined} onSave={handleMemberSave} saving={memberSaving} />
+        <ExecutiveMemberModal open={memberModalOpen} contact={editingContact} onClose={closeMemberModal} onDelete={editingContact ? async () => { if (await handleDelete(editingContact.id)) closeMemberModal(); } : undefined} onUploadAvatar={async (file) => (await apiClient.uploadAsset(file)).storageKey} onSave={handleMemberSave} saving={memberSaving} />
         <Modal
           open={bulkFileName !== null}
           onClose={() => clearBulkImport()}
@@ -325,21 +328,21 @@ function SortableContactRow({ contact, disabled, onEdit }: { contact: ContactRec
   const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
   const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease", willChange: isDragging ? "transform" : undefined };
   return <tr ref={setNodeRef} style={style} className={isDragging ? "relative z-10 opacity-0" : "cursor-pointer transition-colors hover:bg-slate-50/60"} onClick={() => onEdit(contact)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEdit(contact); } }} tabIndex={0}>
-    <AdminTableCell className="px-2 py-2.5 text-center"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="inline-flex size-8 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
+    <AdminTableCell className="px-2 py-2.5 text-center"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="flex size-7 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
     <AdminTableCell className="px-5 py-2.5"><div className="min-w-0"><div className="admin-table-text-emphasis max-w-[240px] truncate" title={contact.nameKo}>{contact.nameKo}</div><div className="admin-table-text mt-0.5 max-w-[240px] truncate" title={contact.nameEn}>{contact.nameEn}</div></div></AdminTableCell>
     <AdminTableCell className="px-5 py-2.5 tabular-nums text-slate-700">{contact.cohort ? `${contact.cohort}기` : "—"}</AdminTableCell>
-    <AdminTableCell className="px-5 py-2.5"><div className="max-w-[220px] truncate" title={contact.roleKo}>{contact.roleKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.roleEn}>{contact.roleEn}</div></AdminTableCell>
+    <AdminTableCell className="px-5 py-2.5"><div className="admin-table-text max-w-[220px] truncate" title={contact.departmentKo ?? undefined}>{contact.departmentKo || "부서 미지정"}</div><div className="mt-0.5 max-w-[220px] truncate text-sm font-medium text-slate-700" title={contact.roleKo}>{contact.roleKo}</div><div className="admin-table-text mt-0.5 max-w-[220px] truncate" title={contact.roleEn}>{contact.roleEn}</div></AdminTableCell>
     <AdminTableCell className="min-w-0 space-y-1 px-5 py-2.5"><div className="admin-table-text flex items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[220px] truncate" title={contact.email ?? undefined}>{contact.email || "—"}</span></div><div className="admin-table-text flex items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="max-w-[180px] truncate" title={contact.phoneNumber ?? undefined}>{contact.phoneNumber || "—"}</span></div></AdminTableCell>
   </tr>;
 }
 
 function ContactDragPreview({ contact, width }: { contact: ContactRecord; width: number | null }) {
   return (
-    <div style={{ width: width ?? "min(980px, calc(100vw - 2rem))", gridTemplateColumns: "52px 300px 100px 240px minmax(0, 320px)" }} className="grid items-center rounded-lg border border-brand-primary/35 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.18)]">
+    <div style={{ width: width ?? undefined, gridTemplateColumns: "52px 300px 100px 240px minmax(0, 320px)" }} className="relative z-50 grid cursor-grabbing items-center rounded-lg border border-brand-primary/45 bg-white shadow-lg">
       <div className="flex h-16 items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
       <div className="min-w-0 px-5"><p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p><p className="truncate text-xs text-slate-500">{contact.nameEn}</p></div>
       <div className="px-5 text-sm tabular-nums text-slate-700">{contact.cohort ? `${contact.cohort}기` : "—"}</div>
-      <div className="min-w-0 px-5"><p className="truncate text-sm text-slate-700">{contact.roleKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{contact.roleEn}</p></div>
+      <div className="min-w-0 px-5"><p className="truncate text-xs text-slate-500">{contact.departmentKo || "부서 미지정"}</p><p className="truncate text-sm text-slate-700">{contact.roleKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{contact.roleEn}</p></div>
       <div className="min-w-0 space-y-1 px-5 text-xs text-slate-500"><p className="truncate">{contact.email || "—"}</p><p className="truncate">{contact.phoneNumber || "—"}</p></div>
     </div>
   );

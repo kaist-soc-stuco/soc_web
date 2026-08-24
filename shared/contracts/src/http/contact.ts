@@ -10,8 +10,11 @@ export interface ContactRecord {
   id: string;
   nameKo: string;
   nameEn: string;
+  departmentKo: string | null;
+  departmentEn: string | null;
   roleKo: string;
   roleEn: string;
+  avatarStorageKey: string | null;
   gender: string | null;
   cohort: number | null;
   email: string | null;

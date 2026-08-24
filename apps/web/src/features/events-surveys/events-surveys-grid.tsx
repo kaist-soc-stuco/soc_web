@@ -167,9 +167,7 @@ export function EventsSurveysGrid({
         return (
           <div
             key={item.id}
-            className={`interaction-card group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${
-              item.kind === "SURVEY" ? "min-h-[22rem]" : ""
-            } ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
+            className={`interaction-card group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
           >
             {item.kind === "EVENT" ? (
               <Link
@@ -195,7 +193,7 @@ export function EventsSurveysGrid({
               </Link>
             ) : null}
 
-            <div className="flex min-h-0 flex-1 flex-col p-4">
+            <div className={`flex min-h-0 flex-1 flex-col ${item.kind === "SURVEY" ? "p-5" : "p-4"}`}>
               <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                 <Link
                   aria-label={title}
@@ -207,11 +205,11 @@ export function EventsSurveysGrid({
                       {eyebrow}
                     </p>
                   ) : null}
-                  <h3 className="mt-1 line-clamp-2 text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong">
+                  <h3 className={`${item.kind === "SURVEY" ? "mt-2.5" : "mt-1"} line-clamp-2 text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong`}>
                     {title}
                   </h3>
                   {desc ? (
-                    <p className="mt-1.5 line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body">
+                    <p className={`${item.kind === "SURVEY" ? "mt-2.5" : "mt-1.5"} line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body`}>
                       {desc}
                     </p>
                   ) : null}
@@ -239,7 +237,7 @@ export function EventsSurveysGrid({
               <Link
                 aria-label={`${title} ${getCardPeriodText(item, lang)}`}
                 to={href}
-                className="mt-auto flex items-center gap-1.5 pt-4 text-xs font-normal text-slate-700"
+                className={`mt-auto flex items-center gap-1.5 text-xs font-normal text-slate-700 ${item.kind === "SURVEY" ? "pt-5" : "pt-4"}`}
               >
                 <Clock className="h-3.5 w-3.5 shrink-0 text-slate-600" />
                 <span className="truncate">{getCardPeriodText(item, lang)}</span>

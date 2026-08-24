@@ -1,9 +1,12 @@
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import type { SurveyRecord } from "@soc/contracts";
 import {
+  ArrowLeft,
   Check,
+  FileText,
   Image,
   Loader2,
+  Music2,
   Video,
   X,
 } from "lucide-react";
@@ -40,6 +43,13 @@ function formatFileSize(sizeBytes: number) {
     return `${Math.round(sizeBytes / 1024)}KB`;
   }
   return `${sizeBytes}B`;
+}
+
+function getAttachmentIcon(mimeType: string) {
+  if (mimeType.startsWith("image/")) return Image;
+  if (mimeType.startsWith("video/")) return Video;
+  if (mimeType.startsWith("audio/")) return Music2;
+  return FileText;
 }
 
 interface HeaderControlsProps {
@@ -451,18 +461,13 @@ export function BoardWriteAttachmentList({
     (asset) => asset.usageType !== "THUMBNAIL",
   );
 
-  if (attachmentAssets.length === 0) {
+  if (attachmentAssets.length === 0 && !uploading) {
     return null;
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-xs font-bold text-slate-800">
-          {lang === "ko"
-            ? `첨부파일 ${attachmentAssets.length}`
-            : `${attachmentAssets.length} attachments`}
-        </h3>
+    <div className="border-t border-slate-200 pt-4">
+      <div className="mb-2 flex min-h-5 items-center justify-end">
         {uploading && (
           <span className="inline-flex items-center gap-1 text-[length:var(--ui-text-caption-size)] font-bold text-kaist-darkgreen">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -470,31 +475,40 @@ export function BoardWriteAttachmentList({
           </span>
         )}
       </div>
-      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {attachmentAssets.map((asset) => (
-          <div
-            key={asset.assetId}
-            className="flex items-center justify-between gap-3 px-4 py-2.5"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-slate-700">
-                {asset.originalFilename}
-              </p>
-              <p className="mt-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-slate-400">
-                {asset.usageType === "IMAGE" ? "IMAGE" : "FILE"} ·{" "}
-                {formatFileSize(asset.sizeBytes)}
-              </p>
-            </div>
-            <Button variant="ghost"
-              type="button"
-              onClick={() => onRemoveAsset(asset.assetId)}
-              className="rounded-lg p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 border-0 bg-transparent cursor-pointer"
-              title={lang === "ko" ? "첨부 제거" : "Remove attachment"}
+      <div className="space-y-1.5">
+        {attachmentAssets.map((asset) => {
+          const AttachmentIcon = getAttachmentIcon(asset.mimeType);
+
+          return (
+            <div
+              key={asset.assetId}
+              className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"
             >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ))}
+              <div className="flex min-w-0 items-center gap-2">
+                <AttachmentIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-slate-500"
+                />
+                <span className="truncate text-xs font-medium text-slate-700">
+                  {asset.originalFilename}
+                </span>
+                <span className="shrink-0 text-[length:var(--ui-text-caption-size)] font-normal text-slate-500">
+                  ({formatFileSize(asset.sizeBytes)})
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                onClick={() => onRemoveAsset(asset.assetId)}
+                className="size-7 shrink-0 rounded-md p-0 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                title={lang === "ko" ? "첨부 제거" : "Remove attachment"}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -542,7 +556,7 @@ export function BoardWriteSettings({
   return (
     <div className="space-y-4 border-t border-slate-200 px-6 py-5 md:px-8">
       <div
-        className={`grid grid-cols-1 items-start gap-x-8 gap-y-4 ${
+        className={`grid grid-cols-1 items-center gap-x-8 gap-y-4 ${
           stacked ? "" : "md:grid-cols-2"
         }`}
       >
@@ -578,9 +592,7 @@ export function BoardWriteSettings({
 
         {/* Visibility Options */}
         <div
-          className={`w-full space-y-3 ${
-            canConfigurePostSettings && !stacked ? "md:pt-[24px]" : ""
-          }`}
+          className="w-full self-center space-y-3"
         >
           <div
             className={
@@ -700,6 +712,7 @@ interface BoardWriteFooterProps {
   isSubmitting: boolean;
   canWriteSelected?: boolean;
   compact?: boolean;
+  leadingActions?: ReactNode;
   onCancel?: () => void;
   onSubmit: () => void;
   submitLabel?: string;
@@ -711,6 +724,7 @@ export function BoardWriteFooter({
   isSubmitting,
   canWriteSelected = true,
   compact = false,
+  leadingActions,
   onCancel,
   onSubmit,
   submitLabel,
@@ -729,10 +743,12 @@ export function BoardWriteFooter({
           disabled={isSubmitting}
           className="h-[var(--ui-control-height)] !font-medium text-slate-600"
         >
+          <ArrowLeft aria-hidden="true" className="size-4" />
           {lang === "ko" ? "취소" : "Cancel"}
         </Button>
       ) : null}
       <div className="flex items-center gap-2">
+        {leadingActions}
         <Button
           type="button"
           onClick={onSubmit}

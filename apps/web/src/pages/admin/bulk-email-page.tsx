@@ -632,7 +632,8 @@ function BulkEmailPageContent() {
   return (
     <AdminPageShell className="email-composer-page min-h-screen !bg-slate-50">
       <main className="w-full px-5 pb-16 md:px-8">
-        <header className="email-composer-header mx-auto mt-6 flex w-full max-w-5xl items-center justify-end gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="email-composer-shell mx-auto mt-6 w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <header className="email-composer-header flex items-center justify-end gap-4 border-b border-slate-100 bg-white p-4 md:p-5">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={openHistory}>
               <History aria-hidden="true" />
@@ -657,18 +658,18 @@ function BulkEmailPageContent() {
         </header>
 
         {operationError ? (
-          <div className="mx-auto mt-4 w-full max-w-5xl rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700" role="alert">
+          <div className="mx-4 mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700 md:mx-6" role="alert">
             {operationError}
           </div>
         ) : null}
         {statusNotice ? (
-          <div className="mx-auto mt-4 w-full max-w-5xl rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700" role="status">
+          <div className="mx-4 mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700 md:mx-6" role="status">
             {statusNotice}
           </div>
         ) : null}
 
-        <form id="bulk-email-compose" className="mx-auto mt-6 w-full max-w-5xl" onSubmit={(event) => void handleReview(event)}>
-          <div className="email-composer-canvas rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+        <form id="bulk-email-compose" className="w-full" onSubmit={(event) => void handleReview(event)}>
+          <div className="email-composer-canvas bg-white p-6 md:p-8">
             {draftRestored && draftSavedAt && draftNoticeVisible ? (
               <DraftRestoredBanner
                 className="mb-5"
@@ -836,6 +837,7 @@ function BulkEmailPageContent() {
           </section>
           </div>
         </form>
+        </div>
       </main>
 
       <Modal
