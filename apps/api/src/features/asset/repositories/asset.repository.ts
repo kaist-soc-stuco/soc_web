@@ -11,6 +11,7 @@ import {
   assets,
   boards,
   contentBlocks,
+  executiveContacts,
 } from "../../../infrastructure/postgres/postgres.schema";
 
 @Injectable()
@@ -91,6 +92,12 @@ export class AssetRepository {
       ))
       .limit(1);
 
+    const [publicContactAvatar] = await this.db
+      .select({ contactId: executiveContacts.id })
+      .from(executiveContacts)
+      .where(eq(executiveContacts.avatarStorageKey, `asset:${assetId}`))
+      .limit(1);
+
     return {
       assetId: String(asset.assetId),
       storageKey: asset.storageKey,
@@ -98,7 +105,7 @@ export class AssetRepository {
       mimeType: asset.mimeType,
       sizeBytes: asset.sizeBytes,
       uploadedBy: String(asset.uploadedBy),
-      publicContentImage: Boolean(publicContentImage),
+      publicContentImage: Boolean(publicContentImage || publicContactAvatar),
       links: links.map((link) => ({
         articleId: String(link.articleId),
         boardCode: link.boardCode,
@@ -246,10 +253,12 @@ export class AssetRepository {
       .from(assets)
       .leftJoin(articleAssets, eq(articleAssets.assetId, assets.assetId))
       .leftJoin(contentBlocks, eq(contentBlocks.imageUrl, sql`'asset:' || ${assets.assetId}::text`))
+      .leftJoin(executiveContacts, eq(executiveContacts.avatarStorageKey, sql`'asset:' || ${assets.assetId}::text`))
       .where(
         and(
           isNull(articleAssets.articleAssetId),
           isNull(contentBlocks.contentBlockId),
+          isNull(executiveContacts.id),
           lt(assets.createdAt, cutoff),
         ),
       )

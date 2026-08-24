@@ -5,7 +5,6 @@ import { CommentSection } from "@/components/ui/comment-section";
 import {
   BoardDetailArticleCard,
   BoardDetailBackLink,
-  BoardDetailBreadcrumb,
 } from "@/features/board-detail/board-detail-sections";
 import { useBoardDetailPageController } from "@/features/board-detail/use-board-detail-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
@@ -26,7 +25,6 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
     comments,
     commentsLoading,
     content,
-    displayBoardLabel,
     engagementSubmitting,
     handleCreateComment,
     handleCreateReply,
@@ -84,11 +82,10 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
 
       <main className="flex-1 w-full mx-auto pb-28">
         <div className="mx-auto max-w-[var(--ui-article-max-width)] px-6 lg:px-8 pt-6 pb-16 flex flex-col gap-3 w-full">
-          <BoardDetailBreadcrumb
+          <BoardDetailBackLink
             category={category}
-            displayBoardLabel={displayBoardLabel}
             lang={lang}
-            publicBasePath={publicBasePath}
+            to={publicBasePath}
           />
 
           <BoardDetailArticleCard
@@ -97,7 +94,6 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             canManageArticle={canManageArticle}
             editHref={publicBasePath ? `${publicBasePath}/${article.articleId}/edit` : undefined}
             category={category}
-            categoryLabel={displayBoardLabel}
             content={content}
             isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
             lang={lang}
@@ -138,11 +134,6 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             replyText={replyText}
           />
 
-          <BoardDetailBackLink
-            category={category}
-            lang={lang}
-            to={publicBasePath}
-          />
         </div>
       </main>
 

@@ -557,7 +557,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               {dropdownOpen && (
                 <PopoverPanel className="right-0 top-full w-52">
                   <div className="border-b border-slate-100 px-3.5 py-3">
-                    <p className="min-w-0 truncate text-[length:var(--ui-text-body-sm-size)] font-semibold text-slate-900">
+                    <p className="min-w-0 truncate text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-900">
                       {user.name}
                     </p>
                   </div>

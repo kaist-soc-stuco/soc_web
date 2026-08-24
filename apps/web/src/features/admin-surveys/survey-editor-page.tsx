@@ -887,7 +887,7 @@ export function SurveyEditorPage() {
                 onClick={() => navigate("/admin/surveys")}
                 className="inline-flex items-center gap-1 text-[length:var(--ui-text-caption-size)] font-semibold text-slate-500 transition-colors hover:text-brand-primary"
               >
-                <ArrowLeft className="size-3.5" /> 설문조사 관리
+                <ArrowLeft className="size-3.5" /> 목록으로
               </button>
             }
             title={form.watch("titleKo").trim() || (isEdit ? "설문조사 편집" : "새 설문조사")}

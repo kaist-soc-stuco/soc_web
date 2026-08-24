@@ -8,7 +8,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { X } from "lucide-react";
+import {
+  CheckCircle2,
+  CircleAlert,
+  Info,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+
+export type ToastType = "success" | "error" | "warning" | "info";
 
 type ToastAction = {
   label: string;
@@ -19,6 +27,7 @@ type ToastOptions = {
   message: string;
   action?: ToastAction;
   duration?: number;
+  type?: ToastType;
 };
 
 type ToastItem = ToastOptions & {
@@ -80,6 +89,23 @@ function ToastCard({
   onDismiss: (id: string) => void;
 }) {
   const [isLeaving, setIsLeaving] = useState(false);
+  const toastType = item.type ?? "info";
+  const Icon =
+    toastType === "success"
+      ? CheckCircle2
+      : toastType === "error"
+        ? CircleAlert
+        : toastType === "warning"
+          ? TriangleAlert
+          : Info;
+  const iconClassName =
+    toastType === "success"
+      ? "text-emerald-300"
+      : toastType === "error"
+        ? "text-rose-300"
+        : toastType === "warning"
+          ? "text-amber-300"
+          : "text-sky-300";
 
   const requestDismiss = useCallback(() => {
     if (isLeaving) return;
@@ -100,6 +126,7 @@ function ToastCard({
       role="status"
       className={`pointer-events-auto inline-flex max-w-full items-center gap-3 rounded-lg border border-slate-800/10 bg-slate-900 px-3.5 py-2.5 text-[length:var(--ui-text-body-sm-size)] font-medium leading-5 text-white shadow-[0_10px_28px_rgba(15,23,42,0.18)] ${isLeaving ? "toast-exit" : "toast-enter"}`}
     >
+      <Icon aria-hidden="true" className={`size-4 shrink-0 ${iconClassName}`} />
       <span className="min-w-0">{item.message}</span>
       {item.action ? (
         <button

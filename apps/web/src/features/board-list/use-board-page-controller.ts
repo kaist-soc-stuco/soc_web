@@ -177,6 +177,7 @@ export function useBoardPageController() {
   ) => {
     if (!session?.canUsePersistentFeatures) {
       toast({
+        type: "info",
         message:
           lang === "ko"
             ? "로그인이 필요한 기능입니다."

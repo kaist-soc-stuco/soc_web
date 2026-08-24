@@ -214,6 +214,7 @@ function ToolbarButton({
       aria-haspopup={hasPopup}
       title={label}
       disabled={disabled}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       className={cn(
         "size-8 rounded-md text-slate-500",
@@ -274,7 +275,7 @@ function ColorPopover({
       ref={popoverRef}
       role="dialog"
       aria-label={label}
-      className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
+      className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
     >
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold text-slate-700">{label}</span>
@@ -320,7 +321,7 @@ function ColorPopover({
         ))}
       </div>
       <div className="my-3 h-px bg-slate-100" aria-hidden="true" />
-      <div className="flex items-center gap-2">
+      <div className="flex items-center">
         <input
           aria-label={`${label} HEX 코드`}
           value={hexValue}
@@ -340,14 +341,6 @@ function ColorPopover({
             error ? "border-rose-400" : "border-slate-200",
           )}
         />
-        <Button
-          type="button"
-          size="sm"
-          onClick={applyHex}
-          className="h-8 rounded-md bg-brand-primary px-2.5 text-xs text-white hover:bg-brand-primary/90"
-        >
-          적용
-        </Button>
       </div>
     </div>
   );

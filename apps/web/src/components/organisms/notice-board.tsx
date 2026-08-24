@@ -18,9 +18,9 @@ interface NoticeItemProps {
   author: string;
   title: string;
   date: string;
+  commentCount?: number;
   isImportant?: boolean;
   isNew?: boolean;
-  count?: number;
   showGroupDivider?: boolean;
   showCategoryBadge?: boolean;
 }
@@ -33,6 +33,7 @@ function NoticeItem({
   author,
   title,
   date,
+  commentCount,
   isImportant,
   isNew,
   showGroupDivider,
@@ -58,6 +59,18 @@ function NoticeItem({
             }`}
           >
             <span className="min-w-0 truncate">{title}</span>
+            {commentCount && commentCount > 0 ? (
+              <span
+                aria-label={
+                  lang === "ko"
+                    ? `댓글 ${commentCount}개`
+                    : `${commentCount} comments`
+                }
+                className="shrink-0 self-end text-xs font-normal leading-4 text-[#1769AA]"
+              >
+                [{commentCount}]
+              </span>
+            ) : null}
             {isNew ? (
               <span
                 className="h-[5px] w-[5px] shrink-0 rounded-full bg-rose-500"
@@ -174,7 +187,7 @@ export function NoticeBoard() {
             }
             return isoToMs(b.postedAt) - isoToMs(a.postedAt);
           })
-          .map((item, idx) => ({
+          .map((item) => ({
             id: item.articleId,
             category: activeCategory,
             categoryLabel: getCategoryLabel(activeCategory),
@@ -193,10 +206,7 @@ export function NoticeBoard() {
               }
               return isoToMs(item.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
             })(),
-            count:
-              activeCategory === "공지"
-                ? [12, 8, 3, 5, 2, 1, 4, 6, 3, 2, 1, 1][idx]
-                : undefined,
+            commentCount: item.commentCount,
         }));
         if (active) {
           setNotices((prev) => ({ ...prev, [activeNoticeKey]: items }));

@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import type { KoreanHolidayRecord } from "@soc/contracts";
 import { ChevronRight, EyeOff, MoreHorizontal, Pencil } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
-import { getKoreanHolidayName } from "@/lib/korean-holidays";
 import { formatNumericDate } from "@/lib/date-display";
 import { stripCalendarPrefix, type CalendarEvent } from "@/lib/events-surveys";
 import { getCalendarEventStyles } from "./events-surveys-calendar-utils";
@@ -21,14 +19,12 @@ interface EventsSurveysDayDetailsProps {
   events: CalendarEvent[];
   lang: Language;
   selectedDateStr: string;
-  selectedHoliday?: KoreanHolidayRecord;
 }
 
 export function EventsSurveysDayDetails({
   events,
   lang,
   selectedDateStr,
-  selectedHoliday,
 }: EventsSurveysDayDetailsProps) {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const queryClient = useQueryClient();
@@ -83,11 +79,11 @@ export function EventsSurveysDayDetails({
         queryClient.invalidateQueries({ queryKey: ["admin", "calendar-events"] }),
       ]);
       if (notify) {
-        toast({ message: successMessage ?? (input.isHiddenByAdmin ? "일정을 숨겼습니다." : "일정 분류를 변경했습니다.") });
+        toast({ type: "success", message: successMessage ?? (input.isHiddenByAdmin ? "일정을 숨겼습니다." : "일정 분류를 변경했습니다.") });
       }
       return true;
     } catch {
-      toast({ message: "일정 설정을 변경하지 못했습니다." });
+      toast({ type: "error", message: "일정 설정을 변경하지 못했습니다." });
       return false;
     }
   };
@@ -102,6 +98,7 @@ export function EventsSurveysDayDetails({
     );
     if (!updated) return;
     toast({
+      type: "success",
       message: `${title} 일정이 숨겨졌습니다.`,
       action: {
         label: "실행 취소",
@@ -120,18 +117,13 @@ export function EventsSurveysDayDetails({
     <>
       <aside className="sticky top-24 flex h-full min-h-[500px] flex-col rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:col-span-1">
       <div className="shrink-0 border-b border-slate-100 pb-4 select-none">
-        <h3 className="text-lg font-bold text-slate-800">{selectedDateStr}</h3>
+        <h3 className="text-lg font-semibold text-slate-800">{selectedDateStr}</h3>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           <p className="text-sm font-medium text-slate-400">
             {lang === "ko"
               ? `${events.length}개의 일정`
               : `${events.length} event${events.length === 1 ? "" : "s"}`}
           </p>
-          {selectedHoliday && (
-            <span className="text-xs font-medium text-rose-300">
-              {getKoreanHolidayName(selectedHoliday.dateName, lang)}
-            </span>
-          )}
         </div>
       </div>
 
@@ -168,7 +160,7 @@ export function EventsSurveysDayDetails({
                     aria-hidden="true"
                   />
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-[length:var(--ui-text-body-sm-size)] font-semibold leading-[1.125rem] text-slate-800">
+                    <h4 className="text-[length:var(--ui-text-body-sm-size)] font-medium leading-[1.125rem] text-slate-800">
                       {shortTitle}
                     </h4>
                     {event.description && (

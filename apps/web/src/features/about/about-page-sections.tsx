@@ -325,7 +325,7 @@ function MembersSection({
       </h2>
       <p className="-mt-4 text-sm text-kaist-grey">
         {lang === "ko"
-          ? "이번 학기 KAIST 전산학부 발전을 위해 활동하고 있는 집행위원회 집행위원회 명단입니다."
+          ? "이번 학기 KAIST 전산학부 발전을 위해 활동하고 있는 집행위원회 명단입니다."
           : "Members of the student council executive committee working for School of Computing."}
       </p>
 
@@ -338,10 +338,25 @@ function MembersSection({
           {lang === "ko" ? "등록된 구성원이 없습니다." : "No members registered."}
         </MembersStatus>
       ) : (
-        <div className="grid grid-cols-1 gap-6 pt-4 md:grid-cols-2">
-          {contacts.map((contact) => (
-            <MemberCard contact={contact} key={contact.id} lang={lang} />
-          ))}
+        <div className="space-y-10 pt-4">
+          {Array.from(
+            contacts.reduce((groups, contact) => {
+              const groupName = (lang === "ko" ? contact.departmentKo : contact.departmentEn)?.trim() ?? "";
+              const group = groups.get(groupName) ?? [];
+              group.push(contact);
+              groups.set(groupName, group);
+              return groups;
+            }, new Map<string, ContactRecord[]>()),
+          )
+            .sort(([, firstMembers], [, secondMembers]) => (firstMembers[0]?.sortOrder ?? 0) - (secondMembers[0]?.sortOrder ?? 0))
+            .map(([groupName, groupMembers]) => (
+              <section key={groupName || "ungrouped"} className="space-y-4">
+                {groupName ? <h3 className="text-base font-semibold text-slate-800">{groupName}</h3> : null}
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                  {groupMembers.map((contact) => <MemberCard contact={contact} key={contact.id} lang={lang} />)}
+                </div>
+              </section>
+            ))}
         </div>
       )}
     </div>
@@ -367,15 +382,17 @@ function MemberCard({
   const role = lang === "ko" ? contact.roleKo : contact.roleEn;
 
   return (
-    <div className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-slate-50/50 p-6 transition-all hover:bg-slate-50 hover:shadow-xs">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-kaist-lightgreen/20 text-kaist-darkgreen">
-        <User className="h-6 w-6" />
+    <div className="flex min-h-56 flex-col rounded-2xl border border-slate-200 bg-white p-5 transition-[background-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:bg-slate-50/60 hover:shadow-xs">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-kaist-lightgreen/20 text-lg font-semibold text-kaist-darkgreen">
+        {contact.avatarStorageKey ? (
+          <img src={resolveAssetUrl(contact.avatarStorageKey)} alt="" className="size-full object-cover" />
+        ) : name.slice(0, 1) || <User className="h-6 w-6" />}
       </div>
-      <div className="min-w-0 space-y-1.5">
-        <div className="truncate text-base font-bold text-kaist-black">
+      <div className="mt-4 min-w-0 space-y-1.5">
+        <div className="truncate text-base font-semibold text-kaist-black">
           {name}
         </div>
-        <div className="text-xs font-bold text-kaist-darkgreen">{role}</div>
+        <div className="text-sm font-medium text-slate-600">{role}</div>
         <div className="space-y-1 pt-2">
           {contact.email && (
             <div className="flex items-center gap-2 text-xs text-gray-600">

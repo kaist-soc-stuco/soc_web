@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Header } from "@/components/organisms/header";
 import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
@@ -81,6 +82,11 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     uploading,
   } = useBoardEditPageController(forcedCategory);
   const categoryLabel = category === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : getBoardLabelFromMetadata(undefined, category, lang);
+  const boardHref = category === "_EVENT"
+    ? "/events"
+    : category
+      ? `/board/${category}`
+      : "/board";
   const [dismissedDraftAt, setDismissedDraftAt] = useState<string | null>(null);
   const showDraftRestoredBanner = Boolean(draftRestoredAt && draftRestoredAt !== dismissedDraftAt);
   const templateSnapshot: BoardTemplateSnapshot = {
@@ -236,30 +242,31 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       <PageHeader
         className="board-write-page-header"
         title={
-          lang === "ko"
-            ? `${categoryLabel} - 글 수정하기`
-            : `${categoryLabel} - Edit Post`
+          <Link
+            to={boardHref}
+            className="inline-flex min-w-0 items-center gap-2 text-inherit transition-colors hover:text-brand-primary"
+          >
+            <ArrowLeft aria-hidden="true" className="size-5 shrink-0" />
+            <span className="truncate">{categoryLabel}</span>
+          </Link>
         }
-        breadcrumbs={[
-          { label: category === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : (lang === "ko" ? "게시판" : "Board"), to: category === "_EVENT" ? "/events" : "/board" },
-          { label: categoryLabel },
-        ]}
         actions={
           <div className="flex items-center justify-end gap-2">
-            {canManageTemplates ? (
-              <ArticleTemplateControl
-                boardCode={category}
-                lang={lang}
-                onApply={applyTemplate}
-                snapshot={templateSnapshot}
-              />
-            ) : null}
             <BoardWriteFooter
               compact
               lang={lang}
               isSubmitting={isSubmitting}
+              leadingActions={canManageTemplates ? (
+                <ArticleTemplateControl
+                  boardCode={category}
+                  lang={lang}
+                  onApply={applyTemplate}
+                  snapshot={templateSnapshot}
+                />
+              ) : null}
+              onCancel={backToArticle}
               onSubmit={handleSubmit}
-              submitLabel={lang === "ko" ? "수정 완료" : "Save Changes"}
+              submitLabel={lang === "ko" ? "수정" : "Save"}
               submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}
             />
           </div>
@@ -267,7 +274,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       />
 
       <PageMain className="pb-20">
-        <PageContainer className="flex max-w-none flex-col gap-4 pb-16 pt-4">
+        <PageContainer className="flex flex-col gap-4 pb-16 pt-4">
           {loading ? (
             <div className="bg-white border border-slate-200 rounded-xl p-16 shadow-[0_10px_35px_rgba(15,23,42,0.05)] flex flex-col items-center justify-center gap-4">
               <Loader2 className="w-10 h-10 text-kaist-darkgreen animate-spin" />

@@ -52,6 +52,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
 
   const showLoginRequiredToast = () => {
     toast({
+      type: "info",
       message:
         lang === "ko"
           ? "로그인이 필요한 기능입니다."
@@ -420,7 +421,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         await navigator.clipboard.writeText(shareUrl);
         setShareCopied(true);
         window.setTimeout(() => setShareCopied(false), 1800);
-        toast({ message: lang === "ko" ? "링크를 복사했습니다." : "Link copied." });
+        toast({ type: "success", message: lang === "ko" ? "링크를 복사했습니다." : "Link copied." });
         return;
       }
 

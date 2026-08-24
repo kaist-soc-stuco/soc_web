@@ -67,7 +67,6 @@ export function EventsSurveysCalendar({
     () => formatShortDateWithWeekday(selectedDate, lang),
     [lang, selectedDate],
   );
-  const selectedHoliday = holidayMap.get(toDateKey(selectedDate));
   const weekHeaders =
     lang === "ko"
       ? ["일", "월", "화", "수", "목", "금", "토"]
@@ -154,7 +153,6 @@ export function EventsSurveysCalendar({
           events={selectedDayEvents}
           lang={lang}
           selectedDateStr={selectedDateStr}
-          selectedHoliday={selectedHoliday}
         />
       </div>
     </div>

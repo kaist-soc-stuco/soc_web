@@ -238,9 +238,9 @@ function CalendarManagementContent() {
       });
       setDrawerOpen(false);
       await refresh();
-      toast({ message: editingEvent ? "일정을 수정했습니다." : "일정을 등록했습니다." });
+      toast({ type: "success", message: editingEvent ? "일정을 수정했습니다." : "일정을 등록했습니다." });
     } catch {
-      toast({ message: "일정을 저장하지 못했습니다." });
+      toast({ type: "error", message: "일정을 저장하지 못했습니다." });
     } finally {
       setSaving(false);
     }
@@ -250,9 +250,9 @@ function CalendarManagementContent() {
     try {
       const result = await apiClient.importCalendarIcs(await file.text());
       await refresh();
-      toast({ message: `${result.importedCount}개 일정을 가져왔습니다.` });
+      toast({ type: "success", message: `${result.importedCount}개 일정을 가져왔습니다.` });
     } catch {
-      toast({ message: "ICS 파일을 가져오지 못했습니다." });
+      toast({ type: "error", message: "ICS 파일을 가져오지 못했습니다." });
     }
   };
 
@@ -261,7 +261,7 @@ function CalendarManagementContent() {
       const blob = await apiClient.exportCalendarIcs();
       downloadBlob(blob, "soc-calendar.ics");
     } catch {
-      toast({ message: "캘린더를 내보내지 못했습니다." });
+      toast({ type: "error", message: "캘린더를 내보내지 못했습니다." });
     }
   };
 
@@ -271,10 +271,11 @@ function CalendarManagementContent() {
       const result = await apiClient.syncKaistAcademicCalendar();
       await refresh();
       toast({
+        type: "success",
         message: `카이스트 동기화 완료 · 추가 ${result.insertedCount} · 수정 ${result.updatedCount}`,
       });
     } catch {
-      toast({ message: "KAIST 일정을 동기화하지 못했습니다." });
+      toast({ type: "error", message: "KAIST 일정을 동기화하지 못했습니다." });
     } finally {
       setSyncing(null);
     }
@@ -286,10 +287,11 @@ function CalendarManagementContent() {
       const result = await apiClient.syncGoogleCalendars();
       await refresh();
       toast({
+        type: "success",
         message: `구글 캘린더 동기화 완료 · 성공 ${result.succeededCount} · 실패 ${result.failedCount}`,
       });
     } catch {
-      toast({ message: "Google Calendar를 동기화하지 못했습니다." });
+      toast({ type: "error", message: "Google Calendar를 동기화하지 못했습니다." });
     } finally {
       setSyncing(null);
     }

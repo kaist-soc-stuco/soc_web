@@ -72,7 +72,7 @@ export function LoginCallbackPage() {
   const returnToPreviousPage = useCallback(
     (message: string) => {
       clearStoredAuthState();
-      toast({ message });
+      toast({ type: "error", message });
       const returnPath = consumeAuthReturnPath();
       if (returnPath) {
         navigate(returnPath, { replace: true });

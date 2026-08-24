@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import type { SurveyDetailResponse } from "@soc/contracts";
 import {
   Calendar,
-  ClipboardList,
   Languages,
   ShieldCheck,
   Users,
@@ -14,7 +13,6 @@ import {
   getLocalizedText,
   getResponsePolicyLabel,
   getScheduleLabel,
-  getSurveyKindLabel,
 } from "./survey-answer-utils";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 
@@ -33,13 +31,6 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
 
   return (
     <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in slide-in-from-top-4 duration-300 sm:p-8">
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-md border border-kaist-darkgreen/15 bg-kaist-lightgreen/20 px-3 py-1.5 text-xs font-semibold text-kaist-darkgreen">
-          <ClipboardList className="h-3.5 w-3.5" />
-          {getSurveyKindLabel(survey.kind, lang)}
-        </span>
-      </div>
-
       <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
         {getLocalizedText(lang, survey.titleKo, survey.titleEn)}
       </h1>

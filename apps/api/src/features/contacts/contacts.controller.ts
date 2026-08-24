@@ -52,10 +52,12 @@ export class ContactsController {
       request.user?.id,
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["이름", "영문명", "직책", "영문직책", "성별", "기수", "이메일", "전화번호", "개인정보동의", "표시순서"],
+      ["이름", "영문명", "부서", "영문부서", "직책", "영문직책", "성별", "기수", "이메일", "전화번호", "개인정보동의", "표시순서"],
       ...items.map((item) => [
         item.nameKo,
         item.nameEn,
+        item.departmentKo,
+        item.departmentEn,
         item.roleKo,
         item.roleEn,
         item.gender,
@@ -67,8 +69,8 @@ export class ContactsController {
       ]),
     ]);
     worksheet["!cols"] = [
-      { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 10 },
-      { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
+      { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 22 },
+      { wch: 10 }, { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");

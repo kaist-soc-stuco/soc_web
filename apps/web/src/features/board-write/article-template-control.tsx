@@ -138,8 +138,7 @@ export function ArticleTemplateControl({
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="!font-medium"
+        className="h-[var(--ui-control-height)] !font-medium"
         onClick={() => {
           setError(null);
           setOpen(true);

@@ -3,6 +3,8 @@ import * as XLSX from "xlsx";
 export interface ParsedContactSpreadsheetRow {
   nameKo: string;
   nameEn: string;
+  departmentKo: string;
+  departmentEn: string;
   roleKo: string;
   roleEn: string;
   gender: string;
@@ -21,6 +23,8 @@ export interface ContactSpreadsheetParseResult {
 const HEADER_ALIASES: Record<keyof ParsedContactSpreadsheetRow, string[]> = {
   nameKo: ["nameko", "이름", "이름(한글)", "이름(국문)"],
   nameEn: ["nameen", "영문이름", "이름(영문)"],
+  departmentKo: ["departmentko", "부서", "부서(한글)", "부서(국문)"],
+  departmentEn: ["departmenten", "영문부서", "부서(영문)"],
   roleKo: ["roleko", "직책", "역할", "직책(한글)", "역할(한글)"],
   roleEn: ["roleen", "영문직책", "직책(영문)", "역할(영문)"],
   gender: ["gender", "성별"],
@@ -98,6 +102,8 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
     const row = {
       nameKo: value("nameKo"),
       nameEn: value("nameEn"),
+      departmentKo: value("departmentKo"),
+      departmentEn: value("departmentEn"),
       roleKo: value("roleKo"),
       roleEn: value("roleEn"),
       gender: value("gender"),
@@ -135,6 +141,6 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
 }
 
 export const CONTACT_XLSX_TEMPLATE_ROWS = [
-  ["이름", "영문명", "직책", "영문직책", "성별", "기수", "이메일", "전화번호", "개인정보동의", "표시순서"],
-  ["홍길동", "Gildong Hong", "회장", "President", "남", 26, "hong@example.com", "010-0000-0000", "동의", 10],
+  ["이름", "영문명", "부서", "영문부서", "직책", "영문직책", "성별", "기수", "이메일", "전화번호", "개인정보동의", "표시순서"],
+  ["홍길동", "Gildong Hong", "회장단", "Presidium", "회장", "President", "남", 26, "hong@example.com", "010-0000-0000", "동의", 10],
 ] as const;

@@ -470,7 +470,7 @@ export function Calendar() {
           ).map((day, index) => (
             <div key={index}>
               <span
-                    className={`text-[length:var(--home-calendar-day-size)] font-normal tracking-tight ${
+                    className={`text-[length:var(--home-calendar-weekday-size)] font-normal tracking-tight ${
                   index === 0
                     ? "text-red-500"
                     : index === 6
@@ -647,10 +647,7 @@ export function Calendar() {
            <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
              <div className="flex shrink-0 items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
                <div className="min-w-0">
-                 <p className="text-[length:var(--ui-text-micro-size)] font-normal text-slate-400">
-                   {lang === "ko" ? "선택한 날짜" : "Selected date"}
-                 </p>
-                 <h4 className="home-calendar-body-text mt-0.5 truncate text-[length:var(--ui-text-body-sm-size)] font-normal tabular-nums text-slate-800">
+                 <h4 className="home-calendar-body-text truncate text-[length:var(--ui-text-body-sm-size)] font-semibold tabular-nums text-slate-800">
                    {selectedDate ? formatShortDate(selectedDate, lang) : "—"}
                  </h4>
                </div>

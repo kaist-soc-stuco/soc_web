@@ -23,8 +23,11 @@ export class ContactsRepository {
       id: row.id,
       nameKo: row.nameKo,
       nameEn: row.nameEn,
+      departmentKo: row.departmentKo ?? null,
+      departmentEn: row.departmentEn ?? null,
       roleKo: row.roleKo,
       roleEn: row.roleEn,
+      avatarStorageKey: row.avatarStorageKey ?? null,
       gender: row.gender ?? null,
       cohort: row.cohort ?? null,
       email: row.email,
@@ -55,6 +58,8 @@ export class ContactsRepository {
         ? or(
             ilike(executiveContacts.nameKo, `%${normalizedQuery}%`),
             ilike(executiveContacts.nameEn, `%${normalizedQuery}%`),
+            ilike(executiveContacts.departmentKo, `%${normalizedQuery}%`),
+            ilike(executiveContacts.departmentEn, `%${normalizedQuery}%`),
             ilike(executiveContacts.roleKo, `%${normalizedQuery}%`),
             ilike(executiveContacts.roleEn, `%${normalizedQuery}%`),
             ilike(executiveContacts.email, `%${normalizedQuery}%`),
@@ -63,10 +68,10 @@ export class ContactsRepository {
         : undefined,
       normalizedGender ? ilike(executiveContacts.gender, `%${normalizedGender}%`) : undefined,
       input.cohort !== undefined ? eq(executiveContacts.cohort, input.cohort) : undefined,
-      input.department
+        input.department
         ? or(
-            eq(executiveContacts.roleKo, input.department),
-            eq(executiveContacts.roleEn, input.department),
+            eq(executiveContacts.departmentKo, input.department),
+            eq(executiveContacts.departmentEn, input.department),
           )
         : undefined,
       input.privacyConsented !== undefined
@@ -121,8 +126,11 @@ export class ContactsRepository {
       .values({
         nameKo: dto.nameKo,
         nameEn: dto.nameEn,
+        departmentKo: dto.departmentKo ?? null,
+        departmentEn: dto.departmentEn ?? null,
         roleKo: dto.roleKo,
         roleEn: dto.roleEn,
+        avatarStorageKey: dto.avatarStorageKey ?? null,
         gender: dto.gender ?? null,
         cohort: dto.cohort ?? null,
         email: dto.email ?? null,
@@ -154,8 +162,11 @@ export class ContactsRepository {
           dto.items.map((item, index) => ({
             nameKo: item.nameKo,
             nameEn: item.nameEn,
+            departmentKo: item.departmentKo ?? null,
+            departmentEn: item.departmentEn ?? null,
             roleKo: item.roleKo,
             roleEn: item.roleEn,
+            avatarStorageKey: item.avatarStorageKey ?? null,
             gender: item.gender ?? null,
             cohort: item.cohort ?? null,
             email: item.email ?? null,
@@ -192,8 +203,11 @@ export class ContactsRepository {
 
     if (dto.nameKo !== undefined) set.nameKo = dto.nameKo;
     if (dto.nameEn !== undefined) set.nameEn = dto.nameEn;
+    if (dto.departmentKo !== undefined) set.departmentKo = dto.departmentKo;
+    if (dto.departmentEn !== undefined) set.departmentEn = dto.departmentEn;
     if (dto.roleKo !== undefined) set.roleKo = dto.roleKo;
     if (dto.roleEn !== undefined) set.roleEn = dto.roleEn;
+    if (dto.avatarStorageKey !== undefined) set.avatarStorageKey = dto.avatarStorageKey;
     if (dto.gender !== undefined) set.gender = dto.gender;
     if (dto.cohort !== undefined) set.cohort = dto.cohort;
     if (dto.email !== undefined) set.email = dto.email;

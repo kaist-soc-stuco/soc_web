@@ -54,7 +54,7 @@ type ImageContentBlockType = "HERO" | "LOGO" | "ORGANIZATION_CHART";
 const isImageOnlyType = (type: ContentBlockType): type is ImageContentBlockType => type === "HERO" || type === "LOGO" || type === "ORGANIZATION_CHART";
 
 const IMAGE_SPECS: Record<"HERO" | "LOGO" | "ORGANIZATION_CHART", { height: number; label: string; width: number }> = {
-  HERO: { height: 600, label: "히어로 이미지", width: 1600 },
+  HERO: { height: 1600, label: "히어로 이미지", width: 900 },
   LOGO: { height: 100, label: "로고 이미지", width: 400 },
   ORGANIZATION_CHART: { height: 900, label: "조직도 이미지", width: 1600 },
 };
@@ -404,7 +404,7 @@ function SiteContentPageContent() {
         {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} /> : null}
       </div>
     </Modal>
-    {cropRequest ? <ImageCropModal aspectRatio={cropRequest.type === "HERO" ? 1600 / 600 : cropRequest.type === "LOGO" ? 400 / 100 : 1600 / 900} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
+    {cropRequest ? <ImageCropModal aspectRatio={getImageSpec(cropRequest.type)!.width / getImageSpec(cropRequest.type)!.height} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
   </AdminPageShell>;
 }
 

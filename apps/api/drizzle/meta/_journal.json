@@ -43,6 +43,13 @@
       "when": 1787490725517,
       "tag": "0005_public_board_label_translations",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787500000000,
+      "tag": "0006_executive_contact_profile_fields",
+      "breakpoints": true
     }
   ]
 }

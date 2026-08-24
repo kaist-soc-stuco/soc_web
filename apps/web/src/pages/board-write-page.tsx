@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 import { Header } from "@/components/organisms/header";
 import { DataViewCard, PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import {
   getBoardLabelFromMetadata,
-  getBoardTitleFromMetadata,
 } from "@/lib/board-metadata";
 import {
   BoardWriteAttachmentList,
@@ -27,6 +28,7 @@ import {
 } from "@/features/board-write/event-date-utils";
 
 export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } = {}) {
+  const navigate = useNavigate();
   const {
     ConfirmDialog,
     assets,
@@ -130,6 +132,11 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
   };
 
   const isEvent = selectedCategory === "_EVENT";
+  const boardHref = isEvent
+    ? "/events"
+    : selectedCategory
+      ? `/board/${selectedCategory}`
+      : "/board";
   const eventFields = isEvent ? (
     <BoardWriteEventFields
       eventDescriptionKo={eventDescriptionKo}
@@ -239,35 +246,30 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       <PageHeader
         className="board-write-page-header"
         title={
-          lang === "ko"
-            ? `${selectedCategory === "_EVENT" ? "행사" : getBoardTitleFromMetadata(
-                selectedBoard,
-                selectedCategory,
-                lang,
-              )} 글 작성`
-            : `${boardLabel} - Write Post`
+          <Link
+            to={boardHref}
+            className="inline-flex min-w-0 items-center gap-2 text-inherit transition-colors hover:text-brand-primary"
+          >
+            <ArrowLeft aria-hidden="true" className="size-5 shrink-0" />
+            <span className="truncate">{boardLabel}</span>
+          </Link>
         }
-        breadcrumbs={[
-          { label: selectedCategory === "_EVENT" ? (lang === "ko" ? "행사" : "Events") : (lang === "ko" ? "게시판" : "Board"), to: selectedCategory === "_EVENT" ? "/events" : "/board" },
-          {
-            label: boardLabel,
-          },
-        ]}
         actions={
           <div className="flex items-center justify-end gap-2">
-            {canManageTemplates ? (
-              <ArticleTemplateControl
-                boardCode={selectedCategory}
-                lang={lang}
-                onApply={applyTemplate}
-                snapshot={templateSnapshot}
-              />
-            ) : null}
             <BoardWriteFooter
               compact
               lang={lang}
               isSubmitting={isSubmitting}
               canWriteSelected={canWriteSelected}
+              leadingActions={canManageTemplates ? (
+                <ArticleTemplateControl
+                  boardCode={selectedCategory}
+                  lang={lang}
+                  onApply={applyTemplate}
+                  snapshot={templateSnapshot}
+                />
+              ) : null}
+              onCancel={() => navigate(-1)}
               onSubmit={handleSubmit}
             />
           </div>

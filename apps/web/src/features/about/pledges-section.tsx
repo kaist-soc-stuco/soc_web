@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Loader2, Target } from "lucide-react";
+import { CheckCircle2, Circle, CircleDashed, Target } from "lucide-react";
 
 import {
   resolveContentBlockText,
@@ -24,7 +24,7 @@ export function PledgesSection({ lang }: { lang: string }) {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[#e5e9ec] bg-white">
+        <div className="divide-y divide-slate-200">
           {pledges.map((pledge) => {
             const text = resolveContentBlockText(pledge, lang === "ko" ? "ko" : "en");
             const status = pledge.pledgeStatus ?? "PLANNED";
@@ -32,28 +32,39 @@ export function PledgesSection({ lang }: { lang: string }) {
               status === "COMPLETED"
                 ? CheckCircle2
                 : status === "IN_PROGRESS"
-                  ? Loader2
-                  : Circle;
+                  ? Circle
+                  : CircleDashed;
 
             return (
               <article
                 key={pledge.contentBlockId}
-                className="grid gap-4 border-b border-[#e5e9ec] px-6 py-5 last:border-b-0 md:grid-cols-[1fr_auto] md:items-start"
+                className="flex gap-3 py-5 first:pt-0 last:pb-0"
               >
+                <StatusIcon
+                  aria-hidden="true"
+                  className={`mt-1 size-4 shrink-0 ${
+                    status === "COMPLETED"
+                      ? "text-emerald-600"
+                      : status === "IN_PROGRESS"
+                        ? "text-brand-primary"
+                        : "text-slate-400"
+                  }`}
+                />
                 <div className="min-w-0">
-                  <h2 className="text-[length:var(--ui-text-section-size)] font-normal leading-6 text-[var(--ui-text-strong)]">
-                    {text.title}
-                  </h2>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <h2 className="text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-[var(--ui-text-strong)]">
+                      {text.title}
+                    </h2>
+                    <span className="text-xs font-medium text-slate-500">
+                      {lang === "ko" ? statusMeta[status].ko : statusMeta[status].en}
+                    </span>
+                  </div>
                   {text.body ? (
-                    <p className="mt-1.5 whitespace-pre-wrap text-sm font-normal leading-6 text-[#344054]">
+                    <p className="mt-1.5 whitespace-pre-wrap text-sm font-medium leading-6 text-[#344054]">
                       {text.body}
                     </p>
                   ) : null}
                 </div>
-                <span className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[#e5e9ec] bg-white px-2.5 py-1.5 text-xs font-normal text-[#344054]">
-                  <StatusIcon aria-hidden="true" className="size-3.5 text-brand-primary" />
-                  {lang === "ko" ? statusMeta[status].ko : statusMeta[status].en}
-                </span>
               </article>
             );
           })}

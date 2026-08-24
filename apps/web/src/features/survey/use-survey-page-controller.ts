@@ -130,11 +130,12 @@ export function useSurveyPageController(surveyId: string | undefined) {
           ]),
         ),
       );
-      setSubmitError(
-        lang === "ko"
-          ? "필수 문항에 모두 응답한 뒤 제출해 주세요."
-          : "Please answer all required questions before submitting.",
-      );
+      const firstMissingQuestion = missingRequired[0];
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById(`survey-question-${firstMissingQuestion.id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       setSubmitting(false);
       return;
     }

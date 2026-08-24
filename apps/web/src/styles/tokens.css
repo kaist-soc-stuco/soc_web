@@ -26,7 +26,7 @@
   --ui-admin-editor-max-width: 80rem;
   --ui-article-max-width: 65rem;
   --ui-legal-max-width: 75rem;
-  --ui-about-max-width: 55rem;
+  --ui-about-max-width: 61.25rem;
   --ui-space-page-x: 1.25rem;
   --ui-space-page-x-wide: 2rem;
   --ui-header-height: 4.25rem;
@@ -84,7 +84,8 @@
   --home-event-description-size: 0.78125rem;
   --home-board-title-size: 0.875rem;
   --home-calendar-title-size: 0.9375rem;
-  --home-meta-size: 0.875rem;
+  --home-meta-size: 0.8125rem;
+  --home-calendar-weekday-size: 0.875rem;
   --home-calendar-day-size: 0.65625rem;
   --home-calendar-event-size: 0.71875rem;
   --home-calendar-detail-size: 0.59375rem;
