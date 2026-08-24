@@ -314,11 +314,11 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   return (
     <header
-      className={`sticky top-0 z-50 shrink-0 ${
+      className={
         variant === "home"
-          ? "site-header-home"
-          : "border-b border-[var(--ui-menu-divider)] bg-white"
-      }`}
+          ? "site-header-home absolute left-0 top-0 z-50 w-full"
+          : "sticky top-0 z-50 shrink-0 border-b border-[var(--ui-menu-divider)] bg-white"
+      }
       onMouseLeave={() => setHoveredIndex(null)}
     >
       <div className="flex h-[var(--ui-header-height)] w-full items-stretch justify-between">
@@ -359,16 +359,24 @@ export function Header({ variant = "default" }: HeaderProps) {
                     aria-expanded={hoveredIndex === index}
                     aria-haspopup="menu"
                     className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center px-4 text-[length:var(--ui-text-section-size)] font-semibold transition-colors ${
-                      active || hoveredIndex === index
-                        ? "text-kaist-darkgreen-main"
-                        : "text-slate-900 hover:text-kaist-darkgreen-main"
+                      variant === "home"
+                        ? "home-header-nav-link"
+                        : active || hoveredIndex === index
+                          ? "text-kaist-darkgreen-main"
+                          : "text-slate-900 hover:text-kaist-darkgreen-main"
                     }`}
                   >
                     <span className="py-2">{item.label}</span>
                     <ChevronDown
                       aria-hidden="true"
-                      className={`ml-1 h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ease-out ${
-                        hoveredIndex === index ? "rotate-180 text-kaist-darkgreen-main" : ""
+                      className={`ml-1 h-3.5 w-3.5 transition-transform duration-200 ease-out ${
+                        variant === "home" ? "text-white/60" : "text-slate-400"
+                      } ${
+                        hoveredIndex === index
+                          ? variant === "home"
+                            ? "rotate-180 text-white"
+                            : "rotate-180 text-kaist-darkgreen-main"
+                          : ""
                       }`}
                     />
                   </Link>
@@ -396,6 +404,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 setNotificationOpen(false);
                 setMobileMenuOpen(false);
               }}
+              className={variant === "home" ? "home-header-icon" : undefined}
             >
               <Search aria-hidden="true" />
             </IconButton>
@@ -441,10 +450,14 @@ export function Header({ variant = "default" }: HeaderProps) {
             variant="ghost"
             size="sm"
             onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-            className="hidden h-9 gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium text-slate-700 shadow-none hover:bg-slate-100 md:flex"
+            className={`hidden h-9 gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium shadow-none md:flex ${
+              variant === "home"
+                ? "text-white hover:bg-white/10 [&_svg]:text-white/70"
+                : "text-slate-700 hover:bg-slate-100 [&_svg]:text-slate-500"
+            }`}
             title={lang === "ko" ? "Switch to English" : "한국어로 변경"}
           >
-            <Globe aria-hidden="true" className="text-slate-500" />
+            <Globe aria-hidden="true" />
             <span>{lang === "ko" ? "KO" : "EN"}</span>
           </Button>
 
@@ -458,7 +471,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   setSearchOpen(false);
                   setDropdownOpen(false);
                 }}
-                className="relative"
+                className={`relative ${variant === "home" ? "home-header-icon" : ""}`}
               >
                 <Bell aria-hidden="true" />
                 {unreadNotificationCount > 0 && (
@@ -550,6 +563,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   setDropdownOpen((value) => !value);
                   setSearchOpen(false);
                 }}
+                className={variant === "home" ? "home-header-icon" : undefined}
               >
                 <User aria-hidden="true" />
               </IconButton>
@@ -604,7 +618,11 @@ export function Header({ variant = "default" }: HeaderProps) {
                 type="button"
                 onClick={() => void handleStartLogin()}
                 disabled={loginStarting}
-                className="hidden cursor-pointer items-center whitespace-nowrap rounded-md border-0 bg-transparent px-2.5 py-1.5 text-sm font-semibold tracking-tight text-kaist-black transition-none hover:bg-slate-100 hover:text-kaist-darkgreen-main disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base"
+                className={`hidden cursor-pointer items-center whitespace-nowrap rounded-md border-0 bg-transparent px-2.5 py-1.5 text-sm font-semibold tracking-tight transition-none disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base ${
+                  variant === "home"
+                    ? "text-white hover:bg-white/10 hover:text-white"
+                    : "text-kaist-black hover:bg-slate-100 hover:text-kaist-darkgreen-main"
+                }`}
               >
                 {loginStarting
                   ? lang === "ko"
@@ -648,7 +666,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               setSearchOpen(false);
               setDropdownOpen(false);
             }}
-            className="text-slate-700 md:hidden"
+            className={variant === "home" ? "home-header-icon md:hidden" : "text-slate-700 md:hidden"}
           >
             {mobileMenuOpen ? (
               <X aria-hidden="true" className="h-5 w-5" />
