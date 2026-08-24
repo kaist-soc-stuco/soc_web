@@ -50,6 +50,13 @@
       "when": 1787500000000,
       "tag": "0006_executive_contact_profile_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787500001000,
+      "tag": "0007_organization_chart_english_image",
+      "breakpoints": true
     }
   ]
 }

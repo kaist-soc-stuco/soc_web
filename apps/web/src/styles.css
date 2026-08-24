@@ -986,26 +986,48 @@
   }
 
   .calendar-week-bars {
+    --calendar-bar-gap: 0.125rem;
+    --calendar-bar-height: 0.25rem;
+    --calendar-bar-top: 1.5rem;
     pointer-events: none;
     position: absolute;
     inset-inline: 0;
-    top: 1.5rem;
+    top: var(--calendar-bar-top);
     z-index: 20;
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    grid-template-rows: repeat(3, 0.25rem);
-    row-gap: 0.125rem;
+    grid-template-rows: repeat(3, var(--calendar-bar-height));
+    row-gap: var(--calendar-bar-gap);
   }
 
   .calendar-week-event-bar {
     box-sizing: border-box;
     display: block;
     min-width: 0;
-    min-height: 0.25rem;
-    max-height: 0.25rem;
-    height: 0.25rem;
+    min-height: var(--calendar-bar-height);
+    max-height: var(--calendar-bar-height);
+    height: var(--calendar-bar-height);
     align-self: start;
     overflow: hidden;
+  }
+
+  .calendar-week-more {
+    position: absolute;
+    top: 2.75rem;
+    right: 0.25rem;
+    z-index: 21;
+    padding-inline: 0.125rem;
+    border-radius: 0.25rem;
+    background: rgb(255 255 255 / 0.92);
+    color: #7890a6;
+    font-size: 0.5625rem;
+    font-weight: 500;
+    line-height: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .calendar-week-more-compact {
+    display: none;
   }
 
   .calendar-week-event-bar-outside-month {
@@ -1054,12 +1076,65 @@
     border-bottom-right-radius: 0.25rem;
   }
 
+  @media (max-width: 63.99rem), (max-height: 48rem) {
+    .calendar-month-grid {
+      /* The detail list moves below the month grid on narrow layouts. Give
+         each week enough room for the compact date row and two event lanes
+         instead of letting the grid collapse to the detail panel height. */
+      min-height: 13rem !important;
+    }
+
+    .calendar-week-bars {
+      --calendar-bar-gap: 0.0625rem;
+      --calendar-bar-height: 0.1875rem;
+      --calendar-bar-top: 1.25rem;
+      grid-template-rows: repeat(2, var(--calendar-bar-height));
+    }
+
+    .calendar-week-event-bar-lane-2 {
+      display: none;
+    }
+
+    .calendar-week-more {
+      top: 1.25rem;
+      right: 0.125rem;
+      font-size: 0.5rem;
+      line-height: 0.625rem;
+    }
+
+    .calendar-week-more-desktop {
+      display: none;
+    }
+
+    .calendar-week-more-compact {
+      display: block;
+    }
+  }
+
   .home-hero-column {
     width: 100%;
   }
 
   .home-main-column {
     width: 100%;
+  }
+
+  /* Keep the hero rail visible while the desktop canvas is narrowed by
+     browser zoom. It only gives way to the compact mobile layout below the
+     md breakpoint. */
+  @media (min-width: 768px) {
+    .home-page-shell {
+      --ui-home-hero-width: clamp(14rem, 22vw, 17.5rem);
+    }
+
+    .home-hero-column {
+      width: var(--ui-home-hero-width);
+      min-height: 100dvh;
+    }
+
+    .home-main-column {
+      width: calc(100% - var(--ui-home-hero-width));
+    }
   }
 
   @media (max-width: 767px) {
@@ -1084,7 +1159,9 @@
     }
 
     .home-event-card {
-      height: clamp(16rem, 46vh, var(--home-event-card-height));
+      /* Keep the card tied to the available canvas width as well as viewport
+         height so browser zoom cannot starve the lower widget row. */
+      height: clamp(14rem, min(38vh, 32vw), var(--home-event-card-height));
     }
 
     .home-hero-column {
@@ -1093,6 +1170,43 @@
 
     .home-main-column {
       width: calc(100% - var(--ui-home-hero-width));
+    }
+  }
+
+  /* A zoomed desktop viewport can be shorter than the compact calendar
+     needs. Let the document grow and scroll in that case instead of forcing
+     the lower widgets through the footer. */
+  @media (min-width: 1024px) and (max-height: 48rem) {
+    .home-viewport-height {
+      height: auto;
+      min-height: 100dvh;
+    }
+
+    .home-page-body,
+    .home-main-column,
+    .home-main-column > main {
+      flex: 0 0 auto;
+    }
+
+    .home-main-column {
+      height: auto !important;
+      overflow: visible;
+    }
+
+    .home-main-column > main {
+      overflow: visible;
+    }
+
+    .home-lower-widgets {
+      flex: 0 0 auto;
+      min-height: 20rem;
+    }
+
+    /* Channel Talk is fixed by its SDK. Do not reserve a large desktop
+       bottom gutter on short laptop viewports, which can make the panel
+       appear clipped against the page footer. */
+    .channel-talk-safe-area {
+      padding-bottom: 1rem !important;
     }
   }
 

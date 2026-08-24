@@ -268,7 +268,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             })),
           },
           {
-            label: "Events & Activities",
+            label: "Events",
             href: "/events",
             megaItems: [
               { label: "Events", href: "/events" },

@@ -38,6 +38,7 @@ export const contentBlocks = pgTable(
     bodyEn: text("body_en"),
     linkUrl: varchar("link_url", { length: 2_000 }),
     imageUrl: varchar("image_url", { length: 2_000 }),
+    imageUrlEn: varchar("image_url_en", { length: 2_000 }),
     pledgeStatus: varchar("pledge_status", { length: 20 }),
     sortOrder: integer("sort_order").notNull().default(0),
     createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
