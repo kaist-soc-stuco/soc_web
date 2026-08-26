@@ -1,38 +1,38 @@
 import {
-  AboutTabContent,
-  AboutTabs,
+  AboutLandingContent,
+  AboutLandingHero,
+  AboutSectionNavigation,
 } from "@/features/about/about-page-sections";
 import { useAboutPageController } from "@/features/about/use-about-page-controller";
 import { Header } from "@/components/organisms/header";
-import { PageHeader, PageShell } from "@/components/ui/page-layout";
+import { PageShell } from "@/components/ui/page-layout";
 
 export function AboutPage() {
   const {
     contacts,
     contactsLoading,
-    currentTab,
-    handleTabChange,
+    activeSection,
     lang,
+    scrollToSection,
   } = useAboutPageController();
 
   return (
-    <PageShell>
+    <PageShell className="about-landing-page">
       <Header />
-      <PageHeader
-        containerClassName="!max-w-[var(--ui-about-max-width)]"
-        title={lang === "ko" ? "학생회 소개" : "About"}
-      />
-      <AboutTabs
-        currentTab={currentTab}
-        lang={lang}
-        onTabChange={handleTabChange}
-      />
-      <AboutTabContent
-        contacts={contacts}
-        contactsLoading={contactsLoading}
-        currentTab={currentTab}
-        lang={lang}
-      />
+      <main className="channel-talk-safe-area flex-1">
+        <AboutLandingHero lang={lang} />
+        <AboutSectionNavigation
+          activeSection={activeSection}
+          lang={lang}
+          onNavigate={scrollToSection}
+        />
+        <AboutLandingContent
+          contacts={contacts}
+          contactsLoading={contactsLoading}
+          lang={lang}
+          onNavigate={scrollToSection}
+        />
+      </main>
     </PageShell>
   );
 }

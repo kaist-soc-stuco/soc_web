@@ -93,18 +93,25 @@ function formatEventStatusDate(value: string | null) {
 function getEventCardStatus(startAt: string | null, endAt: string | null, lang: string): EventCardStatus {
   const currentTime = nowMs();
   const start = startAt ? Date.parse(startAt) : Number.NaN;
-  const startDate = formatEventStatusDate(startAt);
-  const endDate = formatEventStatusDate(endAt);
   if (Number.isFinite(start) && currentTime < start) {
     return {
-      text: lang === "ko" ? `시작 예정${startDate ? ` (${startDate}～)` : ""}` : `Upcoming${startDate ? ` (${startDate}–)` : ""}`,
+      text: lang === "ko" ? "예정" : "Upcoming",
       tone: "upcoming",
     };
   }
   return {
-    text: lang === "ko" ? `진행 중${endDate ? ` (～${endDate})` : ""}` : `In progress${endDate ? ` (–${endDate})` : ""}`,
+    text: lang === "ko" ? "진행 중" : "In progress",
     tone: "active",
   };
+}
+
+function formatEventDateRange(startAt: string | null, endAt: string | null) {
+  const start = formatEventStatusDate(startAt);
+  const end = formatEventStatusDate(endAt);
+  if (!start && !end) return null;
+  if (!start) return end;
+  if (!end || start === end) return start;
+  return `${start} – ${end}`;
 }
 
 function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
@@ -122,12 +129,25 @@ function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
 }
 
 function EventFallback({ event }: { event: EventCardItem }) {
+  const fallbackImages = [
+    "/hero_background_1.jpg",
+    "/hero_background4.jpeg",
+    "/hero_background2.jpeg",
+  ];
+  const imageIndex = Array.from(event.id).reduce(
+    (sum, character) => sum + character.charCodeAt(0),
+    0,
+  ) % fallbackImages.length;
+
   return (
     <div className={`home-event-fallback ${event.palette}`} aria-hidden="true">
-      <span className="home-event-fallback-mark">SOC</span>
-      <span className="home-event-fallback-date">
-        {formatEventStatusDate(event.startAt) ?? "SOC"}
-      </span>
+      <img
+        src={fallbackImages[imageIndex]}
+        alt=""
+        draggable={false}
+        className="home-event-fallback-image"
+      />
+      <span className="home-event-fallback-mark">KAIST SOC</span>
     </div>
   );
 }
@@ -153,34 +173,21 @@ function StatusChip({ event, lang }: { event: EventCardItem; lang: string }) {
   return <span className={`home-editorial-status home-editorial-status-${status.tone}`}>{status.text}</span>;
 }
 
-function FeaturedEvent({ event, lang }: { event: EventCardItem; lang: string }) {
-  return (
-    <Link to={`/events/${encodeURIComponent(event.id)}`} draggable={false} className="home-featured-event group">
-      <div className="home-featured-event-media"><EventImage event={event} /></div>
-      <div className="home-featured-event-copy">
-        <StatusChip event={event} lang={lang} />
-        <h3>{event.title}</h3>
-        {event.description ? <p>{event.description}</p> : null}
-        <span className="home-featured-event-link">
-          {lang === "ko" ? "행사 자세히 보기" : "View event"}
-          <ArrowRight aria-hidden="true" className="size-4" />
-        </span>
-      </div>
-    </Link>
-  );
-}
-
 function EventCard({ event, lang }: { event: EventCardItem; lang: string }) {
+  const dateRange = formatEventDateRange(event.startAt, event.endAt);
   return (
     <Link
       to={`/events/${encodeURIComponent(event.id)}`}
       draggable={false}
       onDragStart={(dragEvent) => dragEvent.preventDefault()}
-      className="home-editorial-event-card group"
+      className="home-portal-event-card group"
     >
-      <div className="home-editorial-event-copy">
-        <div className="flex w-full items-start justify-between gap-4">
-          <span className="home-editorial-event-date">{formatEventStatusDate(event.startAt) ?? "SOC"}</span>
+      <div className="home-portal-event-media">
+        <EventImage event={event} />
+      </div>
+      <div className="home-portal-event-body">
+        <div className="flex w-full items-center justify-between gap-3">
+          {dateRange ? <time className="home-portal-event-date">{dateRange}</time> : <span />}
           <StatusChip event={event} lang={lang} />
         </div>
         <h3 className="line-clamp-2">{event.title}</h3>
@@ -194,16 +201,19 @@ function EventCarouselSkeleton() {
   return (
     <section className="home-events-section" aria-hidden="true">
       <div className="home-section-heading">
-        <div className="home-loading-surface h-3 w-16 rounded" />
-        <div className="home-loading-surface mt-3 h-8 w-44 rounded" />
+        <div className="home-loading-surface h-8 w-24 rounded" />
       </div>
-      <div className="home-featured-event overflow-hidden">
-        <div className="home-loading-surface min-h-80" />
-        <div className="space-y-4 p-8">
-          <div className="home-loading-surface h-5 w-24 rounded" />
-          <div className="home-loading-surface h-10 w-4/5 rounded" />
-          <div className="home-loading-surface h-4 w-full rounded" />
-        </div>
+      <div className="grid gap-6 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="home-loading-surface aspect-[16/9]" />
+            <div className="space-y-3 p-5">
+              <div className="home-loading-surface h-3 w-20 rounded" />
+              <div className="home-loading-surface h-5 w-4/5 rounded" />
+              <div className="home-loading-surface h-3 w-full rounded" />
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -243,7 +253,9 @@ export function EventCarousel() {
           titleEn: item.titleEn,
           descriptionKo: item.eventDescriptionKo ?? item.titleKo,
           descriptionEn: item.eventDescriptionEn || item.titleEn || item.eventDescriptionKo || item.titleKo,
-          imageUrl: item.thumbnailStorageKey ? resolveAssetUrl(item.thumbnailStorageKey) : null,
+          imageUrl: item.thumbnailStorageKey && !item.thumbnailStorageKey.includes("/seed-event-")
+            ? resolveAssetUrl(item.thumbnailStorageKey)
+            : null,
           palette: resolvePalette(item.articleId),
           isPinned: item.isPinned,
           pinOrder: item.pinOrder ?? null,
@@ -273,18 +285,16 @@ export function EventCarousel() {
   }, []);
 
   const localizedEvents = useMemo(() => events.map((event) => localizeEvent(event, lang)), [events, lang]);
-  const featuredEvent = localizedEvents[0];
-  const remainingEvents = localizedEvents.slice(1);
   const pageSize = isMobile ? 1 : 3;
   const pages = useMemo(() => {
     const result: EventCardItem[][] = [];
-    for (let index = 0; index < remainingEvents.length; index += pageSize) result.push(remainingEvents.slice(index, index + pageSize));
+    for (let index = 0; index < localizedEvents.length; index += pageSize) result.push(localizedEvents.slice(index, index + pageSize));
     return result;
-  }, [remainingEvents, pageSize]);
+  }, [localizedEvents, pageSize]);
   const totalPages = pages.length;
   const pageGap = isMobile ? 0 : 24;
 
-  useEffect(() => setCurrentPage(0), [pageSize, remainingEvents.length]);
+  useEffect(() => setCurrentPage(0), [pageSize, localizedEvents.length]);
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport || typeof window === "undefined") return;
@@ -360,8 +370,7 @@ export function EventCarousel() {
     <section className="home-events-section" aria-labelledby="home-events-title">
       <div className="home-section-heading home-section-heading-row">
         <div>
-          <p className="home-section-kicker">EVENTS</p>
-          <h2 id="home-events-title">{lang === "ko" ? "다가오는 행사" : "Upcoming events"}</h2>
+          <h2 id="home-events-title">{lang === "ko" ? "행사" : "Events"}</h2>
         </div>
         <Link to="/events" className="home-section-link">
           {lang === "ko" ? "행사 전체 보기" : "View all events"}
@@ -369,13 +378,10 @@ export function EventCarousel() {
         </Link>
       </div>
 
-      {!featuredEvent ? (
+      {localizedEvents.length === 0 ? (
         <div className="home-events-empty">{lang === "ko" ? "현재 예정된 행사가 없습니다." : "There are no upcoming events."}</div>
       ) : (
-        <>
-          <FeaturedEvent event={featuredEvent} lang={lang} />
-          {remainingEvents.length > 0 ? (
-            <div className="group relative mt-6">
+        <div className="group relative">
               <div
                 ref={viewportRef}
                 className={`touch-pan-y overflow-hidden ${isDragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
@@ -425,9 +431,7 @@ export function EventCarousel() {
                   ))}
                 </div>
               ) : null}
-            </div>
-          ) : null}
-        </>
+        </div>
       )}
     </section>
   );

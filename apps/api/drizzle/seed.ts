@@ -810,6 +810,18 @@ async function seedAboutPageContent(seedAuthorId: string) {
       publishedAt: new Date("2026-03-02T09:00:00+09:00"),
     },
     {
+      type: "ORGANIZATION_CHART",
+      status: "PUBLISHED",
+      titleKo: "전산학부 학생회 조직도",
+      titleEn: "Student Council Organization Chart",
+      imageUrl: "/organization-chart.svg",
+      sortOrder: 0,
+      createdBy: seedAuthorId,
+      updatedBy: seedAuthorId,
+      publishedBy: seedAuthorId,
+      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
+    },
+    {
       type: "PLEDGE",
       status: "PUBLISHED",
       titleKo: "학생 복지 품목과 대여 절차 확대",

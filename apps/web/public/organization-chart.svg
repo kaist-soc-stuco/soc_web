@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">KAIST 전산학부 학생회 조직도</title>
+  <desc id="description">회장단 아래 비서실, 대외소통부, 기획부, 전산관리부, TF가 연결된 조직 구조</desc>
+  <rect width="1600" height="900" fill="#ffffff"/>
+  <g fill="none" stroke="#b8c8c1" stroke-width="3">
+    <path d="M800 270v100"/>
+    <path d="M190 370h1220"/>
+    <path d="M190 370v86M495 370v86M800 370v86M1105 370v86M1410 370v86"/>
+  </g>
+  <g font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif" text-anchor="middle">
+    <g>
+      <rect x="610" y="110" width="380" height="160" rx="24" fill="#f2f7f5" stroke="#287a60" stroke-width="3"/>
+      <text x="800" y="175" fill="#172033" font-size="42" font-weight="700">회장단</text>
+      <text x="800" y="222" fill="#344054" font-size="22" font-weight="400">학생회장 · 부학생회장</text>
+    </g>
+    <g>
+      <rect x="70" y="456" width="240" height="190" rx="20" fill="#ffffff" stroke="#cad5d1" stroke-width="2"/>
+      <text x="190" y="526" fill="#172033" font-size="32" font-weight="650">비서실</text>
+      <line x1="110" y1="552" x2="270" y2="552" stroke="#e5e9ec" stroke-width="2"/>
+      <text x="190" y="600" fill="#344054" font-size="20" font-weight="400">실장 · 실원</text>
+    </g>
+    <g>
+      <rect x="375" y="456" width="240" height="190" rx="20" fill="#ffffff" stroke="#cad5d1" stroke-width="2"/>
+      <text x="495" y="526" fill="#172033" font-size="32" font-weight="650">대외소통부</text>
+      <line x1="415" y1="552" x2="575" y2="552" stroke="#e5e9ec" stroke-width="2"/>
+      <text x="495" y="600" fill="#344054" font-size="20" font-weight="400">부장 · 부원</text>
+    </g>
+    <g>
+      <rect x="680" y="456" width="240" height="190" rx="20" fill="#ffffff" stroke="#287a60" stroke-width="3"/>
+      <text x="800" y="526" fill="#172033" font-size="32" font-weight="650">기획부</text>
+      <line x1="720" y1="552" x2="880" y2="552" stroke="#e5e9ec" stroke-width="2"/>
+      <text x="800" y="600" fill="#344054" font-size="20" font-weight="400">부장 · 부원</text>
+    </g>
+    <g>
+      <rect x="985" y="456" width="240" height="190" rx="20" fill="#ffffff" stroke="#cad5d1" stroke-width="2"/>
+      <text x="1105" y="526" fill="#172033" font-size="32" font-weight="650">전산관리부</text>
+      <line x1="1025" y1="552" x2="1185" y2="552" stroke="#e5e9ec" stroke-width="2"/>
+      <text x="1105" y="600" fill="#344054" font-size="20" font-weight="400">부장 · 부원</text>
+    </g>
+    <g>
+      <rect x="1290" y="456" width="240" height="190" rx="20" fill="#ffffff" stroke="#cad5d1" stroke-width="2"/>
+      <text x="1410" y="526" fill="#172033" font-size="32" font-weight="650">TF</text>
+      <line x1="1330" y1="552" x2="1490" y2="552" stroke="#e5e9ec" stroke-width="2"/>
+      <text x="1410" y="600" fill="#344054" font-size="20" font-weight="400">TF장 · TF원</text>
+    </g>
+  </g>
+</svg>
