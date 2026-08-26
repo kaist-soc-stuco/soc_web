@@ -128,7 +128,10 @@ const mapConnectedSurvey = (
 };
 
 const articleThumbnailStorageKey = sql<string | null>`(
-  select concat('asset:', ${assets.assetId}::text)
+  select case
+    when ${assets.storageKey} like '/uploads/assets/seed-event-%' then null
+    else concat('asset:', ${assets.assetId}::text)
+  end
   from ${articleAssets}
   inner join ${assets} on ${assets.assetId} = ${articleAssets.assetId}
   where ${articleAssets.articleId} = ${articles.articleId}

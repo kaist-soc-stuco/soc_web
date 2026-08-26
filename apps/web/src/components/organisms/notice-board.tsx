@@ -81,7 +81,7 @@ function NoticeItem({
             ) : null}
           </div>
         </div>
-        <div className="home-notice-meta grid w-[13.5rem] min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-1.5 text-right">
+        <div className="home-notice-meta grid w-[10.5rem] min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-1.5 text-right">
           <span className="home-meta-text min-w-0 truncate text-slate-400">
             {author}
           </span>
@@ -103,8 +103,8 @@ function formatDate(dateIso: string) {
 
 function NoticeBoardSkeleton() {
   return (
-    <div className="grid h-full min-h-0 grid-rows-8 divide-y divide-slate-100" aria-busy="true">
-      {Array.from({ length: 8 }).map((_, index) => (
+    <div className="grid h-full min-h-0 grid-rows-6 divide-y divide-slate-100" aria-busy="true">
+      {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className="flex min-h-0 items-center justify-between gap-4 px-3 py-1">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="home-loading-surface h-5 w-12 shrink-0 rounded-full" />
@@ -163,10 +163,10 @@ export function NoticeBoard() {
     const regular = currentNotices.filter((notice) => !notice.isImportant);
     return [...pinned, ...regular];
   }, [currentNotices]);
-  const visibleNotices = displayNotices.slice(0, 8);
+  const visibleNotices = displayNotices.slice(0, 6);
   const renderedNotices = hasCurrentNoticeData
     ? visibleNotices
-    : lastLoadedNotices.slice(0, 8);
+    : lastLoadedNotices.slice(0, 6);
   const showInitialSkeleton = loading && !hasCurrentNoticeData && lastLoadedNotices.length === 0;
 
   useEffect(() => {

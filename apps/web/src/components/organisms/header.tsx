@@ -250,11 +250,11 @@ export function Header({ variant = "default" }: HeaderProps) {
             label: "학생회 소개",
             href: "/about",
             megaItems: [
-              { label: "학생회 소개", href: "/about?tab=intro" },
-              { label: "당해 학생회 소개", href: "/about?tab=history" },
-              { label: "조직도", href: "/about?tab=org" },
-              { label: "공약 이행 현황", href: "/about/pledges" },
-              { label: "구성원", href: "/about?tab=members" },
+              { label: "학생회 소개", href: "/about#intro" },
+              { label: "당해 학생회", href: "/about#history" },
+              { label: "조직도", href: "/about#org" },
+              { label: "공약 이행 현황", href: "/about#pledges" },
+              { label: "구성원", href: "/about#members" },
             ],
           },
         ]
@@ -280,11 +280,11 @@ export function Header({ variant = "default" }: HeaderProps) {
             label: "About",
             href: "/about",
             megaItems: [
-              { label: "About", href: "/about?tab=intro" },
-              { label: "Current Council", href: "/about?tab=history" },
-              { label: "Organization Chart", href: "/about?tab=org" },
-              { label: "Pledge Progress", href: "/about/pledges" },
-              { label: "Members", href: "/about?tab=members" },
+              { label: "About", href: "/about#intro" },
+              { label: "Current Council", href: "/about#history" },
+              { label: "Organization Chart", href: "/about#org" },
+              { label: "Pledge Progress", href: "/about#pledges" },
+              { label: "Members", href: "/about#members" },
             ],
           },
         ];
