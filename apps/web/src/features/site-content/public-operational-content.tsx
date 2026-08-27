@@ -23,6 +23,7 @@ function readDismissed(): string[] {
 
 export function PublicOperationalContent() {
   const location = useLocation();
+  const isHome = location.pathname === "/";
   const { lang } = useLanguage();
   const { data } = usePublicContentBlocks();
   const [dismissed, setDismissed] = useState<string[]>(readDismissed);
@@ -40,10 +41,10 @@ export function PublicOperationalContent() {
   useEffect(() => {
     document.documentElement.classList.toggle(
       "has-public-top-banner",
-      hasVisibleNotice && !location.pathname.startsWith("/admin"),
+      hasVisibleNotice && isHome,
     );
     return () => document.documentElement.classList.remove("has-public-top-banner");
-  }, [hasVisibleNotice, location.pathname]);
+  }, [hasVisibleNotice, isHome]);
 
   const dismiss = (contentBlockId: string) => {
     if (closing.includes(contentBlockId)) return;
@@ -59,7 +60,7 @@ export function PublicOperationalContent() {
     }, 220);
   };
 
-  if (location.pathname.startsWith("/admin")) return null;
+  if (!isHome) return null;
 
   return (
     <>
