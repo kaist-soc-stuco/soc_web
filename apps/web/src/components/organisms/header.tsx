@@ -400,7 +400,11 @@ export function Header({ variant = "default" }: HeaderProps) {
                     id={`site-nav-flyout-${index}`}
                     role="menu"
                     aria-label={`${item.label} ${lang === "ko" ? "하위 메뉴" : "submenu"}`}
-                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-[var(--ui-menu-divider)] bg-white shadow-[0_10px_18px_-20px_rgba(15,23,42,0.38)] transition-[opacity,transform,visibility] duration-150 ease-out ${
+                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b transition-[opacity,transform,visibility] duration-150 ease-out ${
+                      variant === "home"
+                        ? "border-white/15 bg-[rgba(8,29,23,0.84)] shadow-[0_18px_36px_-22px_rgba(0,0,0,0.72)] backdrop-blur-xl backdrop-saturate-150"
+                        : "border-[var(--ui-menu-divider)] bg-white shadow-[0_10px_18px_-20px_rgba(15,23,42,0.38)]"
+                    } ${
                       hoveredIndex === index
                         ? "visible pointer-events-auto translate-y-0 opacity-100"
                         : "invisible pointer-events-none -translate-y-0.5 opacity-0"
@@ -414,7 +418,9 @@ export function Header({ variant = "default" }: HeaderProps) {
                         return (
                           <li
                             key={child.href}
-                            className="mx-4 border-b border-slate-100 last:border-b-0"
+                            className={`mx-4 border-b last:border-b-0 ${
+                              variant === "home" ? "border-white/10" : "border-slate-100"
+                            }`}
                           >
                             <Link
                               to={child.href}
@@ -422,10 +428,14 @@ export function Header({ variant = "default" }: HeaderProps) {
                               aria-current={childActive ? "page" : undefined}
                               tabIndex={hoveredIndex === index ? 0 : -1}
                               onClick={closePopovers}
-                              className={`flex h-10 items-center justify-center whitespace-nowrap px-1 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary/20 ${
-                                childActive
-                                  ? "text-brand-primary"
-                                  : "text-[var(--ui-menu-item-text)] hover:text-brand-primary focus-visible:text-brand-primary"
+                              className={`flex h-11 items-center justify-center whitespace-nowrap px-1 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
+                                variant === "home"
+                                  ? childActive
+                                    ? "text-white focus-visible:ring-white/30"
+                                    : "text-white/78 hover:text-white focus-visible:text-white focus-visible:ring-white/30"
+                                  : childActive
+                                    ? "text-brand-primary focus-visible:ring-brand-primary/20"
+                                    : "text-[var(--ui-menu-item-text)] hover:text-brand-primary focus-visible:text-brand-primary focus-visible:ring-brand-primary/20"
                               }`}
                             >
                               {child.label}
