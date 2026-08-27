@@ -17,6 +17,8 @@ pnpm build
 
 ## DB Migration And Seed
 
+2026-08-28에 개발 단계의 migration 이력을 현재 스키마 기준 `apps/api/drizzle/0000_baseline.sql` 하나로 squash했다. 이 baseline은 빈 PostgreSQL에 적용하는 것을 전제로 한다. squash 이전 migration 기록이 남은 DB를 그대로 업그레이드하지 말고, 운영 배포 전 백업 정책을 확인한 뒤 새 DB에 baseline을 적용한다.
+
 로컬 compose 기준:
 
 ```bash
@@ -36,7 +38,7 @@ SEED_MODE=demo pnpm --filter @soc/api db:seed
 정상 로그 기준:
 
 - `No schema changes, nothing to migrate` 또는 `migrations applied successfully`
-- `Upserted 9 permission(s)`
+- `Upserted 15 permission(s)`
 - `Upserted 7 board(s)`
 - `Seeded ... articles`
 - `Seed finished`

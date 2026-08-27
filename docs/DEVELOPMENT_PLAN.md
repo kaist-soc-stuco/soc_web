@@ -589,7 +589,7 @@ AWS_SECRET_ACCESS_KEY=<local-or-ci-only-secret>
 - 게시글 메타데이터는 `YYYY.MM.DD HH:mm`/medium/muted 규칙을 적용했다. 이전글·다음글 카드는 제거하고 `목록으로` back-link를 카드 바깥에 배치했다.
 - 댓글 제목·수·본문·작성자·메타데이터 위계를 직접 지정했다. 댓글 입력은 공통 `CommentComposer`로 분리하고, 빈 입력과 입력 완료 상태의 원형 ArrowUp action을 구분한다.
 - 댓글 좋아요와 신고는 `comment_engagement`, `comment_report` 테이블 및 사용자별 unique key를 추가했다. `/comments/:commentId/engagements/like`와 `/comments/:commentId/report` API는 로그인·게시글 가독성·댓글 존재를 확인한다. 신고는 확인 dialog를 거치며 같은 사용자의 중복 신고는 idempotent 처리한다.
-- 적용 migration: `apps/api/drizzle/0021_dizzy_wallop.sql`. `pnpm db:migrate`와 Docker API/Web 재빌드를 완료했다.
+- 당시 개별 migration으로 적용했던 댓글 반응 변경은 2026-08-28 migration squash 후 `apps/api/drizzle/0000_baseline.sql`에 포함되었다.
 
 검증: 공유 contracts/api-client build, API typecheck/lint, Web lint/build 통과. `GET /health` 200 및 댓글 목록 API의 `likeCount`, `viewerHasLiked`, `viewerHasReported` 계약을 확인했다. 댓글 좋아요/신고는 테스트 데이터 변조를 피하기 위해 실제 클릭 등록까지 수행하지 않았다.
 

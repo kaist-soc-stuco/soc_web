@@ -48,8 +48,8 @@
 
 - CI와 같은 단일 동시성 설정 및 같은 임시 PostgreSQL에서 API 테스트 89/89 통과, 조건부 skip 0건. 이 안에 설문 실DB 11건과 회비 실DB 3건이 포함됨
 - Web 테스트 33/33 통과, API/Web lint와 전체 workspace typecheck 통과
-- 빈 PostgreSQL에 `0000`부터 `0009`까지 전체 migration 적용 성공. `survey.result_visibility` 기본값 `PRIVATE` 확인
-- `0008` 상태의 게시·비게시 행에 `0009`를 적용해 각각 `PUBLISHED`·`DRAFT` backfill 확인, lifecycle/isPublished 드리프트 시도는 DB CHECK가 거부함을 확인
+- 당시 빈 PostgreSQL에 `0000`부터 `0009`까지 전체 migration 적용 성공. 해당 이력은 2026-08-28 현재 스키마 기준 `0000_baseline.sql`로 squash되었다.
+- 당시 `0008` 상태의 게시·비게시 행에 `0009`를 적용해 각각 `PUBLISHED`·`DRAFT` backfill을 확인했다. 현재 baseline에는 최종 lifecycle 제약과 `survey.result_visibility = PRIVATE` 기본값이 포함된다.
 - Drizzle 재생성 검사에서 추가 schema 변경 없음 확인
 - 실제 nginx 설정으로 20 MiB multipart 전달과 프록시 한도 초과 413 차단 확인, `nginx -t` 통과. 실제 Nest HTTP endpoint는 정확히 20 MiB 201, 1 byte 초과 413, 저장 서비스 미호출을 확인
 - 전체 workspace production build와 `git diff --check` 통과

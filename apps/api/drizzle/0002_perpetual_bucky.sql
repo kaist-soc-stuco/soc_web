@@ -1,1 +1,0 @@
-ALTER TYPE "public"."content_block_type" ADD VALUE 'LOGO' BEFORE 'TOP_BANNER';

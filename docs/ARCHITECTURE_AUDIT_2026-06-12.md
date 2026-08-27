@@ -131,7 +131,7 @@
 적용 현황:
 
 - `article`, `comment`, `article_asset`, `survey`, `survey_responses`, `survey_answers`, `survey_sections`, `survey_questions`, `user_role_group`, `student_fee_status`, `asset`, `audit_log`, `executive_contact`, `bulk_email`, `users`에 첫 번째 조회 인덱스 세트를 추가했다.
-- `drizzle/0002_numerous_sphinx.sql` migration과 Drizzle meta snapshot을 생성했다.
+- 당시 개별 index migration과 Drizzle meta snapshot을 생성했다. 해당 변경은 2026-08-28 현재 스키마 기준 `drizzle/0000_baseline.sql`에 squash되었다.
 - 게시글 목록/상세 주변글, 댓글 count/list, 첨부 exists, 설문 공개 목록/응답 count, 권한 bitmask 계산, 학생회비 필터링 조회를 우선 커버한다.
 - 단일 `postgres.schema.ts` 정의를 `schema/auth.schema.ts`, `fee.schema.ts`, `board.schema.ts`, `survey.schema.ts`, `audit.schema.ts`, `contact.schema.ts`, `email.schema.ts`로 분리했다.
 - 기존 repository import 호환성을 위해 `postgres.schema.ts`는 barrel export로 유지한다.

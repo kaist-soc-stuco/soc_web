@@ -1,5 +1,5 @@
 {
-  "id": "f0f47efb-2a8f-44fe-8395-8337e851c0ca",
+  "id": "d8632e28-110c-4451-a789-cd92bc549250",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -346,6 +346,150 @@
             "user_id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_sanction": {
+      "name": "user_sanction",
+      "schema": "",
+      "columns": {
+        "sanction_id": {
+          "name": "sanction_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'POSTING_SUSPENDED'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issued_by": {
+          "name": "issued_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_by": {
+          "name": "revoked_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "user_sanction_active_idx": {
+          "name": "user_sanction_active_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "revoked_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_sanction_user_id_users_user_id_fk": {
+          "name": "user_sanction_user_id_users_user_id_fk",
+          "tableFrom": "user_sanction",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_sanction_issued_by_users_user_id_fk": {
+          "name": "user_sanction_issued_by_users_user_id_fk",
+          "tableFrom": "user_sanction",
+          "tableTo": "users",
+          "columnsFrom": [
+            "issued_by"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "user_sanction_revoked_by_users_user_id_fk": {
+          "name": "user_sanction_revoked_by_users_user_id_fk",
+          "tableFrom": "user_sanction",
+          "tableTo": "users",
+          "columnsFrom": [
+            "revoked_by"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -1374,6 +1518,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "home_visible": {
+          "name": "home_visible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "home_order": {
+          "name": "home_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_secret": {
           "name": "is_secret",
           "type": "boolean",
@@ -1419,6 +1576,24 @@
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_at": {
+          "name": "hidden_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_by_user_id": {
+          "name": "hidden_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_reason": {
+          "name": "hidden_reason",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1537,6 +1712,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "article_home_presentation_idx": {
+          "name": "article_home_presentation_idx",
+          "columns": [
+            {
+              "expression": "home_visible",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "home_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_start_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1559,6 +1761,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "author_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "article_hidden_by_user_id_users_user_id_fk": {
+          "name": "article_hidden_by_user_id_users_user_id_fk",
+          "tableFrom": "article",
+          "tableTo": "users",
+          "columnsFrom": [
+            "hidden_by_user_id"
           ],
           "columnsTo": [
             "user_id"
@@ -1755,6 +1970,13 @@
           "notNull": true,
           "default": true
         },
+        "allow_guest_read": {
+          "name": "allow_guest_read",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "sort_order": {
           "name": "sort_order",
           "type": "integer",
@@ -1943,6 +2165,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "is_official": {
+          "name": "is_official",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "status": {
           "name": "status",
           "type": "varchar(20)",
@@ -1967,6 +2196,24 @@
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_at": {
+          "name": "hidden_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_by_user_id": {
+          "name": "hidden_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hidden_reason": {
+          "name": "hidden_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -2047,6 +2294,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "author_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "comment_hidden_by_user_id_users_user_id_fk": {
+          "name": "comment_hidden_by_user_id_users_user_id_fk",
+          "tableFrom": "comment",
+          "tableTo": "users",
+          "columnsFrom": [
+            "hidden_by_user_id"
           ],
           "columnsTo": [
             "user_id"
@@ -2678,6 +2938,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "description_image_url_ko": {
+          "name": "description_image_url_ko",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description_image_url_en": {
+          "name": "description_image_url_en",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "connected_article_id": {
           "name": "connected_article_id",
           "type": "integer",
@@ -2690,6 +2962,27 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'NONE'"
+        },
+        "eligible_soc_affiliations": {
+          "name": "eligible_soc_affiliations",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[\"PRIMARY\",\"DOUBLE\",\"MINOR\"]'::jsonb"
+        },
+        "academic_eligibility": {
+          "name": "academic_eligibility",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ENROLLED_OR_LEAVE'"
+        },
+        "allow_anonymous": {
+          "name": "allow_anonymous",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "allow_multiple_responses": {
           "name": "allow_multiple_responses",
@@ -2778,6 +3071,31 @@
           "primaryKey": false,
           "notNull": false
         },
+        "spreadsheet_id": {
+          "name": "spreadsheet_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "spreadsheet_url": {
+          "name": "spreadsheet_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "spreadsheet_sync_status": {
+          "name": "spreadsheet_sync_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NOT_CONNECTED'"
+        },
+        "spreadsheet_last_synced_at": {
+          "name": "spreadsheet_last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2811,6 +3129,21 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "survey_connected_article_unique_idx": {
+          "name": "survey_connected_article_unique_idx",
+          "columns": [
+            {
+              "expression": "connected_article_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2944,6 +3277,18 @@
         "survey_version_number_check": {
           "name": "survey_version_number_check",
           "value": "\"survey\".\"version_number\" >= 1"
+        },
+        "survey_kind_check": {
+          "name": "survey_kind_check",
+          "value": "\"survey\".\"kind\" in ('SURVEY', 'APPLICATION')"
+        },
+        "survey_academic_eligibility_check": {
+          "name": "survey_academic_eligibility_check",
+          "value": "\"survey\".\"academic_eligibility\" in ('ANY', 'ENROLLED_ONLY', 'ENROLLED_OR_LEAVE')"
+        },
+        "survey_spreadsheet_sync_status_check": {
+          "name": "survey_spreadsheet_sync_status_check",
+          "value": "\"survey\".\"spreadsheet_sync_status\" in ('NOT_CONNECTED', 'CONNECTED', 'ERROR')"
         },
         "survey_previous_version_check": {
           "name": "survey_previous_version_check",
@@ -3100,6 +3445,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "department_ko": {
+          "name": "department_ko",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "department_en": {
+          "name": "department_en",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "role_ko": {
           "name": "role_ko",
           "type": "varchar(100)",
@@ -3111,6 +3468,12 @@
           "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
+        },
+        "avatar_storage_key": {
+          "name": "avatar_storage_key",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
         },
         "gender": {
           "name": "gender",
@@ -3589,6 +3952,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "image_url_en": {
+          "name": "image_url_en",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pledge_status": {
+          "name": "pledge_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "sort_order": {
           "name": "sort_order",
           "type": "integer",
@@ -3883,6 +4258,31 @@
           "notNull": true,
           "default": true
         },
+        "is_hidden_by_admin": {
+          "name": "is_hidden_by_admin",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "category_override": {
+          "name": "category_override",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "override_updated_by_user_id": {
+          "name": "override_updated_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "override_updated_at": {
+          "name": "override_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "uuid",
@@ -4043,6 +4443,19 @@
         }
       },
       "foreignKeys": {
+        "calendar_event_override_updated_by_user_id_users_user_id_fk": {
+          "name": "calendar_event_override_updated_by_user_id_users_user_id_fk",
+          "tableFrom": "calendar_event",
+          "tableTo": "users",
+          "columnsFrom": [
+            "override_updated_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "calendar_event_created_by_user_id_users_user_id_fk": {
           "name": "calendar_event_created_by_user_id_users_user_id_fk",
           "tableFrom": "calendar_event",
@@ -4371,9 +4784,11 @@
       "schema": "public",
       "values": [
         "HERO",
+        "LOGO",
         "TOP_BANNER",
         "QUICK_LINK",
-        "ORGANIZATION_CHART"
+        "ORGANIZATION_CHART",
+        "PLEDGE"
       ]
     },
     "public.site_content_key": {

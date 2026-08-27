@@ -78,6 +78,11 @@ export const articles = pgTable("article", {
     table.status,
     table.postedAt,
   ),
+  index("article_home_presentation_idx").on(
+    table.homeVisible,
+    table.homeOrder,
+    table.eventStartDate,
+  ),
 ]);
 
 /** 인증 사용자별 게시글 조회 기록. 복합 PK가 동일 사용자의 재방문 증가를 막는다. */
