@@ -9,6 +9,7 @@ import { resolveApiBaseUrl } from '@/lib/api-base-url';
 import { getTemporaryAuthRequest } from '@/lib/auth-session';
 import { readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 import { PublicOperationalContent } from '@/features/site-content/public-operational-content';
+import { ChannelTalkProvider } from '@/features/channel-talk/channel-talk-provider';
 
 const HomePage = lazy(() =>
   import('@/pages/home-page').then((module) => ({ default: module.HomePage })),
@@ -120,14 +121,6 @@ function LegacyEventsSurveysRedirect() {
   return <Navigate to={`${destination}${query}`} replace />;
 }
 
-function RouteFallback() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50" aria-busy="true">
-      <div className="h-10 w-[min(22rem,70vw)] animate-pulse rounded-lg bg-slate-200/75" />
-    </div>
-  );
-}
-
 /**
  * Keep an authenticated session alive while the user is actively using the site.
  * Refresh rotation is server-side sliding expiry; this client trigger makes route
@@ -190,9 +183,10 @@ export function App() {
   return (
     <BrowserRouter>
       <SessionKeepAlive />
-      <PublicOperationalContent />
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
+      <ChannelTalkProvider>
+        <PublicOperationalContent />
+        <Suspense fallback={null}>
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/about/roadmap" element={<Navigate to="/about#work" replace />} />
@@ -265,8 +259,9 @@ export function App() {
             <Route path="emails" element={<BulkEmailPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </ChannelTalkProvider>
     </BrowserRouter>
   );
 }

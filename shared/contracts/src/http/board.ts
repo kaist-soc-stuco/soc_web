@@ -287,7 +287,10 @@ export interface CommentItem {
 export interface CommentListResponse {
   page: number;
   limit: number;
+  /** Total published comments, including replies. */
   total: number;
+  /** Total top-level comments used to calculate comment pagination. */
+  topLevelTotal: number;
   items: CommentItem[];
 }
 

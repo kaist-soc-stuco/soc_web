@@ -18,7 +18,6 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Skeleton } from "@/components/ui/skeleton";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { Permissions } from "@/lib/permissions";
@@ -356,7 +355,7 @@ function SiteContentPageContent() {
         <AdminCard className="self-start xl:sticky xl:top-6">
           <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
           <div className="scrollbar-hidden max-h-[680px] overflow-y-auto p-2">
-            {blocksQuery.isLoading && !blocksQuery.data ? <div className="grid gap-2">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-lg" />)}</div>
+            {blocksQuery.isLoading && !blocksQuery.data ? null
               : filteredBlocks.length === 0 ? <div className="px-4 py-16 text-center"><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-medium text-slate-600">조건에 맞는 콘텐츠가 없습니다.</p></div>
               : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block) => <SortableContentBlockItem key={block.contentBlockId} block={block} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
             {orderSaving ? <p className="px-3 pb-3 pt-2 text-xs font-normal text-[#344054]">노출 순서를 저장하는 중입니다.</p> : null}

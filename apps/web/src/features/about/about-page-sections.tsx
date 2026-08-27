@@ -1,6 +1,6 @@
 import { nowDate } from "@soc/shared";
 import { useEffect, useRef, type ReactNode } from "react";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { usePublicContentBlocksByType } from "@/features/site-content/site-content";
@@ -13,8 +13,8 @@ const SECTIONS: Array<{
   labelKo: string;
   labelEn: string;
 }> = [
-  { id: "intro", labelKo: "SOC", labelEn: "SOC" },
-  { id: "work", labelKo: "하는 일", labelEn: "What we do" },
+  { id: "intro", labelKo: "소개", labelEn: "About" },
+  { id: "work", labelKo: "주요 사업", labelEn: "What we do" },
   { id: "people", labelKo: "조직도", labelEn: "Organization chart" },
 ];
 
@@ -41,7 +41,7 @@ export function AboutLandingHero({ lang }: { lang: string }) {
           </h1>
           <p>
             {lang === "ko"
-              ? "KAIST 전산학부 학부생을 대표하는 학생자치기구"
+              ? "KAIST 전산학부 학부생을 대표하는 학생자치기구, SOC입니다."
               : "The student council representing KAIST School of Computing undergraduates"}
           </p>
           <div className="about-hero-links">
@@ -174,7 +174,7 @@ function WorkSection({ lang }: { lang: string }) {
     <section id="work" className="about-anchor-section about-landing-section about-landing-section-muted">
       <div className="about-landing-container">
         <div data-about-reveal>
-          <SectionHeading>{lang === "ko" ? "하는 일" : "What we do"}</SectionHeading>
+          <SectionHeading>{lang === "ko" ? "주요 사업" : "What we do"}</SectionHeading>
         </div>
         <ol className="about-scope-list about-reveal-delay-1" data-about-reveal>
           {scopes.map((scope, index) => (
@@ -192,7 +192,7 @@ function WorkSection({ lang }: { lang: string }) {
         </ol>
 
         <div className="about-work-pledges" data-about-reveal>
-          <h3>{lang === "ko" ? "공약 이행" : "Pledge progress"}</h3>
+          <h3>{lang === "ko" ? "공약 이행 현황" : "Pledge progress"}</h3>
           <PledgesSection lang={lang} />
         </div>
       </div>
@@ -228,10 +228,6 @@ function PeopleSection({ lang }: { lang: string }) {
                 loading="lazy"
                 decoding="async"
               />
-              <span>
-                {lang === "ko" ? "조직도 크게 보기" : "Open organization chart"}
-                <ExternalLink aria-hidden="true" />
-              </span>
             </a>
           ) : (
             <p className="about-empty-state">

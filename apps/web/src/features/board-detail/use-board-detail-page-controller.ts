@@ -38,6 +38,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentPage, setCommentPage] = useState(1);
   const [commentTotal, setCommentTotal] = useState(0);
+  const [commentPageTotal, setCommentPageTotal] = useState(0);
   const [commentText, setCommentText] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
@@ -49,7 +50,6 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const [engagementSubmitting, setEngagementSubmitting] =
     useState<ArticleEngagementKind | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const [revealedAuthorName, setRevealedAuthorName] = useState<string | null>(null);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const navigate = useNavigate();
@@ -143,6 +143,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     setComments([]);
     setCommentPage(1);
     setCommentTotal(0);
+    setCommentPageTotal(0);
 
     Promise.all([
       apiClient.getArticle(category, articleId),
@@ -188,6 +189,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         if (!cancelled) {
           setComments(response.items);
           setCommentTotal(response.total);
+          setCommentPageTotal(response.topLevelTotal ?? response.total);
         }
       })
       .catch(() => {
@@ -216,6 +218,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     });
     setComments(response.items);
     setCommentTotal(response.total);
+    setCommentPageTotal(response.topLevelTotal ?? response.total);
   };
 
   const handleCreateComment = async () => {
@@ -528,32 +531,6 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     }
   };
 
-  const handleRevealAnonymousAuthor = async () => {
-    if (!article?.isAnonymous || !canModerate) return;
-    try {
-      const revealed = await apiClient.revealAnonymousArticleAuthor(
-        category,
-        article.articleId,
-      );
-      setRevealedAuthorName(revealed.authorName);
-      toast({
-        type: "info",
-        message:
-          lang === "ko"
-            ? `익명 작성자: ${revealed.authorName}`
-            : `Anonymous author: ${revealed.authorName}`,
-      });
-    } catch {
-      toast({
-        type: "error",
-        message:
-          lang === "ko"
-            ? "익명 작성자를 확인하지 못했습니다."
-            : "The anonymous author could not be revealed.",
-      });
-    }
-  };
-
   const displayBoardLabel = category === "_EVENT"
     ? (lang === "ko" ? "행사" : "Events")
     : getBoardLabelFromMetadata(
@@ -613,6 +590,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     commentActionSubmitting,
     commentPage,
     commentPageSize: COMMENT_PAGE_SIZE,
+    commentPageTotal,
     commentTotal,
     commentSubmitting,
     commentText,
@@ -631,12 +609,10 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,
-    handleRevealAnonymousAuthor,
     lang,
     loading,
     articleErrorCode,
     posterAsset,
-    revealedAuthorName,
     replySubmitting,
     replyTargetId,
     replyText,

@@ -46,14 +46,13 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
     handleDeleteComment,
     handleUpdateComment,
     handleHideComment,
-    handleRevealAnonymousAuthor,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,
     lang,
     loading,
     posterAsset,
-    revealedAuthorName,
+    commentPageTotal,
     replySubmitting,
     replyTargetId,
     replyText,
@@ -159,13 +158,11 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             lang={lang}
             onDeleteArticle={() => void handleDeleteArticle()}
             onHideArticle={() => { setHideReason(""); setHideDialogOpen(true); }}
-            onRevealAnonymousAuthor={() => void handleRevealAnonymousAuthor()}
             onShare={() => void handleShareArticle()}
             onToggle={(kind, active) =>
               void handleSetArticleEngagement(kind, active)
             }
             posterAsset={posterAsset}
-            revealedAuthorName={revealedAuthorName}
             shareCopied={shareCopied}
             surveyDescription={surveyDescription}
             surveyTitle={surveyTitle}
@@ -185,6 +182,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             commentsLoading={commentsLoading}
             commentPage={commentPage}
             commentPageSize={commentPageSize}
+            commentPageTotal={commentPageTotal}
             commentTotal={commentTotal}
             allowEngagement={allowEngagement}
             canManageComments={canManageComments}

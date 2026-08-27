@@ -11,7 +11,6 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { PageSearchField } from "@/components/ui/page-layout";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import {
   AdminDataTable,
@@ -160,7 +159,14 @@ export function SurveyListPage() {
     const confirmed = await requestConfirm({
       confirmLabel: "삭제하기",
       title: "설문조사 삭제",
-      description: <>정말 <strong className="font-semibold text-slate-900">“{survey.titleKo}”</strong> 설문을 삭제하시겠습니까? 삭제된 응답 데이터는 복구할 수 없습니다.</>,
+      description: (
+        <>
+          <span className="block">
+            정말 <strong className="font-semibold text-slate-900">“{survey.titleKo}”</strong> 설문을 삭제하시겠습니까?
+          </span>
+          <span className="mt-1 block">삭제된 응답 데이터는 복구할 수 없습니다.</span>
+        </>
+      ),
       tone: "danger",
     });
     if (!confirmed) return;
@@ -358,8 +364,6 @@ export function SurveyListPage() {
           </div>
 
           <div className="flex min-w-0 flex-col overflow-visible">
-            {showInitialLoading ? <TableSkeleton columns={7} rows={8} /> : null}
-
             {error ? (
               <div className="m-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">
                 {error}
@@ -380,6 +384,7 @@ export function SurveyListPage() {
                   <col style={{ width: 190 }} />
                   <col style={{ width: 190 }} />
                   <col style={{ width: 104 }} />
+                  <col style={{ width: 72 }} />
                   <col style={{ width: 72 }} />
                 </colgroup>
                 <AdminTableHeader>
@@ -412,7 +417,8 @@ export function SurveyListPage() {
                       최근 수정
                     </AdminSortableHead>
                     <AdminTableHead className="text-center">응답</AdminTableHead>
-                    <AdminTableHead><span className="sr-only">작업</span></AdminTableHead>
+                    <AdminTableHead><span className="sr-only">편집</span></AdminTableHead>
+                    <AdminTableHead><span className="sr-only">더보기</span></AdminTableHead>
                   </tr>
                 </AdminTableHeader>
                 <AdminTableBody>
@@ -461,6 +467,15 @@ export function SurveyListPage() {
                           </div>
                         </AdminTableCell>
                         <AdminTableCell className="text-center">
+                          <IconButton
+                            size="sm"
+                            aria-label={`${survey.titleKo} 편집`}
+                            onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)}
+                          >
+                            <Edit2 className="size-4" />
+                          </IconButton>
+                        </AdminTableCell>
+                        <AdminTableCell className="text-center">
                           <AdminRowActions
                             label={`${survey.titleKo} 작업 메뉴`}
                             onClick={(event) => openRowDropdown(survey.id, event.currentTarget)}
@@ -503,7 +518,6 @@ export function SurveyListPage() {
 
                     return (
                       <>
-                        <AdminActionMenuItem icon={<Edit2 />} onClick={() => { setActiveRowDropdown(null); navigate(`/admin/surveys/${target.id}/edit`); }}>편집</AdminActionMenuItem>
                         {hasResponses && (
                           <AdminActionMenuItem
                             icon={<Link2 />}

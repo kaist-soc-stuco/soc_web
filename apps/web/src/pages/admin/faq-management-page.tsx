@@ -39,7 +39,6 @@ import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
@@ -207,15 +206,13 @@ function FaqManagementPageContent() {
           )}
         />
         <AdminTableCard>
-          {loading && items.length === 0 ? (
-            <TableSkeleton columns={3} rows={6} />
-          ) : (
+          {loading && items.length === 0 ? null : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}>
               <AdminDataTable minWidth={760}>
                 <colgroup>
                   <col style={{ width: 52 }} />
                   <col style={{ width: 280 }} />
-                  <col style={{ width: 1 }} />
+                  <col style={{ width: 320 }} />
                   <col style={{ width: 112 }} />
                 </colgroup>
                 <AdminTableHeader>

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -20,7 +19,6 @@ import { useBoardEditPageController } from "@/features/board-write/use-board-edi
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
-import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import {
   switchEventDateInputMode,
   switchEventEndDateInputMode,
@@ -38,7 +36,6 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     category,
     contentEn,
     contentKo,
-    draftRestoredAt,
     error,
     eventDescriptionKo,
     eventDescriptionEn,
@@ -47,7 +44,6 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     fileInputRef,
     handleSubmit,
     handleUploadThumbnail,
-    handleStartNewDraft,
     handleUploadFiles,
     isAnonymous,
     isAllDay,
@@ -91,8 +87,6 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     : category
       ? `/board/${category}`
       : "/board";
-  const [dismissedDraftAt, setDismissedDraftAt] = useState<string | null>(null);
-  const showDraftRestoredBanner = Boolean(draftRestoredAt && draftRestoredAt !== dismissedDraftAt);
   const templateSnapshot: BoardTemplateSnapshot = {
     boardCode: category,
     titleKo,
@@ -188,18 +182,17 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       selectedSurveyId={selectedSurveyId}
       surveys={surveys}
       isAnonymous={isAnonymous}
+      boardCode={category}
       isEvent={isEvent}
       isPinned={isPinned}
       homeVisible={homeVisible}
-      homeOrder={homeOrder}
       isSecret={isSecret}
       allowSecret={allowSecret}
       onAnonymousChange={setIsAnonymous}
       onPinnedChange={setIsPinned}
       onHomeVisibleChange={setHomeVisible}
-      onHomeOrderChange={setHomeOrder}
       onSecretChange={setIsSecret}
-      anonymousLabel={lang === "ko" ? "익명으로 수정" : "Edit Anonymously"}
+      anonymousLabel={lang === "ko" ? "익명으로 작성" : "Write Anonymously"}
       pinnedLabel={
         isEvent
           ? lang === "ko"
@@ -325,14 +318,6 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
                 className="hidden"
                 onChange={(event) => void handleUploadFiles(event.target.files)}
               />
-
-              {showDraftRestoredBanner ? (
-                <DraftRestoredBanner
-                  savedAt={draftRestoredAt ?? undefined}
-                  onStartNew={handleStartNewDraft}
-                  onDismiss={() => setDismissedDraftAt(draftRestoredAt)}
-                />
-              ) : null}
 
               {isEvent ? (
                 <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">

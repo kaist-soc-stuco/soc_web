@@ -194,7 +194,7 @@ export function BoardArticleTable({
     return (
       <div
         key={post.articleId}
-        className={`interaction-row group flex min-h-12 px-4 py-1.5 md:px-6 ${
+        className={`interaction-row group flex min-h-12 border-b border-slate-100 px-4 py-1.5 md:px-6 ${
           pinned ? "bg-emerald-100/35 hover:bg-emerald-100/50" : ""
         }`}
       >
@@ -287,13 +287,13 @@ export function BoardArticleTable({
 
         <div className="relative min-h-48">
           <div
-            className={`divide-y divide-slate-100 transition-opacity duration-150 ${
+            className={`transition-opacity duration-150 ${
               isLoading && articles.length > 0 ? "opacity-70" : "opacity-100"
             }`}
           >
             {articles.length > 0
               ? articles.map((post) => renderArticleRow(post, post.isPinned))
-              : articles.length === 0 && !isLoading ? (
+              : !showInitialSkeleton ? (
                 <EmptyState
                   className="min-h-48 rounded-none border-0 bg-transparent"
                   message={lang === "ko" ? "등록된 게시글이 없습니다." : "No posts available."}

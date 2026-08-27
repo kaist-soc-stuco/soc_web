@@ -49,7 +49,6 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { downloadBlob } from "@/lib/download-blob";
@@ -424,11 +423,6 @@ function CalendarManagementContent() {
                   >
                     이번 달
                   </Button>
-                  {(dateFrom || dateTo) ? (
-                    <Button type="button" variant="ghost" onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}>
-                      기간 초기화
-                    </Button>
-                  ) : null}
                   <AdminSelectDropdown
                     ariaLabel="일정 분류"
                     value={categoryFilter}
@@ -473,9 +467,7 @@ function CalendarManagementContent() {
             />
           )}
         >
-          {eventsQuery.isPending && !eventsQuery.data ? (
-            <TableSkeleton columns={4} rows={10} />
-          ) : eventsQuery.isError ? (
+          {!eventsQuery.data && eventsQuery.isPending ? null : eventsQuery.isError ? (
             <div className="px-5 py-16 text-center text-sm font-normal text-rose-600">일정을 불러오지 못했습니다.</div>
           ) : (
             <AdminDataTable minWidth={760}>

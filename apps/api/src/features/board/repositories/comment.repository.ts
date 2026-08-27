@@ -35,7 +35,7 @@ export class CommentRepository {
     page: number,
     limit: number,
     viewerUserId?: string,
-  ): Promise<{ items: CommentItem[]; total: number }> {
+  ): Promise<{ items: CommentItem[]; total: number; topLevelTotal: number }> {
     const offset = (page - 1) * limit;
     const baseFilter = and(
       eq(comments.articleId, Number(articleId)),
@@ -44,6 +44,10 @@ export class CommentRepository {
 
     const topLevelFilter = and(baseFilter, isNull(comments.parentCommentId));
     const totalResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(comments)
+      .where(baseFilter);
+    const topLevelTotalResult = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(comments)
       .where(topLevelFilter);
@@ -96,6 +100,7 @@ export class CommentRepository {
 
     return {
       total: Number(totalResult[0]?.count ?? 0),
+      topLevelTotal: Number(topLevelTotalResult[0]?.count ?? 0),
       items: rows.map((row) => ({
         commentId: String(row.commentId),
         articleId: String(row.articleId),

@@ -46,7 +46,7 @@ function NoticeItem({
       to={`/board/${category}/${id}`}
       className={`flex min-h-[2.5rem] items-center overflow-hidden border-b border-slate-100 px-3 transition-colors ${
         isImportant
-          ? "bg-brand-primary-light/35 hover:bg-brand-primary/15"
+          ? "bg-brand-primary-light/35 hover:bg-brand-primary/10"
           : "hover:bg-slate-50/80"
       } ${showGroupDivider ? "border-t border-brand-primary-border/50" : ""}`}
     >
@@ -105,35 +105,10 @@ function formatDate(dateIso: string) {
   return formatNumericDate(dateIso);
 }
 
-function NoticeBoardSkeleton() {
-  return (
-    <div className="grid h-full min-h-0 content-start divide-y divide-slate-100" style={{ gridTemplateRows: `repeat(${HOME_NOTICE_LIMIT}, minmax(2.5rem, auto))` }} aria-busy="true">
-      {Array.from({ length: HOME_NOTICE_LIMIT }).map((_, index) => (
-        <div key={index} className="flex min-h-0 items-center justify-between gap-4 px-3 py-1.5">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div className="home-loading-surface h-5 w-12 shrink-0 rounded-full" />
-            <div
-              className={`home-loading-surface h-3.5 min-w-0 rounded ${
-                index % 3 === 0
-                  ? "w-4/5"
-                  : index % 3 === 1
-                    ? "w-3/5"
-                    : "w-2/3"
-              }`}
-            />
-          </div>
-          <div className="home-loading-surface h-3 w-12 shrink-0 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function NoticeBoard() {
   const { lang } = useLanguage();
   const [activeTab, setActiveTab] = useState(0);
   const [notices, setNotices] = useState<Record<string, NoticeItemProps[]>>({});
-  const [loading, setLoading] = useState(true);
   const [lastLoadedNotices, setLastLoadedNotices] = useState<NoticeItemProps[]>([]);
 
   const tabs = [
@@ -170,12 +145,9 @@ export function NoticeBoard() {
   const renderedNotices = hasCurrentNoticeData
     ? visibleNotices
     : lastLoadedNotices.slice(0, HOME_NOTICE_LIMIT);
-  const showInitialSkeleton = loading && !hasCurrentNoticeData && lastLoadedNotices.length === 0;
-
   useEffect(() => {
     let active = true;
     const fetchNotices = async () => {
-      setLoading(true);
       try {
         const res = await apiClient.getArticles(activeCategory, { limit: 20 });
         // Filter out items with blank/empty titles
@@ -217,10 +189,6 @@ export function NoticeBoard() {
         }
       } catch (err) {
         console.error(err);
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
       }
     };
 
@@ -268,13 +236,9 @@ export function NoticeBoard() {
 
         {/* Notice List */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pb-1 pt-1">
-          {showInitialSkeleton ? (
-            <NoticeBoardSkeleton />
-          ) : renderedNotices.length > 0 ? (
+          {renderedNotices.length > 0 ? (
             <div
-              className={`grid min-h-0 flex-none content-start transition-opacity duration-150 ${
-                loading ? "opacity-70" : "opacity-100"
-              }`}
+              className="grid min-h-0 flex-none content-start"
               style={{
                 gridTemplateRows: `repeat(${renderedNotices.length}, 2.5rem)`,
               }}

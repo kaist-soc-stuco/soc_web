@@ -19,7 +19,6 @@ import { SurveyRespondentDrawer } from "@/components/organisms/survey-respondent
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { Breadcrumbs, PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useToast } from "@/components/ui/toast";
@@ -310,7 +309,6 @@ export function SurveyResponseListPage() {
             ]}
           />
 
-          {showInitialLoading ? <TableSkeleton columns={4} rows={5} /> : null}
           {!showInitialLoading && error ? <div className="rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-normal text-red-700">{error}</div> : null}
           {!showInitialLoading && !error && activeView === "summary" && analytics ? <SurveyResponseSummary analytics={analytics} responses={responses} /> : null}
           {!showInitialLoading && !error && activeView === "questions" && analytics && survey ? (

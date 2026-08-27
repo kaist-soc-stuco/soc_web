@@ -94,8 +94,8 @@ const BOARD_SEEDS: BoardSeed[] = [
   },
   {
     code: "_EVENT",
-    nameKo: "행사 콘텐츠",
-    nameEn: "Event content",
+    nameKo: "행사",
+    nameEn: "Events",
     descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요",
     descriptionEn: "Discover events for School of Computing students.",
     writePermissionId: 1,

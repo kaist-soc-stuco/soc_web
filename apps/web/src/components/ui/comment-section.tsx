@@ -8,9 +8,13 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EngagementActionButton } from "@/components/ui/article-engagement-actions";
-import { UiTextarea } from "@/components/ui/form-control";
+import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { Modal } from "@/components/ui/modal";
 import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+
+const COMMENT_TEXTAREA_CLASS =
+  "block w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[length:var(--ui-text-body-size)] leading-normal text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
 
 type CommentSectionProps = {
   allowEngagement: boolean;
@@ -22,6 +26,7 @@ type CommentSectionProps = {
   commentText: string;
   commentPage: number;
   commentPageSize: number;
+  commentPageTotal: number;
   commentTotal: number;
   comments: CommentItem[];
   commentsLoading: boolean;
@@ -58,6 +63,7 @@ export function CommentSection({
   commentText,
   commentPage,
   commentPageSize,
+  commentPageTotal,
   commentTotal,
   commentError,
   commentSubmitting,
@@ -106,7 +112,7 @@ export function CommentSection({
             {lang === "ko" ? "아직 등록된 댓글이 없습니다." : "No comments yet."}
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="divide-y divide-slate-100">
             {topLevelComments.map((comment) => {
               const replies = repliesByParent.get(comment.commentId) ?? [];
               const showReplyComposer = replyTargetId === comment.commentId;
@@ -177,13 +183,13 @@ export function CommentSection({
         )}
       </div>
 
-      {commentTotal > commentPageSize ? (
+      {commentPageTotal > commentPageSize ? (
         <Pagination
           className="mt-4 border-t border-slate-100 pt-3"
           currentPage={commentPage}
           lang={lang}
           onPageChange={onCommentPageChange}
-          totalPages={Math.ceil(commentTotal / commentPageSize)}
+          totalPages={Math.ceil(commentPageTotal / commentPageSize)}
         />
       ) : null}
 
@@ -257,21 +263,23 @@ function CommentRow({
 }) {
   const likeActionKey = `${comment.commentId}:LIKE`;
   const likeActive = isAuthenticated && comment.viewerHasLiked;
-  const [deletePopoverOpen, setDeletePopoverOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [hideModalOpen, setHideModalOpen] = useState(false);
   const [hideReason, setHideReason] = useState("");
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(comment.content);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const handleDeleteConfirm = async () => {
-    setDeletePopoverOpen(false);
+    setDeleteModalOpen(false);
     await onDeleteComment(comment.commentId);
   };
 
   const handleHideConfirm = async () => {
     if (!hideReason.trim()) return;
-    setDeletePopoverOpen(false);
-    await onHideComment(comment.commentId, hideReason);
+    const reason = hideReason.trim();
+    setHideModalOpen(false);
+    await onHideComment(comment.commentId, reason);
     setHideReason("");
   };
 
@@ -287,7 +295,7 @@ function CommentRow({
     <article
       className={cn(
         "group flex items-start gap-2.5 py-3.5",
-        isNested ? "ml-9 border-l-2 border-slate-100 pl-3" : "",
+        isNested ? "ml-9 border-l border-r border-t border-slate-100 pl-3" : "",
       )}
     >
       <div className="size-6 shrink-0 overflow-hidden rounded-full">
@@ -361,58 +369,20 @@ function CommentRow({
                   variant="ghost"
                   size="icon"
                   aria-label={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
-                  aria-expanded={deletePopoverOpen}
-                  onClick={() => setDeletePopoverOpen((open) => !open)}
+                  aria-expanded={canDelete ? deleteModalOpen : hideModalOpen}
+                  onClick={() => {
+                    if (canDelete) {
+                      setDeleteModalOpen(true);
+                      return;
+                    }
+                    setHideReason("");
+                    setHideModalOpen(true);
+                  }}
                   className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                   title={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                 >
                   {canDelete ? <Trash2 className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
                 </Button>
-                {deletePopoverOpen ? (
-                  <div
-                    aria-label={lang === "ko" ? "댓글 삭제 확인" : "Confirm comment deletion"}
-                    className="absolute bottom-full right-0 z-30 mb-2 w-52 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.14)]"
-                    role="dialog"
-                  >
-                    <p className="text-[length:var(--ui-text-body-sm-size)] font-semibold leading-5 text-slate-800">
-                      {canDelete
-                        ? (lang === "ko" ? "댓글 삭제" : "Delete comment")
-                        : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
-                    </p>
-                    <p className="mt-1 text-[length:var(--ui-text-body-sm-size)] font-normal leading-5 text-slate-600">
-                      {canDelete
-                        ? (lang === "ko" ? "이 댓글을 영구적으로 삭제하시겠습니까? 삭제된 댓글은 되돌릴 수 없습니다." : "Delete this comment permanently? Deleted comments cannot be restored.")
-                        : (lang === "ko" ? "숨김 사유를 입력해 주세요." : "Enter a reason for hiding this comment.")}
-                    </p>
-                    {!canDelete ? (
-                      <UiTextarea
-                        className="mt-2 min-h-20"
-                        value={hideReason}
-                        onChange={(event) => setHideReason(event.target.value)}
-                        placeholder={lang === "ko" ? "관리 기록에 남을 사유" : "Reason recorded in the audit log"}
-                      />
-                    ) : null}
-                    <div className="mt-2.5 flex justify-end gap-1.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setDeletePopoverOpen(false)}
-                      >
-                        {lang === "ko" ? "취소" : "Cancel"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        disabled={commentActionSubmitting === comment.commentId || (!canDelete && !hideReason.trim())}
-                        onClick={() => void (canDelete ? handleDeleteConfirm() : handleHideConfirm())}
-                      >
-                        {canDelete ? (lang === "ko" ? "삭제" : "Delete") : (lang === "ko" ? "숨기기" : "Hide")}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
               </div>
             )}
             {canDelete ? (
@@ -432,15 +402,107 @@ function CommentRow({
             ) : null}
           </div>
         </div>
+        {canDelete ? (
+          <Modal
+            open={deleteModalOpen}
+            onClose={() => {
+              if (commentActionSubmitting !== comment.commentId) {
+                setDeleteModalOpen(false);
+              }
+            }}
+            title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
+            showClose={false}
+            className="max-w-sm"
+            footer={(
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={commentActionSubmitting === comment.commentId}
+                  onClick={() => setDeleteModalOpen(false)}
+                >
+                  {lang === "ko" ? "취소" : "Cancel"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={commentActionSubmitting === comment.commentId}
+                  onClick={() => void handleDeleteConfirm()}
+                >
+                  {lang === "ko" ? "삭제" : "Delete"}
+                </Button>
+              </>
+            )}
+          >
+            <p className="text-sm font-normal leading-6 text-slate-600">
+              {lang === "ko" ? (
+                <>
+                  <span className="block">이 댓글을 영구적으로 삭제하시겠습니까?</span>
+                  <span className="block">삭제된 댓글은 되돌릴 수 없습니다.</span>
+                </>
+              ) : (
+                <>
+                  <span className="block">Delete this comment permanently?</span>
+                  <span className="block">Deleted comments cannot be restored.</span>
+                </>
+              )}
+            </p>
+          </Modal>
+        ) : null}
+        {!canDelete && canModerate ? (
+          <Modal
+            open={hideModalOpen}
+            onClose={() => {
+              if (commentActionSubmitting !== comment.commentId) {
+                setHideModalOpen(false);
+              }
+            }}
+            title={lang === "ko" ? "댓글 숨기기" : "Hide comment"}
+            showClose={false}
+            className="max-w-sm"
+            footer={(
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={commentActionSubmitting === comment.commentId}
+                  onClick={() => setHideModalOpen(false)}
+                >
+                  {lang === "ko" ? "취소" : "Cancel"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={commentActionSubmitting === comment.commentId || !hideReason.trim()}
+                  onClick={() => void handleHideConfirm()}
+                >
+                  {lang === "ko" ? "숨기기" : "Hide"}
+                </Button>
+              </>
+            )}
+          >
+            <div className="space-y-3">
+              <p className="text-sm font-normal leading-6 text-slate-600">
+                {lang === "ko" ? "숨김 사유를 입력해 주세요." : "Enter a reason for hiding this comment."}
+              </p>
+              <UiInput
+                autoFocus
+                value={hideReason}
+                onChange={(event) => setHideReason(event.currentTarget.value)}
+                placeholder={lang === "ko" ? "관리 기록에 남길 사유" : "Reason recorded in the audit log"}
+              />
+            </div>
+          </Modal>
+        ) : null}
         {editing ? (
           <div className="mt-2">
-            <UiTextarea
-              autoFocus
-              rows={3}
-              value={editText}
-              onChange={(event) => setEditText(event.target.value)}
-              className="text-[length:var(--ui-text-body-size)] font-normal"
-            />
+              <UiTextarea
+                autoFocus
+                rows={3}
+                value={editText}
+                onChange={(event) => setEditText(event.target.value)}
+                className={cn(COMMENT_TEXTAREA_CLASS, "min-h-[5rem] font-medium")}
+              />
             <div className="mt-2 flex justify-end gap-1.5">
               <Button
                 type="button"
@@ -461,7 +523,7 @@ function CommentRow({
             </div>
           </div>
         ) : (
-          <p className="mt-1 whitespace-pre-line text-[length:var(--ui-text-body-size)] font-normal leading-relaxed text-slate-700">
+            <p className="mt-0 whitespace-pre-line text-[length:var(--ui-text-body-size)] font-normal leading-relaxed text-slate-700">
             {comment.content}
           </p>
         )}
@@ -507,7 +569,7 @@ function CommentComposer({
         placeholder={placeholder}
         aria-label={ariaLabel}
         disabled={disabled}
-        className="block min-h-[2.625rem] w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-12 text-[length:var(--ui-text-body-size)] font-medium leading-normal text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+        className={cn(COMMENT_TEXTAREA_CLASS, "min-h-[2.625rem] pr-12 font-medium")}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey && hasText && !disabled) {
             event.preventDefault();

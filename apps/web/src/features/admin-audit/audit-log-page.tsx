@@ -15,7 +15,6 @@ import { UiInput } from "@/components/ui/form-control";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
-import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { downloadBlob } from "@/lib/download-blob";
@@ -235,7 +234,7 @@ export function AuditLogPage() {
             </div>
 
             <div className={refreshing ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
-              {data === null && loading ? <TableSkeleton columns={5} rows={8} /> : error && data === null ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
+              {error && data === null ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
                 <AdminDataTable minWidth={900}>
                   <colgroup><col style={{ width: 150 }} /><col style={{ width: 112 }} /><col style={{ width: 230 }} /><col /><col style={{ width: 150 }} /></colgroup>
                   <AdminTableHeader>
@@ -265,7 +264,7 @@ export function AuditLogPage() {
                     ))}
                   </AdminTableBody>
                 </AdminDataTable>
-              ) : data ? <EmptyState message="등록된 운영 로그가 없습니다." className="m-5" /> : <Skeleton className="m-5 h-52" />}
+              ) : data ? <EmptyState message="등록된 운영 로그가 없습니다." className="m-5" /> : null}
             </div>
 
             <div className="border-t border-slate-100 px-5 py-3">

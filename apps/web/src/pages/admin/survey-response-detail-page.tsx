@@ -11,7 +11,6 @@ import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminCard, AdminCardHeader, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle } from "@/components/ui/admin-page";
 import { Permissions } from "@/lib/permissions";
 import { ChevronLeft, ClipboardCheck, FileText, Image as ImageIcon, Music, User, Video } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { formatSurveyAnswer } from "@/lib/survey-answer-display";
 import { resolveAssetUrl } from "@/lib/asset-url";
@@ -124,7 +123,7 @@ export function SurveyResponseDetailPage() {
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
-        <AdminPageMain>
+        <AdminPageMain aria-busy={loading}>
           <AdminPageHeader
             title="설문 응답 상세"
             actions={
@@ -135,37 +134,6 @@ export function SurveyResponseDetailPage() {
               </Button>
             }
           />
-
-          {loading && (
-            <div className="space-y-6" aria-busy="true">
-              <AdminCard className="p-5">
-                <div className="border-b border-slate-100 pb-3">
-                  <Skeleton className="h-5 w-44" />
-                </div>
-                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Skeleton className="h-3 w-14" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                  ))}
-                </div>
-              </AdminCard>
-              <AdminCard className="p-5">
-                <div className="border-b border-slate-100 pb-3">
-                  <Skeleton className="h-5 w-36" />
-                </div>
-                <div className="mt-6 space-y-6">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="space-y-3 border-b border-slate-100 pb-6 last:border-0 last:pb-0">
-                      <Skeleton className="h-5 w-2/3" />
-                      <Skeleton className="h-16 w-full rounded-xl" />
-                    </div>
-                  ))}
-                </div>
-              </AdminCard>
-            </div>
-          )}
 
           {error && (
             <div className="rounded-lg border border-rose-200 bg-white px-4 py-3 text-sm font-normal text-rose-700">

@@ -257,9 +257,9 @@ export function Header({ variant = "default" }: HeaderProps) {
             label: "학생회 소개",
             href: "/about",
             megaItems: [
-              { label: "SOC", href: "/about#intro" },
-              { label: "하는 일", href: "/about#work" },
-              { label: "조직과 사람", href: "/about#people" },
+              { label: "소개", href: "/about#intro" },
+              { label: "주요 사업", href: "/about#work" },
+              { label: "조직도", href: "/about#people" },
             ],
           },
         ]
@@ -285,9 +285,9 @@ export function Header({ variant = "default" }: HeaderProps) {
             label: "About",
             href: "/about",
             megaItems: [
-              { label: "SOC", href: "/about#intro" },
-              { label: "What we do", href: "/about#work" },
-              { label: "Organization & People", href: "/about#people" },
+              { label: "About", href: "/about#intro" },
+              { label: "Programs", href: "/about#work" },
+              { label: "Organization chart", href: "/about#people" },
             ],
           },
         ];
@@ -400,7 +400,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     id={`site-nav-flyout-${index}`}
                     role="menu"
                     aria-label={`${item.label} ${lang === "ko" ? "하위 메뉴" : "submenu"}`}
-                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b transition-[opacity,transform,visibility] duration-150 ease-out ${
+                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-t transition-[opacity,transform,visibility] duration-150 ease-out ${
                       variant === "home"
                         ? "border-white/15 bg-[rgba(8,29,23,0.84)] shadow-[0_18px_36px_-22px_rgba(0,0,0,0.72)] backdrop-blur-xl backdrop-saturate-150"
                         : "border-[var(--ui-menu-divider)] bg-white shadow-[0_10px_18px_-20px_rgba(15,23,42,0.38)]"

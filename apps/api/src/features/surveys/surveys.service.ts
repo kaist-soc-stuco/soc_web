@@ -178,8 +178,8 @@ export class SurveysService {
     }
     this.assertAudienceConfiguration({
       feePayersOnly: dto.feeRequirementPolicy === "PAID_ONLY",
-      eligibleSocAffiliations: dto.eligibleSocAffiliations ?? ["PRIMARY", "DOUBLE", "MINOR"],
-      academicEligibility: dto.academicEligibility ?? "ENROLLED_OR_LEAVE",
+      eligibleSocAffiliations: dto.eligibleSocAffiliations ?? [],
+      academicEligibility: dto.academicEligibility ?? "ANY",
       allowAnonymous: dto.allowAnonymous ?? false,
     });
     await this.assertConnectedArticleAvailable(dto.connectedArticleId);

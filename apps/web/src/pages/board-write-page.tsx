@@ -191,16 +191,15 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       selectedSurveyId={selectedSurveyId}
       surveys={surveys}
       isAnonymous={isAnonymous}
+      boardCode={selectedCategory}
       isEvent={isEvent}
       isPinned={isPinned}
       homeVisible={homeVisible}
-      homeOrder={homeOrder}
       isSecret={isSecret}
       allowSecret={selectedBoard?.allowSecret ?? false}
       onAnonymousChange={setIsAnonymous}
       onPinnedChange={setIsPinned}
       onHomeVisibleChange={setHomeVisible}
-      onHomeOrderChange={setHomeOrder}
       onSecretChange={setIsSecret}
       stacked={isEvent}
     />
