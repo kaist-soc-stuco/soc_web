@@ -791,20 +791,6 @@ async function upsertSeedAuthor() {
 async function seedAboutPageContent(seedAuthorId: string) {
   await db.insert(contentBlocks).values([
     {
-      type: "TOP_BANNER",
-      status: "PUBLISHED",
-      titleKo: "2026 봄학기 학생회 운영 안내",
-      titleEn: "Spring 2026 Student Council Operations",
-      bodyKo: "공지·행사·복지 문의를 홈페이지에서 한 번에 확인하세요.",
-      bodyEn: "Find notices, events, and welfare information in one place.",
-      linkUrl: "/board/공지",
-      sortOrder: 0,
-      createdBy: seedAuthorId,
-      updatedBy: seedAuthorId,
-      publishedBy: seedAuthorId,
-      publishedAt: new Date("2026-03-02T09:00:00+09:00"),
-    },
-    {
       type: "QUICK_LINK",
       status: "PUBLISHED",
       titleKo: "행사·일정 확인",
