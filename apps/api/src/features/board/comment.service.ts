@@ -96,6 +96,7 @@ export class CommentService {
       page,
       limit,
       total: result.total,
+      topLevelTotal: result.topLevelTotal,
       items: result.items,
     };
   }

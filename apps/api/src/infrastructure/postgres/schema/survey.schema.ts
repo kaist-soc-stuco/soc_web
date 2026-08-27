@@ -36,10 +36,10 @@ export const surveys = pgTable("survey", {
   eligibleSocAffiliations: jsonb("eligible_soc_affiliations")
     .$type<Array<"PRIMARY" | "DOUBLE" | "MINOR">>()
     .notNull()
-    .default(sql`'["PRIMARY","DOUBLE","MINOR"]'::jsonb`),
+    .default(sql`'[]'::jsonb`),
   academicEligibility: varchar("academic_eligibility", { length: 30 })
     .notNull()
-    .default("ENROLLED_OR_LEAVE"),
+    .default("ANY"),
   allowAnonymous: boolean("allow_anonymous").notNull().default(false),
   allowMultipleResponses: boolean("allow_multiple_responses").notNull().default(false),
   allowResponseEdit: boolean("allow_response_edit").notNull().default(false),

@@ -94,7 +94,11 @@ export function AdminTableCard({
     >
       {toolbar ? <div className="border-b border-slate-100">{toolbar}</div> : null}
       {children}
-      {pagination ? <div className="border-t border-slate-100 bg-white px-5 py-3">{pagination}</div> : null}
+      {pagination ? (
+        <div className="flex min-h-16 items-center border-t border-slate-100 bg-white px-5 py-3 [&_.ui-pagination]:m-0">
+          {pagination}
+        </div>
+      ) : null}
     </section>
   );
 }

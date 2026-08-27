@@ -254,26 +254,31 @@ export function MyPageProfilePanel({
   lang,
   userInfo,
 }: ProfilePanelProps) {
+  const affiliation = [
+    lang === "ko"
+      ? userInfo?.departmentKo || userInfo?.departmentEn
+      : userInfo?.departmentEn || userInfo?.departmentKo,
+    userInfo?.academicStatus,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(" · ");
+  const primaryMajor = [affiliation, userInfo?.primaryMajor]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .join(" · ") || "-";
+
   const profileRows = [
     [lang === "ko" ? "이름" : "Name", displayName],
     [lang === "ko" ? "학번" : "Student ID", userInfo?.studentNumber ?? "-"],
     [lang === "ko" ? "이메일" : "Email", userInfo?.email ?? "-"],
     [lang === "ko" ? "KAIST UID" : "KAIST UID", userInfo?.kaistUid ?? "-"],
-    [lang === "ko" ? "주전공" : "Primary major", userInfo?.primaryMajor ?? "-"],
+    [lang === "ko" ? "주전공" : "Primary major", primaryMajor],
     [lang === "ko" ? "복수전공" : "Double major", userInfo?.doubleMajor ?? "-"],
     [lang === "ko" ? "부전공" : "Minor", userInfo?.minor ?? "-"],
     [lang === "ko" ? "성별" : "Gender", userInfo?.gender ?? "-"],
     [
       lang === "ko" ? "전화번호" : "Phone",
       userInfo?.phoneNumber ?? userInfo?.userMobile ?? "-",
-    ],
-    [
-      lang === "ko" ? "소속" : "Affiliation",
-      `${
-        (lang === "ko"
-          ? userInfo?.departmentKo || userInfo?.departmentEn
-          : userInfo?.departmentEn || userInfo?.departmentKo) ?? "-"
-      }${userInfo?.academicStatus ? ` (${userInfo.academicStatus})` : ""}`,
     ],
     [lang === "ko" ? "상태" : "Status", userInfo?.academicStatus ?? "-"],
     [

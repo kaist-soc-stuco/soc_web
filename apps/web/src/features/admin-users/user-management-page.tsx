@@ -15,7 +15,6 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/ui/modal";
 import { UiTextarea } from "@/components/ui/form-control";
 import { useToast } from "@/components/ui/toast";
@@ -330,8 +329,8 @@ export function UserManagementPage() {
                   onChange={(value) => { setAcademicStatusFilter(value as AcademicStatusFilter); setCurrentPage(1); }}
                   options={[
                     { value: "all", label: "전체 학적" },
-                    { value: "재학", label: `재학 ${data?.facets.academic.enrolled ?? 0}명` },
-                    { value: "졸업", label: `졸업 ${data?.facets.academic.graduated ?? 0}명` },
+                    { value: "재학", label: "재학" },
+                    { value: "졸업", label: "졸업" },
                   ]}
                 />
                 <AdminSelectDropdown
@@ -341,9 +340,9 @@ export function UserManagementPage() {
                   onChange={(value) => { setMajorTypeFilter(value as MajorTypeFilter); setCurrentPage(1); }}
                   options={[
                     { value: "all", label: "전체 전공" },
-                    { value: "PRIMARY", label: `주전공 ${data?.facets.primaryMajor ?? 0}명` },
-                    { value: "DOUBLE", label: `복수전공 ${data?.facets.doubleMajor ?? 0}명` },
-                    { value: "MINOR", label: `부전공 ${data?.facets.minor ?? 0}명` },
+                    { value: "PRIMARY", label: "주전공" },
+                    { value: "DOUBLE", label: "복수전공" },
+                    { value: "MINOR", label: "부전공" },
                   ]}
                 />
                 <AdminSelectDropdown
@@ -353,9 +352,9 @@ export function UserManagementPage() {
                   onChange={(value) => { setFeeStatusFilter(value as FeeStatusFilter); setCurrentPage(1); }}
                   options={[
                     { value: "all", label: "전체 과비" },
-                    { value: "PAID", label: `완납 ${data?.facets.paid ?? 0}명` },
-                    { value: "PARTIAL", label: `부분 납부 ${data?.facets.partial ?? 0}명` },
-                    { value: "UNPAID", label: `미납 ${data?.facets.unpaid ?? 0}명` },
+                    { value: "PAID", label: "완납" },
+                    { value: "PARTIAL", label: "부분 납부" },
+                    { value: "UNPAID", label: "미납" },
                   ]}
                 />
               </div>
@@ -381,9 +380,7 @@ export function UserManagementPage() {
               </div>
             ) : null}
 
-            {showInitialLoading ? (
-              <TableSkeleton columns={6} rows={8} />
-            ) : error && !data ? (
+            {showInitialLoading ? null : error && !data ? (
               <div className="m-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
                 {error}
               </div>

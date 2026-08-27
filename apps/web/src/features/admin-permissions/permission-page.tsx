@@ -343,7 +343,7 @@ export function PermissionPage() {
               </AdminCardHeader>
               <div className="border-b border-slate-100 p-3"><AdminSearchField aria-label="역할 검색" placeholder="역할 검색" value={roleQuery} onValueChange={setRoleQuery} /></div>
               <div className="scrollbar-hidden max-h-[560px] overflow-y-auto p-2">
-                {loading && roles.length === 0 ? <div className="grid gap-1 p-1">{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-14 w-full rounded-lg" />)}</div>
+                {loading && roles.length === 0 ? null
                   : filteredRoles.length === 0 ? <p className="px-3 py-10 text-center text-sm font-normal text-[#344054]">검색 결과가 없습니다.</p>
                   : <div className="grid gap-1" role="listbox" aria-label="역할 목록">{filteredRoles.map((role) => {
                       const selected = role.roleGroupId === selectedRoleId;

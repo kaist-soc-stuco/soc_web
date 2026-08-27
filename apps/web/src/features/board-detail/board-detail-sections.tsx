@@ -44,11 +44,9 @@ interface ArticleCardProps {
   lang: string;
   onDeleteArticle: () => void;
   onHideArticle: () => void;
-  onRevealAnonymousAuthor: () => void;
   onShare: () => void;
   onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   posterAsset?: ArticleAssetItem;
-  revealedAuthorName?: string | null;
   shareCopied: boolean;
   surveyDescription: string;
   surveyTitle: string;
@@ -69,11 +67,9 @@ export function BoardDetailArticleCard({
   lang,
   onDeleteArticle,
   onHideArticle,
-  onRevealAnonymousAuthor,
   onShare,
   onToggle,
   posterAsset,
-  revealedAuthorName,
   shareCopied,
   surveyDescription,
   surveyTitle,
@@ -91,8 +87,8 @@ export function BoardDetailArticleCard({
             <span>
             {article.isAnonymous
                 ? lang === "ko"
-                  ? revealedAuthorName ? `익명 · ${revealedAuthorName}` : "익명"
-                  : revealedAuthorName ? `Anonymous · ${revealedAuthorName}` : "Anonymous"
+                  ? "익명"
+                  : "Anonymous"
                 : article.author.name}
             </span>
             <span className="text-slate-300">·</span>
@@ -123,7 +119,7 @@ export function BoardDetailArticleCard({
                   sideOffset={6}
                   collisionPadding={12}
                 >
-                  <AdminActionMenuPanel className="w-32 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
+                  <AdminActionMenuPanel className="w-44 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
                     {canEdit ? (
                       <>
                         <DropdownMenu.Item asChild>
@@ -143,13 +139,6 @@ export function BoardDetailArticleCard({
                     ) : null}
                     {canModerate ? (
                       <>
-                        {article.isAnonymous ? (
-                          <DropdownMenu.Item asChild>
-                            <AdminActionMenuItem icon={<Eye />} onClick={onRevealAnonymousAuthor}>
-                              {lang === "ko" ? "익명 작성자 확인" : "Reveal author"}
-                            </AdminActionMenuItem>
-                          </DropdownMenu.Item>
-                        ) : null}
                         <DropdownMenu.Item asChild>
                           <AdminActionMenuItem icon={<EyeOff />} tone="danger" onClick={onHideArticle}>
                             {lang === "ko" ? "게시글 숨기기" : "Hide post"}

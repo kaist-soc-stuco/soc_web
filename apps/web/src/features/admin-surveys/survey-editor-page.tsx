@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
   ArticleListItem,
@@ -339,9 +339,13 @@ function QuestionDragOverlayRow({
 }
 
 export function SurveyEditorPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { id: surveyId } = useParams<{ id: string }>();
   const isEdit = Boolean(surveyId);
+  const skipDraftRestore = Boolean(
+    (location.state as { skipDraftRestore?: boolean } | null)?.skipDraftRestore,
+  );
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
   const { toast } = useToast();
@@ -358,8 +362,8 @@ export function SurveyEditorPage() {
       kind: "SURVEY",
       resultVisibility: "PRIVATE",
       feePayersOnly: false,
-      eligibleSocAffiliations: ["PRIMARY", "DOUBLE", "MINOR"],
-      academicEligibility: "ENROLLED_OR_LEAVE",
+      eligibleSocAffiliations: [],
+      academicEligibility: "ANY",
       allowAnonymous: false,
       isKoreanOnly: false,
       allowMultipleResponses: false,
@@ -433,6 +437,7 @@ export function SurveyEditorPage() {
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
   const creatingDraftRef = useRef<Promise<string> | null>(null);
+  const initialDraftLoadAttemptedRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -465,8 +470,8 @@ export function SurveyEditorPage() {
             resultVisibility:
               detail.resultVisibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
             feePayersOnly: detail.feePayersOnly,
-            eligibleSocAffiliations: detail.eligibleSocAffiliations ?? ["PRIMARY", "DOUBLE", "MINOR"],
-            academicEligibility: detail.academicEligibility ?? "ENROLLED_OR_LEAVE",
+            eligibleSocAffiliations: detail.eligibleSocAffiliations ?? [],
+            academicEligibility: detail.academicEligibility ?? "ANY",
             allowAnonymous: detail.allowAnonymous ?? false,
             isKoreanOnly: detail.isKoreanOnly ?? false,
             allowMultipleResponses: detail.allowMultipleResponses ?? false,
@@ -495,6 +500,9 @@ export function SurveyEditorPage() {
           if (detail.lifecycleStatus === "DRAFT") {
             setDraftRestoredAt(detail.updatedAt);
             setDraftBannerVisible(true);
+          } else {
+            setDraftRestoredAt(null);
+            setDraftBannerVisible(false);
           }
 
           if (detail.connectedPostId) {
@@ -579,6 +587,8 @@ export function SurveyEditorPage() {
         setLoadedSurveyId(created.id);
         setLoadedLifecycleStatus(detail.lifecycleStatus);
         setSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
+        setDraftRestoredAt(detail.updatedAt);
+        setDraftBannerVisible(true);
         form.setValue("isPublished", false);
         setSaveState("saved");
         navigate(`/admin/surveys/${created.id}/edit`, { replace: true });
@@ -594,6 +604,43 @@ export function SurveyEditorPage() {
 
     return creatingDraftRef.current;
   };
+
+  useEffect(() => {
+    if (sessionLoading || !session?.authenticated) return;
+    if ((session.permission ?? 0) & Permissions.MANAGE_SURVEY) {
+      if (isEdit) {
+        // Allow the restore check to run again when the user chooses "새로 쓰기".
+        initialDraftLoadAttemptedRef.current = false;
+        return;
+      }
+      if (skipDraftRestore) {
+        initialDraftLoadAttemptedRef.current = true;
+        return;
+      }
+      if (initialDraftLoadAttemptedRef.current) return;
+      initialDraftLoadAttemptedRef.current = true;
+
+      void (async () => {
+        try {
+          const drafts = await client.listSurveys();
+          const currentUserDrafts = drafts
+            .filter((survey) => survey.lifecycleStatus === "DRAFT")
+            .filter((survey) => !session.userId || survey.creatorId === session.userId)
+            .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+          const draft = currentUserDrafts[0];
+          if (draft) {
+            navigate(`/admin/surveys/${draft.id}/edit`, { replace: true });
+            return;
+          }
+
+          await ensureDraft();
+        } catch {
+          // The editor can still be used without automatic draft restoration;
+          // the normal save/content-tab flow will report any creation error.
+        }
+      })();
+    }
+  }, [isEdit, navigate, session, sessionLoading, skipDraftRestore]);
 
   const handleSaveSettings = async (
     values: SurveySettingsFormValues,
@@ -627,6 +674,18 @@ export function SurveyEditorPage() {
       }
     }
     setTab(nextTab);
+  };
+
+  const handleStartNewSurvey = () => {
+    setDraftBannerVisible(false);
+    setDraftRestoredAt(null);
+    setLoadedSurveyId(null);
+    setLoadedLifecycleStatus(null);
+    setSections([]);
+    setError(null);
+    setSaveState("idle");
+    form.reset();
+    navigate("/admin/surveys/new", { state: { skipDraftRestore: true } });
   };
 
   const handleAddSection = async () => {
@@ -960,8 +1019,9 @@ export function SurveyEditorPage() {
                 ) : null}
                 <Button
                   type="button"
+                  variant="secondary"
                   disabled={saving}
-                  className="gap-1.5 bg-brand-primary text-white hover:bg-brand-primary/90"
+                  className="gap-1.5"
                   onClick={() => void form.handleSubmit((values) => handleSaveSettings(values))()}
                 >
                   <Save className="size-4" /> 저장
@@ -973,17 +1033,17 @@ export function SurveyEditorPage() {
                     className="bg-brand-primary text-white hover:bg-brand-primary/90"
                     onClick={() => void form.handleSubmit((values) => handleSaveSettings(values, { publish: true }))()}
                   >
-                    게시하기
+                    게시
                   </Button>
                 ) : null}
               </>
             }
           />
 
-          {isEdit && draftBannerVisible && loadedLifecycleStatus === "DRAFT" ? (
+          {draftBannerVisible && loadedLifecycleStatus === "DRAFT" ? (
             <DraftRestoredBanner
               savedAt={draftRestoredAt}
-              onStartNew={() => navigate("/admin/surveys/new")}
+              onStartNew={handleStartNewSurvey}
               onDismiss={() => setDraftBannerVisible(false)}
             />
           ) : null}

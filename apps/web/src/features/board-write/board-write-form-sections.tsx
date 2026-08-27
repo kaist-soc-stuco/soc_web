@@ -367,13 +367,6 @@ export function BoardWriteEventFields({
           />
         </UiFormField>
       </div>
-      {isEventAlwaysOpen && (
-        <p className="rounded-lg bg-brand-primary-light px-3 py-2 text-[length:var(--ui-text-caption-size)] font-semibold text-brand-primary">
-          {lang === "ko"
-            ? "상시 일정으로 저장하면 캘린더에는 특정 날짜 점으로 표시되지 않습니다."
-            : "Always-open events are saved without fixed calendar dots."}
-        </p>
-      )}
       <UiFormField
         label={
           lang === "ko"
@@ -530,12 +523,11 @@ interface BoardWriteSettingsProps {
   onPinnedChange: (checked: boolean) => void;
   onSecretChange: (checked: boolean) => void;
   anonymousLabel?: string;
+  boardCode?: string;
   pinnedLabel?: string;
   isEvent?: boolean;
   homeVisible?: boolean;
-  homeOrder?: string;
   onHomeVisibleChange?: (checked: boolean) => void;
-  onHomeOrderChange?: (value: string) => void;
   stacked?: boolean;
 }
 
@@ -555,12 +547,11 @@ export function BoardWriteSettings({
   onPinnedChange,
   onSecretChange,
   anonymousLabel,
+  boardCode,
   pinnedLabel,
   isEvent = false,
   homeVisible = true,
-  homeOrder = "",
   onHomeVisibleChange,
-  onHomeOrderChange,
   stacked = false,
 }: BoardWriteSettingsProps) {
   return (
@@ -688,34 +679,36 @@ export function BoardWriteSettings({
               </label>
             )}
 
-            <label className="flex items-center gap-2.5 cursor-pointer group">
-              <div
-                className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
-                  allowComment
-                    ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
-                    : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
-                }`}
-              >
-                {allowComment && (
-                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                )}
-              </div>
-              <UiInput
-                type="checkbox"
-                className="hidden"
-                checked={allowComment}
-                onChange={(event) => onAllowCommentChange(event.target.checked)}
-              />
-              <span className="text-xs font-bold text-slate-700">
-                {lang === "ko" ? "댓글 작성 허용" : "Allow Comments"}
-              </span>
-            </label>
+            {boardCode !== "건의사항" ? (
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <div
+                  className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
+                    allowComment
+                      ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
+                      : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
+                  }`}
+                >
+                  {allowComment && (
+                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                  )}
+                </div>
+                <UiInput
+                  type="checkbox"
+                  className="hidden"
+                  checked={allowComment}
+                  onChange={(event) => onAllowCommentChange(event.target.checked)}
+                />
+                <span className="text-xs font-bold text-slate-700">
+                  {lang === "ko" ? "댓글 작성 허용" : "Allow Comments"}
+                </span>
+              </label>
+            ) : null}
           </div>
         </div>
 
-        {isEvent && canConfigurePostSettings && onHomeVisibleChange && onHomeOrderChange ? (
-          <div className="grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-end">
-            <label className="flex cursor-pointer items-center gap-2.5">
+        {isEvent && canConfigurePostSettings && onHomeVisibleChange ? (
+          <div className="border-t border-slate-100 pt-3">
+            <label className="flex min-w-0 cursor-pointer items-center gap-2.5">
               <UiInput
                 type="checkbox"
                 className="size-4 accent-brand-primary"
@@ -726,17 +719,6 @@ export function BoardWriteSettings({
                 {lang === "ko" ? "홈 화면에 표시" : "Show on home"}
               </span>
             </label>
-            <UiFormField label={lang === "ko" ? "홈 노출 순서" : "Home order"}>
-              <UiInput
-                type="number"
-                min={1}
-                inputMode="numeric"
-                value={homeOrder}
-                onChange={(event) => onHomeOrderChange(event.currentTarget.value)}
-                placeholder={lang === "ko" ? "자동" : "Auto"}
-                aria-label={lang === "ko" ? "홈 노출 순서" : "Home order"}
-              />
-            </UiFormField>
           </div>
         ) : null}
       </div>

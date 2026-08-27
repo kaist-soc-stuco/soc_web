@@ -101,10 +101,6 @@ export function useBoardPageController() {
       })
       .catch((error) => {
         console.error("Failed to load board articles:", error);
-        if (!cancelled) {
-          setArticles([]);
-          setTotalCount(0);
-        }
       })
       .finally(() => {
         if (!cancelled) {

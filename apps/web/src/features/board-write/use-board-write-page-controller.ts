@@ -169,13 +169,18 @@ export function useBoardWritePageController(forcedCategory?: string) {
   }, [selectedCategory]);
 
   useEffect(() => {
+    if (selectedCategory === "건의사항") {
+      setAllowComment(true);
+      return;
+    }
+
     if (selectedBoard?.allowComment === false) {
       setAllowComment(false);
       return;
     }
 
     setAllowComment(true);
-  }, [selectedBoard?.allowComment]);
+  }, [selectedBoard?.allowComment, selectedCategory]);
 
   useEffect(() => {
     if (!selectedBoard?.allowSecret) {
@@ -299,7 +304,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         : String(draft.homeOrder),
     );
     setIsSecret(draft.isSecret);
-    setAllowComment(draft.allowComment);
+    setAllowComment(selectedCategory === "건의사항" ? true : draft.allowComment);
     setIsKoreanOnly(draft.isKoreanOnly);
     setIsEventAlwaysOpen(
       !draft.eventStartDate &&
@@ -418,7 +423,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       homeOrder: selectedCategory === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
       isSecret,
       isAnonymous,
-      allowComment,
+      allowComment: selectedCategory === "건의사항" ? true : allowComment,
       isKoreanOnly,
       assets: assets.map((asset, index) => ({
         assetId: asset.assetId,
@@ -487,7 +492,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
             : String(draft.homeOrder),
         );
         setIsSecret(draft.isSecret);
-        setAllowComment(draft.allowComment);
+        setAllowComment(selectedCategory === "건의사항" ? true : draft.allowComment);
         setIsKoreanOnly(draft.isKoreanOnly);
         setIsEventAlwaysOpen(
           !draft.eventStartDate && !draft.eventEndDate &&
@@ -538,7 +543,9 @@ export function useBoardWritePageController(forcedCategory?: string) {
           : String(parsed.homeOrder),
       );
       setIsSecret(parsed.isSecret ?? false);
-      setAllowComment(parsed.allowComment ?? true);
+      setAllowComment(
+        selectedCategory === "건의사항" ? true : parsed.allowComment ?? true,
+      );
       setIsKoreanOnly(parsed.isKoreanOnly ?? false);
       const parsedIsAllDay =
         parsed.isAllDay ??
@@ -783,7 +790,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
         homeVisible: selectedCategory === "_EVENT" ? homeVisible : undefined,
         homeOrder: selectedCategory === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
         isSecret: selectedBoard?.allowSecret ? isSecret : false,
-        allowComment: selectedBoard?.allowComment === false ? false : allowComment,
+        allowComment:
+          selectedCategory === "건의사항"
+            ? true
+            : selectedBoard?.allowComment === false
+              ? false
+              : allowComment,
         assets: assets.map((asset, index) => ({
           assetId: asset.assetId,
           usageType: asset.usageType,

@@ -42,7 +42,7 @@ import { PageSearchField } from "@/components/ui/page-layout";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PopoverPanel } from "@/components/ui/popover-panel";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { downloadBlob } from "@/lib/download-blob";
@@ -81,15 +81,25 @@ const formatDateTime = (value: string | null | undefined) => {
   return `${formatDate(value)} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 };
 
+const FEE_MANAGEMENT_START_SEMESTER = "2026-1";
+
+const semesterOrdinal = (value: string) => {
+  const [year, term] = value.split("-").map(Number);
+  return year * 2 + term - 1;
+};
+
 const currentSemester = () => {
   const date = isoToDate(nowIso());
   return `${date.getFullYear()}-${date.getMonth() < 6 ? 1 : 2}`;
 };
 
 const buildSemesterOptions = () => {
-  const current = currentSemester().split("-").map(Number);
-  const currentOrdinal = current[0] * 2 + current[1] - 1;
-  return Array.from({ length: 8 }, (_, index) => {
+  const currentOrdinal = Math.max(
+    semesterOrdinal(currentSemester()),
+    semesterOrdinal(FEE_MANAGEMENT_START_SEMESTER),
+  );
+  const startOrdinal = semesterOrdinal(FEE_MANAGEMENT_START_SEMESTER);
+  return Array.from({ length: currentOrdinal - startOrdinal + 1 }, (_, index) => {
     const ordinal = currentOrdinal - index;
     const year = Math.floor(ordinal / 2);
     const term = (ordinal % 2) + 1;
@@ -107,7 +117,12 @@ export function FeeManagementPage() {
   const [operationError, setOperationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
-  const [referenceSemester, setReferenceSemester] = useState(currentSemester());
+  const [referenceSemester, setReferenceSemester] = useState(() => {
+    const current = currentSemester();
+    return semesterOrdinal(current) >= semesterOrdinal(FEE_MANAGEMENT_START_SEMESTER)
+      ? current
+      : FEE_MANAGEMENT_START_SEMESTER;
+  });
   const [majorCategory, setMajorCategory] = useState<StudentFeeListOptions["majorCategory"]>();
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -516,7 +531,7 @@ export function FeeManagementPage() {
 
             <div className="min-w-0">
               <div className={loading && !initialLoading ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
-                {initialLoading ? <TableSkeleton columns={7} rows={7} /> : students.length === 0 ? <EmptyState message="등록된 학생이 없습니다." className="border-0 py-20" /> : (
+                {initialLoading ? null : students.length === 0 ? <EmptyState message="등록된 학생이 없습니다." className="border-0 py-20" /> : (
                   <AdminDataTable minWidth={980}>
                     <colgroup><col className="w-12" /><col className="w-44" /><col className="w-28" /><col className="w-56" /><col /><col className="w-24" /><col className="w-32" /></colgroup>
                     <AdminTableHeader>
@@ -525,15 +540,15 @@ export function FeeManagementPage() {
                           <input type="checkbox" aria-label="현재 페이지 전체 선택" checked={allVisibleSelected} onChange={toggleVisibleUsers} className="block size-4 accent-emerald-700" />
                         </AdminTableHead>
                         {selectedUserIds.size > 0 ? (
-                          <th colSpan={6} className="h-12 min-h-12 px-4 py-0 align-middle">
-                          <div className="flex h-12 items-center justify-between gap-3">
+                          <AdminTableHead colSpan={6} className="h-[var(--ui-table-head-height)] min-h-[var(--ui-table-head-height)] px-4 py-0 align-middle">
+                            <div className="flex h-full items-center justify-between gap-3">
                               <div className="relative">
-                          <Button type="button" variant="ghost" size="sm" className="!font-medium" onClick={() => setSelectionPopoverOpen((value) => !value)}>{selectedUserIds.size}명 선택됨 <ChevronDown aria-hidden="true" className="size-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" className="h-8 !font-medium" onClick={() => setSelectionPopoverOpen((value) => !value)}>{selectedUserIds.size}명 선택됨 <ChevronDown aria-hidden="true" className="size-4" /></Button>
                           {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><Button type="button" variant="ghost" size="sm" className="mb-2 w-full justify-start !font-medium" onClick={() => void selectAllFiltered()} disabled={selectingAllFiltered}>{selectingAllFiltered ? "현재 필터를 불러오는 중" : `현재 필터 전체 선택 (${totalCount.toLocaleString("ko-KR")})`}</Button><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="scrollbar-hidden flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
                               </div>
-                              <Button type="button" size="sm" onClick={openPaymentModal} disabled={saving}><CreditCard aria-hidden="true" className="size-4" /> 일괄 납부 처리</Button>
+                              <Button type="button" size="sm" className="h-8" onClick={openPaymentModal} disabled={saving}><CreditCard aria-hidden="true" className="size-4" /> 일괄 납부 처리</Button>
                             </div>
-                          </th>
+                          </AdminTableHead>
                         ) : (
                           <>
                             <AdminSortableHead active={sortBy === "name"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("name")}>이름(영문명)</AdminSortableHead><AdminSortableHead active={sortBy === "studentId"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("studentId")}>학번</AdminSortableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>전공</AdminTableHead><AdminSortableHead active={sortBy === "status"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("status")}>상태</AdminSortableHead><AdminSortableHead className="text-right" active={sortBy === "paidAt"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("paidAt")}>수납액</AdminSortableHead>

@@ -3,7 +3,7 @@ import { useFormContext, Controller } from "react-hook-form";
 import { Check } from "lucide-react";
 import type { ArticleListItem } from "@soc/contracts";
 import { RichTextEditor } from "./rich-text-editor";
-import { AdminFormField } from "@/components/ui/admin-page";
+import { AdminFormField, AdminSearchField } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -585,9 +585,6 @@ export function SurveySettingsForm({
             <div className="space-y-4 rounded-lg border border-slate-200 p-4">
               <div>
                 <p className="text-sm font-normal text-[#172033]">전산학부 소속 조건</p>
-                <p className="mt-1 text-xs font-normal text-[#344054]">
-                  선택한 구분 중 하나라도 해당하면 응답할 수 있습니다. 모두 해제하면 소속을 제한하지 않습니다.
-                </p>
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-3">
                 {([
@@ -630,13 +627,12 @@ export function SurveySettingsForm({
             <div className="pt-2 border-t border-kaist-grey/10" />
 
             <AdminFormField label="연결 게시글 (선택)">
-              <UiInput
-                type="search"
-                className={`${inputCls} mb-2`}
+              <AdminSearchField
+                aria-label="연결 게시글 검색"
+                className="mb-2"
                 placeholder="게시글 제목 또는 번호 검색"
-                onChange={(event) => {
+                onValueChange={(query) => {
                   if (articleSearchTimer.current) clearTimeout(articleSearchTimer.current);
-                  const query = event.target.value;
                   articleSearchTimer.current = setTimeout(() => {
                     void onFetchArticles(query);
                   }, 250);

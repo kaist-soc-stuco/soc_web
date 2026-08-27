@@ -583,7 +583,7 @@
     }
 
     45% {
-      transform: scale(1.14);
+      transform: scale(1.08);
     }
 
     100% {
@@ -1965,20 +1965,6 @@
     object-position: center;
   }
 
-  .about-org-image-link span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 400;
-  }
-
-  .about-org-image-link svg {
-    width: 0.875rem;
-    height: 0.875rem;
-  }
-
   .about-empty-state {
     margin-top: 2.5rem;
     padding-block: 3rem;
@@ -2211,10 +2197,10 @@
 
   .about-motion-ready [data-about-reveal] {
     opacity: 0;
-    transform: translateY(1rem);
+    transform: translateY(1.25rem);
     transition:
-      opacity 480ms cubic-bezier(0.22, 1, 0.36, 1) var(--about-reveal-delay, 0ms),
-      transform 480ms cubic-bezier(0.22, 1, 0.36, 1) var(--about-reveal-delay, 0ms);
+      opacity 620ms cubic-bezier(0.22, 1, 0.36, 1) var(--about-reveal-delay, 0ms),
+      transform 620ms cubic-bezier(0.22, 1, 0.36, 1) var(--about-reveal-delay, 0ms);
   }
 
   .about-motion-ready [data-about-reveal].is-visible {

@@ -71,7 +71,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               Permissions.has(session?.permission ?? 0, Permissions.WRITE_OFFICIAL) ? (
               <Button asChild>
                 <Link to="/events/write">
-                  {lang === "ko" ? "행사 등록" : "Create event"}
+                  {lang === "ko" ? "등록" : "Create"}
                 </Link>
               </Button>
             ) : undefined
@@ -143,16 +143,14 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
                 lang={lang}
                 onEngagementToggle={handleSetEngagement}
               />
-              {totalPages > 1 ? (
-                <Pagination
-                  className="mt-6"
-                  currentPage={currentPage}
-                  onPageChange={setCurrentPage}
-                  range={lang === "ko" ? `총 ${totalItems}건` : `${totalItems} total`}
-                  totalPages={totalPages}
-                  lang={lang}
-                />
-              ) : null}
+              <Pagination
+                className="mt-6"
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                range={lang === "ko" ? `총 ${totalItems}건` : `${totalItems} total`}
+                totalPages={totalPages}
+                lang={lang}
+              />
             </>
           )}
         </PageContainer>

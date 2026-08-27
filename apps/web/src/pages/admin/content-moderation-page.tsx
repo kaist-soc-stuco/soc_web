@@ -17,7 +17,6 @@ import { AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "
 import { Button } from "@/components/ui/button";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PageSearchField } from "@/components/ui/page-layout";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -143,7 +142,7 @@ function ContentModerationPageContent() {
             />
           ) : undefined}
         >
-          {loading ? <TableSkeleton columns={6} rows={6} /> : view === "articles" ? (
+          {loading && items.length === 0 && comments.length === 0 ? null : view === "articles" ? (
             <AdminDataTable minWidth={920}>
               <colgroup><col style={{ width: 120 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 300 }} /><col style={{ width: 170 }} /><col style={{ width: 92 }} /></colgroup>
               <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>제목</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>처리 일시</AdminTableHead><AdminTableHead>작업</AdminTableHead></tr></AdminTableHeader>

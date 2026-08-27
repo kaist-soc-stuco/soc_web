@@ -1,8 +1,7 @@
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
-  ArticleDraftRecord,
   ArticleDraftSaveRequest,
   SurveyRecord,
 } from "@soc/contracts";
@@ -49,7 +48,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
   }>();
   const category = forcedCategory ?? routeCategory;
   const navigate = useNavigate();
-  const location = useLocation();
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
@@ -89,19 +87,15 @@ export function useBoardEditPageController(forcedCategory?: string) {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<ArticleDraftRecord[]>([]);
   const [serverDraftId, setServerDraftId] = useState<string | null>(null);
   const [serverDraftVersion, setServerDraftVersion] = useState<number>();
   const [draftStatus, setDraftStatus] = useState<
     "idle" | "saving" | "saved" | "failed" | "conflict"
   >("idle");
-  const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
   const initialFingerprintRef = useRef<string | null>(null);
   const lastDraftFingerprintRef = useRef<string | null>(null);
-  const autoRestoredDraftRef = useRef<string | null>(null);
   const canConfigurePostSettings = !PUBLIC_WRITE_BOARD_CODES.has(category);
   const canManageTemplates = hasAdminPermission(session?.permission);
-  const routeDraftId = new URLSearchParams(location.search).get("draftId");
 
   const backToArticle = () => {
     navigate(category === "_EVENT" ? `/events/${articleId}` : `/board/${category}/${articleId}`);
@@ -127,7 +121,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
             : String(res.homeOrder),
         );
         setIsSecret(res.isSecret);
-        setAllowComment(res.allowComment);
+        setAllowComment(category === "건의사항" ? true : res.allowComment);
         setIsKoreanOnly(
           !res.titleEn?.trim() ||
             !res.contentEn?.trim() ||
@@ -221,7 +215,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     homeOrder: category === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
     isSecret: allowSecret ? isSecret : false,
     isAnonymous: canConfigurePostSettings ? isAnonymous : false,
-    allowComment,
+    allowComment: category === "건의사항" ? true : allowComment,
     isKoreanOnly,
     assets: assets.map((asset, index) => ({
       assetId: asset.assetId,
@@ -243,104 +237,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
     linkedSurveyId: selectedSurveyId || null,
   });
 
-  const applyDraft = (draft: ArticleDraftRecord) => {
-    setTitleKo(draft.titleKo || "");
-    setTitleEn(draft.titleEn || "");
-    setContentKo(draft.contentKo || "");
-    setContentEn(draft.contentEn || "");
-    setIsAnonymous(draft.isAnonymous);
-    setIsPinned(draft.isPinned);
-    setHomeVisible(draft.homeVisible !== false);
-    setHomeOrder(
-      draft.homeOrder === null || draft.homeOrder === undefined
-        ? ""
-        : String(draft.homeOrder),
-    );
-    setIsSecret(draft.isSecret);
-    setAllowComment(draft.allowComment);
-    setIsKoreanOnly(draft.isKoreanOnly);
-    setIsEventAlwaysOpen(
-      !draft.eventStartDate &&
-        !draft.eventEndDate &&
-        Boolean(draft.eventDescriptionKo),
-    );
-    const draftIsAllDay = isAllDayDateRange(
-      draft.eventStartDate,
-      draft.eventEndDate,
-    );
-    setIsAllDay(draftIsAllDay);
-    setEventStartDate(
-      draft.eventStartDate
-        ? isoToEventDateInput(draft.eventStartDate, draftIsAllDay)
-        : "",
-    );
-    setEventEndDate(
-      draft.eventEndDate
-        ? isoToEventDateInput(draft.eventEndDate, draftIsAllDay)
-        : "",
-    );
-    setEventDescriptionKo(draft.eventDescriptionKo || "");
-    setEventDescriptionEn(draft.eventDescriptionEn || "");
-    setSelectedSurveyId(draft.linkedSurveyId || "");
-  };
-
-  useEffect(() => {
-    if (!articleId) return;
-
-    let cancelled = false;
-    const listRequest = apiClient.getArticleDrafts({
-      boardCode: category,
-      limit: 20,
-      page: 1,
-    });
-
-    listRequest
-      .then((response) => {
-        if (!cancelled) setDrafts(response.items);
-      })
-      .catch(() => {
-        if (!cancelled) setDrafts([]);
-      });
-
-    if (routeDraftId) {
-      apiClient
-        .getArticleDraft(routeDraftId)
-        .then((draft) => {
-          if (
-            cancelled ||
-            (draft.targetArticleId && draft.targetArticleId !== articleId)
-          ) {
-            return;
-          }
-          applyDraft(draft);
-          setServerDraftId(draft.draftId);
-          setServerDraftVersion(draft.version);
-          setDraftStatus("saved");
-          setDraftRestoredAt(draft.updatedAt);
-        })
-        .catch(() => undefined);
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiClient, articleId, category, location.search]);
-
-  useEffect(() => {
-    if (loading || !articleId || routeDraftId) return;
-    const draft = drafts.find(
-      (item) => item.targetArticleId === articleId,
-    );
-    if (!draft || autoRestoredDraftRef.current === draft.draftId) return;
-
-    autoRestoredDraftRef.current = draft.draftId;
-    applyDraft(draft);
-    setServerDraftId(draft.draftId);
-    setServerDraftVersion(draft.version);
-    setDraftStatus("saved");
-    setDraftRestoredAt(draft.updatedAt);
-  }, [articleId, drafts, loading, routeDraftId]);
-
   const handleSaveDraft = async () => {
     if (!articleId || (!titleKo.trim() && !contentKo.trim())) return;
 
@@ -358,82 +254,12 @@ export function useBoardEditPageController(forcedCategory?: string) {
       });
       setServerDraftId(response.draftId);
       setServerDraftVersion(response.version);
-      setDrafts((current) => [
-        response,
-        ...current.filter((draft) => draft.draftId !== response.draftId),
-      ]);
       setDraftStatus("saved");
       lastDraftFingerprintRef.current = fingerprint;
     } catch (saveError) {
       setDraftStatus(
         String(saveError).includes("conflict") ? "conflict" : "failed",
       );
-    }
-  };
-
-  const handleRestoreDraft = async (draftId: string) => {
-    try {
-      const draft = await apiClient.getArticleDraft(draftId);
-      if (draft.targetArticleId && draft.targetArticleId !== articleId) return;
-      applyDraft(draft);
-      setServerDraftId(draft.draftId);
-      setServerDraftVersion(draft.version);
-      setDraftStatus("saved");
-      setDraftRestoredAt(draft.updatedAt);
-    } catch {
-      setDraftStatus("failed");
-    }
-  };
-
-  const handleStartNewDraft = () => {
-    if (serverDraftId) {
-      void apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
-    }
-    navigate(category === "_EVENT" ? "/events/write" : `/board/${category}/write`);
-  };
-
-  const handleDeleteDraft = async (draftId: string) => {
-    const draft = drafts.find((item) => item.draftId === draftId);
-    const confirmed = await requestConfirm({
-      confirmLabel: lang === "ko" ? "삭제" : "Delete",
-      description:
-        lang === "ko"
-          ? createElement(
-              "span",
-              null,
-              "정말 ",
-              createElement("strong", { className: "font-semibold text-slate-900" }, `“${draft?.titleKo || "제목 없는 임시저장글"}”`),
-              " 임시저장글을 삭제하시겠습니까?",
-            )
-          : createElement(
-              "span",
-              null,
-              "Are you sure you want to delete ",
-              createElement("strong", { className: "font-semibold text-slate-900" }, `“${draft?.titleKo || "this saved draft"}”`),
-              "?",
-            ),
-      warning:
-        lang === "ko"
-          ? "(삭제된 임시저장글은 영구히 복구할 수 없습니다.)"
-          : "(Deleted saved drafts cannot be restored.)",
-      title:
-        lang === "ko" ? "임시저장글을 삭제하시겠습니까?" : "Delete saved draft?",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-
-    try {
-      await apiClient.deleteArticleDraft(draftId);
-      setDrafts((current) =>
-        current.filter((draft) => draft.draftId !== draftId),
-      );
-      if (serverDraftId === draftId) {
-        setServerDraftId(null);
-        setServerDraftVersion(undefined);
-        lastDraftFingerprintRef.current = null;
-      }
-    } catch {
-      setDraftStatus("failed");
     }
   };
 
@@ -639,7 +465,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
         homeVisible: category === "_EVENT" ? homeVisible : undefined,
         homeOrder: category === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
         isSecret: allowSecret ? isSecret : false,
-        allowComment,
+        allowComment: category === "건의사항" ? true : allowComment,
         assets: assets.map((asset, index) => ({
           assetId: asset.assetId,
           usageType: asset.usageType,
@@ -721,9 +547,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
       }
       if (serverDraftId) {
         await apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
-        setDrafts((current) =>
-          current.filter((draft) => draft.draftId !== serverDraftId),
-        );
         setServerDraftId(null);
         setServerDraftVersion(undefined);
       }
@@ -761,9 +584,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     category,
     contentEn,
     contentKo,
-    drafts,
     draftStatus,
-    draftRestoredAt,
     error,
     eventDescriptionKo,
     eventDescriptionEn,
@@ -771,9 +592,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
     eventStartDate,
     fileInputRef,
     handleSubmit,
-    handleDeleteDraft,
-    handleRestoreDraft,
-    handleStartNewDraft,
     handleSaveDraft,
     handleUploadThumbnail,
     handleUploadFiles,
