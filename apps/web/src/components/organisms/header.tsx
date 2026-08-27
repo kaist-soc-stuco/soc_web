@@ -306,6 +306,17 @@ export function Header({ variant = "default" }: HeaderProps) {
     return location.pathname === href || location.pathname.startsWith(`${href}/`);
   };
 
+  const isChildNavItemActive = (href: string) => {
+    const [pathname, hash] = href.split("#");
+    const pathnameMatches =
+      location.pathname === pathname || location.pathname.startsWith(`${pathname}/`);
+
+    if (!pathnameMatches) return false;
+    if (!hash) return true;
+
+    return location.hash === `#${hash}` || (hash === "intro" && !location.hash);
+  };
+
   const activeNavIndex = navItems.findIndex((item) => isNavItemActive(item.href));
   const indicatorIndex = hoveredIndex ?? activeNavIndex;
   const indicatorLeft =
@@ -385,37 +396,43 @@ export function Header({ variant = "default" }: HeaderProps) {
                     />
                   </Link>
 
-                  <span
-                    aria-hidden="true"
-                    className={`absolute left-0 top-full h-3 w-full ${
-                      hoveredIndex === index ? "block" : "hidden"
-                    }`}
-                  />
                   <div
                     id={`site-nav-flyout-${index}`}
                     role="menu"
                     aria-label={`${item.label} ${lang === "ko" ? "하위 메뉴" : "submenu"}`}
-                    className={`absolute left-1/2 top-[calc(100%+0.625rem)] z-50 w-52 -translate-x-1/2 rounded-xl border border-[var(--ui-menu-divider)] bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.14)] transition-[opacity,transform,visibility] duration-200 ease-out ${
+                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-[var(--ui-menu-divider)] bg-white shadow-[0_10px_18px_-20px_rgba(15,23,42,0.38)] transition-[opacity,transform,visibility] duration-150 ease-out ${
                       hoveredIndex === index
                         ? "visible pointer-events-auto translate-y-0 opacity-100"
-                        : "invisible pointer-events-none -translate-y-1 opacity-0"
+                        : "invisible pointer-events-none -translate-y-0.5 opacity-0"
                     }`}
                     onMouseEnter={() => setHoveredIndex(index)}
                   >
-                    <ul className="grid gap-0.5">
-                      {item.megaItems.map((child) => (
-                        <li key={child.href}>
-                          <Link
-                            to={child.href}
-                            role="menuitem"
-                            tabIndex={hoveredIndex === index ? 0 : -1}
-                            onClick={closePopovers}
-                            className="flex min-h-10 items-center rounded-lg px-3 text-left text-[length:var(--ui-text-body-size)] font-medium leading-5 text-[var(--ui-menu-item-text)] transition-colors hover:bg-slate-50 hover:text-brand-primary focus-visible:bg-slate-50 focus-visible:text-brand-primary"
+                    <ul>
+                      {item.megaItems.map((child) => {
+                        const childActive = isChildNavItemActive(child.href);
+
+                        return (
+                          <li
+                            key={child.href}
+                            className="mx-4 border-b border-slate-100 last:border-b-0"
                           >
-                            {child.label}
-                          </Link>
-                        </li>
-                      ))}
+                            <Link
+                              to={child.href}
+                              role="menuitem"
+                              aria-current={childActive ? "page" : undefined}
+                              tabIndex={hoveredIndex === index ? 0 : -1}
+                              onClick={closePopovers}
+                              className={`flex h-10 items-center justify-center whitespace-nowrap px-1 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary/20 ${
+                                childActive
+                                  ? "text-brand-primary"
+                                  : "text-[var(--ui-menu-item-text)] hover:text-brand-primary focus-visible:text-brand-primary"
+                              }`}
+                            >
+                              {child.label}
+                            </Link>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>
