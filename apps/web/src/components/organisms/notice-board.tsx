@@ -205,7 +205,7 @@ export function NoticeBoard() {
 
   return (
     <section className="home-bento-card flex min-h-[24rem] min-w-0 flex-col overflow-hidden">
-      <div className="mx-auto flex h-full min-h-0 w-full flex-col">
+      <div className="mx-auto flex min-h-[24rem] w-full flex-col">
         <SectionHeader
           navigation={
             <SegmentedControl
