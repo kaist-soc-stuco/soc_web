@@ -1,5 +1,5 @@
 CREATE TYPE "public"."content_block_status" AS ENUM('DRAFT', 'PUBLISHED');--> statement-breakpoint
-CREATE TYPE "public"."content_block_type" AS ENUM('HERO', 'TOP_BANNER', 'QUICK_LINK', 'ORGANIZATION_CHART');--> statement-breakpoint
+CREATE TYPE "public"."content_block_type" AS ENUM('HERO', 'LOGO', 'TOP_BANNER', 'QUICK_LINK', 'ORGANIZATION_CHART', 'PLEDGE');--> statement-breakpoint
 CREATE TYPE "public"."site_content_key" AS ENUM('home.hero.title', 'home.hero.description', 'home.hero.cta', 'about.hero.description', 'about.intro.title', 'about.intro.body', 'about.roadmap.title', 'about.roadmap.description', 'footer.description', 'footer.contact');--> statement-breakpoint
 CREATE TABLE "permission" (
 	"permission_id" serial PRIMARY KEY NOT NULL,
@@ -40,6 +40,19 @@ CREATE TABLE "user_role_group" (
 	"valid_from" timestamp with time zone,
 	"valid_to" timestamp with time zone,
 	"is_active" boolean DEFAULT true NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "user_sanction" (
+	"sanction_id" serial PRIMARY KEY NOT NULL,
+	"user_id" uuid NOT NULL,
+	"type" varchar(40) DEFAULT 'POSTING_SUSPENDED' NOT NULL,
+	"reason" text NOT NULL,
+	"issued_by" uuid,
+	"starts_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"expires_at" timestamp with time zone,
+	"revoked_at" timestamp with time zone,
+	"revoked_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
@@ -147,6 +160,8 @@ CREATE TABLE "article" (
 	"visibility_scope" varchar(20) DEFAULT 'PUBLIC' NOT NULL,
 	"is_pinned" boolean DEFAULT false NOT NULL,
 	"pin_order" integer,
+	"home_visible" boolean DEFAULT true NOT NULL,
+	"home_order" integer,
 	"is_secret" boolean DEFAULT false NOT NULL,
 	"is_anonymous" boolean DEFAULT false NOT NULL,
 	"allow_comment" boolean DEFAULT true NOT NULL,
@@ -154,6 +169,9 @@ CREATE TABLE "article" (
 	"posted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone,
+	"hidden_at" timestamp with time zone,
+	"hidden_by_user_id" uuid,
+	"hidden_reason" varchar(500),
 	"event_start_date" timestamp with time zone,
 	"event_end_date" timestamp with time zone,
 	"event_description_ko" text,
@@ -183,6 +201,7 @@ CREATE TABLE "board" (
 	"allow_comment" boolean DEFAULT false NOT NULL,
 	"allow_secret" boolean DEFAULT false NOT NULL,
 	"allow_like" boolean DEFAULT true NOT NULL,
+	"allow_guest_read" boolean DEFAULT true NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	CONSTRAINT "board_code_unique" UNIQUE("code")
@@ -203,10 +222,14 @@ CREATE TABLE "comment" (
 	"parent_comment_id" integer,
 	"author_user_id" uuid NOT NULL,
 	"content" text NOT NULL,
+	"is_official" boolean DEFAULT false NOT NULL,
 	"status" varchar(20) DEFAULT 'PUBLISHED' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone
+	"deleted_at" timestamp with time zone,
+	"hidden_at" timestamp with time zone,
+	"hidden_by_user_id" uuid,
+	"hidden_reason" text
 );
 --> statement-breakpoint
 CREATE TABLE "survey_answers" (
@@ -267,8 +290,13 @@ CREATE TABLE "survey" (
 	"title_en" varchar(255),
 	"description_ko" text,
 	"description_en" text,
+	"description_image_url_ko" text,
+	"description_image_url_en" text,
 	"connected_article_id" integer,
 	"fee_requirement_policy" varchar(20) DEFAULT 'NONE' NOT NULL,
+	"eligible_soc_affiliations" jsonb DEFAULT '["PRIMARY","DOUBLE","MINOR"]'::jsonb NOT NULL,
+	"academic_eligibility" varchar(30) DEFAULT 'ENROLLED_OR_LEAVE' NOT NULL,
+	"allow_anonymous" boolean DEFAULT false NOT NULL,
 	"allow_multiple_responses" boolean DEFAULT false NOT NULL,
 	"allow_response_edit" boolean DEFAULT false NOT NULL,
 	"is_korean_only" boolean DEFAULT false NOT NULL,
@@ -282,11 +310,18 @@ CREATE TABLE "survey" (
 	"is_always_open" boolean DEFAULT false NOT NULL,
 	"open_at" timestamp with time zone,
 	"close_at" timestamp with time zone,
+	"spreadsheet_id" varchar(255),
+	"spreadsheet_url" text,
+	"spreadsheet_sync_status" varchar(20) DEFAULT 'NOT_CONNECTED' NOT NULL,
+	"spreadsheet_last_synced_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "survey_lifecycle_status_check" CHECK ("survey"."lifecycle_status" in ('DRAFT', 'PUBLISHED')),
 	CONSTRAINT "survey_lifecycle_published_check" CHECK (("survey"."lifecycle_status" = 'PUBLISHED') = "survey"."is_published"),
 	CONSTRAINT "survey_version_number_check" CHECK ("survey"."version_number" >= 1),
+	CONSTRAINT "survey_kind_check" CHECK ("survey"."kind" in ('SURVEY', 'APPLICATION')),
+	CONSTRAINT "survey_academic_eligibility_check" CHECK ("survey"."academic_eligibility" in ('ANY', 'ENROLLED_ONLY', 'ENROLLED_OR_LEAVE')),
+	CONSTRAINT "survey_spreadsheet_sync_status_check" CHECK ("survey"."spreadsheet_sync_status" in ('NOT_CONNECTED', 'CONNECTED', 'ERROR')),
 	CONSTRAINT "survey_previous_version_check" CHECK ("survey"."previous_version_id" is null or "survey"."previous_version_id" <> "survey"."survey_id")
 );
 --> statement-breakpoint
@@ -305,8 +340,11 @@ CREATE TABLE "executive_contact" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name_ko" varchar(100) NOT NULL,
 	"name_en" varchar(100) NOT NULL,
+	"department_ko" varchar(100),
+	"department_en" varchar(100),
 	"role_ko" varchar(100) NOT NULL,
 	"role_en" varchar(100) NOT NULL,
+	"avatar_storage_key" varchar(255),
 	"gender" varchar(20),
 	"cohort" integer,
 	"email" varchar(255),
@@ -360,6 +398,8 @@ CREATE TABLE "content_block" (
 	"body_en" text,
 	"link_url" varchar(2000),
 	"image_url" varchar(2000),
+	"image_url_en" varchar(2000),
+	"pledge_status" varchar(20),
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_by" uuid,
 	"updated_by" uuid,
@@ -393,6 +433,10 @@ CREATE TABLE "calendar_event" (
 	"source_hash" varchar(64),
 	"is_read_only" boolean DEFAULT false NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"is_hidden_by_admin" boolean DEFAULT false NOT NULL,
+	"category_override" varchar(20),
+	"override_updated_by_user_id" uuid,
+	"override_updated_at" timestamp with time zone,
 	"created_by_user_id" uuid,
 	"google_calendar_id" varchar(255),
 	"google_event_id" varchar(255),
@@ -436,6 +480,9 @@ ALTER TABLE "role_group_permission" ADD CONSTRAINT "role_group_permission_permis
 ALTER TABLE "user_role_group" ADD CONSTRAINT "user_role_group_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_role_group" ADD CONSTRAINT "user_role_group_role_group_id_role_group_role_group_id_fk" FOREIGN KEY ("role_group_id") REFERENCES "public"."role_group"("role_group_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_role_group" ADD CONSTRAINT "user_role_group_granted_by_users_user_id_fk" FOREIGN KEY ("granted_by") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_sanction" ADD CONSTRAINT "user_sanction_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_sanction" ADD CONSTRAINT "user_sanction_issued_by_users_user_id_fk" FOREIGN KEY ("issued_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_sanction" ADD CONSTRAINT "user_sanction_revoked_by_users_user_id_fk" FOREIGN KEY ("revoked_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_payment" ADD CONSTRAINT "student_fee_payment_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_payment" ADD CONSTRAINT "student_fee_payment_recorded_by_users_user_id_fk" FOREIGN KEY ("recorded_by") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_fee_status" ADD CONSTRAINT "student_fee_status_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -451,12 +498,14 @@ ALTER TABLE "article_view" ADD CONSTRAINT "article_view_article_id_article_artic
 ALTER TABLE "article_view" ADD CONSTRAINT "article_view_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "article" ADD CONSTRAINT "article_board_id_board_board_id_fk" FOREIGN KEY ("board_id") REFERENCES "public"."board"("board_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "article" ADD CONSTRAINT "article_author_user_id_users_user_id_fk" FOREIGN KEY ("author_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "article" ADD CONSTRAINT "article_hidden_by_user_id_users_user_id_fk" FOREIGN KEY ("hidden_by_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "asset" ADD CONSTRAINT "asset_uploaded_by_users_user_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "board" ADD CONSTRAINT "board_write_permission_id_permission_permission_id_fk" FOREIGN KEY ("write_permission_id") REFERENCES "public"."permission"("permission_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment_engagement" ADD CONSTRAINT "comment_engagement_comment_id_comment_comment_id_fk" FOREIGN KEY ("comment_id") REFERENCES "public"."comment"("comment_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment_engagement" ADD CONSTRAINT "comment_engagement_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment" ADD CONSTRAINT "comment_article_id_article_article_id_fk" FOREIGN KEY ("article_id") REFERENCES "public"."article"("article_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment" ADD CONSTRAINT "comment_author_user_id_users_user_id_fk" FOREIGN KEY ("author_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "comment" ADD CONSTRAINT "comment_hidden_by_user_id_users_user_id_fk" FOREIGN KEY ("hidden_by_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "comment" ADD CONSTRAINT "comment_parent_comment_id_comment_comment_id_fk" FOREIGN KEY ("parent_comment_id") REFERENCES "public"."comment"("comment_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "survey_answers" ADD CONSTRAINT "survey_answers_response_id_survey_responses_id_fk" FOREIGN KEY ("response_id") REFERENCES "public"."survey_responses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "survey_answers" ADD CONSTRAINT "survey_answers_question_id_survey_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."survey_questions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -475,12 +524,14 @@ ALTER TABLE "content_block" ADD CONSTRAINT "content_block_created_by_users_user_
 ALTER TABLE "content_block" ADD CONSTRAINT "content_block_updated_by_users_user_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "content_block" ADD CONSTRAINT "content_block_published_by_users_user_id_fk" FOREIGN KEY ("published_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "site_content" ADD CONSTRAINT "site_content_updated_by_users_user_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "calendar_event" ADD CONSTRAINT "calendar_event_override_updated_by_user_id_users_user_id_fk" FOREIGN KEY ("override_updated_by_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "calendar_event" ADD CONSTRAINT "calendar_event_created_by_user_id_users_user_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "calendar_sync_job" ADD CONSTRAINT "calendar_sync_job_calendar_event_id_calendar_event_calendar_event_id_fk" FOREIGN KEY ("calendar_event_id") REFERENCES "public"."calendar_event"("calendar_event_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notification" ADD CONSTRAINT "notification_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notification" ADD CONSTRAINT "notification_actor_user_id_users_user_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "user_role_group_user_active_idx" ON "user_role_group" USING btree ("user_id","is_active");--> statement-breakpoint
 CREATE INDEX "user_role_group_role_active_idx" ON "user_role_group" USING btree ("role_group_id","is_active");--> statement-breakpoint
+CREATE INDEX "user_sanction_active_idx" ON "user_sanction" USING btree ("user_id","type","revoked_at");--> statement-breakpoint
 CREATE INDEX "users_active_name_idx" ON "users" USING btree ("is_active","name_ko");--> statement-breakpoint
 CREATE INDEX "student_fee_payment_user_paid_idx" ON "student_fee_payment" USING btree ("user_id","paid_at");--> statement-breakpoint
 CREATE INDEX "student_fee_payment_semester_idx" ON "student_fee_payment" USING btree ("effective_start_semester");--> statement-breakpoint
@@ -495,6 +546,7 @@ CREATE INDEX "article_board_idx" ON "article" USING btree ("board_id");--> state
 CREATE INDEX "article_board_status_posted_idx" ON "article" USING btree ("board_id","status","posted_at");--> statement-breakpoint
 CREATE INDEX "article_status_posted_idx" ON "article" USING btree ("status","posted_at");--> statement-breakpoint
 CREATE INDEX "article_author_status_posted_idx" ON "article" USING btree ("author_user_id","status","posted_at");--> statement-breakpoint
+CREATE INDEX "article_home_presentation_idx" ON "article" USING btree ("home_visible","home_order","event_start_date");--> statement-breakpoint
 CREATE INDEX "asset_created_idx" ON "asset" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "asset_uploaded_by_idx" ON "asset" USING btree ("uploaded_by");--> statement-breakpoint
 CREATE INDEX "comment_engagement_user_kind_idx" ON "comment_engagement" USING btree ("user_id","kind","updated_at");--> statement-breakpoint
@@ -509,6 +561,7 @@ CREATE UNIQUE INDEX "survey_responses_single_response_user_unique_idx" ON "surve
 CREATE INDEX "survey_responses_user_created_idx" ON "survey_responses" USING btree ("user_id","created_at");--> statement-breakpoint
 CREATE INDEX "survey_sections_survey_sort_idx" ON "survey_sections" USING btree ("survey_id","sort_order");--> statement-breakpoint
 CREATE INDEX "survey_connected_article_published_idx" ON "survey" USING btree ("connected_article_id","is_published");--> statement-breakpoint
+CREATE UNIQUE INDEX "survey_connected_article_unique_idx" ON "survey" USING btree ("connected_article_id");--> statement-breakpoint
 CREATE INDEX "survey_published_created_idx" ON "survey" USING btree ("is_published","created_at");--> statement-breakpoint
 CREATE INDEX "survey_lifecycle_created_idx" ON "survey" USING btree ("lifecycle_status","created_at");--> statement-breakpoint
 CREATE INDEX "survey_previous_version_idx" ON "survey" USING btree ("previous_version_id");--> statement-breakpoint
