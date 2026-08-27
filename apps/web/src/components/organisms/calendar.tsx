@@ -134,6 +134,7 @@ export function Calendar() {
           {schedules.map((item) => {
             const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
             const ddayLabel = getScheduleDdayLabel(item);
+            const showDdayBadge = ddayLabel !== null && ddayLabel !== "D-Day";
             return (
               <li key={item.id}>
                 <Link
@@ -146,7 +147,7 @@ export function Calendar() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-normal text-[#172033]">{title}</p>
                   </div>
-                  {ddayLabel ? <span className="home-editorial-dday shrink-0">{ddayLabel}</span> : null}
+                  {showDdayBadge ? <span className="home-editorial-dday shrink-0">{ddayLabel}</span> : null}
                 </Link>
               </li>
             );
