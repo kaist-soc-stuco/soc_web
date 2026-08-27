@@ -128,7 +128,7 @@ export function EventsSurveysCalendar({
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />
-                {lang === "ko" ? "설문·투표" : "Surveys & Polls"}
+                {lang === "ko" ? "설문" : "Surveys"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />

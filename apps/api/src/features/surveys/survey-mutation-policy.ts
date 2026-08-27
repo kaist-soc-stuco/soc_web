@@ -1,10 +1,5 @@
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -12,73 +7,8 @@ import {
   PostgresTransaction,
 } from "../../infrastructure/postgres/postgres.provider";
 import {
-  surveyResponses,
   surveys,
 } from "../../infrastructure/postgres/postgres.schema";
-
-import type { SurveyRecord } from "./entities/survey.entity";
-import type { UpdateSurveyDto } from "./dto/update-survey.dto";
-
-const normalizeOptionalText = (value: string | null | undefined): string =>
-  value?.trim() ?? "";
-
-export function changesSurveyMeaning(
-  current: SurveyRecord,
-  dto: UpdateSurveyDto,
-): boolean {
-  if (dto.kind !== undefined && dto.kind !== current.kind) return true;
-  if (dto.titleKo !== undefined && dto.titleKo.trim() !== current.titleKo.trim()) {
-    return true;
-  }
-  if (
-    dto.titleEn !== undefined &&
-    normalizeOptionalText(dto.titleEn) !== normalizeOptionalText(current.titleEn)
-  ) {
-    return true;
-  }
-  if (
-    dto.descriptionKo !== undefined &&
-    normalizeOptionalText(dto.descriptionKo) !==
-      normalizeOptionalText(current.descriptionKo)
-  ) {
-    return true;
-  }
-  if (
-    dto.descriptionEn !== undefined &&
-    normalizeOptionalText(dto.descriptionEn) !==
-      normalizeOptionalText(current.descriptionEn)
-  ) {
-    return true;
-  }
-
-  const currentFeePolicy = current.feePayersOnly ? "PAID_ONLY" : "NONE";
-  if (
-    dto.feeRequirementPolicy !== undefined &&
-    dto.feeRequirementPolicy !== currentFeePolicy
-  ) {
-    return true;
-  }
-  if (
-    dto.allowMultipleResponses !== undefined &&
-    dto.allowMultipleResponses !== current.allowMultipleResponses
-  ) {
-    return true;
-  }
-  if (
-    dto.allowResponseEdit !== undefined &&
-    dto.allowResponseEdit !== current.allowResponseEdit
-  ) {
-    return true;
-  }
-  if (
-    dto.isKoreanOnly !== undefined &&
-    dto.isKoreanOnly !== current.isKoreanOnly
-  ) {
-    return true;
-  }
-
-  return false;
-}
 
 interface LockedSurvey {
   id: string;
@@ -125,14 +55,7 @@ export class SurveyMutationPolicy {
     surveyId: string,
     mutation: LockedSurveyMutation<T>,
   ): Promise<T> {
-    return this.withSurveyLock(surveyId, async (tx, survey) => {
-      await this.assertNoSubmittedResponses(
-        tx,
-        surveyId,
-        "survey_structure_locked_after_response",
-      );
-      return mutation(tx, survey);
-    });
+    return this.withSurveyLock(surveyId, mutation);
   }
 
   async withHardDelete<T>(
@@ -140,41 +63,6 @@ export class SurveyMutationPolicy {
     mutation: LockedSurveyMutation<T>,
   ): Promise<T> {
     return this.withSurveyLock(surveyId, mutation);
-  }
-
-  async assertMeaningMutable(
-    tx: PostgresTransaction,
-    surveyId: string,
-    current: SurveyRecord,
-    dto: UpdateSurveyDto,
-  ): Promise<void> {
-    if (!changesSurveyMeaning(current, dto)) return;
-
-    await this.assertNoSubmittedResponses(
-      tx,
-      surveyId,
-      "survey_meaning_locked_after_response",
-    );
-  }
-
-  private async assertNoSubmittedResponses(
-    tx: PostgresTransaction,
-    surveyId: string,
-    conflictCode: string,
-  ): Promise<void> {
-    const [result] = await tx
-      .select({ count: sql<number>`count(*)::int` })
-      .from(surveyResponses)
-      .where(
-        and(
-          eq(surveyResponses.surveyId, surveyId),
-          eq(surveyResponses.status, "submitted"),
-        ),
-      );
-
-    if ((result?.count ?? 0) > 0) {
-      throw new ConflictException(conflictCode);
-    }
   }
 
 }

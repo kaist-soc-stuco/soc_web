@@ -131,6 +131,16 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: asOptionalString(
       config.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
     ),
+    GOOGLE_OAUTH_CLIENT_KEY_FILE: asOptionalString(
+      config.GOOGLE_OAUTH_CLIENT_KEY_FILE,
+    ),
+    GOOGLE_OAUTH_TOKEN_FILE: asOptionalString(config.GOOGLE_OAUTH_TOKEN_FILE),
+    GOOGLE_SURVEY_RESULTS_FOLDER_ID: asOptionalString(
+      config.GOOGLE_SURVEY_RESULTS_FOLDER_ID,
+    ),
+    GOOGLE_SURVEY_RESULTS_FOLDER_NAME:
+      asOptionalString(config.GOOGLE_SURVEY_RESULTS_FOLDER_NAME) ??
+      "KAIST SOC 설문 결과",
     GOOGLE_CALENDAR_SYNC_ENABLED: asOptionalBoolean(
       config.GOOGLE_CALENDAR_SYNC_ENABLED,
       "GOOGLE_CALENDAR_SYNC_ENABLED",

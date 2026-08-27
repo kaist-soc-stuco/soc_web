@@ -61,6 +61,20 @@ pnpm --filter @soc/api test
 pnpm --filter @soc/web test
 ```
 
+## Google Survey Sheets OAuth
+
+설문 결과 시트는 Gmail과 분리된 Google Drive·Sheets 사용자 OAuth로 연결합니다. 최초 배포 또는 refresh token 교체 시에만 아래 명령을 실행합니다.
+
+```bash
+pnpm --filter @soc/api google:oauth:authorize
+```
+
+브라우저에서 운영 Google 계정으로 로그인하고 앱이 만든 Drive 파일만 다루는 `drive.file` 범위를 승인합니다. 이 범위는 앱이 만든 Google Sheets의 생성·수정에도 사용됩니다. 완료 후 생성되는 `secrets/google-oauth-token.json`은 서버 비밀 파일로 배포하며 Git에 커밋하지 않습니다. API 컨테이너에는 OAuth client와 token 파일을 모두 읽기 전용으로 마운트합니다.
+
+OAuth 동의 화면의 publishing status가 `Testing`이면 refresh token은 7일 후 만료됩니다. 장기 운영 전 `In production`으로 전환한 다음 위 명령으로 최종 토큰을 한 번 다시 발급합니다. 이후에는 사용자가 접근 권한을 취소하거나 토큰이 장기간 사용되지 않는 등의 예외가 아니면 재로그인이 필요하지 않습니다.
+
+연결 후 첫 설문에서 `Google Sheets 연결`을 실행하면 사용자 내 드라이브에 `KAIST SOC 설문 결과` 폴더가 생성됩니다. 원하는 상위 폴더로 정리할 때는 생성된 폴더 자체를 이동합니다. Gmail 받은편지함·보낸편지함에는 접근하지 않습니다.
+
 ## Log Check
 
 로컬 compose:

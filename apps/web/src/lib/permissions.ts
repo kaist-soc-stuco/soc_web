@@ -30,7 +30,7 @@ export const hasSurveyManagePermission = (permission?: number | null): boolean =
   Permissions.has(permission ?? 0, Permissions.MANAGE_SURVEY);
 
 export const hasAdminPermission = (permission?: number | null): boolean =>
-  Permissions.has(permission ?? 0, Permissions.ADMIN);
+  Permissions.has(permission ?? 0, Permissions.SUPER_ADMIN);
 
 export const hasFinancePermission = (permission?: number | null): boolean =>
   Permissions.has(permission ?? 0, Permissions.MANAGE_FINANCE);

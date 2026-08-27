@@ -51,7 +51,7 @@ import { FeeStatisticsPanel, type PeriodPreset } from "./fee-statistics-panel";
 
 type FeeSortBy = "name" | "studentId" | "status" | "paidAt";
 type SortDirection = "asc" | "desc";
-type StatusFilter = "ALL" | "PAID" | "UNPAID";
+type StatusFilter = "ALL" | "PAID" | "PARTIAL" | "UNPAID";
 type StudentFeeRow = StudentFeeListResponse["students"][number];
 
 const DEFAULT_FEE_AMOUNT = 45_000;
@@ -115,6 +115,8 @@ export function FeeManagementPage() {
   const [sortBy, setSortBy] = useState<FeeSortBy>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [lastSelectedUserId, setLastSelectedUserId] = useState<string | null>(null);
+  const [selectingAllFiltered, setSelectingAllFiltered] = useState(false);
   const [selectionPopoverOpen, setSelectionPopoverOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
@@ -251,13 +253,58 @@ export function FeeManagementPage() {
     setCurrentPage(1);
   };
 
-  const toggleSelectedUser = (userId: string) => {
+  const toggleSelectedUser = (userId: string, extendSelection = false) => {
     setSelectedUserIds((current) => {
       const next = new Set(current);
+      if (extendSelection && lastSelectedUserId) {
+        const start = students.findIndex((student) => student.userId === lastSelectedUserId);
+        const end = students.findIndex((student) => student.userId === userId);
+        if (start >= 0 && end >= 0) {
+          const rangeStart = Math.min(start, end);
+          const rangeEnd = Math.max(start, end);
+          students.slice(rangeStart, rangeEnd + 1).forEach((student) => next.add(student.userId));
+          return next;
+        }
+      }
       if (next.has(userId)) next.delete(userId);
       else next.add(userId);
       return next;
     });
+    setLastSelectedUserId(userId);
+  };
+
+  const selectAllFiltered = async () => {
+    if (selectingAllFiltered || totalCount === 0) return;
+    setSelectingAllFiltered(true);
+    try {
+      const allStudents: StudentFeeRow[] = [];
+      const batchSize = 1_000;
+      const pages = Math.max(1, Math.ceil(totalCount / batchSize));
+      for (let page = 1; page <= pages; page += 1) {
+        const data = await apiClient.listStudentsByFeeStatus({
+          status: statusFilter === "ALL" ? undefined : statusFilter,
+          page,
+          pageSize: batchSize,
+          sortBy,
+          sortDirection,
+          query,
+          referenceSemester,
+          majorCategory,
+        });
+        allStudents.push(...data.students);
+        if (data.students.length < batchSize) break;
+      }
+      setStudentCache((current) => {
+        const next = { ...current };
+        allStudents.forEach((student) => { next[student.userId] = student; });
+        return next;
+      });
+      setSelectedUserIds((current) => new Set([...current, ...allStudents.map((student) => student.userId)]));
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : "현재 필터의 학생을 모두 선택하지 못했습니다.");
+    } finally {
+      setSelectingAllFiltered(false);
+    }
   };
 
   const toggleVisibleUsers = () => {
@@ -311,6 +358,7 @@ export function FeeManagementPage() {
       setOperationError(null);
       await apiClient.processStudentFeePayments({ payments });
       setSelectedUserIds(new Set());
+      setLastSelectedUserId(null);
       setSelectionPopoverOpen(false);
       setPaymentModalOpen(false);
       setSuccessMessage(`${payments.length}명의 납부 내역을 원장에 반영했습니다.`);
@@ -409,7 +457,7 @@ export function FeeManagementPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_FINANCE}>
       <AdminPageShell>
         <AdminPageMain className="gap-5">
-          <AdminPageHeader title="과비 납부 관리" />
+          <AdminPageHeader title="과비 관리" />
 
           <SegmentedControl
             ariaLabel="과비 관리 보기"
@@ -445,6 +493,7 @@ export function FeeManagementPage() {
                 options={[
                   { value: "ALL", label: "전체" },
                   { value: "PAID", label: "완납" },
+                  { value: "PARTIAL", label: "부분 납부" },
                   { value: "UNPAID", label: "미납" },
                 ]}
               />
@@ -477,10 +526,10 @@ export function FeeManagementPage() {
                         </AdminTableHead>
                         {selectedUserIds.size > 0 ? (
                           <th colSpan={6} className="h-12 min-h-12 px-4 py-0 align-middle">
-                            <div className="flex h-12 items-center justify-between gap-3">
+                          <div className="flex h-12 items-center justify-between gap-3">
                               <div className="relative">
                           <Button type="button" variant="ghost" size="sm" className="!font-medium" onClick={() => setSelectionPopoverOpen((value) => !value)}>{selectedUserIds.size}명 선택됨 <ChevronDown aria-hidden="true" className="size-4" /></Button>
-                          {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="scrollbar-hidden flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
+                          {selectionPopoverOpen ? <><button type="button" aria-label="선택 목록 닫기" className="fixed inset-0 z-40 cursor-default" onClick={() => setSelectionPopoverOpen(false)} /><PopoverPanel className="left-0 top-full z-50 mt-2 w-80 p-3"><Button type="button" variant="ghost" size="sm" className="mb-2 w-full justify-start !font-medium" onClick={() => void selectAllFiltered()} disabled={selectingAllFiltered}>{selectingAllFiltered ? "현재 필터를 불러오는 중" : `현재 필터 전체 선택 (${totalCount.toLocaleString("ko-KR")})`}</Button><p className="mb-2 text-xs font-medium text-slate-500">선택한 학생</p><div className="scrollbar-hidden flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">{selectedStudents.map((student) => <button key={student.userId} type="button" className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-700 hover:bg-slate-200" onClick={() => toggleSelectedUser(student.userId)}>{student.nameKo} <span aria-hidden="true">×</span></button>)}</div></PopoverPanel></> : null}
                               </div>
                               <Button type="button" size="sm" onClick={openPaymentModal} disabled={saving}><CreditCard aria-hidden="true" className="size-4" /> 일괄 납부 처리</Button>
                             </div>
@@ -493,12 +542,12 @@ export function FeeManagementPage() {
                       </tr>
                     </AdminTableHeader>
                     <AdminTableBody>{students.map((student) => <tr key={student.userId} className="cursor-pointer border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70" onClick={() => void openDetail(student)}>
-                      <AdminTableCell className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${student.nameKo} 선택`} checked={selectedUserIds.has(student.userId)} onChange={() => toggleSelectedUser(student.userId)} className="size-4 accent-emerald-700" /></AdminTableCell>
+                      <AdminTableCell className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`${student.nameKo} 선택`} checked={selectedUserIds.has(student.userId)} onChange={(event) => toggleSelectedUser(student.userId, "shiftKey" in event.nativeEvent && Boolean(event.nativeEvent.shiftKey))} className="size-4 accent-emerald-700" /></AdminTableCell>
                       <AdminTableCell className="py-2.5"><div className="font-medium text-slate-900">{student.nameKo}</div>{student.nameEn ? <div className="mt-0.5 text-xs font-normal text-slate-500">{student.nameEn}</div> : null}</AdminTableCell>
                       <AdminTableCell className="py-2.5 tabular-nums text-slate-700">{student.stdNo || null}</AdminTableCell>
                       <AdminTableCell className="max-w-56 truncate py-2.5 text-slate-700" title={student.email}>{student.email}</AdminTableCell>
                       <AdminTableCell className="py-2.5 text-slate-700"><div>{student.primaryMajor || null}</div>{student.doubleMajor ? <div className="text-xs text-slate-500">복수 {student.doubleMajor}</div> : null}{student.minor ? <div className="text-xs text-slate-500">부전공 {student.minor}</div> : null}</AdminTableCell>
-                      <AdminTableCell className="py-2.5"><AdminStatusBadge tone={student.status === "PAID" ? "positive" : "neutral"}>{student.status === "PAID" ? "완납" : "미납"}</AdminStatusBadge></AdminTableCell>
+                      <AdminTableCell className="py-2.5"><AdminStatusBadge tone={student.status === "PAID" ? "positive" : student.status === "PARTIAL" ? "warning" : "neutral"}>{student.status === "PAID" ? "완납" : student.status === "PARTIAL" ? "부분 납부" : "미납"}</AdminStatusBadge></AdminTableCell>
                       <AdminTableCell className="py-2.5 text-right font-medium tabular-nums text-slate-900">{formatCurrency(student.paidAmount)}</AdminTableCell>
                     </tr>)}</AdminTableBody>
                   </AdminDataTable>

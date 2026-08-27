@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import type {
   ArticleDraftListResponse,
@@ -14,6 +15,7 @@ import { Permissions } from "@soc/contracts";
 
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleDraftRepository } from "./repositories/article-draft.repository";
+import { UsersService } from "../users/users.service";
 
 interface AuthenticatedUser {
   id: string;
@@ -27,12 +29,17 @@ export class ArticleDraftService {
   constructor(
     private readonly boardRepository: BoardRepository,
     private readonly articleDraftRepository: ArticleDraftRepository,
+    @Optional() private readonly usersService?: UsersService,
   ) {}
 
   private async assertBoardWritable(
     boardCode: string,
     user: AuthenticatedUser,
   ) {
+    if (this.usersService && await this.usersService.isPostingSuspended(user.id)) {
+      throw new ForbiddenException("posting_suspended");
+    }
+
     const board = await this.boardRepository.findByCode(boardCode);
     if (!board || !board.isActive) {
       throw new NotFoundException("board_not_found");

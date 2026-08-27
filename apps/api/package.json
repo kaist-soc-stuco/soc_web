@@ -10,6 +10,7 @@
     "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
     "db:push": "drizzle-kit push --config drizzle.config.ts",
     "db:seed": "ts-node --transpile-only ./drizzle/seed.ts",
+    "google:oauth:authorize": "ts-node --transpile-only scripts/google-oauth-authorize.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "pnpm --dir ../../shared/common build && pnpm build && node --conditions=production --test --test-concurrency=1 test/*.test.js"

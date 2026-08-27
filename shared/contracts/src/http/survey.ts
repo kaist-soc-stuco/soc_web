@@ -12,12 +12,16 @@ import type {
   UpdateSurveySchema,
   ReorderSurveyQuestionsSchema,
   ReorderSurveySectionsSchema,
+  SurveySocAffiliationSchema,
+  SurveyAcademicEligibilitySchema,
 } from "../schemas.js";
 
 export type ResponseStatus = 'submitted';
 export type QuestionType = z.infer<typeof QuestionTypeSchema>;
 export type ComputedSurveyState = 'before_open' | 'open' | 'closed';
 export type SurveyLifecycleStatus = 'DRAFT' | 'PUBLISHED';
+export type SurveySocAffiliation = z.infer<typeof SurveySocAffiliationSchema>;
+export type SurveyAcademicEligibility = z.infer<typeof SurveyAcademicEligibilitySchema>;
 
 export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
 export type SurveyQuestionConfig = z.infer<typeof QuestionConfigSchema>;
@@ -30,11 +34,16 @@ export interface SurveyRecord {
   titleEn: string | null;
   descriptionKo: string | null;
   descriptionEn: string | null;
+  descriptionImageUrlKo: string | null;
+  descriptionImageUrlEn: string | null;
   creatorId: string | null;
   computedState: ComputedSurveyState;
   publishedAt: string | null;
   connectedPostId: string | null;
   feePayersOnly: boolean;
+  eligibleSocAffiliations: SurveySocAffiliation[];
+  academicEligibility: SurveyAcademicEligibility;
+  allowAnonymous: boolean;
   allowMultipleResponses: boolean;
   allowResponseEdit: boolean;
   isKoreanOnly: boolean;
@@ -51,6 +60,10 @@ export interface SurveyRecord {
   createdAt: string;
   updatedAt: string;
   responseCount?: number;
+  spreadsheetId: string | null;
+  spreadsheetUrl: string | null;
+  spreadsheetSyncStatus: "NOT_CONNECTED" | "CONNECTED" | "ERROR";
+  spreadsheetLastSyncedAt: string | null;
 }
 
 export interface SurveySectionRecord {
@@ -95,9 +108,16 @@ export interface SurveyResponseRecord {
 
 export interface SurveyResponseUserRecord {
   nameKo: string | null;
+  nameEn: string | null;
   email: string | null;
+  phoneNumber: string | null;
   departmentKo: string | null;
   stdNo: string | null;
+  primaryMajor: string | null;
+  doubleMajor: string | null;
+  minor: string | null;
+  academicStatus: string | null;
+  feeStatus: "PAID" | "PARTIAL" | "UNPAID" | null;
 }
 
 export interface SurveyAnswerRecord {

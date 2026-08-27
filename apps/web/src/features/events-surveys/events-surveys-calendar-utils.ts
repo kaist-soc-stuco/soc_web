@@ -93,13 +93,6 @@ export function getCalendarEventStyles(
   }
 
   switch (kind) {
-    case "VOTE":
-      return {
-        bg: "bg-sky-100 text-sky-700 hover:bg-sky-200",
-        hoverBg: "bg-sky-200",
-        bullet: "bg-sky-500",
-        label: lang === "ko" ? "투표" : "Poll",
-      };
     case "EVENT":
       return {
         bg: "bg-brand-primary/15 text-brand-primary hover:bg-brand-primary/25",
@@ -136,7 +129,6 @@ export function getCompactKindLabel(
   if (sourceType === "MANUAL") {
     return lang === "ko" ? "일정" : "Calendar";
   }
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
   if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Application";
   if (kind === "EVENT") return lang === "ko" ? "행사" : "Event";
   return lang === "ko" ? "설문" : "Survey";

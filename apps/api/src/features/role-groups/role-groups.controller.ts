@@ -16,7 +16,7 @@ type AuthenticatedRequest = Request & {
 };
 
 @Controller("role-groups")
-@RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_ROLES)
 export class RoleGroupsController {
   constructor(private readonly roleGroupsService: RoleGroupsService) {}
 
@@ -64,6 +64,8 @@ export class RoleGroupsController {
     @Query("q") q?: string,
     @Query("department") department?: string,
     @Query("academicStatus") academicStatus?: string,
+    @Query("majorType") majorType?: string,
+    @Query("feeStatus") feeStatus?: string,
     @Query("status") status?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
@@ -72,6 +74,22 @@ export class RoleGroupsController {
       q,
       department,
       academicStatus,
+      majorType:
+        majorType === "PRIMARY"
+          ? "PRIMARY"
+          : majorType === "DOUBLE"
+            ? "DOUBLE"
+            : majorType === "MINOR"
+              ? "MINOR"
+              : undefined,
+      feeStatus:
+        feeStatus === "PAID"
+          ? "PAID"
+          : feeStatus === "PARTIAL"
+            ? "PARTIAL"
+            : feeStatus === "UNPAID"
+              ? "UNPAID"
+              : undefined,
       status: status === "active" || status === "inactive" ? status : undefined,
       page: page ? Number(page) : 1,
       pageSize: pageSize ? Number(pageSize) : 20,

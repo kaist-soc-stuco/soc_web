@@ -13,6 +13,8 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
 import { ABOUT_ITEMS, includesQuery, type SearchFilter } from "./search-utils";
 
+export type SearchBy = "title" | "title_content";
+
 export function useSearchPageController() {
   const { lang } = useLanguage();
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export function useSearchPageController() {
   const query = searchParams.get("q")?.trim() ?? "";
   const [inputValue, setInputValue] = useState(query);
   const [filter, setFilter] = useState<SearchFilter>("all");
+  const [searchBy, setSearchBy] = useState<SearchBy>("title_content");
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<PublicCalendarEventItem[]>([]);
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
@@ -52,14 +55,23 @@ export function useSearchPageController() {
     setError(null);
 
     Promise.all([
-      apiClient.searchArticles(query, 60),
+      apiClient.searchArticles(query, 60, searchBy),
+      apiClient.getArticles("_EVENT", {
+        page: 1,
+        limit: 60,
+        q: query,
+        searchBy,
+      }),
       apiClient.getPublicSurveys(),
       apiClient.getBoards().catch(() => ({ items: [] as BoardSummary[] })),
       apiClient.searchPublicCalendarEvents(query, 40),
     ])
-      .then(([articleItems, surveyItems, boardResponse, calendarResponse]) => {
+      .then(([articleItems, eventResponse, surveyItems, boardResponse, calendarResponse]) => {
         if (cancelled) return;
-        setArticles(articleItems);
+        setArticles([
+          ...articleItems,
+          ...eventResponse.items.map((item) => ({ ...item, boardCode: "_EVENT" })),
+        ]);
         setCalendarEvents(
           calendarResponse.items.filter(
             (item) => item.sourceType === "MANUAL" || item.sourceType === "KAIST_ACADEMIC",
@@ -100,7 +112,7 @@ export function useSearchPageController() {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, lang, query]);
+  }, [apiClient, lang, query, searchBy]);
 
   const boardById = useMemo(
     () => new Map(boards.map((board) => [board.boardId, board])),
@@ -118,7 +130,7 @@ export function useSearchPageController() {
   );
 
   const aboutResults = useMemo(() => {
-    if (!query) return ABOUT_ITEMS;
+    if (!query) return [];
     return ABOUT_ITEMS.filter((item) =>
       includesQuery(
         [
@@ -161,6 +173,8 @@ export function useSearchPageController() {
     query,
     setInputValue,
     setFilter,
+    searchBy,
+    setSearchBy,
     surveys,
     totalCount,
   };

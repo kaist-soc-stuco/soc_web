@@ -24,7 +24,7 @@ export function HomePage() {
             <div className="home-section-heading">
               <h2 id="home-updates-title">{lang === 'ko' ? '소식과 일정' : 'News and schedule'}</h2>
             </div>
-            <div className="grid min-w-0 items-stretch gap-6 lg:grid-cols-2">
+            <div className="grid min-w-0 items-start gap-6 lg:grid-cols-2">
               <div className="min-w-0">
                 <NoticeBoard />
               </div>

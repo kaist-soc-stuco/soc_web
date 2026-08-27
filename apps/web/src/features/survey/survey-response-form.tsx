@@ -13,6 +13,7 @@ import { SurveyQuestionInput } from "./survey-question-input";
 import { PreviewNoticeView } from "./survey-state-views";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { Button } from "@/components/ui/button";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 interface SurveyResponseFormProps {
   allQuestions: SurveyQuestionRecord[];
@@ -91,6 +92,9 @@ export function SurveyResponseForm({
               const questionIndex =
                 allQuestions.findIndex((item) => item.id === question.id) + 1;
               const questionError = questionErrors[question.id] ?? null;
+              const questionImage = lang === "ko"
+                ? question.config?.imageUrlKo
+                : question.config?.imageUrlEn || question.config?.imageUrlKo;
 
               return (
                 <div
@@ -135,6 +139,13 @@ export function SurveyResponseForm({
                       className="mb-4 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-500"
                     />
                   )}
+                  {questionImage ? (
+                    <img
+                      src={resolveAssetUrl(questionImage)}
+                      alt=""
+                      className="mb-4 max-h-[28rem] w-full rounded-xl border border-slate-200 object-contain"
+                    />
+                  ) : null}
                   <div>
                     <SurveyQuestionInput
                       question={question}

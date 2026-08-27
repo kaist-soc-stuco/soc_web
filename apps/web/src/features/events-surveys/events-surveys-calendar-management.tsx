@@ -9,7 +9,7 @@ export function EventsSurveysCalendarManagement() {
   const { data: session } = useCurrentSession();
   const canManage = Permissions.has(
     session?.permission ?? 0,
-    Permissions.MANAGE_CONTENT,
+    Permissions.MANAGE_CALENDAR,
   );
 
   if (!canManage) return null;

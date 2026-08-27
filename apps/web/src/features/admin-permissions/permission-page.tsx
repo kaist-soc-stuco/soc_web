@@ -9,6 +9,7 @@ import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableEmpty, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { AdminCard, AdminCardHeader, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSearchField, AdminSectionTitle } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput } from "@/components/ui/form-control";
@@ -21,6 +22,9 @@ import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 type DetailTab = "permissions" | "members";
+type CandidateMajorType = "" | "PRIMARY" | "DOUBLE" | "MINOR";
+type CandidateFeeStatus = "" | "PAID" | "PARTIAL" | "UNPAID";
+type CandidateAcademicStatus = "" | "재학" | "졸업";
 
 interface RoleDraft {
   description: string;
@@ -30,21 +34,27 @@ interface RoleDraft {
 
 const CANDIDATE_PAGE_SIZE = 20;
 const permissionDomains = [
-  { id: "content", label: "콘텐츠", codes: ["WRITE_NOTICE", "WRITE_GENERAL", "WRITE_REPLY", "MANAGE_CONTENT"] },
-  { id: "operations", label: "운영", codes: ["MANAGE_SURVEY", "MANAGE_FINANCE", "MANAGE_TOOL"] },
-  { id: "system", label: "시스템", codes: ["MODERATOR", "ADMIN"] },
+  { id: "publishing", label: "게시·응답", codes: ["WRITE_OFFICIAL", "WRITE_LAB", "WRITE_REPLY", "MODERATE_CONTENT", "MANAGE_BOARDS"] },
+  { id: "operations", label: "운영", codes: ["MANAGE_SURVEY", "MANAGE_FINANCE", "MANAGE_SITE_CONTENT", "MANAGE_CALENDAR", "MANAGE_CONTACTS", "SEND_BULK_EMAIL"] },
+  { id: "system", label: "시스템", codes: ["MANAGE_USERS", "VIEW_AUDIT_LOG", "MANAGE_ROLES", "SUPER_ADMIN"] },
 ] as const;
 
 const permissionLabels: Record<string, string> = {
-  WRITE_NOTICE: "공지·행사 작성",
-  WRITE_GENERAL: "일반 게시판 작성",
+  WRITE_OFFICIAL: "공지·행사·HoC·홍보 작성",
+  WRITE_LAB: "연구실 게시판 작성",
   WRITE_REPLY: "공식 답변 관리",
   MANAGE_SURVEY: "설문조사 관리",
-  MANAGE_FINANCE: "학생회비 관리",
-  MANAGE_CONTENT: "운영 콘텐츠 관리",
-  MANAGE_TOOL: "운영 도구 관리",
-  MODERATOR: "게시글·댓글 관리",
-  ADMIN: "권한 및 관리자 설정",
+  MANAGE_FINANCE: "과비 관리",
+  MANAGE_SITE_CONTENT: "사이트 설정",
+  MANAGE_CALENDAR: "일정 관리",
+  MANAGE_CONTACTS: "연락망 관리",
+  MANAGE_USERS: "사용자 관리",
+  MODERATE_CONTENT: "게시글·댓글 관리",
+  MANAGE_BOARDS: "게시판 설정",
+  SEND_BULK_EMAIL: "이메일 일괄 발송",
+  VIEW_AUDIT_LOG: "운영 로그 조회",
+  MANAGE_ROLES: "권한·역할 관리",
+  SUPER_ADMIN: "최고 관리자",
 };
 
 const emptyRoleDraft = (): RoleDraft => ({ description: "", nameKo: "", permissionIds: [] });
@@ -84,6 +94,9 @@ export function PermissionPage() {
   const [memberEditorOpen, setMemberEditorOpen] = useState(false);
   const [candidateData, setCandidateData] = useState<RoleGroupCandidateListResponse | null>(null);
   const [candidateQuery, setCandidateQuery] = useState("");
+  const [candidateMajorType, setCandidateMajorType] = useState<CandidateMajorType>("");
+  const [candidateFeeStatus, setCandidateFeeStatus] = useState<CandidateFeeStatus>("");
+  const [candidateAcademicStatus, setCandidateAcademicStatus] = useState<CandidateAcademicStatus>("");
   const [candidatePage, setCandidatePage] = useState(1);
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [candidateSaving, setCandidateSaving] = useState(false);
@@ -238,7 +251,14 @@ export function PermissionPage() {
     setCandidateLoading(true);
     setError(null);
     try {
-      const data = await client.listRoleGroupCandidates(roleId, { q: query, page, pageSize: CANDIDATE_PAGE_SIZE });
+      const data = await client.listRoleGroupCandidates(roleId, {
+        q: query,
+        academicStatus: candidateAcademicStatus || undefined,
+        majorType: candidateMajorType || undefined,
+        feeStatus: candidateFeeStatus || undefined,
+        page,
+        pageSize: CANDIDATE_PAGE_SIZE,
+      });
       if (requestId !== candidateRequestIdRef.current) return;
       setCandidateData(data);
       setCandidatePage(page);
@@ -247,7 +267,7 @@ export function PermissionPage() {
     } finally {
       if (requestId === candidateRequestIdRef.current) setCandidateLoading(false);
     }
-  }, [candidateQuery, client]);
+  }, [candidateAcademicStatus, candidateFeeStatus, candidateMajorType, candidateQuery, client]);
 
   useEffect(() => {
     if (!memberEditorOpen || !selectedRole) return;
@@ -268,6 +288,8 @@ export function PermissionPage() {
       return;
     }
     setCandidateQuery("");
+    setCandidateMajorType("");
+    setCandidateFeeStatus("");
     setCandidateData(null);
     setCandidateLoading(true);
     setCandidatePage(1);
@@ -307,7 +329,7 @@ export function PermissionPage() {
   };
 
   return (
-    <AuthGuard requirePermission={Permissions.ADMIN}>
+    <AuthGuard requirePermission={Permissions.MANAGE_ROLES}>
       <AdminPageShell>
         {ConfirmDialog}
         <AdminPageMain>
@@ -432,7 +454,44 @@ export function PermissionPage() {
 
         <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="h-[680px] max-h-[calc(100dvh-3rem)] max-w-4xl" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><span className="mr-auto self-center text-sm font-normal text-[#344054]">전체 {candidateData?.total ?? 0}명 · 선택 {selectedMemberIds.length}명</span><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button type="button" onClick={() => void saveMembers()} disabled={candidateSaving}>{candidateSaving ? "적용 중" : "적용"}</Button></>}>
           <div className="flex min-h-0 flex-1 flex-col gap-4">
-            <div className="grid shrink-0 gap-1.5"><span className="text-xs font-normal leading-4 text-[#344054]">구성원 검색</span><AdminSearchField aria-label="구성원 검색" value={candidateQuery} onValueChange={setCandidateQuery} placeholder="이름, 학번, 이메일, 소속 검색" /></div>
+            <div className="grid shrink-0 gap-2 md:grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_7.5rem]">
+              <AdminSearchField aria-label="구성원 검색" value={candidateQuery} onValueChange={setCandidateQuery} placeholder="이름, 학번, 이메일, 소속 검색" />
+              <AdminSelectDropdown
+                ariaLabel="학적 상태 필터"
+                className="w-full"
+                value={candidateAcademicStatus}
+                onChange={(value) => setCandidateAcademicStatus(value as CandidateAcademicStatus)}
+                options={[
+                  { value: "", label: "전체 학적" },
+                  { value: "재학", label: "재학" },
+                  { value: "졸업", label: "졸업" },
+                ]}
+              />
+              <AdminSelectDropdown
+                ariaLabel="전공 유형 필터"
+                className="w-full"
+                value={candidateMajorType}
+                onChange={(value) => setCandidateMajorType(value as CandidateMajorType)}
+                options={[
+                  { value: "", label: "전체 전공" },
+                  { value: "PRIMARY", label: "주전공" },
+                  { value: "DOUBLE", label: "복수전공" },
+                  { value: "MINOR", label: "부전공" },
+                ]}
+              />
+              <AdminSelectDropdown
+                ariaLabel="과비 납부 상태 필터"
+                className="w-full"
+                value={candidateFeeStatus}
+                onChange={(value) => setCandidateFeeStatus(value as CandidateFeeStatus)}
+                options={[
+                  { value: "", label: "전체 과비" },
+                  { value: "PAID", label: "완납" },
+                  { value: "PARTIAL", label: "부분 납부" },
+                  { value: "UNPAID", label: "미납" },
+                ]}
+              />
+            </div>
             <div className={cn("scrollbar-hidden min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 transition-opacity duration-150", candidateLoading && candidateData ? "opacity-60" : "opacity-100")} aria-busy={candidateLoading}>
               <AdminDataTable minWidth={688}><colgroup><col style={{ width: 48 }} /><col style={{ width: 240 }} /><col style={{ width: 150 }} /><col style={{ width: 250 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center"><UiInput type="checkbox" aria-label="현재 페이지 전체 선택" checked={Boolean(candidateData?.items.length && candidateData.items.every((item) => selectedMemberIds.includes(item.userId)))} onChange={(event) => { const pageIds = candidateData?.items.map((item) => item.userId) ?? []; const checked = event.currentTarget.checked; setSelectedMemberIds((current) => checked ? [...new Set([...current, ...pageIds])] : current.filter((id) => !pageIds.includes(id))); }} /></AdminTableHead><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead></tr></AdminTableHeader><AdminTableBody>
               {!candidateData && candidateLoading ? Array.from({ length: 5 }).map((_, index) => <tr key={index}>{Array.from({ length: 4 }).map((__, cell) => <AdminTableCell key={cell}><Skeleton className="h-4 w-20" /></AdminTableCell>)}</tr>)

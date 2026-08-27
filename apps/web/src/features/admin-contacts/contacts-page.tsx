@@ -38,6 +38,7 @@ import { AdminEmptyState, AdminPageHeader, AdminPageShell, AdminTableCard } from
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { PageSearchField } from "@/components/ui/page-layout";
@@ -51,7 +52,7 @@ import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./Executiv
 const CONTACT_LIST_PAGE_SIZE = 500;
 
 export function ExecutiveDirectoryPage() {
-  return <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}><ContactsPageContent /></AuthGuard>;
+  return <AuthGuard requirePermission={Permissions.MANAGE_CONTACTS}><ContactsPageContent /></AuthGuard>;
 }
 
 export const ContactsPage = ExecutiveDirectoryPage;
@@ -63,6 +64,7 @@ function sortContacts(items: ContactRecord[]) {
 function ContactsPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -208,7 +210,10 @@ function ContactsPageContent() {
       const result = await apiClient.bulkImportContacts({ items: bulkRows, replaceExisting: bulkReplaceExisting });
       clearBulkImport(true);
       await loadContacts();
-      alert(`${result.importedCount}명을 가져왔습니다.${result.removedCount > 0 ? ` 기존 ${result.removedCount}명은 교체되었습니다.` : ""}`);
+      toast({
+        type: "success",
+        message: `${result.importedCount}명을 가져왔습니다.${result.removedCount > 0 ? ` 기존 ${result.removedCount}명은 교체되었습니다.` : ""}`,
+      });
     } catch {
       setBulkErrors(["일괄 업로드에 실패했습니다. 입력값과 권한을 확인해 주세요."]);
     } finally {

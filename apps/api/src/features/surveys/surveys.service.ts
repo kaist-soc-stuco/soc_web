@@ -67,6 +67,34 @@ export class SurveysService {
     );
   }
 
+  private assertAudienceConfiguration(input: {
+    feePayersOnly: boolean;
+    eligibleSocAffiliations: SurveyRecordWithState["eligibleSocAffiliations"];
+    academicEligibility: SurveyRecordWithState["academicEligibility"];
+    allowAnonymous: boolean;
+  }): void {
+    if (
+      input.allowAnonymous &&
+      (input.feePayersOnly ||
+        input.eligibleSocAffiliations.length > 0 ||
+        input.academicEligibility !== "ANY")
+    ) {
+      throw new BadRequestException("anonymous_survey_cannot_require_member_attributes");
+    }
+  }
+
+  private async assertConnectedArticleAvailable(
+    articleId: string | null | undefined,
+    surveyId?: string,
+    tx?: Parameters<SurveysRepository["findById"]>[1],
+  ): Promise<void> {
+    if (!articleId) return;
+    const connected = await this.surveysRepo.findByConnectedArticleId(articleId, tx);
+    if (connected && connected.id !== surveyId) {
+      throw new BadRequestException("article_already_connected_to_survey");
+    }
+  }
+
   async findAll(): Promise<SurveyRecordWithState[]> {
     const surveys = await this.surveysRepo.findAll();
     const responseCounts = await Promise.all(
@@ -148,6 +176,13 @@ export class SurveysService {
     if (dto.isPublished) {
       throw new BadRequestException("survey_publish_requires_saved_definition");
     }
+    this.assertAudienceConfiguration({
+      feePayersOnly: dto.feeRequirementPolicy === "PAID_ONLY",
+      eligibleSocAffiliations: dto.eligibleSocAffiliations ?? ["PRIMARY", "DOUBLE", "MINOR"],
+      academicEligibility: dto.academicEligibility ?? "ENROLLED_OR_LEAVE",
+      allowAnonymous: dto.allowAnonymous ?? false,
+    });
+    await this.assertConnectedArticleAvailable(dto.connectedArticleId);
     const survey = await this.surveysRepo.insert(creatorId, dto);
     const computedState = this.computeState(survey);
     return { ...survey, computedState, responseCount: 0 };
@@ -157,7 +192,19 @@ export class SurveysService {
     return this.mutationPolicy.withSurveyLock(id, async (tx) => {
       const current = await this.surveysRepo.findById(id, tx);
       if (!current) throw new NotFoundException("survey_not_found");
-      await this.mutationPolicy.assertMeaningMutable(tx, id, current, dto);
+
+      this.assertAudienceConfiguration({
+        feePayersOnly:
+          dto.feeRequirementPolicy === undefined
+            ? current.feePayersOnly
+            : dto.feeRequirementPolicy === "PAID_ONLY",
+        eligibleSocAffiliations:
+          dto.eligibleSocAffiliations ?? current.eligibleSocAffiliations,
+        academicEligibility:
+          dto.academicEligibility ?? current.academicEligibility,
+        allowAnonymous: dto.allowAnonymous ?? current.allowAnonymous,
+      });
+      await this.assertConnectedArticleAvailable(dto.connectedArticleId, id, tx);
 
       const isAlwaysOpen = dto.isAlwaysOpen ?? current.isAlwaysOpen;
       const opensAt = isAlwaysOpen ? null : dto.openAt === undefined ? current.opensAt : dto.openAt;
@@ -221,7 +268,12 @@ export class SurveysService {
           titleEn: original.titleEn ? `${original.titleEn} (Copy)` : undefined,
           descriptionKo: original.descriptionKo ?? undefined,
           descriptionEn: original.descriptionEn ?? undefined,
+          descriptionImageUrlKo: original.descriptionImageUrlKo,
+          descriptionImageUrlEn: original.descriptionImageUrlEn,
           feeRequirementPolicy: original.feePayersOnly ? "PAID_ONLY" : "NONE",
+          eligibleSocAffiliations: original.eligibleSocAffiliations,
+          academicEligibility: original.academicEligibility,
+          allowAnonymous: original.allowAnonymous,
           allowMultipleResponses: original.allowMultipleResponses,
           allowResponseEdit: original.allowResponseEdit,
           isKoreanOnly: original.isKoreanOnly,

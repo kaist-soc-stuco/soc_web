@@ -6,13 +6,13 @@ import { BulkEmailController } from "./bulk-email.controller";
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
-import { EmailDeliveryService } from "./email-delivery.service";
+import { EmailDeliveryModule } from "./email-delivery.module";
 import { AssetModule } from "../asset/asset.module";
 
 @Module({
-  imports: [AuthModule, UsersModule, PostgresModule, AssetModule],
+  imports: [AuthModule, UsersModule, PostgresModule, AssetModule, EmailDeliveryModule],
   controllers: [BulkEmailController],
-  providers: [BulkEmailRepository, BulkEmailTemplateRepository, BulkEmailService, EmailDeliveryService],
+  providers: [BulkEmailRepository, BulkEmailTemplateRepository, BulkEmailService],
   exports: [BulkEmailService, BulkEmailRepository],
 })
 export class BulkEmailModule {}

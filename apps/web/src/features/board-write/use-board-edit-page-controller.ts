@@ -7,6 +7,7 @@ import type {
   SurveyRecord,
 } from "@soc/contracts";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -20,6 +21,11 @@ import {
 } from "./event-date-utils";
 
 const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항"]);
+
+const parseHomeOrder = (value: string): number | null => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
 
 const getDraftFingerprint = (
   payload: Omit<
@@ -47,6 +53,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -59,6 +66,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
   const [contentEn, setContentEn] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [homeVisible, setHomeVisible] = useState(true);
+  const [homeOrder, setHomeOrder] = useState("");
   const [isSecret, setIsSecret] = useState(false);
   const [allowSecret, setAllowSecret] = useState(false);
   const [allowComment, setAllowComment] = useState(true);
@@ -111,6 +120,12 @@ export function useBoardEditPageController(forcedCategory?: string) {
         setContentEn(res.contentEn || "");
         setIsAnonymous(res.isAnonymous);
         setIsPinned(res.isPinned);
+        setHomeVisible(res.homeVisible !== false);
+        setHomeOrder(
+          res.homeOrder === null || res.homeOrder === undefined
+            ? ""
+            : String(res.homeOrder),
+        );
         setIsSecret(res.isSecret);
         setAllowComment(res.allowComment);
         setIsKoreanOnly(
@@ -202,6 +217,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
     contentEn: contentEn || null,
     visibilityScope: "PUBLIC" as const,
     isPinned: canConfigurePostSettings ? isPinned : false,
+    homeVisible: category === "_EVENT" ? homeVisible : true,
+    homeOrder: category === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
     isSecret: allowSecret ? isSecret : false,
     isAnonymous: canConfigurePostSettings ? isAnonymous : false,
     allowComment,
@@ -233,6 +250,12 @@ export function useBoardEditPageController(forcedCategory?: string) {
     setContentEn(draft.contentEn || "");
     setIsAnonymous(draft.isAnonymous);
     setIsPinned(draft.isPinned);
+    setHomeVisible(draft.homeVisible !== false);
+    setHomeOrder(
+      draft.homeOrder === null || draft.homeOrder === undefined
+        ? ""
+        : String(draft.homeOrder),
+    );
     setIsSecret(draft.isSecret);
     setAllowComment(draft.allowComment);
     setIsKoreanOnly(draft.isKoreanOnly);
@@ -436,6 +459,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
     contentEn,
     isAnonymous,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSecret,
     allowComment,
     isKoreanOnly,
@@ -465,6 +490,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
     contentEn,
     isAnonymous,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSecret,
     allowComment,
     isKoreanOnly,
@@ -502,11 +529,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
       setAssets((prev) => [...prev, ...uploaded]);
     } catch (err) {
       console.error(err);
-      alert(
-        lang === "ko"
-          ? "파일 업로드에 실패했습니다."
-          : "Failed to upload files.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "파일 업로드에 실패했습니다."
+            : "Failed to upload files.",
+      });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -517,11 +546,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
   const handleUploadThumbnail = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      alert(
-        lang === "ko"
-          ? "썸네일은 이미지 파일만 선택할 수 있습니다."
-          : "The thumbnail must be an image file.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "썸네일은 이미지 파일만 선택할 수 있습니다."
+            : "The thumbnail must be an image file.",
+      });
       return;
     }
 
@@ -542,11 +573,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
       ]);
     } catch (error) {
       console.error(error);
-      alert(
-        lang === "ko"
-          ? "썸네일 업로드에 실패했습니다."
-          : "Failed to upload the thumbnail.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "썸네일 업로드에 실패했습니다."
+            : "Failed to upload the thumbnail.",
+      });
     } finally {
       setUploading(false);
     }
@@ -556,20 +589,24 @@ export function useBoardEditPageController(forcedCategory?: string) {
     if (!articleId) return;
 
     if (!titleKo.trim() || !contentKo.trim()) {
-      alert(
-        lang === "ko"
-          ? "국문 제목과 내용은 필수입니다."
-          : "Korean title and content are required.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "국문 제목과 내용은 필수입니다."
+            : "Korean title and content are required.",
+      });
       return;
     }
 
     if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
-      alert(
-        lang === "ko"
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
             ? "영문 제목과 내용을 입력하거나 '한국어 사용자만'을 선택해 주세요."
             : "Enter an English title and content, or select 'Korean Speakers Only'.",
-      );
+      });
       return;
     }
 
@@ -579,11 +616,13 @@ export function useBoardEditPageController(forcedCategory?: string) {
         (!isKoreanOnly && !eventDescriptionEn.trim()) ||
         (!isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
       ) {
-        alert(
-          lang === "ko"
-            ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
-            : "Event schedule or always-open status, plus card description, is required.",
-        );
+        toast({
+          type: "error",
+          message:
+            lang === "ko"
+              ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
+              : "Event schedule or always-open status, plus card description, is required.",
+        });
         return;
       }
     }
@@ -597,6 +636,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
         contentEn: isKoreanOnly ? "" : contentEn,
         isAnonymous: canConfigurePostSettings ? isAnonymous : false,
         isPinned: canConfigurePostSettings ? isPinned : false,
+        homeVisible: category === "_EVENT" ? homeVisible : undefined,
+        homeOrder: category === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
         isSecret: allowSecret ? isSecret : false,
         allowComment,
         assets: assets.map((asset, index) => ({
@@ -656,7 +697,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
         await apiClient.updateSurvey(selectedSurveyId, {
           connectedArticleId: articleId,
-          kind: category === "_EVENT" ? "EVENT" : undefined,
+          kind: category === "_EVENT" ? "APPLICATION" : undefined,
           isAlwaysOpen: overwriteAlwaysOpen
             ? true
             : overwriteSchedule
@@ -686,19 +727,23 @@ export function useBoardEditPageController(forcedCategory?: string) {
         setServerDraftId(null);
         setServerDraftVersion(undefined);
       }
-      alert(
-        lang === "ko"
-          ? "게시글이 수정되었습니다."
-          : "Article updated successfully.",
-      );
+      toast({
+        type: "success",
+        message:
+          lang === "ko"
+            ? "게시글이 수정되었습니다."
+            : "Article updated successfully.",
+      });
       backToArticle();
     } catch (err) {
       console.error(err);
-      alert(
-        lang === "ko"
-          ? "게시글 수정에 실패했습니다."
-          : "Failed to update article.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "게시글 수정에 실패했습니다."
+            : "Failed to update article.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -737,6 +782,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSecret,
     isSubmitting,
     lang,
@@ -755,6 +802,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
+    setHomeVisible,
+    setHomeOrder,
     setIsSecret,
     setSelectedSurveyId,
     setTitleEn,

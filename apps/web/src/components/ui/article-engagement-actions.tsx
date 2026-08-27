@@ -14,11 +14,13 @@ interface ArticleEngagementActionsProps {
   onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   compact?: boolean;
   allowLike?: boolean;
+  allowScrap?: boolean;
   scrapIconOnly?: boolean;
 }
 
 export function ArticleEngagementActions({
   allowLike = true,
+  allowScrap = true,
   compact = false,
   isAuthenticated,
   lang,
@@ -35,6 +37,8 @@ export function ArticleEngagementActions({
   const buttonClass = compact
     ? 'min-h-8 rounded-md px-2 text-[length:var(--ui-text-caption-size)]'
     : 'min-h-9 rounded-lg px-3 text-xs';
+
+  if (!allowLike && !allowScrap) return null;
 
   return (
     <div className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
@@ -55,22 +59,24 @@ export function ArticleEngagementActions({
           tone="like"
         />
       ) : null}
-      <EngagementActionButton
-        active={scrapActive}
-        count={scrapIconOnly ? null : scrapCount}
-        icon={
-          <Bookmark
-            className={`h-3.5 w-3.5 ${scrapActive ? 'text-amber-400' : 'text-slate-400'}`}
-            fill={scrapActive ? 'currentColor' : 'none'}
-          />
-        }
-        label={lang === 'ko' ? '스크랩' : 'Scrap'}
-        loading={submitting === 'SCRAP'}
-        showLoadingIndicator={!scrapIconOnly}
-        onClick={() => onToggle('SCRAP', !scrapActive)}
-        className={scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass}
-        tone="scrap"
-      />
+      {allowScrap ? (
+        <EngagementActionButton
+          active={scrapActive}
+          count={scrapIconOnly ? null : scrapCount}
+          icon={
+            <Bookmark
+              className={`h-3.5 w-3.5 ${scrapActive ? 'text-amber-400' : 'text-slate-400'}`}
+              fill={scrapActive ? 'currentColor' : 'none'}
+            />
+          }
+          label={lang === 'ko' ? '스크랩' : 'Scrap'}
+          loading={submitting === 'SCRAP'}
+          showLoadingIndicator={!scrapIconOnly}
+          onClick={() => onToggle('SCRAP', !scrapActive)}
+          className={scrapIconOnly ? 'size-8 rounded-md p-0' : buttonClass}
+          tone="scrap"
+        />
+      ) : null}
     </div>
   );
 }

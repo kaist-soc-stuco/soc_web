@@ -57,6 +57,62 @@
       "when": 1787500001000,
       "tag": "0007_organization_chart_english_image",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787808135668,
+      "tag": "0008_left_rhodey",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787809304932,
+      "tag": "0009_lean_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787811000000,
+      "tag": "0010_modern_permission_repair",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787815003046,
+      "tag": "0011_icy_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787815776262,
+      "tag": "0012_wakeful_serpent_society",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787817000000,
+      "tag": "0013_public_board_read_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787818000000,
+      "tag": "0014_user_posting_sanctions",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1787819000000,
+      "tag": "0015_home_event_presentation",
+      "breakpoints": true
     }
   ]
 }

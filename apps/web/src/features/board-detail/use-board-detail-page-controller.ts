@@ -5,7 +5,7 @@ import type {
   CommentEngagementKind,
   CommentItem,
 } from "@soc/contracts";
-import { createApiClient } from "@soc/api-client";
+import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import { createElement, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -22,6 +22,8 @@ import {
 import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
+const COMMENT_PAGE_SIZE = 10;
+
 export function useBoardDetailPageController(forcedCategory?: string) {
   const { category: routeCategory = "공지", articleId } = useParams<{
     category: string;
@@ -31,8 +33,11 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const [article, setArticle] = useState<ArticleDetailResponse | null>(null);
   const [board, setBoard] = useState<BoardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [articleErrorCode, setArticleErrorCode] = useState<string | null>(null);
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentPage, setCommentPage] = useState(1);
+  const [commentTotal, setCommentTotal] = useState(0);
   const [commentText, setCommentText] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
@@ -44,6 +49,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const [engagementSubmitting, setEngagementSubmitting] =
     useState<ArticleEngagementKind | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [revealedAuthorName, setRevealedAuthorName] = useState<string | null>(null);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const navigate = useNavigate();
@@ -83,18 +89,31 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const canManageComments = useMemo(() => {
     if (!board) return false;
     const permission = session?.permission ?? 0;
-    return Permissions.hasAny(permission, Permissions.MODERATOR, Permissions.ADMIN);
+    return Permissions.has(permission, Permissions.MODERATE_CONTENT);
   }, [board, session]);
 
   const canManageArticle = canEdit || canManageComments;
+  const canModerate = canManageComments;
 
   const canCreateComment = useMemo(() => {
-    if (!board?.allowComment) return false;
-    if (!article?.allowComment) return false;
     if (!session?.canUsePersistentFeatures) return false;
 
+    const canWriteOfficialReply =
+      category === "건의사항" &&
+      Permissions.has(session.permission ?? 0, Permissions.WRITE_REPLY);
+    if (canWriteOfficialReply) return true;
+    if (!board?.allowComment) return false;
+    if (!article?.allowComment) return false;
+
     return true;
-  }, [article, board, session]);
+  }, [article, board, category, session]);
+
+  const canViewCommentSection = Boolean(
+    canCreateComment ||
+      (board?.allowComment && article?.allowComment) ||
+      (category === "건의사항" &&
+        Permissions.has(session?.permission ?? 0, Permissions.WRITE_REPLY)),
+  );
 
   const posterAsset = useMemo(
     () =>
@@ -119,7 +138,11 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     let cancelled = false;
     setLoading(true);
     setArticle(null);
+    setArticleErrorCode(null);
     setBoard(null);
+    setComments([]);
+    setCommentPage(1);
+    setCommentTotal(0);
 
     Promise.all([
       apiClient.getArticle(category, articleId),
@@ -131,10 +154,13 @@ export function useBoardDetailPageController(forcedCategory?: string) {
           setBoard(boardResponse);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
           setArticle(null);
           setBoard(null);
+          setArticleErrorCode(
+            error instanceof ApiClientHttpError ? error.code ?? null : null,
+          );
         }
       })
       .finally(() => {
@@ -154,9 +180,15 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     setCommentError(null);
 
     apiClient
-      .getComments(category, articleId, { page: 1, limit: 50 })
+      .getComments(category, articleId, {
+        page: commentPage,
+        limit: COMMENT_PAGE_SIZE,
+      })
       .then((response) => {
-        if (!cancelled) setComments(response.items);
+        if (!cancelled) {
+          setComments(response.items);
+          setCommentTotal(response.total);
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -174,15 +206,16 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, articleId, category, lang, loading]);
+  }, [apiClient, articleId, category, commentPage, lang, loading]);
 
-  const refreshComments = async () => {
+  const refreshComments = async (page = commentPage) => {
     if (!articleId) return;
     const response = await apiClient.getComments(category, articleId, {
-      page: 1,
-      limit: 50,
+      page,
+      limit: COMMENT_PAGE_SIZE,
     });
     setComments(response.items);
+    setCommentTotal(response.total);
   };
 
   const handleCreateComment = async () => {
@@ -195,7 +228,8 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         content: commentText.trim(),
       });
       setCommentText("");
-      await refreshComments();
+      setCommentPage(1);
+      await refreshComments(1);
     } catch {
       setCommentError(
         lang === "ko"
@@ -256,11 +290,63 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       await apiClient.deleteArticle(category, articleId);
       navigate(category === "_EVENT" ? "/events" : `/board/${category}`, { replace: true });
     } catch {
-      alert(
-        lang === "ko"
-          ? "게시글 삭제에 실패했습니다."
-          : "Failed to delete the post.",
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "게시글 삭제에 실패했습니다."
+            : "Failed to delete the post.",
+      });
+    }
+  };
+
+  const handleUpdateComment = async (commentId: string, content: string) => {
+    if (!articleId || !content.trim()) return;
+    setCommentError(null);
+    try {
+      const response = await apiClient.updateComment(category, articleId, commentId, {
+        content: content.trim(),
+      });
+      setComments((current) =>
+        current.map((comment) =>
+          comment.commentId === commentId
+            ? { ...comment, content: content.trim(), updatedAt: response.updatedAt }
+            : comment,
+        ),
       );
+    } catch {
+      setCommentError(
+        lang === "ko"
+          ? "댓글 수정에 실패했습니다."
+          : "Failed to update the comment.",
+      );
+    }
+  };
+
+  const handleHideComment = async (commentId: string, reason: string) => {
+    if (!articleId || !reason.trim()) return;
+    setCommentError(null);
+    try {
+      await apiClient.hideComment(category, articleId, commentId, { reason: reason.trim() });
+      await refreshComments();
+    } catch {
+      setCommentError(
+        lang === "ko"
+          ? "댓글을 숨기지 못했습니다."
+          : "Failed to hide the comment.",
+      );
+    }
+  };
+
+  const handleHideArticle = async (reason: string) => {
+    if (!articleId || !canModerate) return false;
+    try {
+      await apiClient.hideArticle(category, articleId, { reason });
+      navigate(category === "_EVENT" ? "/events" : `/board/${category}`, { replace: true });
+      return true;
+    } catch {
+      toast({ type: "error", message: lang === "ko" ? "게시글을 숨기지 못했습니다." : "Failed to hide the post." });
+      return false;
     }
   };
 
@@ -334,11 +420,13 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       setArticle((current) => (current ? { ...current, ...response } : current));
     } catch {
       setArticle(previousArticle);
-      alert(
-        lang === "ko"
-          ? "좋아요 또는 스크랩 처리에 실패했습니다."
-          : "Failed to update like or scrap.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "좋아요 또는 스크랩 처리에 실패했습니다."
+            : "Failed to update like or scrap.",
+      });
     } finally {
       setEngagementSubmitting(null);
     }
@@ -394,11 +482,13 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       );
     } catch {
       await refreshComments();
-      alert(
-        lang === "ko"
-          ? "댓글 좋아요 처리에 실패했습니다."
-          : "Failed to update the comment like.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "댓글 좋아요 처리에 실패했습니다."
+            : "Failed to update the comment like.",
+      });
     } finally {
       setCommentActionSubmitting(null);
     }
@@ -425,14 +515,42 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         return;
       }
 
-      alert(shareUrl);
+      toast({ type: "info", message: shareUrl });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      alert(
-        lang === "ko"
-          ? "공유 링크를 복사하지 못했습니다."
-          : "The share link could not be copied.",
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "공유 링크를 복사하지 못했습니다."
+            : "The share link could not be copied.",
+      });
+    }
+  };
+
+  const handleRevealAnonymousAuthor = async () => {
+    if (!article?.isAnonymous || !canModerate) return;
+    try {
+      const revealed = await apiClient.revealAnonymousArticleAuthor(
+        category,
+        article.articleId,
       );
+      setRevealedAuthorName(revealed.authorName);
+      toast({
+        type: "info",
+        message:
+          lang === "ko"
+            ? `익명 작성자: ${revealed.authorName}`
+            : `Anonymous author: ${revealed.authorName}`,
+      });
+    } catch {
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "익명 작성자를 확인하지 못했습니다."
+            : "The anonymous author could not be revealed.",
+      });
     }
   };
 
@@ -473,22 +591,29 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     category,
     lang,
   );
+  const allowEngagement = (board ?? catalogBoard)?.allowLike ?? true;
 
   return {
     ConfirmDialog,
     article,
     articleId,
+    allowEngagement,
     attachmentAssets,
     boardDescription,
     boardTitle,
     boards,
     canCreateComment,
+    canViewCommentSection,
     canEdit,
     canManageArticle,
+    canModerate,
     canManageComments,
     category,
     commentError,
     commentActionSubmitting,
+    commentPage,
+    commentPageSize: COMMENT_PAGE_SIZE,
+    commentTotal,
     commentSubmitting,
     commentText,
     comments,
@@ -499,19 +624,26 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     handleCreateComment,
     handleCreateReply,
     handleDeleteArticle,
+    handleUpdateComment,
+    handleHideArticle,
     handleDeleteComment,
+    handleHideComment,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,
+    handleRevealAnonymousAuthor,
     lang,
     loading,
+    articleErrorCode,
     posterAsset,
+    revealedAuthorName,
     replySubmitting,
     replyTargetId,
     replyText,
     session,
     shareCopied,
     setCommentText,
+    setCommentPage,
     setReplyTargetId,
     setReplyText,
     surveyDescription,

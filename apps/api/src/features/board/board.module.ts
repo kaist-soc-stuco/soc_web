@@ -7,6 +7,7 @@ import { ArticleController } from "./article.controller";
 import { ArticleDraftController } from "./article-draft.controller";
 import { ArticleSearchController } from "./article-search.controller";
 import { CommentController } from "./comment.controller";
+import { CommentModerationController } from "./comment-moderation.controller";
 import { BoardService } from "./board.service";
 import { ArticleService } from "./article.service";
 import { ArticleDraftService } from "./article-draft.service";
@@ -17,13 +18,15 @@ import { ArticleDraftRepository } from "./repositories/article-draft.repository"
 import { CommentRepository } from "./repositories/comment.repository";
 import { UsersModule } from "../users/users.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { AuditLogModule } from "../audit/audit-log.module";
 
 @Module({
-  imports: [PostgresModule, UsersModule, AuthModule, NotificationsModule],
+  imports: [PostgresModule, UsersModule, AuthModule, NotificationsModule, AuditLogModule],
   controllers: [
     ArticleController,
     ArticleDraftController,
     CommentController,
+    CommentModerationController,
     BoardController,
     ArticleSearchController,
   ],

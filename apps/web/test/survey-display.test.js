@@ -89,17 +89,17 @@ test("filters surveys by query, status, type, and period", () => {
       responseCount: 10,
     }),
     survey({
-      id: "fresh-vote",
-      kind: "VOTE",
-      titleKo: "대표 선거",
-      descriptionEn: "leadership vote",
+      id: "fresh-survey",
+      kind: "SURVEY",
+      titleKo: "학생 의견 조사",
+      descriptionEn: "student survey",
       createdAt: "2026-05-28T00:00:00.000Z",
       responseCount: 5,
     }),
     survey({
-      id: "draft-vote",
-      kind: "VOTE",
-      titleKo: "임시 선거",
+      id: "draft-survey",
+      kind: "SURVEY",
+      titleKo: "임시 설문",
       computedState: "closed",
       createdAt: "2026-05-30T00:00:00.000Z",
       isPublished: false,
@@ -111,15 +111,15 @@ test("filters surveys by query, status, type, and period", () => {
     surveys,
     {
       periodFilter: "7days",
-      searchQuery: "선거",
+      searchQuery: "학생",
       sortBy: "responseCount",
       statusFilter: "open",
-      typeFilter: "VOTE",
+      typeFilter: "SURVEY",
     },
     NOW,
   );
 
-  assert.deepEqual(result.map((item) => item.id), ["fresh-vote"]);
+  assert.deepEqual(result.map((item) => item.id), ["fresh-survey"]);
 });
 
 test("sorts surveys by updated date and response count", () => {

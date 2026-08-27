@@ -73,7 +73,11 @@ export function useBoardPageController() {
 
     const queryParam = searchQuery;
     const fetchPromise = category
-      ? apiClient.getArticles(category, { page: 1, limit: 100, q: queryParam })
+      ? apiClient.getArticles(category, {
+          page: currentPage,
+          limit: postsPerPage,
+          q: queryParam,
+        })
       : apiClient.getAllArticles({
           limit: postsPerPage,
           page: currentPage,
@@ -86,33 +90,14 @@ export function useBoardPageController() {
     fetchPromise
       .then((data) => {
         if (cancelled) return;
-        let items = [...data.items];
+        const items = [...data.items];
 
         if (!category) {
           items.sort((a, b) => comparePinnedArticles(a, b));
-          setArticles(items);
-          setTotalCount(data.total);
-          return;
         }
 
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          items = items.filter((item) => {
-            const title = `${item.titleKo} ${item.titleEn ?? ""}`.toLowerCase();
-            return title.includes(query);
-          });
-        }
-
-        items.sort((a, b) => {
-          const pinnedOrder = comparePinnedArticles(a, b);
-          if (pinnedOrder !== 0) return pinnedOrder;
-          return isoToMs(b.postedAt) - isoToMs(a.postedAt);
-        });
-
-        const total = items.length;
-        const startIndex = (currentPage - 1) * postsPerPage;
-        setArticles(items.slice(startIndex, startIndex + postsPerPage));
-        setTotalCount(total);
+        setArticles(items);
+        setTotalCount(data.total);
       })
       .catch((error) => {
         console.error("Failed to load board articles:", error);
@@ -251,11 +236,13 @@ export function useBoardPageController() {
             : item,
         ),
       );
-      alert(
-        lang === "ko"
-          ? "좋아요 또는 스크랩 처리에 실패했습니다."
-          : "Failed to update like or scrap.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "좋아요 또는 스크랩 처리에 실패했습니다."
+            : "Failed to update like or scrap.",
+      });
     } finally {
       setEngagementSubmitting(null);
     }

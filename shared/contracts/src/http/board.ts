@@ -2,6 +2,8 @@ import type { z } from "zod";
 import type {
   ArticleAssetRequestSchema,
   ArticleCreateSchema,
+  ArticleModerationSchema,
+  FaqReorderSchema,
   ArticleDraftSaveSchema,
   ArticleUpdateSchema,
   BoardCreateSchema,
@@ -23,6 +25,8 @@ export interface BoardSummary {
   allowComment: boolean;
   allowSecret: boolean;
   allowLike: boolean;
+  /** 비로그인 사용자가 게시글을 열람할 수 있는지 여부. */
+  allowGuestRead: boolean;
   sortOrder: number;
   isActive: boolean;
 }
@@ -63,6 +67,8 @@ export interface ArticleListItem {
   visibilityScope: VisibilityScope;
   isPinned: boolean;
   pinOrder?: number | null;
+  homeVisible?: boolean;
+  homeOrder?: number | null;
   isSecret: boolean;
   postedAt: string;
   updatedAt: string;
@@ -132,6 +138,8 @@ export interface ArticleDetailResponse {
   visibilityScope: VisibilityScope;
   isPinned: boolean;
   pinOrder?: number | null;
+  homeVisible?: boolean;
+  homeOrder?: number | null;
   isSecret: boolean;
   postedAt: string;
   updatedAt: string;
@@ -165,6 +173,32 @@ export interface ArticleCreateResponse {
 }
 
 export type ArticleUpdateRequest = z.infer<typeof ArticleUpdateSchema>;
+export type ArticleModerationRequest = z.infer<typeof ArticleModerationSchema>;
+export type FaqReorderRequest = z.infer<typeof FaqReorderSchema>;
+
+export interface FaqReorderResponse {
+  ok: true;
+}
+
+export interface ArticleModerationResponse {
+  ok: true;
+  articleId: string;
+  status: "PUBLISHED" | "HIDDEN";
+  updatedAt: string;
+}
+
+export interface HiddenArticleItem {
+  articleId: string;
+  boardCode: string;
+  titleKo: string;
+  authorName: string;
+  hiddenAt: string;
+  hiddenReason: string;
+}
+
+export interface HiddenArticleListResponse {
+  items: HiddenArticleItem[];
+}
 
 export type ArticleEngagementKind = "LIKE" | "SCRAP";
 
@@ -183,6 +217,12 @@ export interface ArticleUpdateResponse {
   updatedAt: string;
 }
 
+export interface AnonymousArticleAuthorResponse {
+  articleId: string;
+  authorUserId: string;
+  authorName: string;
+}
+
 export interface ArticleDraftRecord {
   draftId: string;
   boardId: number;
@@ -195,6 +235,8 @@ export interface ArticleDraftRecord {
   visibilityScope: VisibilityScope;
   isPinned: boolean;
   pinOrder?: number | null;
+  homeVisible?: boolean;
+  homeOrder?: number | null;
   isSecret: boolean;
   isAnonymous: boolean;
   allowComment: boolean;
@@ -277,4 +319,27 @@ export interface CommentDeleteResponse {
   ok: boolean;
   commentId: string;
   deletedAt: string;
+}
+
+export type CommentModerationRequest = ArticleModerationRequest;
+
+export interface CommentModerationResponse {
+  commentId: string;
+  status: "PUBLISHED" | "HIDDEN";
+  hiddenAt: string | null;
+}
+
+export interface HiddenCommentItem {
+  commentId: string;
+  articleId: string;
+  articleTitleKo: string;
+  boardCode: string;
+  content: string;
+  authorName: string;
+  hiddenAt: string;
+  hiddenReason: string;
+}
+
+export interface HiddenCommentListResponse {
+  items: HiddenCommentItem[];
 }

@@ -1,5 +1,5 @@
 import { createApiClient } from "@soc/api-client";
-import { isoToMs, msToDate, nowMs } from "@soc/shared";
+import { isoToMs, localDate, msToDate, nowMs } from "@soc/shared";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -21,6 +21,8 @@ interface EventCardRecord {
   descriptionEn?: string;
   isPinned: boolean;
   pinOrder: number | null;
+  homeVisible: boolean;
+  homeOrder: number | null;
   startAt: string | null;
   endAt: string | null;
 }
@@ -35,8 +37,7 @@ interface EventCardItem {
   endAt: string | null;
 }
 
-type EventSortRecord = Pick<EventCardRecord, "isPinned" | "pinOrder" | "startAt" | "endAt">;
-type EventCardStatus = { text: string; tone: "upcoming" | "active" };
+type EventSortRecord = Pick<EventCardRecord, "isPinned" | "pinOrder" | "homeOrder" | "startAt" | "endAt">;
 
 const EVENT_PALETTES = [
   "home-event-palette-green",
@@ -60,6 +61,12 @@ function getEventSortGroup(event: EventSortRecord, referenceTime: number) {
 }
 
 function compareEventCards(a: EventSortRecord, b: EventSortRecord, referenceTime: number) {
+  const aHasHomeOrder = a.homeOrder !== null && Number.isFinite(a.homeOrder);
+  const bHasHomeOrder = b.homeOrder !== null && Number.isFinite(b.homeOrder);
+  if (aHasHomeOrder !== bHasHomeOrder) return aHasHomeOrder ? -1 : 1;
+  if (aHasHomeOrder && bHasHomeOrder && a.homeOrder !== b.homeOrder) {
+    return (a.homeOrder ?? Number.MAX_SAFE_INTEGER) - (b.homeOrder ?? Number.MAX_SAFE_INTEGER);
+  }
   const aGroup = getEventSortGroup(a, referenceTime);
   const bGroup = getEventSortGroup(b, referenceTime);
   if (aGroup !== bGroup) return aGroup - bGroup;
@@ -88,21 +95,6 @@ function formatEventStatusDate(value: string | null) {
   if (!Number.isFinite(timestamp)) return null;
   const date = msToDate(timestamp);
   return `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function getEventCardStatus(startAt: string | null, endAt: string | null, lang: string): EventCardStatus {
-  const currentTime = nowMs();
-  const start = startAt ? Date.parse(startAt) : Number.NaN;
-  if (Number.isFinite(start) && currentTime < start) {
-    return {
-      text: lang === "ko" ? "예정" : "Upcoming",
-      tone: "upcoming",
-    };
-  }
-  return {
-    text: lang === "ko" ? "진행 중" : "In progress",
-    tone: "active",
-  };
 }
 
 function formatEventDateRange(startAt: string | null, endAt: string | null) {
@@ -168,12 +160,38 @@ function EventImage({ event }: { event: EventCardItem }) {
   );
 }
 
-function StatusChip({ event, lang }: { event: EventCardItem; lang: string }) {
-  const status = getEventCardStatus(event.startAt, event.endAt, lang);
-  return <span className={`home-editorial-status home-editorial-status-${status.tone}`}>{status.text}</span>;
+const EVENT_DDAY_WINDOW_DAYS = 7;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function localDayTimestamp(value: number) {
+  const date = msToDate(value);
+  return localDate(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-function EventCard({ event, lang }: { event: EventCardItem; lang: string }) {
+function getEventDdayLabel(startAt: string | null, endAt: string | null) {
+  const today = localDayTimestamp(nowMs());
+  const start = startAt ? isoToMs(startAt) : Number.NaN;
+  const end = endAt ? isoToMs(endAt) : Number.NaN;
+  const startDay = Number.isFinite(start) ? localDayTimestamp(start) : null;
+  const endDay = Number.isFinite(end) ? localDayTimestamp(end) : null;
+  const targetDay = startDay !== null && startDay >= today
+    ? startDay
+    : endDay !== null && endDay >= today
+      ? endDay
+      : null;
+
+  if (targetDay === null) return null;
+  const dayDifference = Math.round((targetDay - today) / DAY_IN_MS);
+  if (dayDifference < 0 || dayDifference > EVENT_DDAY_WINDOW_DAYS) return null;
+  return dayDifference === 0 ? "D-Day" : `D-${dayDifference}`;
+}
+
+function EventDayBadge({ event }: { event: EventCardItem }) {
+  const label = getEventDdayLabel(event.startAt, event.endAt);
+  return label ? <span className="home-editorial-dday">{label}</span> : null;
+}
+
+function EventCard({ event }: { event: EventCardItem }) {
   const dateRange = formatEventDateRange(event.startAt, event.endAt);
   return (
     <Link
@@ -188,7 +206,7 @@ function EventCard({ event, lang }: { event: EventCardItem; lang: string }) {
       <div className="home-portal-event-body">
         <div className="flex w-full items-center justify-between gap-3">
           {dateRange ? <time className="home-portal-event-date">{dateRange}</time> : <span />}
-          <StatusChip event={event} lang={lang} />
+          <EventDayBadge event={event} />
         </div>
         <h3 className="line-clamp-2">{event.title}</h3>
         {event.description ? <p className="line-clamp-2">{event.description}</p> : null}
@@ -244,6 +262,7 @@ export function EventCarousel() {
       const referenceTime = nowMs();
       const nextEvents = response.items
         .filter((item) => {
+          if (item.homeVisible === false) return false;
           const state = getEventArticleState(item, referenceTime);
           return state === "open" || (state === "before_open" && startsWithinNextMonth(item.eventStartDate ?? null, referenceTime));
         })
@@ -253,12 +272,14 @@ export function EventCarousel() {
           titleEn: item.titleEn,
           descriptionKo: item.eventDescriptionKo ?? item.titleKo,
           descriptionEn: item.eventDescriptionEn || item.titleEn || item.eventDescriptionKo || item.titleKo,
-          imageUrl: item.thumbnailStorageKey && !item.thumbnailStorageKey.includes("/seed-event-")
+          imageUrl: item.thumbnailStorageKey
             ? resolveAssetUrl(item.thumbnailStorageKey)
             : null,
           palette: resolvePalette(item.articleId),
           isPinned: item.isPinned,
           pinOrder: item.pinOrder ?? null,
+          homeVisible: item.homeVisible !== false,
+          homeOrder: item.homeOrder ?? null,
           startAt: item.eventStartDate ?? null,
           endAt: item.eventEndDate ?? null,
         }))
@@ -407,19 +428,19 @@ export function EventCarousel() {
                       className="grid flex-shrink-0 gap-6 md:grid-cols-3"
                       style={{ width: viewportWidth ? `${viewportWidth}px` : "100%", marginRight: pageIndex < pages.length - 1 ? `${pageGap}px` : undefined }}
                     >
-                      {page.map((event) => <EventCard key={event.id} event={event} lang={lang} />)}
+                      {page.map((event) => <EventCard key={event.id} event={event} />)}
                     </div>
                   ))}
                 </div>
               </div>
 
               {totalPages > 1 && currentPage > 0 ? (
-                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.max(0, page - 1))} className="home-events-navigation left-0 -translate-x-1/2" aria-label={lang === "ko" ? "이전 행사" : "Previous events"}>
+                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.max(0, page - 1))} className="home-events-navigation left-2 !rounded-full" aria-label={lang === "ko" ? "이전 행사" : "Previous events"}>
                   <ChevronLeft aria-hidden="true" className="size-5" />
                 </IconButton>
               ) : null}
               {totalPages > 1 && currentPage < totalPages - 1 ? (
-                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))} className="home-events-navigation right-0 translate-x-1/2" aria-label={lang === "ko" ? "다음 행사" : "Next events"}>
+                <IconButton size="lg" tone="navigation" onClick={() => setCurrentPage((page) => Math.min(totalPages - 1, page + 1))} className="home-events-navigation right-2 !rounded-full" aria-label={lang === "ko" ? "다음 행사" : "Next events"}>
                   <ChevronRight aria-hidden="true" className="size-5" />
                 </IconButton>
               ) : null}

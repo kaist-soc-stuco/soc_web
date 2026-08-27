@@ -24,15 +24,21 @@ export const RequirePermission = (permission: number) =>
  * 호환을 위해 유지되며, 값은 Permissions 래퍼에서 가져옵니다.
  */
 export const PermissionFlags = {
-  WRITE_NOTICE: Permissions.WRITE_NOTICE,
-  WRITE_GENERAL: Permissions.WRITE_GENERAL,
+  WRITE_OFFICIAL: Permissions.WRITE_OFFICIAL,
+  WRITE_LAB: Permissions.WRITE_LAB,
   WRITE_REPLY: Permissions.WRITE_REPLY,
   MANAGE_SURVEY: Permissions.MANAGE_SURVEY,
   MANAGE_FINANCE: Permissions.MANAGE_FINANCE,
-  MANAGE_CONTENT: Permissions.MANAGE_CONTENT,
-  MANAGE_TOOL: Permissions.MANAGE_TOOL,
-  MODERATOR: Permissions.MODERATOR,
-  ADMIN: Permissions.ADMIN,
+  MANAGE_SITE_CONTENT: Permissions.MANAGE_SITE_CONTENT,
+  MANAGE_CALENDAR: Permissions.MANAGE_CALENDAR,
+  MANAGE_CONTACTS: Permissions.MANAGE_CONTACTS,
+  MANAGE_USERS: Permissions.MANAGE_USERS,
+  MODERATE_CONTENT: Permissions.MODERATE_CONTENT,
+  MANAGE_BOARDS: Permissions.MANAGE_BOARDS,
+  SEND_BULK_EMAIL: Permissions.SEND_BULK_EMAIL,
+  VIEW_AUDIT_LOG: Permissions.VIEW_AUDIT_LOG,
+  MANAGE_ROLES: Permissions.MANAGE_ROLES,
+  SUPER_ADMIN: Permissions.SUPER_ADMIN,
 } as const;
 
 @Injectable()

@@ -170,11 +170,34 @@ export function useSurveyPageController(surveyId: string | undefined) {
       setSubmitted(true);
     } catch (error) {
       if (error instanceof ApiClientHttpError && error.status === 403) {
-        setSubmitError(
+        const requirementMessages: Record<string, { ko: string; en: string }> = {
+          login_required: {
+            ko: "로그인한 사용자만 참여할 수 있습니다.",
+            en: "You must sign in to participate.",
+          },
+          soc_affiliation_required: {
+            ko: "전산학부 주전공·복수전공·부전공 조건을 충족하지 못했습니다.",
+            en: "This survey is limited to eligible School of Computing students.",
+          },
+          academic_status_required: {
+            ko: "이 설문에서 요구하는 학적 상태를 충족하지 못했습니다.",
+            en: "Your academic status does not meet this survey's requirements.",
+          },
+          fee_payer_only: {
+            ko: "과비 납부가 확인된 사용자만 참여할 수 있습니다.",
+            en: "This survey is limited to verified fee-paying members.",
+          },
+          login_required_for_file_upload: {
+            ko: "파일을 제출하려면 로그인해야 합니다.",
+            en: "You must sign in to upload files.",
+          },
+        };
+        const message = error.code ? requirementMessages[error.code] : undefined;
+        setSubmitError(message?.[lang === "ko" ? "ko" : "en"] ?? (
           lang === "ko"
-            ? "응답 권한 또는 참여 조건을 충족하지 못했습니다."
-            : "You do not meet the response requirements.",
-        );
+            ? "응답 참여 조건을 충족하지 못했습니다."
+            : "You do not meet the response requirements."
+        ));
       } else if (error instanceof ApiClientHttpError && error.status === 409) {
         setSubmitError(
           lang === "ko"

@@ -162,6 +162,22 @@ export const createSurveyApi = ({
     );
   },
 
+  connectSurveySpreadsheet: async (surveyId: string): Promise<SurveyRecord> => {
+    return requestJson<SurveyRecord>(
+      `${surveyBaseUrl}/${surveyId}/spreadsheet`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  syncSurveySpreadsheet: async (surveyId: string): Promise<SurveyRecord> => {
+    return requestJson<SurveyRecord>(
+      `${surveyBaseUrl}/${surveyId}/spreadsheet/sync`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   reorderSurveySections: async (
     surveyId: string,
     body: ReorderSurveySectionsRequest,

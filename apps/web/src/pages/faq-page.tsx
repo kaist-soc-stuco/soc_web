@@ -30,7 +30,7 @@ import { RichTextContent } from "@/components/ui/rich-text-content";
 
 export function FaqPage() {
   const { lang } = useLanguage();
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const [openItems, setOpenItems] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const { data: session } = useCurrentSession();
@@ -111,8 +111,8 @@ export function FaqPage() {
                 />
               ) : (
                 <div className="min-h-48 divide-y divide-slate-100">
-                  {filteredItems.map((item, index) => {
-                    const isOpen = openIndex === index;
+                  {filteredItems.map((item) => {
+                    const isOpen = openItems.has(item.articleId);
                     const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
                     const answer = lang === "ko" ? item.snippetKo : item.snippetEn || item.snippetKo;
                     const answerId = `faq-answer-${item.articleId}`;
@@ -126,7 +126,17 @@ export function FaqPage() {
                           id={questionId}
                           aria-expanded={isOpen}
                           aria-controls={answerId}
-                          onClick={() => setOpenIndex(isOpen ? null : index)}
+                          onClick={() => {
+                            setOpenItems((current) => {
+                              const next = new Set(current);
+                              if (next.has(item.articleId)) {
+                                next.delete(item.articleId);
+                              } else {
+                                next.add(item.articleId);
+                              }
+                              return next;
+                            });
+                          }}
                           className="flex min-h-14 w-full items-center justify-between gap-4 rounded-none border-0 px-4 py-3 text-left text-[length:var(--ui-text-section-size)] font-medium text-slate-800 hover:bg-slate-50 sm:px-6"
                         >
                           <span className="min-w-0 truncate">{title}</span>

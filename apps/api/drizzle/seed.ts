@@ -60,6 +60,7 @@ type BoardSeed = {
   allowComment: boolean;
   allowSecret: boolean;
   allowLike: boolean;
+  allowGuestRead: boolean;
   isActive: boolean;
   sortOrder: number;
 };
@@ -87,6 +88,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     allowComment: true,
     allowSecret: false,
     allowLike: true,
+    allowGuestRead: true,
     isActive: true,
     sortOrder: 0,
   },
@@ -100,6 +102,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     allowComment: true,
     allowSecret: false,
     allowLike: true,
+    allowGuestRead: true,
     isActive: true,
     sortOrder: 1,
   },
@@ -109,10 +112,11 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "HoC",
     descriptionKo: "Hall of Code 프로젝트 및 활동 내역",
     descriptionEn: "Browse Hall of Code projects and activity updates.",
-    writePermissionId: 2,
+    writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
+    allowGuestRead: true,
     isActive: true,
     sortOrder: 2,
   },
@@ -122,10 +126,11 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Promotional Posts",
     descriptionKo: "집행위원회 및 학회의 홍보 게시물",
     descriptionEn: "Find promotions from SOC and student organizations.",
-    writePermissionId: 2,
+    writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
+    allowGuestRead: true,
     isActive: true,
     sortOrder: 3,
   },
@@ -139,6 +144,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     allowComment: true,
     allowSecret: true,
     allowLike: true,
+    allowGuestRead: true,
     isActive: true,
     sortOrder: 4,
   },
@@ -148,10 +154,11 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Research Labs",
     descriptionKo: "각 연구실의 소식과 공지사항",
     descriptionEn: "Read news and announcements from research labs.",
-    writePermissionId: 2,
+    writePermissionId: null,
     allowComment: true,
     allowSecret: false,
     allowLike: true,
+    allowGuestRead: true,
     isActive: true,
     sortOrder: 5,
   },
@@ -165,6 +172,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     allowComment: false,
     allowSecret: false,
     allowLike: false,
+    allowGuestRead: true,
     isActive: true,
     sortOrder: 6,
   },
@@ -195,6 +203,7 @@ async function seedBoards() {
         allowComment: sql`excluded.allow_comment`,
         allowLike: sql`excluded.allow_like`,
         allowSecret: sql`excluded.allow_secret`,
+        allowGuestRead: sql`excluded.allow_guest_read`,
         descriptionKo: sql`excluded.description_ko`,
         descriptionEn: sql`excluded.description_en`,
         isActive: sql`excluded.is_active`,
@@ -415,7 +424,7 @@ type QuestionSeed = {
 };
 
 type SurveySeed = {
-  kind: "APPLICATION" | "EVENT" | "SURVEY" | "VOTE";
+  kind: "APPLICATION" | "SURVEY";
   titleKo: string;
   titleEn: string;
   descriptionKo: string;
@@ -504,7 +513,7 @@ function makeSimpleEventSurvey(input: {
   maxResponseCount?: number;
 }): SurveySeed {
   return {
-    kind: "EVENT",
+    kind: "APPLICATION",
     titleKo: input.titleKo,
     titleEn: input.titleEn,
     descriptionKo: input.descriptionKo,
@@ -1384,7 +1393,7 @@ async function seedMockData() {
     const faqItems = [
       ["로그인은 어떻게 하나요?", "How do I sign in?", "상단 프로필 아이콘에서 KAIST 계정으로 로그인할 수 있습니다.", "Use the profile icon in the header to sign in with your KAIST account."],
       ["게시글이나 댓글은 누가 작성할 수 있나요?", "Who can create posts and comments?", "게시판별 운영 권한과 로그인 상태에 따라 작성 가능 범위가 달라집니다.", "Posting permissions depend on the board and your signed-in account."],
-      ["행사와 학사 일정은 어디서 확인하나요?", "Where can I find events and academic dates?", "행사·일정 메뉴에서 행사, 설문·투표, 캘린더를 각각 확인할 수 있습니다.", "Use Events & Calendar to browse events, surveys, and the calendar."],
+      ["행사와 학사 일정은 어디서 확인하나요?", "Where can I find events and academic dates?", "행사·일정 메뉴에서 행사, 설문, 캘린더를 각각 확인할 수 있습니다.", "Use Events & Calendar to browse events, surveys, and the calendar."],
       ["건의사항 답변은 어떻게 확인하나요?", "How do I track an official response?", "건의사항에 공식 답변이 등록되면 상단 알림에서 바로 확인할 수 있습니다.", "You will receive a header notification when an official response is posted."],
       ["개인정보 수정은 어디에서 하나요?", "Where can I update my profile?", "마이페이지에서 연락처와 선택 정보를 확인하고 수정할 수 있습니다.", "Review and update supported profile details on My Page."],
     ] as const;
@@ -1442,7 +1451,7 @@ async function seedMockData() {
         accentDark: "#005f3a",
       }),
       survey: {
-        kind: "EVENT",
+        kind: "APPLICATION",
         titleKo: "전산인의 밤 참가 신청",
         titleEn: "SOC Night Registration",
         descriptionKo: "참석 인원과 식사 준비를 위해 사전 신청을 받습니다. 신청 후 일정이 바뀌면 마감 전까지 응답을 수정할 수 있습니다.",
@@ -1531,7 +1540,7 @@ async function seedMockData() {
         accentDark: "#115e59",
       }),
       survey: {
-        kind: "EVENT",
+        kind: "APPLICATION",
         titleKo: "기말고사 간식 배부 신청",
         titleEn: "Final Exam Snack Pickup Registration",
         descriptionKo: "간식 수량과 수령 시간을 조정하기 위한 신청 설문입니다. 신청은 1인 1회만 가능하며, 마감 전까지 응답을 수정할 수 있습니다.",
@@ -1619,7 +1628,7 @@ async function seedMockData() {
         accentDark: "#0e7490",
       }),
       survey: {
-        kind: "EVENT",
+        kind: "APPLICATION",
         titleKo: "여름 개발 워크숍 참가 신청",
         titleEn: "Summer Development Workshop Registration",
         descriptionKo: "워크숍 팀 구성과 멘토 배정을 위해 관심 트랙과 개발 경험을 확인합니다. 신청 후 마감 전까지 응답을 수정할 수 있습니다.",
@@ -1707,7 +1716,7 @@ async function seedMockData() {
         accentDark: "#5b21b6",
       }),
       survey: {
-        kind: "EVENT",
+        kind: "APPLICATION",
         titleKo: "가을 MT 사전 수요조사",
         titleEn: "Fall MT Preliminary Demand Survey",
         descriptionKo: "참여 의향과 선호 일정을 확인하기 위한 사전 조사입니다. 실제 참가 신청은 추후 별도 공지됩니다.",

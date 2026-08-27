@@ -127,7 +127,7 @@ test("keeps event-connected surveys out of the pure survey tab", () => {
     [
       survey({
         id: "event-child",
-        kind: "EVENT",
+        kind: "APPLICATION",
         connectedPostId: "article-1",
       }),
       survey({ id: "pure-survey", kind: "SURVEY" }),
@@ -198,7 +198,7 @@ test("filters by tab and sorts open items before closed items", () => {
   const items = buildUnifiedItems(
     [
       survey({ id: "closed-survey", computedState: "closed" }),
-      survey({ id: "open-vote", kind: "VOTE", closesAt: "2026-05-30T12:00:00.000Z" }),
+      survey({ id: "open-application", kind: "APPLICATION", closesAt: "2026-05-30T12:00:00.000Z" }),
     ],
     [article({ articleId: "event-1" })],
     NOW,
@@ -206,17 +206,17 @@ test("filters by tab and sorts open items before closed items", () => {
 
   assert.deepEqual(
     filterItemsByTab(items, "survey").map((item) => item.id),
-    ["closed-survey", "open-vote"],
+    ["closed-survey", "open-application"],
   );
   assert.deepEqual(
     sortVisibleItems(filterItemsByTab(items, "survey"), "deadline", false).map(
       (item) => item.id,
     ),
-    ["open-vote", "closed-survey"],
+    ["open-application", "closed-survey"],
   );
   assert.deepEqual(
     sortVisibleItems(items, "latest", true).map((item) => item.id),
-    ["event-1", "open-vote"],
+    ["event-1", "open-application"],
   );
 });
 

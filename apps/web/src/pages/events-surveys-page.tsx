@@ -8,6 +8,7 @@ import { useEventsSurveysPageController } from "@/features/events-surveys/use-ev
 import { AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
 import {
@@ -28,6 +29,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
   const {
     calendarEvents,
     calendarQuery,
+    currentPage,
     currentDate,
     engagementSubmitting,
     error,
@@ -37,12 +39,15 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     selectedDate,
     setCurrentDate,
     setCalendarQuery,
+    setCurrentPage,
     itemQuery,
     setItemQuery,
     setSelectedDate,
     setStateFilter,
     stateCounts,
     stateFilter,
+    totalItems,
+    totalPages,
     visibleItems,
   } = useEventsSurveysPageController({
     currentTab,
@@ -63,7 +68,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
                 <Link to="/admin/surveys/new">{lang === "ko" ? "등록" : "Create"}</Link>
               </Button>
             ) : currentTab === "event" &&
-              Permissions.has(session?.permission ?? 0, Permissions.WRITE_NOTICE) ? (
+              Permissions.has(session?.permission ?? 0, Permissions.WRITE_OFFICIAL) ? (
               <Button asChild>
                 <Link to="/events/write">
                   {lang === "ko" ? "행사 등록" : "Create event"}
@@ -75,7 +80,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             currentTab === "calendar"
               ? lang === "ko" ? "일정" : "Calendar"
               : currentTab === "survey"
-                ? lang === "ko" ? "설문·투표" : "Surveys & Polls"
+                ? lang === "ko" ? "설문" : "Surveys"
                 : lang === "ko" ? "행사" : "Events"
           }
         />
@@ -116,7 +121,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               onSelectedDateChange={setSelectedDate}
               selectedDate={selectedDate}
             />
-          ) : visibleItems.length === 0 ? (
+          ) : totalItems === 0 ? (
             <div className="space-y-4 rounded-lg border border-dashed border-gray-200 bg-white py-16 text-center">
               <div className="text-lg font-medium text-gray-300">
                 {lang === "ko"
@@ -130,13 +135,25 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               </p>
             </div>
           ) : (
-            <EventsSurveysGrid
-              engagementSubmitting={engagementSubmitting}
-              isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
-              items={visibleItems}
-              lang={lang}
-              onEngagementToggle={handleSetEngagement}
-            />
+            <>
+              <EventsSurveysGrid
+                engagementSubmitting={engagementSubmitting}
+                isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
+                items={visibleItems}
+                lang={lang}
+                onEngagementToggle={handleSetEngagement}
+              />
+              {totalPages > 1 ? (
+                <Pagination
+                  className="mt-6"
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  range={lang === "ko" ? `총 ${totalItems}건` : `${totalItems} total`}
+                  totalPages={totalPages}
+                  lang={lang}
+                />
+              ) : null}
+            </>
           )}
         </PageContainer>
       </PageMain>

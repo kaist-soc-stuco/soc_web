@@ -5,9 +5,10 @@ import { RedisModule } from "../../infrastructure/redis/redis.module";
 import { AuditLogModule } from "../audit/audit-log.module";
 import { UsersRepository } from "./repositories/users.repository";
 import { UsersService } from "./users.service";
+import { EmailDeliveryModule } from "../email/email-delivery.module";
 
 @Module({
-  imports: [PostgresModule, RedisModule, AuditLogModule],
+  imports: [PostgresModule, RedisModule, AuditLogModule, EmailDeliveryModule],
   providers: [UsersRepository, UsersService],
   exports: [UsersService],
 })

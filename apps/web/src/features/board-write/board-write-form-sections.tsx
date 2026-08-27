@@ -531,6 +531,11 @@ interface BoardWriteSettingsProps {
   onSecretChange: (checked: boolean) => void;
   anonymousLabel?: string;
   pinnedLabel?: string;
+  isEvent?: boolean;
+  homeVisible?: boolean;
+  homeOrder?: string;
+  onHomeVisibleChange?: (checked: boolean) => void;
+  onHomeOrderChange?: (value: string) => void;
   stacked?: boolean;
 }
 
@@ -551,6 +556,11 @@ export function BoardWriteSettings({
   onSecretChange,
   anonymousLabel,
   pinnedLabel,
+  isEvent = false,
+  homeVisible = true,
+  homeOrder = "",
+  onHomeVisibleChange,
+  onHomeOrderChange,
   stacked = false,
 }: BoardWriteSettingsProps) {
   return (
@@ -702,6 +712,33 @@ export function BoardWriteSettings({
             </label>
           </div>
         </div>
+
+        {isEvent && canConfigurePostSettings && onHomeVisibleChange && onHomeOrderChange ? (
+          <div className="grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-end">
+            <label className="flex cursor-pointer items-center gap-2.5">
+              <UiInput
+                type="checkbox"
+                className="size-4 accent-brand-primary"
+                checked={homeVisible}
+                onChange={(event) => onHomeVisibleChange(event.target.checked)}
+              />
+              <span className="text-xs font-medium text-slate-700">
+                {lang === "ko" ? "홈 화면에 표시" : "Show on home"}
+              </span>
+            </label>
+            <UiFormField label={lang === "ko" ? "홈 노출 순서" : "Home order"}>
+              <UiInput
+                type="number"
+                min={1}
+                inputMode="numeric"
+                value={homeOrder}
+                onChange={(event) => onHomeOrderChange(event.currentTarget.value)}
+                placeholder={lang === "ko" ? "자동" : "Auto"}
+                aria-label={lang === "ko" ? "홈 노출 순서" : "Home order"}
+              />
+            </UiFormField>
+          </div>
+        ) : null}
       </div>
     </div>
   );

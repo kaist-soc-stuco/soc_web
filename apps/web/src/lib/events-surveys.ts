@@ -243,8 +243,13 @@ export const buildUnifiedItems = (
   events: Array<ArticleListItem & { imageUrl?: string | null }>,
   currentMs = nowMs(),
 ): UnifiedItem[] => {
+  const eventSurveyIds = new Set(
+    events
+      .map((event) => event.surveyId ?? event.survey?.surveyId ?? null)
+      .filter((surveyId): surveyId is string => Boolean(surveyId)),
+  );
   const mappedSurveys: UnifiedItem[] = surveys
-    .filter((survey) => !(survey.kind === "EVENT" && survey.connectedPostId))
+    .filter((survey) => !eventSurveyIds.has(survey.id))
     .map((survey) => ({
     id: survey.id,
     kind: survey.kind,
@@ -326,7 +331,7 @@ export const filterItemsByTab = (
 ) =>
   items.filter((item) => {
     if (tab === "survey") {
-      return item.kind === "SURVEY" || item.kind === "VOTE";
+      return item.kind !== "EVENT";
     }
     return item.kind === "EVENT";
   });

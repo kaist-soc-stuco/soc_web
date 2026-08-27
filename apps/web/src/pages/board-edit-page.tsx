@@ -54,6 +54,8 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSecret,
     isSubmitting,
     lang,
@@ -72,6 +74,8 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
+    setHomeVisible,
+    setHomeOrder,
     setIsSecret,
     setSelectedSurveyId,
     setTitleEn,
@@ -97,6 +101,8 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     contentEn,
     isAnonymous,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSecret,
     allowComment,
     isKoreanOnly,
@@ -116,6 +122,8 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     setContentEn(template.contentEn);
     setIsAnonymous(template.isAnonymous);
     setIsPinned(template.isPinned);
+    if (template.homeVisible !== undefined) setHomeVisible(template.homeVisible);
+    if (template.homeOrder !== undefined) setHomeOrder(template.homeOrder);
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
     setIsKoreanOnly(template.isKoreanOnly);
@@ -180,14 +188,27 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       selectedSurveyId={selectedSurveyId}
       surveys={surveys}
       isAnonymous={isAnonymous}
+      isEvent={isEvent}
       isPinned={isPinned}
+      homeVisible={homeVisible}
+      homeOrder={homeOrder}
       isSecret={isSecret}
       allowSecret={allowSecret}
       onAnonymousChange={setIsAnonymous}
       onPinnedChange={setIsPinned}
+      onHomeVisibleChange={setHomeVisible}
+      onHomeOrderChange={setHomeOrder}
       onSecretChange={setIsSecret}
       anonymousLabel={lang === "ko" ? "익명으로 수정" : "Edit Anonymously"}
-      pinnedLabel={lang === "ko" ? "게시글 상단 고정" : "Pin to Top"}
+      pinnedLabel={
+        isEvent
+          ? lang === "ko"
+            ? "홈 행사 우선 노출"
+            : "Prioritize on home"
+          : lang === "ko"
+            ? "게시글 상단 고정"
+            : "Pin to Top"
+      }
       stacked={isEvent}
     />
   );

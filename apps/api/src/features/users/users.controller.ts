@@ -6,6 +6,7 @@ import {
   BulkUpdateStudentFeeStatusSchema,
   UpdateStudentFeeStatusSchema,
   UpdateUserActiveStatusSchema,
+  UpdateUserPostingSuspensionSchema,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
@@ -20,6 +21,7 @@ import type {
   BulkProcessStudentFeePaymentsRequest,
   UpdateStudentFeeStatusRequest,
   UpdateUserActiveStatusRequest,
+  UpdateUserPostingSuspensionRequest,
 } from "@soc/contracts";
 
 /**
@@ -126,7 +128,7 @@ export class UsersController {
   }
 
   @Put(":userId/status")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_USERS)
   async updateUserActiveStatus(
     @Param("userId") userId: string,
     @Body(new ZodValidationPipe(UpdateUserActiveStatusSchema))
@@ -137,7 +139,7 @@ export class UsersController {
       userId,
       body.isActive,
       { actorUserId: req.user?.id, ipAddress: req.ip },
-      "admin_manual",
+      body.reason ?? "admin_manual",
     );
 
     return {
@@ -146,8 +148,28 @@ export class UsersController {
     };
   }
 
+  @Get(":userId/sanctions/posting")
+  @RequirePermissions(Permissions.MANAGE_USERS)
+  async getUserPostingSuspension(@Param("userId") userId: string) {
+    return this.usersService.getPostingSuspension(userId);
+  }
+
+  @Put(":userId/sanctions/posting")
+  @RequirePermissions(Permissions.MANAGE_USERS)
+  async updateUserPostingSuspension(
+    @Param("userId") userId: string,
+    @Body(new ZodValidationPipe(UpdateUserPostingSuspensionSchema))
+    body: UpdateUserPostingSuspensionRequest,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.setPostingSuspension(userId, body, {
+      actorUserId: req.user?.id,
+      ipAddress: req.ip,
+    });
+  }
+
   @Get("admin/list")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_USERS)
   async listAdminUsers(
     @Query("q") query?: string,
     @Query("page") page?: string,
@@ -155,6 +177,9 @@ export class UsersController {
     @Query("sortBy") sortBy?: string,
     @Query("sortDirection") sortDirection?: string,
     @Query("status") status?: string,
+    @Query("majorType") majorType?: string,
+    @Query("feeStatus") feeStatus?: string,
+    @Query("academicStatus") academicStatus?: string,
   ) {
     const adminUserSortBy =
       sortBy === "studentId" ||
@@ -174,11 +199,14 @@ export class UsersController {
       sortBy: adminUserSortBy,
       sortDirection: sortDirection === "desc" ? "desc" : "asc",
       status: adminUserStatus,
+      majorType: majorType === "PRIMARY" || majorType === "DOUBLE" || majorType === "MINOR" ? majorType : undefined,
+      feeStatus: feeStatus === "PAID" || feeStatus === "PARTIAL" || feeStatus === "UNPAID" ? feeStatus : undefined,
+      academicStatus: academicStatus?.trim() || undefined,
     });
   }
 
   @Get()
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_USERS)
   async searchUsers(
     @Query("q") query?: string,
     @Query("limit") limit?: string,

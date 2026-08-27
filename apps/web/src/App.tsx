@@ -52,6 +52,12 @@ const FeeManagementPage = lazy(() =>
 const BoardManagementPage = lazy(() =>
   import('@/pages/admin/board-management-page').then((module) => ({ default: module.BoardManagementPage })),
 );
+const FaqManagementPage = lazy(() =>
+  import('@/pages/admin/faq-management-page').then((module) => ({ default: module.FaqManagementPage })),
+);
+const ContentModerationPage = lazy(() =>
+  import('@/pages/admin/content-moderation-page').then((module) => ({ default: module.ContentModerationPage })),
+);
 const BoardDetailPage = lazy(() =>
   import('@/pages/board-detail-page').then((module) => ({ default: module.BoardDetailPage })),
 );
@@ -64,11 +70,11 @@ const BoardEditPage = lazy(() =>
 const MyPage = lazy(() =>
   import('@/pages/my-page').then((module) => ({ default: module.MyPage })),
 );
+const NotificationsPage = lazy(() =>
+  import('@/pages/notifications-page').then((module) => ({ default: module.NotificationsPage })),
+);
 const AboutPage = lazy(() =>
   import('@/pages/about-page').then((module) => ({ default: module.AboutPage })),
-);
-const RoadmapPage = lazy(() =>
-  import('@/pages/roadmap-page').then((module) => ({ default: module.RoadmapPage })),
 );
 const EventsSurveysPage = lazy(() =>
   import('@/pages/events-surveys-page').then((module) => ({ default: module.EventsSurveysPage })),
@@ -81,9 +87,6 @@ const TermsPage = lazy(() =>
 );
 const FaqPage = lazy(() =>
   import('@/pages/faq-page').then((module) => ({ default: module.FaqPage })),
-);
-const PledgesPage = lazy(() =>
-  import('@/pages/pledges-page').then((module) => ({ default: module.PledgesPage })),
 );
 const SearchPage = lazy(() =>
   import('@/pages/search-page').then((module) => ({ default: module.SearchPage })),
@@ -192,7 +195,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
-          <Route path="/about/roadmap" element={<RoadmapPage />} />
+          <Route path="/about/roadmap" element={<Navigate to="/about#work" replace />} />
           <Route path="/events-surveys" element={<LegacyEventsSurveysRedirect />} />
           <Route path="/events" element={<EventsSurveysPage view="event" />} />
           <Route path="/events/:articleId" element={<BoardDetailPage forcedCategory="_EVENT" publicBasePath="/events" />} />
@@ -202,7 +205,7 @@ export function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/about/faq" element={<FaqPage />} />
-          <Route path="/about/pledges" element={<PledgesPage />} />
+          <Route path="/about/pledges" element={<Navigate to="/about#work" replace />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/calendar" element={<EventsSurveysPage view="calendar" />} />
           <Route path="/board" element={<BoardPage />} />
@@ -239,6 +242,7 @@ export function App() {
           <Route path="/survey/:id/results" element={<SurveyResultsPage />} />
           <Route path="/login" element={<LoginCallbackPage />} />
           <Route path="/mypage" element={<MyPage />} />
+          <Route path="/notifications" element={<AuthGuard><NotificationsPage /></AuthGuard>} />
 
           {/* Admin Routes with nested Outlet */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -249,6 +253,8 @@ export function App() {
             <Route path="permissions" element={<PermissionPage />} />
             <Route path="finance" element={<FeeManagementPage />} />
             <Route path="boards" element={<BoardManagementPage />} />
+            <Route path="faq" element={<FaqManagementPage />} />
+            <Route path="moderation" element={<ContentModerationPage />} />
             <Route path="surveys/new" element={<SurveyEditorPage />} />
             <Route path="surveys/:id/edit" element={<SurveyEditorPage />} />
             <Route path="surveys/:id/responses" element={<SurveyResponseListPage />} />

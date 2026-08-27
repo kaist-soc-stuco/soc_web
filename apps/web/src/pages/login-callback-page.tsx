@@ -215,10 +215,20 @@ export function LoginCallbackPage() {
     }
 
     if (loginStatus === "error") {
+      const reason = searchParams.get("reason");
+      const message = reason === "account_expired"
+        ? lang === "ko"
+          ? "관리자에 의해 비활성화된 계정입니다. 복구가 필요하면 화면 하단의 채널톡으로 문의해 주세요."
+          : "This account has been deactivated. Contact us through Channel Talk at the bottom of the page to request recovery."
+        : reason === "department_not_eligible"
+          ? lang === "ko"
+            ? "현재 전산학부 소속 정보로 확인되지 않아 로그인할 수 없습니다. 소속 정보가 잘못되었다면 채널톡으로 문의해 주세요."
+            : "Your current affiliation is not eligible for this service. Contact us through Channel Talk if this appears incorrect."
+          : lang === "ko"
+            ? "로그인 중 오류가 발생했습니다."
+            : "An error occurred while signing in.";
       returnToPreviousPage(
-        lang === "ko"
-          ? "로그인 중 오류가 발생했습니다."
-          : "An error occurred while signing in.",
+        message,
       );
       return;
     }

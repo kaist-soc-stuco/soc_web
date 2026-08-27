@@ -25,6 +25,8 @@ interface NoticeItemProps {
   showCategoryBadge?: boolean;
 }
 
+const HOME_NOTICE_LIMIT = 8;
+
 function NoticeItem({
   id,
   category,
@@ -42,8 +44,10 @@ function NoticeItem({
   return (
     <Link
       to={`/board/${category}/${id}`}
-      className={`flex h-full min-h-0 items-center overflow-hidden border-b border-slate-100 px-3 transition-colors last:border-b-0 hover:bg-slate-50/80 ${
-        isImportant ? "bg-brand-primary-light/35" : ""
+      className={`flex min-h-[2.5rem] items-center overflow-hidden border-b border-slate-100 px-3 transition-colors ${
+        isImportant
+          ? "bg-brand-primary-light/35 hover:bg-brand-primary/15"
+          : "hover:bg-slate-50/80"
       } ${showGroupDivider ? "border-t border-brand-primary-border/50" : ""}`}
     >
       <div className="flex w-full min-w-0 items-center justify-between gap-4 py-0.5">
@@ -103,9 +107,9 @@ function formatDate(dateIso: string) {
 
 function NoticeBoardSkeleton() {
   return (
-    <div className="grid h-full min-h-0 grid-rows-6 divide-y divide-slate-100" aria-busy="true">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="flex min-h-0 items-center justify-between gap-4 px-3 py-1">
+    <div className="grid h-full min-h-0 content-start divide-y divide-slate-100" style={{ gridTemplateRows: `repeat(${HOME_NOTICE_LIMIT}, minmax(2.5rem, auto))` }} aria-busy="true">
+      {Array.from({ length: HOME_NOTICE_LIMIT }).map((_, index) => (
+        <div key={index} className="flex min-h-0 items-center justify-between gap-4 px-3 py-1.5">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="home-loading-surface h-5 w-12 shrink-0 rounded-full" />
             <div
@@ -136,7 +140,6 @@ export function NoticeBoard() {
     { code: "공지", labelKo: "공지", labelEn: "Notice" },
     { code: "HoC", labelKo: "HoC", labelEn: "HoC" },
     { code: "홍보글", labelKo: "홍보글", labelEn: "Promotional Posts" },
-    { code: "건의사항", labelKo: "건의사항", labelEn: "Suggestions" },
     { code: "연구실", labelKo: "연구실", labelEn: "Research Labs" },
   ];
 
@@ -163,10 +166,10 @@ export function NoticeBoard() {
     const regular = currentNotices.filter((notice) => !notice.isImportant);
     return [...pinned, ...regular];
   }, [currentNotices]);
-  const visibleNotices = displayNotices.slice(0, 6);
+  const visibleNotices = displayNotices.slice(0, HOME_NOTICE_LIMIT);
   const renderedNotices = hasCurrentNoticeData
     ? visibleNotices
-    : lastLoadedNotices.slice(0, 6);
+    : lastLoadedNotices.slice(0, HOME_NOTICE_LIMIT);
   const showInitialSkeleton = loading && !hasCurrentNoticeData && lastLoadedNotices.length === 0;
 
   useEffect(() => {
@@ -233,7 +236,7 @@ export function NoticeBoard() {
   ]);
 
   return (
-    <section className="home-bento-card flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+    <section className="home-bento-card flex min-h-[24rem] min-w-0 flex-col overflow-hidden">
       <div className="mx-auto flex h-full min-h-0 w-full flex-col">
         <SectionHeader
           navigation={
@@ -269,13 +272,11 @@ export function NoticeBoard() {
             <NoticeBoardSkeleton />
           ) : renderedNotices.length > 0 ? (
             <div
-              className={`grid min-h-0 flex-1 transition-opacity duration-150 ${
+              className={`grid min-h-0 flex-none content-start transition-opacity duration-150 ${
                 loading ? "opacity-70" : "opacity-100"
               }`}
               style={{
-                gridTemplateRows: renderedNotices.length === 1
-                  ? "auto"
-                  : `repeat(${renderedNotices.length}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${renderedNotices.length}, 2.5rem)`,
               }}
             >
               {renderedNotices.map((notice, index) => (

@@ -5,6 +5,7 @@ import type {
   ReplaceRoleGroupMembersSchema,
   RoleGroupMemberFilterSchema,
   UpdateRoleGroupSchema,
+  UpdateUserPostingSuspensionSchema,
 } from "../schemas.js";
 
 export interface PermissionRecord {
@@ -46,6 +47,19 @@ export interface AdminUserListResponse {
   page: number;
   pageSize: number;
   total: number;
+  facets: {
+    primaryMajor: number;
+    doubleMajor: number;
+    minor: number;
+    paid: number;
+    partial: number;
+    unpaid: number;
+    academic: {
+      enrolled: number;
+      graduated: number;
+      other: number;
+    };
+  };
 }
 
 export interface RoleGroupMemberRecord {
@@ -115,3 +129,26 @@ export type RoleGroupMemberFilterRequest = z.infer<
 export type ReplaceRoleGroupMembersRequest = z.infer<
   typeof ReplaceRoleGroupMembersSchema
 >;
+
+export interface UserSanctionRecord {
+  sanctionId: number;
+  userId: string;
+  type: "POSTING_SUSPENDED";
+  reason: string;
+  issuedBy: string | null;
+  startsAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  createdAt: string;
+}
+
+export type UpdateUserPostingSuspensionRequest = z.infer<
+  typeof UpdateUserPostingSuspensionSchema
+>;
+
+export interface UserPostingSuspensionResponse {
+  userId: string;
+  suspended: boolean;
+  sanction: UserSanctionRecord | null;
+}

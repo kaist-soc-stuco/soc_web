@@ -20,6 +20,8 @@ import {
 } from "@/lib/events-surveys";
 import { buildCalendarGrid } from "./events-surveys-calendar-utils";
 
+const PUBLIC_ITEMS_PAGE_SIZE = 9;
+
 function parseSelectedCalendarDate(value: string | null) {
   if (!value) return null;
   const parsed = isoToDate(value);
@@ -58,6 +60,7 @@ export function useEventsSurveysPageController({
   );
   const [calendarQuery, setCalendarQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
   const [engagementOverrides, setEngagementOverrides] = useState<
     Record<string, Partial<UnifiedItem>>
@@ -212,9 +215,25 @@ export function useEventsSurveysPageController({
     );
   }, [filteredItems, itemQuery]);
 
-  const visibleItems = useMemo(() => {
+  const sortedItems = useMemo(() => {
     return sortVisibleItems(searchedItems, "latest", stateFilter);
   }, [searchedItems, stateFilter]);
+
+  const totalItems = sortedItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PUBLIC_ITEMS_PAGE_SIZE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentTab, itemQuery, stateFilter]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const visibleItems = useMemo(() => {
+    const start = (currentPage - 1) * PUBLIC_ITEMS_PAGE_SIZE;
+    return sortedItems.slice(start, start + PUBLIC_ITEMS_PAGE_SIZE);
+  }, [currentPage, sortedItems]);
 
   const stateCounts = useMemo(
     () => ({
@@ -302,11 +321,13 @@ export function useEventsSurveysPageController({
           ...previous,
         },
       }));
-      alert(
-        lang === "ko"
-          ? "좋아요 또는 스크랩 처리에 실패했습니다."
-          : "Failed to update like or scrap.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "좋아요 또는 스크랩 처리에 실패했습니다."
+            : "Failed to update like or scrap.",
+      });
     } finally {
       setEngagementSubmitting(null);
     }
@@ -342,16 +363,20 @@ export function useEventsSurveysPageController({
         : listQuery.isPending,
     selectedDate,
     calendarQuery,
+    currentPage,
     engagementSubmitting,
     handleSetEngagement,
     setCurrentDate: handleCurrentDateChange,
     setCalendarQuery,
+    setCurrentPage,
     itemQuery,
     setItemQuery,
     setSelectedDate,
     setStateFilter,
     stateCounts,
     stateFilter,
+    totalItems,
+    totalPages,
     visibleItems,
   };
 }

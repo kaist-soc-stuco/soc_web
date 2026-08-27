@@ -10,10 +10,71 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminCard, AdminCardHeader, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle } from "@/components/ui/admin-page";
 import { Permissions } from "@/lib/permissions";
-import { ChevronLeft, User, ClipboardCheck } from "lucide-react";
+import { ChevronLeft, ClipboardCheck, FileText, Image as ImageIcon, Music, User, Video } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { formatSurveyAnswer } from "@/lib/survey-answer-display";
+import { resolveAssetUrl } from "@/lib/asset-url";
+import { SurveyRespondentDrawer } from "@/components/organisms/survey-respondent-drawer";
+
+interface ResponseFile {
+  assetId: string;
+  fileName: string;
+  sizeBytes?: number;
+  mimeType?: string;
+}
+
+function getResponseFiles(content: Record<string, unknown>): ResponseFile[] {
+  const metadata = Array.isArray(content.files)
+    ? content.files.filter(
+        (file): file is Record<string, unknown> =>
+          typeof file === "object" && file !== null,
+      )
+    : [];
+  const assetIds = Array.isArray(content.assetIds)
+    ? content.assetIds.filter((assetId): assetId is string => typeof assetId === "string")
+    : typeof content.assetId === "string"
+      ? [content.assetId]
+      : [];
+
+  return assetIds.map((assetId, index) => {
+    const metadataItem = metadata[index];
+    return {
+      assetId,
+      fileName:
+        typeof metadataItem?.fileName === "string"
+          ? metadataItem.fileName
+          : index === 0 && typeof content.fileName === "string"
+            ? content.fileName
+            : "첨부 파일",
+      sizeBytes:
+        typeof metadataItem?.sizeBytes === "number"
+          ? metadataItem.sizeBytes
+          : index === 0 && typeof content.sizeBytes === "number"
+            ? content.sizeBytes
+            : undefined,
+      mimeType:
+        typeof metadataItem?.mimeType === "string"
+          ? metadataItem.mimeType
+          : index === 0 && typeof content.mimeType === "string"
+            ? content.mimeType
+            : undefined,
+    };
+  });
+}
+
+function formatFileSize(sizeBytes?: number) {
+  if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes)) return "";
+  if (sizeBytes < 1_000_000) return `${Math.max(1, Math.round(sizeBytes / 1_000))}KB`;
+  return `${(sizeBytes / 1_000_000).toFixed(1)}MB`;
+}
+
+function FileTypeIcon({ mimeType }: { mimeType?: string }) {
+  if (mimeType?.startsWith("image/")) return <ImageIcon aria-hidden="true" className="size-4" />;
+  if (mimeType?.startsWith("video/")) return <Video aria-hidden="true" className="size-4" />;
+  if (mimeType?.startsWith("audio/")) return <Music aria-hidden="true" className="size-4" />;
+  return <FileText aria-hidden="true" className="size-4" />;
+}
 
 export function SurveyResponseDetailPage() {
   const navigate = useNavigate();
@@ -31,6 +92,7 @@ export function SurveyResponseDetailPage() {
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRespondent, setSelectedRespondent] = useState<ResponseDetailResponse["user"]>(null);
 
   useEffect(() => {
     if (!surveyId || !responseId) return;
@@ -118,7 +180,17 @@ export function SurveyResponseDetailPage() {
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4 text-sm font-normal text-[#172033]">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-normal text-[#344054]">이름</span>
-                    <span>{response.user?.nameKo ?? "—"}</span>
+                    {response.user?.nameKo ? (
+                      <button
+                        type="button"
+                        className="font-medium text-slate-900 underline-offset-4 hover:underline"
+                        onClick={() => setSelectedRespondent(response.user)}
+                      >
+                        {response.user.nameKo}
+                      </button>
+                    ) : (
+                      <span>{response.user ? "—" : "비로그인 응답"}</span>
+                    )}
                   </div>
                   <span className="hidden text-slate-200 md:inline">|</span>
                   <div className="flex items-center gap-2 min-w-0">
@@ -157,7 +229,23 @@ export function SurveyResponseDetailPage() {
                         </p>
                       </div>
                       <div className="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm font-normal text-[#172033]">
-                        {match ? formatSurveyAnswer(a, match.question) || "—" : "—"}
+                        {match?.question.questionType === "file_upload" && getResponseFiles(a.content).length > 0 ? (
+                          <div className="space-y-2">
+                            {getResponseFiles(a.content).map((file) => (
+                              <a
+                                key={file.assetId}
+                                className="flex items-center gap-2 text-brand-primary underline-offset-4 hover:underline"
+                                href={resolveAssetUrl(`asset:${file.assetId}`)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <FileTypeIcon mimeType={file.mimeType} />
+                                <span className="min-w-0 truncate">{file.fileName}</span>
+                                {formatFileSize(file.sizeBytes) ? <span className="shrink-0 text-xs text-slate-500">({formatFileSize(file.sizeBytes)})</span> : null}
+                              </a>
+                            ))}
+                          </div>
+                        ) : match ? formatSurveyAnswer(a, match.question) || "—" : "—"}
                       </div>
                     </div>
                   );})}
@@ -166,6 +254,10 @@ export function SurveyResponseDetailPage() {
             </div>
           )}
         </AdminPageMain>
+        <SurveyRespondentDrawer
+          user={selectedRespondent}
+          onClose={() => setSelectedRespondent(null)}
+        />
       </AdminPageShell>
     </AuthGuard>
   );

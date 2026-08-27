@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import type {
   CommentCreateRequest,
@@ -11,8 +12,11 @@ import type {
   CommentEngagementKind,
   CommentEngagementResponse,
   CommentListResponse,
+  CommentModerationRequest,
+  CommentModerationResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
+  HiddenCommentListResponse,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
@@ -23,6 +27,8 @@ import { getReadableArticleScopes } from "./article-access";
 import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "./board.constants";
 import { NotificationsService } from "../notifications/notifications.service";
+import { AuditLogService } from "../audit/audit-log.service";
+import { UsersService } from "../users/users.service";
 
 interface CommentQueryParams {
   page?: number;
@@ -44,6 +50,8 @@ export class CommentService {
     private readonly articleRepository: ArticleRepository,
     private readonly commentRepository: CommentRepository,
     private readonly notificationsService: NotificationsService,
+    private readonly auditLogService: AuditLogService,
+    @Optional() private readonly usersService?: UsersService,
   ) {}
 
   async getComments(
@@ -58,10 +66,15 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
+    const readableScopes = getReadableArticleScopes(currentUser, board.allowGuestRead);
+    if (readableScopes.length === 0) {
+      throw new NotFoundException("article_not_found");
+    }
+
     const articleReadable = await this.articleRepository.isReadableArticle(
       board.boardId,
       articleId,
-      getReadableArticleScopes(currentUser),
+      readableScopes,
     );
 
     if (!articleReadable) {
@@ -125,7 +138,15 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    if (!board.allowComment) {
+    if (this.usersService && await this.usersService.isPostingSuspended(user.id)) {
+      throw new ForbiddenException("posting_suspended");
+    }
+
+    const isOfficialReply =
+      code === "건의사항" &&
+      Permissions.has(user.permission, Permissions.WRITE_REPLY);
+
+    if (!board.allowComment && !isOfficialReply) {
       throw new ForbiddenException("comment_not_allowed");
     }
 
@@ -139,7 +160,7 @@ export class CommentService {
       throw new NotFoundException("article_not_found");
     }
 
-    if (!article.allowComment) {
+    if (!article.allowComment && !isOfficialReply) {
       throw new ForbiddenException("comment_not_allowed");
     }
 
@@ -164,9 +185,7 @@ export class CommentService {
     const created = await this.commentRepository.createComment({
       articleId,
       authorUserId: user.id,
-      isOfficial:
-        code === "건의사항" &&
-        Permissions.hasAny(user.permission, Permissions.WRITE_REPLY, Permissions.ADMIN),
+      isOfficial: isOfficialReply,
       payload,
     });
 
@@ -222,13 +241,7 @@ export class CommentService {
     }
 
     const isOwner = comment.authorUserId === user.id;
-    const isManager = Permissions.hasAny(
-      user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
-    );
-
-    if (!isOwner && !isManager) {
+    if (!isOwner) {
       throw new ForbiddenException("insufficient_permission");
     }
 
@@ -268,17 +281,78 @@ export class CommentService {
     }
 
     const isOwner = comment.authorUserId === user.id;
-    const isManager = Permissions.hasAny(
-      user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
-    );
-
-    if (!isOwner && !isManager) {
+    if (!isOwner) {
       throw new ForbiddenException("insufficient_permission");
     }
 
     return this.commentRepository.softDeleteComment(commentId);
+  }
+
+  async listHiddenComments(user: AuthenticatedUser): Promise<HiddenCommentListResponse> {
+    if (!Permissions.has(user.permission, Permissions.MODERATE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+    return { items: await this.commentRepository.listHiddenComments() };
+  }
+
+  async hideComment(
+    code: string,
+    articleId: string,
+    commentId: string,
+    input: CommentModerationRequest,
+    user: AuthenticatedUser,
+  ): Promise<CommentModerationResponse> {
+    if (!Permissions.has(user.permission, Permissions.MODERATE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+    const board = await this.boardRepository.findByCode(code);
+    if (!board) throw new NotFoundException("board_not_found");
+    const comment = await this.commentRepository.findPermissionInfo(commentId, articleId, board.boardId);
+    if (!comment || comment.status !== COMMENT_STATUS.PUBLISHED) {
+      throw new NotFoundException("comment_not_found");
+    }
+    const result = await this.commentRepository.moderateComment(commentId, {
+      hidden: true,
+      moderatorUserId: user.id,
+      reason: input.reason,
+    });
+    await this.auditLogService.record({
+      action: "comment.hide",
+      actorUserId: user.id,
+      payload: { articleId, boardCode: code, reason: input.reason },
+      targetId: commentId,
+      targetType: "comment",
+    });
+    return result;
+  }
+
+  async restoreComment(
+    code: string,
+    articleId: string,
+    commentId: string,
+    user: AuthenticatedUser,
+  ): Promise<CommentModerationResponse> {
+    if (!Permissions.has(user.permission, Permissions.MODERATE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+    const board = await this.boardRepository.findByCode(code);
+    if (!board) throw new NotFoundException("board_not_found");
+    const comment = await this.commentRepository.findPermissionInfo(commentId, articleId, board.boardId);
+    if (!comment || comment.status !== COMMENT_STATUS.HIDDEN) {
+      throw new NotFoundException("comment_not_found");
+    }
+    const result = await this.commentRepository.moderateComment(commentId, {
+      hidden: false,
+      moderatorUserId: user.id,
+    });
+    await this.auditLogService.record({
+      action: "comment.restore",
+      actorUserId: user.id,
+      payload: { articleId, boardCode: code },
+      targetId: commentId,
+      targetType: "comment",
+    });
+    return result;
   }
 
   private async assertCommentActionAllowed(
@@ -291,6 +365,10 @@ export class CommentService {
 
     if (!board || !board.isActive) {
       throw new NotFoundException("board_not_found");
+    }
+
+    if (!board.allowLike) {
+      throw new ForbiddenException("engagement_not_allowed");
     }
 
     const articleReadable = await this.articleRepository.isReadableArticle(

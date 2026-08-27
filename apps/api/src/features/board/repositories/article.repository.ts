@@ -21,6 +21,8 @@ import type {
   ArticleUpdateResponse,
   ArticleDeleteResponse,
   ArticleEngagementKind,
+  ArticleModerationResponse,
+  HiddenArticleItem,
   SurveySummary,
   VisibilityScope,
 } from "@soc/contracts";
@@ -128,10 +130,7 @@ const mapConnectedSurvey = (
 };
 
 const articleThumbnailStorageKey = sql<string | null>`(
-  select case
-    when ${assets.storageKey} like '/uploads/assets/seed-event-%' then null
-    else concat('asset:', ${assets.assetId}::text)
-  end
+  select concat('asset:', ${assets.assetId}::text)
   from ${articleAssets}
   inner join ${assets} on ${assets.assetId} = ${articleAssets.assetId}
   where ${articleAssets.articleId} = ${articles.articleId}
@@ -175,14 +174,24 @@ export class ArticleRepository {
     query?: string,
     viewerUserId?: string,
     includeContentPreview = false,
+    searchBy: "title" | "title_content" = "title",
   ): Promise<{ items: ArticleListItem[]; total: number }> {
     const offset = (page - 1) * limit;
     const normalizedQuery = query?.trim();
     const searchFilter = normalizedQuery
-      ? or(
-          ilike(articles.titleKo, `%${normalizedQuery}%`),
-          ilike(articles.titleEn, `%${normalizedQuery}%`),
-        )
+      ? searchBy === "title_content"
+        ? or(
+            ilike(articles.titleKo, `%${normalizedQuery}%`),
+            ilike(articles.titleEn, `%${normalizedQuery}%`),
+            ilike(articles.contentKo, `%${normalizedQuery}%`),
+            ilike(articles.contentEn, `%${normalizedQuery}%`),
+            ilike(articles.eventDescriptionKo, `%${normalizedQuery}%`),
+            ilike(articles.eventDescriptionEn, `%${normalizedQuery}%`),
+          )
+        : or(
+            ilike(articles.titleKo, `%${normalizedQuery}%`),
+            ilike(articles.titleEn, `%${normalizedQuery}%`),
+          )
       : undefined;
 
     const baseFilter = and(
@@ -209,6 +218,8 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        homeVisible: articles.homeVisible,
+        homeOrder: articles.homeOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
@@ -267,6 +278,8 @@ export class ArticleRepository {
           row.visibilityScope as ArticleListItem["visibilityScope"],
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
+        homeVisible: row.homeVisible,
+        homeOrder: row.homeOrder ?? null,
         isSecret: row.isSecret,
         isAnonymous: row.isAnonymous,
         allowComment: row.allowComment,
@@ -375,6 +388,8 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        homeVisible: articles.homeVisible,
+        homeOrder: articles.homeOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
@@ -436,6 +451,8 @@ export class ArticleRepository {
           row.visibilityScope as ArticleListItem["visibilityScope"],
         isPinned: row.isPinned,
         pinOrder: row.pinOrder ?? null,
+        homeVisible: row.homeVisible,
+        homeOrder: row.homeOrder ?? null,
         isSecret: row.isSecret,
         isAnonymous: row.isAnonymous,
         allowComment: row.allowComment,
@@ -506,6 +523,8 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        homeVisible: articles.homeVisible,
+        homeOrder: articles.homeOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
@@ -553,6 +572,8 @@ export class ArticleRepository {
         row.visibilityScope as ArticleListItem["visibilityScope"],
       isPinned: row.isPinned,
       pinOrder: row.pinOrder ?? null,
+      homeVisible: row.homeVisible,
+      homeOrder: row.homeOrder ?? null,
       isSecret: row.isSecret,
       isAnonymous: row.isAnonymous,
       allowComment: row.allowComment,
@@ -597,6 +618,8 @@ export class ArticleRepository {
         visibilityScope: articles.visibilityScope,
         isPinned: articles.isPinned,
         pinOrder: articles.pinOrder,
+        homeVisible: articles.homeVisible,
+        homeOrder: articles.homeOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
         allowComment: articles.allowComment,
@@ -716,6 +739,8 @@ export class ArticleRepository {
         .visibilityScope as ArticleDetailResponse["visibilityScope"],
       isPinned: row[0].isPinned,
       pinOrder: row[0].pinOrder ?? null,
+      homeVisible: row[0].homeVisible,
+      homeOrder: row[0].homeOrder ?? null,
       isSecret: row[0].isSecret,
       isAnonymous: row[0].isAnonymous,
       allowComment: row[0].allowComment,
@@ -842,6 +867,8 @@ export class ArticleRepository {
           visibilityScope: input.payload.visibilityScope,
           isPinned: input.payload.isPinned ?? false,
           pinOrder: input.payload.pinOrder ?? null,
+          homeVisible: input.payload.homeVisible ?? true,
+          homeOrder: input.payload.homeOrder ?? null,
           isSecret: input.payload.isSecret ?? false,
           isAnonymous: input.payload.isAnonymous ?? false,
           allowComment: input.payload.allowComment ?? true,
@@ -903,6 +930,33 @@ export class ArticleRepository {
     };
   }
 
+  async findAnonymousAuthor(
+    boardId: number,
+    articleId: string,
+  ): Promise<{ authorUserId: string; authorName: string } | null> {
+    const row = await this.db
+      .select({
+        authorUserId: articles.authorUserId,
+        authorName: users.nameKo,
+      })
+      .from(articles)
+      .innerJoin(users, eq(articles.authorUserId, users.userId))
+      .where(
+        and(
+          eq(articles.boardId, boardId),
+          eq(articles.articleId, Number(articleId)),
+          eq(articles.isAnonymous, true),
+        ),
+      )
+      .limit(1);
+
+    if (!row[0]) return null;
+    return {
+      authorUserId: String(row[0].authorUserId),
+      authorName: row[0].authorName,
+    };
+  }
+
   async findCommentPermissionInfo(
     boardId: number,
     articleId: string,
@@ -949,6 +1003,8 @@ export class ArticleRepository {
       visibilityScope?: string;
       isPinned?: boolean;
       pinOrder?: number | null;
+      homeVisible?: boolean;
+      homeOrder?: number | null;
       isSecret?: boolean;
       isAnonymous?: boolean;
       allowComment?: boolean;
@@ -987,6 +1043,14 @@ export class ArticleRepository {
 
     if (payload.pinOrder !== undefined) {
       updateSet.pinOrder = payload.pinOrder ?? null;
+    }
+
+    if (payload.homeVisible !== undefined) {
+      updateSet.homeVisible = payload.homeVisible;
+    }
+
+    if (payload.homeOrder !== undefined) {
+      updateSet.homeOrder = payload.homeOrder ?? null;
     }
 
     if (payload.isSecret !== undefined) {
@@ -1132,6 +1196,80 @@ export class ArticleRepository {
       .update(articles)
       .set({ viewCount: sql`${articles.viewCount} + 1` })
       .where(eq(articles.articleId, Number(articleId)));
+  }
+
+  async reorderFaqArticles(
+    items: Array<{ articleId: string; sortOrder: number }>,
+  ): Promise<void> {
+    const now = nowDate();
+    await this.db.transaction(async (tx) => {
+      for (const item of items) {
+        await tx
+          .update(articles)
+          .set({
+            // FAQ uses the existing stable ordering column without exposing
+            // the post pin treatment on the public FAQ accordion.
+            isPinned: false,
+            pinOrder: item.sortOrder,
+            updatedAt: now,
+          })
+          .where(eq(articles.articleId, Number(item.articleId)));
+      }
+    });
+  }
+
+  async moderateArticle(
+    boardId: number,
+    articleId: string,
+    input: { hidden: boolean; moderatorUserId: string; reason?: string },
+  ): Promise<ArticleModerationResponse> {
+    const now = nowDate();
+    const [updated] = await this.db
+      .update(articles)
+      .set({
+        status: input.hidden ? ARTICLE_STATUS.HIDDEN : ARTICLE_STATUS.PUBLISHED,
+        hiddenAt: input.hidden ? now : null,
+        hiddenByUserId: input.hidden ? input.moderatorUserId : null,
+        hiddenReason: input.hidden ? input.reason ?? null : null,
+        updatedAt: now,
+      })
+      .where(and(eq(articles.boardId, boardId), eq(articles.articleId, Number(articleId))))
+      .returning({ articleId: articles.articleId, status: articles.status });
+
+    if (!updated) {
+      throw new BadRequestException("article_moderation_failed");
+    }
+
+    return {
+      ok: true,
+      articleId: String(updated.articleId),
+      status: updated.status as ArticleModerationResponse["status"],
+      updatedAt: msToIso(now.valueOf()),
+    };
+  }
+
+  async listHiddenArticles(boardId: number, boardCode: string): Promise<HiddenArticleItem[]> {
+    const rows = await this.db
+      .select({
+        articleId: articles.articleId,
+        authorName: users.nameKo,
+        hiddenAt: articles.hiddenAt,
+        hiddenReason: articles.hiddenReason,
+        titleKo: articles.titleKo,
+      })
+      .from(articles)
+      .leftJoin(users, eq(articles.authorUserId, users.userId))
+      .where(and(eq(articles.boardId, boardId), eq(articles.status, ARTICLE_STATUS.HIDDEN)))
+      .orderBy(desc(articles.hiddenAt), desc(articles.updatedAt));
+
+    return rows.map((row) => ({
+      articleId: String(row.articleId),
+      authorName: row.authorName ?? "알 수 없음",
+      boardCode,
+      hiddenAt: row.hiddenAt ? msToIso(row.hiddenAt.valueOf()) : "",
+      hiddenReason: row.hiddenReason ?? "사유 없음",
+      titleKo: row.titleKo,
+    }));
   }
 
   async recordArticleView(articleId: string, userId: string): Promise<boolean> {

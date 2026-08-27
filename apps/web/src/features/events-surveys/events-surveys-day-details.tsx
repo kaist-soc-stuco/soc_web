@@ -32,7 +32,7 @@ export function EventsSurveysDayDetails({
   const { data: session } = useCurrentSession();
   const { toast } = useToast();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const canManage = Permissions.has(session?.permission ?? 0, Permissions.MANAGE_CONTENT);
+  const canManage = Permissions.has(session?.permission ?? 0, Permissions.MANAGE_CALENDAR);
 
   useEffect(() => {
     if (!openMenuId) return;

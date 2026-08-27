@@ -24,6 +24,8 @@ export function SearchPage() {
     query,
     setInputValue,
     setFilter,
+    searchBy,
+    setSearchBy,
     surveys,
     totalCount,
   } = useSearchPageController();
@@ -39,6 +41,8 @@ export function SearchPage() {
           lang={lang}
           onInputValueChange={setInputValue}
           onSubmit={handleSubmit}
+          onSearchByChange={setSearchBy}
+          searchBy={searchBy}
         />
         <SearchFilterTabs
           activeFilter={filter}

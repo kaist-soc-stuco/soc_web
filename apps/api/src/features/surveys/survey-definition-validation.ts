@@ -14,7 +14,14 @@ export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): 
     throw new BadRequestException("survey_question_title_required");
   }
   if (question.questionType === "file_upload") {
-    throw new BadRequestException("survey_file_upload_temporarily_disabled");
+    const maxFiles = question.config?.maxFiles ?? 1;
+    const maxSizeBytes = question.config?.maxSizeBytes ?? 10_000_000;
+    if (maxFiles < 1 || maxFiles > 10) {
+      throw new BadRequestException("survey_file_upload_count_invalid");
+    }
+    if (maxSizeBytes < 1 || maxSizeBytes > 20_000_000) {
+      throw new BadRequestException("survey_file_upload_size_invalid");
+    }
   }
   if (CHOICE_TYPES.has(question.questionType) && (question.options?.length ?? 0) < 2) {
     throw new BadRequestException("survey_choice_requires_two_options");

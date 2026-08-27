@@ -12,6 +12,10 @@ import {
   boards,
   contentBlocks,
   executiveContacts,
+  surveyAnswers,
+  surveyQuestions,
+  surveySections,
+  surveys,
 } from "../../../infrastructure/postgres/postgres.schema";
 
 @Injectable()
@@ -49,6 +53,7 @@ export class AssetRepository {
     sizeBytes: number;
     uploadedBy: string;
     publicContentImage: boolean;
+    surveyAnswerFile: boolean;
     links: Array<{
       articleId: string;
       boardCode: string;
@@ -101,6 +106,32 @@ export class AssetRepository {
       .where(eq(executiveContacts.avatarStorageKey, `asset:${assetId}`))
       .limit(1);
 
+    const [surveyAnswerFile] = await this.db
+      .select({ answerId: surveyAnswers.id })
+      .from(surveyAnswers)
+      .where(sql`
+        ${surveyAnswers.content}->>'assetId' = ${assetId}
+        OR (${surveyAnswers.content}->'assetIds') ? ${assetId}
+      `)
+      .limit(1);
+
+    const assetReference = `asset:${assetId}`;
+    const [publicSurveyImage] = await this.db
+      .select({ surveyId: surveys.surveyId })
+      .from(surveys)
+      .leftJoin(surveySections, eq(surveySections.surveyId, surveys.surveyId))
+      .leftJoin(surveyQuestions, eq(surveyQuestions.sectionId, surveySections.id))
+      .where(and(
+        eq(surveys.isPublished, true),
+        or(
+          eq(surveys.descriptionImageUrlKo, assetReference),
+          eq(surveys.descriptionImageUrlEn, assetReference),
+          sql`${surveyQuestions.options}::text LIKE ${`%${assetReference}%`}`,
+          sql`${surveyQuestions.config}::text LIKE ${`%${assetReference}%`}`,
+        ),
+      ))
+      .limit(1);
+
     return {
       assetId: String(asset.assetId),
       storageKey: asset.storageKey,
@@ -108,7 +139,8 @@ export class AssetRepository {
       mimeType: asset.mimeType,
       sizeBytes: asset.sizeBytes,
       uploadedBy: String(asset.uploadedBy),
-      publicContentImage: Boolean(publicContentImage || publicContactAvatar),
+      publicContentImage: Boolean(publicContentImage || publicContactAvatar || publicSurveyImage),
+      surveyAnswerFile: Boolean(surveyAnswerFile),
       links: links.map((link) => ({
         articleId: String(link.articleId),
         boardCode: link.boardCode,
@@ -260,11 +292,26 @@ export class AssetRepository {
         eq(contentBlocks.imageUrlEn, sql`'asset:' || ${assets.assetId}::text`),
       ))
       .leftJoin(executiveContacts, eq(executiveContacts.avatarStorageKey, sql`'asset:' || ${assets.assetId}::text`))
+      .leftJoin(surveyAnswers, sql`
+        ${surveyAnswers.content}->>'assetId' = ${assets.assetId}::text
+        OR (${surveyAnswers.content}->'assetIds') ? ${assets.assetId}::text
+      `)
+      .leftJoin(surveys, or(
+        eq(surveys.descriptionImageUrlKo, sql`'asset:' || ${assets.assetId}::text`),
+        eq(surveys.descriptionImageUrlEn, sql`'asset:' || ${assets.assetId}::text`),
+      ))
+      .leftJoin(surveyQuestions, sql`
+        ${surveyQuestions.options}::text LIKE ('%asset:' || ${assets.assetId}::text || '%')
+        OR ${surveyQuestions.config}::text LIKE ('%asset:' || ${assets.assetId}::text || '%')
+      `)
       .where(
         and(
           isNull(articleAssets.articleAssetId),
           isNull(contentBlocks.contentBlockId),
           isNull(executiveContacts.id),
+          isNull(surveyAnswers.id),
+          isNull(surveys.surveyId),
+          isNull(surveyQuestions.id),
           lt(assets.createdAt, cutoff),
         ),
       )

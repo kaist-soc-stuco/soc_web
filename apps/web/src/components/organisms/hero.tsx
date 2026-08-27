@@ -1,6 +1,5 @@
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import {
   resolveContentBlockText,
@@ -13,14 +12,12 @@ import { resolveAssetUrl } from "@/lib/asset-url";
 export function Hero() {
   const [imageLoaded, setImageLoaded] = useState(false);
   const { lang } = useLanguage();
-  const fallbackTitle = useLocalizedSiteContent("home.hero.title");
-  const fallbackCta = useLocalizedSiteContent("home.hero.cta");
   const hero = usePublicContentBlocksByType("HERO")[0];
   const quickLinks = usePublicContentBlocksByType("QUICK_LINK");
   const imageUrl = hero?.imageUrl ? resolveAssetUrl(hero.imageUrl) : "/hero_background_1.jpg";
+  const fallbackTitle = useLocalizedSiteContent("home.hero.title");
   const heroText = hero ? resolveContentBlockText(hero, lang) : null;
   const title = heroText?.title || fallbackTitle;
-  const ctaUrl = hero?.linkUrl || "/about";
 
   return (
     <section className="hero-image-placeholder home-public-hero relative w-full overflow-hidden">
@@ -40,21 +37,19 @@ export function Hero() {
       <div className="home-hero-content absolute inset-0 z-10 flex items-end">
         <div className="home-public-content w-full">
           <h1 className="home-hero-title whitespace-pre-line text-white">{title}</h1>
-          <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <Link to={ctaUrl} className="home-hero-primary-link">
-              {fallbackCta}
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
-            {quickLinks.map((block) => {
-              const text = resolveContentBlockText(block, lang);
-              return block.linkUrl ? (
-                <a key={block.contentBlockId} href={block.linkUrl} className="home-hero-quick-link">
-                  {text.title}
-                  <ArrowUpRight aria-hidden="true" className="size-3.5" />
-                </a>
-              ) : null;
-            })}
-          </div>
+          {quickLinks.length > 0 ? (
+            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
+              {quickLinks.map((block) => {
+                const text = resolveContentBlockText(block, lang);
+                return block.linkUrl ? (
+                  <a key={block.contentBlockId} href={block.linkUrl} className="home-hero-quick-link">
+                    {text.title}
+                    <ArrowUpRight aria-hidden="true" className="size-3.5" />
+                  </a>
+                ) : null;
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

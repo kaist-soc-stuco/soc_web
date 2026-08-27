@@ -15,6 +15,7 @@ import {
   getScheduleLabel,
 } from "./survey-answer-utils";
 import { RichTextContent } from "@/components/ui/rich-text-content";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 interface SurveySummaryCardProps {
   children?: ReactNode;
@@ -28,6 +29,9 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
     survey.descriptionKo,
     survey.descriptionEn,
   );
+  const descriptionImage = lang === "ko"
+    ? survey.descriptionImageUrlKo
+    : survey.descriptionImageUrlEn || survey.descriptionImageUrlKo;
 
   return (
     <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in slide-in-from-top-4 duration-300 sm:p-8">
@@ -40,6 +44,14 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
           className="mt-4 border-t border-slate-100 pt-4 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-600"
         />
       )}
+
+      {descriptionImage ? (
+        <img
+          src={resolveAssetUrl(descriptionImage)}
+          alt=""
+          className="mt-4 max-h-[32rem] w-full rounded-xl border border-slate-200 object-contain"
+        />
+      ) : null}
 
       <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-normal text-slate-500">
         <span className="inline-flex items-center gap-1.5">

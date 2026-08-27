@@ -26,11 +26,21 @@ export const surveys = pgTable("survey", {
   titleEn: varchar("title_en", { length: 255 }),
   descriptionKo: text("description_ko"),
   descriptionEn: text("description_en"),
+  descriptionImageUrlKo: text("description_image_url_ko"),
+  descriptionImageUrlEn: text("description_image_url_en"),
   connectedArticleId: integer("connected_article_id")
     .references(() => articles.articleId, { onDelete: "set null" }),
   feeRequirementPolicy: varchar("fee_requirement_policy", { length: 20 })
     .notNull()
     .default("NONE"),
+  eligibleSocAffiliations: jsonb("eligible_soc_affiliations")
+    .$type<Array<"PRIMARY" | "DOUBLE" | "MINOR">>()
+    .notNull()
+    .default(sql`'["PRIMARY","DOUBLE","MINOR"]'::jsonb`),
+  academicEligibility: varchar("academic_eligibility", { length: 30 })
+    .notNull()
+    .default("ENROLLED_OR_LEAVE"),
+  allowAnonymous: boolean("allow_anonymous").notNull().default(false),
   allowMultipleResponses: boolean("allow_multiple_responses").notNull().default(false),
   allowResponseEdit: boolean("allow_response_edit").notNull().default(false),
   isKoreanOnly: boolean("is_korean_only").notNull().default(false),
@@ -51,6 +61,12 @@ export const surveys = pgTable("survey", {
   isAlwaysOpen: boolean("is_always_open").notNull().default(false),
   openAt: timestamp("open_at", { withTimezone: true }),
   closeAt: timestamp("close_at", { withTimezone: true }),
+  spreadsheetId: varchar("spreadsheet_id", { length: 255 }),
+  spreadsheetUrl: text("spreadsheet_url"),
+  spreadsheetSyncStatus: varchar("spreadsheet_sync_status", { length: 20 })
+    .notNull()
+    .default("NOT_CONNECTED"),
+  spreadsheetLastSyncedAt: timestamp("spreadsheet_last_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -58,6 +74,7 @@ export const surveys = pgTable("survey", {
     table.connectedArticleId,
     table.isPublished,
   ),
+  uniqueIndex("survey_connected_article_unique_idx").on(table.connectedArticleId),
   index("survey_published_created_idx").on(table.isPublished, table.createdAt),
   index("survey_lifecycle_created_idx").on(table.lifecycleStatus, table.createdAt),
   index("survey_previous_version_idx").on(table.previousVersionId),
@@ -71,6 +88,15 @@ export const surveys = pgTable("survey", {
     sql`(${table.lifecycleStatus} = 'PUBLISHED') = ${table.isPublished}`,
   ),
   check("survey_version_number_check", sql`${table.versionNumber} >= 1`),
+  check("survey_kind_check", sql`${table.kind} in ('SURVEY', 'APPLICATION')`),
+  check(
+    "survey_academic_eligibility_check",
+    sql`${table.academicEligibility} in ('ANY', 'ENROLLED_ONLY', 'ENROLLED_OR_LEAVE')`,
+  ),
+  check(
+    "survey_spreadsheet_sync_status_check",
+    sql`${table.spreadsheetSyncStatus} in ('NOT_CONNECTED', 'CONNECTED', 'ERROR')`,
+  ),
   check(
     "survey_previous_version_check",
     sql`${table.previousVersionId} is null or ${table.previousVersionId} <> ${table.surveyId}`,

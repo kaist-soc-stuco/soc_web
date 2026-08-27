@@ -15,17 +15,22 @@ import { resolveApiBaseUrl } from "@/lib/api";
 import { downloadBlob } from "@/lib/download-blob";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminCard, AdminEmptyState, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
+import { SurveyRespondentDrawer } from "@/components/organisms/survey-respondent-drawer";
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { Breadcrumbs, PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
 import { useCurrentSession } from "@/hooks/use-current-session";
+import { useToast } from "@/components/ui/toast";
 import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import { 
   ChevronLeft,
   Eye,
   Download,
+  ExternalLink,
+  RefreshCw,
+  Sheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -85,6 +90,7 @@ export function SurveyResponseListPage() {
   const [analytics, setAnalytics] = useState<SurveyAnalyticsResponse | null>(null);
   const [activeView, setActiveView] = useState<ResponseView>("summary");
   const [loading, setLoading] = useState(true);
+  const [sheetBusy, setSheetBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filter States
@@ -92,9 +98,11 @@ export function SurveyResponseListPage() {
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRespondent, setSelectedRespondent] = useState<SurveyResponseRecord["user"]>(null);
 
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
+  const { toast } = useToast();
   const showInitialLoading = loading && !survey;
 
   const fetchSurveyAndResponses = async () => {
@@ -165,7 +173,40 @@ export function SurveyResponseListPage() {
       downloadBlob(blob, `survey_responses_${surveyId}.xlsx`);
     } catch (err) {
       console.error(err);
-      alert("응답을 내보내지 못했습니다.");
+      toast({ type: "error", message: "응답을 내보내지 못했습니다." });
+    }
+  };
+
+  const handleSheet = async () => {
+    if (!surveyId || sheetBusy) return;
+    if (survey?.spreadsheetUrl) {
+      window.open(survey.spreadsheetUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setSheetBusy(true);
+    try {
+      const updated = await client.connectSurveySpreadsheet(surveyId);
+      setSurvey((current) => current ? { ...current, ...updated } : current);
+      if (updated.spreadsheetUrl) {
+        window.open(updated.spreadsheetUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      toast({ type: "error", message: "Google Sheets를 연결하지 못했습니다. Google 계정 연결과 OAuth 권한을 확인해주세요." });
+    } finally {
+      setSheetBusy(false);
+    }
+  };
+
+  const handleSheetSync = async () => {
+    if (!surveyId || sheetBusy) return;
+    setSheetBusy(true);
+    try {
+      const updated = await client.syncSurveySpreadsheet(surveyId);
+      setSurvey((current) => current ? { ...current, ...updated } : current);
+    } catch {
+      toast({ type: "error", message: "Google Sheets 동기화에 실패했습니다." });
+    } finally {
+      setSheetBusy(false);
     }
   };
 
@@ -228,6 +269,20 @@ export function SurveyResponseListPage() {
                 <Download className="size-4" />
                 <span>내보내기</span>
               </Button>
+              <Button variant="outline" onClick={handleSheet} disabled={sheetBusy}>
+                <Sheet className="size-4" />
+                <span>{survey?.spreadsheetUrl ? "Google Sheets 열기" : "Google Sheets 연결"}</span>
+                {survey?.spreadsheetUrl ? <ExternalLink className="size-3.5" /> : null}
+              </Button>
+              {survey?.spreadsheetUrl ? (
+                <IconButton
+                  aria-label="Google Sheets 지금 동기화"
+                  onClick={handleSheetSync}
+                  disabled={sheetBusy}
+                >
+                  <RefreshCw className="size-4" />
+                </IconButton>
+              ) : null}
               </>
             }
           />
@@ -340,7 +395,17 @@ export function SurveyResponseListPage() {
 
                             {/* 이름 (center-aligned) */}
                             <AdminTableCell className="text-center">
-                              <span className="admin-table-text-emphasis">{formatResponseName(r)}</span>
+                              {r.user?.nameKo ? (
+                                <button
+                                  type="button"
+                                  className="admin-table-text-emphasis max-w-full truncate text-left underline-offset-4 hover:underline"
+                                  onClick={() => setSelectedRespondent(r.user)}
+                                >
+                                  {r.user.nameKo}
+                                </button>
+                              ) : (
+                                <span className="admin-table-text">—</span>
+                              )}
                             </AdminTableCell>
 
                             {/* 이메일 (left-aligned) */}
@@ -400,6 +465,10 @@ export function SurveyResponseListPage() {
           </div>
           </AdminTableCard> : null}
         </AdminPageMain>
+        <SurveyRespondentDrawer
+          user={selectedRespondent}
+          onClose={() => setSelectedRespondent(null)}
+        />
       </AdminPageShell>
     </AuthGuard>
   );

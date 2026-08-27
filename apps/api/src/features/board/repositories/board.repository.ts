@@ -66,6 +66,7 @@ export class BoardRepository {
       allowComment: row.allowComment,
       allowSecret: row.allowSecret,
       allowLike: row.allowLike,
+      allowGuestRead: row.allowGuestRead,
       sortOrder: row.sortOrder,
       isActive: row.isActive,
     }));
@@ -142,6 +143,7 @@ export class BoardRepository {
         allowComment: input.allowComment,
         allowSecret: input.allowSecret,
         allowLike: input.allowLike,
+        allowGuestRead: input.allowGuestRead,
         sortOrder: input.sortOrder,
         isActive: true,
       })
@@ -161,6 +163,7 @@ export class BoardRepository {
     if (input.allowComment !== undefined) set.allowComment = input.allowComment;
     if (input.allowSecret !== undefined) set.allowSecret = input.allowSecret;
     if (input.allowLike !== undefined) set.allowLike = input.allowLike;
+    if (input.allowGuestRead !== undefined) set.allowGuestRead = input.allowGuestRead;
     if (input.sortOrder !== undefined) set.sortOrder = input.sortOrder;
     if (input.isActive !== undefined) set.isActive = input.isActive;
 

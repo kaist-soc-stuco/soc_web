@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import type {
   ArticleCreateRequest,
@@ -15,6 +16,10 @@ import type {
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   ArticleDeleteResponse,
+  ArticleModerationRequest,
+  ArticleModerationResponse,
+  HiddenArticleListResponse,
+  FaqReorderRequest,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { isoToDate, localDate, msToIso, nowDate, nowMs } from "@soc/shared";
@@ -28,6 +33,8 @@ import {
 import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
 import { sanitizeArticleHtml } from "./article-html-sanitizer";
+import { AuditLogService } from "../audit/audit-log.service";
+import { UsersService } from "../users/users.service";
 
 interface ArticleQueryParams {
   page?: number;
@@ -57,8 +64,8 @@ const canReadSecretArticle = (
   if (currentUser.user?.id === article.author.userId) return true;
   return Boolean(currentUser.user && Permissions.hasAny(
     currentUser.user.permission,
-    Permissions.MODERATOR,
-    Permissions.ADMIN,
+    Permissions.WRITE_REPLY,
+    Permissions.MODERATE_CONTENT,
   ));
 };
 
@@ -89,6 +96,8 @@ export class ArticleService {
   constructor(
     private readonly boardRepository: BoardRepository,
     private readonly articleRepository: ArticleRepository,
+    private readonly auditLogService: AuditLogService,
+    @Optional() private readonly usersService?: UsersService,
   ) {}
 
   async getArticles(
@@ -106,15 +115,21 @@ export class ArticleService {
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
     const limit = Math.min(rawLimit, MAX_PAGE_SIZE);
     const query = params.q?.trim();
+    const readableScopes = getReadableArticleScopes(currentUser, board.allowGuestRead);
+
+    if (readableScopes.length === 0) {
+      return { page, limit, total: 0, items: [] };
+    }
 
     const result = await this.articleRepository.listByBoardId(
       board.boardId,
       page,
       limit,
-      getReadableArticleScopes(currentUser),
+      readableScopes,
       query,
       currentUser.user?.id,
       params.includeContentPreview,
+      params.searchBy === "title_content" ? "title_content" : "title",
     );
 
     const visibleItems = result.items.map((item) =>
@@ -136,6 +151,7 @@ export class ArticleService {
     currentUser: CurrentUserContext,
   ): Promise<ArticleListResponse> {
     const readableBoards = (await this.boardRepository.listBoards())
+      .filter((board) => currentUser.authenticated || board.allowGuestRead)
       // Keep legacy boards addressable through their direct routes, but keep
       // the public aggregate feed aligned with the current IA.
       .filter((board) => !PUBLIC_NON_AGGREGATE_BOARD_CODES.has(board.code));
@@ -162,6 +178,11 @@ export class ArticleService {
             ? isoToDate(msToIso(nowMs() - 30 * 24 * 60 * 60 * 1000))
             : undefined;
 
+    const readableScopes = getReadableArticleScopes(currentUser);
+    if (readableBoards.length === 0 || readableScopes.length === 0) {
+      return { page, limit, total: 0, items: [] };
+    }
+
     const result = await this.articleRepository.listByBoardIds(
       readableBoards.map((board) => board.boardId),
       {
@@ -173,7 +194,7 @@ export class ArticleService {
         sortBy,
         sortDirection,
         includeContentPreview: params.includeContentPreview,
-        visibilityScopes: getReadableArticleScopes(currentUser),
+        visibilityScopes: readableScopes,
         viewerUserId: currentUser.user?.id,
       },
     );
@@ -210,10 +231,15 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
+    const readableScopes = getReadableArticleScopes(currentUser, board.allowGuestRead);
+    if (readableScopes.length === 0) {
+      throw new ForbiddenException("board_guest_read_disabled");
+    }
+
     const article = await this.articleRepository.findDetailById(
       board.boardId,
       articleId,
-      getReadableArticleScopes(currentUser),
+      readableScopes,
       currentUser.user?.id,
     );
 
@@ -273,8 +299,16 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
+    if (this.usersService && await this.usersService.isPostingSuspended(user.id)) {
+      throw new ForbiddenException("posting_suspended");
+    }
+
     if (payload.isSecret && !board.allowSecret) {
       throw new ForbiddenException("secret_post_not_allowed");
+    }
+
+    if (payload.allowComment === true && !board.allowComment) {
+      throw new ForbiddenException("comment_not_allowed");
     }
 
     if (
@@ -340,6 +374,10 @@ export class ArticleService {
       throw new ForbiddenException("secret_post_not_allowed");
     }
 
+    if (payload.allowComment === true && !board.allowComment) {
+      throw new ForbiddenException("comment_not_allowed");
+    }
+
     const article = await this.articleRepository.findPermissionInfo(
       board.boardId,
       articleId,
@@ -350,13 +388,7 @@ export class ArticleService {
     }
 
     const isOwner = article.authorUserId === user.id;
-    const isManager = Permissions.hasAny(
-      user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
-    );
-
-    if (!isOwner && !isManager) {
+    if (!isOwner) {
       throw new ForbiddenException("insufficient_permission");
     }
 
@@ -389,17 +421,216 @@ export class ArticleService {
     }
 
     const isOwner = article.authorUserId === user.id;
-    const isManager = Permissions.hasAny(
-      user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
-    );
-
-    if (!isOwner && !isManager) {
+    const canModerate = Permissions.has(user.permission, Permissions.MODERATE_CONTENT);
+    if (!isOwner && !canModerate) {
       throw new ForbiddenException("insufficient_permission");
     }
 
     return this.articleRepository.softDeleteArticle(board.boardId, articleId);
+  }
+
+  async updateFaqArticle(
+    articleId: string,
+    payload: ArticleUpdateRequest,
+    user: AuthenticatedUser,
+  ): Promise<ArticleUpdateResponse> {
+    this.assertFaqManager(user);
+    const board = await this.getFaqBoard();
+    const article = await this.articleRepository.findPermissionInfo(board.boardId, articleId);
+    if (!article || article.status === ARTICLE_STATUS.DELETED) {
+      throw new NotFoundException("article_not_found");
+    }
+
+    const sanitizedPayload: ArticleUpdateRequest = {};
+    if (payload.titleKo !== undefined) sanitizedPayload.titleKo = payload.titleKo;
+    if (payload.titleEn !== undefined) sanitizedPayload.titleEn = payload.titleEn;
+    if (payload.contentKo !== undefined) {
+      const contentKo = sanitizeArticleHtml(payload.contentKo);
+      if (!contentKo.trim()) throw new BadRequestException("content_empty_after_sanitization");
+      sanitizedPayload.contentKo = contentKo;
+    }
+    if (payload.contentEn !== undefined) {
+      sanitizedPayload.contentEn = payload.contentEn
+        ? sanitizeArticleHtml(payload.contentEn)
+        : payload.contentEn;
+    }
+
+    if (Object.keys(sanitizedPayload).length === 0) {
+      throw new BadRequestException("faq_update_empty");
+    }
+
+    return this.articleRepository.updateArticle(
+      board.boardId,
+      articleId,
+      sanitizedPayload,
+      user.id,
+    );
+  }
+
+  async createFaqArticle(
+    payload: ArticleCreateRequest,
+    user: AuthenticatedUser,
+  ): Promise<ArticleCreateResponse> {
+    this.assertFaqManager(user);
+    const board = await this.getFaqBoard();
+    const contentKo = sanitizeArticleHtml(payload.contentKo);
+    if (!contentKo.trim()) throw new BadRequestException("content_empty_after_sanitization");
+    const contentEn = payload.contentEn ? sanitizeArticleHtml(payload.contentEn) : undefined;
+
+    return this.articleRepository.createArticle({
+      boardId: board.boardId,
+      authorUserId: user.id,
+      payload: {
+        titleKo: payload.titleKo,
+        titleEn: payload.titleEn,
+        contentKo,
+        contentEn,
+        visibilityScope: "PUBLIC",
+        isPinned: false,
+        pinOrder: null,
+        isSecret: false,
+        isAnonymous: false,
+        allowComment: false,
+        assets: payload.assets,
+      },
+    });
+  }
+
+  async deleteFaqArticle(
+    articleId: string,
+    user: AuthenticatedUser,
+  ): Promise<ArticleDeleteResponse> {
+    this.assertFaqManager(user);
+    const board = await this.getFaqBoard();
+    const article = await this.articleRepository.findPermissionInfo(board.boardId, articleId);
+    if (!article || article.status === ARTICLE_STATUS.DELETED) {
+      throw new NotFoundException("article_not_found");
+    }
+    return this.articleRepository.softDeleteArticle(board.boardId, articleId);
+  }
+
+  async reorderFaqArticles(
+    input: FaqReorderRequest,
+    user: AuthenticatedUser,
+  ): Promise<{ ok: true }> {
+    this.assertFaqManager(user);
+    const board = await this.getFaqBoard();
+    const articles = await Promise.all(
+      input.items.map((item) => this.articleRepository.findPermissionInfo(board.boardId, item.articleId)),
+    );
+    if (articles.some((article) => !article || article.status !== ARTICLE_STATUS.PUBLISHED)) {
+      throw new BadRequestException("faq_reorder_article_invalid");
+    }
+    await this.articleRepository.reorderFaqArticles(input.items);
+    return { ok: true };
+  }
+
+  private async getFaqBoard() {
+    const board = await this.boardRepository.findByCode("FAQ");
+    if (!board || !board.isActive) throw new NotFoundException("board_not_found");
+    return board;
+  }
+
+  private assertFaqManager(user: AuthenticatedUser): void {
+    if (!Permissions.has(user.permission, Permissions.MANAGE_SITE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+  }
+
+  async listHiddenArticles(code: string, user: AuthenticatedUser): Promise<HiddenArticleListResponse> {
+    if (!Permissions.has(user.permission, Permissions.MODERATE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+    const board = await this.boardRepository.findByCode(code);
+    if (!board) throw new NotFoundException("board_not_found");
+    return { items: await this.articleRepository.listHiddenArticles(board.boardId, code) };
+  }
+
+  async hideArticle(
+    code: string,
+    articleId: string,
+    input: ArticleModerationRequest,
+    user: AuthenticatedUser,
+  ): Promise<ArticleModerationResponse> {
+    if (!Permissions.has(user.permission, Permissions.MODERATE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+    const board = await this.boardRepository.findByCode(code);
+    if (!board) throw new NotFoundException("board_not_found");
+    const article = await this.articleRepository.findPermissionInfo(board.boardId, articleId);
+    if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
+      throw new NotFoundException("article_not_found");
+    }
+    const result = await this.articleRepository.moderateArticle(board.boardId, articleId, {
+      hidden: true,
+      moderatorUserId: user.id,
+      reason: input.reason,
+    });
+    await this.auditLogService.record({
+      action: "article.hide",
+      actorUserId: user.id,
+      payload: { boardCode: code, reason: input.reason },
+      targetId: articleId,
+      targetType: "article",
+    });
+    return result;
+  }
+
+  async restoreArticle(
+    code: string,
+    articleId: string,
+    user: AuthenticatedUser,
+  ): Promise<ArticleModerationResponse> {
+    if (!Permissions.has(user.permission, Permissions.MODERATE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+    const board = await this.boardRepository.findByCode(code);
+    if (!board) throw new NotFoundException("board_not_found");
+    const article = await this.articleRepository.findPermissionInfo(board.boardId, articleId);
+    if (!article || article.status !== ARTICLE_STATUS.HIDDEN) {
+      throw new NotFoundException("article_not_found");
+    }
+    const result = await this.articleRepository.moderateArticle(board.boardId, articleId, {
+      hidden: false,
+      moderatorUserId: user.id,
+    });
+    await this.auditLogService.record({
+      action: "article.restore",
+      actorUserId: user.id,
+      payload: { boardCode: code },
+      targetId: articleId,
+      targetType: "article",
+    });
+    return result;
+  }
+
+  async revealAnonymousAuthor(
+    code: string,
+    articleId: string,
+    user: AuthenticatedUser,
+  ): Promise<{ articleId: string; authorUserId: string; authorName: string }> {
+    if (!Permissions.has(user.permission, Permissions.MODERATE_CONTENT)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+
+    const board = await this.boardRepository.findByCode(code);
+    if (!board) throw new NotFoundException("board_not_found");
+
+    const article = await this.articleRepository.findAnonymousAuthor(
+      board.boardId,
+      articleId,
+    );
+    if (!article) throw new NotFoundException("anonymous_article_not_found");
+
+    await this.auditLogService.record({
+      action: "article.anonymous_identity_reveal",
+      actorUserId: user.id,
+      payload: { boardCode: code },
+      targetId: articleId,
+      targetType: "article",
+    });
+
+    return { articleId, ...article };
   }
 
   async setArticleEngagement(
@@ -419,8 +650,8 @@ export class ArticleService {
       throw new NotFoundException("board_not_found");
     }
 
-    if (kind === "LIKE" && !board.allowLike) {
-      throw new ForbiddenException("like_not_allowed");
+    if (!board.allowLike) {
+      throw new ForbiddenException("engagement_not_allowed");
     }
 
     const article = await this.articleRepository.findDetailById(
@@ -460,13 +691,14 @@ export class ArticleService {
     query: string | undefined,
     limit: number,
     currentUser: CurrentUserContext,
+    searchBy: "title" | "title_content" = "title_content",
   ): Promise<ArticleListItem[]> {
     const result = await this.getAllArticles(
       {
         limit,
         page: 1,
         q: query,
-        searchBy: "title_content",
+        searchBy,
         sortBy: "latest",
         sortDirection: "desc",
         includeContentPreview: true,

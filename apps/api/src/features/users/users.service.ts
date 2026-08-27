@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
 
 import { AuditLogService } from "../audit/audit-log.service";
 import type { UserRecord } from "./entities/user";
@@ -28,8 +28,11 @@ import type {
   StudentFeeStatsOptions,
   StudentFeeStatusRecord,
   StudentFeeDetailResponse,
+  UpdateUserPostingSuspensionRequest,
+  UserPostingSuspensionResponse,
 } from "@soc/contracts";
-import { nowDate } from "@soc/shared";
+import { isoToDate, nowDate } from "@soc/shared";
+import { EmailDeliveryService } from "../email/email-delivery.service";
 
 interface AuditMetadata {
   actorUserId?: string | null;
@@ -41,9 +44,12 @@ interface AuditMetadata {
  */
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly auditLogService: AuditLogService,
+    @Optional() private readonly emailDeliveryService?: EmailDeliveryService,
   ) {}
 
   private normalizeListOptions(options: { page: number; limit: number }) {
@@ -135,6 +141,25 @@ export class UsersService {
         targetId: userId,
         targetType: "user",
       });
+      if (!isActive) {
+        try {
+          await this.emailDeliveryService?.send({
+            recipients: [updated.email],
+            subject: "[KAIST SOC] 계정 비활성화 안내",
+            content: [
+              `${updated.nameKo}님의 KAIST SOC 계정이 비활성화되었습니다.`,
+              "",
+              `사유: ${reason}`,
+              "",
+              "계정 복구가 필요하거나 문의할 내용이 있다면 웹사이트 우측 하단 채널톡으로 연락해 주세요.",
+            ].join("\n"),
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to send account deactivation email to ${updated.userId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
     }
 
     return updated;
@@ -146,6 +171,49 @@ export class UsersService {
     audit?: AuditMetadata,
   ): Promise<UserRecord | null> {
     return this.setAccountActive(userId, false, audit, reason);
+  }
+
+  async getPostingSuspension(userId: string): Promise<UserPostingSuspensionResponse> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) throw new NotFoundException("user_not_found");
+    const sanction = await this.usersRepository.getPostingSuspension(userId);
+    return { userId, suspended: Boolean(sanction), sanction };
+  }
+
+  async setPostingSuspension(
+    userId: string,
+    input: UpdateUserPostingSuspensionRequest,
+    audit?: AuditMetadata,
+  ): Promise<UserPostingSuspensionResponse> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) throw new NotFoundException("user_not_found");
+    if (!audit?.actorUserId) throw new BadRequestException("actor_required");
+
+    const sanction = await this.usersRepository.setPostingSuspension({
+      userId,
+      suspended: input.suspended,
+      reason: input.reason,
+      issuedBy: audit.actorUserId,
+      expiresAt: input.expiresAt ? isoToDate(input.expiresAt) : null,
+    });
+
+    await this.auditLogService.record({
+      action: input.suspended ? "user.posting_suspend" : "user.posting_resume",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        reason: input.reason ?? null,
+        expiresAt: input.expiresAt ?? null,
+      },
+      targetId: userId,
+      targetType: "user",
+    });
+
+    return { userId, suspended: Boolean(sanction), sanction };
+  }
+
+  async isPostingSuspended(userId: string): Promise<boolean> {
+    return Boolean(await this.usersRepository.getPostingSuspension(userId));
   }
 
   async searchUsers(input: { query?: string; limit?: number }): Promise<AdminUserRecord[]> {
@@ -173,6 +241,9 @@ export class UsersService {
     sortBy?: AdminUserSortBy;
     sortDirection?: SortDirection;
     status?: "active" | "inactive";
+    majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+    feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
+    academicStatus?: string;
   }): Promise<AdminUserListResponse> {
     return this.usersRepository.listAdminUsers(input);
   }

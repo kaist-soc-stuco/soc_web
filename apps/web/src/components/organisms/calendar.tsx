@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
-import type { PublicCalendarEventItem } from "@soc/contracts";
 import { ChevronRight } from "lucide-react";
 
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -12,13 +11,15 @@ import { useLanguage } from "@/hooks/use-language";
 
 interface HomeScheduleItem {
   id: string;
-  sourceType: PublicCalendarEventItem["sourceType"];
-  category?: PublicCalendarEventItem["category"];
   titleKo: string;
   titleEn?: string | null;
   startAt: Date;
   endAt: Date;
 }
+
+const HOME_SCHEDULE_LIMIT = 8;
+const HOME_SCHEDULE_DDAY_WINDOW_DAYS = 7;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function toIsoDate(date: Date) {
   const year = date.getFullYear();
@@ -27,32 +28,35 @@ function toIsoDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function getScheduleType(item: HomeScheduleItem, lang: string) {
-  if (item.category === "HOLIDAY") {
-    return lang === "ko" ? "공휴일" : "Public holiday";
-  }
-  if (item.sourceType === "KAIST_ACADEMIC") {
-    return lang === "ko" ? "학사 일정" : "Academic schedule";
-  }
-  return lang === "ko" ? "학생회 일정" : "Council schedule";
-}
-
 function formatScheduleRange(item: HomeScheduleItem) {
   const start = formatNumericDate(item.startAt);
   const end = formatNumericDate(item.endAt);
   return start === end ? start : `${start} – ${end}`;
 }
 
+function localDayTimestamp(value: Date) {
+  return localDate(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+}
+
+function getScheduleDdayLabel(item: HomeScheduleItem) {
+  const today = localDayTimestamp(nowDate());
+  const start = localDayTimestamp(item.startAt);
+  const end = localDayTimestamp(item.endAt);
+  const target = start >= today ? start : end >= today ? end : null;
+  if (target === null) return null;
+
+  const dayDifference = Math.round((target - today) / DAY_IN_MS);
+  if (dayDifference < 0 || dayDifference > HOME_SCHEDULE_DDAY_WINDOW_DAYS) return null;
+  return dayDifference === 0 ? "D-Day" : `D-${dayDifference}`;
+}
+
 function ScheduleSkeleton() {
   return (
-    <div className="grid flex-1 grid-rows-6 divide-y divide-slate-100" aria-busy="true">
-      {Array.from({ length: 6 }).map((_, index) => (
+    <div className="grid flex-1 divide-y divide-slate-100" style={{ gridTemplateRows: `repeat(${HOME_SCHEDULE_LIMIT}, minmax(0, 1fr))` }} aria-busy="true">
+      {Array.from({ length: HOME_SCHEDULE_LIMIT }).map((_, index) => (
         <div key={index} className="flex items-center gap-4 px-4 py-3">
           <div className="home-loading-surface h-4 w-12 rounded" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="home-loading-surface h-3.5 w-4/5 rounded" />
-            <div className="home-loading-surface h-3 w-32 rounded" />
-          </div>
+          <div className="home-loading-surface h-3.5 min-w-0 flex-1 rounded" />
         </div>
       ))}
     </div>
@@ -91,8 +95,6 @@ export function Calendar() {
       if (!previous) {
         grouped.set(event.id, {
           id: event.id,
-          sourceType: event.sourceType,
-          category: event.category,
           titleKo: event.titleKo,
           titleEn: event.titleEn,
           startAt,
@@ -107,11 +109,11 @@ export function Calendar() {
     return [...grouped.values()]
       .filter((item) => item.endAt.getTime() >= range.from.getTime())
       .sort((a, b) => a.startAt.getTime() - b.startAt.getTime() || a.titleKo.localeCompare(b.titleKo))
-      .slice(0, 6);
+      .slice(0, HOME_SCHEDULE_LIMIT);
   }, [eventsQuery.data?.items, range.from]);
 
   return (
-    <section className="home-bento-card flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+    <section className="home-bento-card flex min-h-[24rem] min-w-0 flex-col overflow-hidden">
       <header className="flex h-11 shrink-0 items-center justify-between border-b border-slate-100 px-4">
         <h3 className="text-sm font-semibold tracking-[-0.01em] text-[#172033]">
           {lang === "ko" ? "다가오는 일정" : "Upcoming schedule"}
@@ -125,24 +127,26 @@ export function Calendar() {
       {eventsQuery.isPending ? (
         <ScheduleSkeleton />
       ) : schedules.length > 0 ? (
-        <ul className="grid min-h-0 flex-1 divide-y divide-slate-100">
+        <ul
+          className="grid min-h-0 flex-none content-start divide-y divide-slate-100"
+          style={{ gridTemplateRows: `repeat(${schedules.length}, 2.5rem)` }}
+        >
           {schedules.map((item) => {
             const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
+            const ddayLabel = getScheduleDdayLabel(item);
             return (
               <li key={item.id}>
                 <Link
                   to={`/calendar?selected=${toIsoDate(item.startAt)}`}
-                  className="home-schedule-row flex h-full min-h-[3.625rem] items-center gap-4 px-4 py-2.5 hover:bg-slate-50/80"
+                  className="home-schedule-row flex h-full min-h-[2.5rem] items-center gap-4 px-4 py-1.5 hover:bg-slate-50/80"
                 >
                   <time className="w-[6.75rem] shrink-0 whitespace-nowrap text-[0.8125rem] font-normal tabular-nums text-[#667085]">
                     {formatScheduleRange(item)}
                   </time>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-normal text-[#172033]">{title}</p>
-                    <p className="mt-0.5 truncate text-xs font-normal text-[#667085]">
-                      {getScheduleType(item, lang)}
-                    </p>
                   </div>
+                  {ddayLabel ? <span className="home-editorial-dday shrink-0">{ddayLabel}</span> : null}
                 </Link>
               </li>
             );

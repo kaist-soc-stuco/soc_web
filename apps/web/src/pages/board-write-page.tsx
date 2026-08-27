@@ -55,6 +55,8 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     isEventAlwaysOpen,
     isKoreanOnly,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSecret,
     isSubmitting,
     lang,
@@ -74,6 +76,8 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
     setIsPinned,
+    setHomeVisible,
+    setHomeOrder,
     setIsSecret,
     setSelectedSurveyId,
     setTitleEn,
@@ -95,6 +99,8 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     contentEn,
     isAnonymous,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSecret,
     allowComment,
     isKoreanOnly,
@@ -114,6 +120,8 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setContentEn(template.contentEn);
     setIsAnonymous(template.isAnonymous);
     setIsPinned(template.isPinned);
+    if (template.homeVisible !== undefined) setHomeVisible(template.homeVisible);
+    if (template.homeOrder !== undefined) setHomeOrder(template.homeOrder);
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
     setIsKoreanOnly(template.isKoreanOnly);
@@ -183,11 +191,16 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       selectedSurveyId={selectedSurveyId}
       surveys={surveys}
       isAnonymous={isAnonymous}
+      isEvent={isEvent}
       isPinned={isPinned}
+      homeVisible={homeVisible}
+      homeOrder={homeOrder}
       isSecret={isSecret}
       allowSecret={selectedBoard?.allowSecret ?? false}
       onAnonymousChange={setIsAnonymous}
       onPinnedChange={setIsPinned}
+      onHomeVisibleChange={setHomeVisible}
+      onHomeOrderChange={setHomeOrder}
       onSecretChange={setIsSecret}
       stacked={isEvent}
     />

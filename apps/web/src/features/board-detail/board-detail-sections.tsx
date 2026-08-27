@@ -3,7 +3,7 @@ import type {
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { ArrowLeft, Check, ClipboardCheck, Edit2, EllipsisVertical, Eye, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, ClipboardCheck, Edit2, EllipsisVertical, Eye, EyeOff, Share2, Trash2 } from "lucide-react";
 import { isoToDate } from "@soc/shared";
 import { Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -33,17 +33,22 @@ function formatDate(isoString: string) {
 
 interface ArticleCardProps {
   article: ArticleDetailResponse;
+  allowEngagement: boolean;
   attachmentAssets: ArticleAssetItem[];
-  canManageArticle: boolean;
+  canEdit: boolean;
+  canModerate: boolean;
   category: string;
   content: string;
   editHref?: string;
   isAuthenticated: boolean;
   lang: string;
   onDeleteArticle: () => void;
+  onHideArticle: () => void;
+  onRevealAnonymousAuthor: () => void;
   onShare: () => void;
   onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   posterAsset?: ArticleAssetItem;
+  revealedAuthorName?: string | null;
   shareCopied: boolean;
   surveyDescription: string;
   surveyTitle: string;
@@ -53,17 +58,22 @@ interface ArticleCardProps {
 
 export function BoardDetailArticleCard({
   article,
+  allowEngagement,
   attachmentAssets,
-  canManageArticle,
+  canEdit,
+  canModerate,
   category,
   content,
   editHref,
   isAuthenticated,
   lang,
   onDeleteArticle,
+  onHideArticle,
+  onRevealAnonymousAuthor,
   onShare,
   onToggle,
   posterAsset,
+  revealedAuthorName,
   shareCopied,
   surveyDescription,
   surveyTitle,
@@ -79,10 +89,10 @@ export function BoardDetailArticleCard({
         <div className="mt-3 flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-x-2 text-xs font-normal text-slate-400">
             <span>
-              {article.isAnonymous
+            {article.isAnonymous
                 ? lang === "ko"
-                  ? "익명"
-                  : "Anonymous"
+                  ? revealedAuthorName ? `익명 · ${revealedAuthorName}` : "익명"
+                  : revealedAuthorName ? `Anonymous · ${revealedAuthorName}` : "Anonymous"
                 : article.author.name}
             </span>
             <span className="text-slate-300">·</span>
@@ -93,7 +103,7 @@ export function BoardDetailArticleCard({
               {article.viewCount}
             </span>
           </div>
-          {canManageArticle ? (
+          {canEdit || canModerate ? (
             <DropdownMenu.Root modal={false}>
               <DropdownMenu.Trigger asChild>
                 <Button
@@ -114,23 +124,39 @@ export function BoardDetailArticleCard({
                   collisionPadding={12}
                 >
                   <AdminActionMenuPanel className="w-32 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
-                    <DropdownMenu.Item asChild>
-                      <AdminActionMenuLink
-                        to={editHref ?? `/board/${category}/${article.articleId}/edit`}
-                        icon={<Edit2 className="text-slate-400" aria-hidden="true" />}
-                      >
-                        {lang === "ko" ? "수정" : "Edit"}
-                      </AdminActionMenuLink>
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item asChild>
-                      <AdminActionMenuItem
-                        icon={<Trash2 />}
-                        tone="danger"
-                        onClick={onDeleteArticle}
-                      >
-                        {lang === "ko" ? "삭제" : "Delete"}
-                      </AdminActionMenuItem>
-                    </DropdownMenu.Item>
+                    {canEdit ? (
+                      <>
+                        <DropdownMenu.Item asChild>
+                          <AdminActionMenuLink
+                            to={editHref ?? `/board/${category}/${article.articleId}/edit`}
+                            icon={<Edit2 className="text-slate-400" aria-hidden="true" />}
+                          >
+                            {lang === "ko" ? "수정" : "Edit"}
+                          </AdminActionMenuLink>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item asChild>
+                          <AdminActionMenuItem icon={<Trash2 />} tone="danger" onClick={onDeleteArticle}>
+                            {lang === "ko" ? "삭제" : "Delete"}
+                          </AdminActionMenuItem>
+                        </DropdownMenu.Item>
+                      </>
+                    ) : null}
+                    {canModerate ? (
+                      <>
+                        {article.isAnonymous ? (
+                          <DropdownMenu.Item asChild>
+                            <AdminActionMenuItem icon={<Eye />} onClick={onRevealAnonymousAuthor}>
+                              {lang === "ko" ? "익명 작성자 확인" : "Reveal author"}
+                            </AdminActionMenuItem>
+                          </DropdownMenu.Item>
+                        ) : null}
+                        <DropdownMenu.Item asChild>
+                          <AdminActionMenuItem icon={<EyeOff />} tone="danger" onClick={onHideArticle}>
+                            {lang === "ko" ? "게시글 숨기기" : "Hide post"}
+                          </AdminActionMenuItem>
+                        </DropdownMenu.Item>
+                      </>
+                    ) : null}
                   </AdminActionMenuPanel>
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
@@ -206,6 +232,8 @@ export function BoardDetailArticleCard({
 
       <div className="mt-8 flex items-center justify-start gap-2 border-t border-slate-100 pt-4">
         <ArticleEngagementActions
+          allowLike={allowEngagement}
+          allowScrap={allowEngagement}
           isAuthenticated={isAuthenticated}
           lang={lang}
           likeCount={article.likeCount}
@@ -268,5 +296,65 @@ export function BoardDetailBackLink({
       <ArrowLeft className="size-4" aria-hidden="true" />
       {lang === "ko" ? "목록으로" : "Back to list"}
     </Link>
+  );
+}
+
+type AdjacentArticle = NonNullable<ArticleDetailResponse["prevArticle"]>;
+
+export function BoardDetailAdjacentNav({
+  lang,
+  nextArticle,
+  toBase,
+  prevArticle,
+}: {
+  lang: string;
+  nextArticle?: AdjacentArticle | null;
+  prevArticle?: AdjacentArticle | null;
+  toBase: string;
+}) {
+  if (!prevArticle && !nextArticle) return null;
+
+  const renderLink = (article: AdjacentArticle, direction: "prev" | "next") => {
+    const label = lang === "ko" ? (direction === "prev" ? "이전글" : "다음글") : direction === "prev" ? "Previous" : "Next";
+    return (
+      <Link
+        key={direction}
+        to={`${toBase}/${article.articleId}`}
+        className="group flex min-w-0 items-center gap-3 bg-white px-4 py-3.5 text-slate-500 transition-colors hover:bg-slate-50"
+      >
+        {direction === "prev" ? (
+          <ChevronLeft className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+        ) : null}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[0.6875rem] font-medium leading-4 text-slate-400">{label}</span>
+          <span className="mt-0.5 block truncate text-sm font-medium leading-5 text-slate-700 group-hover:text-slate-900">
+            {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
+          </span>
+        </span>
+        {direction === "next" ? (
+          <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+        ) : null}
+      </Link>
+    );
+  };
+
+  return (
+    <nav
+      aria-label={lang === "ko" ? "게시글 이동" : "Post navigation"}
+      className="grid w-full divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-[0_2px_8px_rgb(15_23_42_/_0.03)] sm:grid-cols-2 sm:divide-x sm:divide-y-0"
+    >
+      {prevArticle ? renderLink(prevArticle, "prev") : (
+        <span className="flex min-h-[4.5rem] items-center gap-3 bg-white px-4 py-3.5 text-slate-300">
+          <ChevronLeft className="size-4 shrink-0" aria-hidden="true" />
+          <span className="text-xs font-normal">{lang === "ko" ? "이전글 없음" : "No previous post"}</span>
+        </span>
+      )}
+      {nextArticle ? renderLink(nextArticle, "next") : (
+        <span className="flex min-h-[4.5rem] items-center justify-end gap-3 bg-white px-4 py-3.5 text-slate-300">
+          <span className="text-xs font-normal">{lang === "ko" ? "다음글 없음" : "No next post"}</span>
+          <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
+        </span>
+      )}
+    </nav>
   );
 }

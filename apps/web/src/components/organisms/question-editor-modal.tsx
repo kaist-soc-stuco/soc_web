@@ -9,6 +9,7 @@ import { UiInput } from "@/components/ui/form-control";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
+import { SurveyImageField } from "@/components/ui/survey-image-field";
 
 const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: "short_text", label: "단답형" },
@@ -30,7 +31,7 @@ export interface QuestionFormState {
   descriptionKo: string;
   descriptionEn: string;
   questionType: QuestionType;
-  options: { value: string; labelKo: string; labelEn: string }[];
+  options: { value: string; labelKo: string; labelEn: string; imageUrlKo?: string | null; imageUrlEn?: string | null }[];
   answerRegex: string;
   isRequired: boolean;
   config: SurveyQuestionConfig | null;
@@ -101,19 +102,19 @@ export function QuestionEditorModal({
   };
 
   const addOption = () => {
-    set("options", [...form.options, { value: nextUniqueValue(form.options, "option"), labelKo: "", labelEn: "" }]);
+    set("options", [...form.options, { value: nextUniqueValue(form.options, "option"), labelKo: "", labelEn: "", imageUrlKo: null, imageUrlEn: null }]);
   };
 
   const removeOption = (i: number) => {
     set("options", form.options.filter((_, idx) => idx !== i));
   };
 
-  const updateOption = (i: number, field: "value" | "labelKo" | "labelEn", val: string) => {
+  const updateOption = (i: number, field: "value" | "labelKo" | "labelEn" | "imageUrlKo" | "imageUrlEn", val: string | null) => {
     const next = [...form.options];
     const previousValue = next[i]?.value;
     next[i] = { ...next[i], [field]: val };
     set("options", next);
-    if (field === "value" && previousValue && previousValue !== val) {
+    if (field === "value" && typeof val === "string" && previousValue && previousValue !== val) {
       const nextMap = { ...(form.config?.goToSectionByValue ?? {}) };
       if (nextMap[previousValue]) {
         nextMap[val] = nextMap[previousValue];
@@ -300,6 +301,15 @@ export function QuestionEditorModal({
               />
             )}
           </div>
+          <SurveyImageField
+            label={activeTab === "ko" ? "문항 설명 이미지" : "Question description image"}
+            value={activeTab === "ko" ? form.config?.imageUrlKo : form.config?.imageUrlEn}
+            onChange={(value) => set("config", {
+              ...(form.config ?? {}),
+              [activeTab === "ko" ? "imageUrlKo" : "imageUrlEn"]: value,
+            })}
+            disabled={isOngoing}
+          />
         </div>
 
         <div className="space-y-6 pt-4 border-t border-gray-100">
@@ -319,7 +329,8 @@ export function QuestionEditorModal({
               <div className="mb-3 text-xs font-medium leading-4 text-slate-600">선택지</div>
               <div className="scrollbar-hidden mb-4 max-h-60 space-y-3 overflow-y-auto pr-1">
                 {form.options.map((opt, i) => (
-                  <div key={i} className="flex flex-wrap items-center gap-2 group sm:flex-nowrap">
+                  <div key={i} className="space-y-2 rounded-lg border border-slate-100 p-2">
+                    <div className="flex flex-wrap items-center gap-2 group sm:flex-nowrap">
                     {activeTab === "ko" ? (
                       <UiInput
                         key={`labelKo-${i}`}
@@ -363,6 +374,13 @@ export function QuestionEditorModal({
                         <Trash2 className="w-4 h-4" />
                       </IconButton>
                     )}
+                    </div>
+                    <SurveyImageField
+                      label={activeTab === "ko" ? "선택지 이미지" : "Option image"}
+                      value={activeTab === "ko" ? opt.imageUrlKo : opt.imageUrlEn}
+                      onChange={(value) => updateOption(i, activeTab === "ko" ? "imageUrlKo" : "imageUrlEn", value)}
+                      disabled={isOngoing}
+                    />
                   </div>
                 ))}
               </div>

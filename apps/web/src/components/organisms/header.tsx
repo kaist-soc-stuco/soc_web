@@ -81,10 +81,17 @@ export function Header({ variant = "default" }: HeaderProps) {
     ? Permissions.hasAny(
         user.permission,
         Permissions.MANAGE_SURVEY,
-        Permissions.MANAGE_CONTENT,
+        Permissions.MANAGE_SITE_CONTENT,
+        Permissions.MANAGE_CALENDAR,
+        Permissions.MANAGE_CONTACTS,
+        Permissions.MANAGE_USERS,
         Permissions.MANAGE_FINANCE,
-        Permissions.ADMIN,
-    )
+        Permissions.MODERATE_CONTENT,
+        Permissions.MANAGE_BOARDS,
+        Permissions.SEND_BULK_EMAIL,
+        Permissions.VIEW_AUDIT_LOG,
+        Permissions.MANAGE_ROLES,
+      )
     : false;
 
   useEffect(() => {
@@ -100,7 +107,7 @@ export function Header({ variant = "default" }: HeaderProps) {
       .getNotifications({ page: 1, pageSize: 5 })
       .then((response) => {
         if (cancelled) return;
-        setNotifications(response.items);
+        setNotifications(response.items.filter((item) => !item.isRead));
         setUnreadNotificationCount(response.unreadCount);
       })
       .catch(() => {
@@ -242,7 +249,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             href: "/events",
             megaItems: [
               { label: "행사", href: "/events" },
-              { label: "설문·투표", href: "/surveys" },
+              { label: "설문", href: "/surveys" },
               { label: "일정", href: "/calendar" },
             ],
           },
@@ -250,11 +257,9 @@ export function Header({ variant = "default" }: HeaderProps) {
             label: "학생회 소개",
             href: "/about",
             megaItems: [
-              { label: "학생회 소개", href: "/about#intro" },
-              { label: "당해 학생회", href: "/about#history" },
-              { label: "조직도", href: "/about#org" },
-              { label: "공약 이행 현황", href: "/about#pledges" },
-              { label: "구성원", href: "/about#members" },
+              { label: "SOC", href: "/about#intro" },
+              { label: "하는 일", href: "/about#work" },
+              { label: "조직과 사람", href: "/about#people" },
             ],
           },
         ]
@@ -272,7 +277,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             href: "/events",
             megaItems: [
               { label: "Events", href: "/events" },
-              { label: "Surveys & Polls", href: "/surveys" },
+              { label: "Surveys", href: "/surveys" },
               { label: "Calendar", href: "/calendar" },
             ],
           },
@@ -280,11 +285,9 @@ export function Header({ variant = "default" }: HeaderProps) {
             label: "About",
             href: "/about",
             megaItems: [
-              { label: "About", href: "/about#intro" },
-              { label: "Current Council", href: "/about#history" },
-              { label: "Organization Chart", href: "/about#org" },
-              { label: "Pledge Progress", href: "/about#pledges" },
-              { label: "Members", href: "/about#members" },
+              { label: "SOC", href: "/about#intro" },
+              { label: "What we do", href: "/about#work" },
+              { label: "Organization & People", href: "/about#people" },
             ],
           },
         ];
@@ -358,6 +361,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     aria-current={active ? "page" : undefined}
                     aria-expanded={hoveredIndex === index}
                     aria-haspopup="menu"
+                    aria-controls={`site-nav-flyout-${index}`}
                     className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center px-4 text-[length:var(--ui-text-section-size)] font-semibold transition-colors ${
                       variant === "home"
                         ? "home-header-nav-link"
@@ -380,6 +384,40 @@ export function Header({ variant = "default" }: HeaderProps) {
                       }`}
                     />
                   </Link>
+
+                  <span
+                    aria-hidden="true"
+                    className={`absolute left-0 top-full h-3 w-full ${
+                      hoveredIndex === index ? "block" : "hidden"
+                    }`}
+                  />
+                  <div
+                    id={`site-nav-flyout-${index}`}
+                    role="menu"
+                    aria-label={`${item.label} ${lang === "ko" ? "하위 메뉴" : "submenu"}`}
+                    className={`absolute left-1/2 top-[calc(100%+0.625rem)] z-50 w-52 -translate-x-1/2 rounded-xl border border-[var(--ui-menu-divider)] bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.14)] transition-[opacity,transform,visibility] duration-200 ease-out ${
+                      hoveredIndex === index
+                        ? "visible pointer-events-auto translate-y-0 opacity-100"
+                        : "invisible pointer-events-none -translate-y-1 opacity-0"
+                    }`}
+                    onMouseEnter={() => setHoveredIndex(index)}
+                  >
+                    <ul className="grid gap-0.5">
+                      {item.megaItems.map((child) => (
+                        <li key={child.href}>
+                          <Link
+                            to={child.href}
+                            role="menuitem"
+                            tabIndex={hoveredIndex === index ? 0 : -1}
+                            onClick={closePopovers}
+                            className="flex min-h-10 items-center rounded-lg px-3 text-left text-[length:var(--ui-text-body-size)] font-medium leading-5 text-[var(--ui-menu-item-text)] transition-colors hover:bg-slate-50 hover:text-brand-primary focus-visible:bg-slate-50 focus-visible:text-brand-primary"
+                          >
+                            {child.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               );
             })}
@@ -393,7 +431,7 @@ export function Header({ variant = "default" }: HeaderProps) {
           </nav>
         </div>
 
-        <div className="relative flex items-center gap-1.5 pr-3 md:gap-2 md:pr-6">
+        <div className="home-header-utilities relative flex items-center gap-1.5 pr-3 md:gap-2 md:pr-6">
           <div ref={searchRef} className="relative">
             <IconButton
               aria-label={lang === "ko" ? "통합검색" : "Search"}
@@ -496,9 +534,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                       onClick={() => {
                         void apiClient.markAllNotificationsRead().then(() => {
                           setUnreadNotificationCount(0);
-                          setNotifications((items) =>
-                            items.map((item) => ({ ...item, isRead: true })),
-                          );
+                          setNotifications([]);
                         });
                       }}
                     >
@@ -524,10 +560,8 @@ export function Header({ variant = "default" }: HeaderProps) {
                               .markNotificationRead(notification.notificationId)
                               .then(() => {
                                 setNotifications((items) =>
-                                  items.map((item) =>
-                                    item.notificationId === notification.notificationId
-                                      ? { ...item, isRead: true }
-                                      : item,
+                                  items.filter(
+                                    (item) => item.notificationId !== notification.notificationId,
                                   ),
                                 );
                                 setUnreadNotificationCount((count) => Math.max(0, count - (notification.isRead ? 0 : 1)));
@@ -548,6 +582,13 @@ export function Header({ variant = "default" }: HeaderProps) {
                       ))}
                     </div>
                   )}
+                  <div className="border-t border-slate-100 p-2">
+                    <Button asChild variant="ghost" className="h-9 w-full justify-center rounded-md text-xs font-normal text-slate-600">
+                      <Link to="/notifications" onClick={closePopovers}>
+                        {lang === "ko" ? "전체 알림 보기" : "View all notifications"}
+                      </Link>
+                    </Button>
+                  </div>
                 </PopoverPanel>
               )}
             </div>
@@ -797,57 +838,6 @@ export function Header({ variant = "default" }: HeaderProps) {
           </div>
         </div>
       )}
-
-      <div
-        className={`site-header-mega-menu absolute left-0 top-full z-40 w-full overflow-hidden bg-white shadow-[0_12px_24px_rgba(15,23,42,0.05)] transition-[max-height,opacity,transform] duration-300 ease-out ${
-          hoveredIndex !== null
-            ? "pointer-events-auto max-h-[28rem] translate-y-0 opacity-100"
-            : "pointer-events-none max-h-0 -translate-y-2 opacity-0"
-        }`}
-      >
-        <div
-          className="flex items-stretch gap-0 pl-[calc(var(--ui-brand-rail-width)+var(--ui-nav-start-offset))]"
-          role="menu"
-          aria-label={lang === "ko" ? "메뉴 바로가기" : "Navigation shortcuts"}
-        >
-            {navItems.map((item, index) => (
-            <div
-              key={item.label}
-              className="w-[var(--ui-nav-column-width)] border-r border-[var(--ui-menu-divider)] bg-white px-5 pb-6 pt-1 first:border-l first:border-[var(--ui-menu-divider)]"
-              onMouseEnter={() => setHoveredIndex(index)}
-            >
-              <ul>
-                {item.megaItems.map((child, subIndex) => (
-                  <li
-                    key={child.href}
-                    className={`border-b border-[var(--ui-menu-divider)] last:border-b-0 transition-[opacity,transform] duration-200 ${
-                      hoveredIndex !== null
-                        ? "translate-y-0 opacity-100"
-                        : "-translate-y-1 opacity-0"
-                    }`}
-                    style={{
-                      transitionDelay:
-                        hoveredIndex !== null
-                          ? `${index * 50 + subIndex * 35}ms`
-                          : "0ms",
-                    }}
-                  >
-                    <Link
-                      to={child.href}
-                      role="menuitem"
-                      tabIndex={hoveredIndex === null ? -1 : 0}
-                      onClick={closePopovers}
-                      className="flex min-h-11 items-center justify-center px-1 text-center text-[length:var(--ui-text-body-size)] font-medium leading-5 text-[var(--ui-menu-item-text)] transition-colors hover:text-brand-primary"
-                    >
-                      {child.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div>
 
     </header>
   );

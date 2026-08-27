@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { createApiClient } from "@soc/api-client";
-import type { ContactRecord } from "@soc/contracts";
 
 import { useLanguage } from "@/hooks/use-language";
-import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
-export const ABOUT_SECTION_IDS = ["intro", "history", "org", "pledges", "members"] as const;
+export const ABOUT_SECTION_IDS = ["intro", "work", "people"] as const;
 export type AboutSectionId = (typeof ABOUT_SECTION_IDS)[number];
+
+const LEGACY_ABOUT_SECTIONS: Record<string, AboutSectionId> = {
+  history: "intro",
+  org: "people",
+  pledges: "work",
+  members: "people",
+};
 
 function isAboutSectionId(value: string | null | undefined): value is AboutSectionId {
   return Boolean(value && ABOUT_SECTION_IDS.includes(value as AboutSectionId));
+}
+
+function resolveAboutSectionId(value: string | null | undefined): AboutSectionId | null {
+  if (!value) return null;
+  if (isAboutSectionId(value)) return value;
+  return LEGACY_ABOUT_SECTIONS[value] ?? null;
 }
 
 function replaceSectionHash(sectionId: AboutSectionId) {
@@ -30,41 +40,17 @@ export function useAboutPageController() {
   const [searchParams] = useSearchParams();
   const legacyTab = searchParams.get("tab");
   const { lang } = useLanguage();
-  const apiClient = useMemo(
-    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
-    [],
-  );
   const requestedSection = useMemo(() => {
     const hashSection = location.hash.replace(/^#/, "");
-    if (isAboutSectionId(hashSection)) return hashSection;
-    return isAboutSectionId(legacyTab) ? legacyTab : null;
+    const resolvedHash = resolveAboutSectionId(hashSection);
+    if (resolvedHash) return resolvedHash;
+    return resolveAboutSectionId(legacyTab);
   }, [legacyTab, location.hash]);
 
   const [activeSection, setActiveSection] = useState<AboutSectionId>(requestedSection ?? "intro");
-  const [contacts, setContacts] = useState<ContactRecord[]>([]);
-  const [contactsLoading, setContactsLoading] = useState(true);
   const suppressScrollSpyUntilRef = useRef(
     requestedSection ? performance.now() + 2500 : 0,
   );
-
-  useEffect(() => {
-    let active = true;
-    setContactsLoading(true);
-    void apiClient
-      .getContacts()
-      .then((response) => {
-        if (active) setContacts([...response.items].sort((a, b) => a.sortOrder - b.sortOrder));
-      })
-      .catch(() => {
-        if (active) setContacts([]);
-      })
-      .finally(() => {
-        if (active) setContactsLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [apiClient]);
 
   const scrollToSection = useCallback((sectionId: AboutSectionId, behavior: ScrollBehavior = "smooth") => {
     const target = document.getElementById(sectionId);
@@ -134,7 +120,7 @@ export function useAboutPageController() {
       window.removeEventListener("pointerdown", stopCorrections);
       window.removeEventListener("keydown", stopCorrections);
     };
-  }, [legacyTab, navigate, requestedSection]);
+  }, [legacyTab, location.hash, navigate, requestedSection]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -179,8 +165,6 @@ export function useAboutPageController() {
 
   return {
     activeSection,
-    contacts,
-    contactsLoading,
     lang,
     scrollToSection,
   };

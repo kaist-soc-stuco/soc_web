@@ -21,6 +21,8 @@ import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import { isoToMs, nowMs } from "@soc/shared";
+import { getSurveyEligibilityFailure } from "./survey-eligibility";
+import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 
 @Injectable()
 export class SurveyResponsesService {
@@ -28,9 +30,10 @@ export class SurveyResponsesService {
     private readonly responsesRepo: SurveyResponsesRepository,
     private readonly surveysRepo: SurveysRepository,
     private readonly usersService: UsersService,
-    private readonly assetRepository: AssetRepository,
     @Optional() private readonly sectionsRepo?: SurveySectionsRepository,
     @Optional() private readonly questionsRepo?: SurveyQuestionsRepository,
+    @Optional() private readonly assetRepository?: AssetRepository,
+    @Optional() private readonly surveySheetsService?: GoogleSurveySheetsService,
   ) {}
 
   private async validateUploadedAssets(
@@ -38,6 +41,8 @@ export class SurveyResponsesService {
     userId: string,
     questions: SurveyQuestionRecord[] = [],
   ): Promise<void> {
+    const assetRepository = this.assetRepository;
+    if (!assetRepository) return;
     const questionById = new Map(questions.map((question) => [question.id, question]));
     const assetInputs = answers.flatMap((answer) => {
       const content = answer.content;
@@ -50,7 +55,7 @@ export class SurveyResponsesService {
     });
     const uniqueAssetIds = [...new Set(assetInputs.map((input) => input.assetId))];
     const ownedAssets = await Promise.all(
-      uniqueAssetIds.map((assetId) => this.assetRepository.findOwnedAssetDetails(assetId, userId)),
+      uniqueAssetIds.map((assetId) => assetRepository.findOwnedAssetDetails(assetId, userId)),
     );
     if (ownedAssets.some((asset) => !asset)) {
       throw new ForbiddenException("answer_file_not_owned");
@@ -101,11 +106,24 @@ export class SurveyResponsesService {
     if (survey.closesAt && isoToMs(survey.closesAt) <= now)
       throw new ConflictException("survey_closed");
 
-    if (!caller) {
+    if (!caller && !survey.allowAnonymous) {
       throw new ForbiddenException("login_required");
     }
 
-    if (survey.feePayersOnly) {
+    if (caller) {
+      if (typeof this.usersService.findById === "function") {
+        const user = await this.usersService.findById(caller.id);
+        if (!user) throw new ForbiddenException("login_required");
+        const eligibilityFailure = getSurveyEligibilityFailure({
+          user,
+          eligibleSocAffiliations: survey.eligibleSocAffiliations ?? [],
+          academicEligibility: survey.academicEligibility ?? "ANY",
+        });
+        if (eligibilityFailure) throw new ForbiddenException(eligibilityFailure);
+      }
+    }
+
+    if (survey.feePayersOnly && caller) {
       const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
       if (!feeStatus || feeStatus.status !== "PAID") {
         throw new ForbiddenException("fee_payer_only");
@@ -115,11 +133,15 @@ export class SurveyResponsesService {
     const questions = this.sectionsRepo && this.questionsRepo
       ? await this.loadQuestions(surveyId)
       : [];
-    await this.validateUploadedAssets(dto.answers, caller.id, questions);
+    if (caller) {
+      await this.validateUploadedAssets(dto.answers, caller.id, questions);
+    } else if (questions.some((question) => question.questionType === "file_upload")) {
+      throw new ForbiddenException("login_required_for_file_upload");
+    }
 
     const submission = await this.responsesRepo.insertSubmission({
       surveyId,
-      userId: caller.id,
+      userId: caller?.id ?? null,
       answers: dto.answers,
     });
 
@@ -145,6 +167,7 @@ export class SurveyResponsesService {
       throw new ConflictException("survey_capacity_full");
     }
 
+    await this.surveySheetsService?.refresh(surveyId);
     return { ...submission.response, answers: submission.answers };
   }
 
@@ -198,6 +221,17 @@ export class SurveyResponsesService {
       }
     }
 
+    if (typeof this.usersService.findById === "function") {
+      const user = await this.usersService.findById(caller.id);
+      if (!user) throw new ForbiddenException("login_required");
+      const eligibilityFailure = getSurveyEligibilityFailure({
+        user,
+        eligibleSocAffiliations: survey.eligibleSocAffiliations ?? [],
+        academicEligibility: survey.academicEligibility ?? "ANY",
+      });
+      if (eligibilityFailure) throw new ForbiddenException(eligibilityFailure);
+    }
+
     const questions = this.sectionsRepo && this.questionsRepo
       ? await this.loadQuestions(surveyId)
       : [];
@@ -214,6 +248,7 @@ export class SurveyResponsesService {
     });
 
     if (update.status === "updated") {
+      await this.surveySheetsService?.refresh(surveyId);
       return { ...update.response, answers: update.answers };
     }
     if (

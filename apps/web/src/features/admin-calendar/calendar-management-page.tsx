@@ -11,6 +11,8 @@ import {
   htmlDatetimeLocalToIso,
   isoToDate,
   isoToHtmlDatetimeLocal,
+  localDate,
+  msToDate,
   msToIso,
   nowMs,
 } from "@soc/shared";
@@ -112,9 +114,37 @@ function formatPeriod(event: CalendarEventRecord) {
   });
 }
 
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthRange() {
+  const today = msToDate(nowMs());
+  return {
+    from: toDateInputValue(localDate(today.getFullYear(), today.getMonth(), 1)),
+    to: toDateInputValue(localDate(today.getFullYear(), today.getMonth() + 1, 0)),
+  };
+}
+
+function dateInputToMs(value: string, endOfDay = false) {
+  const [year, month, day] = value.split("-").map(Number);
+  return localDate(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  ).getTime();
+}
+
 export function CalendarManagementPage() {
   return (
-    <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}>
+    <AuthGuard requirePermission={Permissions.MANAGE_CALENDAR}>
       <CalendarManagementContent />
     </AuthGuard>
   );
@@ -134,6 +164,8 @@ function CalendarManagementContent() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -155,12 +187,21 @@ function CalendarManagementContent() {
       .filter((event) => sourceFilter === "all" || event.sourceType === sourceFilter)
       .filter((event) => categoryFilter === "all" || event.category === categoryFilter)
       .filter((event) => visibilityFilter === "all" || (visibilityFilter === "hidden") === event.isHiddenByAdmin)
+      .filter((event) => {
+        const eventStart = isoToDate(event.startAt).getTime();
+        const eventEnd = isoToDate(event.endAt).getTime();
+        const rangeStart = dateFrom ? dateInputToMs(dateFrom) : null;
+        const rangeEnd = dateTo ? dateInputToMs(dateTo, true) : null;
+        if (rangeStart !== null && eventEnd < rangeStart) return false;
+        if (rangeEnd !== null && eventStart > rangeEnd) return false;
+        return true;
+      })
       .filter((event) => !normalized || [event.titleKo, event.titleEn ?? "", event.location ?? ""].some((value) => value.toLocaleLowerCase().includes(normalized)))
       .sort((a, b) => {
         const direction = sortDirection === "asc" ? 1 : -1;
         return a.startAt.localeCompare(b.startAt) * direction || a.titleKo.localeCompare(b.titleKo, "ko") * direction;
       });
-  }, [categoryFilter, events, query, sortDirection, sourceFilter, visibilityFilter]);
+  }, [categoryFilter, dateFrom, dateTo, events, query, sortDirection, sourceFilter, visibilityFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -354,6 +395,40 @@ function CalendarManagementContent() {
                   ]}
                 />
                 <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
+                  <UiInput
+                    type="date"
+                    aria-label="조회 시작일"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(event) => { setDateFrom(event.currentTarget.value); setPage(1); }}
+                    className="w-[9.25rem]"
+                  />
+                  <span className="text-sm font-normal text-slate-400" aria-hidden="true">–</span>
+                  <UiInput
+                    type="date"
+                    aria-label="조회 종료일"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(event) => { setDateTo(event.currentTarget.value); setPage(1); }}
+                    className="w-[9.25rem]"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const range = getCurrentMonthRange();
+                      setDateFrom(range.from);
+                      setDateTo(range.to);
+                      setPage(1);
+                    }}
+                  >
+                    이번 달
+                  </Button>
+                  {(dateFrom || dateTo) ? (
+                    <Button type="button" variant="ghost" onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}>
+                      기간 초기화
+                    </Button>
+                  ) : null}
                   <AdminSelectDropdown
                     ariaLabel="일정 분류"
                     value={categoryFilter}
@@ -362,7 +437,6 @@ function CalendarManagementContent() {
                       { value: "all", label: "전체 분류" },
                       { value: "EVENT", label: "행사" },
                       { value: "ACADEMIC", label: "학사일정" },
-                      { value: "HOLIDAY", label: "공휴일" },
                     ]}
                     className="w-32"
                   />
@@ -507,7 +581,6 @@ function CalendarManagementContent() {
               options={[
                 { value: "EVENT", label: "행사" },
                 { value: "ACADEMIC", label: "학사일정" },
-                { value: "HOLIDAY", label: "공휴일" },
               ]}
             />
           </AdminFormField>

@@ -156,12 +156,12 @@ const executionContext = (handler, user) => ({
   switchToHttp: () => ({ getRequest: () => ({ user }) }),
 });
 
-test("CMS mutation endpoints require MANAGE_CONTENT", () => {
+test("CMS mutation endpoints require MANAGE_SITE_CONTENT", () => {
   const guard = new PermissionBitsGuard(new Reflector());
   const regularUser = { id: "member", permission: 0 };
   const contentManager = {
     id: "manager",
-    permission: Permissions.MANAGE_CONTENT,
+    permission: Permissions.MANAGE_SITE_CONTENT,
   };
 
   assert.throws(
