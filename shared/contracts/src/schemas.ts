@@ -146,6 +146,7 @@ export const SsoCallbackBodySchema = z.object({
     allowComment: z.boolean().default(true),
     allowSecret: z.boolean().default(false),
     allowLike: z.boolean().default(true),
+    allowGuestRead: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
   });
 
@@ -238,6 +239,8 @@ const ArticleAssetsSchema = z
   visibilityScope: VisibilityScopeSchema,
   isPinned: z.boolean().optional(),
   pinOrder: z.number().int().nullable().optional(),
+  homeVisible: z.boolean().optional(),
+  homeOrder: z.number().int().nullable().optional(),
   isSecret: z.boolean().optional(),
   isAnonymous: z.boolean().optional(),
   allowComment: z.boolean().optional(),
@@ -256,6 +259,8 @@ export const ArticleUpdateSchema = z.object({
   visibilityScope: VisibilityScopeSchema.optional(),
   isPinned: z.boolean().optional(),
   pinOrder: z.number().int().nullable().optional(),
+  homeVisible: z.boolean().optional(),
+  homeOrder: z.number().int().nullable().optional(),
   isSecret: z.boolean().optional(),
   isAnonymous: z.boolean().optional(),
   allowComment: z.boolean().optional(),
@@ -265,6 +270,17 @@ export const ArticleUpdateSchema = z.object({
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
 });
+
+export const ArticleModerationSchema = z.object({
+  reason: z.string().trim().min(2).max(500),
+});
+
+export const FaqReorderSchema = z.object({
+  items: z.array(z.object({
+    articleId: z.string().regex(/^\d+$/),
+    sortOrder: z.number().int().min(0),
+  }).strict()).min(1).max(100),
+}).strict();
 
 export const ArticleDraftSaveSchema = z.object({
   draftId: z.string().uuid().optional(),
@@ -277,6 +293,8 @@ export const ArticleDraftSaveSchema = z.object({
   visibilityScope: VisibilityScopeSchema.default("PUBLIC"),
   isPinned: z.boolean().default(false),
   pinOrder: z.number().int().nullable().optional(),
+  homeVisible: z.boolean().default(true),
+  homeOrder: z.number().int().nullable().optional(),
   isSecret: z.boolean().default(false),
   isAnonymous: z.boolean().default(false),
   allowComment: z.boolean().default(true),
@@ -305,10 +323,20 @@ export const CommentUpdateSchema = z.object({
 // ─── Survey ──────────────────────────────────────────────────────────────────
 
 const SurveyResultVisibilitySchema = z.enum(["PRIVATE", "PUBLIC"]);
-const SurveyKindSchema = z.enum(["GENERAL", "SURVEY", "VOTE", "APPLICATION", "EVENT"]);
+const SurveyKindSchema = z.enum(["SURVEY", "APPLICATION"]);
 const SurveyFeeRequirementPolicySchema = z.enum(["NONE", "PAID_ONLY"]);
+export const SurveySocAffiliationSchema = z.enum(["PRIMARY", "DOUBLE", "MINOR"]);
+export const SurveyAcademicEligibilitySchema = z.enum([
+  "ANY",
+  "ENROLLED_ONLY",
+  "ENROLLED_OR_LEAVE",
+]);
 const NullableSurveyDateTimeSchema = z.string().datetime({ offset: true }).nullable();
 const SurveyRichTextSchema = z.string().max(50_000).optional();
+const SurveyImageReferenceSchema = z.string().trim().max(2_000).refine(
+  (value) => /^asset:\d+$/.test(value) || z.string().url().safeParse(value).success,
+  "survey_image_invalid",
+);
 
 const SurveyFieldsSchema = z.object({
   kind: SurveyKindSchema,
@@ -316,7 +344,12 @@ const SurveyFieldsSchema = z.object({
   titleEn: z.string().max(255).optional(),
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,
+  descriptionImageUrlKo: SurveyImageReferenceSchema.nullable().optional(),
+  descriptionImageUrlEn: SurveyImageReferenceSchema.nullable().optional(),
   feeRequirementPolicy: SurveyFeeRequirementPolicySchema.optional(),
+  eligibleSocAffiliations: z.array(SurveySocAffiliationSchema).max(3).optional(),
+  academicEligibility: SurveyAcademicEligibilitySchema.optional(),
+  allowAnonymous: z.boolean().optional(),
   allowMultipleResponses: z.boolean().optional(),
   allowResponseEdit: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
@@ -377,6 +410,8 @@ export const QuestionOptionSchema = z.object({
   value: z.string().min(1),
   labelKo: z.string().min(1),
   labelEn: z.string().optional(),
+  imageUrlKo: SurveyImageReferenceSchema.nullable().optional(),
+  imageUrlEn: SurveyImageReferenceSchema.nullable().optional(),
 });
 
 const QuestionOptionsSchema = z
@@ -398,6 +433,8 @@ const QuestionOptionsSchema = z
   });
 
 export const QuestionConfigSchema = z.object({
+  imageUrlKo: SurveyImageReferenceSchema.nullable().optional(),
+  imageUrlEn: SurveyImageReferenceSchema.nullable().optional(),
   rows: QuestionOptionsSchema.optional(),
   columns: QuestionOptionsSchema.optional(),
   maxFiles: z.number().int().positive().max(10).optional(),
@@ -471,6 +508,8 @@ export const RoleGroupMemberFilterSchema = z.object({
   q: z.string().optional(),
   department: z.string().optional(),
   academicStatus: z.string().optional(),
+  majorType: z.enum(["PRIMARY", "DOUBLE", "MINOR"]).optional(),
+  feeStatus: z.enum(["PAID", "PARTIAL", "UNPAID"]).optional(),
   status: z.enum(["active", "inactive"]).optional(),
   page: z.number().int().positive().optional(),
   pageSize: z.number().int().positive().max(100).optional(),
@@ -482,6 +521,29 @@ export const ReplaceRoleGroupMembersSchema = z.object({
 
 export const UpdateUserActiveStatusSchema = z.object({
   isActive: z.boolean(),
+  reason: z.string().trim().max(500).optional(),
+}).superRefine((value, context) => {
+  if (!value.isActive && (!value.reason || value.reason.length < 2)) {
+    context.addIssue({
+      code: "custom",
+      message: "deactivation_reason_required",
+      path: ["reason"],
+    });
+  }
+});
+
+export const UpdateUserPostingSuspensionSchema = z.object({
+  suspended: z.boolean(),
+  reason: z.string().trim().max(500).optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
+}).superRefine((value, context) => {
+  if (value.suspended && (!value.reason || value.reason.length < 2)) {
+    context.addIssue({
+      code: "custom",
+      message: "posting_suspension_reason_required",
+      path: ["reason"],
+    });
+  }
 });
 
 // ─── Finance ─────────────────────────────────────────────────────────────────

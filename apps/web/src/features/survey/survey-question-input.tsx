@@ -5,10 +5,11 @@ import type {
   QuestionType,
   SurveyQuestionRecord,
 } from "@soc/contracts";
-import { Check } from "lucide-react";
+import { Check, FileText, X } from "lucide-react";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 import type { AnswerValue, FileAnswer } from "./survey-answer-utils";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
@@ -57,6 +58,8 @@ export function SurveyQuestionInput({
   const getOptionLabel = (opt: QuestionOption) => {
     return lang === "ko" ? opt.labelKo : opt.labelEn || opt.labelKo;
   };
+  const getOptionImage = (opt: QuestionOption) =>
+    lang === "ko" ? opt.imageUrlKo : opt.imageUrlEn || opt.imageUrlKo;
 
   switch (question.questionType as QuestionType) {
     case "short_text":
@@ -160,6 +163,9 @@ export function SurveyQuestionInput({
                 <span className="text-[length:var(--ui-text-body-size)] leading-5">
                   {getOptionLabel(opt)}
                 </span>
+                {getOptionImage(opt) ? (
+                  <img src={resolveAssetUrl(getOptionImage(opt)!)} alt="" className="ml-auto max-h-28 max-w-40 rounded-lg object-contain" />
+                ) : null}
               </label>
             );
           })}
@@ -213,6 +219,9 @@ export function SurveyQuestionInput({
                 <span className="text-[length:var(--ui-text-body-size)] leading-5">
                   {getOptionLabel(opt)}
                 </span>
+                {getOptionImage(opt) ? (
+                  <img src={resolveAssetUrl(getOptionImage(opt)!)} alt="" className="ml-auto max-h-28 max-w-40 rounded-lg object-contain" />
+                ) : null}
               </label>
             );
           })}
@@ -292,44 +301,80 @@ export function SurveyQuestionInput({
 
     case "file_upload": {
       const maxSizeBytes = question.config?.maxSizeBytes ?? 20_000_000;
+      const maxFiles = question.config?.maxFiles ?? 1;
       const accept = question.config?.allowedMimeTypes?.join(",") || undefined;
-      const handleFileChange = async (file: File | undefined) => {
-        if (!file) return;
-        if (file.size > maxSizeBytes) {
+      const currentFiles =
+        typeof value === "object" && value !== null && "kind" in value && value.kind === "file" && Array.isArray(value.files)
+          ? value.files
+          : [];
+      const handleFileChange = async (fileList: FileList | undefined) => {
+        const selectedFiles = Array.from(fileList ?? []);
+        if (selectedFiles.length === 0) return;
+        if (currentFiles.length + selectedFiles.length > maxFiles) {
+          setUploadError(`파일은 최대 ${maxFiles}개까지 업로드할 수 있습니다.`);
+          return;
+        }
+        const invalidSize = selectedFiles.find((file) => file.size > maxSizeBytes);
+        if (invalidSize) {
           setUploadError(`파일은 ${(maxSizeBytes / 1_000_000).toFixed(0)}MB 이하만 업로드할 수 있습니다.`);
           return;
         }
-        if (question.config?.allowedMimeTypes?.length && !question.config.allowedMimeTypes.includes(file.type)) {
+        if (question.config?.allowedMimeTypes?.length && selectedFiles.some((file) => !question.config?.allowedMimeTypes?.includes(file.type))) {
           setUploadError("허용되지 않은 파일 형식입니다.");
           return;
         }
         setUploadError(null);
         setUploading(true);
         try {
-          const asset = await apiClient.uploadAsset(file);
-          const nextFile: FileAnswer = {
-            assetId: asset.assetId,
-            fileName: asset.originalFilename,
-            sizeBytes: asset.sizeBytes,
-            mimeType: asset.mimeType,
-          };
-          onChange({ kind: "file", file: nextFile });
+          const uploadedFiles = await Promise.all(
+            selectedFiles.map(async (file): Promise<FileAnswer> => {
+              const asset = await apiClient.uploadAsset(file);
+              return {
+                assetId: asset.assetId,
+                fileName: asset.originalFilename,
+                sizeBytes: asset.sizeBytes,
+                mimeType: asset.mimeType,
+              };
+            }),
+          );
+          onChange({ kind: "file", files: [...currentFiles, ...uploadedFiles] });
         } catch {
           setUploadError("파일 업로드에 실패했습니다. 다시 시도해 주세요.");
         } finally {
           setUploading(false);
         }
       };
+      const removeFile = (assetId: string) => {
+        onChange({ kind: "file", files: currentFiles.filter((file) => file.assetId !== assetId) });
+      };
       return (
         <div className="space-y-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4">
           <UiInput
             type="file"
             accept={accept}
+            multiple={maxFiles > 1}
             disabled={disabled || uploading}
             aria-invalid={Boolean(error)}
-            onChange={(event) => void handleFileChange(event.target.files?.[0])}
+            onChange={(event) => {
+              void handleFileChange(event.target.files ?? undefined);
+              event.currentTarget.value = "";
+            }}
             className="block w-full text-sm font-semibold text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-kaist-darkgreen file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-kaist-darkgreen/90"
           />
+          {currentFiles.length > 0 ? (
+            <div className="space-y-1.5" aria-label="업로드된 파일 목록">
+              {currentFiles.map((file) => (
+                <div key={file.assetId} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-normal text-slate-700">
+                  <FileText aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+                  <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+                  {typeof file.sizeBytes === "number" ? <span className="shrink-0 text-xs text-slate-400">{(file.sizeBytes / 1_000_000).toFixed(1)}MB</span> : null}
+                  <button type="button" className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => removeFile(file.assetId)} disabled={disabled || uploading} aria-label={`${file.fileName} 삭제`}>
+                    <X aria-hidden="true" className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {uploadError ? <p className="text-xs font-normal text-rose-600" role="alert">{uploadError}</p> : null}
           {renderError}
         </div>

@@ -17,6 +17,8 @@ export interface BoardTemplateSnapshot {
   contentEn: string;
   isAnonymous: boolean;
   isPinned: boolean;
+  homeVisible?: boolean;
+  homeOrder?: string;
   isSecret: boolean;
   allowComment: boolean;
   isKoreanOnly: boolean;

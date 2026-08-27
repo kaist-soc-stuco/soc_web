@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, Controller } from "react-hook-form";
 import { Check } from "lucide-react";
 import type { ArticleListItem } from "@soc/contracts";
@@ -7,12 +7,11 @@ import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SurveyImageField } from "@/components/ui/survey-image-field";
 
 export const SURVEY_KINDS = [
   { value: "SURVEY", label: "일반 설문" },
-  { value: "VOTE", label: "투표" },
-  { value: "APPLICATION", label: "신청서/행사 접수" },
-  { value: "EVENT", label: "행사" },
+  { value: "APPLICATION", label: "행사 신청" },
 ];
 
 export const SURVEY_VISIBILITIES = [
@@ -25,9 +24,14 @@ export interface SurveySettingsFormValues {
   titleEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  kind: "GENERAL" | "SURVEY" | "VOTE" | "APPLICATION" | "EVENT";
+  descriptionImageUrlKo?: string | null;
+  descriptionImageUrlEn?: string | null;
+  kind: "SURVEY" | "APPLICATION";
   resultVisibility: "PRIVATE" | "PUBLIC";
   feePayersOnly?: boolean;
+  eligibleSocAffiliations: Array<"PRIMARY" | "DOUBLE" | "MINOR">;
+  academicEligibility: "ANY" | "ENROLLED_ONLY" | "ENROLLED_OR_LEAVE";
+  allowAnonymous?: boolean;
   isKoreanOnly?: boolean;
   allowMultipleResponses?: boolean;
   allowResponseEdit?: boolean;
@@ -46,7 +50,7 @@ interface SurveySettingsFormProps {
   isOngoing?: boolean;
   articleSearchResults: ArticleListItem[];
   selectedArticleTitle: string | null;
-  onFetchArticles: () => Promise<void>;
+  onFetchArticles: (query?: string) => Promise<void>;
   onSelectArticle: (articleId: string, title: string) => void;
   onSubmit: (values: SurveySettingsFormValues) => void;
 }
@@ -61,6 +65,7 @@ export function SurveySettingsForm({
   onSubmit,
 }: SurveySettingsFormProps) {
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
+  const articleSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     register,
     handleSubmit,
@@ -71,6 +76,9 @@ export function SurveySettingsForm({
   } = useFormContext<SurveySettingsFormValues>();
 
   const feePayersOnly = Boolean(watch("feePayersOnly"));
+  const eligibleSocAffiliations = watch("eligibleSocAffiliations") ?? [];
+  const academicEligibility = watch("academicEligibility") ?? "ANY";
+  const allowAnonymous = Boolean(watch("allowAnonymous"));
   const isKoreanOnly = Boolean(watch("isKoreanOnly"));
   const allowMultipleResponses = Boolean(watch("allowMultipleResponses"));
   const allowResponseEdit = Boolean(watch("allowResponseEdit"));
@@ -133,6 +141,13 @@ export function SurveySettingsForm({
       setValue("openAt", toDateTime(watch("openAt") ?? "", "09:00"));
       setValue("closeAt", toDateTime(watch("closeAt") ?? "", "18:00"));
     }
+  };
+
+  const toggleSocAffiliation = (value: "PRIMARY" | "DOUBLE" | "MINOR") => {
+    const next = eligibleSocAffiliations.includes(value)
+      ? eligibleSocAffiliations.filter((item) => item !== value)
+      : [...eligibleSocAffiliations, value];
+    setValue("eligibleSocAffiliations", next, { shouldDirty: true, shouldValidate: true });
   };
 
   const inputCls =
@@ -250,6 +265,18 @@ export function SurveySettingsForm({
                 />
               )}
             </div>
+            <Controller
+              name={activeTab === "ko" ? "descriptionImageUrlKo" : "descriptionImageUrlEn"}
+              control={control}
+              render={({ field }) => (
+                <SurveyImageField
+                  label={activeTab === "ko" ? "설명 이미지" : "Description image"}
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isOngoing}
+                />
+              )}
+            />
           </div>
         </div> : null}
 
@@ -447,6 +474,23 @@ export function SurveySettingsForm({
                 </span>
               </label>
 
+              <label
+                className={`flex items-center gap-3 group ${
+                  isOngoing || feePayersOnly || eligibleSocAffiliations.length > 0 || academicEligibility !== "ANY"
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer"
+                }`}
+              >
+                <UiInput
+                  type="checkbox"
+                  className="size-4 rounded border-slate-300 accent-brand-primary"
+                  checked={allowAnonymous}
+                  disabled={isOngoing || feePayersOnly || eligibleSocAffiliations.length > 0 || academicEligibility !== "ANY"}
+                  onChange={(event) => setValue("allowAnonymous", event.target.checked, { shouldDirty: true })}
+                />
+                <span className="text-sm font-normal text-[#172033]">로그인 없이 응답 허용</span>
+              </label>
+
               <label className="flex items-center gap-3 group cursor-pointer">
                 <div
                   className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
@@ -538,9 +582,66 @@ export function SurveySettingsForm({
               </label>
             </div>
 
+            <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+              <div>
+                <p className="text-sm font-normal text-[#172033]">전산학부 소속 조건</p>
+                <p className="mt-1 text-xs font-normal text-[#344054]">
+                  선택한 구분 중 하나라도 해당하면 응답할 수 있습니다. 모두 해제하면 소속을 제한하지 않습니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3">
+                {([
+                  ["PRIMARY", "주전공"],
+                  ["DOUBLE", "복수전공"],
+                  ["MINOR", "부전공"],
+                ] as const).map(([value, label]) => (
+                  <label key={value} className={`flex items-center gap-2 ${isOngoing || allowAnonymous ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                    <UiInput
+                      type="checkbox"
+                      className="size-4 rounded border-slate-300 accent-brand-primary"
+                      checked={eligibleSocAffiliations.includes(value)}
+                      disabled={isOngoing || allowAnonymous}
+                      onChange={() => toggleSocAffiliation(value)}
+                    />
+                    <span className="text-sm font-normal text-[#344054]">{label}</span>
+                  </label>
+                ))}
+              </div>
+              <AdminFormField label="학적 조건">
+                <Controller
+                  name="academicEligibility"
+                  control={control}
+                  render={({ field }) => (
+                    <AdminSelectDropdown
+                      value={field.value}
+                      options={[
+                        { value: "ANY", label: "제한 없음" },
+                        { value: "ENROLLED_ONLY", label: "재학생만" },
+                        { value: "ENROLLED_OR_LEAVE", label: "재학생·휴학생" },
+                      ]}
+                      onChange={field.onChange}
+                      disabled={isOngoing || allowAnonymous}
+                    />
+                  )}
+                />
+              </AdminFormField>
+            </div>
+
             <div className="pt-2 border-t border-kaist-grey/10" />
 
             <AdminFormField label="연결 게시글 (선택)">
+              <UiInput
+                type="search"
+                className={`${inputCls} mb-2`}
+                placeholder="게시글 제목 또는 번호 검색"
+                onChange={(event) => {
+                  if (articleSearchTimer.current) clearTimeout(articleSearchTimer.current);
+                  const query = event.target.value;
+                  articleSearchTimer.current = setTimeout(() => {
+                    void onFetchArticles(query);
+                  }, 250);
+                }}
+              />
               <AdminSelectDropdown
                 ariaLabel="연결 게시글"
                 value={connectedArticleId}
@@ -559,7 +660,7 @@ export function SurveySettingsForm({
                   );
                 }}
                 onOpenChange={(open) => {
-                  if (open && articleSearchResults.length === 0) void onFetchArticles();
+                  if (open && articleSearchResults.length === 0) void onFetchArticles("");
                 }}
                 emptyLabel="불러온 게시글이 없습니다."
                 className="w-full"

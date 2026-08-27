@@ -2,7 +2,6 @@ const assert = require("node:assert/strict");
 const { after, before, beforeEach, test } = require("node:test");
 const {
   BadRequestException,
-  ConflictException,
   NotFoundException,
 } = require("@nestjs/common");
 const { drizzle } = require("drizzle-orm/node-postgres");
@@ -108,7 +107,7 @@ async function insertSurvey({
        allow_multiple_responses, allow_response_edit, max_response_count,
        is_published, lifecycle_status, is_always_open, open_at, close_at,
        connected_article_id, show_on_calendar
-     ) VALUES ($1, $2, 'GENERAL', 'Concurrency test', $3, $4, $5, $6,
+     ) VALUES ($1, $2, 'SURVEY', 'Concurrency test', $3, $4, $5, $6,
                $7, $8, $9, $10, $11, $12, $13)`,
     [
       id,
@@ -389,7 +388,7 @@ test(
 );
 
 test(
-  "a first response commits before a waiting structure mutation, which then conflicts",
+  "a first response commits before a waiting structure mutation, which then proceeds",
   integrationOptions,
   async () => {
     await insertSurvey({ id: RESPONSE_FIRST_SURVEY });
@@ -452,16 +451,16 @@ test(
 
       const submission = await submissionPromise;
       assert.equal(submission.status, "created");
-      await assert.rejects(mutationPromise, (error) => {
-        assert.ok(error instanceof ConflictException);
-        assert.equal(error.message, "survey_structure_locked_after_response");
-        return true;
-      });
+      const createdQuestion = await mutationPromise;
+      assert.equal(
+        createdQuestion.titleKo,
+        "Must not be added after the first response",
+      );
       const { rows } = await pool.query(
         "SELECT count(*)::int AS count FROM survey_questions WHERE section_id = $1",
         [sectionId],
       );
-      assert.equal(rows[0].count, 0);
+      assert.equal(rows[0].count, 1);
     } finally {
       if (advisoryLockHeld) {
         await blocker.query(

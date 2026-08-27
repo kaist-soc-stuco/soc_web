@@ -83,7 +83,7 @@ export function Modal({
             dividerless ? "px-6" : "px-5",
           )}
         >
-          <h2 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
+          <h2 className="text-lg font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
           <div className="flex shrink-0 items-center gap-1.5">
             {headerActions}
             {showClose ? (

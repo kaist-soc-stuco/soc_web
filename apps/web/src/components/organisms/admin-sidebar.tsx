@@ -4,6 +4,8 @@ import {
   ClipboardList,
   ContactRound,
   LayoutList,
+  MessageCircleQuestion,
+  EyeOff,
   Mail,
   PanelsTopLeft,
   ScrollText,
@@ -15,19 +17,34 @@ import {
 import { Permissions } from "@/lib/permissions";
 import { useCurrentSession } from "@/hooks/use-current-session";
 
-const ADMIN_MENU = [
-  { label: "사이트 설정", to: "/admin/content", bit: Permissions.MANAGE_CONTENT, icon: PanelsTopLeft },
-  { label: "일정 관리", to: "/admin/calendar", bit: Permissions.MANAGE_CONTENT, icon: CalendarDays },
-  { label: "유저 관리", to: "/admin/users", bit: Permissions.ADMIN, icon: Users },
-  { label: "권한 관리", to: "/admin/permissions", bit: Permissions.ADMIN, icon: ShieldCheck },
-  { label: "과비 납부 관리", to: "/admin/finance", bit: Permissions.MANAGE_FINANCE, icon: WalletCards },
-  { label: "설문조사 관리", to: "/admin/surveys", bit: Permissions.MANAGE_SURVEY, icon: ClipboardList },
-  { label: "이메일 일괄 발송", to: "/admin/emails", bit: Permissions.ADMIN, icon: Mail },
-  { label: "연락망", to: "/admin/contacts", bit: Permissions.MANAGE_CONTENT, icon: ContactRound },
-  { label: "운영 로그", to: "/admin/audit-logs", bit: Permissions.ADMIN, icon: ScrollText },
-  // 게시판 관리 기능은 유지하되, 운영 핵심 메뉴 뒤에 배치한다.
-  { label: "게시판 관리", to: "/admin/boards", bit: Permissions.ADMIN, icon: LayoutList },
+type AdminMenuItem = {
+  label: string;
+  to: string;
+  bits: number[];
+  icon: typeof PanelsTopLeft;
+};
+
+const ADMIN_MENU: AdminMenuItem[] = [
+  { label: "사이트 설정", to: "/admin/content", bits: [Permissions.MANAGE_SITE_CONTENT], icon: PanelsTopLeft },
+  { label: "일정 관리", to: "/admin/calendar", bits: [Permissions.MANAGE_CALENDAR], icon: CalendarDays },
+  { label: "유저 관리", to: "/admin/users", bits: [Permissions.MANAGE_USERS], icon: Users },
+  { label: "권한 관리", to: "/admin/permissions", bits: [Permissions.MANAGE_ROLES], icon: ShieldCheck },
+  { label: "과비 관리", to: "/admin/finance", bits: [Permissions.MANAGE_FINANCE], icon: WalletCards },
+  { label: "설문조사 관리", to: "/admin/surveys", bits: [Permissions.MANAGE_SURVEY], icon: ClipboardList },
+  { label: "이메일 일괄 발송", to: "/admin/emails", bits: [Permissions.SEND_BULK_EMAIL], icon: Mail },
+  { label: "연락망", to: "/admin/contacts", bits: [Permissions.MANAGE_CONTACTS], icon: ContactRound },
+  { label: "운영 로그", to: "/admin/audit-logs", bits: [Permissions.VIEW_AUDIT_LOG], icon: ScrollText },
+  { label: "게시판 관리", to: "/admin/boards", bits: [Permissions.MANAGE_BOARDS], icon: LayoutList },
+  {
+    label: "FAQ 관리",
+    to: "/admin/faq",
+    bits: [Permissions.MANAGE_SITE_CONTENT],
+    icon: MessageCircleQuestion,
+  },
+  { label: "게시글 관리", to: "/admin/moderation", bits: [Permissions.MODERATE_CONTENT], icon: EyeOff },
 ];
+
+const ADMIN_ACCESS_PERMISSIONS = ADMIN_MENU.flatMap((item) => item.bits);
 
 export function AdminSidebar() {
   const location = useLocation();
@@ -36,10 +53,7 @@ export function AdminSidebar() {
 
   const canShow = Permissions.hasAny(
     permission,
-    Permissions.MANAGE_SURVEY,
-    Permissions.MANAGE_CONTENT,
-    Permissions.MANAGE_FINANCE,
-    Permissions.ADMIN,
+    ...ADMIN_ACCESS_PERMISSIONS,
   );
 
   if (!canShow) {
@@ -47,7 +61,7 @@ export function AdminSidebar() {
   }
 
   const visibleItems = ADMIN_MENU.filter((item) =>
-    Permissions.has(permission, item.bit),
+    Permissions.hasAny(permission, ...item.bits),
   );
 
   return (

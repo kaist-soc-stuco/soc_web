@@ -10,8 +10,11 @@ import type {
   ArticleEngagementResponse,
   ArticleListItem,
   ArticleListResponse,
+  ArticleModerationRequest,
+  ArticleModerationResponse,
   ArticleUpdateRequest,
   ArticleUpdateResponse,
+  AnonymousArticleAuthorResponse,
   AssetDirectUploadPrepareRequest,
   AssetDirectUploadPrepareResponse,
   AssetDirectUploadCompleteRequest,
@@ -29,8 +32,14 @@ import type {
   CommentEngagementResponse,
   CommentDeleteResponse,
   CommentListResponse,
+  CommentModerationRequest,
+  CommentModerationResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
+  HiddenArticleListResponse,
+  HiddenCommentListResponse,
+  FaqReorderRequest,
+  FaqReorderResponse,
 } from "@soc/contracts";
 
 import {
@@ -55,10 +64,12 @@ export const createBoardApi = ({
   searchArticles: async (
     query?: string,
     limit = 20,
+    searchBy: "title" | "title_content" = "title_content",
   ): Promise<ArticleListItem[]> => {
     const params = new URLSearchParams();
     if (query?.trim()) params.set("q", query.trim());
     params.set("limit", String(limit));
+    params.set("searchBy", searchBy);
     return requestJson<ArticleListItem[]>(
       `${normalizedBaseUrl}/articles/search?${params.toString()}`,
       { method: "GET" },
@@ -215,6 +226,100 @@ export const createBoardApi = ({
       {
         method: "DELETE",
       },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  createFaqArticle: async (
+    input: ArticleCreateRequest,
+  ): Promise<ArticleCreateResponse> => {
+    return requestJson<ArticleCreateResponse>(
+      `${normalizedBaseUrl}/boards/FAQ/articles/admin`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateFaqArticle: async (
+    articleId: string,
+    input: ArticleUpdateRequest,
+  ): Promise<ArticleUpdateResponse> => {
+    return requestJson<ArticleUpdateResponse>(
+      `${normalizedBaseUrl}/boards/FAQ/articles/${encodeURIComponent(articleId)}/admin`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  deleteFaqArticle: async (articleId: string): Promise<ArticleDeleteResponse> => {
+    return requestJson<ArticleDeleteResponse>(
+      `${normalizedBaseUrl}/boards/FAQ/articles/${encodeURIComponent(articleId)}/admin`,
+      { method: "DELETE" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  reorderFaqArticles: async (
+    input: FaqReorderRequest,
+  ): Promise<FaqReorderResponse> => {
+    return requestJson<FaqReorderResponse>(
+      `${normalizedBaseUrl}/boards/FAQ/articles/admin/reorder`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getHiddenArticles: async (code: string): Promise<HiddenArticleListResponse> => {
+    return requestJson<HiddenArticleListResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/moderation/hidden`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  hideArticle: async (
+    code: string,
+    articleId: string,
+    input: ArticleModerationRequest,
+  ): Promise<ArticleModerationResponse> => {
+    return requestJson<ArticleModerationResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/hide`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  restoreArticle: async (code: string, articleId: string): Promise<ArticleModerationResponse> => {
+    return requestJson<ArticleModerationResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/restore`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  revealAnonymousArticleAuthor: async (
+    code: string,
+    articleId: string,
+  ): Promise<AnonymousArticleAuthorResponse> => {
+    return requestJson<AnonymousArticleAuthorResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/anonymous-author`,
+      { method: "GET" },
       { retryOnUnauthorized: true },
     );
   },
@@ -405,6 +510,43 @@ export const createBoardApi = ({
       {
         method: "DELETE",
       },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getHiddenComments: async (): Promise<HiddenCommentListResponse> => {
+    return requestJson<HiddenCommentListResponse>(
+      `${normalizedBaseUrl}/comment-moderation/hidden`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  hideComment: async (
+    code: string,
+    articleId: string,
+    commentId: string,
+    input: CommentModerationRequest,
+  ): Promise<CommentModerationResponse> => {
+    return requestJson<CommentModerationResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}/hide`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  restoreComment: async (
+    code: string,
+    articleId: string,
+    commentId: string,
+  ): Promise<CommentModerationResponse> => {
+    return requestJson<CommentModerationResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}/restore`,
+      { method: "POST" },
       { retryOnUnauthorized: true },
     );
   },

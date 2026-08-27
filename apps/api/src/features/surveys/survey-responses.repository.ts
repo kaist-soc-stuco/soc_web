@@ -36,9 +36,16 @@ type SurveyResponseQueryRow = {
   createdAt: Date;
   updatedAt: Date;
   userNameKo: string | null;
+  userNameEn: string | null;
   userEmail: string | null;
+  userPhoneNumber: string | null;
   userDepartmentKo: string | null;
   userStdNo: string | null;
+  userPrimaryMajor: string | null;
+  userDoubleMajor: string | null;
+  userMinor: string | null;
+  userAcademicStatus: string | null;
+  userFeeStatus: string | null;
 };
 
 type InsertSubmissionResult =
@@ -153,9 +160,21 @@ export class SurveyResponsesRepository {
       user: row.userId
         ? {
             nameKo: row.userNameKo,
+            nameEn: row.userNameEn,
             email: row.userEmail,
+            phoneNumber: row.userPhoneNumber,
             departmentKo: row.userDepartmentKo,
             stdNo: row.userStdNo,
+            primaryMajor: row.userPrimaryMajor,
+            doubleMajor: row.userDoubleMajor,
+            minor: row.userMinor,
+            academicStatus: row.userAcademicStatus,
+            feeStatus:
+              row.userFeeStatus === "PAID" ||
+              row.userFeeStatus === "PARTIAL" ||
+              row.userFeeStatus === "UNPAID"
+                ? row.userFeeStatus
+                : null,
           }
         : null,
       createdAt: msToIso(row.createdAt.valueOf()),
@@ -172,9 +191,21 @@ export class SurveyResponsesRepository {
     createdAt: surveyResponses.createdAt,
     updatedAt: surveyResponses.updatedAt,
     userNameKo: users.nameKo,
+    userNameEn: users.nameEn,
     userEmail: users.email,
+    userPhoneNumber: users.phoneNumber,
     userDepartmentKo: users.departmentKo,
     userStdNo: users.stdNo,
+    userPrimaryMajor: users.primaryMajor,
+    userDoubleMajor: users.doubleMajor,
+    userMinor: users.minor,
+    userAcademicStatus: users.academicStatus,
+    userFeeStatus: sql<string | null>`(
+      select ${studentFeeStatus.status}
+      from ${studentFeeStatus}
+      where ${studentFeeStatus.userId} = ${users.userId}
+      limit 1
+    )`,
   };
 
   private mapAnswer(row: typeof surveyAnswers.$inferSelect): SurveyAnswerRecord {
@@ -255,10 +286,11 @@ export class SurveyResponsesRepository {
 
   private async satisfiesFeeRequirement(
     tx: PostgresTransaction,
-    userId: string,
+    userId: string | null,
     feeRequirementPolicy: string,
   ): Promise<boolean> {
     if (feeRequirementPolicy !== "PAID_ONLY") return true;
+    if (!userId) return false;
 
     const [feeStatus] = await tx
       .select({ status: studentFeeStatus.status })
@@ -318,7 +350,7 @@ export class SurveyResponsesRepository {
 
   async insertSubmission(input: {
     surveyId: string;
-    userId: string;
+    userId: string | null;
     answers: Array<{ questionId: string; content: Record<string, unknown> }>;
   }): Promise<InsertSubmissionResult> {
     const transactionResult = await this.db
@@ -374,7 +406,7 @@ export class SurveyResponsesRepository {
           return question && !isSurveyAnswerEmpty(question, answer.content);
         });
 
-        const singleResponseUserId = lockedSurvey.allowMultipleResponses
+        const singleResponseUserId = lockedSurvey.allowMultipleResponses || !input.userId
           ? null
           : input.userId;
 
@@ -457,9 +489,16 @@ export class SurveyResponsesRepository {
               createdAt: insertedResponse.createdAt,
               updatedAt: insertedResponse.updatedAt,
               userNameKo: null,
+              userNameEn: null,
               userEmail: null,
+              userPhoneNumber: null,
               userDepartmentKo: null,
               userStdNo: null,
+              userPrimaryMajor: null,
+              userDoubleMajor: null,
+              userMinor: null,
+              userAcademicStatus: null,
+              userFeeStatus: null,
             }),
           answers,
         } as const;
@@ -604,9 +643,16 @@ export class SurveyResponsesRepository {
             createdAt: updatedResponse.createdAt,
             updatedAt: updatedResponse.updatedAt,
             userNameKo: null,
+            userNameEn: null,
             userEmail: null,
+            userPhoneNumber: null,
             userDepartmentKo: null,
             userStdNo: null,
+            userPrimaryMajor: null,
+            userDoubleMajor: null,
+            userMinor: null,
+            userAcademicStatus: null,
+            userFeeStatus: null,
           }),
         answers,
       } as const;

@@ -37,6 +37,24 @@ export const users = pgTable("users", {
   index("users_active_name_idx").on(table.isActive, table.nameKo),
 ]);
 
+/** 계정 상태와 분리된 운영 제재입니다. 역할 권한으로 게시를 우회 차단하지 않습니다. */
+export const userSanctions = pgTable("user_sanction", {
+  sanctionId: serial("sanction_id").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.userId, { onDelete: "cascade" }),
+  type: varchar("type", { length: 40 }).notNull().default("POSTING_SUSPENDED"),
+  reason: text("reason").notNull(),
+  issuedBy: uuid("issued_by").references(() => users.userId, { onDelete: "set null" }),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedBy: uuid("revoked_by").references(() => users.userId, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("user_sanction_active_idx").on(table.userId, table.type, table.revokedAt),
+]);
+
 export const permissions = pgTable("permission", {
   permissionId: serial("permission_id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),

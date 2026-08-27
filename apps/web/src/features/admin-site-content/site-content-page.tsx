@@ -140,7 +140,7 @@ const formatDateTime = (value: string | null) => value
 const effectiveStatus = (block: ContentBlockRecord): ContentBlockStatus => block.status;
 
 export function SiteContentPage() {
-  return <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}><SiteContentPageContent /></AuthGuard>;
+  return <AuthGuard requirePermission={Permissions.MANAGE_SITE_CONTENT}><SiteContentPageContent /></AuthGuard>;
 }
 
 function SiteContentPageContent() {

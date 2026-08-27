@@ -7,7 +7,7 @@ import { RequirePermissions } from "../auth/guards";
 import { AuditLogService } from "./audit-log.service";
 
 @Controller("audit-logs")
-@RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.VIEW_AUDIT_LOG)
 export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
 

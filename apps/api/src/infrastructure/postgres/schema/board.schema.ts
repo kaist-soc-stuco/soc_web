@@ -28,6 +28,7 @@ export const boards = pgTable("board", {
   allowComment: boolean("allow_comment").notNull().default(false),
   allowSecret: boolean("allow_secret").notNull().default(false),
   allowLike: boolean("allow_like").notNull().default(true),
+  allowGuestRead: boolean("allow_guest_read").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
 });
@@ -48,6 +49,8 @@ export const articles = pgTable("article", {
   visibilityScope: varchar("visibility_scope", { length: 20 }).notNull().default("PUBLIC"),
   isPinned: boolean("is_pinned").notNull().default(false),
   pinOrder: integer("pin_order"),
+  homeVisible: boolean("home_visible").notNull().default(true),
+  homeOrder: integer("home_order"),
   isSecret: boolean("is_secret").notNull().default(false),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
   allowComment: boolean("allow_comment").notNull().default(true),
@@ -55,6 +58,9 @@ export const articles = pgTable("article", {
   postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  hiddenAt: timestamp("hidden_at", { withTimezone: true }),
+  hiddenByUserId: uuid("hidden_by_user_id").references(() => users.userId),
+  hiddenReason: varchar("hidden_reason", { length: 500 }),
   eventStartDate: timestamp("event_start_date", { withTimezone: true }),
   eventEndDate: timestamp("event_end_date", { withTimezone: true }),
   eventDescriptionKo: text("event_description_ko"),
@@ -213,6 +219,9 @@ export const comments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
+    hiddenByUserId: uuid("hidden_by_user_id").references(() => users.userId),
+    hiddenReason: text("hidden_reason"),
   },
   (table) => [
     foreignKey({

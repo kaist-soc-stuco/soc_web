@@ -47,6 +47,8 @@ import type {
   UpdateRoleGroupRequest,
   UpdateStudentFeeStatusRequest,
   UpdateUserActiveStatusRequest,
+  UpdateUserPostingSuspensionRequest,
+  UserPostingSuspensionResponse,
 } from "@soc/contracts";
 
 import {
@@ -255,6 +257,9 @@ export const createAdminApi = ({
     sortBy?: "name" | "studentId" | "status" | "lastLoginAt" | "createdAt";
     sortDirection?: "asc" | "desc";
     status?: "active" | "inactive";
+    majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+    feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
+    academicStatus?: string;
   }): Promise<AdminUserListResponse> => {
     const params = new URLSearchParams();
     if (options?.q?.trim()) {
@@ -274,6 +279,15 @@ export const createAdminApi = ({
     }
     if (options?.status !== undefined) {
       params.set("status", options.status);
+    }
+    if (options?.majorType !== undefined) {
+      params.set("majorType", options.majorType);
+    }
+    if (options?.feeStatus !== undefined) {
+      params.set("feeStatus", options.feeStatus);
+    }
+    if (options?.academicStatus?.trim()) {
+      params.set("academicStatus", options.academicStatus.trim());
     }
 
     return requestJson<AdminUserListResponse>(
@@ -455,6 +469,31 @@ export const createAdminApi = ({
     );
   },
 
+  getUserPostingSuspension: async (
+    userId: string,
+  ): Promise<UserPostingSuspensionResponse> => {
+    return requestJson<UserPostingSuspensionResponse>(
+      `${usersBaseUrl}/${encodeURIComponent(userId)}/sanctions/posting`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateUserPostingSuspension: async (
+    userId: string,
+    body: UpdateUserPostingSuspensionRequest,
+  ): Promise<UserPostingSuspensionResponse> => {
+    return requestJson<UserPostingSuspensionResponse>(
+      `${usersBaseUrl}/${encodeURIComponent(userId)}/sanctions/posting`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   downloadAuditLogsXlsx: async (options?: {
     action?: string;
     q?: string;
@@ -568,6 +607,8 @@ export const createAdminApi = ({
       q?: string;
       department?: string;
       academicStatus?: string;
+      majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+      feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
       status?: "active" | "inactive";
       page?: number;
       pageSize?: number;
@@ -577,6 +618,8 @@ export const createAdminApi = ({
     if (options?.q?.trim()) params.set("q", options.q.trim());
     if (options?.department?.trim()) params.set("department", options.department.trim());
     if (options?.academicStatus?.trim()) params.set("academicStatus", options.academicStatus.trim());
+    if (options?.majorType) params.set("majorType", options.majorType);
+    if (options?.feeStatus) params.set("feeStatus", options.feeStatus);
     if (options?.status) params.set("status", options.status);
     if (options?.page !== undefined) params.set("page", String(options.page));
     if (options?.pageSize !== undefined) params.set("pageSize", String(options.pageSize));

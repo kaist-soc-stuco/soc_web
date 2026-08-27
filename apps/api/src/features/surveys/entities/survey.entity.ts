@@ -1,6 +1,8 @@
 import type {
   ComputedSurveyState,
   SurveyLifecycleStatus,
+  SurveySocAffiliation,
+  SurveyAcademicEligibility,
 } from "@soc/contracts";
 
 export interface SurveyRecord {
@@ -11,10 +13,15 @@ export interface SurveyRecord {
   titleEn: string | null;
   descriptionKo: string | null;
   descriptionEn: string | null;
+  descriptionImageUrlKo: string | null;
+  descriptionImageUrlEn: string | null;
   creatorId: string | null;
   publishedAt: string | null;
   connectedPostId: string | null;
   feePayersOnly: boolean;
+  eligibleSocAffiliations: SurveySocAffiliation[];
+  academicEligibility: SurveyAcademicEligibility;
+  allowAnonymous: boolean;
   allowMultipleResponses: boolean;
   allowResponseEdit: boolean;
   isKoreanOnly: boolean;
@@ -31,6 +38,10 @@ export interface SurveyRecord {
   createdAt: string;
   updatedAt: string;
   responseCount?: number;
+  spreadsheetId: string | null;
+  spreadsheetUrl: string | null;
+  spreadsheetSyncStatus: "NOT_CONNECTED" | "CONNECTED" | "ERROR";
+  spreadsheetLastSyncedAt: string | null;
 }
 
 export interface SurveyRecordWithState extends SurveyRecord {

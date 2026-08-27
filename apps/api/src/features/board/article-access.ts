@@ -5,9 +5,9 @@ import type { VisibilityScope } from "@soc/contracts";
 import type { CurrentUserContext } from "./board-access";
 
 const STAFF_ARTICLE_PERMISSIONS = [
-  Permissions.MANAGE_CONTENT,
-  Permissions.MODERATOR,
-  Permissions.ADMIN,
+  Permissions.WRITE_OFFICIAL,
+  Permissions.WRITE_REPLY,
+  Permissions.MODERATE_CONTENT,
 ] as const;
 
 export const canReadStaffArticles = (user: CurrentUserContext): boolean =>
@@ -19,7 +19,10 @@ export const canReadStaffArticles = (user: CurrentUserContext): boolean =>
 
 export const getReadableArticleScopes = (
   user: CurrentUserContext,
+  allowGuestRead = true,
 ): VisibilityScope[] => {
+  if (!user.authenticated && !allowGuestRead) return [];
+
   const scopes: VisibilityScope[] = ["PUBLIC"];
 
   if (user.authenticated) {

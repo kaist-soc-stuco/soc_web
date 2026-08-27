@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -32,10 +32,15 @@ export class SurveysRepository {
       titleEn: row.titleEn,
       descriptionKo: row.descriptionKo,
       descriptionEn: row.descriptionEn,
+      descriptionImageUrlKo: row.descriptionImageUrlKo,
+      descriptionImageUrlEn: row.descriptionImageUrlEn,
       creatorId: row.creatorId ? String(row.creatorId) : null,
       publishedAt: null,
       connectedPostId: row.connectedArticleId ? String(row.connectedArticleId) : null,
       feePayersOnly: row.feeRequirementPolicy === "PAID_ONLY",
+      eligibleSocAffiliations: row.eligibleSocAffiliations,
+      academicEligibility: row.academicEligibility as SurveyRecord["academicEligibility"],
+      allowAnonymous: row.allowAnonymous,
       allowMultipleResponses: row.allowMultipleResponses,
       allowResponseEdit: row.allowResponseEdit,
       isKoreanOnly: row.isKoreanOnly,
@@ -51,6 +56,12 @@ export class SurveysRepository {
       closesAt: row.closeAt ? msToIso(row.closeAt.valueOf()) : null,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
+      spreadsheetId: row.spreadsheetId,
+      spreadsheetUrl: row.spreadsheetUrl,
+      spreadsheetSyncStatus: row.spreadsheetSyncStatus as SurveyRecord["spreadsheetSyncStatus"],
+      spreadsheetLastSyncedAt: row.spreadsheetLastSyncedAt
+        ? msToIso(row.spreadsheetLastSyncedAt.valueOf())
+        : null,
     };
   }
 
@@ -108,7 +119,12 @@ export class SurveysRepository {
         titleEn: dto.titleEn,
         descriptionKo: sanitizeSurveyRichText(dto.descriptionKo),
         descriptionEn: sanitizeSurveyRichText(dto.descriptionEn),
+        descriptionImageUrlKo: dto.descriptionImageUrlKo ?? null,
+        descriptionImageUrlEn: dto.descriptionImageUrlEn ?? null,
         feeRequirementPolicy: dto.feeRequirementPolicy ?? "NONE",
+        eligibleSocAffiliations: dto.eligibleSocAffiliations ?? ["PRIMARY", "DOUBLE", "MINOR"],
+        academicEligibility: dto.academicEligibility ?? "ENROLLED_OR_LEAVE",
+        allowAnonymous: dto.allowAnonymous ?? false,
         allowMultipleResponses: dto.allowMultipleResponses ?? false,
         allowResponseEdit: dto.allowResponseEdit ?? false,
         isKoreanOnly: dto.isKoreanOnly ?? false,
@@ -147,9 +163,18 @@ export class SurveysRepository {
     if (dto.descriptionEn !== undefined) {
       set.descriptionEn = sanitizeSurveyRichText(dto.descriptionEn);
     }
+    if (dto.descriptionImageUrlKo !== undefined) set.descriptionImageUrlKo = dto.descriptionImageUrlKo;
+    if (dto.descriptionImageUrlEn !== undefined) set.descriptionImageUrlEn = dto.descriptionImageUrlEn;
     if (dto.feeRequirementPolicy !== undefined) {
       set.feeRequirementPolicy = dto.feeRequirementPolicy;
     }
+    if (dto.eligibleSocAffiliations !== undefined) {
+      set.eligibleSocAffiliations = dto.eligibleSocAffiliations;
+    }
+    if (dto.academicEligibility !== undefined) {
+      set.academicEligibility = dto.academicEligibility;
+    }
+    if (dto.allowAnonymous !== undefined) set.allowAnonymous = dto.allowAnonymous;
     if (dto.allowMultipleResponses !== undefined) set.allowMultipleResponses = dto.allowMultipleResponses;
     if (dto.allowResponseEdit !== undefined) set.allowResponseEdit = dto.allowResponseEdit;
     if (dto.isKoreanOnly !== undefined) set.isKoreanOnly = dto.isKoreanOnly;
@@ -193,6 +218,54 @@ export class SurveysRepository {
     await db.delete(surveys).where(eq(surveys.surveyId, id));
   }
 
+  async updateSpreadsheetConnection(
+    id: string,
+    input: {
+      spreadsheetId: string | null;
+      spreadsheetUrl: string | null;
+      spreadsheetSyncStatus: "NOT_CONNECTED" | "CONNECTED" | "ERROR";
+      spreadsheetLastSyncedAt?: Date | null;
+    },
+  ): Promise<SurveyRecord | null> {
+    const [row] = await this.db
+      .update(surveys)
+      .set({
+        spreadsheetId: input.spreadsheetId,
+        spreadsheetUrl: input.spreadsheetUrl,
+        spreadsheetSyncStatus: input.spreadsheetSyncStatus,
+        spreadsheetLastSyncedAt: input.spreadsheetLastSyncedAt ?? null,
+        updatedAt: nowDate(),
+      })
+      .where(eq(surveys.surveyId, id))
+      .returning();
+    return row ? this.map(row) : null;
+  }
+
+  async updateSpreadsheetSyncState(
+    id: string,
+    status: "CONNECTED" | "ERROR",
+  ): Promise<void> {
+    await this.db
+      .update(surveys)
+      .set({
+        spreadsheetSyncStatus: status,
+        spreadsheetLastSyncedAt: status === "CONNECTED" ? nowDate() : undefined,
+        updatedAt: nowDate(),
+      })
+      .where(eq(surveys.surveyId, id));
+  }
+
+  async findByConnectedArticleId(
+    articleId: string,
+    tx?: PostgresTransaction,
+  ): Promise<SurveyRecord | null> {
+    const db = tx ?? this.db;
+    const row = await db.query.surveys.findFirst({
+      where: eq(surveys.connectedArticleId, Number(articleId)),
+    });
+    return row ? this.map(row) : null;
+  }
+
   async countPublished(surveyId: string): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)::int` })
@@ -209,12 +282,7 @@ export class SurveysRepository {
         derivedVersionCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM "survey" AS child WHERE child."previous_version_id" = ${surveys.surveyId}), 0)`,
       })
       .from(surveys)
-      .where(
-        and(
-          eq(surveys.lifecycleStatus, "PUBLISHED"),
-          isNull(surveys.connectedArticleId),
-        ),
-      );
+      .where(eq(surveys.lifecycleStatus, "PUBLISHED"));
     return rows.map((r) => ({
       ...this.map(r.survey),
       responseCount: r.responseCount,

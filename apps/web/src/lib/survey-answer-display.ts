@@ -46,6 +46,16 @@ export function formatSurveyAnswer(
   }
 
   if (question.questionType === "file_upload") {
+    if (Array.isArray(content.files)) {
+      const names = content.files
+        .filter((file): file is Record<string, unknown> => typeof file === "object" && file !== null)
+        .map((file) => typeof file.fileName === "string" ? file.fileName : "첨부 파일");
+      if (names.length > 0) return names.join(", ");
+    }
+    if (Array.isArray(content.assetIds)) {
+      const count = content.assetIds.filter((assetId) => typeof assetId === "string").length;
+      if (count > 0) return lang === "ko" ? `첨부 파일 ${count}개` : `${count} attached files`;
+    }
     return typeof content.fileName === "string" ? content.fileName : lang === "ko" ? "첨부 파일" : "Attached file";
   }
 

@@ -82,7 +82,7 @@ export function SurveyPage() {
       return <ClosedView lang={lang} />;
     }
 
-    if (!isPreview && !sessionAuthenticated) {
+    if (!isPreview && !sessionAuthenticated && !survey.allowAnonymous) {
       return (
         <LoginRequiredView lang={lang} feePayersOnly={survey.feePayersOnly} />
       );

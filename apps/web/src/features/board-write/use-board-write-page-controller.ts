@@ -13,6 +13,7 @@ import {
 } from "@soc/shared";
 
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
@@ -36,6 +37,11 @@ type BoardWriteLocationState = {
 
 const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항"]);
 
+const parseHomeOrder = (value: string): number | null => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
 const getDraftFingerprint = (payload: Omit<ArticleDraftSaveRequest, "fingerprint" | "draftId" | "expectedVersion">) => {
   const serialized = JSON.stringify(payload);
   let hash = 2166136261;
@@ -53,6 +59,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
   const routeInitialCategory = (
     location.state as BoardWriteLocationState | null
   )?.initialCategory;
@@ -63,6 +70,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [homeVisible, setHomeVisible] = useState(true);
+  const [homeOrder, setHomeOrder] = useState("");
   const [isSecret, setIsSecret] = useState(false);
   const [allowComment, setAllowComment] = useState(true);
   const [isKoreanOnly, setIsKoreanOnly] = useState(false);
@@ -154,6 +163,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
   }, [canConfigurePostSettings]);
 
   useEffect(() => {
+    if (selectedCategory === "_EVENT") return;
+    setHomeVisible(true);
+    setHomeOrder("");
+  }, [selectedCategory]);
+
+  useEffect(() => {
     if (selectedBoard?.allowComment === false) {
       setAllowComment(false);
       return;
@@ -203,11 +218,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
       setAssets((prev) => [...prev, ...uploaded]);
     } catch (err) {
       console.error(err);
-      alert(
-        lang === "ko"
-          ? "파일 업로드에 실패했습니다."
-          : "Failed to upload files.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "파일 업로드에 실패했습니다."
+            : "Failed to upload files.",
+      });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -218,11 +235,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
   const handleUploadThumbnail = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      alert(
-        lang === "ko"
-          ? "썸네일은 이미지 파일만 선택할 수 있습니다."
-          : "The thumbnail must be an image file.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "썸네일은 이미지 파일만 선택할 수 있습니다."
+            : "The thumbnail must be an image file.",
+      });
       return;
     }
 
@@ -243,11 +262,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
       ]);
     } catch (error) {
       console.error(error);
-      alert(
-        lang === "ko"
-          ? "썸네일 업로드에 실패했습니다."
-          : "Failed to upload the thumbnail.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "썸네일 업로드에 실패했습니다."
+            : "Failed to upload the thumbnail.",
+      });
     } finally {
       setUploading(false);
     }
@@ -271,6 +292,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setContentEn(draft.contentEn || "");
     setIsAnonymous(draft.isAnonymous);
     setIsPinned(draft.isPinned);
+    setHomeVisible(draft.homeVisible !== false);
+    setHomeOrder(
+      draft.homeOrder === null || draft.homeOrder === undefined
+        ? ""
+        : String(draft.homeOrder),
+    );
     setIsSecret(draft.isSecret);
     setAllowComment(draft.allowComment);
     setIsKoreanOnly(draft.isKoreanOnly);
@@ -364,6 +391,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
       contentEn,
       isAnonymous,
       isPinned,
+      homeVisible,
+      homeOrder,
       isSecret,
       allowComment,
       isKoreanOnly,
@@ -385,6 +414,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
       contentEn: contentEn || null,
       visibilityScope: "PUBLIC" as const,
       isPinned,
+      homeVisible: selectedCategory === "_EVENT" ? homeVisible : true,
+      homeOrder: selectedCategory === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
       isSecret,
       isAnonymous,
       allowComment,
@@ -449,6 +480,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
         setContentEn(draft.contentEn || "");
         setIsAnonymous(draft.isAnonymous);
         setIsPinned(draft.isPinned);
+        setHomeVisible(draft.homeVisible !== false);
+        setHomeOrder(
+          draft.homeOrder === null || draft.homeOrder === undefined
+            ? ""
+            : String(draft.homeOrder),
+        );
         setIsSecret(draft.isSecret);
         setAllowComment(draft.allowComment);
         setIsKoreanOnly(draft.isKoreanOnly);
@@ -494,6 +531,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
       setContentEn(parsed.contentEn || "");
       setIsAnonymous(parsed.isAnonymous ?? false);
       setIsPinned(parsed.isPinned ?? false);
+      setHomeVisible(parsed.homeVisible !== false);
+      setHomeOrder(
+        parsed.homeOrder === null || parsed.homeOrder === undefined
+          ? ""
+          : String(parsed.homeOrder),
+      );
       setIsSecret(parsed.isSecret ?? false);
       setAllowComment(parsed.allowComment ?? true);
       setIsKoreanOnly(parsed.isKoreanOnly ?? false);
@@ -542,6 +585,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setContentEn("");
     setIsAnonymous(false);
     setIsPinned(false);
+    setHomeVisible(true);
+    setHomeOrder("");
     setIsSecret(false);
     setAllowComment(true);
     setIsKoreanOnly(false);
@@ -676,29 +721,35 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
   const handleSubmit = async () => {
     if (!canWriteSelected) {
-      alert(
-        lang === "ko"
-          ? "이 게시판에 글을 작성할 권한이 없습니다."
-          : "You do not have permission to write to this board.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "이 게시판에 글을 작성할 권한이 없습니다."
+            : "You do not have permission to write to this board.",
+      });
       return;
     }
 
     if (!titleKo.trim() || !contentKo.trim()) {
-      alert(
-        lang === "ko"
-          ? "국문 제목과 내용은 필수입니다."
-          : "Korean title and content are required.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "국문 제목과 내용은 필수입니다."
+            : "Korean title and content are required.",
+      });
       return;
     }
 
     if (!isKoreanOnly && (!titleEn.trim() || !contentEn.trim())) {
-      alert(
-        lang === "ko"
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
             ? "영문 제목과 내용을 입력하거나 '한국어 사용자만'을 선택해 주세요."
             : "Enter an English title and content, or select 'Korean Speakers Only'.",
-      );
+      });
       return;
     }
 
@@ -708,11 +759,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
         (!isKoreanOnly && !eventDescriptionEn.trim()) ||
         (!isEventAlwaysOpen && (!eventStartDate || !eventEndDate))
       ) {
-        alert(
-          lang === "ko"
-            ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
-            : "Event schedule or always-open status, plus card description, is required.",
-        );
+        toast({
+          type: "error",
+          message:
+            lang === "ko"
+              ? "행사 일정 또는 상시 여부, 그리고 간단한 설명은 필수입니다."
+              : "Event schedule or always-open status, plus card description, is required.",
+        });
         return;
       }
     }
@@ -727,6 +780,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
         visibilityScope: "PUBLIC",
         isAnonymous: canConfigurePostSettings ? isAnonymous : false,
         isPinned: canConfigurePostSettings ? isPinned : false,
+        homeVisible: selectedCategory === "_EVENT" ? homeVisible : undefined,
+        homeOrder: selectedCategory === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
         isSecret: selectedBoard?.allowSecret ? isSecret : false,
         allowComment: selectedBoard?.allowComment === false ? false : allowComment,
         assets: assets.map((asset, index) => ({
@@ -786,7 +841,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
         await apiClient.updateSurvey(selectedSurveyId, {
           connectedArticleId: article.articleId,
-          kind: selectedCategory === "_EVENT" ? "EVENT" : undefined,
+          kind: selectedCategory === "_EVENT" ? "APPLICATION" : undefined,
           isAlwaysOpen: overwriteAlwaysOpen
             ? true
             : overwriteSchedule
@@ -803,19 +858,23 @@ export function useBoardWritePageController(forcedCategory?: string) {
       if (serverDraftId) {
         await apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
       }
-      alert(
-        lang === "ko"
-          ? "게시글이 작성되었습니다."
-          : "Article published successfully.",
-      );
+      toast({
+        type: "success",
+        message:
+          lang === "ko"
+            ? "게시글이 작성되었습니다."
+            : "Article published successfully.",
+      });
       navigate(selectedCategory === "_EVENT" ? `/events/${article.articleId}` : `/board/${selectedCategory}/${article.articleId}`);
     } catch (error) {
       console.error(error);
-      alert(
-        lang === "ko"
-          ? "게시글 작성에 실패했습니다."
-          : "Failed to publish article.",
-      );
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "게시글 작성에 실패했습니다."
+            : "Failed to publish article.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -852,6 +911,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
     isSecret,
     isKoreanOnly,
     isPinned,
+    homeVisible,
+    homeOrder,
     isSubmitting,
     lang,
     selectedBoard,
@@ -868,6 +929,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setIsAnonymous,
     setIsAllDay,
     setIsEventAlwaysOpen,
+    setHomeOrder,
+    setHomeVisible,
     setIsKoreanOnly,
     setIsPinned,
     setIsSecret,

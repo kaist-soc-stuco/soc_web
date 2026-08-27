@@ -35,6 +35,7 @@ export interface BoardFallbackMetadata {
 export type BoardMetadata = Pick<
   BoardSummary,
   | "allowComment"
+  | "allowGuestRead"
   | "allowLike"
   | "allowSecret"
   | "code"
@@ -135,6 +136,7 @@ export const getFallbackBoards = (): BoardMetadata[] =>
       descriptionKo: metadata.descriptionKo,
       descriptionEn: metadata.descriptionEn,
       allowComment: true,
+      allowGuestRead: true,
       allowLike: true,
       allowSecret: code === "건의사항",
       writePermissionBit: metadata.writePermissionBit,

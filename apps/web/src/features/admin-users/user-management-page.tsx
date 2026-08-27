@@ -1,12 +1,13 @@
 import { createApiClient } from "@soc/api-client";
-import type { AdminUserListResponse, AdminUserRecord } from "@soc/contracts";
+import type { AdminUserListResponse, AdminUserRecord, UserPostingSuspensionResponse } from "@soc/contracts";
 import { isoToDate, nowMs } from "@soc/shared";
-import { UserRoundCheck, UserRoundX } from "lucide-react";
+import { Ban, UserRoundCheck, UserRoundX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminSortableHead, AdminTableBody, AdminTableCell, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { AdminCardHeader, AdminEmptyState, AdminPageHeader, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,9 @@ import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { Modal } from "@/components/ui/modal";
+import { UiTextarea } from "@/components/ui/form-control";
+import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
@@ -22,6 +26,9 @@ import { Permissions } from "@/lib/permissions";
 type UserSortBy = "name" | "lastLoginAt";
 type SortDirection = "asc" | "desc";
 type UserStatusFilter = "all" | "active" | "inactive";
+type MajorTypeFilter = "all" | "PRIMARY" | "DOUBLE" | "MINOR";
+type FeeStatusFilter = "all" | "PAID" | "PARTIAL" | "UNPAID";
+type AcademicStatusFilter = "all" | "재학" | "졸업";
 
 const formatShortDateTime = (value?: string | null) => {
   if (!value) return "-";
@@ -64,12 +71,16 @@ export function UserManagementPage() {
     [],
   );
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const [data, setData] = useState<AdminUserListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
+  const [majorTypeFilter, setMajorTypeFilter] = useState<MajorTypeFilter>("all");
+  const [feeStatusFilter, setFeeStatusFilter] = useState<FeeStatusFilter>("all");
+  const [academicStatusFilter, setAcademicStatusFilter] = useState<AcademicStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -77,11 +88,43 @@ export function UserManagementPage() {
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [selectedUser, setSelectedUser] = useState<AdminUserRecord | null>(null);
+  const [deactivationTarget, setDeactivationTarget] = useState<AdminUserRecord | null>(null);
+  const [deactivationReason, setDeactivationReason] = useState("");
+  const [postingSuspension, setPostingSuspension] = useState<UserPostingSuspensionResponse | null>(null);
+  const [postingSuspensionLoading, setPostingSuspensionLoading] = useState(false);
+  const [postingSuspensionTarget, setPostingSuspensionTarget] = useState<AdminUserRecord | null>(null);
+  const [postingSuspensionReason, setPostingSuspensionReason] = useState("");
+  const [postingSuspensionSaving, setPostingSuspensionSaving] = useState(false);
 
   const canManageUsers = Permissions.has(
     session?.permission ?? 0,
-    Permissions.ADMIN,
+    Permissions.MANAGE_USERS,
   );
+
+  useEffect(() => {
+    if (!selectedUser) {
+      setPostingSuspension(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPostingSuspensionLoading(true);
+    client
+      .getUserPostingSuspension(selectedUser.userId)
+      .then((response) => {
+        if (!cancelled) setPostingSuspension(response);
+      })
+      .catch(() => {
+        if (!cancelled) setPostingSuspension(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPostingSuspensionLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, selectedUser]);
 
   useEffect(() => {
     if (sessionLoading || !canManageUsers) return;
@@ -98,6 +141,9 @@ export function UserManagementPage() {
         sortBy,
         sortDirection,
         status: statusFilter === "all" ? undefined : statusFilter,
+        majorType: majorTypeFilter === "all" ? undefined : majorTypeFilter,
+        feeStatus: feeStatusFilter === "all" ? undefined : feeStatusFilter,
+        academicStatus: academicStatusFilter === "all" ? undefined : academicStatusFilter,
       })
       .then((response) => {
         if (!cancelled) setData(response);
@@ -120,6 +166,9 @@ export function UserManagementPage() {
     currentPage,
     pageSize,
     query,
+    majorTypeFilter,
+    feeStatusFilter,
+    academicStatusFilter,
     refreshVersion,
     sessionLoading,
     sortBy,
@@ -147,6 +196,11 @@ export function UserManagementPage() {
 
   const handleToggleActive = async (user: AdminUserRecord) => {
     const isDeactivation = user.isActive;
+    if (isDeactivation) {
+      setDeactivationTarget(user);
+      setDeactivationReason("");
+      return;
+    }
     const confirmed = await requestConfirm({
       title: isDeactivation
         ? `${user.nameKo} 계정을 비활성화할까요?`
@@ -171,28 +225,140 @@ export function UserManagementPage() {
     }
   };
 
+  const confirmDeactivation = async () => {
+    const user = deactivationTarget;
+    if (!user || deactivationReason.trim().length < 2) return;
+    setUpdatingUserId(user.userId);
+    setError(null);
+    try {
+      const result = await client.updateUserActiveStatus(user.userId, {
+        isActive: false,
+        reason: deactivationReason.trim(),
+      });
+      setSelectedUser((current) => current?.userId === user.userId ? { ...current, isActive: result.isActive } : current);
+      setRefreshVersion((version) => version + 1);
+      setDeactivationTarget(null);
+      setDeactivationReason("");
+    } catch {
+      setError("계정을 비활성화하지 못했습니다.");
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
+  const handleTogglePostingSuspension = async (
+    user: AdminUserRecord,
+    suspended: boolean,
+  ) => {
+    if (!suspended) {
+      setPostingSuspensionTarget(user);
+      setPostingSuspensionReason("");
+      return;
+    }
+
+    const confirmed = await requestConfirm({
+      title: "게시 제한 해제",
+      description: `${user.nameKo}님의 게시글·댓글 작성 제한을 해제할까요?`,
+      confirmLabel: "제한 해제",
+    });
+    if (!confirmed) return;
+
+    setPostingSuspensionSaving(true);
+    try {
+      const result = await client.updateUserPostingSuspension(user.userId, {
+        suspended: false,
+      });
+      setPostingSuspension(result);
+      toast({ type: "success", message: "게시 작성 제한을 해제했습니다." });
+    } catch {
+      setError("게시 작성 제한을 해제하지 못했습니다.");
+      toast({ type: "error", message: "게시 작성 제한을 해제하지 못했습니다." });
+    } finally {
+      setPostingSuspensionSaving(false);
+    }
+  };
+
+  const confirmPostingSuspension = async () => {
+    const user = postingSuspensionTarget;
+    if (!user || postingSuspensionReason.trim().length < 2) return;
+
+    setPostingSuspensionSaving(true);
+    try {
+      const result = await client.updateUserPostingSuspension(user.userId, {
+        suspended: true,
+        reason: postingSuspensionReason.trim(),
+      });
+      setPostingSuspension(result);
+      setPostingSuspensionTarget(null);
+      setPostingSuspensionReason("");
+      toast({ type: "success", message: "게시글·댓글 작성 제한을 적용했습니다." });
+    } catch {
+      setError("게시 작성 제한을 적용하지 못했습니다.");
+      toast({ type: "error", message: "게시 작성 제한을 적용하지 못했습니다." });
+    } finally {
+      setPostingSuspensionSaving(false);
+    }
+  };
+
   return (
-    <AuthGuard requirePermission={Permissions.ADMIN}>
+    <AuthGuard requirePermission={Permissions.MANAGE_USERS}>
       <AdminPageShell>
         <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           <AdminPageHeader title="유저 관리" />
 
           <AdminTableCard className="user-management-table" aria-busy={loading}>
             <AdminCardHeader className="items-center gap-4">
-              <SegmentedControl<UserStatusFilter>
-                ariaLabel="사용자 상태"
-                role="tablist"
-                options={[
-                  { value: "all", label: "전체" },
-                  { value: "active", label: "활성" },
-                  { value: "inactive", label: "비활성" },
-                ]}
-                value={statusFilter}
-                onChange={(value) => {
-                  setStatusFilter(value);
-                  setCurrentPage(1);
-                }}
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <SegmentedControl<UserStatusFilter>
+                  ariaLabel="사용자 상태"
+                  role="tablist"
+                  options={[
+                    { value: "all", label: "전체" },
+                    { value: "active", label: "활성" },
+                    { value: "inactive", label: "비활성" },
+                  ]}
+                  value={statusFilter}
+                  onChange={(value) => {
+                    setStatusFilter(value);
+                    setCurrentPage(1);
+                  }}
+                />
+                <AdminSelectDropdown
+                  ariaLabel="학적 상태"
+                  className="w-32"
+                  value={academicStatusFilter}
+                  onChange={(value) => { setAcademicStatusFilter(value as AcademicStatusFilter); setCurrentPage(1); }}
+                  options={[
+                    { value: "all", label: "전체 학적" },
+                    { value: "재학", label: `재학 ${data?.facets.academic.enrolled ?? 0}명` },
+                    { value: "졸업", label: `졸업 ${data?.facets.academic.graduated ?? 0}명` },
+                  ]}
+                />
+                <AdminSelectDropdown
+                  ariaLabel="전공 유형"
+                  className="w-36"
+                  value={majorTypeFilter}
+                  onChange={(value) => { setMajorTypeFilter(value as MajorTypeFilter); setCurrentPage(1); }}
+                  options={[
+                    { value: "all", label: "전체 전공" },
+                    { value: "PRIMARY", label: `주전공 ${data?.facets.primaryMajor ?? 0}명` },
+                    { value: "DOUBLE", label: `복수전공 ${data?.facets.doubleMajor ?? 0}명` },
+                    { value: "MINOR", label: `부전공 ${data?.facets.minor ?? 0}명` },
+                  ]}
+                />
+                <AdminSelectDropdown
+                  ariaLabel="과비 납부 상태"
+                  className="w-36"
+                  value={feeStatusFilter}
+                  onChange={(value) => { setFeeStatusFilter(value as FeeStatusFilter); setCurrentPage(1); }}
+                  options={[
+                    { value: "all", label: "전체 과비" },
+                    { value: "PAID", label: `완납 ${data?.facets.paid ?? 0}명` },
+                    { value: "PARTIAL", label: `부분 납부 ${data?.facets.partial ?? 0}명` },
+                    { value: "UNPAID", label: `미납 ${data?.facets.unpaid ?? 0}명` },
+                  ]}
+                />
+              </div>
               <PageSearchField
                 ariaLabel="사용자 검색"
                 className="w-full md:w-72 lg:w-80"
@@ -224,13 +390,14 @@ export function UserManagementPage() {
             ) : (data?.items ?? []).length === 0 ? (
               <AdminEmptyState message="조건에 맞는 사용자가 없습니다." />
             ) : (
-              <AdminDataTable minWidth={1080}>
+              <AdminDataTable minWidth={1120}>
                 <colgroup>
-                  <col style={{ width: 220 }} />
-                  <col style={{ width: 140 }} />
-                  <col style={{ width: 260 }} />
                   <col style={{ width: 240 }} />
+                  <col style={{ width: 290 }} />
+                  <col style={{ width: 230 }} />
+                  <col style={{ width: 165 }} />
                   <col style={{ width: 150 }} />
+                  <col style={{ width: 72 }} />
                 </colgroup>
                 <AdminTableHeader>
                   <tr>
@@ -241,9 +408,9 @@ export function UserManagementPage() {
                     >
                       이름
                     </AdminSortableHead>
-                    <AdminTableHead>학번</AdminTableHead>
-                    <AdminTableHead>이메일</AdminTableHead>
+                    <AdminTableHead>연락처</AdminTableHead>
                     <AdminTableHead>소속 · 전공</AdminTableHead>
+                    <AdminTableHead>동의 시각</AdminTableHead>
                     <AdminSortableHead
                       active={sortBy === "lastLoginAt"}
                       ascending={sortBy === "lastLoginAt" && sortDirection === "asc"}
@@ -251,6 +418,7 @@ export function UserManagementPage() {
                     >
                       최근 접속
                     </AdminSortableHead>
+                    <AdminTableHead className="text-center">작업</AdminTableHead>
                   </tr>
                 </AdminTableHeader>
                 <AdminTableBody>
@@ -273,22 +441,47 @@ export function UserManagementPage() {
                           }
                         }}
                       >
-                        <AdminTableCell className="py-2.5">
-                          <div className="truncate text-sm font-medium text-slate-900" title={user.nameKo}>{user.nameKo}</div>
-                          {user.nameEn && user.nameEn.trim() !== user.nameKo.trim() ? <div className="mt-0.5 truncate text-xs font-normal text-slate-500" title={user.nameEn}>{user.nameEn}</div> : null}
+                        <AdminTableCell className="py-3">
+                          <div className="truncate text-[length:var(--ui-text-section-size)] font-medium leading-5 text-[var(--j-color-text-primary)]" title={user.nameKo}>
+                            {user.nameKo}
+                            {user.nameEn && user.nameEn.trim() !== user.nameKo.trim() ? <span className="font-normal text-slate-500">{" · "}{user.nameEn}</span> : null}
+                          </div>
+                          <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={displayStudentId(user)}>
+                            {displayStudentId(user)}
+                          </div>
                         </AdminTableCell>
-                        <AdminTableCell className="py-2.5 tabular-nums text-sm text-slate-700">
-                          {displayStudentId(user)}
+                        <AdminTableCell className="py-3">
+                          <div className="truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={user.email}>{user.email}</div>
+                          <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={user.phoneNumber ?? undefined}>{user.phoneNumber ?? ""}</div>
                         </AdminTableCell>
-                        <AdminTableCell className="py-2.5 truncate text-sm" title={user.email}>{user.email}</AdminTableCell>
-                        <AdminTableCell className="py-2.5 text-sm">
-                          {user.departmentKo ? <div className="truncate">{user.departmentKo}</div> : null}
-                          {major ? <div className="mt-0.5 truncate text-xs text-slate-500">{major}</div> : null}
+                        <AdminTableCell className="py-3">
+                          <div className="truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{user.departmentKo ?? ""}</div>
+                          {major ? <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{major}</div> : null}
                         </AdminTableCell>
-                        <AdminTableCell className="py-2.5 text-sm">
+                        <AdminTableCell className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
+                          {user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : ""}
+                        </AdminTableCell>
+                        <AdminTableCell className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
                           <time dateTime={user.lastLoginAt ?? undefined} title={formatShortDateTime(user.lastLoginAt)}>
                             {formatRelativeTime(user.lastLoginAt)}
                           </time>
+                        </AdminTableCell>
+                        <AdminTableCell className="py-3 text-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={user.isActive ? "계정 비활성화" : "계정 복구"}
+                            title={user.isActive ? "계정 비활성화" : "계정 복구"}
+                            disabled={updatingUserId === user.userId}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleToggleActive(user);
+                            }}
+                            className="size-8 rounded-md border-0 bg-transparent text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-600"
+                          >
+                            {user.isActive ? <UserRoundX className="size-4" aria-hidden="true" /> : <UserRoundCheck className="size-4" aria-hidden="true" />}
+                          </Button>
                         </AdminTableCell>
                       </tr>
                     );
@@ -321,10 +514,77 @@ export function UserManagementPage() {
         </main>
         <UserDetailDrawer
           user={selectedUser}
+          postingSuspension={postingSuspension}
+          postingSuspensionLoading={postingSuspensionLoading}
           onClose={() => setSelectedUser(null)}
           onToggleActive={() => selectedUser ? void handleToggleActive(selectedUser) : undefined}
+          onTogglePostingSuspension={() => selectedUser ? void handleTogglePostingSuspension(selectedUser, Boolean(postingSuspension?.suspended)) : undefined}
           updating={selectedUser ? updatingUserId === selectedUser.userId : false}
         />
+        <Modal
+          open={Boolean(deactivationTarget)}
+          onClose={() => { setDeactivationTarget(null); setDeactivationReason(""); }}
+          title="계정 비활성화"
+          footer={(
+            <>
+              <Button type="button" variant="outline" onClick={() => { setDeactivationTarget(null); setDeactivationReason(""); }}>취소</Button>
+              <Button type="button" variant="destructive" disabled={deactivationReason.trim().length < 2 || Boolean(updatingUserId)} onClick={() => void confirmDeactivation()}>비활성화</Button>
+            </>
+          )}
+        >
+          <p className="text-sm font-normal leading-6 text-app-text-secondary">
+            {deactivationTarget?.nameKo}님은 즉시 로그인할 수 없게 되며, 로그인 시 비활성화 안내와 복구 문의 방법이 표시됩니다.
+          </p>
+          <UiTextarea
+            className="mt-4 min-h-28"
+            value={deactivationReason}
+            onChange={(event) => setDeactivationReason(event.target.value)}
+            placeholder="비활성화 사유를 입력해 주세요."
+          />
+        </Modal>
+        <Modal
+          open={Boolean(postingSuspensionTarget)}
+          onClose={() => {
+            if (!postingSuspensionSaving) {
+              setPostingSuspensionTarget(null);
+              setPostingSuspensionReason("");
+            }
+          }}
+          title="게시 작성 제한"
+          footer={(
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={postingSuspensionSaving}
+                onClick={() => {
+                  setPostingSuspensionTarget(null);
+                  setPostingSuspensionReason("");
+                }}
+              >
+                취소
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={postingSuspensionSaving || postingSuspensionReason.trim().length < 2}
+                onClick={() => void confirmPostingSuspension()}
+              >
+                제한 적용
+              </Button>
+            </>
+          )}
+        >
+          <p className="text-sm font-normal leading-6 text-app-text-secondary">
+            {postingSuspensionTarget?.nameKo}님의 새 게시글과 댓글 작성을 제한합니다. 운영 기록에 남길 사유를 입력해 주세요.
+          </p>
+          <UiTextarea
+            className="mt-4 min-h-28"
+            value={postingSuspensionReason}
+            onChange={(event) => setPostingSuspensionReason(event.target.value)}
+            placeholder="게시 제한 사유를 입력해 주세요."
+          />
+        </Modal>
         {ConfirmDialog}
       </AdminPageShell>
     </AuthGuard>
@@ -334,33 +594,37 @@ export function UserManagementPage() {
 function UserDetailDrawer({
   onClose,
   onToggleActive,
+  onTogglePostingSuspension,
+  postingSuspension,
+  postingSuspensionLoading,
   updating,
   user,
 }: {
   onClose: () => void;
   onToggleActive: () => void;
+  onTogglePostingSuspension: () => void;
+  postingSuspension: UserPostingSuspensionResponse | null;
+  postingSuspensionLoading: boolean;
   updating: boolean;
   user: AdminUserRecord | null;
 }) {
-  const major = [user?.primaryMajor, user?.doubleMajor && `복수전공 ${user.doubleMajor}`, user?.minor && `부전공 ${user.minor}`]
-    .filter(Boolean)
-    .join(" · ");
-
   return (
     <AdminDrawer
       open={Boolean(user)}
       onClose={onClose}
       title={user ? `${user.nameKo} 상세 정보` : "사용자 상세 정보"}
       width="max-w-xl"
-      footer={user ? <div className="flex justify-end"><Button type="button" variant="outline" disabled={updating} onClick={onToggleActive}><span className="inline-flex items-center gap-2">{user.isActive ? <UserRoundX aria-hidden="true" className="size-4" /> : <UserRoundCheck aria-hidden="true" className="size-4" />}{updating ? "처리 중" : user.isActive ? "계정 비활성화" : "계정 복구"}</span></Button></div> : undefined}
+      footer={user ? <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={updating} onClick={onToggleActive}><span className="inline-flex items-center gap-2">{user.isActive ? <UserRoundX aria-hidden="true" className="size-4" /> : <UserRoundCheck aria-hidden="true" className="size-4" />}{updating ? "처리 중" : user.isActive ? "계정 비활성화" : "계정 복구"}</span></Button><Button type="button" variant={postingSuspension?.suspended ? "outline" : "destructive"} disabled={postingSuspensionLoading} onClick={onTogglePostingSuspension}><span className="inline-flex items-center gap-2"><Ban aria-hidden="true" className="size-4" />{postingSuspensionLoading ? "확인 중" : postingSuspension?.suspended ? "게시 제한 해제" : "게시 제한"}</span></Button></div> : undefined}
     >
       {user ? (
         <div className="space-y-6">
           <section className="rounded-xl bg-slate-50 px-4 py-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <h3 className="truncate text-lg font-semibold text-slate-950">{user.nameKo}</h3>
-                {user.nameEn ? <p className="mt-1 truncate text-sm font-normal text-slate-500">{user.nameEn}</p> : null}
+                <h3 className="truncate text-lg font-semibold text-slate-950">
+                  {user.nameKo}
+                  {user.nameEn ? <span className="font-normal text-slate-500">{" · "}{user.nameEn}</span> : null}
+                </h3>
               </div>
               <AdminStatusBadge tone={user.isActive ? "positive" : "danger"}>{user.isActive ? "활성 계정" : "비활성 계정"}</AdminStatusBadge>
             </div>
@@ -368,8 +632,11 @@ function UserDetailDrawer({
               <UserDetailItem label="학번" value={displayStudentId(user)} />
               <UserDetailItem label="KAIST UID" value={user.kaistUid} />
               <UserDetailItem label="이메일" value={user.email} />
+              <UserDetailItem label="전화번호" value={user.phoneNumber ?? ""} />
               <UserDetailItem label="소속" value={user.departmentKo ?? "—"} />
-              <UserDetailItem label="전공" value={major || "—"} />
+              <UserDetailItem label="주전공" value={user.primaryMajor ?? "—"} />
+              <UserDetailItem label="복수전공" value={user.doubleMajor ?? "—"} />
+              <UserDetailItem label="부전공" value={user.minor ?? "—"} />
               <UserDetailItem label="학적 상태" value={user.academicStatus ?? "—"} />
             </dl>
           </section>
@@ -379,9 +646,22 @@ function UserDetailDrawer({
             <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200">
               <UserDetailRow label="가입 일시" value={formatShortDateTime(user.createdAt)} />
               <UserDetailRow label="최근 접속" value={formatShortDateTime(user.lastLoginAt)} />
-              <UserDetailRow label="개인정보 동의" value={user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : "미동의"} />
+              <UserDetailRow label="개인정보 동의 시각" value={user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : ""} />
               <UserDetailRow label="계정 식별 코드" value={user.identityCode ?? "—"} />
             </dl>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">게시 권한</h3>
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+              <span className="text-sm font-normal text-slate-600">새 게시글·댓글 작성</span>
+              <AdminStatusBadge tone={postingSuspension?.suspended ? "danger" : "positive"}>
+                {postingSuspension?.suspended ? "제한됨" : "허용됨"}
+              </AdminStatusBadge>
+            </div>
+            {postingSuspension?.sanction?.reason ? (
+              <p className="text-xs font-normal leading-5 text-slate-500">사유: {postingSuspension.sanction.reason}</p>
+            ) : null}
           </section>
 
           <section className="space-y-3">

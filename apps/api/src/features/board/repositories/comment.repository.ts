@@ -1,14 +1,16 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type {
   CommentCreateRequest,
   CommentCreateResponse,
   CommentDeleteResponse,
+  CommentModerationResponse,
   CommentEngagementKind,
   CommentEngagementResponse,
   CommentItem,
   CommentUpdateRequest,
   CommentUpdateResponse,
+  HiddenCommentItem,
 } from "@soc/contracts";
 
 import {
@@ -40,10 +42,11 @@ export class CommentRepository {
       eq(comments.status, COMMENT_STATUS.PUBLISHED),
     );
 
+    const topLevelFilter = and(baseFilter, isNull(comments.parentCommentId));
     const totalResult = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(comments)
-      .where(baseFilter);
+      .where(topLevelFilter);
 
     const likeCount = sql<number>`(
       select count(*)
@@ -60,7 +63,7 @@ export class CommentRepository {
             and ${commentEngagements.kind} = 'LIKE'
         )`
       : sql<boolean>`false`;
-    const rows = await this.db
+    const selectCommentRows = (filter: typeof baseFilter) => this.db
       .select({
         commentId: comments.commentId,
         articleId: comments.articleId,
@@ -77,10 +80,19 @@ export class CommentRepository {
       })
       .from(comments)
       .leftJoin(users, eq(comments.authorUserId, users.userId))
-      .where(baseFilter)
-      .orderBy(asc(comments.createdAt))
+      .where(filter)
+      .orderBy(asc(comments.createdAt));
+
+    const topLevelRows = await selectCommentRows(topLevelFilter)
       .limit(limit)
       .offset(offset);
+    const parentIds = topLevelRows.map((row) => row.commentId);
+    const replyRows = parentIds.length
+      ? await selectCommentRows(
+          and(baseFilter, inArray(comments.parentCommentId, parentIds)),
+        )
+      : [];
+    const rows = [...topLevelRows, ...replyRows];
 
     return {
       total: Number(totalResult[0]?.count ?? 0),
@@ -94,7 +106,9 @@ export class CommentRepository {
         updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
           userId: String(row.authorId ?? ""),
-          name: row.authorName ?? "unknown",
+          name: row.isOfficial
+            ? "전산학부 집행위원회"
+            : row.authorName ?? "unknown",
         },
         likeCount: Number(row.likeCount ?? 0),
         viewerHasLiked: Boolean(row.viewerHasLiked),
@@ -366,5 +380,62 @@ export class CommentRepository {
       commentId: String(commentId),
       deletedAt: msToIso(now.valueOf()),
     };
+  }
+
+  async moderateComment(
+    commentId: string,
+    input: { hidden: boolean; moderatorUserId: string; reason?: string },
+  ): Promise<CommentModerationResponse> {
+    const now = nowDate();
+    await this.db
+      .update(comments)
+      .set({
+        status: input.hidden ? COMMENT_STATUS.HIDDEN : COMMENT_STATUS.PUBLISHED,
+        hiddenAt: input.hidden ? now : null,
+        hiddenByUserId: input.hidden ? input.moderatorUserId : null,
+        hiddenReason: input.hidden ? input.reason?.trim() ?? null : null,
+        updatedAt: now,
+      })
+      .where(eq(comments.commentId, Number(commentId)));
+
+    return {
+      commentId,
+      status: input.hidden ? "HIDDEN" : "PUBLISHED",
+      hiddenAt: input.hidden ? msToIso(now.valueOf()) : null,
+    };
+  }
+
+  async listHiddenComments(): Promise<HiddenCommentItem[]> {
+    const rows = await this.db
+      .select({
+        commentId: comments.commentId,
+        articleId: comments.articleId,
+        articleTitleKo: articles.titleKo,
+        boardCode: sql<string>`(select code from board where board_id = ${articles.boardId} limit 1)`,
+        content: comments.content,
+        authorName: users.nameKo,
+        hiddenAt: comments.hiddenAt,
+        hiddenReason: comments.hiddenReason,
+      })
+      .from(comments)
+      .innerJoin(articles, eq(comments.articleId, articles.articleId))
+      .leftJoin(users, eq(comments.authorUserId, users.userId))
+      .where(eq(comments.status, COMMENT_STATUS.HIDDEN))
+      .orderBy(sql`${comments.hiddenAt} desc`);
+
+    return rows.flatMap((row) =>
+      row.hiddenAt
+        ? [{
+            commentId: String(row.commentId),
+            articleId: String(row.articleId),
+            articleTitleKo: row.articleTitleKo,
+            boardCode: row.boardCode,
+            content: row.content,
+            authorName: row.authorName ?? "알 수 없음",
+            hiddenAt: msToIso(row.hiddenAt.valueOf()),
+            hiddenReason: row.hiddenReason ?? "",
+          }]
+        : [],
+    );
   }
 }

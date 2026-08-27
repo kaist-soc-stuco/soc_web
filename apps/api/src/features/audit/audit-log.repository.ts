@@ -31,6 +31,7 @@ const DOMAIN_DEFINITIONS: Record<string, { domain: string; label: string }> = {
   site_content: { domain: "content", label: "사이트" },
   student_fee_payment: { domain: "fee", label: "과비" },
   student_fee_status: { domain: "fee", label: "과비" },
+  survey_answer_file: { domain: "survey", label: "설문 응답 파일" },
   user: { domain: "user", label: "유저" },
   article: { domain: "board", label: "게시판" },
 };
@@ -55,6 +56,10 @@ const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKin
   "student_fee_status.update": { label: "수납 상태 변경", kind: "UPDATE" },
   "user.account.activate": { label: "계정 활성화", kind: "UPDATE" },
   "user.account.expire": { label: "계정 만료", kind: "UPDATE" },
+  "user.posting_suspend": { label: "게시 작성 제한", kind: "EXECUTE" },
+  "user.posting_resume": { label: "게시 작성 제한 해제", kind: "EXECUTE" },
+  "article.anonymous_identity_reveal": { label: "익명 작성자 확인", kind: "EXECUTE" },
+  "survey.answer_file.download": { label: "설문 응답 파일 다운로드", kind: "EXECUTE" },
   CONTACT_PRIVACY_PURGE: { label: "개인정보 파기", kind: "EXECUTE" },
 };
 
@@ -67,6 +72,7 @@ const TARGET_TYPE_LABELS: Record<string, string> = {
   site_content: "공개 문구",
   student_fee_payment: "학생회비 납부",
   student_fee_status: "학생회비 상태",
+  survey_answer_file: "설문 응답 파일",
   user: "사용자",
 };
 

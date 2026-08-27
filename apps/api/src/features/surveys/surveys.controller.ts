@@ -20,6 +20,7 @@ import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { SurveysService } from "./surveys.service";
 import { CreateSurveyDto } from "./dto/create-survey.dto";
 import { UpdateSurveyDto } from "./dto/update-survey.dto";
+import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 
 interface AuthedRequest extends Request {
   user: { id: string; permission: number };
@@ -31,7 +32,10 @@ interface OptionalAuthedRequest extends Request {
 
 @Controller("surveys")
 export class SurveysController {
-  constructor(private readonly surveysService: SurveysService) {}
+  constructor(
+    private readonly surveysService: SurveysService,
+    private readonly surveySheetsService: GoogleSurveySheetsService,
+  ) {}
 
   @Get()
   @RequirePermissions(Permissions.MANAGE_SURVEY)
@@ -87,5 +91,18 @@ export class SurveysController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.surveysService.duplicate(id, req.user.id);
+  }
+
+  @Post(":id/spreadsheet")
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  connectSpreadsheet(@Param("id", ParseUUIDPipe) id: string) {
+    return this.surveySheetsService.connect(id);
+  }
+
+  @Post(":id/spreadsheet/sync")
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  async syncSpreadsheet(@Param("id", ParseUUIDPipe) id: string) {
+    await this.surveySheetsService.refresh(id, true);
+    return this.surveysService.findById(id);
   }
 }

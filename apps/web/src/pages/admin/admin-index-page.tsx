@@ -5,15 +5,16 @@ import { Permissions } from "@/lib/permissions";
 
 const ADMIN_ENTRY_ROUTES = [
   { to: "surveys", bit: Permissions.MANAGE_SURVEY },
-  { to: "users", bit: Permissions.ADMIN },
-  { to: "audit-logs", bit: Permissions.ADMIN },
-  { to: "content", bit: Permissions.MANAGE_CONTENT },
-  { to: "calendar", bit: Permissions.MANAGE_CONTENT },
-  { to: "contacts", bit: Permissions.MANAGE_CONTENT },
-  { to: "emails", bit: Permissions.ADMIN },
-  { to: "permissions", bit: Permissions.ADMIN },
+  { to: "users", bit: Permissions.MANAGE_USERS },
+  { to: "audit-logs", bit: Permissions.VIEW_AUDIT_LOG },
+  { to: "content", bit: Permissions.MANAGE_SITE_CONTENT },
+  { to: "calendar", bit: Permissions.MANAGE_CALENDAR },
+  { to: "contacts", bit: Permissions.MANAGE_CONTACTS },
+  { to: "emails", bit: Permissions.SEND_BULK_EMAIL },
+  { to: "permissions", bit: Permissions.MANAGE_ROLES },
   { to: "finance", bit: Permissions.MANAGE_FINANCE },
-  { to: "boards", bit: Permissions.ADMIN },
+  { to: "boards", bit: Permissions.MANAGE_BOARDS },
+  { to: "moderation", bit: Permissions.MODERATE_CONTENT },
 ];
 
 export function AdminIndexPage() {

@@ -12,9 +12,10 @@ import {
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
 import { BoardModule } from "../board/board.module";
+import { AuditLogModule } from "../audit/audit-log.module";
 
 @Module({
-  imports: [AuthModule, UsersModule, PostgresModule, RedisModule, BoardModule],
+  imports: [AuthModule, UsersModule, PostgresModule, RedisModule, BoardModule, AuditLogModule],
   controllers: [AssetController],
   providers: [
     AssetRepository,

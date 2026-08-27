@@ -38,13 +38,13 @@ export class BoardController {
   }
 
   @Get("admin")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_BOARDS)
   async getAdminBoards(): Promise<BoardListResponse> {
     return this.boardService.getAdminBoards();
   }
 
   @Post()
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_BOARDS)
   async createBoard(
     @Body(new ZodValidationPipe(BoardCreateSchema)) body: BoardCreateRequest,
   ): Promise<BoardSummary> {
@@ -52,7 +52,7 @@ export class BoardController {
   }
 
   @Patch("admin/order")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_BOARDS)
   async reorderBoards(
     @Body(new ZodValidationPipe(BoardReorderSchema)) body: BoardReorderRequest,
   ): Promise<BoardListResponse> {
@@ -65,7 +65,7 @@ export class BoardController {
   }
 
   @Patch(":code")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_BOARDS)
   async updateBoard(
     @Param("code") code: string,
     @Body(new ZodValidationPipe(BoardUpdateSchema)) body: BoardUpdateRequest,
@@ -75,7 +75,7 @@ export class BoardController {
 
   @Delete(":code/permanent")
   @HttpCode(200)
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_BOARDS)
   async deleteBoard(@Param("code") code: string): Promise<BoardDeleteResponse> {
     const board = await this.boardService.deleteBoard(code);
     return { ok: true, boardId: board.boardId };
@@ -83,7 +83,7 @@ export class BoardController {
 
   @Delete(":code")
   @HttpCode(200)
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_BOARDS)
   async archiveBoard(@Param("code") code: string): Promise<BoardArchiveResponse> {
     const board = await this.boardService.archiveBoard(code);
     return { ok: true, boardId: board.boardId, isActive: false };

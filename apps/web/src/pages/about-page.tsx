@@ -9,8 +9,6 @@ import { PageShell } from "@/components/ui/page-layout";
 
 export function AboutPage() {
   const {
-    contacts,
-    contactsLoading,
     activeSection,
     lang,
     scrollToSection,
@@ -27,10 +25,7 @@ export function AboutPage() {
           onNavigate={scrollToSection}
         />
         <AboutLandingContent
-          contacts={contacts}
-          contactsLoading={contactsLoading}
           lang={lang}
-          onNavigate={scrollToSection}
         />
       </main>
     </PageShell>

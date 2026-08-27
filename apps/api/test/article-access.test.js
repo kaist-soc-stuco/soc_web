@@ -16,7 +16,7 @@ const member = {
 };
 const contentManager = {
   authenticated: true,
-  user: { id: "staff-1", permission: Permissions.MANAGE_CONTENT },
+  user: { id: "staff-1", permission: Permissions.MODERATE_CONTENT },
 };
 
 test("anonymous users can read only public articles", () => {

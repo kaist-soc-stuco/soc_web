@@ -53,9 +53,8 @@ function getQuestionTypeLabel(type: QuestionType, lang: string) {
 }
 
 function getSurveyKindLabel(kind: string, lang: string) {
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
   if (kind === "APPLICATION") {
-    return lang === "ko" ? "신청서/행사 접수" : "Application";
+    return lang === "ko" ? "행사 신청" : "Event application";
   }
   return lang === "ko" ? "일반 설문" : "Survey";
 }

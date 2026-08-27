@@ -14,18 +14,22 @@ export interface FileAnswer {
   sizeBytes?: number;
   mimeType?: string;
 }
+export interface FileAnswerValue {
+  kind: "file";
+  files: FileAnswer[];
+}
 export type AnswerValue =
   | string
   | string[]
   | { kind: "grid"; values: GridAnswer }
-  | { kind: "file"; file: FileAnswer | null };
+  | FileAnswerValue;
 
 export function emptyAnswerValue(type: QuestionType): AnswerValue {
   if (type === "multiple_choice") return [];
   if (type === "grid_single" || type === "grid_multiple") {
     return { kind: "grid", values: {} };
   }
-  if (type === "file_upload") return { kind: "file", file: null };
+  if (type === "file_upload") return { kind: "file", files: [] };
   return "";
 }
 
@@ -46,15 +50,21 @@ export function toAnswerContent(
     case "grid_multiple":
       return { grid: (value as { kind: "grid"; values: GridAnswer }).values };
     case "file_upload": {
-      const file = (value as { kind: "file"; file: FileAnswer | null }).file;
-      return file
-        ? {
-            assetId: file.assetId,
-            fileName: file.fileName,
-            sizeBytes: file.sizeBytes,
-            mimeType: file.mimeType,
-          }
-        : {};
+      const files = (value as FileAnswerValue).files;
+      if (files.length === 0) return {};
+      return {
+        assetId: files[0]?.assetId,
+        assetIds: files.map((file) => file.assetId),
+        files: files.map((file) => ({
+          assetId: file.assetId,
+          fileName: file.fileName,
+          sizeBytes: file.sizeBytes,
+          mimeType: file.mimeType,
+        })),
+        fileName: files[0]?.fileName,
+        sizeBytes: files[0]?.sizeBytes,
+        mimeType: files[0]?.mimeType,
+      };
     }
     case "date":
       return { date: value as string };
@@ -76,7 +86,7 @@ export function answerContentToValue(
     if (type === "grid_single" || type === "grid_multiple") {
       return { kind: "grid", values: {} };
     }
-    if (type === "file_upload") return { kind: "file", file: null };
+    if (type === "file_upload") return { kind: "file", files: [] };
     return "";
   }
   const content = answer.content;
@@ -95,24 +105,42 @@ export function answerContentToValue(
       : { kind: "grid", values: {} };
   }
   if (type === "file_upload") {
-    return typeof content.assetId === "string"
-      ? {
-          kind: "file",
-          file: {
-            assetId: content.assetId,
-            fileName:
-              typeof content.fileName === "string"
-                ? content.fileName
-                : "uploaded-file",
-            sizeBytes:
-              typeof content.sizeBytes === "number"
-                ? content.sizeBytes
-                : undefined,
-            mimeType:
-              typeof content.mimeType === "string" ? content.mimeType : undefined,
-          },
-        }
-      : { kind: "file", file: null };
+    const metadata = Array.isArray(content.files)
+      ? content.files.filter(
+          (file): file is Record<string, unknown> =>
+            typeof file === "object" && file !== null,
+        )
+      : [];
+    const assetIds = Array.isArray(content.assetIds)
+      ? content.assetIds.filter((assetId): assetId is string => typeof assetId === "string")
+      : typeof content.assetId === "string"
+        ? [content.assetId]
+        : [];
+    const files = assetIds.map((assetId, index) => {
+      const file = metadata[index];
+      return {
+        assetId,
+        fileName:
+          typeof file?.fileName === "string"
+            ? file.fileName
+            : index === 0 && typeof content.fileName === "string"
+              ? content.fileName
+              : "uploaded-file",
+        sizeBytes:
+          typeof file?.sizeBytes === "number"
+            ? file.sizeBytes
+            : index === 0 && typeof content.sizeBytes === "number"
+              ? content.sizeBytes
+              : undefined,
+        mimeType:
+          typeof file?.mimeType === "string"
+            ? file.mimeType
+            : index === 0 && typeof content.mimeType === "string"
+              ? content.mimeType
+              : undefined,
+      };
+    });
+    return { kind: "file", files };
   }
   if (type === "short_text" || type === "long_text") {
     return typeof content.text === "string" ? content.text : "";
@@ -154,7 +182,9 @@ export function isAnswerFilled(
       value !== null &&
       "kind" in value &&
       value.kind === "file" &&
-      Boolean(value.file?.assetId)
+      Array.isArray(value.files) &&
+      value.files.length > 0 &&
+      value.files.every((file) => Boolean(file.assetId))
     );
   }
   return typeof value === "string" && value.trim().length > 0;
@@ -222,18 +252,33 @@ export function getLocalizedText(
 }
 
 export function getSurveyKindLabel(kind: string, lang: string) {
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
   if (kind === "APPLICATION") {
-    return lang === "ko" ? "신청서/행사 접수" : "Application";
+    return lang === "ko" ? "행사 신청" : "Event application";
   }
   return lang === "ko" ? "일반 설문" : "Survey";
 }
 
 export function getAudienceLabel(survey: SurveyDetailResponse, lang: string) {
-  if (survey.feePayersOnly) {
-    return lang === "ko" ? "과비 납부자" : "Fee-paying members";
+  if (survey.allowAnonymous) {
+    return lang === "ko" ? "로그인 없이 참여 가능" : "No sign-in required";
   }
-  return lang === "ko" ? "로그인 필요" : "Login required";
+  const affiliations = survey.eligibleSocAffiliations.map((item) => {
+    if (lang !== "ko") return item === "PRIMARY" ? "primary major" : item === "DOUBLE" ? "double major" : "minor";
+    return item === "PRIMARY" ? "주전공" : item === "DOUBLE" ? "복수전공" : "부전공";
+  });
+  const parts: string[] = [];
+  if (affiliations.length > 0) {
+    parts.push(lang === "ko" ? `전산학부 ${affiliations.join("·")}` : `School of Computing ${affiliations.join(", ")}`);
+  }
+  if (survey.academicEligibility === "ENROLLED_ONLY") {
+    parts.push(lang === "ko" ? "재학생" : "enrolled students");
+  } else if (survey.academicEligibility === "ENROLLED_OR_LEAVE") {
+    parts.push(lang === "ko" ? "재학생·휴학생" : "enrolled or on leave");
+  }
+  if (survey.feePayersOnly) {
+    parts.push(lang === "ko" ? "과비 납부자" : "fee-paying members");
+  }
+  return parts.length > 0 ? parts.join(" · ") : lang === "ko" ? "로그인 필요" : "Login required";
 }
 
 export function getResponsePolicyLabel(

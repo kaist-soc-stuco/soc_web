@@ -1,10 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { ConflictException } = require("@nestjs/common");
-
 const {
   SurveyMutationPolicy,
-  changesSurveyMeaning,
 } = require("../dist/apps/api/src/features/surveys/survey-mutation-policy.js");
 const {
   SurveysService,
@@ -21,7 +18,7 @@ const NOW = "2026-07-15T00:00:00.000Z";
 function survey(overrides = {}) {
   return {
     id: "survey-1",
-    kind: "GENERAL",
+    kind: "SURVEY",
     resultVisibility: "PUBLIC",
     titleKo: "Existing survey",
     titleEn: "Existing survey",
@@ -105,65 +102,8 @@ function createPolicyHarness({
   return { policy: new SurveyMutationPolicy(db), tx, events };
 }
 
-async function expectConflict(promise, message) {
-  await assert.rejects(promise, (error) => {
-    assert.ok(error instanceof ConflictException);
-    assert.equal(error.message, message);
-    return true;
-  });
-}
-
-test("detects only edits that can change the meaning of existing responses", () => {
-  const current = survey();
-
-  assert.equal(changesSurveyMeaning(current, { titleKo: "Changed title" }), true);
-  assert.equal(
-    changesSurveyMeaning(current, { feeRequirementPolicy: "PAID_ONLY" }),
-    true,
-  );
-  assert.equal(
-    changesSurveyMeaning(current, { allowMultipleResponses: true }),
-    true,
-  );
-  assert.equal(
-    changesSurveyMeaning(current, {
-      kind: current.kind,
-      titleKo: current.titleKo,
-      titleEn: current.titleEn,
-      descriptionKo: current.descriptionKo,
-      descriptionEn: current.descriptionEn,
-      feeRequirementPolicy: "NONE",
-      allowMultipleResponses: current.allowMultipleResponses,
-      allowResponseEdit: current.allowResponseEdit,
-      isKoreanOnly: current.isKoreanOnly,
-      resultVisibility: "PRIVATE",
-      isPublished: false,
-      showOnCalendar: false,
-      closeAt: NOW,
-    }),
-    false,
-  );
-});
-
-test("locks the survey row, checks submitted responses, and mutates in one transaction", async () => {
-  const blocked = createPolicyHarness({ responseCount: 1 });
-  let blockedMutationCalled = false;
-
-  await expectConflict(
-    blocked.policy.withStructureMutation("survey-1", async () => {
-      blockedMutationCalled = true;
-    }),
-    "survey_structure_locked_after_response",
-  );
-  assert.equal(blockedMutationCalled, false);
-  assert.deepEqual(blocked.events, [
-    "transaction:start",
-    "lock:update",
-    "count-submitted",
-    "transaction:end",
-  ]);
-
-  const allowed = createPolicyHarness({ responseCount: 0 });
+test("locks the survey row and mutates in one transaction even after responses", async () => {
+  const allowed = createPolicyHarness({ responseCount: 1 });
   const value = await allowed.policy.withStructureMutation(
     "survey-1",
     async (tx) => {
@@ -176,7 +116,6 @@ test("locks the survey row, checks submitted responses, and mutates in one trans
   assert.deepEqual(allowed.events, [
     "transaction:start",
     "lock:update",
-    "count-submitted",
     "mutation",
     "transaction:end",
   ]);
@@ -198,38 +137,6 @@ test("hard deletion uses the survey lock and permits response cleanup", async ()
     "lock:update",
     "transaction:end",
   ]);
-});
-
-test("meaning changes are blocked in the caller transaction while operational changes remain allowed", async () => {
-  const blocked = createPolicyHarness({ responseCount: 1 });
-  await expectConflict(
-    blocked.policy.assertMeaningMutable(
-      blocked.tx,
-      "survey-1",
-      survey(),
-      { titleKo: "Changed title" },
-    ),
-    "survey_meaning_locked_after_response",
-  );
-
-  const allowed = createPolicyHarness({ responseCount: 1 });
-  const current = survey();
-  await allowed.policy.assertMeaningMutable(
-    allowed.tx,
-    "survey-1",
-    current,
-    {
-      titleKo: current.titleKo,
-      descriptionKo: current.descriptionKo,
-      feeRequirementPolicy: "NONE",
-      resultVisibility: "PRIVATE",
-      isPublished: false,
-      showOnCalendar: false,
-      maxResponseCount: 100,
-      closeAt: NOW,
-    },
-  );
-  assert.deepEqual(allowed.events, []);
 });
 
 test("question and section services pass the locked transaction to every repository call", async () => {
@@ -283,13 +190,24 @@ test("question and section services pass the locked transaction to every reposit
   assert.ok(seenTransactions.every((repositoryTx) => repositoryTx === tx));
 });
 
-test("submitted responses freeze question definitions used by stored answers", async () => {
+test("submitted responses do not freeze question definitions", async () => {
   const { policy } = createPolicyHarness({ responseCount: 1 });
   const repositoryCalls = [];
   const questionsService = new SurveyQuestionsService(
     {
-      update: async () => repositoryCalls.push("update"),
-      findById: async () => repositoryCalls.push("find"),
+      update: async () => {
+        repositoryCalls.push("update");
+        return {
+          id: "question-1", sectionId: "section-1", titleKo: "Changed question meaning",
+          titleEn: null, descriptionKo: null, descriptionEn: null,
+          questionType: "short_text", options: null, config: null,
+          answerRegex: null, isRequired: true, sortOrder: 0,
+        };
+      },
+      findById: async () => {
+        repositoryCalls.push("find");
+        return { id: "question-1" };
+      },
       delete: async () => repositoryCalls.push("delete"),
     },
     {
@@ -301,20 +219,14 @@ test("submitted responses freeze question definitions used by stored answers", a
     policy,
   );
 
-  await expectConflict(
-    questionsService.update(
-      "survey-1",
-      "section-1",
-      "question-1",
-      { titleKo: "Changed question meaning" },
-    ),
-    "survey_structure_locked_after_response",
+  await questionsService.update(
+    "survey-1",
+    "section-1",
+    "question-1",
+    { titleKo: "Changed question meaning" },
   );
-  await expectConflict(
-    questionsService.delete("survey-1", "section-1", "question-1"),
-    "survey_structure_locked_after_response",
-  );
-  assert.deepEqual(repositoryCalls, []);
+  await questionsService.delete("survey-1", "section-1", "question-1");
+  assert.deepEqual(repositoryCalls, ["section", "update", "section", "find", "delete"]);
 });
 
 test("responded surveys can be hard-deleted", async () => {

@@ -1,9 +1,10 @@
 import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { DEFAULT_AUTHENTICATED_PERMISSION_BITS } from "@soc/contracts";
 import Redis from "ioredis";
 
 import { isoToDate, isoToMs, msToIso, nowDate } from "@soc/shared";
-import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -23,6 +24,7 @@ import {
   articleEngagements,
   surveyResponses,
   surveys,
+  userSanctions,
 } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
@@ -50,6 +52,8 @@ import type {
   FeePaymentMethod,
   FeePaymentType,
   VisibilityScope,
+  UserPostingSuspensionResponse,
+  UserSanctionRecord,
 } from "@soc/contracts";
 
 type UserUpsertInput = {
@@ -466,6 +470,85 @@ export class UsersRepository {
     return this.mapRowToUserRecord(updated);
   }
 
+  private mapUserSanction(row: typeof userSanctions.$inferSelect): UserSanctionRecord {
+    return {
+      sanctionId: row.sanctionId,
+      userId: String(row.userId),
+      type: "POSTING_SUSPENDED",
+      reason: row.reason,
+      issuedBy: row.issuedBy ? String(row.issuedBy) : null,
+      startsAt: msToIso(row.startsAt.valueOf()),
+      expiresAt: row.expiresAt ? msToIso(row.expiresAt.valueOf()) : null,
+      revokedAt: row.revokedAt ? msToIso(row.revokedAt.valueOf()) : null,
+      revokedBy: row.revokedBy ? String(row.revokedBy) : null,
+      createdAt: msToIso(row.createdAt.valueOf()),
+    };
+  }
+
+  async getPostingSuspension(userId: string): Promise<UserSanctionRecord | null> {
+    const now = nowDate();
+    const rows = await this.db
+      .select()
+      .from(userSanctions)
+      .where(
+        and(
+          eq(userSanctions.userId, userId),
+          eq(userSanctions.type, "POSTING_SUSPENDED"),
+          isNull(userSanctions.revokedAt),
+          lte(userSanctions.startsAt, now),
+          or(isNull(userSanctions.expiresAt), gt(userSanctions.expiresAt, now)),
+        ),
+      )
+      .orderBy(desc(userSanctions.createdAt))
+      .limit(1);
+
+    return rows[0] ? this.mapUserSanction(rows[0]) : null;
+  }
+
+  async setPostingSuspension(input: {
+    userId: string;
+    suspended: boolean;
+    reason?: string;
+    issuedBy: string;
+    expiresAt?: Date | null;
+  }): Promise<UserSanctionRecord | null> {
+    const now = nowDate();
+    return this.db.transaction(async (tx) => {
+      const activeWhere = and(
+        eq(userSanctions.userId, input.userId),
+        eq(userSanctions.type, "POSTING_SUSPENDED"),
+        isNull(userSanctions.revokedAt),
+      );
+
+      if (!input.suspended) {
+        await tx
+          .update(userSanctions)
+          .set({ revokedAt: now, revokedBy: input.issuedBy })
+          .where(activeWhere);
+        return null;
+      }
+
+      await tx
+        .update(userSanctions)
+        .set({ revokedAt: now, revokedBy: input.issuedBy })
+        .where(activeWhere);
+
+      const [created] = await tx
+        .insert(userSanctions)
+        .values({
+          userId: input.userId,
+          type: "POSTING_SUSPENDED",
+          reason: input.reason?.trim() || "admin_manual",
+          issuedBy: input.issuedBy,
+          startsAt: now,
+          expiresAt: input.expiresAt ?? null,
+        })
+        .returning();
+
+      return created ? this.mapUserSanction(created) : null;
+    });
+  }
+
   async searchUsers(query: string | undefined, limit = 20): Promise<AdminUserRecord[]> {
     const normalizedQuery = query?.trim() ?? "";
     const whereClause = normalizedQuery
@@ -553,12 +636,15 @@ export class UsersRepository {
     sortBy?: AdminUserSortBy;
     sortDirection?: SortDirection;
     status?: "active" | "inactive";
+    majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+    feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
+    academicStatus?: string;
   }): Promise<AdminUserListResponse> {
     const page = Math.max(input.page ?? 1, 1);
     const pageSize = Math.min(Math.max(input.pageSize ?? 20, 1), 100);
     const offset = (page - 1) * pageSize;
     const normalizedQuery = input.query?.trim() ?? "";
-    const conditions = [
+    const baseConditions = [
       normalizedQuery
         ? or(
             ilike(users.nameKo, `%${normalizedQuery}%`),
@@ -573,7 +659,20 @@ export class UsersRepository {
         : input.status === "inactive"
           ? eq(users.isActive, false)
           : undefined,
-    ].filter(Boolean);
+      input.academicStatus?.trim()
+        ? eq(users.academicStatus, input.academicStatus.trim())
+        : undefined,
+    ].filter(Boolean) as SQL[];
+    const conditions = [...baseConditions];
+    if (input.majorType === "PRIMARY") conditions.push(sql`nullif(trim(${users.primaryMajor}), '') is not null`);
+    if (input.majorType === "DOUBLE") conditions.push(sql`nullif(trim(${users.doubleMajor}), '') is not null`);
+    if (input.majorType === "MINOR") conditions.push(sql`nullif(trim(${users.minor}), '') is not null`);
+    if (input.feeStatus === "PAID" || input.feeStatus === "PARTIAL") {
+      conditions.push(sql`exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = ${input.feeStatus})`);
+    }
+    if (input.feeStatus === "UNPAID") {
+      conditions.push(sql`not exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} in ('PAID', 'PARTIAL'))`);
+    }
     const whereClause =
       conditions.length === 0 ? undefined : and(...conditions);
     const direction = input.sortDirection === "desc" ? desc : asc;
@@ -602,6 +701,22 @@ export class UsersRepository {
       .from(users)
       .where(whereClause);
 
+    const facetWhereClause = baseConditions.length === 0 ? undefined : and(...baseConditions);
+    const facetRows = await this.db
+      .select({
+        primaryMajor: sql<number>`count(*) filter (where nullif(trim(${users.primaryMajor}), '') is not null)`,
+        doubleMajor: sql<number>`count(*) filter (where nullif(trim(${users.doubleMajor}), '') is not null)`,
+        minor: sql<number>`count(*) filter (where nullif(trim(${users.minor}), '') is not null)`,
+        paid: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PAID'))`,
+        partial: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PARTIAL'))`,
+        enrolled: sql<number>`count(*) filter (where ${users.academicStatus} = '재학')`,
+        graduated: sql<number>`count(*) filter (where ${users.academicStatus} = '졸업')`,
+        otherAcademic: sql<number>`count(*) filter (where ${users.academicStatus} is null or ${users.academicStatus} not in ('재학', '졸업'))`,
+        unpaid: sql<number>`count(*) filter (where not exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} in ('PAID', 'PARTIAL')))`,
+      })
+      .from(users)
+      .where(facetWhereClause);
+
     const feeRows = rows.length
       ? await this.db
           .select({ userId: studentFeeStatus.userId, status: studentFeeStatus.status })
@@ -622,6 +737,19 @@ export class UsersRepository {
       page,
       pageSize,
       total: Number(countResult[0]?.count ?? 0),
+      facets: {
+        primaryMajor: Number(facetRows[0]?.primaryMajor ?? 0),
+        doubleMajor: Number(facetRows[0]?.doubleMajor ?? 0),
+        minor: Number(facetRows[0]?.minor ?? 0),
+        paid: Number(facetRows[0]?.paid ?? 0),
+        partial: Number(facetRows[0]?.partial ?? 0),
+        unpaid: Number(facetRows[0]?.unpaid ?? 0),
+        academic: {
+          enrolled: Number(facetRows[0]?.enrolled ?? 0),
+          graduated: Number(facetRows[0]?.graduated ?? 0),
+          other: Number(facetRows[0]?.otherAcademic ?? 0),
+        },
+      },
     };
   }
 
@@ -631,7 +759,7 @@ export class UsersRepository {
     if (cachedPermissionBits !== null) {
       const parsedPermissionBits = Number(cachedPermissionBits);
       if (Number.isFinite(parsedPermissionBits)) {
-        return parsedPermissionBits;
+        return parsedPermissionBits | DEFAULT_AUTHENTICATED_PERMISSION_BITS;
       }
     }
 
@@ -659,10 +787,12 @@ export class UsersRepository {
         ),
       );
 
-      const permissionBits = Number(rows[0]?.permissionBits ?? 0);
-      await this.cachePermissionBitmask(userId, permissionBits);
+    const permissionBits =
+      Number(rows[0]?.permissionBits ?? 0) |
+      DEFAULT_AUTHENTICATED_PERMISSION_BITS;
+    await this.cachePermissionBitmask(userId, permissionBits);
 
-      return permissionBits;
+    return permissionBits;
   }
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {

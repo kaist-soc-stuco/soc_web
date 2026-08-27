@@ -193,10 +193,11 @@ test("validates date and time answer formats", () => {
   );
 });
 
-test("rejects file-upload answers while durable survey asset links are disabled", () => {
-  expectHttpError(
-    () => validateSurveyAnswers([question({ questionType: "file_upload" })], [{ questionId: "question-1", content: { assetId: "1" } }]),
-    BadRequestException,
-    "survey_file_upload_temporarily_disabled",
+test("accepts a valid uploaded asset reference", () => {
+  assert.doesNotThrow(() =>
+    validateSurveyAnswers(
+      [question({ questionType: "file_upload", config: { maxFiles: 1 } })],
+      [{ questionId: "question-1", content: { assetId: "1" } }],
+    ),
   );
 });

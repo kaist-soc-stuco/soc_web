@@ -141,7 +141,19 @@ function validateAnswerContent(
       break;
     }
     case "file_upload": {
-      throw new BadRequestException("survey_file_upload_temporarily_disabled");
+      const assetIds = Array.isArray(content.assetIds)
+        ? content.assetIds
+        : typeof content.assetId === "string"
+          ? [content.assetId]
+          : [];
+      if (
+        !assetIds.every((assetId) => typeof assetId === "string" && /^\d+$/.test(assetId)) ||
+        hasDuplicateValues(assetIds as string[]) ||
+        assetIds.length > (question.config?.maxFiles ?? 1)
+      ) {
+        throw new BadRequestException("survey_file_upload_invalid");
+      }
+      break;
     }
     case "date": {
       if (typeof content.date !== "string" || !isValidDateOnly(content.date)) {

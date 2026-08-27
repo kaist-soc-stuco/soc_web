@@ -14,8 +14,11 @@ export interface ListQueryOptions {
 }
 
 export class ApiClientHttpError extends Error {
-  constructor(public readonly status: number) {
-    super(`HTTP ${status}`);
+  constructor(
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(code ? `HTTP ${status}: ${code}` : `HTTP ${status}`);
     this.name = "ApiClientHttpError";
   }
 }
@@ -137,7 +140,17 @@ const redirectToLogin = (): void => {
 
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    throw new ApiClientHttpError(response.status);
+    let code: string | undefined;
+    try {
+      const payload = (await response.json()) as { message?: unknown };
+      if (typeof payload.message === "string") code = payload.message;
+      if (Array.isArray(payload.message) && typeof payload.message[0] === "string") {
+        code = payload.message[0];
+      }
+    } catch {
+      // Error responses from proxies do not always contain JSON.
+    }
+    throw new ApiClientHttpError(response.status, code);
   }
 
   return response.json() as Promise<T>;

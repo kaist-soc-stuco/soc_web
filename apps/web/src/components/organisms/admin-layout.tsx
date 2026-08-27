@@ -18,9 +18,16 @@ import { PopoverPanel } from "@/components/ui/popover-panel";
 
 const ADMIN_ACCESS_PERMISSIONS = [
   Permissions.MANAGE_SURVEY,
-  Permissions.MANAGE_CONTENT,
+  Permissions.MANAGE_SITE_CONTENT,
+  Permissions.MANAGE_CALENDAR,
+  Permissions.MANAGE_CONTACTS,
+  Permissions.MANAGE_USERS,
   Permissions.MANAGE_FINANCE,
-  Permissions.ADMIN,
+  Permissions.MODERATE_CONTENT,
+  Permissions.MANAGE_BOARDS,
+  Permissions.SEND_BULK_EMAIL,
+  Permissions.VIEW_AUDIT_LOG,
+  Permissions.MANAGE_ROLES,
 ];
 
 export function AdminLayout() {

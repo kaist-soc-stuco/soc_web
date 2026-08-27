@@ -9,6 +9,7 @@ import type {
 import { ArrowRight, Loader2 } from "lucide-react";
 
 import { PageActionButton, PageSearchField, PageTabButton, PageTabs } from "@/components/ui/page-layout";
+import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { formatShortDate } from "@/lib/date-display";
@@ -20,9 +21,8 @@ function formatDate(value: string, lang: string) {
 }
 
 function getSurveyKindLabel(kind: string, lang: string) {
-  if (kind === "VOTE") return lang === "ko" ? "투표" : "Poll";
-  if (kind === "APPLICATION") return lang === "ko" ? "신청" : "Application";
-  return lang === "ko" ? "설문" : "Survey";
+  if (kind === "APPLICATION") return lang === "ko" ? "행사 신청" : "Event application";
+  return lang === "ko" ? "일반 설문" : "Survey";
 }
 
 function getSurveyStateLabel(state: string, lang: string) {
@@ -36,11 +36,15 @@ export function SearchForm({
   lang,
   onInputValueChange,
   onSubmit,
+  onSearchByChange,
+  searchBy,
 }: {
   inputValue: string;
   lang: string;
   onInputValueChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSearchByChange: (value: "title" | "title_content") => void;
+  searchBy: "title" | "title_content";
 }) {
   return (
     <form
@@ -55,6 +59,18 @@ export function SearchForm({
           onChange={onInputValueChange}
           onClear={() => onInputValueChange("")}
           placeholder={lang === "ko" ? "검색어를 입력하세요" : "Enter a search term"}
+        />
+        <SelectDropdown
+          ariaLabel={lang === "ko" ? "검색 범위" : "Search scope"}
+          className="w-full sm:w-36"
+          value={searchBy}
+          onChange={(value) => onSearchByChange(value as "title" | "title_content")}
+          options={[
+            { value: "title_content", label: lang === "ko" ? "제목+내용" : "Title + content" },
+            { value: "title", label: lang === "ko" ? "제목" : "Title" },
+          ]}
+          buttonClassName="text-sm font-normal"
+          optionClassName="text-sm !font-normal"
         />
         <PageActionButton type="submit" tone="primary" className="px-5">
           {lang === "ko" ? "검색" : "Search"}
@@ -92,7 +108,7 @@ export function SearchFilterTabs({
     {
       count: surveyCount,
       filter: "survey",
-      label: lang === "ko" ? "설문·투표" : "Surveys · Votes",
+      label: lang === "ko" ? "설문" : "Surveys",
     },
   ];
 
@@ -128,13 +144,7 @@ export function SearchStatus({
   totalCount: number;
 }) {
   if (!query) {
-    return (
-      <p className="px-1 text-sm font-normal text-slate-500">
-        {lang === "ko"
-          ? "검색어를 입력하면 게시판, 행사, 설문·투표, 일정 결과를 확인할 수 있습니다."
-          : "Enter a query to search board posts, events, surveys, and calendar items."}
-      </p>
-    );
+    return null;
   }
 
   return (
@@ -376,7 +386,7 @@ function SurveyResults({
   surveys: SurveyRecord[];
 }) {
   return (
-    <SectionShell count={surveys.length} title={lang === "ko" ? "설문·투표" : "Surveys · Votes"}>
+    <SectionShell count={surveys.length} title={lang === "ko" ? "설문" : "Surveys"}>
       {surveys.map((survey) => {
         const title = lang === "ko" ? survey.titleKo : survey.titleEn || survey.titleKo;
         const description = lang === "ko" ? survey.descriptionKo : survey.descriptionEn || survey.descriptionKo;

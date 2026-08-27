@@ -15,6 +15,7 @@ import { SurveySectionsService } from "./survey-sections.service";
 import { SurveyQuestionsService } from "./survey-questions.service";
 import { SurveyResponsesService } from "./survey-responses.service";
 import { SurveyMutationPolicy } from "./survey-mutation-policy";
+import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 
 import { SurveysController } from "./surveys.controller";
 import { SurveySectionsController } from "./survey-sections.controller";
@@ -41,6 +42,7 @@ import { SurveyResponsesController } from "./survey-responses.controller";
     SurveyQuestionsService,
     SurveyResponsesService,
     SurveyMutationPolicy,
+    GoogleSurveySheetsService,
   ],
 })
 export class SurveysModule {}

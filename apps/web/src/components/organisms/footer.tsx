@@ -1,34 +1,48 @@
 import { Link } from "react-router-dom";
 import { Instagram } from "lucide-react";
 
+import { useLanguage } from "@/hooks/use-language";
+
 const OFFICIAL_INSTAGRAM_URL = "https://www.instagram.com/in.cs.tagram/";
 
 export function Footer() {
+  const { lang } = useLanguage();
+
   return (
-    <footer className="mt-auto shrink-0 border-t border-slate-200 bg-slate-100 py-2.5 text-app-text-muted">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-start gap-x-2 gap-y-1 px-4 text-left text-[length:var(--home-calendar-day-size)] font-normal md:px-8">
-        <Link to="/about" className="rounded-sm transition-colors hover:text-brand-primary">
-          전산학부 집행위원회
-        </Link>
-        <span aria-hidden="true" className="text-slate-300">|</span>
-        <Link to="/terms" className="rounded-sm transition-colors hover:text-brand-primary">
-          이용약관
-        </Link>
-        <span aria-hidden="true" className="text-slate-300">|</span>
-        <Link to="/privacy" className="rounded-sm transition-colors hover:text-brand-primary">
-          개인정보처리방침
-        </Link>
-        <span className="text-slate-500">Copyright © KAIST SOC. All rights reserved.</span>
-        <a
-          href={OFFICIAL_INSTAGRAM_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Instagram"
-          title="Instagram"
-          className="ml-2 inline-flex size-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200 hover:text-brand-primary"
-        >
-          <Instagram className="size-3.5" aria-hidden="true" />
-        </a>
+    <footer className="home-site-footer mt-auto shrink-0 text-app-text-muted">
+      <div className="home-footer-inner mx-auto w-full max-w-7xl px-4 md:px-8">
+        <div className="home-footer-contact">
+          <Link to="/about" className="rounded-sm transition-colors hover:text-brand-primary">
+            {lang === "ko" ? "KAIST 전산학부 학생회 SOC" : "KAIST School of Computing Student Council SOC"}
+          </Link>
+          <span aria-hidden="true" className="home-footer-separator">·</span>
+          <span>{lang === "ko" ? "학생회실: N1 4층 4xx호" : "Student Council Office: N1 4F, Room 4xx"}</span>
+          <span aria-hidden="true" className="home-footer-separator">·</span>
+          <a className="rounded-sm transition-colors hover:text-brand-primary" href="mailto:contact@cs.kaist.ac.kr">
+            contact@cs.kaist.ac.kr
+          </a>
+        </div>
+
+        <div className="home-footer-meta">
+          <Link to="/terms" className="rounded-sm transition-colors hover:text-brand-primary">
+            {lang === "ko" ? "이용약관" : "Terms"}
+          </Link>
+          <span aria-hidden="true" className="home-footer-separator">|</span>
+          <Link to="/privacy" className="rounded-sm transition-colors hover:text-brand-primary">
+            {lang === "ko" ? "개인정보처리방침" : "Privacy"}
+          </Link>
+          <span className="home-footer-copyright">Copyright © KAIST SOC. All rights reserved.</span>
+          <a
+            href={OFFICIAL_INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            title="Instagram"
+            className="home-footer-instagram"
+          >
+            <Instagram aria-hidden="true" />
+          </a>
+        </div>
       </div>
     </footer>
   );

@@ -3,21 +3,26 @@ import type {
   CommentItem,
 } from "@soc/contracts";
 import { isoToDate, nowDate } from "@soc/shared";
-import { ArrowUp, Heart, Loader2, Trash2 } from "lucide-react";
+import { ArrowUp, Edit2, EyeOff, Heart, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EngagementActionButton } from "@/components/ui/article-engagement-actions";
 import { UiTextarea } from "@/components/ui/form-control";
+import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 
 type CommentSectionProps = {
+  allowEngagement: boolean;
   canCreateComment: boolean;
   canManageComments: boolean;
   commentActionSubmitting: string | null;
   commentError: string | null;
   commentSubmitting: boolean;
   commentText: string;
+  commentPage: number;
+  commentPageSize: number;
+  commentTotal: number;
   comments: CommentItem[];
   commentsLoading: boolean;
   currentUserId: string | null;
@@ -27,6 +32,9 @@ type CommentSectionProps = {
   onCreateComment: () => Promise<void>;
   onCreateReply: (parentCommentId: string) => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
+  onHideComment: (commentId: string, reason: string) => Promise<void>;
+  onCommentPageChange: (page: number) => void;
+  onUpdateComment: (commentId: string, content: string) => Promise<void>;
   onSetCommentEngagement: (
     commentId: string,
     kind: CommentEngagementKind,
@@ -40,6 +48,7 @@ type CommentSectionProps = {
 };
 
 export function CommentSection({
+  allowEngagement,
   comments,
   commentsLoading,
   canManageComments,
@@ -47,6 +56,9 @@ export function CommentSection({
   currentUserId,
   commentActionSubmitting,
   commentText,
+  commentPage,
+  commentPageSize,
+  commentTotal,
   commentError,
   commentSubmitting,
   isAuthenticated,
@@ -55,6 +67,9 @@ export function CommentSection({
   onCreateComment,
   onCreateReply,
   onDeleteComment,
+  onHideComment,
+  onCommentPageChange,
+  onUpdateComment,
   onSetCommentEngagement,
   onReplyTextChange,
   onReplyTargetChange,
@@ -78,7 +93,7 @@ export function CommentSection({
       <div className="flex items-center justify-between">
         <h2 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-slate-800">
           <span>{lang === "ko" ? "댓글" : "Comments"}</span>
-          <span className="ml-1 text-[length:var(--ui-text-body-size)] text-brand-primary">{comments.length}</span>
+          <span className="ml-1 text-[length:var(--ui-text-body-size)] font-normal text-brand-primary">{commentTotal}</span>
         </h2>
         {commentsLoading && (
           <Loader2 className="size-4 animate-spin text-brand-primary" />
@@ -99,14 +114,16 @@ export function CommentSection({
               return (
                 <div key={comment.commentId}>
                   <CommentRow
-                    canDelete={
-                      canManageComments || currentUserId === comment.author.userId
-                    }
+                    allowEngagement={allowEngagement}
+                    canDelete={currentUserId === comment.author.userId}
+                    canModerate={canManageComments}
                     comment={comment}
                     commentActionSubmitting={commentActionSubmitting}
                     isAuthenticated={isAuthenticated}
                     lang={lang}
                     onDeleteComment={onDeleteComment}
+                    onHideComment={onHideComment}
+                    onUpdateComment={onUpdateComment}
                     onSetCommentEngagement={onSetCommentEngagement}
                     onReplyToggle={() =>
                       onReplyTargetChange(
@@ -137,15 +154,17 @@ export function CommentSection({
                   {replies.map((reply) => (
                     <CommentRow
                       key={reply.commentId}
-                      canDelete={
-                        canManageComments || currentUserId === reply.author.userId
-                      }
+                      allowEngagement={allowEngagement}
+                      canDelete={currentUserId === reply.author.userId}
+                      canModerate={canManageComments}
                       comment={reply}
                       commentActionSubmitting={commentActionSubmitting}
                       isAuthenticated={isAuthenticated}
                       isNested
                       lang={lang}
                       onDeleteComment={onDeleteComment}
+                      onHideComment={onHideComment}
+                      onUpdateComment={onUpdateComment}
                       onSetCommentEngagement={onSetCommentEngagement}
                       onReplyToggle={() => undefined}
                       showReplyButton={false}
@@ -157,6 +176,16 @@ export function CommentSection({
           </div>
         )}
       </div>
+
+      {commentTotal > commentPageSize ? (
+        <Pagination
+          className="mt-4 border-t border-slate-100 pt-3"
+          currentPage={commentPage}
+          lang={lang}
+          onPageChange={onCommentPageChange}
+          totalPages={Math.ceil(commentTotal / commentPageSize)}
+        />
+      ) : null}
 
       <div className="mt-5">
         <CommentComposer
@@ -192,24 +221,32 @@ export function CommentSection({
 }
 
 function CommentRow({
+  allowEngagement,
   canDelete,
+  canModerate,
   comment,
   commentActionSubmitting,
   isAuthenticated,
   isNested = false,
   lang,
   onDeleteComment,
+  onHideComment,
+  onUpdateComment,
   onSetCommentEngagement,
   onReplyToggle,
   showReplyButton,
 }: {
+  allowEngagement: boolean;
   canDelete: boolean;
+  canModerate: boolean;
   comment: CommentItem;
   commentActionSubmitting: string | null;
   isAuthenticated: boolean;
   isNested?: boolean;
   lang: string;
   onDeleteComment: (commentId: string) => Promise<void>;
+  onHideComment: (commentId: string, reason: string) => Promise<void>;
+  onUpdateComment: (commentId: string, content: string) => Promise<void>;
   onSetCommentEngagement: (
     commentId: string,
     kind: CommentEngagementKind,
@@ -221,10 +258,29 @@ function CommentRow({
   const likeActionKey = `${comment.commentId}:LIKE`;
   const likeActive = isAuthenticated && comment.viewerHasLiked;
   const [deletePopoverOpen, setDeletePopoverOpen] = useState(false);
+  const [hideReason, setHideReason] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(comment.content);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const handleDeleteConfirm = async () => {
     setDeletePopoverOpen(false);
     await onDeleteComment(comment.commentId);
+  };
+
+  const handleHideConfirm = async () => {
+    if (!hideReason.trim()) return;
+    setDeletePopoverOpen(false);
+    await onHideComment(comment.commentId, hideReason);
+    setHideReason("");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editText.trim() || editSubmitting) return;
+    setEditSubmitting(true);
+    await onUpdateComment(comment.commentId, editText);
+    setEditSubmitting(false);
+    setEditing(false);
   };
 
   return (
@@ -263,7 +319,7 @@ function CommentRow({
             </time>
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
-            <EngagementActionButton
+            {allowEngagement ? <EngagementActionButton
               active={likeActive}
               className="h-7 gap-1 rounded-md border-0 px-1.5 text-xs font-medium"
               count={comment.likeCount}
@@ -286,7 +342,7 @@ function CommentRow({
                 )
               }
               tone="like"
-            />
+            /> : null}
             {showReplyButton ? (
               <Button
                 type="button"
@@ -298,19 +354,19 @@ function CommentRow({
                 {lang === "ko" ? "답글" : "Reply"}
               </Button>
             ) : null}
-            {canDelete && (
+            {(canDelete || canModerate) && (
               <div className="relative">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={lang === "ko" ? "댓글 삭제" : "Delete comment"}
+                  aria-label={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                   aria-expanded={deletePopoverOpen}
                   onClick={() => setDeletePopoverOpen((open) => !open)}
                   className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                  title={lang === "ko" ? "댓글 삭제" : "Delete comment"}
+                  title={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                 >
-                  <Trash2 className="size-3.5" aria-hidden="true" />
+                  {canDelete ? <Trash2 className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
                 </Button>
                 {deletePopoverOpen ? (
                   <div
@@ -318,9 +374,24 @@ function CommentRow({
                     className="absolute bottom-full right-0 z-30 mb-2 w-52 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.14)]"
                     role="dialog"
                   >
-                    <p className="text-[length:var(--ui-text-body-sm-size)] font-medium leading-5 text-slate-700">
-                      {lang === "ko" ? "댓글을 삭제할까요?" : "Delete this comment?"}
+                    <p className="text-[length:var(--ui-text-body-sm-size)] font-semibold leading-5 text-slate-800">
+                      {canDelete
+                        ? (lang === "ko" ? "댓글 삭제" : "Delete comment")
+                        : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                     </p>
+                    <p className="mt-1 text-[length:var(--ui-text-body-sm-size)] font-normal leading-5 text-slate-600">
+                      {canDelete
+                        ? (lang === "ko" ? "이 댓글을 영구적으로 삭제하시겠습니까? 삭제된 댓글은 되돌릴 수 없습니다." : "Delete this comment permanently? Deleted comments cannot be restored.")
+                        : (lang === "ko" ? "숨김 사유를 입력해 주세요." : "Enter a reason for hiding this comment.")}
+                    </p>
+                    {!canDelete ? (
+                      <UiTextarea
+                        className="mt-2 min-h-20"
+                        value={hideReason}
+                        onChange={(event) => setHideReason(event.target.value)}
+                        placeholder={lang === "ko" ? "관리 기록에 남을 사유" : "Reason recorded in the audit log"}
+                      />
+                    ) : null}
                     <div className="mt-2.5 flex justify-end gap-1.5">
                       <Button
                         type="button"
@@ -334,21 +405,66 @@ function CommentRow({
                         type="button"
                         size="sm"
                         variant="destructive"
-                        disabled={commentActionSubmitting === comment.commentId}
-                        onClick={() => void handleDeleteConfirm()}
+                        disabled={commentActionSubmitting === comment.commentId || (!canDelete && !hideReason.trim())}
+                        onClick={() => void (canDelete ? handleDeleteConfirm() : handleHideConfirm())}
                       >
-                        {lang === "ko" ? "삭제" : "Delete"}
+                        {canDelete ? (lang === "ko" ? "삭제" : "Delete") : (lang === "ko" ? "숨기기" : "Hide")}
                       </Button>
                     </div>
                   </div>
                 ) : null}
               </div>
             )}
+            {canDelete ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={lang === "ko" ? "댓글 수정" : "Edit comment"}
+                onClick={() => {
+                  setEditText(comment.content);
+                  setEditing(true);
+                }}
+                className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+              >
+                <Edit2 className="size-3.5" aria-hidden="true" />
+              </Button>
+            ) : null}
           </div>
         </div>
-        <p className="mt-1 whitespace-pre-line text-[length:var(--ui-text-body-size)] font-medium leading-relaxed text-slate-700">
-          {comment.content}
-        </p>
+        {editing ? (
+          <div className="mt-2">
+            <UiTextarea
+              autoFocus
+              rows={3}
+              value={editText}
+              onChange={(event) => setEditText(event.target.value)}
+              className="text-[length:var(--ui-text-body-size)] font-normal"
+            />
+            <div className="mt-2 flex justify-end gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(false)}
+              >
+                {lang === "ko" ? "취소" : "Cancel"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleSaveEdit()}
+                disabled={editSubmitting || !editText.trim()}
+              >
+                {lang === "ko" ? "저장" : "Save"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-1 whitespace-pre-line text-[length:var(--ui-text-body-size)] font-normal leading-relaxed text-slate-700">
+            {comment.content}
+          </p>
+        )}
       </div>
     </article>
   );

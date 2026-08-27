@@ -52,16 +52,16 @@ export function PledgesSection({ lang }: { lang: string }) {
               const status = pledge.pledgeStatus ?? "PLANNED";
 
               return (
-                <article key={pledge.contentBlockId}>
-                  <span className="about-pledge-index">{String(index + 1).padStart(2, "0")}</span>
-                  <div>
-                    <h3>{text.title}</h3>
-                    {text.body ? <p>{text.body}</p> : null}
-                  </div>
-                  <span className={`about-pledge-status is-${status.toLowerCase().replace("_", "-")}`}>
-                    {lang === "ko" ? statusMeta[status].ko : statusMeta[status].en}
-                  </span>
-                </article>
+                <details key={pledge.contentBlockId} className="about-pledge-item">
+                  <summary>
+                    <span className="about-pledge-index">{String(index + 1).padStart(2, "0")}</span>
+                    <span className="about-pledge-title">{text.title}</span>
+                    <span className={`about-pledge-status is-${status.toLowerCase().replace("_", "-")}`}>
+                      {lang === "ko" ? statusMeta[status].ko : statusMeta[status].en}
+                    </span>
+                  </summary>
+                  {text.body ? <p>{text.body}</p> : null}
+                </details>
               );
             })}
           </div>

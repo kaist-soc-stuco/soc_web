@@ -13,7 +13,6 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { PageSearchField } from "@/components/ui/page-layout";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { SurveyStatusBadge } from "@/components/ui/survey-status-badge";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   AdminDataTable,
   AdminRowActions,
@@ -45,6 +44,8 @@ import {
   Link2, 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { useToast } from "@/components/ui/toast";
 
 // Convert timestamp to 24-hour format
 function format24hDateTime(dateIso: string | null) {
@@ -89,7 +90,7 @@ function formatRelativeTime(dateIso: string | null) {
 }
 
 function renderTypeLabel(survey: SurveyRecord) {
-  const label = survey.kind === "VOTE" ? "투표" : survey.kind === "APPLICATION" ? "신청" : "설문";
+  const label = survey.kind === "APPLICATION" ? "행사 신청" : "일반 설문";
 
   return <span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{label}</span>;
 }
@@ -121,6 +122,7 @@ export function SurveyListPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
   const showInitialLoading = loading && surveys.length === 0;
 
   const fetchSurveys = async () => {
@@ -158,9 +160,8 @@ export function SurveyListPage() {
     const confirmed = await requestConfirm({
       confirmLabel: "삭제하기",
       title: "설문조사 삭제",
-      description: <>정말 <strong className="font-semibold text-slate-900">“{survey.titleKo}”</strong> 설문을 삭제하시겠습니까?</>,
+      description: <>정말 <strong className="font-semibold text-slate-900">“{survey.titleKo}”</strong> 설문을 삭제하시겠습니까? 삭제된 응답 데이터는 복구할 수 없습니다.</>,
       tone: "danger",
-      warning: "(삭제된 응답 데이터는 영구히 복구할 수 없습니다.)",
     });
     if (!confirmed) return;
 
@@ -169,7 +170,7 @@ export function SurveyListPage() {
       await client.deleteSurvey(survey.id);
       setSurveys((prev) => prev.filter((item) => item.id !== survey.id));
     } catch {
-      alert("삭제에 실패했습니다.");
+      toast({ type: "error", message: "삭제에 실패했습니다." });
     } finally {
       setDeleting(null);
     }
@@ -187,10 +188,10 @@ export function SurveyListPage() {
     try {
       await client.duplicateSurvey(id);
       await fetchSurveys();
-      alert("설문조사가 성공적으로 복제되었습니다.");
+      toast({ type: "success", message: "설문조사가 성공적으로 복제되었습니다." });
     } catch (err) {
       console.error(err);
-      alert("설문 복제에 실패했습니다.");
+      toast({ type: "error", message: "설문 복제에 실패했습니다." });
     } finally {
       setDuplicating(null);
     }
@@ -200,7 +201,8 @@ export function SurveyListPage() {
     const url = `${window.location.origin}/survey/${id}`;
     navigator.clipboard
       .writeText(url)
-      .then(() => alert("설문 응답 링크가 복사되었습니다."));
+      .then(() => toast({ type: "success", message: "설문 응답 링크가 복사되었습니다." }))
+      .catch(() => toast({ type: "error", message: "설문 응답 링크를 복사하지 못했습니다." }));
   };
 
   const openRowDropdown = (surveyId: string, buttonElement: HTMLButtonElement) => {
@@ -309,13 +311,11 @@ export function SurveyListPage() {
           <AdminTableCard className="overflow-visible">
             <div className="border-b border-slate-100 p-5">
             <div className="flex flex-wrap items-center gap-3">
-              <SegmentedControl
+              <AdminSelectDropdown
                 ariaLabel="설문 상태"
-                role="tablist"
-                className="shrink-0"
                 value={statusFilter}
                 options={[
-                  { value: "all", label: "전체" },
+                  { value: "all", label: "전체 상태" },
                   { value: "open", label: "진행중" },
                   { value: "closed", label: "마감" },
                   { value: "draft", label: "임시저장" },
@@ -324,15 +324,15 @@ export function SurveyListPage() {
                   setStatusFilter(value as SurveyStatusFilter);
                   setCurrentPage(1);
                 }}
+                className="w-28 shrink-0"
               />
               <AdminSelectDropdown
                 ariaLabel="설문 유형"
                 value={typeFilter}
                 options={[
                   { value: "all", label: "전체 유형" },
-                  { value: "SURVEY", label: "설문" },
-                  { value: "VOTE", label: "투표" },
-                  { value: "APPLICATION", label: "신청" },
+                  { value: "SURVEY", label: "일반 설문" },
+                  { value: "APPLICATION", label: "행사 신청" },
                 ]}
                 onChange={(value) => {
                   setTypeFilter(value);
@@ -379,6 +379,7 @@ export function SurveyListPage() {
                   <col style={{ width: 120 }} />
                   <col style={{ width: 190 }} />
                   <col style={{ width: 190 }} />
+                  <col style={{ width: 104 }} />
                   <col style={{ width: 72 }} />
                 </colgroup>
                 <AdminTableHeader>
@@ -410,6 +411,7 @@ export function SurveyListPage() {
                     >
                       최근 수정
                     </AdminSortableHead>
+                    <AdminTableHead className="text-center">응답</AdminTableHead>
                     <AdminTableHead><span className="sr-only">작업</span></AdminTableHead>
                   </tr>
                 </AdminTableHeader>
@@ -439,6 +441,24 @@ export function SurveyListPage() {
                         </AdminTableCell>
                         <AdminTableCell className="text-center whitespace-nowrap">
                           {formatRelativeTime(survey.updatedAt)}
+                        </AdminTableCell>
+                        <AdminTableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <IconButton
+                              size="sm"
+                              aria-label={`${survey.titleKo} 응답 목록`}
+                              onClick={() => navigate(`/admin/surveys/${survey.id}/responses`)}
+                            >
+                              <ClipboardList className="size-4" />
+                            </IconButton>
+                            <IconButton
+                              size="sm"
+                              aria-label={`${survey.titleKo} 결과 요약`}
+                              onClick={() => navigate(`/survey/${survey.id}/results`)}
+                            >
+                              <BarChart3 className="size-4" />
+                            </IconButton>
+                          </div>
                         </AdminTableCell>
                         <AdminTableCell className="text-center">
                           <AdminRowActions
@@ -479,14 +499,11 @@ export function SurveyListPage() {
                   {(() => {
                     const target = surveys.find((survey) => survey.id === activeRowDropdown.id);
                     if (!target) return null;
-                    const hasResponses = Boolean(target.isPublished);
+                    const hasResponses = (target.responseCount ?? 0) > 0;
 
                     return (
                       <>
                         <AdminActionMenuItem icon={<Edit2 />} onClick={() => { setActiveRowDropdown(null); navigate(`/admin/surveys/${target.id}/edit`); }}>편집</AdminActionMenuItem>
-                        {hasResponses ? <AdminActionMenuItem icon={<ClipboardList />} onClick={() => { setActiveRowDropdown(null); navigate(`/admin/surveys/${target.id}/responses`); }}>응답 목록</AdminActionMenuItem> : null}
-                        {hasResponses ? <AdminActionMenuItem icon={<BarChart3 />} onClick={() => { setActiveRowDropdown(null); navigate(`/survey/${target.id}/results`); }}>결과 보기</AdminActionMenuItem> : null}
-                        {hasResponses ? <AdminActionMenuDivider /> : null}
                         {hasResponses && (
                           <AdminActionMenuItem
                             icon={<Link2 />}

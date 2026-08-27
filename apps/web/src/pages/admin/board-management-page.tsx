@@ -31,25 +31,26 @@ import { AdminCard, AdminFormField, AdminPageHeader, AdminPageMain, AdminPageShe
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { UiInput } from "@/components/ui/form-control";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const permissionOptions = [
   { bit: 0, label: "제한 없음" },
-  ...PERMISSION_REGISTRY.map((permission) => ({ bit: permission.bit, label: permission.labelKo })),
+  ...PERMISSION_REGISTRY
+    .filter((permission) => permission.code === "WRITE_OFFICIAL" || permission.code === "WRITE_LAB")
+    .map((permission) => ({ bit: permission.bit, label: permission.labelKo })),
 ];
 
-type BoardFormValues = BoardCreateRequest & { isActive: boolean };
+type BoardFormValues = Omit<BoardCreateRequest, "descriptionKo" | "descriptionEn"> & { isActive: boolean };
 
 const createEmptyForm = (sortOrder = 0): BoardFormValues => ({
   allowComment: true,
+  allowGuestRead: true,
   allowLike: true,
   allowSecret: false,
   code: "",
-  descriptionEn: "",
-  descriptionKo: "",
   isActive: true,
   nameEn: "",
   nameKo: "",
@@ -58,7 +59,7 @@ const createEmptyForm = (sortOrder = 0): BoardFormValues => ({
 });
 
 export function BoardManagementPage() {
-  return <AuthGuard requirePermission={Permissions.ADMIN}><BoardManagementPageContent /></AuthGuard>;
+  return <AuthGuard requirePermission={Permissions.MANAGE_BOARDS}><BoardManagementPageContent /></AuthGuard>;
 }
 
 function BoardManagementPageContent() {
@@ -111,11 +112,10 @@ function BoardManagementPageContent() {
     setEditingCode(board.code);
     setForm({
       allowComment: board.allowComment,
+      allowGuestRead: board.allowGuestRead,
       allowLike: board.allowLike,
       allowSecret: board.allowSecret,
       code: board.code,
-      descriptionEn: board.descriptionEn ?? "",
-      descriptionKo: board.descriptionKo ?? "",
       isActive: board.isActive,
       nameEn: board.nameEn ?? "",
       nameKo: board.nameKo,
@@ -263,15 +263,11 @@ function BoardManagementPageContent() {
     >
       <div className="space-y-8">
         <section className="space-y-4">
-          <div><h3 className="text-sm font-semibold text-slate-900">기본 정보</h3><p className="mt-1 text-xs text-slate-500">게시판 식별자와 이름, 설명을 관리합니다.</p></div>
+          <h3 className="text-sm font-semibold text-slate-900">기본 정보</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2"><AdminFormField label="게시판 코드"><UiInput value={form.code} disabled={Boolean(editingCode)} onChange={(event) => setForm((current) => ({ ...current, code: event.currentTarget.value }))} placeholder="notice" /></AdminFormField></div>
             <AdminFormField label="이름 (한글)"><UiInput value={form.nameKo} onChange={(event) => setForm((current) => ({ ...current, nameKo: event.currentTarget.value }))} /></AdminFormField>
             <AdminFormField label="Name (English)"><UiInput value={form.nameEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} /></AdminFormField>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <AdminFormField label="설명 (한글)"><UiTextarea rows={4} maxLength={255} value={form.descriptionKo ?? ""} onChange={(event) => setForm((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} placeholder="게시판 설명을 입력하세요." /></AdminFormField>
-            <AdminFormField label="Description (English)"><UiTextarea rows={4} maxLength={255} value={form.descriptionEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, descriptionEn: event.currentTarget.value }))} placeholder="Describe this board in English." /></AdminFormField>
           </div>
           <Toggle label="공개 여부" checked={form.isActive} onChange={(checked) => setForm((current) => ({ ...current, isActive: checked }))} />
         </section>
@@ -282,8 +278,8 @@ function BoardManagementPageContent() {
         </section>
 
         <section className="space-y-4 border-t border-slate-100 pt-6">
-          <div><h3 className="text-sm font-semibold text-slate-900">게시판 기능</h3><p className="mt-1 text-xs text-slate-500">필요한 기능만 켜서 사용합니다.</p></div>
-          <div className="grid gap-2 md:grid-cols-3"><Toggle label="댓글 허용" checked={form.allowComment} onChange={(checked) => setForm((current) => ({ ...current, allowComment: checked }))} /><Toggle label="비밀글 허용" checked={form.allowSecret} onChange={(checked) => setForm((current) => ({ ...current, allowSecret: checked }))} /><Toggle label="추천 및 스크랩" checked={form.allowLike} onChange={(checked) => setForm((current) => ({ ...current, allowLike: checked }))} /></div>
+          <h3 className="text-sm font-semibold text-slate-900">게시판 기능</h3>
+          <div className="grid gap-2 md:grid-cols-2"><Toggle label="댓글 허용" checked={form.allowComment} onChange={(checked) => setForm((current) => ({ ...current, allowComment: checked }))} /><Toggle label="비밀글 허용" checked={form.allowSecret} onChange={(checked) => setForm((current) => ({ ...current, allowSecret: checked }))} /><Toggle label="추천 및 스크랩" checked={form.allowLike} onChange={(checked) => setForm((current) => ({ ...current, allowLike: checked }))} /><Toggle label="비로그인 열람 허용" checked={form.allowGuestRead} onChange={(checked) => setForm((current) => ({ ...current, allowGuestRead: checked }))} /></div>
         </section>
 
       </div>

@@ -69,10 +69,12 @@ test("requires complete options and grid axes", () => {
   );
 });
 
-test("temporarily disables file-upload questions at the backend boundary", () => {
-  expectBadRequest(
-    () => assertSurveyQuestionDefinition(question({ questionType: "file_upload" })),
-    "survey_file_upload_temporarily_disabled",
+test("accepts configured file-upload questions", () => {
+  assert.doesNotThrow(() =>
+    assertSurveyQuestionDefinition(question({
+      questionType: "file_upload",
+      config: { maxFiles: 1, maxSizeBytes: 20_000_000 },
+    })),
   );
 });
 

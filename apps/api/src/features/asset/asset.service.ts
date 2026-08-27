@@ -7,6 +7,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { isoToDate, msToIso, nowMs } from "@soc/shared";
@@ -18,10 +19,12 @@ import { BoardRepository } from "../board/repositories/board.repository";
 import { ArticleRepository } from "../board/repositories/article.repository";
 import type { CurrentUserContext } from "../board/board-access";
 import { getReadableArticleScopes } from "../board/article-access";
+import { AuditLogService } from "../audit/audit-log.service";
 import type {
   AssetDirectUploadPrepareResponse,
   AssetUploadResponse,
 } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 
 type UploadedAssetFile = {
   buffer: Buffer;
@@ -43,6 +46,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     private readonly storage: AssetStorageProvider,
     private readonly boardRepository: BoardRepository,
     private readonly articleRepository: ArticleRepository,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   onModuleInit() {
@@ -252,17 +256,27 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     if (asset.links.length === 0) {
       if (asset.publicContentImage) {
         readableUsageTypes = ["IMAGE"];
+      } else if (
+        asset.surveyAnswerFile &&
+        currentUser.user &&
+        Permissions.has(currentUser.user.permission, Permissions.MANAGE_SURVEY)
+      ) {
+        readableUsageTypes = ["ATTACHMENT"];
       } else if (!currentUser.user || currentUser.user.id !== asset.uploadedBy) {
         throw new NotFoundException("asset_not_found");
       }
     } else {
-      const readableScopes = getReadableArticleScopes(currentUser);
-
       for (const link of asset.links) {
         const board = await this.boardRepository.findByCode(link.boardCode);
         if (!board || !board.isActive) {
           continue;
         }
+
+        const readableScopes = getReadableArticleScopes(
+          currentUser,
+          board.allowGuestRead,
+        );
+        if (readableScopes.length === 0) continue;
 
         const articleReadable = await this.articleRepository.isReadableArticle(
           board.boardId,
@@ -285,6 +299,23 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       buffer = await this.storage.read(asset.storageKey);
     } catch {
       throw new NotFoundException("asset_not_found");
+    }
+
+    if (
+      asset.surveyAnswerFile &&
+      currentUser.user &&
+      Permissions.has(currentUser.user.permission, Permissions.MANAGE_SURVEY)
+    ) {
+      await this.auditLogService?.record({
+        action: "survey.answer_file.download",
+        actorUserId: currentUser.user.id,
+        targetId: asset.assetId,
+        targetType: "survey_answer_file",
+        payload: {
+          filename: asset.originalFilename,
+          mimeType: asset.mimeType,
+        },
+      });
     }
 
     const isImage = asset.mimeType.startsWith("image/");

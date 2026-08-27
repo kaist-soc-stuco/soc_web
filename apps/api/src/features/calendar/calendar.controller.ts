@@ -77,19 +77,19 @@ export class CalendarController {
   }
 
   @Get("manual")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async listManualEvents(): Promise<CalendarEventListResponse> {
     return this.calendarService.listManualEvents();
   }
 
   @Get("admin/events")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async listManagedEvents(): Promise<CalendarEventListResponse> {
     return this.calendarService.listManagedEvents();
   }
 
   @Patch("admin/events/:id/presentation")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async updateEventPresentation(
     @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
@@ -100,7 +100,7 @@ export class CalendarController {
   }
 
   @Get("manual/export")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   @Header("Content-Type", "text/calendar; charset=utf-8")
   @Header("Content-Disposition", "attachment; filename=\"soc-calendar.ics\"")
   async exportIcs(): Promise<string> {
@@ -108,7 +108,7 @@ export class CalendarController {
   }
 
   @Post("manual")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async createManualEvent(
     @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(CalendarEventCreateSchema))
@@ -118,7 +118,7 @@ export class CalendarController {
   }
 
   @Post("manual/sync-external")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async syncExternalCalendarIcs(
     @Req() request: AuthenticatedRequest,
   ): Promise<CalendarExternalSyncResponse> {
@@ -126,7 +126,7 @@ export class CalendarController {
   }
 
   @Post("manual/sync-kaist")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async syncKaistAcademicCalendar(
     @Query("year") year?: string,
   ): Promise<CalendarKaistSyncResponse> {
@@ -138,13 +138,13 @@ export class CalendarController {
   }
 
   @Post("manual/sync-google")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async syncGoogleCalendars(): Promise<CalendarGoogleSyncResponse> {
     return this.calendarService.syncGoogleCalendars();
   }
 
   @Post("manual/import")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async importIcs(
     @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(CalendarIcsImportSchema))
@@ -154,7 +154,7 @@ export class CalendarController {
   }
 
   @Patch("manual/:id")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async updateManualEvent(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(CalendarEventUpdateSchema))
@@ -164,7 +164,7 @@ export class CalendarController {
   }
 
   @Delete("manual/:id")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async archiveManualEvent(
     @Param("id") id: string,
   ): Promise<{ ok: true; calendarEventId: string }> {

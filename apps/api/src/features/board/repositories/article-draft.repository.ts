@@ -63,6 +63,8 @@ const mapRow = (row: DraftSelectRow): ArticleDraftRecord => {
       "PUBLIC",
     isPinned: toOptionalBoolean(payload.isPinned, false),
     pinOrder: toOptionalNumber(payload.pinOrder),
+    homeVisible: toOptionalBoolean(payload.homeVisible, true),
+    homeOrder: toOptionalNumber(payload.homeOrder),
     isSecret: toOptionalBoolean(payload.isSecret, false),
     isAnonymous: toOptionalBoolean(payload.isAnonymous, false),
     allowComment: toOptionalBoolean(payload.allowComment, true),

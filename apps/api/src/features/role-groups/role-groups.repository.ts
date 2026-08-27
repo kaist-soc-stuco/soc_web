@@ -10,6 +10,7 @@ import {
   permissions,
   roleGroupPermissions,
   roleGroups,
+  studentFeeStatus,
   userRoleGroups,
   users,
 } from "../../infrastructure/postgres/postgres.schema";
@@ -308,6 +309,18 @@ export class RoleGroupsRepository {
       input.academicStatus?.trim()
         ? ilike(users.academicStatus, `%${input.academicStatus.trim()}%`)
         : undefined,
+      input.majorType === "PRIMARY"
+        ? sql`nullif(trim(${users.primaryMajor}), '') is not null`
+        : input.majorType === "DOUBLE"
+          ? sql`nullif(trim(${users.doubleMajor}), '') is not null`
+          : input.majorType === "MINOR"
+            ? sql`nullif(trim(${users.minor}), '') is not null`
+            : undefined,
+      input.feeStatus === "PAID" || input.feeStatus === "PARTIAL"
+        ? sql`exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = ${input.feeStatus})`
+        : input.feeStatus === "UNPAID"
+          ? sql`not exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} in ('PAID', 'PARTIAL'))`
+          : undefined,
       input.status === "active"
         ? eq(users.isActive, true)
         : input.status === "inactive"

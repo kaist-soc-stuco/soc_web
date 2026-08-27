@@ -54,6 +54,7 @@ import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
+import { useToast } from "@/components/ui/toast";
 
 const formatCompactDateTime = (value: string | null) => {
   if (!value) return "";
@@ -93,6 +94,7 @@ const QUESTION_TYPES = [
   { value: "dropdown", label: "드롭다운" },
   { value: "grid_single", label: "객관식 그리드" },
   { value: "grid_multiple", label: "체크박스 그리드" },
+  { value: "file_upload", label: "파일 업로드" },
   { value: "date", label: "날짜" },
   { value: "time", label: "시간" },
   { value: "datetime", label: "날짜+시간" },
@@ -103,9 +105,14 @@ const SurveySettingsSchema = z.object({
   titleEn: z.string().max(255).optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
-  kind: z.enum(["GENERAL", "SURVEY", "VOTE", "APPLICATION", "EVENT"]),
+  descriptionImageUrlKo: z.string().nullable().optional(),
+  descriptionImageUrlEn: z.string().nullable().optional(),
+  kind: z.enum(["SURVEY", "APPLICATION"]),
   resultVisibility: z.enum(["PRIVATE", "PUBLIC"]),
   feePayersOnly: z.boolean().optional(),
+  eligibleSocAffiliations: z.array(z.enum(["PRIMARY", "DOUBLE", "MINOR"])),
+  academicEligibility: z.enum(["ANY", "ENROLLED_ONLY", "ENROLLED_OR_LEAVE"]),
+  allowAnonymous: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
   allowMultipleResponses: z.boolean().optional(),
   allowResponseEdit: z.boolean().optional(),
@@ -123,6 +130,18 @@ const SurveySettingsSchema = z.object({
   closeAt: z.string(),
   connectedArticleId: z.string().optional(),
 }).superRefine((data, ctx) => {
+  if (
+    data.allowAnonymous &&
+    (data.feePayersOnly ||
+      data.eligibleSocAffiliations.length > 0 ||
+      data.academicEligibility !== "ANY")
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "로그인 없이 응답을 허용하려면 소속·학적·과비 조건을 해제해야 합니다.",
+      path: ["allowAnonymous"],
+    });
+  }
   if (!data.isKoreanOnly) {
     if (!data.titleEn?.trim()) {
       ctx.addIssue({
@@ -325,6 +344,7 @@ export function SurveyEditorPage() {
   const isEdit = Boolean(surveyId);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const { confirm: requestConfirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
 
   const form = useForm<SurveySettingsFormValues>({
     resolver: zodResolver(SurveySettingsSchema),
@@ -333,9 +353,14 @@ export function SurveyEditorPage() {
       titleEn: "",
       descriptionKo: "",
       descriptionEn: "",
+      descriptionImageUrlKo: null,
+      descriptionImageUrlEn: null,
       kind: "SURVEY",
       resultVisibility: "PRIVATE",
       feePayersOnly: false,
+      eligibleSocAffiliations: ["PRIMARY", "DOUBLE", "MINOR"],
+      academicEligibility: "ENROLLED_OR_LEAVE",
+      allowAnonymous: false,
       isKoreanOnly: false,
       allowMultipleResponses: false,
       allowResponseEdit: false,
@@ -355,10 +380,10 @@ export function SurveyEditorPage() {
   const [loadedLifecycleStatus, setLoadedLifecycleStatus] = useState<
     SurveyDetailResponse["lifecycleStatus"] | null
   >(null);
-  const [loadedResponseCount, setLoadedResponseCount] = useState(0);
-  // Publishing alone must not freeze the form. As in Typeform/Tally, a
-  // published survey remains editable until the first submitted response.
-  const isOngoing = loadedResponseCount > 0;
+  // Existing responses are immutable snapshots, not a reason to freeze the
+  // current survey definition. General surveys and applications stay
+  // editable after publication and after responses have been submitted.
+  const isOngoing = false;
 
   const [articleSearchResults, setArticleSearchResults] = useState<ArticleListItem[]>([]);
   const [selectedArticleTitle, setSelectedArticleTitle] = useState<string | null>(null);
@@ -418,7 +443,7 @@ export function SurveyEditorPage() {
       }
       const userPermission = session.permission ?? 0;
       if (!(userPermission & Permissions.MANAGE_SURVEY)) {
-        alert("권한이 없습니다.");
+        toast({ type: "error", message: "권한이 없습니다." });
         navigate("/");
         return;
       }
@@ -432,12 +457,17 @@ export function SurveyEditorPage() {
             titleEn: detail.titleEn ?? "",
             descriptionKo: detail.descriptionKo ?? "",
             descriptionEn: detail.descriptionEn ?? "",
-            kind: (["GENERAL", "SURVEY", "VOTE", "APPLICATION", "EVENT"] as const).includes(
+            descriptionImageUrlKo: detail.descriptionImageUrlKo ?? null,
+            descriptionImageUrlEn: detail.descriptionImageUrlEn ?? null,
+            kind: (["SURVEY", "APPLICATION"] as const).includes(
               detail.kind as SurveySettingsFormValues["kind"],
             ) ? detail.kind as SurveySettingsFormValues["kind"] : "SURVEY",
             resultVisibility:
               detail.resultVisibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
             feePayersOnly: detail.feePayersOnly,
+            eligibleSocAffiliations: detail.eligibleSocAffiliations ?? ["PRIMARY", "DOUBLE", "MINOR"],
+            academicEligibility: detail.academicEligibility ?? "ENROLLED_OR_LEAVE",
+            allowAnonymous: detail.allowAnonymous ?? false,
             isKoreanOnly: detail.isKoreanOnly ?? false,
             allowMultipleResponses: detail.allowMultipleResponses ?? false,
             allowResponseEdit: detail.allowResponseEdit ?? false,
@@ -462,7 +492,6 @@ export function SurveyEditorPage() {
           setSections(detail.sections);
           setLoadedSurveyId(surveyId);
           setLoadedLifecycleStatus(detail.lifecycleStatus);
-          setLoadedResponseCount(detail.responseCount ?? 0);
           if (detail.lifecycleStatus === "DRAFT") {
             setDraftRestoredAt(detail.updatedAt);
             setDraftBannerVisible(true);
@@ -497,7 +526,12 @@ export function SurveyEditorPage() {
       titleEn: values.titleEn?.trim() || undefined,
       descriptionKo: values.descriptionKo?.trim() || undefined,
       descriptionEn: values.descriptionEn?.trim() || undefined,
+      descriptionImageUrlKo: values.descriptionImageUrlKo ?? null,
+      descriptionImageUrlEn: values.descriptionImageUrlEn ?? null,
       feeRequirementPolicy: values.feePayersOnly ? "PAID_ONLY" : "NONE",
+      eligibleSocAffiliations: values.eligibleSocAffiliations,
+      academicEligibility: values.academicEligibility,
+      allowAnonymous: values.allowAnonymous,
       allowMultipleResponses: values.allowMultipleResponses,
       allowResponseEdit: values.allowMultipleResponses ? false : values.allowResponseEdit,
       isKoreanOnly: values.isKoreanOnly,
@@ -522,7 +556,7 @@ export function SurveyEditorPage() {
               ? `${values.closeAt}T23:59`
               : values.closeAt,
           ),
-      connectedArticleId: values.connectedArticleId?.trim() || undefined,
+      connectedArticleId: values.connectedArticleId?.trim() || null,
     };
   };
 
@@ -544,7 +578,6 @@ export function SurveyEditorPage() {
         const detail = await client.getSurveyDetail(created.id);
         setLoadedSurveyId(created.id);
         setLoadedLifecycleStatus(detail.lifecycleStatus);
-        setLoadedResponseCount(detail.responseCount ?? 0);
         setSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
         form.setValue("isPublished", false);
         setSaveState("saved");
@@ -696,6 +729,8 @@ export function SurveyEditorPage() {
           value: opt.value,
           labelKo: opt.labelKo,
           labelEn: opt.labelEn ?? "",
+          imageUrlKo: opt.imageUrlKo ?? null,
+          imageUrlEn: opt.imageUrlEn ?? null,
         })),
         answerRegex: q.answerRegex ?? "",
         isRequired: q.isRequired ?? true,
@@ -824,9 +859,9 @@ export function SurveyEditorPage() {
     void persistQuestionOrder(sourceSection.id, nextQuestions, backup);
   };
 
-  const handleFetchArticles = async () => {
+  const handleFetchArticles = async (query = "") => {
     try {
-      const results = await client.searchArticles("", 30);
+      const results = await client.searchArticles(query, 30);
       setArticleSearchResults(results);
     } catch (err) {
       console.error(err);
@@ -925,9 +960,8 @@ export function SurveyEditorPage() {
                 ) : null}
                 <Button
                   type="button"
-                  variant="outline"
                   disabled={saving}
-                  className="gap-1.5 bg-white"
+                  className="gap-1.5 bg-brand-primary text-white hover:bg-brand-primary/90"
                   onClick={() => void form.handleSubmit((values) => handleSaveSettings(values))()}
                 >
                   <Save className="size-4" /> 저장
