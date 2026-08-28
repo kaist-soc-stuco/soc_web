@@ -5,7 +5,7 @@ import type {
   QuestionType,
   SurveyQuestionRecord,
 } from "@soc/contracts";
-import { Check, FileText, X } from "lucide-react";
+import { Check, FileText, Star, X } from "lucide-react";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -134,10 +134,10 @@ export function SurveyQuestionInput({
             return (
               <label
                 key={opt.value}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 ${
+                className={`flex cursor-pointer items-center gap-3 rounded-xl px-2 py-3.5 transition-colors ${
                   isSelected
-                    ? "border-kaist-darkgreen bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold shadow-sm shadow-kaist-darkgreen/5"
-                    : "border-gray-200 hover:border-gray-300 text-kaist-black hover:bg-gray-50/50"
+                    ? "bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold"
+                    : "text-kaist-black hover:bg-gray-50/50"
                 }`}
               >
                 <div
@@ -183,10 +183,10 @@ export function SurveyQuestionInput({
             return (
               <label
                 key={opt.value}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 ${
+                className={`flex cursor-pointer items-center gap-3 rounded-xl px-2 py-3.5 transition-colors ${
                   selected
-                    ? "border-kaist-darkgreen bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold shadow-sm shadow-kaist-darkgreen/5"
-                    : "border-gray-200 hover:border-gray-300 text-kaist-black hover:bg-gray-50/50"
+                    ? "bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold"
+                    : "text-kaist-black hover:bg-gray-50/50"
                 }`}
               >
                 <div
@@ -229,6 +229,49 @@ export function SurveyQuestionInput({
           {renderError}
         </div>
       );
+
+    case "rating": {
+      const configuredMax = Number(question.config?.ratingMax ?? 5);
+      const max = Number.isInteger(configuredMax)
+        ? Math.min(Math.max(configuredMax, 2), 10)
+        : 5;
+      const selectedRating = typeof value === "string" ? Number(value) : Number.NaN;
+
+      return (
+        <div>
+          <fieldset className="w-full">
+            <legend className="sr-only">
+              {lang === "ko" ? "등급을 선택하세요" : "Choose a rating"}
+            </legend>
+            <div className="flex max-w-lg items-start justify-between gap-3 px-2">
+              {Array.from({ length: max }, (_, index) => {
+                const rating = index + 1;
+                const selected = selectedRating === rating;
+                return (
+                  <button
+                    key={rating}
+                    type="button"
+                    aria-label={lang === "ko" ? `${rating}점` : `${rating} stars`}
+                    aria-pressed={selected}
+                    disabled={disabled}
+                    onClick={() => onChange(String(rating))}
+                    className="group flex min-w-10 flex-col items-center gap-2 rounded-lg px-2 py-1 text-sm font-normal text-slate-700 outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="leading-5">{rating}</span>
+                    <Star
+                      aria-hidden="true"
+                      className={`size-7 transition-colors ${selected ? "fill-amber-400 text-amber-400" : "text-slate-500 group-hover:text-slate-700"}`}
+                      strokeWidth={1.8}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+          {renderError}
+        </div>
+      );
+    }
 
     case "grid_single":
     case "grid_multiple": {

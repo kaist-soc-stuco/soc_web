@@ -30,10 +30,10 @@ export function VotePage() {
   const [submitting, setSubmitting] = useState(false);
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const t = lang === "ko" ? {
-    back: "← 투표 목록", private: "전산학부 주전생 대상 · 개인별 선택은 관리자에게 공개되지 않습니다.", submitted: "투표가 제출되었습니다.",
+    back: "← 투표 목록", private: "전산학부 주전공 학부생 대상 · 개인별 선택은 관리자에게 공개되지 않습니다.", submitted: "투표가 제출되었습니다.",
     receiptHelp: "영수증 코드는 투표 내용이 아니라 정상 접수 여부를 확인하는 용도입니다.", verify: "접수 확인", verified: "정상 접수 확인됨",
     results: "투표 결과", ballots: "표", notStarted: "아직 투표가 시작되지 않았습니다.", ended: "투표가 종료되었습니다. 결과는 공개 후 확인할 수 있습니다.",
-    loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "게시 시점의 전산학부 주전생 명부에 포함되지 않아 참여할 수 없습니다.",
+    loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "게시 시점의 전산학부 주전공 학부생 명부에 포함되지 않아 참여할 수 없습니다.",
     voted: "이미 투표를 제출했습니다.", submit: "투표 제출", submitting: "제출 중", required: "모든 문항에 응답해 주세요.",
     confirmTitle: "투표를 제출할까요?", confirmDescription: "제출한 뒤에는 선택을 확인하거나 수정할 수 없습니다.", confirmLabel: "제출",
   } : {

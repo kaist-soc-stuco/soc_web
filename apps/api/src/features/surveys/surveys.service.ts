@@ -3,9 +3,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { isoToMs, nowMs } from "@soc/shared";
-import { Permissions } from "@soc/contracts";
+import {
+  Permissions,
+  type SurveyParticipationEligibility,
+  type SurveyParticipationEligibilityReason,
+} from "@soc/contracts";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -20,11 +25,22 @@ import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateSurveyDto } from "./dto/create-survey.dto";
 import type { UpdateSurveyDto } from "./dto/update-survey.dto";
 import type { ComputedSurveyState, SurveyDetailResponse } from "@soc/contracts";
+import { UsersService } from "../users/users.service";
+import { getSurveyEligibilityFailures } from "./survey-eligibility";
 
 interface SurveyCaller {
   id: string;
   permission: number;
 }
+
+type EligibilityUser = Awaited<ReturnType<UsersService["findById"]>>;
+type EligibilityFeeStatus = Awaited<
+  ReturnType<UsersService["getStudentFeeStatus"]>
+>;
+type EligibilityContext = {
+  user: EligibilityUser;
+  feeStatus: EligibilityFeeStatus;
+};
 
 @Injectable()
 export class SurveysService {
@@ -34,6 +50,7 @@ export class SurveysService {
     private readonly questionsRepo: SurveyQuestionsRepository,
     private readonly responsesRepo: SurveyResponsesRepository,
     private readonly mutationPolicy: SurveyMutationPolicy,
+    @Optional() private readonly usersService?: UsersService,
   ) {}
 
   private computeState(survey: {
@@ -95,6 +112,79 @@ export class SurveysService {
     }
   }
 
+  private async loadEligibilityContext(
+    caller?: SurveyCaller,
+  ): Promise<EligibilityContext | null> {
+    if (!caller || !this.usersService) return null;
+
+    const user = await this.usersService.findById(caller.id);
+    if (!user) return { user: null, feeStatus: null };
+
+    return {
+      user,
+      feeStatus: await this.usersService.getStudentFeeStatus(caller.id),
+    };
+  }
+
+  private getParticipationEligibility(
+    survey: SurveyRecordWithState,
+    caller: SurveyCaller | undefined,
+    context: EligibilityContext | null,
+  ): SurveyParticipationEligibility {
+    const eligibleSocAffiliations = survey.eligibleSocAffiliations ?? [];
+    const academicEligibility = survey.academicEligibility ?? "ANY";
+    const hasMemberRequirements =
+      survey.feePayersOnly ||
+      eligibleSocAffiliations.length > 0 ||
+      academicEligibility !== "ANY";
+
+    if (survey.allowAnonymous && !hasMemberRequirements) {
+      return { status: "ANONYMOUS", reasons: [] };
+    }
+
+    if (!caller) {
+      return {
+        status: "LOGIN_REQUIRED",
+        reasons: ["LOGIN_REQUIRED"],
+      };
+    }
+
+    // Unit tests and lightweight service consumers may omit UsersService. The
+    // real SurveysModule always provides it; preserve the existing behavior
+    // for those callers while production requests use the full check below.
+    if (!this.usersService) {
+      return { status: "ELIGIBLE", reasons: [] };
+    }
+
+    if (!context?.user) {
+      return {
+        status: "LOGIN_REQUIRED",
+        reasons: ["LOGIN_REQUIRED"],
+      };
+    }
+
+    const reasons: SurveyParticipationEligibilityReason[] = [];
+    const failures = getSurveyEligibilityFailures({
+      user: context.user,
+      eligibleSocAffiliations,
+      academicEligibility,
+    });
+
+    if (failures.includes("soc_affiliation_required")) {
+      reasons.push("PRIMARY_MAJOR_REQUIRED");
+    }
+    if (failures.includes("academic_status_required")) {
+      reasons.push("ACADEMIC_STATUS_REQUIRED");
+    }
+    if (survey.feePayersOnly && context.feeStatus?.status !== "PAID") {
+      reasons.push("FEE_PAYER_REQUIRED");
+    }
+
+    return reasons.length > 0
+      ? { status: "NOT_ELIGIBLE", reasons }
+      : { status: "ELIGIBLE", reasons: [] };
+  }
+
   async findAll(): Promise<SurveyRecordWithState[]> {
     const surveys = await this.surveysRepo.findAll();
     const responseCounts = await Promise.all(
@@ -112,8 +202,9 @@ export class SurveysService {
     });
   }
 
-  async findPublished(): Promise<SurveyRecordWithState[]> {
+  async findPublished(caller?: SurveyCaller): Promise<SurveyRecordWithState[]> {
     const surveys = await this.surveysRepo.findPublished();
+    const eligibilityContext = await this.loadEligibilityContext(caller);
     const responseCounts = await Promise.all(
       surveys.map(async (survey) => ({
         surveyId: survey.id,
@@ -125,7 +216,19 @@ export class SurveysService {
 
     return surveys.map((s) => {
       const computedState = this.computeState(s);
-      return { ...s, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
+      const withState = {
+        ...s,
+        computedState,
+        responseCount: responseCountMap.get(s.id) ?? 0,
+      };
+      return {
+        ...withState,
+        participationEligibility: this.getParticipationEligibility(
+          withState,
+          caller,
+          eligibilityContext,
+        ),
+      };
     });
   }
 
@@ -153,6 +256,8 @@ export class SurveysService {
       }),
     );
 
+    const eligibilityContext = await this.loadEligibilityContext(caller);
+
     const existingResponse = caller?.id
       ? await this.responsesRepo.findByUserAndSurvey(id, caller.id)
       : null;
@@ -165,6 +270,11 @@ export class SurveysService {
 
     return {
       ...survey,
+      participationEligibility: this.getParticipationEligibility(
+        survey,
+        caller,
+        eligibilityContext,
+      ),
       sections: sectionsWithQuestions,
       currentResponse,
       hasSubmitted: Boolean(existingResponse),
@@ -403,14 +513,21 @@ export class SurveysService {
             const isChoice =
               q.questionType === "single_choice" ||
               q.questionType === "multiple_choice" ||
-              q.questionType === "dropdown";
+              q.questionType === "dropdown" ||
+              q.questionType === "rating";
 
             if (isChoice) {
-              const options = (q.options as Array<{
-                value: string;
-                labelKo: string;
-                labelEn?: string;
-              }>) || [];
+              const options = q.questionType === "rating"
+                ? Array.from({ length: q.config?.ratingMax ?? 5 }, (_, index) => ({
+                    value: String(index + 1),
+                    labelKo: String(index + 1),
+                    labelEn: String(index + 1),
+                  }))
+                : ((q.options as Array<{
+                    value: string;
+                    labelKo: string;
+                    labelEn?: string;
+                  }>) || []);
 
               const choiceCounts: Record<string, number> = {};
               for (const opt of options) {
@@ -425,7 +542,7 @@ export class SurveysService {
                     choiceCounts[val] = (choiceCounts[val] ?? 0) + 1;
                   }
                 } else {
-                  const val = content.value as string;
+                  const val = (q.questionType === "rating" ? content.rating : content.value) as string;
                   if (val !== undefined) {
                     choiceCounts[val] = (choiceCounts[val] ?? 0) + 1;
                   }

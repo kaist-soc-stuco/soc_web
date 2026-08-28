@@ -126,7 +126,7 @@ export function BoardWriteHeaderControls({
           <span
             className="text-xs font-medium text-slate-600"
           >
-            {lang === "ko" ? "한국어 사용자만" : "Korean Speakers Only"}
+            {lang === "ko" ? "한국어 전용" : "Korean only"}
           </span>
         </label>
       </div>
@@ -188,7 +188,7 @@ export function BoardEditHeaderControls({
           <span
             className="text-xs font-medium text-slate-600"
           >
-            {lang === "ko" ? "한국어 사용자만" : "Korean Speakers Only"}
+            {lang === "ko" ? "한국어 전용" : "Korean only"}
           </span>
         </label>
       </div>
@@ -203,6 +203,7 @@ interface EditorFieldsProps {
   lang: string;
   onContentEnChange: (value: string) => void;
   onContentKoChange: (value: string) => void;
+  onImageUpload?: (file: File) => Promise<string | null>;
   onTitleEnChange: (value: string) => void;
   onTitleKoChange: (value: string) => void;
   titleEn: string;
@@ -218,6 +219,7 @@ export function BoardWriteEditorFields({
   lang,
   onContentEnChange,
   onContentKoChange,
+  onImageUpload,
   onTitleEnChange,
   onTitleKoChange,
   titleEn,
@@ -232,6 +234,7 @@ export function BoardWriteEditorFields({
       fileInputRef={fileInputRef}
       isKoreanOnly={isKoreanOnly}
       lang={lang}
+      onImageUpload={onImageUpload}
       onContentEnChange={onContentEnChange}
       onContentKoChange={onContentKoChange}
       onTitleEnChange={onTitleEnChange}
@@ -293,8 +296,8 @@ export function BoardWriteEventFields({
 
   return (
     <div className="space-y-4 p-5 animate-in fade-in duration-300">
-      <div className="grid grid-cols-1 gap-2">
-        <label className="flex items-center gap-2.5 cursor-pointer group rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+      <div className="flex items-center gap-6">
+        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2.5 group">
           <div
             className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
               isAllDay
@@ -316,7 +319,7 @@ export function BoardWriteEventFields({
             {lang === "ko" ? "종일" : "All day"}
           </span>
         </label>
-        <label className="flex items-center gap-2.5 cursor-pointer group rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2.5 group">
           <div
             className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
               isEventAlwaysOpen
@@ -405,31 +408,41 @@ export function BoardWriteEventFields({
         }
       >
         <div className="grid grid-cols-1 gap-3">
-          <UiInput
-            type="text"
-            aria-label={lang === "ko" ? "국문 카드 설명" : "Korean card description"}
-            placeholder={
-              lang === "ko"
-                ? "피드에 표시될 짧은 국문 행사 정보입니다"
-                : "Short Korean description for card display"
-            }
-            className="w-full"
-            value={eventDescriptionKo}
-            onChange={(event) => onEventDescriptionKoChange(event.target.value)}
-          />
-          {!isKoreanOnly ? (
+          <label className="flex min-w-0 items-center gap-2">
+            <span className="w-7 shrink-0 text-[length:var(--ui-text-micro-size)] font-bold uppercase tracking-[0.12em] text-slate-400">
+              KO
+            </span>
             <UiInput
               type="text"
-              aria-label={lang === "ko" ? "영문 카드 설명" : "English card description"}
+              aria-label={lang === "ko" ? "국문 카드 설명" : "Korean card description"}
               placeholder={
                 lang === "ko"
-                  ? "피드에 표시될 짧은 영문 행사 정보입니다"
-                  : "Short English description for card display"
+                  ? "피드에 표시될 짧은 국문 행사 정보입니다"
+                  : "Short Korean description for card display"
               }
-              className="w-full"
-              value={eventDescriptionEn}
-              onChange={(event) => onEventDescriptionEnChange(event.target.value)}
+              className="min-w-0 w-full flex-1"
+              value={eventDescriptionKo}
+              onChange={(event) => onEventDescriptionKoChange(event.target.value)}
             />
+          </label>
+          {!isKoreanOnly ? (
+            <label className="flex min-w-0 items-center gap-2">
+              <span className="w-7 shrink-0 text-[length:var(--ui-text-micro-size)] font-bold uppercase tracking-[0.12em] text-slate-400">
+                EN
+              </span>
+              <UiInput
+                type="text"
+                aria-label={lang === "ko" ? "영문 카드 설명" : "English card description"}
+                placeholder={
+                  lang === "ko"
+                    ? "피드에 표시될 짧은 영문 행사 정보입니다"
+                    : "Short English description for card display"
+                }
+                className="min-w-0 w-full flex-1"
+                value={eventDescriptionEn}
+                onChange={(event) => onEventDescriptionEnChange(event.target.value)}
+              />
+            </label>
           ) : null}
         </div>
       </UiFormField>
@@ -561,9 +574,11 @@ export function BoardWriteSettings({
           stacked ? "" : "md:grid-cols-2"
         }`}
       >
-        {/* Survey Selection */}
         {canConfigurePostSettings && (
-          <div className="space-y-1.5 w-full">
+          <div className="w-full space-y-1.5">
+            <p className="text-xs font-semibold text-slate-700">
+              {lang === "ko" ? "행사/설문조사 연동" : "Event/survey link"}
+            </p>
             <SelectDropdown
               id="settings-survey-select"
               aria-label={lang === "ko" ? "연결된 설문조사" : "Linked survey"}
@@ -591,17 +606,13 @@ export function BoardWriteSettings({
           </div>
         )}
 
-        {/* Visibility Options */}
-        <div
-          className="w-full self-center space-y-3"
-        >
-          <div
-            className={
-              stacked
-                ? "grid grid-cols-1 gap-y-3"
-                : "flex flex-wrap gap-x-10 gap-y-4"
-            }
-          >
+        <div className="w-full self-center space-y-3">
+          {isEvent ? (
+            <p className="text-xs font-semibold text-slate-700">
+              {lang === "ko" ? "공개 및 게시 옵션" : "Visibility and publishing options"}
+            </p>
+          ) : null}
+          <div className={stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
             {canConfigurePostSettings && (
               <label className="flex items-center gap-2.5 cursor-pointer group">
                 <div
@@ -703,24 +714,31 @@ export function BoardWriteSettings({
                 </span>
               </label>
             ) : null}
+
+            {isEvent && canConfigurePostSettings && onHomeVisibleChange ? (
+              <label className="flex cursor-pointer items-center gap-2.5 group">
+                <div
+                  className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all ${
+                    homeVisible
+                      ? "border-kaist-darkgreen bg-kaist-darkgreen text-white"
+                      : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
+                  }`}
+                >
+                  {homeVisible && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                </div>
+                <UiInput
+                  type="checkbox"
+                  className="hidden"
+                  checked={homeVisible}
+                  onChange={(event) => onHomeVisibleChange(event.target.checked)}
+                />
+                <span className="text-xs font-bold text-slate-700">
+                  {lang === "ko" ? "홈 화면에 표시" : "Show on home"}
+                </span>
+              </label>
+            ) : null}
           </div>
         </div>
-
-        {isEvent && canConfigurePostSettings && onHomeVisibleChange ? (
-          <div className="border-t border-slate-100 pt-3">
-            <label className="flex min-w-0 cursor-pointer items-center gap-2.5">
-              <UiInput
-                type="checkbox"
-                className="size-4 accent-brand-primary"
-                checked={homeVisible}
-                onChange={(event) => onHomeVisibleChange(event.target.checked)}
-              />
-              <span className="text-xs font-medium text-slate-700">
-                {lang === "ko" ? "홈 화면에 표시" : "Show on home"}
-              </span>
-            </label>
-          </div>
-        ) : null}
       </div>
     </div>
   );

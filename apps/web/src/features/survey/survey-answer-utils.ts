@@ -26,6 +26,7 @@ export type AnswerValue =
 
 export function emptyAnswerValue(type: QuestionType): AnswerValue {
   if (type === "multiple_choice") return [];
+  if (type === "rating") return "";
   if (type === "grid_single" || type === "grid_multiple") {
     return { kind: "grid", values: {} };
   }
@@ -46,6 +47,8 @@ export function toAnswerContent(
       return { value: value as string };
     case "multiple_choice":
       return { values: value as string[] };
+    case "rating":
+      return { rating: value as string };
     case "grid_single":
     case "grid_multiple":
       return { grid: (value as { kind: "grid"; values: GridAnswer }).values };
@@ -97,6 +100,9 @@ export function answerContentToValue(
           (value): value is string => typeof value === "string",
         )
       : [];
+  }
+  if (type === "rating") {
+    return typeof content.rating === "string" ? content.rating : "";
   }
   if (type === "grid_single" || type === "grid_multiple") {
     const grid = content.grid;

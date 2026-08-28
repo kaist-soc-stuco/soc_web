@@ -45,6 +45,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     handleSubmit,
     handleUploadThumbnail,
     handleUploadFiles,
+    handleUploadInlineImage,
     isAnonymous,
     isAllDay,
     isEventAlwaysOpen,
@@ -224,6 +225,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
           lang={lang}
           onContentEnChange={setContentEn}
           onContentKoChange={setContentKo}
+          onImageUpload={handleUploadInlineImage}
           onTitleEnChange={setTitleEn}
           onTitleKoChange={setTitleKo}
           titleEn={titleEn}

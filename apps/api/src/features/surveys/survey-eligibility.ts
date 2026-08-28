@@ -56,15 +56,17 @@ export type SurveyEligibilityFailure =
   | "soc_affiliation_required"
   | "academic_status_required";
 
-export const getSurveyEligibilityFailure = (input: {
+export const getSurveyEligibilityFailures = (input: {
   user: SurveyEligibilityUser;
   eligibleSocAffiliations: SurveySocAffiliation[];
   academicEligibility: SurveyAcademicEligibility;
-}): SurveyEligibilityFailure | null => {
+}): SurveyEligibilityFailure[] => {
+  const failures: SurveyEligibilityFailure[] = [];
+
   if (input.eligibleSocAffiliations.length > 0) {
     const userAffiliations = getSocAffiliations(input.user);
     if (!input.eligibleSocAffiliations.some((item) => userAffiliations.includes(item))) {
-      return "soc_affiliation_required";
+      failures.push("soc_affiliation_required");
     }
   }
 
@@ -72,14 +74,23 @@ export const getSurveyEligibilityFailure = (input: {
     input.academicEligibility === "ENROLLED_ONLY" &&
     !isEnrolled(input.user.academicStatus)
   ) {
-    return "academic_status_required";
+    failures.push("academic_status_required");
   }
   if (
     input.academicEligibility === "ENROLLED_OR_LEAVE" &&
     !isEnrolled(input.user.academicStatus) &&
     !isOnLeave(input.user.academicStatus)
   ) {
-    return "academic_status_required";
+    failures.push("academic_status_required");
   }
-  return null;
+
+  return failures;
+};
+
+export const getSurveyEligibilityFailure = (input: {
+  user: SurveyEligibilityUser;
+  eligibleSocAffiliations: SurveySocAffiliation[];
+  academicEligibility: SurveyAcademicEligibility;
+}): SurveyEligibilityFailure | null => {
+  return getSurveyEligibilityFailures(input)[0] ?? null;
 };

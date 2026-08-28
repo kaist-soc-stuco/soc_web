@@ -23,6 +23,12 @@ export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): 
       throw new BadRequestException("survey_file_upload_size_invalid");
     }
   }
+  if (question.questionType === "rating") {
+    const ratingMax = question.config?.ratingMax ?? 5;
+    if (!Number.isInteger(ratingMax) || ratingMax < 2 || ratingMax > 10) {
+      throw new BadRequestException("survey_rating_scale_invalid");
+    }
+  }
   if (CHOICE_TYPES.has(question.questionType) && (question.options?.length ?? 0) < 2) {
     throw new BadRequestException("survey_choice_requires_two_options");
   }

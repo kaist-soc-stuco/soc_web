@@ -1,10 +1,14 @@
-import type { ArticleEngagementKind } from "@soc/contracts";
+import type {
+  ArticleEngagementKind,
+  SurveyParticipationEligibility,
+} from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
 import { CalendarDays, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
 import { stripRichText } from "@/components/ui/rich-text-content";
+import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
 import {
   getCardPeriodText,
   isClosedItem,
@@ -121,15 +125,23 @@ function getAudienceText(item: UnifiedItem, lang: string) {
         ? lang === "ko"
           ? "과비 납부자만"
           : "Fee-paying members only"
+        : item.allowAnonymous
+          ? lang === "ko"
+            ? "로그인 없이 참여"
+            : "No login required"
         : lang === "ko"
           ? "로그인 필요"
           : "Login required";
 
-  const audienceText = audience ? `🔒 ${audience}` : "";
+  const audienceText = audience
+    ? item.kind !== "EVENT" && item.allowAnonymous
+      ? audience
+      : `🔒 ${audience}`
+    : "";
   const languageText = item.isKoreanOnly
     ? lang === "ko"
-      ? "한국어 사용자만"
-      : "Korean Speakers Only"
+      ? "한국어 전용"
+      : "Korean only"
     : "";
 
   return [audienceText, languageText].filter(Boolean).join(" · ");
@@ -153,6 +165,19 @@ export function EventsSurveysGrid({
         );
         const closed = isClosedItem(item);
         const href = getItemHref(item);
+        const participationEligibility: SurveyParticipationEligibility | undefined =
+          item.kind !== "EVENT"
+            ? item.participationEligibility ??
+              (!isAuthenticated && !item.allowAnonymous
+                ? { status: "LOGIN_REQUIRED", reasons: ["LOGIN_REQUIRED"] }
+                : undefined)
+            : undefined;
+        const participationBlocked = Boolean(
+          participationEligibility &&
+            item.computedState === "open" &&
+            (participationEligibility.status === "LOGIN_REQUIRED" ||
+              participationEligibility.status === "NOT_ELIGIBLE"),
+        );
         const eyebrow = [
           getStatusText(item, lang),
           getApplicationText(item, lang),
@@ -233,6 +258,14 @@ export function EventsSurveysGrid({
                   />
                 ) : null}
               </div>
+
+              {participationBlocked && participationEligibility ? (
+                <SurveyParticipationNotice
+                  compact
+                  eligibility={participationEligibility}
+                  lang={lang}
+                />
+              ) : null}
 
               <Link
                 aria-label={`${title} ${getCardPeriodText(item, lang)}`}

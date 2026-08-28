@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createApiClient } from "@soc/api-client";
 
 import { RichTextEditor } from "./rich-text-editor";
 import { Button } from "@/components/ui/button";
 import { AdminFormField } from "@/components/ui/admin-page";
 import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 export interface SectionFormState {
   titleKo: string;
@@ -21,6 +24,16 @@ interface SectionEditorModalProps {
   onCancel: () => void;
 }
 
+const escapeHtmlAttribute = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+const appendInlineImage = (content: string, src: string) =>
+  `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
+
 export function SectionEditorModal({
   initial,
   isKoreanOnly = false,
@@ -31,6 +44,7 @@ export function SectionEditorModal({
   const [form, setForm] = useState<SectionFormState>(initial);
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [error, setError] = useState<string | null>(null);
+  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
 
   useEffect(() => {
     if (isKoreanOnly && activeTab === "en") setActiveTab("ko");
@@ -40,6 +54,20 @@ export function SectionEditorModal({
     key: K,
     value: SectionFormState[K],
   ) => setForm((current) => ({ ...current, [key]: value }));
+
+  const handleDescriptionImageUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) return null;
+
+    const uploadLanguage = activeTab;
+    const asset = await apiClient.uploadAsset(file);
+    const src = resolveAssetUrl(asset.storageKey);
+    const otherKey = uploadLanguage === "ko" ? "descriptionEn" : "descriptionKo";
+    setForm((current) => ({
+      ...current,
+      [otherKey]: appendInlineImage(current[otherKey], src),
+    }));
+    return src;
+  };
 
   const handleSave = () => {
     if (!form.titleKo.trim()) {
@@ -121,6 +149,7 @@ export function SectionEditorModal({
                 compact
                 disabled={isOngoing}
                 content={form.descriptionKo}
+                onImageUpload={handleDescriptionImageUpload}
                 onChange={(value) => update("descriptionKo", value)}
                 lang="ko"
               />
@@ -142,6 +171,7 @@ export function SectionEditorModal({
                 compact
                 disabled={isOngoing || isKoreanOnly}
                 content={form.descriptionEn}
+                onImageUpload={handleDescriptionImageUpload}
                 onChange={(value) => update("descriptionEn", value)}
                 lang="en"
               />

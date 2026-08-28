@@ -1,5 +1,9 @@
 import { createApiClient } from "@soc/api-client";
-import type { NotificationRecord } from "@soc/contracts";
+import {
+  OPERATIONAL_SURVEY_IDS,
+  operationalSurveyPath,
+  type NotificationRecord,
+} from "@soc/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
@@ -35,6 +39,7 @@ interface HeaderProps {
 }
 
 type HeaderNavItem = {
+  activePaths?: string[];
   megaItems: Array<{ href: string; label: string }>;
   href: string;
   label: string;
@@ -246,22 +251,44 @@ export function Header({ variant = "default" }: HeaderProps) {
             })),
           },
           {
+            label: "학부 생활",
+            href: "/life/roadmap",
+            activePaths: ["/life"],
+            megaItems: [
+              { label: "전산학부 로드맵", href: "/life/roadmap" },
+              {
+                label: "학번톡 참여 신청",
+                href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
+              },
+            ],
+          },
+          {
             label: "행사·일정",
             href: "/events",
+            activePaths: ["/events", "/calendar"],
             megaItems: [
               { label: "행사", href: "/events" },
+              { label: "일정", href: "/calendar" },
+            ],
+          },
+          {
+            label: "설문·투표",
+            href: "/surveys",
+            activePaths: ["/surveys", "/survey", "/votes", "/vote"],
+            megaItems: [
               { label: "설문", href: "/surveys" },
               { label: "투표", href: "/votes" },
-              { label: "일정", href: "/calendar" },
             ],
           },
           {
             label: "학생회 소개",
             href: "/about",
+            activePaths: ["/about"],
             megaItems: [
               { label: "소개", href: "/about#intro" },
               { label: "주요 사업", href: "/about#work" },
               { label: "조직도", href: "/about#people" },
+              { label: "후원 및 제휴", href: "/about#partnership" },
             ],
           },
         ]
@@ -275,38 +302,57 @@ export function Header({ variant = "default" }: HeaderProps) {
             })),
           },
           {
-            label: "Events",
+            label: "Campus Life",
+            href: "/life/roadmap",
+            activePaths: ["/life"],
+            megaItems: [
+              { label: "SoC Roadmap", href: "/life/roadmap" },
+              {
+                label: "Join Cohort Chat",
+                href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
+              },
+            ],
+          },
+          {
+            label: "Events & Calendar",
             href: "/events",
+            activePaths: ["/events", "/calendar"],
             megaItems: [
               { label: "Events", href: "/events" },
-              { label: "Surveys", href: "/surveys" },
-              { label: "Votes", href: "/votes" },
               { label: "Calendar", href: "/calendar" },
+            ],
+          },
+          {
+            label: "Surveys & Voting",
+            href: "/surveys",
+            activePaths: ["/surveys", "/survey", "/votes", "/vote"],
+            megaItems: [
+              { label: "Surveys", href: "/surveys" },
+              { label: "Voting", href: "/votes" },
             ],
           },
           {
             label: "About",
             href: "/about",
+            activePaths: ["/about"],
             megaItems: [
               { label: "About", href: "/about#intro" },
               { label: "Programs", href: "/about#work" },
               { label: "Organization chart", href: "/about#people" },
+              { label: "Partnerships", href: "/about#partnership" },
             ],
           },
         ];
 
-  const isNavItemActive = (href: string) => {
-    if (href === "/board") {
+  const isPathActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  const isNavItemActive = (item: HeaderNavItem) => {
+    if (item.href === "/board") {
       return location.pathname === "/board" || location.pathname.startsWith("/board/");
     }
 
-    if (href === "/events") {
-      return ["/events", "/surveys", "/calendar"].some(
-        (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
-      );
-    }
-
-    return location.pathname === href || location.pathname.startsWith(`${href}/`);
+    return (item.activePaths ?? [item.href]).some(isPathActive);
   };
 
   const isChildNavItemActive = (href: string) => {
@@ -320,14 +366,15 @@ export function Header({ variant = "default" }: HeaderProps) {
     return location.hash === `#${hash}` || (hash === "intro" && !location.hash);
   };
 
-  const activeNavIndex = navItems.findIndex((item) => isNavItemActive(item.href));
+  const activeNavIndex = navItems.findIndex(isNavItemActive);
   const indicatorIndex = hoveredIndex ?? activeNavIndex;
-  const indicatorLeft =
-    indicatorIndex <= 0
-      ? "2rem"
-      : indicatorIndex === 1
-        ? "calc(2rem + var(--ui-nav-column-width))"
-        : "calc(2rem + var(--ui-nav-column-width) + var(--ui-nav-column-width))";
+  const indicatorOffset = Array.from(
+    { length: Math.max(0, indicatorIndex) },
+    () => "var(--ui-nav-column-width)",
+  ).join(" + ");
+  const indicatorLeft = indicatorOffset
+    ? `calc(2rem + ${indicatorOffset})`
+    : "2rem";
 
   return (
     <header
@@ -345,7 +392,7 @@ export function Header({ variant = "default" }: HeaderProps) {
           </div>
 
           <nav
-            className="site-primary-nav hidden items-stretch md:flex"
+            className="site-primary-nav hidden items-stretch xl:flex"
             aria-label={lang === "ko" ? "주요 메뉴" : "Primary navigation"}
             onMouseMove={(event) => {
               const item = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-index]");
@@ -356,7 +403,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             onMouseLeave={() => setHoveredIndex(null)}
           >
             {navItems.map((item, index) => {
-              const active = isNavItemActive(item.href);
+              const active = isNavItemActive(item);
               return (
                 <div
                   key={item.label}
@@ -376,7 +423,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     aria-expanded={hoveredIndex === index}
                     aria-haspopup="menu"
                     aria-controls={`site-nav-flyout-${index}`}
-                    className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center px-4 text-[length:var(--ui-text-section-size)] font-semibold transition-colors ${
+                    className={`interaction-link relative flex h-full w-[var(--ui-nav-column-width)] items-center justify-center whitespace-nowrap px-4 text-[length:var(--ui-text-section-size)] font-semibold transition-colors ${
                       variant === "home"
                         ? "home-header-nav-link"
                         : active || hoveredIndex === index
@@ -737,7 +784,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               setSearchOpen(false);
               setDropdownOpen(false);
             }}
-            className={variant === "home" ? "home-header-icon md:hidden" : "text-slate-700 md:hidden"}
+            className={variant === "home" ? "home-header-icon xl:hidden" : "text-slate-700 xl:hidden"}
           >
             {mobileMenuOpen ? (
               <X aria-hidden="true" className="h-5 w-5" />
@@ -751,12 +798,12 @@ export function Header({ variant = "default" }: HeaderProps) {
       {mobileMenuOpen && (
         <div
           id="mobile-primary-navigation"
-          className="absolute left-0 right-0 top-full z-50 border-t border-slate-100 bg-white px-4 pb-5 pt-4 shadow-xl md:hidden"
+          className="absolute left-0 right-0 top-full z-50 border-t border-slate-100 bg-white px-4 pb-5 pt-4 shadow-xl xl:hidden"
         >
           <nav aria-label={lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}>
             <div className="grid grid-cols-3 gap-2">
               {navItems.map((item) => {
-                const active = isNavItemActive(item.href);
+                const active = isNavItemActive(item);
                 return (
                   <div
                     key={item.href}

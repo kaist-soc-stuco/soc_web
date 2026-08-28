@@ -10,12 +10,11 @@ import { getTemporaryAuthRequest } from '@/lib/auth-session';
 import { readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 import { PublicOperationalContent } from '@/features/site-content/public-operational-content';
 import { ChannelTalkProvider } from '@/features/channel-talk/channel-talk-provider';
+import { BoardPage } from '@/pages/board-page';
+import { FaqPage } from '@/pages/faq-page';
 
 const HomePage = lazy(() =>
   import('@/pages/home-page').then((module) => ({ default: module.HomePage })),
-);
-const BoardPage = lazy(() =>
-  import('@/pages/board-page').then((module) => ({ default: module.BoardPage })),
 );
 const LoginCallbackPage = lazy(() =>
   import('@/pages/login-callback-page').then((module) => ({ default: module.LoginCallbackPage })),
@@ -89,6 +88,9 @@ const NotificationsPage = lazy(() =>
 const AboutPage = lazy(() =>
   import('@/pages/about-page').then((module) => ({ default: module.AboutPage })),
 );
+const RoadmapPage = lazy(() =>
+  import('@/pages/roadmap-page').then((module) => ({ default: module.RoadmapPage })),
+);
 const EventsSurveysPage = lazy(() =>
   import('@/pages/events-surveys-page').then((module) => ({ default: module.EventsSurveysPage })),
 );
@@ -97,9 +99,6 @@ const PrivacyPage = lazy(() =>
 );
 const TermsPage = lazy(() =>
   import('@/pages/terms-page').then((module) => ({ default: module.TermsPage })),
-);
-const FaqPage = lazy(() =>
-  import('@/pages/faq-page').then((module) => ({ default: module.FaqPage })),
 );
 const SearchPage = lazy(() =>
   import('@/pages/search-page').then((module) => ({ default: module.SearchPage })),
@@ -201,7 +200,8 @@ export function App() {
           <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
-          <Route path="/about/roadmap" element={<Navigate to="/about#work" replace />} />
+          <Route path="/life/roadmap" element={<RoadmapPage />} />
+          <Route path="/about/roadmap" element={<Navigate to="/life/roadmap" replace />} />
           <Route path="/events-surveys" element={<LegacyEventsSurveysRedirect />} />
           <Route path="/events" element={<EventsSurveysPage view="event" />} />
           <Route path="/events/:articleId" element={<BoardDetailPage forcedCategory="_EVENT" publicBasePath="/events" />} />

@@ -23,6 +23,23 @@ export type SurveyLifecycleStatus = 'DRAFT' | 'PUBLISHED';
 export type SurveySocAffiliation = z.infer<typeof SurveySocAffiliationSchema>;
 export type SurveyAcademicEligibility = z.infer<typeof SurveyAcademicEligibilitySchema>;
 
+export type SurveyParticipationEligibilityReason =
+  | "LOGIN_REQUIRED"
+  | "PRIMARY_MAJOR_REQUIRED"
+  | "ACADEMIC_STATUS_REQUIRED"
+  | "FEE_PAYER_REQUIRED";
+
+export type SurveyParticipationEligibilityStatus =
+  | "ANONYMOUS"
+  | "LOGIN_REQUIRED"
+  | "ELIGIBLE"
+  | "NOT_ELIGIBLE";
+
+export interface SurveyParticipationEligibility {
+  status: SurveyParticipationEligibilityStatus;
+  reasons: SurveyParticipationEligibilityReason[];
+}
+
 export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
 export type SurveyQuestionConfig = z.infer<typeof QuestionConfigSchema>;
 
@@ -60,6 +77,7 @@ export interface SurveyRecord {
   createdAt: string;
   updatedAt: string;
   responseCount?: number;
+  participationEligibility?: SurveyParticipationEligibility;
   spreadsheetId: string | null;
   spreadsheetUrl: string | null;
   spreadsheetSyncStatus: "NOT_CONNECTED" | "CONNECTED" | "ERROR";

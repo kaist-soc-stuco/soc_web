@@ -28,7 +28,7 @@ export function Hero() {
         aria-hidden="true"
         loading="eager"
         onLoad={() => setImageLoaded(true)}
-        className={`absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-700 ${
+        className={`home-hero-background absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-700 ${
           imageLoaded ? "opacity-100" : ""
         }`}
       />
@@ -36,9 +36,11 @@ export function Hero() {
 
       <div className="home-hero-content absolute inset-0 z-10 flex items-end">
         <div className="home-public-content w-full">
-          <h1 className="home-hero-title whitespace-pre-line text-white">{title}</h1>
+          <h1 className="home-hero-title home-hero-title-enter whitespace-pre-line text-white">
+            {title}
+          </h1>
           {quickLinks.length > 0 ? (
-            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="home-hero-links-enter mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
               {quickLinks.map((block) => {
                 const text = resolveContentBlockText(block, lang);
                 return block.linkUrl ? (

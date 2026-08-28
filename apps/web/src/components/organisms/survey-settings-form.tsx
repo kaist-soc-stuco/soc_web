@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, Controller } from "react-hook-form";
+import { createApiClient } from "@soc/api-client";
 import { Check } from "lucide-react";
 import type { ArticleListItem } from "@soc/contracts";
 import { RichTextEditor } from "./rich-text-editor";
@@ -7,7 +8,8 @@ import { AdminFormField, AdminSearchField } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { SurveyImageField } from "@/components/ui/survey-image-field";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 export const SURVEY_KINDS = [
   { value: "SURVEY", label: "일반 설문" },
@@ -55,6 +57,16 @@ interface SurveySettingsFormProps {
   onSubmit: (values: SurveySettingsFormValues) => void;
 }
 
+const escapeHtmlAttribute = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+const appendInlineImage = (content: string, src: string) =>
+  `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
+
 export function SurveySettingsForm({
   mode = "all",
   isOngoing = false,
@@ -66,11 +78,13 @@ export function SurveySettingsForm({
 }: SurveySettingsFormProps) {
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const articleSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    getValues,
     control,
     formState: { errors },
   } = useFormContext<SurveySettingsFormValues>();
@@ -150,6 +164,20 @@ export function SurveySettingsForm({
     setValue("eligibleSocAffiliations", next, { shouldDirty: true, shouldValidate: true });
   };
 
+  const handleDescriptionImageUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) return null;
+
+    const asset = await apiClient.uploadAsset(file);
+    const src = resolveAssetUrl(asset.storageKey);
+    const otherDescription = activeTab === "ko" ? "descriptionEn" : "descriptionKo";
+    const currentOtherDescription = getValues(otherDescription) ?? "";
+    setValue(otherDescription, appendInlineImage(currentOtherDescription, src), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    return src;
+  };
+
   const inputCls =
     "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-[#172033] outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60";
 
@@ -195,7 +223,7 @@ export function SurveySettingsForm({
                 <span
                   className="text-sm font-normal text-[#344054]"
                 >
-                  국문 전용
+                  한국어 전용
                 </span>
               </label>
             </div>
@@ -242,6 +270,7 @@ export function SurveySettingsForm({
                       className="!mx-0 !max-w-none"
                       compact
                       content={field.value ?? ""}
+                      onImageUpload={handleDescriptionImageUpload}
                       onChange={field.onChange}
                       lang="ko"
                       placeholder="설문 설명을 입력하세요"
@@ -257,6 +286,7 @@ export function SurveySettingsForm({
                       className="!mx-0 !max-w-none"
                       compact
                       content={field.value ?? ""}
+                      onImageUpload={handleDescriptionImageUpload}
                       onChange={field.onChange}
                       lang="en"
                       placeholder="Enter a survey description"
@@ -265,18 +295,6 @@ export function SurveySettingsForm({
                 />
               )}
             </div>
-            <Controller
-              name={activeTab === "ko" ? "descriptionImageUrlKo" : "descriptionImageUrlEn"}
-              control={control}
-              render={({ field }) => (
-                <SurveyImageField
-                  label={activeTab === "ko" ? "설명 이미지" : "Description image"}
-                  value={field.value}
-                  onChange={field.onChange}
-                  disabled={isOngoing}
-                />
-              )}
-            />
           </div>
         </div> : null}
 

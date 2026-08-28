@@ -52,6 +52,7 @@ function survey(overrides = {}) {
     publishedAt: null,
     connectedPostId: null,
     feePayersOnly: false,
+    allowAnonymous: false,
     allowMultipleResponses: false,
     isKoreanOnly: false,
     isPublished: true,
@@ -108,7 +109,11 @@ test("does not treat members-only visibility as a language restriction", () => {
 });
 
 test("builds unified survey and event items", () => {
-  const items = buildUnifiedItems([survey()], [article()], NOW);
+  const items = buildUnifiedItems(
+    [survey({ allowAnonymous: true })],
+    [article()],
+    NOW,
+  );
 
   assert.deepEqual(
     items.map((item) => [item.id, item.kind, item.computedState]),
@@ -117,6 +122,7 @@ test("builds unified survey and event items", () => {
       ["article-1", "EVENT", "open"],
     ],
   );
+  assert.equal(items[0].allowAnonymous, true);
   assert.equal(items[1].surveyId, "survey-child");
   assert.equal(items[1].descriptionKo, "행사 설명");
   assert.equal(items[1].descriptionEn, "Event description");

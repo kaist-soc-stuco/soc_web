@@ -5,7 +5,6 @@ import { Paperclip } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   getBoardLabelFromMetadata,
   isLegacyPublicBoardCode,
@@ -62,7 +61,7 @@ export function BoardCategoryNavigation({
             return (
               <PageTabLink
                 key={board.code}
-                to={`/board/${board.code}`}
+                to={board.code === "FAQ" ? "/about/faq" : `/board/${board.code}`}
                 active={isActive}
               >
                 {getBoardLabelFromMetadata(board, board.code, lang)}
@@ -152,13 +151,8 @@ interface BoardArticleTableProps {
 }
 
 function BoardTableSkeleton({ columns }: { columns: number }) {
-  return (
-    <TableSkeleton
-      columns={columns}
-      rows={8}
-      className="border-t border-slate-100"
-    />
-  );
+  void columns;
+  return <div className="min-h-48 border-t border-slate-100" aria-label="게시글 불러오는 중" aria-busy="true" />;
 }
 
 export function BoardArticleTable({

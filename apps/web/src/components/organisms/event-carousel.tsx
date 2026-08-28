@@ -1,7 +1,13 @@
 import { createApiClient } from "@soc/api-client";
 import { isoToMs, localDate, msToDate, nowMs } from "@soc/shared";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -191,14 +197,27 @@ function EventDayBadge({ event }: { event: EventCardItem }) {
   return label ? <span className="home-editorial-dday">{label}</span> : null;
 }
 
-function EventCard({ event }: { event: EventCardItem }) {
+function EventCard({
+  event,
+  enter,
+  enterIndex,
+}: {
+  event: EventCardItem;
+  enter: boolean;
+  enterIndex: number;
+}) {
   const dateRange = formatEventDateRange(event.startAt, event.endAt);
+  const style = {
+    "--home-event-card-delay": `${enterIndex * 80}ms`,
+  } as CSSProperties;
+
   return (
     <Link
       to={`/events/${encodeURIComponent(event.id)}`}
       draggable={false}
       onDragStart={(dragEvent) => dragEvent.preventDefault()}
-      className="home-portal-event-card group"
+      className={`home-portal-event-card group ${enter ? "home-event-card-enter" : ""}`}
+      style={style}
     >
       <div className="home-portal-event-media">
         <EventImage event={event} />
@@ -246,7 +265,9 @@ export function EventCarousel() {
   const [viewportWidth, setViewportWidth] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [hasEnteredViewport, setHasEnteredViewport] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const dragStartXRef = useRef<number | null>(null);
   const dragStartYRef = useRef<number | null>(null);
   const dragPointerIdRef = useRef<number | null>(null);
@@ -326,6 +347,28 @@ export function EventCarousel() {
     return () => observer.disconnect();
   }, [totalPages]);
 
+  useEffect(() => {
+    if (loading || hasEnteredViewport) return;
+
+    const section = sectionRef.current;
+    if (!section || typeof IntersectionObserver === "undefined") {
+      setHasEnteredViewport(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setHasEnteredViewport(true);
+        observer.disconnect();
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -8%" },
+    );
+    observer.observe(section);
+
+    return () => observer.disconnect();
+  }, [hasEnteredViewport, loading]);
+
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (totalPages <= 1) return;
@@ -388,7 +431,11 @@ export function EventCarousel() {
   if (loading) return <EventCarouselSkeleton />;
 
   return (
-    <section className="home-events-section" aria-labelledby="home-events-title">
+    <section
+      ref={sectionRef}
+      className="home-events-section"
+      aria-labelledby="home-events-title"
+    >
       <div className="home-section-heading home-section-heading-row">
         <div>
           <h2 id="home-events-title">{lang === "ko" ? "행사" : "Events"}</h2>
@@ -428,7 +475,14 @@ export function EventCarousel() {
                       className="grid flex-shrink-0 gap-6 md:grid-cols-3"
                       style={{ width: viewportWidth ? `${viewportWidth}px` : "100%", marginRight: pageIndex < pages.length - 1 ? `${pageGap}px` : undefined }}
                     >
-                      {page.map((event) => <EventCard key={event.id} event={event} />)}
+                      {page.map((event, eventIndex) => (
+                        <EventCard
+                          key={event.id}
+                          enter={hasEnteredViewport}
+                          enterIndex={eventIndex}
+                          event={event}
+                        />
+                      ))}
                     </div>
                   ))}
                 </div>

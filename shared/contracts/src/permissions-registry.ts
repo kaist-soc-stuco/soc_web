@@ -154,7 +154,7 @@ export const PERMISSION_REGISTRY: readonly PermissionDefinition[] = [
     bit: 32768,
     labelKo: "투표 관리",
     labelEn: "Manage votes",
-    description: "전산학부 주전생 대상 비밀투표를 만들고 명부·투표율·결과를 관리할 수 있습니다.",
+    description: "전산학부 주전공 학부생 대상 비밀투표를 만들고 명부·투표율·결과를 관리할 수 있습니다.",
   },
   {
     code: PermissionCode.SUPER_ADMIN,

@@ -32,9 +32,10 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
   const descriptionImage = lang === "ko"
     ? survey.descriptionImageUrlKo
     : survey.descriptionImageUrlEn || survey.descriptionImageUrlKo;
+  const hasInlineDescriptionImage = /<img\b/i.test(description);
 
   return (
-    <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in slide-in-from-top-4 duration-300 sm:p-8">
+    <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in duration-300 sm:p-8">
       <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
         {getLocalizedText(lang, survey.titleKo, survey.titleEn)}
       </h1>
@@ -45,7 +46,7 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
         />
       )}
 
-      {descriptionImage ? (
+      {descriptionImage && !hasInlineDescriptionImage ? (
         <img
           src={resolveAssetUrl(descriptionImage)}
           alt=""
@@ -69,7 +70,7 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
         {survey.isKoreanOnly && (
           <span className="inline-flex items-center gap-1.5">
             <Languages className="h-3.5 w-3.5 text-kaist-darkgreen" />
-            {lang === "ko" ? "한국어 사용자만" : "Korean Speakers Only"}
+            {lang === "ko" ? "한국어 전용" : "Korean only"}
           </span>
         )}
       </div>

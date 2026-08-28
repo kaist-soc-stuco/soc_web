@@ -1,3 +1,4 @@
+import { OPERATIONAL_SURVEY_IDS, operationalSurveyPath } from "@soc/contracts";
 import { nowDate } from "@soc/shared";
 import { useEffect, useRef, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
@@ -16,6 +17,7 @@ const SECTIONS: Array<{
   { id: "intro", labelKo: "소개", labelEn: "About" },
   { id: "work", labelKo: "주요 사업", labelEn: "What we do" },
   { id: "people", labelKo: "조직도", labelEn: "Organization chart" },
+  { id: "partnership", labelKo: "후원 및 제휴", labelEn: "Partnerships" },
 ];
 
 export function AboutLandingHero({ lang }: { lang: string }) {
@@ -145,6 +147,7 @@ export function AboutLandingContent({
     <div ref={contentRef} data-about-content>
       <WorkSection lang={lang} />
       <PeopleSection lang={lang} />
+      <PartnershipSection lang={lang} />
     </div>
   );
 }
@@ -234,6 +237,45 @@ function PeopleSection({ lang }: { lang: string }) {
               {lang === "ko" ? "등록된 조직도가 없습니다." : "No organization chart has been published."}
             </p>
           )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PartnershipSection({ lang }: { lang: string }) {
+  const inquiryHref = operationalSurveyPath(OPERATIONAL_SURVEY_IDS.corporatePartnership);
+  const areas = lang === "ko"
+    ? ["행사 후원", "채용·기술 세션", "공동 프로그램"]
+    : ["Event sponsorship", "Recruiting and technical sessions", "Joint programs"];
+
+  return (
+    <section
+      id="partnership"
+      className="about-anchor-section about-landing-section about-landing-section-muted"
+    >
+      <div className="about-landing-container">
+        <div className="about-partnership-layout">
+          <div data-about-reveal>
+            <SectionHeading>{lang === "ko" ? "후원 및 제휴" : "Partnerships"}</SectionHeading>
+            <p className="about-partnership-description">
+              {lang === "ko"
+                ? "전산학부 학생과 연결되는 행사, 세션과 공동 프로그램 제안을 받습니다. 담당자 연락처와 제안 내용을 남겨 주세요."
+                : "We welcome proposals for events, sessions, and joint programs that connect with School of Computing students."}
+            </p>
+            <Link className="about-partnership-link" to={inquiryHref}>
+              {lang === "ko" ? "후원·제휴 문의하기" : "Submit an inquiry"}
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </div>
+          <ol className="about-partnership-areas about-reveal-delay-1" data-about-reveal>
+            {areas.map((area, index) => (
+              <li key={area}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{area}</strong>
+              </li>
+            ))}
+          </ol>
         </div>
       </div>
     </section>

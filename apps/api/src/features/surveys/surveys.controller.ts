@@ -44,8 +44,9 @@ export class SurveysController {
   }
 
   @Get("list/public")
-  findPublic() {
-    return this.surveysService.findPublished();
+  @UseGuards(OptionalAuthGuard)
+  findPublic(@Req() req: OptionalAuthedRequest) {
+    return this.surveysService.findPublished(req.user);
   }
 
   @Get(":id")

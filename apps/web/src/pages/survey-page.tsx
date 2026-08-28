@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { Header } from "@/components/organisms/header";
 import { SurveyResponseForm } from "@/features/survey/survey-response-form";
+import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
 import {
   AlreadySubmittedView,
   BeforeOpenView,
@@ -15,7 +16,6 @@ import { PageShell } from "@/components/ui/page-layout";
 export function SurveyPage() {
   const { id } = useParams<{ id: string }>();
   const {
-    allQuestions,
     answers,
     handleAnswerChange,
     handleSubmit,
@@ -82,9 +82,23 @@ export function SurveyPage() {
       return <ClosedView lang={lang} />;
     }
 
-    if (!isPreview && !sessionAuthenticated && !survey.allowAnonymous) {
+    if (
+      !isPreview &&
+      (survey.participationEligibility?.status === "LOGIN_REQUIRED" ||
+        (!sessionAuthenticated && !survey.allowAnonymous))
+    ) {
+      return <LoginRequiredView lang={lang} />;
+    }
+
+    if (
+      !isPreview &&
+      survey.participationEligibility?.status === "NOT_ELIGIBLE"
+    ) {
       return (
-        <LoginRequiredView lang={lang} feePayersOnly={survey.feePayersOnly} />
+        <SurveyParticipationNotice
+          eligibility={survey.participationEligibility}
+          lang={lang}
+        />
       );
     }
 
@@ -112,7 +126,6 @@ export function SurveyPage() {
 
     return (
       <SurveyResponseForm
-        allQuestions={allQuestions}
         answers={answers}
         isEditingExistingResponse={isEditingExistingResponse}
         isPreview={isPreview}
@@ -131,7 +144,7 @@ export function SurveyPage() {
   return (
     <PageShell>
       <Header />
-      <main className="flex-1 px-4 py-10 lg:px-0">
+      <main className="flex-1 bg-[#f3f5f4] px-4 py-10 lg:px-0">
         <div className="mx-auto max-w-[52rem]">
           {survey && shouldEmbedTerminalState ? (
             <SurveySummaryCard lang={lang} survey={survey}>

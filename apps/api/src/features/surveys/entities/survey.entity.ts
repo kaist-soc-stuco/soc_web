@@ -1,6 +1,7 @@
 import type {
   ComputedSurveyState,
   SurveyLifecycleStatus,
+  SurveyParticipationEligibility,
   SurveySocAffiliation,
   SurveyAcademicEligibility,
 } from "@soc/contracts";
@@ -38,6 +39,7 @@ export interface SurveyRecord {
   createdAt: string;
   updatedAt: string;
   responseCount?: number;
+  participationEligibility?: SurveyParticipationEligibility;
   spreadsheetId: string | null;
   spreadsheetUrl: string | null;
   spreadsheetSyncStatus: "NOT_CONNECTED" | "CONNECTED" | "ERROR";
