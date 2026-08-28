@@ -83,7 +83,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameKo: "공지",
     nameEn: "Notice",
     descriptionKo: "집행위원회 및 학교의 중요한 공지사항을 확인하세요",
-    descriptionEn: "Read important announcements from SOC and the school.",
+    descriptionEn: "Read important announcements from SoC Student Council and the school.",
     writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
@@ -125,7 +125,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameKo: "홍보글",
     nameEn: "Promotional Posts",
     descriptionKo: "집행위원회 및 학회의 홍보 게시물",
-    descriptionEn: "Find promotions from SOC and student organizations.",
+    descriptionEn: "Find promotions from SoC Student Council and student organizations.",
     writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
@@ -139,7 +139,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameKo: "건의사항",
     nameEn: "Suggestions",
     descriptionKo: "학생들의 의견과 건의사항을 나눠주세요",
-    descriptionEn: "Share feedback and suggestions with SOC.",
+    descriptionEn: "Share feedback and suggestions with SoC Student Council.",
     writePermissionId: null,
     allowComment: true,
     allowSecret: true,
@@ -336,7 +336,7 @@ const recruitmentPosterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="960
   <rect width="960" height="540" rx="12" fill="url(#bg)"/>
   <text x="480" y="74" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="800" fill="#007044">2026 전산학부</text>
   <text x="480" y="123" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="900" fill="#00633b">학생회 임원 모집 안내</text>
-  <text x="480" y="157" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#00633b">전산학부 학생회의 임원으로 활발한 참여를 기다립니다!</text>
+  <text x="480" y="157" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#00633b">전산학부 집행위원회의 임원으로 활발한 참여를 기다립니다!</text>
   <g transform="translate(62 207)">
     <g>
       <rect width="208" height="174" rx="10" fill="#fffdf9" stroke="#ccd9d1"/>
@@ -760,8 +760,8 @@ async function upsertSeedAuthor() {
     )
     values (
       'seed-council-author',
-      '전산학부 학생회',
-      'SOC Student Council',
+      '전산학부 집행위원회',
+      'SoC Student Council',
       'student-council@kaist.ac.kr',
       '전산학부',
       'School of Computing',
@@ -807,8 +807,8 @@ async function seedAboutPageContent(seedAuthorId: string) {
     {
       type: "ORGANIZATION_CHART",
       status: "PUBLISHED",
-      titleKo: "전산학부 학생회 조직도",
-      titleEn: "Student Council Organization Chart",
+      titleKo: "전산학부 집행위원회 조직도",
+      titleEn: "SoC Student Council Organization Chart",
       imageUrl: "/organization-chart.svg",
       sortOrder: 0,
       createdBy: seedAuthorId,
@@ -1047,7 +1047,7 @@ async function seedMockData() {
   await seedAboutPageContent(seedAuthor.userId);
 
   const detailedNoticeContent = [
-    "전산학부 학생회는 학부 여러분의 의견을 반영하고 보다 나은 학부 문화를 만들어가기 위해 열정과 책임감 있는 임원분들을 모집합니다.",
+    "전산학부 집행위원회는 학부 여러분의 의견을 반영하고 보다 나은 학부 문화를 만들어가기 위해 열정과 책임감 있는 임원분들을 모집합니다.",
     "",
     "• 모집 대상 : 전산학부에 재학 중인 학생 (휴학생 활동 가능)",
     "• 모집 부문 : 기획팀, 사무국, 재정(회계)팀, 홍보팀, 행사팀 등",
@@ -1059,10 +1059,10 @@ async function seedMockData() {
 
   const noticeItems = [
     {
-      titleKo: "2026 봄학기 전산학부 학생회 운영 안내",
-      titleEn: "Spring 2026 Student Council Operations Notice",
+      titleKo: "2026 봄학기 전산학부 집행위원회 운영 안내",
+      titleEn: "Spring 2026 SoC Student Council Operations Notice",
       contentKo: [
-        "안녕하세요, 전산학부 학생회입니다.",
+        "안녕하세요, 전산학부 집행위원회입니다.",
         "",
         "2026 봄학기 동안 학생회는 공지 전달, 행사 운영, 복지 물품 관리, 건의사항 접수 창구를 통합하여 운영합니다.",
         "학생회실 방문이 필요한 경우 아래 운영 시간을 확인해 주세요.",
@@ -1075,7 +1075,7 @@ async function seedMockData() {
         "급한 문의는 홈페이지 문의 게시판 또는 학생회 대표 메일로 남겨주시면 확인 후 순차적으로 답변드리겠습니다.",
       ].join("\n"),
       contentEn: [
-        "Hello, this is the School of Computing Student Council.",
+        "Hello, this is the SoC Student Council.",
         "",
         "During Spring 2026, the council will operate integrated channels for notices, events, welfare item rentals, and student feedback.",
         "",
@@ -1098,10 +1098,10 @@ async function seedMockData() {
     },
     {
       titleKo: "2026 전산학부 집행위원회 임원 공개 모집",
-      titleEn: "2026 SOC Executive Committee Recruitment",
+      titleEn: "2026 SoC Student Council Executive Committee Recruitment",
       contentKo: detailedNoticeContent,
       contentEn: [
-        "The School of Computing Student Council is recruiting executive committee members for 2026.",
+        "The SoC Student Council is recruiting executive committee members for 2026.",
         "",
         "We welcome students who want to plan events, improve student welfare, and build better communication channels within the department.",
         "",
@@ -1118,7 +1118,7 @@ async function seedMockData() {
     },
     {
       titleKo: "전산학부 라운지 이용 및 물품 대여 안내",
-      titleEn: "SOC Lounge and Welfare Item Rental Guide",
+      titleEn: "SoC Lounge and Welfare Item Rental Guide",
       contentKo: [
         "전산학부 라운지와 학생회 보유 물품 대여 절차를 안내드립니다.",
         "",
@@ -1130,7 +1130,7 @@ async function seedMockData() {
         "• 유의사항: 파손 또는 분실 시 동일 물품 기준으로 보상 요청이 있을 수 있습니다.",
       ].join("\n"),
       contentEn: [
-        "This notice explains how to use the SOC lounge and borrow welfare items managed by the student council.",
+        "This notice explains how to use the SoC lounge and borrow welfare items managed by the student council.",
         "",
         "Please keep the lounge clean and return borrowed items on time.",
       ].join("\n"),
@@ -1210,7 +1210,7 @@ async function seedMockData() {
     },
     {
       titleKo: "2026 여름학기 학생회실 운영 시간 안내",
-      titleEn: "Student Council Office Hours for Summer 2026",
+      titleEn: "SoC Student Council Office Hours for Summer 2026",
       contentKo: [
         "2026 여름학기 학생회실 운영 시간과 방문 상담 방법을 안내드립니다.",
         "",
@@ -1221,10 +1221,10 @@ async function seedMockData() {
         "방문이 어려운 경우 홈페이지 문의하기를 이용해 주세요.",
       ].join("\n"),
       contentEn: [
-        "Student Council office hours and in-person consultation details for Summer 2026.",
+        "SoC Student Council office hours and in-person consultation details for Summer 2026.",
         "",
         "• Office hours: Weekdays 12:30 ~ 13:30, 18:00 ~ 19:00",
-        "• Location: N1 Student Council Office",
+        "• Location: N1 SoC Student Council Office",
       ].join("\n"),
       isPinned: false,
       viewCount: 28,
@@ -1263,14 +1263,14 @@ async function seedMockData() {
         eyebrow: "SHARED SPACE",
         title: "공용공간 이용 수칙",
         subtitle: "함께 쓰는 공간을 위한 작은 약속",
-        dateLine: "SOC COMMUNITY",
+        dateLine: "SoC COMMUNITY",
         accent: "#2563eb",
         accentDark: "#1e3a8a",
       }),
     },
     {
       titleKo: "여름방학 학생회 프로그램 사전 안내",
-      titleEn: "Preview of Summer Student Council Programs",
+      titleEn: "Preview of Summer SoC Student Council Programs",
       contentKo: [
         "여름방학 동안 진행할 학습·교류 프로그램을 미리 안내드립니다.",
         "",
@@ -1403,7 +1403,7 @@ async function seedMockData() {
   const eventItems: EventSeed[] = [
     {
       titleKo: "전산인의 밤: 봄학기 네트워킹 데이",
-      titleEn: "SOC Night: Spring Networking Day",
+      titleEn: "SoC Night: Spring Networking Day",
       contentKo: [
         "전산학부 구성원이 한자리에 모여 프로젝트 경험, 연구실 생활, 진로 고민을 나누는 네트워킹 행사를 진행합니다.",
         "",
@@ -1416,7 +1416,7 @@ async function seedMockData() {
         "• 신청: 연결된 설문에서 참석 여부와 관심 세션을 선택해 주세요.",
       ].join("\n"),
       contentEn: [
-        "SOC Night is a networking event for students to share project experiences, research interests, and career questions.",
+        "SoC Night is a networking event for students to share project experiences, research interests, and career questions.",
         "",
         "Dinner, small-group networking, and an alumni panel talk will be provided.",
       ].join("\n"),
@@ -1439,7 +1439,7 @@ async function seedMockData() {
       survey: {
         kind: "APPLICATION",
         titleKo: "전산인의 밤 참가 신청",
-        titleEn: "SOC Night Registration",
+        titleEn: "SoC Night Registration",
         descriptionKo: "참석 인원과 식사 준비를 위해 사전 신청을 받습니다. 신청 후 일정이 바뀌면 마감 전까지 응답을 수정할 수 있습니다.",
         descriptionEn: "Please register in advance so we can prepare seats and dinner. Responses can be edited until the deadline.",
         feeRequirementPolicy: "NONE",
@@ -1495,7 +1495,7 @@ async function seedMockData() {
       titleKo: "기말고사 간식 배부 신청",
       titleEn: "Final Exam Snack Pickup Registration",
       contentKo: [
-        "기말고사 기간을 맞아 전산학부 학생회에서 간식 배부를 진행합니다.",
+        "기말고사 기간을 맞아 전산학부 집행위원회에서 간식 배부를 진행합니다.",
         "",
         "수령 시간을 분산하기 위해 사전 신청제로 운영하며, 신청자 본인 확인 후 배부합니다. 준비 수량이 한정되어 있으므로 신청 후 수령이 어려워진 경우 마감 전 응답을 수정해 주세요.",
         "",
@@ -1506,7 +1506,7 @@ async function seedMockData() {
         "• 유의사항: 중복 수령은 불가합니다.",
       ].join("\n"),
       contentEn: [
-        "The student council will distribute snacks during finals week.",
+        "The SoC Student Council will distribute snacks during finals week.",
         "",
         "Please register for a pickup slot in advance. Duplicate pickup is not allowed.",
       ].join("\n"),
@@ -1682,7 +1682,7 @@ async function seedMockData() {
         "• 조사 기간: 2026.05.30 ~ 2026.06.14",
       ].join("\n"),
       contentEn: [
-        "The student council is running a preliminary demand survey for the Fall 2026 MT.",
+        "The SoC Student Council is running a preliminary demand survey for the Fall 2026 MT.",
         "",
         "This is not the final registration form. The result will be used to estimate budget, venue size, and transportation.",
       ].join("\n"),
@@ -1756,7 +1756,7 @@ async function seedMockData() {
     },
     {
       titleKo: "전산학부 커리어 밋업",
-      titleEn: "SOC Career Meetup",
+      titleEn: "SoC Career Meetup",
       contentKo: "현업 선배와 함께 개발자 커리어, 인턴 준비, 포트폴리오에 대해 이야기하는 소규모 밋업입니다.",
       contentEn: "A small meetup with alumni and industry mentors about software careers, internships, and portfolios.",
       eventDescriptionKo: "현업 선배와 개발자 커리어를 함께 이야기하는 저녁 밋업",
@@ -1776,7 +1776,7 @@ async function seedMockData() {
       }),
       survey: makeSimpleEventSurvey({
         titleKo: "전산학부 커리어 밋업 참가 신청",
-        titleEn: "SOC Career Meetup Registration",
+        titleEn: "SoC Career Meetup Registration",
         descriptionKo: "좌석과 다과 준비를 위해 참석 여부를 미리 알려 주세요.",
         descriptionEn: "Please let us know whether you will attend so we can prepare seats and refreshments.",
         openAt: new Date("2026-08-21T09:00:00+09:00"),
@@ -1846,7 +1846,7 @@ async function seedMockData() {
     },
     {
       titleKo: "전산학부 가을 네트워킹 데이",
-      titleEn: "SOC Fall Networking Day",
+      titleEn: "SoC Fall Networking Day",
       contentKo: "새 학기의 관심사를 나누고 동료·선배와 편하게 연결되는 네트워킹 데이를 준비했습니다.",
       contentEn: "Meet classmates and alumni, share interests, and build new connections this fall.",
       eventDescriptionKo: "새 학기 관심사와 진로를 나누는 가을 네트워킹 데이",
@@ -1866,7 +1866,7 @@ async function seedMockData() {
       }),
       survey: makeSimpleEventSurvey({
         titleKo: "전산학부 가을 네트워킹 데이 참가 신청",
-        titleEn: "SOC Fall Networking Day Registration",
+        titleEn: "SoC Fall Networking Day Registration",
         descriptionKo: "행사 준비를 위해 참석 여부를 알려 주세요.",
         descriptionEn: "Please let us know whether you will attend so we can prepare the event.",
         openAt: new Date("2026-08-18T11:00:00+09:00"),

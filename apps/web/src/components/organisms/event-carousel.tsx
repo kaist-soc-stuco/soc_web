@@ -139,7 +139,7 @@ function EventFallback({ event }: { event: EventCardItem }) {
         draggable={false}
         className="home-event-fallback-image"
       />
-      <span className="home-event-fallback-mark">KAIST SOC</span>
+      <span className="home-event-fallback-mark">KAIST SoC</span>
     </div>
   );
 }

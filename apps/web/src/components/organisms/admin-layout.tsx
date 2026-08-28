@@ -114,7 +114,7 @@ export function AdminLayout() {
             </Button>
 
             {dropdownOpen && (
-              <PopoverPanel className="right-0 top-full w-44 rounded-lg p-1">
+              <PopoverPanel className="right-0 top-full w-52 rounded-lg p-1">
                 <Button variant="ghost"
                   type="button"
                   className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"

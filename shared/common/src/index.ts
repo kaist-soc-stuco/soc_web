@@ -1,4 +1,4 @@
-export const APP_TITLE = "SOC";
+export const APP_TITLE = "SoC";
 
 export * from './time';
 import { formatKorean } from './time';

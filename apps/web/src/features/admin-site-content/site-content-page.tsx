@@ -425,9 +425,9 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
   uploading: boolean;
   value: string;
 }) {
-  const renderSlot = (label: string, slotValue: string, select: (file: File) => void, remove: (() => void) | undefined) => (
+  const renderSlot = (label: string | null, slotValue: string, select: (file: File) => void, remove: (() => void) | undefined) => (
     <div className="space-y-3">
-      <p className="text-sm font-medium text-slate-700">{label} <span className="text-xs font-normal text-slate-400">({spec.width} × {spec.height})</span></p>
+      {label ? <p className="text-sm font-medium text-slate-700">{label}</p> : null}
       {slotValue ? <div className={cn("overflow-hidden rounded-lg", previewBorderless ? "bg-white" : "border border-[#e5e9ec] bg-slate-50")}><img src={resolveAssetUrl(slotValue)} alt="" className={cn("block h-36 w-full object-contain", previewBorderless && "h-auto max-h-[420px]")} /></div> : null}
       <div className="flex flex-wrap gap-2">
         <label className={cn("inline-flex h-[var(--ui-control-height)] cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-[length:var(--ui-control-font-size)] font-normal text-[#172033] transition-colors hover:bg-slate-50", uploading && "pointer-events-none opacity-60")}>
@@ -443,9 +443,8 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
   const hasSecondary = Boolean(secondaryLabel && onSecondarySelect);
   return <AdminFormField label={hasSecondary ? "조직도 이미지" : `${spec.label} (${spec.width} × ${spec.height}) *`}>
     <div className="grid gap-5">
-      {renderSlot(hasSecondary ? "한국어 조직도" : spec.label, value, onSelect, onRemove)}
+      {renderSlot(hasSecondary ? "한국어 조직도" : null, value, onSelect, onRemove)}
       {hasSecondary ? renderSlot(secondaryLabel!, secondaryValue ?? "", onSecondarySelect!, onSecondaryRemove) : null}
-      <p className="text-xs font-normal text-[#344054]">JPG, PNG 또는 WebP 이미지 파일을 선택하면 지정한 크기로 자를 수 있습니다.</p>
     </div>
   </AdminFormField>;
 }

@@ -27,7 +27,6 @@ export function SurveyImageField({
       <ImageUploadField
         alt={`${label} 미리보기`}
         disabled={disabled || uploading}
-        emptyText="JPG, PNG 또는 WebP 이미지를 등록할 수 있습니다."
         imageUrl={value ? resolveAssetUrl(value) : undefined}
         onRemove={() => onChange(null)}
         onSelect={async (file) => {
