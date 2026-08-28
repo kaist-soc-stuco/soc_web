@@ -25,24 +25,24 @@ export function AboutLandingHero({ lang }: { lang: string }) {
     <section id="intro" className="about-anchor-section about-landing-hero" aria-labelledby="about-hero-title">
       <div className="about-landing-container about-landing-hero-inner">
         <div className="about-landing-hero-copy">
-          <span className="about-hero-term">{currentYear} SOC</span>
+          <span className="about-hero-term">{currentYear} SoC</span>
           <h1 id="about-hero-title">
             {lang === "ko" ? (
               <>
                 <span>전산학부</span>
-                <span>학생회 SOC</span>
+                <span>집행위원회</span>
               </>
             ) : (
               <>
-                <span>Student Council</span>
-                <span>of Computing</span>
+                <span>SoC Student</span>
+                <span>Council</span>
               </>
             )}
           </h1>
           <p>
             {lang === "ko"
-              ? "KAIST 전산학부 학부생을 대표하는 학생자치기구, SOC입니다."
-              : "The student council representing KAIST School of Computing undergraduates"}
+              ? "KAIST 전산학부 학부생을 대표하는 학생자치기구 집행위원회입니다."
+              : "SoC Student Council representing KAIST School of Computing undergraduates"}
           </p>
           <div className="about-hero-links">
             <Link to="/events">
@@ -58,7 +58,7 @@ export function AboutLandingHero({ lang }: { lang: string }) {
         <figure className="about-landing-hero-media">
           <img
             src="/hero_background2.jpeg"
-            alt={lang === "ko" ? "전산학부 학생회 구성원 단체 사진" : "KAIST School of Computing Student Council members"}
+            alt={lang === "ko" ? "전산학부 집행위원회 구성원 단체 사진" : "KAIST SoC Student Council members"}
             width={3000}
             height={2000}
             decoding="async"

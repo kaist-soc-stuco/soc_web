@@ -64,7 +64,7 @@ const BOARD_FALLBACK_METADATA: Record<
   },
   홍보글: {
     descriptionKo: "집행위원회 및 학회 홍보 게시물을 확인하세요.",
-    descriptionEn: "Promotional posts from the Student Council and societies.",
+    descriptionEn: "Promotional posts from the SoC Student Council and societies.",
     labelEn: "Promotional Posts",
     titleKo: "홍보글",
   },

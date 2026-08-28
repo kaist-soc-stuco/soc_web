@@ -9,7 +9,7 @@ interface ImageUploadFieldProps {
   alt: string;
   className?: string;
   disabled?: boolean;
-  emptyText: string;
+  emptyText?: string;
   imageUrl?: string;
   onRemove: () => void;
   onSelect: (file: File) => void | Promise<void>;
@@ -95,9 +95,11 @@ export function ImageUploadField({
             <span className="block text-sm font-normal text-[#172033]">
               {selectLabel}
             </span>
-            <span className="mt-0.5 block text-xs font-normal text-[#344054]">
-              {emptyText}
-            </span>
+            {emptyText ? (
+              <span className="mt-0.5 block text-xs font-normal text-[#344054]">
+                {emptyText}
+              </span>
+            ) : null}
           </span>
         </button>
       )}

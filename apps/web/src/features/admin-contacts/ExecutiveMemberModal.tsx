@@ -166,7 +166,6 @@ export function ExecutiveMemberModal({
                 }}
               />
             </div>
-            <p className="text-xs text-slate-500">JPG, PNG, WebP, GIF 이미지를 선택할 수 있습니다.</p>
             {avatarError ? <p className="text-xs font-medium text-rose-600">{avatarError}</p> : null}
           </div>
         </div>

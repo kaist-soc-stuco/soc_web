@@ -210,7 +210,7 @@ export function RoadmapPage() {
           className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-kaist-grey transition-colors hover:text-kaist-darkgreen"
         >
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-          {lang === "ko" ? "SOC 소개로 돌아가기" : "Back to About"}
+          {lang === "ko" ? "SoC 소개로 돌아가기" : "Back to About"}
         </Link>
 
         <section className="mt-5 grid gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-[1fr_18rem] md:p-8">
@@ -413,7 +413,7 @@ export function RoadmapPage() {
             <div className="flex items-center gap-3">
               <Users aria-hidden="true" className="h-5 w-5 text-kaist-lightgreen" />
               <h2 className="text-xl font-bold">
-                {lang === "ko" ? "SOC에서 다음 정보 찾기" : "Find your next step on SOC"}
+                {lang === "ko" ? "SoC에서 다음 정보 찾기" : "Find your next step on SoC"}
               </h2>
             </div>
             <p className="mt-3 text-sm font-medium leading-6 text-white/75">

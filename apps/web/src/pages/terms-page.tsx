@@ -6,8 +6,8 @@ const termsSections = [
   {
     titleKo: '서비스 이용',
     titleEn: 'Using the service',
-    bodyKo: '이 사이트는 전산학부 학생회가 공지, 행사, 설문 및 학생회 운영 정보를 제공하기 위한 서비스입니다. 이용자는 관련 법령과 사이트 운영 원칙을 준수해야 합니다.',
-    bodyEn: 'This site provides School of Computing Student Council notices, events, surveys, and operating information. Users must follow applicable law and the site rules.',
+    bodyKo: '이 사이트는 전산학부 집행위원회가 공지, 행사, 설문 및 학생회 운영 정보를 제공하기 위한 서비스입니다. 이용자는 관련 법령과 사이트 운영 원칙을 준수해야 합니다.',
+    bodyEn: 'This site provides SoC Student Council notices, events, surveys, and operating information. Users must follow applicable law and the site rules.',
   },
   {
     titleKo: '계정과 게시물',
@@ -18,8 +18,8 @@ const termsSections = [
   {
     titleKo: '서비스 변경 및 문의',
     titleEn: 'Changes and contact',
-    bodyKo: '학생회 운영에 따라 메뉴와 기능은 변경될 수 있습니다. 서비스 이용 또는 게시물 처리와 관련한 문의는 전산학부 학생회 운영진에게 연락해 주세요.',
-    bodyEn: 'Menus and features may change as the council operates the service. Contact the School of Computing Student Council with questions about using the service or handling a post.',
+    bodyKo: '학생회 운영에 따라 메뉴와 기능은 변경될 수 있습니다. 서비스 이용 또는 게시물 처리와 관련한 문의는 전산학부 집행위원회 운영진에게 연락해 주세요.',
+    bodyEn: 'Menus and features may change as the council operates the service. Contact the SoC Student Council with questions about using the service or handling a post.',
   },
 ];
 
