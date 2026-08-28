@@ -263,6 +263,7 @@ function CommentRow({
 }) {
   const likeActionKey = `${comment.commentId}:LIKE`;
   const likeActive = isAuthenticated && comment.viewerHasLiked;
+  const canHide = canModerate && comment.status === "PUBLISHED";
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [hideModalOpen, setHideModalOpen] = useState(false);
   const [hideReason, setHideReason] = useState("");
@@ -296,6 +297,7 @@ function CommentRow({
       className={cn(
         "group flex items-start gap-2.5 py-3.5",
         isNested ? "ml-9 border-l border-r border-t border-slate-100 pl-3" : "",
+        comment.status === "HIDDEN" && "rounded-lg bg-amber-50/70 px-3 py-3",
       )}
     >
       <div className="size-6 shrink-0 overflow-hidden rounded-full">
@@ -316,6 +318,11 @@ function CommentRow({
             {comment.isOfficial ? (
               <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-normal text-emerald-700">
                 {lang === "ko" ? "공식 답변" : "Official response"}
+              </span>
+            ) : null}
+            {comment.status === "HIDDEN" ? (
+              <span className="shrink-0 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold text-amber-800">
+                {lang === "ko" ? "숨김" : "Hidden"}
               </span>
             ) : null}
             <time
@@ -362,7 +369,7 @@ function CommentRow({
                 {lang === "ko" ? "답글" : "Reply"}
               </Button>
             ) : null}
-            {(canDelete || canModerate) && (
+            {(canDelete || canHide) && (
               <div className="relative">
                 <Button
                   type="button"
@@ -449,7 +456,7 @@ function CommentRow({
             </p>
           </Modal>
         ) : null}
-        {!canDelete && canModerate ? (
+        {!canDelete && canHide ? (
           <Modal
             open={hideModalOpen}
             onClose={() => {
@@ -487,6 +494,7 @@ function CommentRow({
               </p>
               <UiInput
                 autoFocus
+                className="w-full"
                 value={hideReason}
                 onChange={(event) => setHideReason(event.currentTarget.value)}
                 placeholder={lang === "ko" ? "관리 기록에 남길 사유" : "Reason recorded in the audit log"}

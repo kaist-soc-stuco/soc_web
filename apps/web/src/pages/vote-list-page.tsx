@@ -3,7 +3,7 @@ import type { VoteRecord } from "@soc/contracts";
 import { isoToMs } from "@soc/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, LockKeyhole } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { Header } from "@/components/organisms/header";
 import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
@@ -31,10 +31,6 @@ export function VoteListPage() {
       <PageMain>
         <PageHeader title={lang === "ko" ? "투표" : "Voting"} />
         <PageContainer className="pb-16">
-          <div className="mb-5 flex items-start gap-3 border-b border-slate-200 pb-5 text-sm font-normal text-[#344054]">
-            <LockKeyhole className="mt-0.5 size-4 shrink-0 text-brand-primary" aria-hidden="true" />
-            <p>{lang === "ko" ? "투표 시작 시점에 확정된 전산학부 주전공 학부생 명부로 본인 인증하며, 투표 내용은 참여 기록과 분리해 저장합니다." : "Eligibility is verified against the School of Computing primary-major voter roll fixed at publication. Ballots are stored separately from participation records."}</p>
-          </div>
           {loading ? (
             <div className="py-20 text-center text-sm font-normal text-[#344054]">{lang === "ko" ? "불러오는 중..." : "Loading..."}</div>
           ) : votes.length === 0 ? (

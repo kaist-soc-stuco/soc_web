@@ -34,6 +34,7 @@ import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
 import { sanitizeArticleHtml } from "./article-html-sanitizer";
 import { AuditLogService } from "../audit/audit-log.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { UsersService } from "../users/users.service";
 
 interface ArticleQueryParams {
@@ -97,6 +98,7 @@ export class ArticleService {
     private readonly boardRepository: BoardRepository,
     private readonly articleRepository: ArticleRepository,
     private readonly auditLogService: AuditLogService,
+    @Optional() private readonly notificationsService?: NotificationsService,
     @Optional() private readonly usersService?: UsersService,
   ) {}
 
@@ -236,11 +238,17 @@ export class ArticleService {
       throw new ForbiddenException("board_guest_read_disabled");
     }
 
+    const canModerate = Boolean(
+      currentUser.user &&
+        Permissions.has(currentUser.user.permission, Permissions.MODERATE_CONTENT),
+    );
+
     const article = await this.articleRepository.findDetailById(
       board.boardId,
       articleId,
       readableScopes,
       currentUser.user?.id,
+      canModerate,
     );
 
     if (!article) {
@@ -426,7 +434,9 @@ export class ArticleService {
       throw new ForbiddenException("insufficient_permission");
     }
 
-    return this.articleRepository.softDeleteArticle(board.boardId, articleId);
+    const result = await this.articleRepository.softDeleteArticle(board.boardId, articleId);
+    await this.notificationsService?.removeForArticle(code, articleId);
+    return result;
   }
 
   async updateFaqArticle(
@@ -506,7 +516,9 @@ export class ArticleService {
     if (!article || article.status === ARTICLE_STATUS.DELETED) {
       throw new NotFoundException("article_not_found");
     }
-    return this.articleRepository.softDeleteArticle(board.boardId, articleId);
+    const result = await this.articleRepository.softDeleteArticle(board.boardId, articleId);
+    await this.notificationsService?.removeForArticle("FAQ", articleId);
+    return result;
   }
 
   async reorderFaqArticles(

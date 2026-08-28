@@ -82,9 +82,6 @@ const BoardEditPage = lazy(() =>
 const MyPage = lazy(() =>
   import('@/pages/my-page').then((module) => ({ default: module.MyPage })),
 );
-const NotificationsPage = lazy(() =>
-  import('@/pages/notifications-page').then((module) => ({ default: module.NotificationsPage })),
-);
 const AboutPage = lazy(() =>
   import('@/pages/about-page').then((module) => ({ default: module.AboutPage })),
 );
@@ -250,8 +247,6 @@ export function App() {
           <Route path="/votes/:id" element={<VotePage />} />
           <Route path="/login" element={<LoginCallbackPage />} />
           <Route path="/mypage" element={<MyPage />} />
-          <Route path="/notifications" element={<AuthGuard><NotificationsPage /></AuthGuard>} />
-
           {/* Admin Routes with nested Outlet */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminIndexPage />} />

@@ -267,7 +267,7 @@ function BoardManagementPageContent() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2"><AdminFormField label="게시판 코드"><UiInput value={form.code} disabled={Boolean(editingCode)} onChange={(event) => setForm((current) => ({ ...current, code: event.currentTarget.value }))} placeholder="notice" /></AdminFormField></div>
             <AdminFormField label="이름 (한글)"><UiInput value={form.nameKo} onChange={(event) => setForm((current) => ({ ...current, nameKo: event.currentTarget.value }))} /></AdminFormField>
-            <AdminFormField label="Name (English)"><UiInput value={form.nameEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} /></AdminFormField>
+            <AdminFormField label="이름 (영문)"><UiInput value={form.nameEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} /></AdminFormField>
           </div>
           <Toggle label="공개 여부" checked={form.isActive} onChange={(checked) => setForm((current) => ({ ...current, isActive: checked }))} />
         </section>

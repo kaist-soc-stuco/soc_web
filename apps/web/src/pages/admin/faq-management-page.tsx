@@ -265,7 +265,7 @@ function FaqManagementPageContent() {
             <UiInput spellCheck={false} value={form.titleKo} onChange={(event) => setForm((current) => ({ ...current, titleKo: event.currentTarget.value }))} />
           </label>
           <label className="grid gap-1.5 text-xs font-normal text-slate-600">
-            Question (English)
+            질문 (영문)
             <UiInput spellCheck={false} value={form.titleEn} onChange={(event) => setForm((current) => ({ ...current, titleEn: event.currentTarget.value }))} />
           </label>
           <label className="grid gap-1.5 text-xs font-normal text-slate-600">
@@ -273,7 +273,7 @@ function FaqManagementPageContent() {
             <UiTextarea spellCheck={false} rows={10} value={form.contentKo} onChange={(event) => setForm((current) => ({ ...current, contentKo: event.currentTarget.value }))} />
           </label>
           <label className="grid gap-1.5 text-xs font-normal text-slate-600">
-            Answer (English)
+            답변 (영문)
             <UiTextarea spellCheck={false} rows={8} value={form.contentEn} onChange={(event) => setForm((current) => ({ ...current, contentEn: event.currentTarget.value }))} />
           </label>
         </div>

@@ -329,23 +329,33 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const handleHideComment = async (commentId: string, reason: string) => {
     if (!articleId || !reason.trim()) return;
     setCommentError(null);
+    setCommentActionSubmitting(commentId);
     try {
       await apiClient.hideComment(category, articleId, commentId, { reason: reason.trim() });
       await refreshComments();
+      toast({
+        type: "success",
+        message: lang === "ko" ? "댓글을 숨겼습니다." : "Comment hidden.",
+      });
     } catch {
-      setCommentError(
-        lang === "ko"
-          ? "댓글을 숨기지 못했습니다."
-          : "Failed to hide the comment.",
-      );
+      toast({
+        type: "error",
+        message: lang === "ko" ? "댓글을 숨기지 못했습니다." : "Failed to hide the comment.",
+      });
+    } finally {
+      setCommentActionSubmitting(null);
     }
   };
 
   const handleHideArticle = async (reason: string) => {
     if (!articleId || !canModerate) return false;
     try {
-      await apiClient.hideArticle(category, articleId, { reason });
-      navigate(category === "_EVENT" ? "/events" : `/board/${category}`, { replace: true });
+      const response = await apiClient.hideArticle(category, articleId, { reason });
+      setArticle((current) => (current ? { ...current, status: response.status } : current));
+      toast({
+        type: "success",
+        message: lang === "ko" ? "게시글을 숨겼습니다." : "Post hidden.",
+      });
       return true;
     } catch {
       toast({ type: "error", message: lang === "ko" ? "게시글을 숨기지 못했습니다." : "Failed to hide the post." });

@@ -2,7 +2,7 @@ import type {
   SurveyParticipationEligibility,
   SurveyParticipationEligibilityReason,
 } from "@soc/contracts";
-import { CircleAlert, LogIn, ShieldAlert } from "lucide-react";
+import { CircleAlert, LockKeyhole, ShieldAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ export function SurveyParticipationNotice({
         "flex flex-col gap-4 rounded-2xl border text-left",
         compact
           ? "mt-4 border-slate-200 bg-slate-50/80 p-4"
-          : "mx-auto my-10 w-full max-w-md border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.04)]",
+          : "mx-auto my-10 w-full border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.04)]",
       )}
     >
       <div className={cn("flex gap-3", !compact && "flex-col items-center text-center")}>
@@ -74,7 +74,7 @@ export function SurveyParticipationNotice({
           )}
         >
           {isLoginRequired ? (
-            <LogIn aria-hidden="true" className="size-5" />
+            <LockKeyhole aria-hidden="true" className="size-5" />
           ) : (
             <ShieldAlert aria-hidden="true" className="size-5" />
           )}
@@ -84,7 +84,7 @@ export function SurveyParticipationNotice({
           <h2 className="text-base font-semibold text-slate-900">
             {isLoginRequired
               ? lang === "ko"
-                ? "로그인이 필요합니다"
+                ? "로그인이 필요한 설문입니다"
                 : "Login required"
               : lang === "ko"
                 ? "참여 자격을 충족하지 않습니다"
@@ -93,7 +93,7 @@ export function SurveyParticipationNotice({
           <p className="mt-1.5 text-sm font-normal leading-6 text-slate-600">
             {isLoginRequired
               ? lang === "ko"
-                ? "로그인하면 이 설문에 설정된 참여 조건을 확인할 수 있습니다."
+                ? "설문 참여 및 본인 확인을 위해 KAIST 계정으로 로그인해 주세요."
                 : "Sign in to check the participation requirements for this survey."
               : lang === "ko"
                 ? "다음 조건을 충족하지 못해 응답할 수 없습니다."

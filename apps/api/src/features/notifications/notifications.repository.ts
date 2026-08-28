@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, like, or } from "drizzle-orm";
 import type {
   NotificationListResponse,
   NotificationRecord,
@@ -11,7 +11,47 @@ import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
-import { notifications } from "../../infrastructure/postgres/postgres.schema";
+import {
+  articles,
+  boards,
+  notifications,
+} from "../../infrastructure/postgres/postgres.schema";
+
+interface NotificationArticleTarget {
+  boardCode: string;
+  articleId: string;
+}
+
+function parseArticleTarget(link: string | null): NotificationArticleTarget | null {
+  if (!link) return null;
+
+  const pathname = link.split("#", 1)[0]?.split("?", 1)[0] ?? "";
+  const segments = pathname.split("/").filter(Boolean);
+
+  if (segments[0] === "events" && segments.length === 2) {
+    try {
+      return {
+        boardCode: "_EVENT",
+        articleId: decodeURIComponent(segments[1]),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  if (segments[0] === "board" && segments.length === 3) {
+    try {
+      return {
+        boardCode: decodeURIComponent(segments[1]),
+        articleId: decodeURIComponent(segments[2]),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
 
 @Injectable()
 export class NotificationsRepository {
@@ -35,32 +75,75 @@ export class NotificationsRepository {
     page: number,
     pageSize: number,
   ): Promise<NotificationListResponse> {
+    const rows = await this.db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+
+    const articleTargets = rows
+      .map((row) => parseArticleTarget(row.link))
+      .filter((target): target is NotificationArticleTarget => Boolean(target));
+    const articleIds = [
+      ...new Set(
+        articleTargets
+          .map((target) => Number(target.articleId))
+          .filter((articleId) => Number.isInteger(articleId) && articleId > 0),
+      ),
+    ];
+    const existingArticles = articleIds.length
+      ? await this.db
+          .select({ articleId: articles.articleId, boardCode: boards.code })
+          .from(articles)
+          .innerJoin(boards, eq(boards.boardId, articles.boardId))
+          .where(
+            and(
+              inArray(articles.articleId, articleIds),
+              eq(articles.status, "PUBLISHED"),
+              eq(boards.isActive, true),
+            ),
+          )
+      : [];
+    const existingArticleKeys = new Set(
+      existingArticles.map((article) => `${article.boardCode}:${article.articleId}`),
+    );
+    const visibleRows = rows.filter((row) => {
+      const target = parseArticleTarget(row.link);
+      if (!target) return true;
+      return existingArticleKeys.has(`${target.boardCode}:${target.articleId}`);
+    });
     const offset = (page - 1) * pageSize;
-    const [rows, totalRows, unreadRows] = await Promise.all([
-      this.db
-        .select()
-        .from(notifications)
-        .where(eq(notifications.userId, userId))
-        .orderBy(desc(notifications.createdAt))
-        .limit(pageSize)
-        .offset(offset),
-      this.db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(notifications)
-        .where(eq(notifications.userId, userId)),
-      this.db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(notifications)
-        .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false))),
-    ]);
+    const pageRows = visibleRows.slice(offset, offset + pageSize);
 
     return {
-      items: rows.map((row) => this.mapRow(row)),
+      items: pageRows.map((row) => this.mapRow(row)),
       page,
       pageSize,
-      total: Number(totalRows[0]?.count ?? 0),
-      unreadCount: Number(unreadRows[0]?.count ?? 0),
+      total: visibleRows.length,
+      unreadCount: visibleRows.filter((row) => !row.isRead).length,
     };
+  }
+
+  async deleteForArticle(boardCode: string, articleId: string): Promise<void> {
+    const encodedBoardCode = encodeURIComponent(boardCode);
+    const encodedArticleId = encodeURIComponent(articleId);
+    const paths = [
+      boardCode === "_EVENT"
+        ? `/events/${encodedArticleId}`
+        : `/board/${encodedBoardCode}/${encodedArticleId}`,
+      boardCode === "_EVENT"
+        ? `/board/${encodedBoardCode}/${encodedArticleId}`
+        : `/board/${boardCode}/${articleId}`,
+    ];
+
+    await this.db.delete(notifications).where(
+      or(
+        ...paths.flatMap((path) => [
+          eq(notifications.link, path),
+          like(notifications.link, `${path}#%`),
+        ]),
+      ),
+    );
   }
 
   async create(input: {
