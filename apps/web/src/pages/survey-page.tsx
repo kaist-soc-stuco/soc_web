@@ -17,7 +17,9 @@ export function SurveyPage() {
   const { id } = useParams<{ id: string }>();
   const {
     answers,
+    draftRestored,
     handleAnswerChange,
+    handleNextSection,
     handleSubmit,
     lang,
     loadError,
@@ -131,12 +133,14 @@ export function SurveyPage() {
         isPreview={isPreview}
         lang={lang}
         onAnswerChange={handleAnswerChange}
+        onNextSection={handleNextSection}
         onSubmit={handleSubmit}
         questionErrors={questionErrors}
         submitError={submitError}
         submitting={submitting}
         survey={survey}
         visibleSectionIds={visibleSectionIds}
+        draftRestored={draftRestored}
       />
     );
   };

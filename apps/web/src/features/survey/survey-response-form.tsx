@@ -1,7 +1,5 @@
-import type {
-  SurveyDetailResponse,
-} from "@soc/contracts";
-import { CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
+import type { SurveyDetailResponse } from "@soc/contracts";
 
 import {
   emptyAnswerValue,
@@ -20,12 +18,14 @@ interface SurveyResponseFormProps {
   isPreview: boolean;
   lang: string;
   onAnswerChange: (questionId: string, value: AnswerValue) => void;
-  onSubmit: (event: React.SyntheticEvent<HTMLFormElement>) => void;
+  onNextSection: (sectionId: string) => boolean;
+  onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
   questionErrors: Record<string, string>;
   submitError: string | null;
   submitting: boolean;
   survey: SurveyDetailResponse;
   visibleSectionIds: Set<string>;
+  draftRestored: boolean;
 }
 
 export function SurveyResponseForm({
@@ -34,17 +34,61 @@ export function SurveyResponseForm({
   isPreview,
   lang,
   onAnswerChange,
+  onNextSection,
   onSubmit,
   questionErrors,
   submitError,
   submitting,
   survey,
   visibleSectionIds,
+  draftRestored,
 }: SurveyResponseFormProps) {
+  const visibleSections = useMemo(
+    () => survey.sections.filter((section) => visibleSectionIds.has(section.id)),
+    [survey.sections, visibleSectionIds],
+  );
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveSectionId((current) =>
+      current && visibleSections.some((section) => section.id === current)
+        ? current
+        : visibleSections[0]?.id ?? null,
+    );
+  }, [visibleSections]);
+
+  const activeSectionIndex = Math.max(
+    0,
+    visibleSections.findIndex((section) => section.id === activeSectionId),
+  );
+  const activeSection = visibleSections[activeSectionIndex];
+  const hasPreviousSection = activeSectionIndex > 0;
+  const hasNextSection = activeSectionIndex < visibleSections.length - 1;
+
+  const handleNext = () => {
+    if (!activeSection || !onNextSection(activeSection.id)) return;
+    const nextSection = visibleSections[activeSectionIndex + 1];
+    if (nextSection) setActiveSectionId(nextSection.id);
+  };
+
+  const handlePrevious = () => {
+    const previousSection = visibleSections[activeSectionIndex - 1];
+    if (previousSection) setActiveSectionId(previousSection.id);
+  };
+
+  const handleFormSubmit = (event: SyntheticEvent<HTMLFormElement>) => {
+    if (hasNextSection) {
+      event.preventDefault();
+      handleNext();
+      return;
+    }
+    onSubmit(event);
+  };
+
   return (
     <div className="animate-in fade-in duration-300">
       {isPreview && <PreviewNoticeView lang={lang} />}
-      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
+      <form noValidate onSubmit={handleFormSubmit} className="flex flex-col gap-5">
         {isEditingExistingResponse && (
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
             {lang === "ko"
@@ -52,18 +96,28 @@ export function SurveyResponseForm({
               : "You are editing your previous response. Changes can be saved before the survey closes."}
           </div>
         )}
-        {survey.sections.filter((section) => visibleSectionIds.has(section.id)).map((section) => (
-          <section key={section.id} className="flex flex-col gap-4">
+        {draftRestored && (
+          <p
+            role="status"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-normal text-slate-500"
+          >
+            {lang === "ko"
+              ? "이전에 입력한 응답을 불러왔습니다."
+              : "Your saved response has been restored."}
+          </p>
+        )}
+        {activeSection ? (
+          <section key={activeSection.id} className="flex flex-col gap-4">
             {(() => {
               const sectionTitle = getLocalizedText(
                 lang,
-                section.titleKo,
-                section.titleEn,
+                activeSection.titleKo,
+                activeSection.titleEn,
               );
               const sectionDescription = getLocalizedText(
                 lang,
-                section.descriptionKo,
-                section.descriptionEn,
+                activeSection.descriptionKo,
+                activeSection.descriptionEn,
               );
 
               if (!sectionTitle && !sectionDescription) return null;
@@ -87,7 +141,7 @@ export function SurveyResponseForm({
               );
             })()}
 
-            {section.questions.map((question) => {
+            {activeSection.questions.map((question) => {
               const questionError = questionErrors[question.id] ?? null;
               const questionImage = lang === "ko"
                 ? question.config?.imageUrlKo
@@ -156,7 +210,7 @@ export function SurveyResponseForm({
               );
             })}
           </section>
-        ))}
+        ) : null}
 
         {submitError && (
           <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
@@ -164,17 +218,34 @@ export function SurveyResponseForm({
           </div>
         )}
 
-        <div className="flex justify-end border-t border-slate-100 pt-4">
+        <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+          <div className="flex items-center gap-3">
+            {visibleSections.length > 1 && (
+              <span className="text-xs font-normal text-slate-500">
+                {activeSectionIndex + 1} / {visibleSections.length}
+              </span>
+            )}
+            {hasPreviousSection && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePrevious}
+                className="rounded-xl px-5 py-3 text-sm font-medium"
+              >
+                {lang === "ko" ? "이전" : "Back"}
+              </Button>
+            )}
+          </div>
           <Button
             variant="default"
             type="submit"
-            disabled={submitting || isPreview}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm !font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition-all hover:bg-kaist-darkgreen/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            disabled={submitting || (isPreview && !hasNextSection)}
+            className="inline-flex w-full items-center justify-center rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm !font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition-all hover:bg-kaist-darkgreen/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {submitting ? (
               <>
                 <svg
-                  className="animate-spin h-4 w-4 text-white"
+                  className="mr-2 h-4 w-4 animate-spin text-white"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -195,17 +266,12 @@ export function SurveyResponseForm({
                 </svg>
                 {lang === "ko" ? "제출 중..." : "Submitting..."}
               </>
+            ) : hasNextSection ? (
+              lang === "ko" ? "다음" : "Next"
+            ) : isEditingExistingResponse ? (
+              lang === "ko" ? "저장" : "Save"
             ) : (
-              <>
-                <CheckCircle2 className="w-4.5 h-4.5" />
-                {isEditingExistingResponse
-                  ? lang === "ko"
-                    ? "수정 내용 저장하기"
-                    : "Save changes"
-                  : lang === "ko"
-                    ? "설문 응답 제출하기"
-                    : "Submit Response"}
-              </>
+              lang === "ko" ? "제출" : "Submit"
             )}
           </Button>
         </div>

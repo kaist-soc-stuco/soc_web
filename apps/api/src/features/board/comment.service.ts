@@ -71,10 +71,16 @@ export class CommentService {
       throw new NotFoundException("article_not_found");
     }
 
+    const canModerate = Boolean(
+      currentUser.user &&
+        Permissions.has(currentUser.user.permission, Permissions.MODERATE_CONTENT),
+    );
+
     const articleReadable = await this.articleRepository.isReadableArticle(
       board.boardId,
       articleId,
       readableScopes,
+      canModerate,
     );
 
     if (!articleReadable) {
@@ -90,6 +96,7 @@ export class CommentService {
       page,
       limit,
       currentUser.user?.id,
+      canModerate,
     );
 
     return {

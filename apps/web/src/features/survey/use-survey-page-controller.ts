@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
-import type { SurveyDetailResponse } from "@soc/contracts";
+import type { SurveyDetailResponse, SurveyQuestionRecord } from "@soc/contracts";
+import { msToIso, nowMs } from "@soc/shared";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
@@ -13,6 +14,40 @@ import {
   type AnswerValue,
 } from "./survey-answer-utils";
 import { getVisibleSurveySectionIds } from "./survey-branching";
+
+const SURVEY_RESPONSE_DRAFT_VERSION = 1;
+
+function getSurveyResponseDraftKey(surveyId: string, userId?: string) {
+  return `soc:survey-response-draft:${surveyId}:${userId ?? "anonymous"}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readSurveyResponseDraft(
+  storageKey: string,
+): Record<string, AnswerValue> | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return null;
+
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      !isRecord(parsed) ||
+      parsed.version !== SURVEY_RESPONSE_DRAFT_VERSION ||
+      !isRecord(parsed.answers)
+    ) {
+      return null;
+    }
+
+    return parsed.answers as Record<string, AnswerValue>;
+  } catch {
+    return null;
+  }
+}
 
 export function useSurveyPageController(surveyId: string | undefined) {
   const apiClient = useMemo(
@@ -32,6 +67,8 @@ export function useSurveyPageController(surveyId: string | undefined) {
   const [responseSubmittedAt, setResponseSubmittedAt] = useState<string | null>(
     null,
   );
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [hydratedDraftKey, setHydratedDraftKey] = useState<string | null>(null);
 
   const allSurveyQuestions = useMemo(
     () => survey?.sections.flatMap((section) => section.questions) ?? [],
@@ -59,9 +96,19 @@ export function useSurveyPageController(surveyId: string | undefined) {
   useEffect(() => {
     if (!surveyId) return;
 
+    const storageKey = getSurveyResponseDraftKey(surveyId, session?.userId);
+    let active = true;
+
+    setLoadError(null);
+    setSubmitted(false);
+    setDraftRestored(false);
+    setHydratedDraftKey(null);
+
     apiClient
       .getSurveyDetail(surveyId)
       .then((data) => {
+        if (!active) return;
+
         setSurvey(data);
         setResponseSubmittedAt(data.currentResponse?.submittedAt ?? null);
         const answerByQuestionId = new Map(
@@ -79,16 +126,74 @@ export function useSurveyPageController(surveyId: string | undefined) {
             );
           }
         }
-        setAnswers(init);
+        const savedAnswers = readSurveyResponseDraft(storageKey);
+        setAnswers(savedAnswers ? { ...init, ...savedAnswers } : init);
+        setDraftRestored(Boolean(savedAnswers && Object.keys(savedAnswers).length > 0));
+        setHydratedDraftKey(storageKey);
       })
-      .catch(() =>
+      .catch(() => {
+        if (!active) return;
         setLoadError(
           lang === "ko"
             ? "설문을 불러오지 못했습니다."
             : "Failed to load survey.",
-        ),
-      );
+        );
+      });
+
+    return () => {
+      active = false;
+    };
   }, [surveyId, apiClient, lang, session?.userId]);
+
+  const draftStorageKey = surveyId
+    ? getSurveyResponseDraftKey(surveyId, session?.userId)
+    : null;
+
+  useEffect(() => {
+    if (
+      !survey ||
+      !surveyId ||
+      !draftStorageKey ||
+      hydratedDraftKey !== draftStorageKey ||
+      submitted ||
+      survey.isPreview ||
+      !survey.isPublished
+    ) {
+      return;
+    }
+
+    if (typeof window === "undefined") return;
+
+    try {
+      const hasAnswer = allSurveyQuestions.some((question) =>
+        isAnswerFilled(question.questionType, answers[question.id]),
+      );
+
+      if (!hasAnswer) {
+        window.localStorage.removeItem(draftStorageKey);
+        return;
+      }
+
+      window.localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          answers,
+          savedAt: msToIso(nowMs()),
+          version: SURVEY_RESPONSE_DRAFT_VERSION,
+        }),
+      );
+    } catch {
+      // Draft persistence is best effort and must not block answering.
+    }
+  }, [
+    allSurveyQuestions,
+    answers,
+    draftStorageKey,
+    hydratedDraftKey,
+    submitted,
+    survey,
+    surveyId,
+  ]);
 
   const handleAnswerChange = (questionId: string, value: AnswerValue) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
@@ -98,6 +203,42 @@ export function useSurveyPageController(surveyId: string | undefined) {
       delete next[questionId];
       return next;
     });
+  };
+
+  const validateRequiredQuestions = (questions: SurveyQuestionRecord[]) => {
+    const missingRequired = questions.filter(
+      (question) =>
+        question.isRequired &&
+        !isAnswerFilled(question.questionType, answers[question.id]),
+    );
+
+    setQuestionErrors((previous) => {
+      const next = { ...previous };
+      for (const question of questions) {
+        delete next[question.id];
+      }
+      for (const question of missingRequired) {
+        next[question.id] =
+          lang === "ko" ? "필수 문항입니다." : "This question is required.";
+      }
+      return next;
+    });
+
+    if (missingRequired.length === 0) return true;
+
+    const firstMissingQuestion = missingRequired[0];
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`survey-question-${firstMissingQuestion.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return false;
+  };
+
+  const handleNextSection = (sectionId: string) => {
+    if (!survey || survey.isPreview || !survey.isPublished) return true;
+    const section = survey.sections.find((candidate) => candidate.id === sectionId);
+    return section ? validateRequiredQuestions(section.questions) : true;
   };
 
   const handleSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
@@ -117,25 +258,8 @@ export function useSurveyPageController(surveyId: string | undefined) {
       return;
     }
 
-    const missingRequired = requiredQuestions.filter(
-      (question) =>
-        !isAnswerFilled(question.questionType, answers[question.id]),
-    );
-    if (missingRequired.length > 0) {
-      setQuestionErrors(
-        Object.fromEntries(
-          missingRequired.map((question) => [
-            question.id,
-            lang === "ko" ? "필수 문항입니다." : "This question is required.",
-          ]),
-        ),
-      );
-      const firstMissingQuestion = missingRequired[0];
-      window.requestAnimationFrame(() => {
-        document
-          .getElementById(`survey-question-${firstMissingQuestion.id}`)
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
+    setQuestionErrors({});
+    if (!validateRequiredQuestions(requiredQuestions)) {
       setSubmitting(false);
       return;
     }
@@ -168,6 +292,14 @@ export function useSurveyPageController(surveyId: string | undefined) {
       }
       setResponseSubmittedAt(submittedAt);
       setSubmitted(true);
+      setDraftRestored(false);
+      if (typeof window !== "undefined" && draftStorageKey) {
+        try {
+          window.localStorage.removeItem(draftStorageKey);
+        } catch {
+          // Draft cleanup is best effort.
+        }
+      }
     } catch (error) {
       if (error instanceof ApiClientHttpError && error.status === 403) {
         const requirementMessages: Record<string, { ko: string; en: string }> = {
@@ -220,7 +352,9 @@ export function useSurveyPageController(surveyId: string | undefined) {
     allQuestions,
     allSurveyQuestions,
     answers,
+    draftRestored,
     handleAnswerChange,
+    handleNextSection,
     handleSubmit,
     lang,
     loadError,

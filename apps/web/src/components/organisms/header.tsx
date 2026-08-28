@@ -314,7 +314,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             ],
           },
           {
-            label: "Events & Calendar",
+            label: "Events",
             href: "/events",
             activePaths: ["/events", "/calendar"],
             megaItems: [
@@ -323,7 +323,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             ],
           },
           {
-            label: "Surveys & Voting",
+            label: "Surveys",
             href: "/surveys",
             activePaths: ["/surveys", "/survey", "/votes", "/vote"],
             megaItems: [
@@ -450,14 +450,14 @@ export function Header({ variant = "default" }: HeaderProps) {
                     id={`site-nav-flyout-${index}`}
                     role="menu"
                     aria-label={`${item.label} ${lang === "ko" ? "하위 메뉴" : "submenu"}`}
-                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-t transition-[opacity,transform,visibility] duration-150 ease-out ${
+                    className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-t transition-[opacity,transform,visibility] duration-200 ease-out ${
                       variant === "home"
                         ? "border-white/15 bg-[rgba(8,29,23,0.84)] shadow-[0_18px_36px_-22px_rgba(0,0,0,0.72)] backdrop-blur-xl backdrop-saturate-150"
                         : "border-[var(--ui-menu-divider)] bg-white shadow-[0_10px_18px_-20px_rgba(15,23,42,0.38)]"
                     } ${
                       hoveredIndex === index
                         ? "visible pointer-events-auto translate-y-0 opacity-100"
-                        : "invisible pointer-events-none -translate-y-0.5 opacity-0"
+                        : "invisible pointer-events-none -translate-y-1 opacity-0"
                     }`}
                     onMouseEnter={() => setHoveredIndex(index)}
                   >
@@ -659,13 +659,6 @@ export function Header({ variant = "default" }: HeaderProps) {
                       ))}
                     </div>
                   )}
-                  <div className="border-t border-slate-100 p-2">
-                    <Button asChild variant="ghost" className="h-9 w-full justify-center rounded-md text-xs font-normal text-slate-600">
-                      <Link to="/notifications" onClick={closePopovers}>
-                        {lang === "ko" ? "전체 알림 보기" : "View all notifications"}
-                      </Link>
-                    </Button>
-                  </div>
                 </PopoverPanel>
               )}
             </div>

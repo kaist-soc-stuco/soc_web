@@ -2055,11 +2055,13 @@
   }
 
   .about-pledge-item summary {
+    position: relative;
     display: grid;
     grid-template-columns: 3.25rem minmax(0, 1fr) auto;
     gap: 1.25rem;
     align-items: center;
     padding-block: 1.5rem;
+    padding-right: 1.75rem;
     cursor: pointer;
     list-style: none;
   }
@@ -2068,18 +2070,26 @@
     display: none;
   }
 
+  .about-pledge-item summary:focus {
+    outline: none;
+  }
+
   .about-pledge-item summary::after {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
     width: 0.5rem;
     height: 0.5rem;
+    margin-top: -0.3rem;
     border-right: 1px solid #76837e;
     border-bottom: 1px solid #76837e;
-    transform: rotate(45deg) translateY(-0.15rem);
+    transform: rotate(45deg);
     transition: transform 150ms ease;
     content: "";
   }
 
   .about-pledge-item[open] summary::after {
-    transform: rotate(225deg) translateY(-0.15rem);
+    transform: rotate(225deg);
   }
 
   .about-pledge-index {

@@ -77,7 +77,25 @@ export function BoardDetailArticleCard({
   title,
 }: ArticleCardProps) {
   return (
-    <article className="w-full rounded-xl border border-card-border-subtle bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]">
+    <article className={article.status === "HIDDEN"
+      ? "w-full rounded-xl border border-amber-200 bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]"
+      : "w-full rounded-xl border border-card-border-subtle bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]"}>
+      {article.status === "HIDDEN" ? (
+        <div
+          role="status"
+          className="mb-5 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900"
+        >
+          <EyeOff className="mt-0.5 size-4 shrink-0 text-amber-700" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">
+              {lang === "ko" ? "숨김 처리된 게시글입니다." : "This post is hidden."}
+            </p>
+            <p className="mt-0.5 text-xs font-normal text-amber-800">
+              {lang === "ko" ? "관리자에게만 표시되는 게시글입니다." : "Only moderators can see this post."}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <header>
         <h1 className="text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
           {title}
@@ -137,7 +155,7 @@ export function BoardDetailArticleCard({
                         </DropdownMenu.Item>
                       </>
                     ) : null}
-                    {canModerate ? (
+                    {canModerate && article.status === "PUBLISHED" ? (
                       <>
                         <DropdownMenu.Item asChild>
                           <AdminActionMenuItem icon={<EyeOff />} tone="danger" onClick={onHideArticle}>

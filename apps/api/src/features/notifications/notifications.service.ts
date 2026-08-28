@@ -47,6 +47,10 @@ export class NotificationsService {
     };
   }
 
+  async removeForArticle(boardCode: string, articleId: string): Promise<void> {
+    await this.notificationsRepository.deleteForArticle(boardCode, articleId);
+  }
+
   async notifyCommentCreated(input: {
     articleId: string;
     articleTitleKo: string;
@@ -76,9 +80,7 @@ export class NotificationsService {
             : isReply
             ? `회원님의 댓글에 새 답글이 달렸습니다: ${input.articleTitleKo}`
             : `회원님의 게시글에 새 댓글이 달렸습니다: ${input.articleTitleKo}`,
-          link: input.boardCode === "_EVENT"
-            ? `/events/${input.articleId}#comment-${input.commentId}`
-            : `/board/${input.boardCode}/${input.articleId}#comment-${input.commentId}`,
+          link: buildCommentNotificationLink(input),
           titleKo: isOfficial ? "건의사항에 공식 답변이 등록되었습니다" : isReply ? "내 댓글에 답글이 달렸습니다" : "내 게시글에 댓글이 달렸습니다",
           type: isOfficial ? ("OFFICIAL_RESPONSE" as NotificationType) : isReply ? ("REPLY_TO_COMMENT" as NotificationType) : ("COMMENT_ON_ARTICLE" as NotificationType),
           userId,
@@ -91,4 +93,16 @@ export class NotificationsService {
       }
     }
   }
+}
+
+function buildCommentNotificationLink(input: {
+  articleId: string;
+  boardCode: string;
+  commentId: string;
+}): string {
+  const articlePath = input.boardCode === "_EVENT"
+    ? `/events/${encodeURIComponent(input.articleId)}`
+    : `/board/${encodeURIComponent(input.boardCode)}/${encodeURIComponent(input.articleId)}`;
+
+  return `${articlePath}#comment-${encodeURIComponent(input.commentId)}`;
 }

@@ -35,11 +35,14 @@ export class CommentRepository {
     page: number,
     limit: number,
     viewerUserId?: string,
+    includeHidden = false,
   ): Promise<{ items: CommentItem[]; total: number; topLevelTotal: number }> {
     const offset = (page - 1) * limit;
     const baseFilter = and(
       eq(comments.articleId, Number(articleId)),
-      eq(comments.status, COMMENT_STATUS.PUBLISHED),
+      includeHidden
+        ? inArray(comments.status, [COMMENT_STATUS.PUBLISHED, COMMENT_STATUS.HIDDEN])
+        : eq(comments.status, COMMENT_STATUS.PUBLISHED),
     );
 
     const topLevelFilter = and(baseFilter, isNull(comments.parentCommentId));

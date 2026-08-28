@@ -299,19 +299,19 @@ export function QuestionInlineEditor({
       <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
         <div className="min-w-0">
           <label className="mb-1.5 block text-xs font-medium text-slate-600">
-            {activeTab === "ko" ? "질문 제목" : "Question title"} <span className="text-rose-500">*</span>
+            질문 제목 <span className="text-rose-500">*</span>
           </label>
           <div className="flex items-center gap-2">
             <UiInput
               autoFocus
               className={`${inputCls} min-w-0 flex-1`}
-              placeholder={activeTab === "ko" ? "질문을 입력하세요" : "Enter your question"}
+              placeholder={activeTab === "ko" ? "질문을 입력하세요" : "영문 질문을 입력하세요"}
               value={activeTab === "ko" ? form.titleKo : form.titleEn}
               disabled={isOngoing}
               onChange={(event) => set(activeTab === "ko" ? "titleKo" : "titleEn", event.target.value)}
             />
             <CompactImagePicker
-              label={activeTab === "ko" ? "문항 이미지" : "Question image"}
+              label="문항 이미지"
               value={activeTab === "ko" ? form.config?.imageUrlKo : form.config?.imageUrlEn}
               onChange={(value) => set("config", {
                 ...(form.config ?? {}),
@@ -352,7 +352,7 @@ export function QuestionInlineEditor({
                 </span>
                 <UiInput
                   className={`${compactInputCls} min-w-[12rem] flex-1`}
-                  placeholder={activeTab === "ko" ? "선택지 라벨" : "Option label"}
+                  placeholder={activeTab === "ko" ? "선택지 라벨" : "영문 선택지 라벨"}
                   aria-label={`${index + 1}번 ${activeTab === "ko" ? "국문 라벨" : "영문 라벨"}`}
                   value={activeTab === "ko" ? option.labelKo : option.labelEn}
                   disabled={isOngoing}
@@ -383,7 +383,7 @@ export function QuestionInlineEditor({
                   />
                 ) : null}
                 <CompactImagePicker
-                  label={activeTab === "ko" ? "선택지 이미지" : "Option image"}
+                  label="선택지 이미지"
                   value={activeTab === "ko" ? option.imageUrlKo : option.imageUrlEn}
                   onChange={(value) => updateOption(index, activeTab === "ko" ? "imageUrlKo" : "imageUrlEn", value)}
                   disabled={isOngoing}

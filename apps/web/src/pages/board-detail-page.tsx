@@ -116,7 +116,14 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
               disabled={hideSubmitting || hideReason.trim().length < 2}
               onClick={() => {
                 setHideSubmitting(true);
-                void handleHideArticle(hideReason.trim()).finally(() => setHideSubmitting(false));
+                void handleHideArticle(hideReason.trim())
+                  .then((success) => {
+                    if (success) {
+                      setHideDialogOpen(false);
+                      setHideReason("");
+                    }
+                  })
+                  .finally(() => setHideSubmitting(false));
               }}
             >
               {lang === "ko" ? "숨기기" : "Hide"}

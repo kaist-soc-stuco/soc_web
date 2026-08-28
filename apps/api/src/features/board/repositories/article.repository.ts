@@ -605,6 +605,7 @@ export class ArticleRepository {
     articleId: string,
     visibilityScopes: VisibilityScope[],
     viewerUserId?: string,
+    includeHidden = false,
   ): Promise<ArticleDetailResponse | null> {
     const row = await this.db
       .select({
@@ -645,7 +646,9 @@ export class ArticleRepository {
         and(
           eq(articles.boardId, boardId),
           eq(articles.articleId, Number(articleId)),
-          eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          includeHidden
+            ? inArray(articles.status, [ARTICLE_STATUS.PUBLISHED, ARTICLE_STATUS.HIDDEN])
+            : eq(articles.status, ARTICLE_STATUS.PUBLISHED),
           inArray(articles.visibilityScope, visibilityScopes),
         ),
       )
@@ -1174,6 +1177,7 @@ export class ArticleRepository {
     boardId: number,
     articleId: string,
     visibilityScopes: VisibilityScope[],
+    includeHidden = false,
   ): Promise<boolean> {
     const row = await this.db
       .select({ articleId: articles.articleId })
@@ -1182,7 +1186,9 @@ export class ArticleRepository {
         and(
           eq(articles.boardId, boardId),
           eq(articles.articleId, Number(articleId)),
-          eq(articles.status, ARTICLE_STATUS.PUBLISHED),
+          includeHidden
+            ? inArray(articles.status, [ARTICLE_STATUS.PUBLISHED, ARTICLE_STATUS.HIDDEN])
+            : eq(articles.status, ARTICLE_STATUS.PUBLISHED),
           inArray(articles.visibilityScope, visibilityScopes),
         ),
       )

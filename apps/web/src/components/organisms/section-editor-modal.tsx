@@ -117,7 +117,7 @@ export function SectionEditorModal({
                 : "text-slate-500 hover:bg-white/70"
             }`}
           >
-            국문 (Korean)
+            국문
           </Button>
           <Button variant="ghost"
             type="button"
@@ -129,7 +129,7 @@ export function SectionEditorModal({
                 : "text-slate-500 hover:bg-white/70"
             } ${isKoreanOnly ? "cursor-not-allowed opacity-40" : ""}`}
           >
-            영문 (English)
+            영문
           </Button>
         </div>
 
@@ -157,23 +157,23 @@ export function SectionEditorModal({
           </div>
         ) : (
           <div className="space-y-4">
-            <AdminFormField label="Section title *">
+            <AdminFormField label="섹션 제목 *">
               <UiInput
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-normal text-slate-900 outline-none transition hover:border-slate-300 focus-visible:border-kaist-darkgreen focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/20"
                 value={form.titleEn}
                 onChange={(event) => update("titleEn", event.target.value)}
                 disabled={isOngoing || isKoreanOnly}
-                placeholder="English section title"
+                placeholder="영문 섹션 제목"
               />
             </AdminFormField>
-            <AdminFormField label="Section description">
+            <AdminFormField label="섹션 설명">
               <RichTextEditor
                 compact
                 disabled={isOngoing || isKoreanOnly}
                 content={form.descriptionEn}
                 onImageUpload={handleDescriptionImageUpload}
                 onChange={(value) => update("descriptionEn", value)}
-                lang="en"
+                lang="ko"
               />
             </AdminFormField>
           </div>
