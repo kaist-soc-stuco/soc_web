@@ -32,8 +32,6 @@ export function SurveyRespondentDrawer({
               <RespondentDetailItem label="전화번호" value={user.phoneNumber ?? ""} />
               <RespondentDetailItem label="소속" value={user.departmentKo ?? ""} />
               <RespondentDetailItem label="주전공" value={user.primaryMajor ?? ""} />
-              <RespondentDetailItem label="복수전공" value={user.doubleMajor ?? ""} />
-              <RespondentDetailItem label="부전공" value={user.minor ?? ""} />
               <RespondentDetailItem label="학적 상태" value={user.academicStatus ?? ""} />
             </dl>
           </section>

@@ -30,8 +30,6 @@ export interface PendingSsoUser {
   departmentKo?: string;
   departmentEn?: string;
   primaryMajor?: string;
-  doubleMajor?: string;
-  minor?: string;
   gender?: string;
   academicStatus?: string;
   identityCode?: string;
@@ -163,22 +161,11 @@ export interface CurrentUserSummary {
     email: string;
     nameKo: string;
     nameEn: string | null;
-    userMobile: string | null;
     studentNumber: string | null;
     departmentKo: string | null;
     departmentEn: string | null;
     primaryMajor: string | null;
-    doubleMajor: string | null;
-    minor: string | null;
-    gender: string | null;
-    phoneNumber: string | null;
-    privacyConsentAt: string | null;
-    createdAt: string;
-    updatedAt: string;
-    lastLoginAt: string | null;
-    kaistUid: string;
     feeStatus: "PAID" | "PARTIAL" | "UNPAID" | null;
     academicStatus: string | null;
-    identityCode: string | null;
   };
 }

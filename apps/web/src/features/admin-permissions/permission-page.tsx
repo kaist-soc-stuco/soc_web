@@ -22,7 +22,7 @@ import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 type DetailTab = "permissions" | "members";
-type CandidateMajorType = "" | "PRIMARY" | "DOUBLE" | "MINOR";
+type CandidateMajorType = "" | "PRIMARY";
 type CandidateFeeStatus = "" | "PAID" | "PARTIAL" | "UNPAID";
 type CandidateAcademicStatus = "" | "재학" | "졸업";
 
@@ -35,7 +35,7 @@ interface RoleDraft {
 const CANDIDATE_PAGE_SIZE = 20;
 const permissionDomains = [
   { id: "publishing", label: "게시·응답", codes: ["WRITE_OFFICIAL", "WRITE_LAB", "WRITE_REPLY", "MODERATE_CONTENT", "MANAGE_BOARDS"] },
-  { id: "operations", label: "운영", codes: ["MANAGE_SURVEY", "MANAGE_FINANCE", "MANAGE_SITE_CONTENT", "MANAGE_CALENDAR", "MANAGE_CONTACTS", "SEND_BULK_EMAIL"] },
+  { id: "operations", label: "운영", codes: ["MANAGE_SURVEY", "MANAGE_VOTE", "MANAGE_FINANCE", "MANAGE_SITE_CONTENT", "MANAGE_CALENDAR", "MANAGE_CONTACTS", "SEND_BULK_EMAIL"] },
   { id: "system", label: "시스템", codes: ["MANAGE_USERS", "VIEW_AUDIT_LOG", "MANAGE_ROLES", "SUPER_ADMIN"] },
 ] as const;
 
@@ -44,6 +44,7 @@ const permissionLabels: Record<string, string> = {
   WRITE_LAB: "연구실 게시판 작성",
   WRITE_REPLY: "공식 답변 관리",
   MANAGE_SURVEY: "설문조사 관리",
+  MANAGE_VOTE: "투표 관리",
   MANAGE_FINANCE: "과비 관리",
   MANAGE_SITE_CONTENT: "사이트 설정",
   MANAGE_CALENDAR: "일정 관리",
@@ -475,8 +476,6 @@ export function PermissionPage() {
                 options={[
                   { value: "", label: "전체 전공" },
                   { value: "PRIMARY", label: "주전공" },
-                  { value: "DOUBLE", label: "복수전공" },
-                  { value: "MINOR", label: "부전공" },
                 ]}
               />
               <AdminSelectDropdown

@@ -34,7 +34,7 @@ export const surveys = pgTable("survey", {
     .notNull()
     .default("NONE"),
   eligibleSocAffiliations: jsonb("eligible_soc_affiliations")
-    .$type<Array<"PRIMARY" | "DOUBLE" | "MINOR">>()
+    .$type<Array<"PRIMARY">>()
     .notNull()
     .default(sql`'[]'::jsonb`),
   academicEligibility: varchar("academic_eligibility", { length: 30 })

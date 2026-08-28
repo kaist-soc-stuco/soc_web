@@ -267,12 +267,6 @@ export class AuthService {
       const primaryMajor =
         this.readUserInfoString(userInfo, "std_major_kor_nm") ??
         this.readUserInfoString(userInfo, "major_kor");
-      const doubleMajor =
-        this.readUserInfoString(userInfo, "std_double_major_kor_nm") ??
-        this.readUserInfoString(userInfo, "double_major_kor");
-      const minor =
-        this.readUserInfoString(userInfo, "std_minor_kor_nm") ??
-        this.readUserInfoString(userInfo, "minor_kor");
       const gender =
         this.readUserInfoString(userInfo, "gender") ??
         this.readUserInfoString(userInfo, "gender_cd");
@@ -314,8 +308,6 @@ export class AuthService {
             departmentEn,
             departmentKo,
             primaryMajor,
-            doubleMajor,
-            minor,
             gender,
             email: userEmail,
             identityCode,
@@ -365,8 +357,6 @@ export class AuthService {
         ssoSubject,
         stdNo,
         primaryMajor,
-        doubleMajor,
-        minor,
         gender,
         userMobile,
       }, PENDING_LOGIN_TTL_SECONDS);

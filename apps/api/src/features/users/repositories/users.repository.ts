@@ -65,8 +65,6 @@ type UserUpsertInput = {
   departmentEn?: string | null;
   departmentKo?: string | null;
   primaryMajor?: string | null;
-  doubleMajor?: string | null;
-  minor?: string | null;
   gender?: string | null;
   phoneNumber?: string | null;
   email: string;
@@ -81,8 +79,6 @@ type UserProfileUpdateInput = {
   departmentEn?: string | null;
   departmentKo?: string | null;
   primaryMajor?: string | null;
-  doubleMajor?: string | null;
-  minor?: string | null;
   gender?: string | null;
   phoneNumber?: string | null;
   email?: string;
@@ -100,8 +96,6 @@ export type EmailRecipientFilters = {
   query?: string;
   studentNumber?: string;
   primaryMajor?: string;
-  doubleMajor?: string;
-  minor?: string;
   academicStatus?: string;
 };
 export type AdminUserSortBy =
@@ -164,8 +158,6 @@ export class UsersRepository {
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
-      doubleMajor: row.doubleMajor ?? null,
-      minor: row.minor ?? null,
       gender: row.gender ?? null,
       phoneNumber: row.phoneNumber ?? null,
       academicStatus: row.academicStatus ?? null,
@@ -187,8 +179,6 @@ export class UsersRepository {
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
-      doubleMajor: row.doubleMajor ?? null,
-      minor: row.minor ?? null,
       gender: row.gender ?? null,
       phoneNumber: row.phoneNumber ?? null,
       privacyConsentAt: row.privacyConsentAt
@@ -258,8 +248,6 @@ export class UsersRepository {
         departmentEn: input.departmentEn ?? null,
         departmentKo: input.departmentKo ?? null,
         primaryMajor: input.primaryMajor ?? null,
-        doubleMajor: input.doubleMajor ?? null,
-        minor: input.minor ?? null,
         gender: input.gender ?? null,
         phoneNumber: input.phoneNumber ?? null,
         email: input.email,
@@ -293,10 +281,6 @@ export class UsersRepository {
       ...(input.primaryMajor !== undefined
         ? { primaryMajor: input.primaryMajor }
         : {}),
-      ...(input.doubleMajor !== undefined
-        ? { doubleMajor: input.doubleMajor }
-        : {}),
-      ...(input.minor !== undefined ? { minor: input.minor } : {}),
       ...(input.gender !== undefined ? { gender: input.gender } : {}),
       ...(input.phoneNumber !== undefined
         ? { phoneNumber: input.phoneNumber }
@@ -353,8 +337,6 @@ export class UsersRepository {
           stdNo: input.stdNo ?? null,
           departmentKo: input.departmentKo ?? null,
           primaryMajor: input.primaryMajor ?? null,
-          doubleMajor: input.doubleMajor ?? null,
-          minor: input.minor ?? null,
           gender: input.gender ?? null,
           phoneNumber: input.phoneNumber ?? null,
           departmentEn: input.departmentEn ?? null,
@@ -379,8 +361,6 @@ export class UsersRepository {
       departmentEn?: string | null;
       departmentKo?: string | null;
       primaryMajor?: string | null;
-      doubleMajor?: string | null;
-      minor?: string | null;
       gender?: string | null;
       phoneNumber?: string | null;
       updatedAt: Date;
@@ -420,14 +400,6 @@ export class UsersRepository {
 
     if (input.primaryMajor !== undefined) {
       updateSet.primaryMajor = input.primaryMajor;
-    }
-
-    if (input.doubleMajor !== undefined) {
-      updateSet.doubleMajor = input.doubleMajor;
-    }
-
-    if (input.minor !== undefined) {
-      updateSet.minor = input.minor;
     }
 
     if (input.gender !== undefined) {
@@ -610,8 +582,6 @@ export class UsersRepository {
       conditions.push(ilike(users.stdNo, `%${studentNumber}%`));
     }
     if (filters?.primaryMajor?.trim()) conditions.push(ilike(users.primaryMajor, `%${filters.primaryMajor.trim()}%`));
-    if (filters?.doubleMajor?.trim()) conditions.push(ilike(users.doubleMajor, `%${filters.doubleMajor.trim()}%`));
-    if (filters?.minor?.trim()) conditions.push(ilike(users.minor, `%${filters.minor.trim()}%`));
     if (filters?.academicStatus?.trim()) conditions.push(eq(users.academicStatus, filters.academicStatus.trim()));
 
     const rows = await this.db
@@ -636,7 +606,7 @@ export class UsersRepository {
     sortBy?: AdminUserSortBy;
     sortDirection?: SortDirection;
     status?: "active" | "inactive";
-    majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+    majorType?: "PRIMARY";
     feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
     academicStatus?: string;
   }): Promise<AdminUserListResponse> {
@@ -665,8 +635,6 @@ export class UsersRepository {
     ].filter(Boolean) as SQL[];
     const conditions = [...baseConditions];
     if (input.majorType === "PRIMARY") conditions.push(sql`nullif(trim(${users.primaryMajor}), '') is not null`);
-    if (input.majorType === "DOUBLE") conditions.push(sql`nullif(trim(${users.doubleMajor}), '') is not null`);
-    if (input.majorType === "MINOR") conditions.push(sql`nullif(trim(${users.minor}), '') is not null`);
     if (input.feeStatus === "PAID" || input.feeStatus === "PARTIAL") {
       conditions.push(sql`exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = ${input.feeStatus})`);
     }
@@ -705,8 +673,6 @@ export class UsersRepository {
     const facetRows = await this.db
       .select({
         primaryMajor: sql<number>`count(*) filter (where nullif(trim(${users.primaryMajor}), '') is not null)`,
-        doubleMajor: sql<number>`count(*) filter (where nullif(trim(${users.doubleMajor}), '') is not null)`,
-        minor: sql<number>`count(*) filter (where nullif(trim(${users.minor}), '') is not null)`,
         paid: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PAID'))`,
         partial: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PARTIAL'))`,
         enrolled: sql<number>`count(*) filter (where ${users.academicStatus} = '재학')`,
@@ -739,8 +705,6 @@ export class UsersRepository {
       total: Number(countResult[0]?.count ?? 0),
       facets: {
         primaryMajor: Number(facetRows[0]?.primaryMajor ?? 0),
-        doubleMajor: Number(facetRows[0]?.doubleMajor ?? 0),
-        minor: Number(facetRows[0]?.minor ?? 0),
         paid: Number(facetRows[0]?.paid ?? 0),
         partial: Number(facetRows[0]?.partial ?? 0),
         unpaid: Number(facetRows[0]?.unpaid ?? 0),
@@ -847,8 +811,6 @@ export class UsersRepository {
           stdNo: users.stdNo,
           email: users.email,
           primaryMajor: users.primaryMajor,
-          doubleMajor: users.doubleMajor,
-          minor: users.minor,
         })
         .from(users)
         .where(eq(users.userId, userId))
@@ -872,8 +834,6 @@ export class UsersRepository {
         stdNo: user[0].stdNo ?? undefined,
         email: user[0].email,
         primaryMajor: user[0].primaryMajor,
-        doubleMajor: user[0].doubleMajor,
-        minor: user[0].minor,
       },
       status,
       history: history.map((row) => this.mapFeePaymentRow(row)),
@@ -1166,8 +1126,6 @@ export class UsersRepository {
         ilike(users.stdNo, `%${normalizedQuery}%`),
         ilike(users.email, `%${normalizedQuery}%`),
         ilike(users.primaryMajor, `%${normalizedQuery}%`),
-        ilike(users.doubleMajor, `%${normalizedQuery}%`),
-        ilike(users.minor, `%${normalizedQuery}%`),
       );
       if (searchFilter) filters.push(searchFilter);
     }
@@ -1178,8 +1136,6 @@ export class UsersRepository {
       );
     }
     if (majorCategory === "PRIMARY") filters.push(isNotNull(users.primaryMajor));
-    if (majorCategory === "DOUBLE") filters.push(isNotNull(users.doubleMajor));
-    if (majorCategory === "MINOR") filters.push(isNotNull(users.minor));
 
     const where = filters.length > 0 ? and(...filters) : undefined;
     const rows = await this.db
@@ -1191,8 +1147,6 @@ export class UsersRepository {
         email: users.email,
         departmentKo: users.departmentKo,
         primaryMajor: users.primaryMajor,
-        doubleMajor: users.doubleMajor,
-        minor: users.minor,
         status: studentFeeStatus.status,
         coverageSemesters: studentFeeStatus.coverageSemesters,
         paidAmount: studentFeeStatus.paidAmount,
@@ -1255,8 +1209,6 @@ export class UsersRepository {
         email: row.email,
         departmentKo: row.departmentKo,
         primaryMajor: row.primaryMajor,
-        doubleMajor: row.doubleMajor,
-        minor: row.minor,
         coverageSemesters:
           latestPayment?.coverageSemesters ?? row.coverageSemesters ?? 6,
         coverageStartSemester:
@@ -1346,8 +1298,6 @@ export class UsersRepository {
       this.db.select({
         userId: users.userId,
         primaryMajor: users.primaryMajor,
-        doubleMajor: users.doubleMajor,
-        minor: users.minor,
       }).from(users),
     ]);
 
@@ -1408,8 +1358,6 @@ export class UsersRepository {
     const paidStudents = paidUserIds.size;
     const categoryDefinitions = [
       { category: "PRIMARY" as const, label: "주전공", field: "primaryMajor" as const },
-      { category: "DOUBLE" as const, label: "복수전공", field: "doubleMajor" as const },
-      { category: "MINOR" as const, label: "부전공", field: "minor" as const },
     ];
 
     return {

@@ -38,6 +38,7 @@ export const PermissionFlags = {
   SEND_BULK_EMAIL: Permissions.SEND_BULK_EMAIL,
   VIEW_AUDIT_LOG: Permissions.VIEW_AUDIT_LOG,
   MANAGE_ROLES: Permissions.MANAGE_ROLES,
+  MANAGE_VOTE: Permissions.MANAGE_VOTE,
   SUPER_ADMIN: Permissions.SUPER_ADMIN,
 } as const;
 

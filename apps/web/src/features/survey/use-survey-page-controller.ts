@@ -176,7 +176,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
             en: "You must sign in to participate.",
           },
           soc_affiliation_required: {
-            ko: "전산학부 주전공·복수전공·부전공 조건을 충족하지 못했습니다.",
+            ko: "전산학부 주전공 조건을 충족하지 못했습니다.",
             en: "This survey is limited to eligible School of Computing students.",
           },
           academic_status_required: {

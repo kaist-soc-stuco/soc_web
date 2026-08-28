@@ -29,7 +29,7 @@ export interface SurveySettingsFormValues {
   kind: "SURVEY" | "APPLICATION";
   resultVisibility: "PRIVATE" | "PUBLIC";
   feePayersOnly?: boolean;
-  eligibleSocAffiliations: Array<"PRIMARY" | "DOUBLE" | "MINOR">;
+  eligibleSocAffiliations: Array<"PRIMARY">;
   academicEligibility: "ANY" | "ENROLLED_ONLY" | "ENROLLED_OR_LEAVE";
   allowAnonymous?: boolean;
   isKoreanOnly?: boolean;
@@ -143,7 +143,7 @@ export function SurveySettingsForm({
     }
   };
 
-  const toggleSocAffiliation = (value: "PRIMARY" | "DOUBLE" | "MINOR") => {
+  const toggleSocAffiliation = (value: "PRIMARY") => {
     const next = eligibleSocAffiliations.includes(value)
       ? eligibleSocAffiliations.filter((item) => item !== value)
       : [...eligibleSocAffiliations, value];
@@ -589,8 +589,6 @@ export function SurveySettingsForm({
               <div className="flex flex-wrap gap-x-5 gap-y-3">
                 {([
                   ["PRIMARY", "주전공"],
-                  ["DOUBLE", "복수전공"],
-                  ["MINOR", "부전공"],
                 ] as const).map(([value, label]) => (
                   <label key={value} className={`flex items-center gap-2 ${isOngoing || allowAnonymous ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                     <UiInput

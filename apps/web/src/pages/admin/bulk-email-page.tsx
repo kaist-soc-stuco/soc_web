@@ -117,8 +117,6 @@ const RECIPIENT_FILTER_GROUPS: ReadonlyArray<{
     label: "학과 구분",
     options: [
       { kind: "filter", key: "primaryMajor", value: "전산학부", label: "전산학부 주전공" },
-      { kind: "filter", key: "doubleMajor", value: "전산학부", label: "전산학부 복수전공" },
-      { kind: "filter", key: "minor", value: "전산학부", label: "전산학부 부전공" },
     ],
   },
   {
@@ -230,8 +228,6 @@ function BulkEmailPageContent() {
     add("studentNumber", "학번", formatStudentNumberFilter(filters.studentNumber));
     add("academicStatus", "학적", filters.academicStatus);
     add("primaryMajor", "주전공", filters.primaryMajor, `${filters.primaryMajor ?? ""} 주전공`);
-    add("doubleMajor", "복수전공", filters.doubleMajor, `${filters.doubleMajor ?? ""} 복수전공`);
-    add("minor", "부전공", filters.minor, `${filters.minor ?? ""} 부전공`);
     add("query", "검색", filters.query, `검색: ${filters.query ?? ""}`);
     return entries;
   }, [filters]);

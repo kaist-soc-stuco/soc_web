@@ -185,6 +185,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       config.AUTH_PENDING_LOGIN_ENCRYPTION_KEY,
       'AUTH_PENDING_LOGIN_ENCRYPTION_KEY',
     ),
+    VOTE_BALLOT_ENCRYPTION_KEY: asOptionalString(config.VOTE_BALLOT_ENCRYPTION_KEY),
     AUTH_ELIGIBLE_DEPARTMENTS:
       asOptionalString(config.AUTH_ELIGIBLE_DEPARTMENTS) ?? '전산학부',
     REDIS_AUTH_TTL_SECONDS: asPositiveInt(

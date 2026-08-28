@@ -16,8 +16,6 @@ export interface UserRecord {
   departmentEn: string | null;
   departmentKo: string | null;
   primaryMajor: string | null;
-  doubleMajor: string | null;
-  minor: string | null;
   gender: string | null;
   phoneNumber: string | null;
   academicStatus: string | null;

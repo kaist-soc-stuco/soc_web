@@ -257,7 +257,7 @@ export const createAdminApi = ({
     sortBy?: "name" | "studentId" | "status" | "lastLoginAt" | "createdAt";
     sortDirection?: "asc" | "desc";
     status?: "active" | "inactive";
-    majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+    majorType?: "PRIMARY";
     feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
     academicStatus?: string;
   }): Promise<AdminUserListResponse> => {
@@ -607,7 +607,7 @@ export const createAdminApi = ({
       q?: string;
       department?: string;
       academicStatus?: string;
-      majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+      majorType?: "PRIMARY";
       feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
       status?: "active" | "inactive";
       page?: number;

@@ -27,8 +27,8 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
     key: "home.hero.title",
     labelKo: "히어로 제목",
     multiline: true,
-    valueKo: "KAIST School of Computing\nSoC Student Council",
-    valueEn: "KAIST School of Computing\nSoC Student Council",
+    valueKo: "KAIST School of Computing\nStudent Council",
+    valueEn: "KAIST School of Computing\nStudent Council",
   },
   {
     group: "home",

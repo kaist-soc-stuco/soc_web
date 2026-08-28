@@ -25,6 +25,7 @@ export const PermissionCode = {
   SEND_BULK_EMAIL: "SEND_BULK_EMAIL",
   VIEW_AUDIT_LOG: "VIEW_AUDIT_LOG",
   MANAGE_ROLES: "MANAGE_ROLES",
+  MANAGE_VOTE: "MANAGE_VOTE",
   SUPER_ADMIN: "SUPER_ADMIN",
 } as const;
 
@@ -149,6 +150,13 @@ export const PERMISSION_REGISTRY: readonly PermissionDefinition[] = [
     description: "운영 역할을 만들고 권한과 구성원을 관리할 수 있습니다.",
   },
   {
+    code: PermissionCode.MANAGE_VOTE,
+    bit: 32768,
+    labelKo: "투표 관리",
+    labelEn: "Manage votes",
+    description: "전산학부 주전생 대상 비밀투표를 만들고 명부·투표율·결과를 관리할 수 있습니다.",
+  },
+  {
     code: PermissionCode.SUPER_ADMIN,
     bit: 16384,
     labelKo: "최고 관리자",
@@ -220,6 +228,7 @@ export const Permissions = {
   VIEW_AUDIT_LOG: 4096,
   MANAGE_ROLES: 8192,
   SUPER_ADMIN: 16384,
+  MANAGE_VOTE: 32768,
 
   // ── Checks ─────────────────────────────────────────────────────────────
 

@@ -34,6 +34,7 @@ const DOMAIN_DEFINITIONS: Record<string, { domain: string; label: string }> = {
   survey_answer_file: { domain: "survey", label: "설문 응답 파일" },
   user: { domain: "user", label: "유저" },
   article: { domain: "board", label: "게시판" },
+  vote: { domain: "vote", label: "투표" },
 };
 
 const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKind }> = {
@@ -61,6 +62,15 @@ const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKin
   "article.anonymous_identity_reveal": { label: "익명 작성자 확인", kind: "EXECUTE" },
   "survey.answer_file.download": { label: "설문 응답 파일 다운로드", kind: "EXECUTE" },
   CONTACT_PRIVACY_PURGE: { label: "개인정보 파기", kind: "EXECUTE" },
+  "vote.close": { label: "투표 마감", kind: "EXECUTE" },
+  "vote.create": { label: "투표 생성", kind: "CREATE" },
+  "vote.delete": { label: "투표 삭제", kind: "DELETE" },
+  "vote.publish": { label: "투표 게시", kind: "EXECUTE" },
+  "vote.results.publish": { label: "투표 결과 공개", kind: "EXECUTE" },
+  "vote.tally": { label: "투표 집계", kind: "EXECUTE" },
+  "vote.update": { label: "투표 수정", kind: "UPDATE" },
+  "vote.voter.add": { label: "투표인 명부 추가", kind: "BATCH" },
+  "vote.voter.exclude": { label: "투표인 명부 제외", kind: "BATCH" },
 };
 
 const TARGET_TYPE_LABELS: Record<string, string> = {
@@ -74,6 +84,7 @@ const TARGET_TYPE_LABELS: Record<string, string> = {
   student_fee_status: "학생회비 상태",
   survey_answer_file: "설문 응답 파일",
   user: "사용자",
+  vote: "투표",
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

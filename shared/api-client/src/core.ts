@@ -61,6 +61,7 @@ export interface ApiClientContext {
   siteContentBaseUrl: string;
   surveyBaseUrl: string;
   usersBaseUrl: string;
+  votesBaseUrl: string;
 }
 
 export const buildListQuery = (options?: ListQueryOptions): string => {
@@ -346,5 +347,6 @@ export const createApiClientContext = ({
     siteContentBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "site-content"),
     surveyBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "surveys"),
     usersBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "users"),
+    votesBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "votes"),
   };
 };

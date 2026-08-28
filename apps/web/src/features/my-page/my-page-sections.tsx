@@ -1,5 +1,5 @@
 import type { CurrentUserResponse, MyScrapItem } from "@soc/contracts";
-import { isoToMs, msToDate, nowMs } from "@soc/shared";
+import { isoToMs, nowMs } from "@soc/shared";
 import { Bookmark, Clock3, User, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -24,15 +24,6 @@ const formatRelative = (value: string | null | undefined, lang: string) => {
   if (diffDays <= 0) return lang === "ko" ? "오늘" : "Today";
   if (diffDays === 1) return lang === "ko" ? "어제" : "Yesterday";
   return lang === "ko" ? `${diffDays}일 전` : `${diffDays} days ago`;
-};
-
-const formatProfileDateTime = (value: string | null | undefined) => {
-  if (!value) return "-";
-  const time = isoToMs(value);
-  if (Number.isNaN(time)) return "-";
-  const date = msToDate(time);
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
 type UserInfo = CurrentUserResponse["user"] | undefined;
@@ -150,7 +141,7 @@ interface UnavailableStateProps {
 
 export function MyPageUnavailableState({ authenticated, lang }: UnavailableStateProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm max-w-xl mx-auto">
+    <div className="w-full rounded-xl border border-slate-200 bg-white p-6 text-center shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:p-8">
       <p className="text-xs font-semibold text-slate-500 leading-relaxed">
         {authenticated
           ? lang === "ko"
@@ -254,15 +245,11 @@ export function MyPageProfilePanel({
   lang,
   userInfo,
 }: ProfilePanelProps) {
-  const affiliation = [
+  const department =
     lang === "ko"
       ? userInfo?.departmentKo || userInfo?.departmentEn
-      : userInfo?.departmentEn || userInfo?.departmentKo,
-    userInfo?.academicStatus,
-  ]
-    .filter((value): value is string => Boolean(value?.trim()))
-    .join(" · ");
-  const primaryMajor = [affiliation, userInfo?.primaryMajor]
+      : userInfo?.departmentEn || userInfo?.departmentKo;
+  const primaryMajor = [department, userInfo?.primaryMajor]
     .filter((value): value is string => Boolean(value?.trim()))
     .filter((value, index, values) => values.indexOf(value) === index)
     .join(" · ") || "-";
@@ -271,20 +258,8 @@ export function MyPageProfilePanel({
     [lang === "ko" ? "이름" : "Name", displayName],
     [lang === "ko" ? "학번" : "Student ID", userInfo?.studentNumber ?? "-"],
     [lang === "ko" ? "이메일" : "Email", userInfo?.email ?? "-"],
-    [lang === "ko" ? "KAIST UID" : "KAIST UID", userInfo?.kaistUid ?? "-"],
     [lang === "ko" ? "주전공" : "Primary major", primaryMajor],
-    [lang === "ko" ? "복수전공" : "Double major", userInfo?.doubleMajor ?? "-"],
-    [lang === "ko" ? "부전공" : "Minor", userInfo?.minor ?? "-"],
-    [lang === "ko" ? "성별" : "Gender", userInfo?.gender ?? "-"],
-    [
-      lang === "ko" ? "전화번호" : "Phone",
-      userInfo?.phoneNumber ?? userInfo?.userMobile ?? "-",
-    ],
     [lang === "ko" ? "상태" : "Status", userInfo?.academicStatus ?? "-"],
-    [
-      lang === "ko" ? "개인정보 동의" : "Privacy consent",
-      formatProfileDateTime(userInfo?.privacyConsentAt),
-    ],
     [
       lang === "ko" ? "회비 납부" : "Student fee",
       userInfo?.feeStatus === "PAID"
@@ -301,12 +276,6 @@ export function MyPageProfilePanel({
               : "Unpaid"
             : "-",
     ],
-    [
-      lang === "ko" ? "최근 로그인" : "Last login",
-      formatProfileDateTime(userInfo?.lastLoginAt),
-    ],
-    [lang === "ko" ? "가입일" : "Created", formatProfileDateTime(userInfo?.createdAt)],
-    [lang === "ko" ? "정보 갱신" : "Updated", formatProfileDateTime(userInfo?.updatedAt)],
     [
       lang === "ko" ? "권한" : "Role",
       isAdmin
@@ -331,7 +300,7 @@ export function MyPageProfilePanel({
         {profileRows.map(([label, value]) => (
           <div
             key={label}
-            className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-100 py-2.5 text-[length:var(--ui-text-body-sm-size)] last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
+            className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-100 py-2 text-[length:var(--ui-text-body-sm-size)] last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
           >
             <span className="font-normal text-xs text-slate-400">{label}</span>
             <span className="min-w-0 break-words font-normal text-sm text-slate-800">

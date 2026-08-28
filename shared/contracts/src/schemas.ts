@@ -325,7 +325,7 @@ export const CommentUpdateSchema = z.object({
 const SurveyResultVisibilitySchema = z.enum(["PRIVATE", "PUBLIC"]);
 const SurveyKindSchema = z.enum(["SURVEY", "APPLICATION"]);
 const SurveyFeeRequirementPolicySchema = z.enum(["NONE", "PAID_ONLY"]);
-export const SurveySocAffiliationSchema = z.enum(["PRIMARY", "DOUBLE", "MINOR"]);
+export const SurveySocAffiliationSchema = z.enum(["PRIMARY"]);
 export const SurveyAcademicEligibilitySchema = z.enum([
   "ANY",
   "ENROLLED_ONLY",
@@ -508,7 +508,7 @@ export const RoleGroupMemberFilterSchema = z.object({
   q: z.string().optional(),
   department: z.string().optional(),
   academicStatus: z.string().optional(),
-  majorType: z.enum(["PRIMARY", "DOUBLE", "MINOR"]).optional(),
+  majorType: z.enum(["PRIMARY"]).optional(),
   feeStatus: z.enum(["PAID", "PARTIAL", "UNPAID"]).optional(),
   status: z.enum(["active", "inactive"]).optional(),
   page: z.number().int().positive().optional(),
@@ -660,8 +660,6 @@ export const BulkEmailRecipientFiltersSchema = z.object({
   query: z.string().trim().max(100).optional(),
   studentNumber: z.string().trim().max(30).optional(),
   primaryMajor: z.string().trim().max(100).optional(),
-  doubleMajor: z.string().trim().max(100).optional(),
-  minor: z.string().trim().max(100).optional(),
   academicStatus: z.string().trim().max(30).optional(),
 });
 

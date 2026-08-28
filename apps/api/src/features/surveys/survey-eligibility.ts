@@ -5,8 +5,6 @@ import type {
 
 interface SurveyEligibilityUser {
   primaryMajor?: string | null;
-  doubleMajor?: string | null;
-  minor?: string | null;
   departmentKo?: string | null;
   departmentEn?: string | null;
   academicStatus?: string | null;
@@ -37,8 +35,6 @@ export const getSocAffiliations = (
   ) {
     affiliations.push("PRIMARY");
   }
-  if (isSchoolOfComputing(user.doubleMajor)) affiliations.push("DOUBLE");
-  if (isSchoolOfComputing(user.minor)) affiliations.push("MINOR");
   return affiliations;
 };
 

@@ -240,6 +240,7 @@ async function seedDevAdminRole() {
       lastLoginAt: now,
       nameEn: "Development Admin",
       nameKo: "관리자",
+      primaryMajor: "전산학부",
       privacyConsentAt: now,
       stdNo: "20260001",
     })
@@ -255,6 +256,7 @@ async function seedDevAdminRole() {
         lastLoginAt: sql`excluded.last_login_at`,
         nameEn: sql`excluded.name_en`,
         nameKo: sql`excluded.name_ko`,
+        primaryMajor: sql`excluded.primary_major`,
         privacyConsentAt: sql`excluded.privacy_consent_at`,
         stdNo: sql`excluded.std_no`,
         updatedAt: sql`now()`,

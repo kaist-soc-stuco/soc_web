@@ -43,8 +43,6 @@ export class RoleGroupsRepository {
       departmentEn: row.departmentEn ?? null,
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
-      doubleMajor: row.doubleMajor ?? null,
-      minor: row.minor ?? null,
       gender: row.gender ?? null,
       phoneNumber: row.phoneNumber ?? null,
       privacyConsentAt: row.privacyConsentAt
@@ -311,11 +309,7 @@ export class RoleGroupsRepository {
         : undefined,
       input.majorType === "PRIMARY"
         ? sql`nullif(trim(${users.primaryMajor}), '') is not null`
-        : input.majorType === "DOUBLE"
-          ? sql`nullif(trim(${users.doubleMajor}), '') is not null`
-          : input.majorType === "MINOR"
-            ? sql`nullif(trim(${users.minor}), '') is not null`
-            : undefined,
+        : undefined,
       input.feeStatus === "PAID" || input.feeStatus === "PARTIAL"
         ? sql`exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = ${input.feeStatus})`
         : input.feeStatus === "UNPAID"

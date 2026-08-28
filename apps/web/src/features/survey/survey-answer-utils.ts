@@ -263,8 +263,7 @@ export function getAudienceLabel(survey: SurveyDetailResponse, lang: string) {
     return lang === "ko" ? "로그인 없이 참여 가능" : "No sign-in required";
   }
   const affiliations = survey.eligibleSocAffiliations.map((item) => {
-    if (lang !== "ko") return item === "PRIMARY" ? "primary major" : item === "DOUBLE" ? "double major" : "minor";
-    return item === "PRIMARY" ? "주전공" : item === "DOUBLE" ? "복수전공" : "부전공";
+    return lang !== "ko" ? "primary major" : "주전공";
   });
   const parts: string[] = [];
   if (affiliations.length > 0) {
