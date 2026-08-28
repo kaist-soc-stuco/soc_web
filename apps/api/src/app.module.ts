@@ -22,6 +22,7 @@ import { CalendarModule } from "./features/calendar/calendar.module";
 import { AuditLogHttpModule } from "./features/audit/audit-log-http.module";
 import { SiteContentModule } from "./features/site-content/site-content.module";
 import { NotificationsModule } from "./features/notifications/notifications.module";
+import { VotesModule } from "./features/votes/votes.module";
 
 const devOnlyModules =
   process.env.NODE_ENV === "production" ? [] : [AuthDevModule, MockModule];
@@ -52,6 +53,7 @@ const devOnlyModules =
     AuditLogHttpModule,
     SiteContentModule,
     NotificationsModule,
+    VotesModule,
     RoleGroupsModule,
     HealthModule,
     ...devOnlyModules,

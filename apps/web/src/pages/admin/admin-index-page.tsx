@@ -4,6 +4,7 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
 
 const ADMIN_ENTRY_ROUTES = [
+  { to: "votes", bit: Permissions.MANAGE_VOTE },
   { to: "surveys", bit: Permissions.MANAGE_SURVEY },
   { to: "users", bit: Permissions.MANAGE_USERS },
   { to: "audit-logs", bit: Permissions.VIEW_AUDIT_LOG },

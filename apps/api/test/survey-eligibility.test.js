@@ -6,22 +6,20 @@ const {
   getSurveyEligibilityFailure,
 } = require("../dist/apps/api/src/features/surveys/survey-eligibility.js");
 
-test("recognizes School of Computing primary, double, and minor affiliations", () => {
+test("recognizes School of Computing primary affiliation", () => {
   assert.deepEqual(getSocAffiliations({ primaryMajor: "전산학부" }), ["PRIMARY"]);
-  assert.deepEqual(getSocAffiliations({ doubleMajor: "School of Computing" }), ["DOUBLE"]);
-  assert.deepEqual(getSocAffiliations({ minor: "전산학과" }), ["MINOR"]);
 });
 
 test("combines affiliation and academic conditions with AND semantics", () => {
   assert.equal(getSurveyEligibilityFailure({
-    user: { doubleMajor: "전산학부", academicStatus: "재학" },
-    eligibleSocAffiliations: ["PRIMARY", "DOUBLE"],
+    user: { primaryMajor: "전산학부", academicStatus: "재학" },
+    eligibleSocAffiliations: ["PRIMARY"],
     academicEligibility: "ENROLLED_OR_LEAVE",
   }), null);
 
   assert.equal(getSurveyEligibilityFailure({
     user: { primaryMajor: "수리과학과", academicStatus: "재학" },
-    eligibleSocAffiliations: ["PRIMARY", "DOUBLE", "MINOR"],
+    eligibleSocAffiliations: ["PRIMARY"],
     academicEligibility: "ENROLLED_OR_LEAVE",
   }), "soc_affiliation_required");
 

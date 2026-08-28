@@ -23,8 +23,6 @@ export const users = pgTable("users", {
   departmentKo: varchar("dept_ko", { length: 100 }),
   departmentEn: varchar("dept_en", { length: 100 }),
   primaryMajor: varchar("primary_major", { length: 100 }),
-  doubleMajor: varchar("double_major", { length: 100 }),
-  minor: varchar("minor", { length: 100 }),
   gender: varchar("gender", { length: 20 }),
   phoneNumber: varchar("phone_number", { length: 50 }),
   academicStatus: varchar("academic_status", { length: 20 }),

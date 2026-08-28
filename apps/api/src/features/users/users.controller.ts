@@ -199,7 +199,7 @@ export class UsersController {
       sortBy: adminUserSortBy,
       sortDirection: sortDirection === "desc" ? "desc" : "asc",
       status: adminUserStatus,
-      majorType: majorType === "PRIMARY" || majorType === "DOUBLE" || majorType === "MINOR" ? majorType : undefined,
+      majorType: majorType === "PRIMARY" ? majorType : undefined,
       feeStatus: feeStatus === "PAID" || feeStatus === "PARTIAL" || feeStatus === "UNPAID" ? feeStatus : undefined,
       academicStatus: academicStatus?.trim() || undefined,
     });
@@ -242,9 +242,7 @@ export class UsersController {
         : "name";
     const feeSortDirection = sortDirection === "desc" ? "desc" : "asc";
     const feeMajorCategory: FeeMajorCategory | undefined =
-      majorCategory === "PRIMARY" || majorCategory === "DOUBLE" || majorCategory === "MINOR"
-        ? majorCategory
-        : undefined;
+      majorCategory === "PRIMARY" ? majorCategory : undefined;
     const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
 
     return this.usersService.listStudentsByFeeStatus(
@@ -302,9 +300,7 @@ export class UsersController {
         : "name";
     const feeSortDirection = sortDirection === "desc" ? "desc" : "asc";
     const feeMajorCategory: FeeMajorCategory | undefined =
-      majorCategory === "PRIMARY" || majorCategory === "DOUBLE" || majorCategory === "MINOR"
-        ? majorCategory
-        : undefined;
+      majorCategory === "PRIMARY" ? majorCategory : undefined;
     const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
     const rows = await this.usersService.exportStudentsByFeeStatus(
       feeStatus,
@@ -317,7 +313,7 @@ export class UsersController {
       userIds?.split(",").filter(Boolean),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["사용자ID", "학번", "이름", "이메일", "소속", "주전공", "복수전공", "부전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "혜택대상", "납부일", "비고"],
+      ["사용자ID", "학번", "이름", "이메일", "소속", "주전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "혜택대상", "납부일", "비고"],
       ...rows.map((row) => [
         row.userId,
         row.stdNo,
@@ -325,8 +321,6 @@ export class UsersController {
         row.email,
         row.departmentKo,
         row.primaryMajor,
-        row.doubleMajor,
-        row.minor,
         row.status,
         row.coverageSemesters,
         row.coverageStartSemester,

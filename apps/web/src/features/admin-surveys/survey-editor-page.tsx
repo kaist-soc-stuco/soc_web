@@ -110,7 +110,7 @@ const SurveySettingsSchema = z.object({
   kind: z.enum(["SURVEY", "APPLICATION"]),
   resultVisibility: z.enum(["PRIVATE", "PUBLIC"]),
   feePayersOnly: z.boolean().optional(),
-  eligibleSocAffiliations: z.array(z.enum(["PRIMARY", "DOUBLE", "MINOR"])),
+  eligibleSocAffiliations: z.array(z.enum(["PRIMARY"])),
   academicEligibility: z.enum(["ANY", "ENROLLED_ONLY", "ENROLLED_OR_LEAVE"]),
   allowAnonymous: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),

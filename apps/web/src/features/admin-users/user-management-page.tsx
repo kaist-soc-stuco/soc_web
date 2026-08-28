@@ -25,7 +25,7 @@ import { Permissions } from "@/lib/permissions";
 type UserSortBy = "name" | "lastLoginAt";
 type SortDirection = "asc" | "desc";
 type UserStatusFilter = "all" | "active" | "inactive";
-type MajorTypeFilter = "all" | "PRIMARY" | "DOUBLE" | "MINOR";
+type MajorTypeFilter = "all" | "PRIMARY";
 type FeeStatusFilter = "all" | "PAID" | "PARTIAL" | "UNPAID";
 type AcademicStatusFilter = "all" | "재학" | "졸업";
 
@@ -341,8 +341,6 @@ export function UserManagementPage() {
                   options={[
                     { value: "all", label: "전체 전공" },
                     { value: "PRIMARY", label: "주전공" },
-                    { value: "DOUBLE", label: "복수전공" },
-                    { value: "MINOR", label: "부전공" },
                   ]}
                 />
                 <AdminSelectDropdown
@@ -420,9 +418,7 @@ export function UserManagementPage() {
                 </AdminTableHeader>
                 <AdminTableBody>
                   {(data?.items ?? []).map((user) => {
-                    const major = [user.primaryMajor, user.doubleMajor, user.minor]
-                      .filter(Boolean)
-                      .join(" / ");
+                    const major = user.primaryMajor ?? "";
 
                     return (
                       <tr
@@ -632,8 +628,6 @@ function UserDetailDrawer({
               <UserDetailItem label="전화번호" value={user.phoneNumber ?? ""} />
               <UserDetailItem label="소속" value={user.departmentKo ?? "—"} />
               <UserDetailItem label="주전공" value={user.primaryMajor ?? "—"} />
-              <UserDetailItem label="복수전공" value={user.doubleMajor ?? "—"} />
-              <UserDetailItem label="부전공" value={user.minor ?? "—"} />
               <UserDetailItem label="학적 상태" value={user.academicStatus ?? "—"} />
             </dl>
           </section>

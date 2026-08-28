@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Users,
   WalletCards,
+  Vote,
 } from "lucide-react";
 
 import { Permissions } from "@/lib/permissions";
@@ -31,6 +32,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
   { label: "권한 관리", to: "/admin/permissions", bits: [Permissions.MANAGE_ROLES], icon: ShieldCheck },
   { label: "과비 관리", to: "/admin/finance", bits: [Permissions.MANAGE_FINANCE], icon: WalletCards },
   { label: "설문조사 관리", to: "/admin/surveys", bits: [Permissions.MANAGE_SURVEY], icon: ClipboardList },
+  { label: "투표 관리", to: "/admin/votes", bits: [Permissions.MANAGE_VOTE], icon: Vote },
   { label: "이메일 일괄 발송", to: "/admin/emails", bits: [Permissions.SEND_BULK_EMAIL], icon: Mail },
   { label: "연락망", to: "/admin/contacts", bits: [Permissions.MANAGE_CONTACTS], icon: ContactRound },
   { label: "운영 로그", to: "/admin/audit-logs", bits: [Permissions.VIEW_AUDIT_LOG], icon: ScrollText },

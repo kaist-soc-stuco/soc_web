@@ -28,8 +28,6 @@ export interface AdminUserRecord {
   departmentKo: string | null;
   departmentEn: string | null;
   primaryMajor?: string | null;
-  doubleMajor?: string | null;
-  minor?: string | null;
   gender?: string | null;
   phoneNumber?: string | null;
   privacyConsentAt?: string | null;
@@ -49,8 +47,6 @@ export interface AdminUserListResponse {
   total: number;
   facets: {
     primaryMajor: number;
-    doubleMajor: number;
-    minor: number;
     paid: number;
     partial: number;
     unpaid: number;
@@ -74,8 +70,6 @@ export interface RoleGroupMemberRecord {
   departmentKo: string | null;
   departmentEn: string | null;
   primaryMajor?: string | null;
-  doubleMajor?: string | null;
-  minor?: string | null;
   gender?: string | null;
   phoneNumber?: string | null;
   academicStatus: string | null;

@@ -83,8 +83,6 @@ export class UsersService {
     departmentEn?: string;
     departmentKo?: string;
     primaryMajor?: string;
-    doubleMajor?: string;
-    minor?: string;
     gender?: string;
     identityCode?: string;
     stdNo?: string;
@@ -97,8 +95,6 @@ export class UsersService {
       departmentEn: input.departmentEn,
       departmentKo: input.departmentKo,
       primaryMajor: input.primaryMajor,
-      doubleMajor: input.doubleMajor,
-      minor: input.minor,
       gender: input.gender,
       phoneNumber: input.userMobile,
       kaistUid: input.kaistUid,
@@ -241,7 +237,7 @@ export class UsersService {
     sortBy?: AdminUserSortBy;
     sortDirection?: SortDirection;
     status?: "active" | "inactive";
-    majorType?: "PRIMARY" | "DOUBLE" | "MINOR";
+    majorType?: "PRIMARY";
     feeStatus?: "PAID" | "PARTIAL" | "UNPAID";
     academicStatus?: string;
   }): Promise<AdminUserListResponse> {
@@ -264,8 +260,6 @@ export class UsersService {
       departmentEn?: string;
       departmentKo?: string;
       primaryMajor?: string;
-      doubleMajor?: string;
-      minor?: string;
       gender?: string;
       email?: string;
       identityCode?: string;

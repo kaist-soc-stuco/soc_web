@@ -11,6 +11,7 @@ import { createMiscApi } from "./misc.js";
 import { createNotificationsApi } from "./notifications.js";
 import { createSurveyApi } from "./survey.js";
 import { createSiteContentApi } from "./site-content.js";
+import { createVoteApi } from "./vote.js";
 
 export { ApiClientHttpError };
 export type { ApiClientOptions, ListQueryOptions } from "./core.js";
@@ -27,5 +28,6 @@ export const createApiClient = (options: ApiClientOptions) => {
     ...createSiteContentApi(context),
     ...createMiscApi(context),
     ...createNotificationsApi(context),
+    ...createVoteApi(context),
   };
 };

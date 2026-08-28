@@ -50,6 +50,18 @@ const AuditLogPage = lazy(() =>
 const FeeManagementPage = lazy(() =>
   import('@/pages/admin/fee-management-page').then((module) => ({ default: module.FeeManagementPage })),
 );
+const VoteListPage = lazy(() =>
+  import('@/pages/vote-list-page').then((module) => ({ default: module.VoteListPage })),
+);
+const VotePage = lazy(() =>
+  import('@/pages/vote-page').then((module) => ({ default: module.VotePage })),
+);
+const AdminVoteListPage = lazy(() =>
+  import('@/pages/admin/vote-list-page').then((module) => ({ default: module.VoteListPage })),
+);
+const VoteEditorPage = lazy(() =>
+  import('@/pages/admin/vote-editor-page').then((module) => ({ default: module.VoteEditorPage })),
+);
 const BoardManagementPage = lazy(() =>
   import('@/pages/admin/board-management-page').then((module) => ({ default: module.BoardManagementPage })),
 );
@@ -234,6 +246,8 @@ export function App() {
           />
           <Route path="/survey/:id" element={<SurveyPage />} />
           <Route path="/survey/:id/results" element={<SurveyResultsPage />} />
+          <Route path="/votes" element={<VoteListPage />} />
+          <Route path="/votes/:id" element={<VotePage />} />
           <Route path="/login" element={<LoginCallbackPage />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/notifications" element={<AuthGuard><NotificationsPage /></AuthGuard>} />
@@ -253,6 +267,9 @@ export function App() {
             <Route path="surveys/:id/edit" element={<SurveyEditorPage />} />
             <Route path="surveys/:id/responses" element={<SurveyResponseListPage />} />
             <Route path="surveys/:id/responses/:responseId" element={<SurveyResponseDetailPage />} />
+            <Route path="votes" element={<AdminVoteListPage />} />
+            <Route path="votes/new" element={<VoteEditorPage />} />
+            <Route path="votes/:id" element={<VoteEditorPage />} />
             <Route path="content" element={<SiteContentPage />} />
             <Route path="calendar" element={<CalendarManagementPage />} />
             <Route path="contacts" element={<ContactsPage />} />

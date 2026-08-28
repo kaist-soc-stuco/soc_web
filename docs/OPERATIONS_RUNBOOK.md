@@ -38,7 +38,7 @@ SEED_MODE=demo pnpm --filter @soc/api db:seed
 정상 로그 기준:
 
 - `No schema changes, nothing to migrate` 또는 `migrations applied successfully`
-- `Upserted 15 permission(s)`
+- `Upserted 16 permission(s)`
 - `Upserted 7 board(s)`
 - `Seeded ... articles`
 - `Seed finished`

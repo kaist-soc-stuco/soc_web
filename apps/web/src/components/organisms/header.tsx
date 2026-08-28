@@ -91,6 +91,7 @@ export function Header({ variant = "default" }: HeaderProps) {
         Permissions.SEND_BULK_EMAIL,
         Permissions.VIEW_AUDIT_LOG,
         Permissions.MANAGE_ROLES,
+        Permissions.MANAGE_VOTE,
       )
     : false;
 
@@ -250,6 +251,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             megaItems: [
               { label: "행사", href: "/events" },
               { label: "설문", href: "/surveys" },
+              { label: "투표", href: "/votes" },
               { label: "일정", href: "/calendar" },
             ],
           },
@@ -278,6 +280,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             megaItems: [
               { label: "Events", href: "/events" },
               { label: "Surveys", href: "/surveys" },
+              { label: "Votes", href: "/votes" },
               { label: "Calendar", href: "/calendar" },
             ],
           },

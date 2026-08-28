@@ -114,8 +114,6 @@ export interface SurveyResponseUserRecord {
   departmentKo: string | null;
   stdNo: string | null;
   primaryMajor: string | null;
-  doubleMajor: string | null;
-  minor: string | null;
   academicStatus: string | null;
   feeStatus: "PAID" | "PARTIAL" | "UNPAID" | null;
 }

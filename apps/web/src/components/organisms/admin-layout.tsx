@@ -28,6 +28,7 @@ const ADMIN_ACCESS_PERMISSIONS = [
   Permissions.SEND_BULK_EMAIL,
   Permissions.VIEW_AUDIT_LOG,
   Permissions.MANAGE_ROLES,
+  Permissions.MANAGE_VOTE,
 ];
 
 export function AdminLayout() {

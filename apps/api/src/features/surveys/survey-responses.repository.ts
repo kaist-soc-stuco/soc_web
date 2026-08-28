@@ -42,8 +42,6 @@ type SurveyResponseQueryRow = {
   userDepartmentKo: string | null;
   userStdNo: string | null;
   userPrimaryMajor: string | null;
-  userDoubleMajor: string | null;
-  userMinor: string | null;
   userAcademicStatus: string | null;
   userFeeStatus: string | null;
 };
@@ -166,8 +164,6 @@ export class SurveyResponsesRepository {
             departmentKo: row.userDepartmentKo,
             stdNo: row.userStdNo,
             primaryMajor: row.userPrimaryMajor,
-            doubleMajor: row.userDoubleMajor,
-            minor: row.userMinor,
             academicStatus: row.userAcademicStatus,
             feeStatus:
               row.userFeeStatus === "PAID" ||
@@ -197,8 +193,6 @@ export class SurveyResponsesRepository {
     userDepartmentKo: users.departmentKo,
     userStdNo: users.stdNo,
     userPrimaryMajor: users.primaryMajor,
-    userDoubleMajor: users.doubleMajor,
-    userMinor: users.minor,
     userAcademicStatus: users.academicStatus,
     userFeeStatus: sql<string | null>`(
       select ${studentFeeStatus.status}
@@ -495,8 +489,6 @@ export class SurveyResponsesRepository {
               userDepartmentKo: null,
               userStdNo: null,
               userPrimaryMajor: null,
-              userDoubleMajor: null,
-              userMinor: null,
               userAcademicStatus: null,
               userFeeStatus: null,
             }),
@@ -649,8 +641,6 @@ export class SurveyResponsesRepository {
             userDepartmentKo: null,
             userStdNo: null,
             userPrimaryMajor: null,
-            userDoubleMajor: null,
-            userMinor: null,
             userAcademicStatus: null,
             userFeeStatus: null,
           }),

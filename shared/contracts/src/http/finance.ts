@@ -10,7 +10,7 @@ import type {
 } from "../schemas.js";
 
 export type FeeStatus = "PAID" | "PARTIAL" | "UNPAID";
-export type FeeMajorCategory = "PRIMARY" | "DOUBLE" | "MINOR";
+export type FeeMajorCategory = "PRIMARY";
 export type FeePaymentType = "SIX_SEMESTER_LUMP_SUM" | "PRIOR_PAYMENT_BALANCE";
 export type FeePaymentMethod = "BANK_TRANSFER" | "CASH" | "OTHER";
 
@@ -64,8 +64,6 @@ export interface StudentFeeDetailResponse {
     stdNo?: string;
     email: string;
     primaryMajor?: string | null;
-    doubleMajor?: string | null;
-    minor?: string | null;
   };
   status: StudentFeeStatusRecord;
   history: StudentFeePaymentRecord[];
@@ -100,8 +98,6 @@ export interface StudentFeeListResponse {
     email: string;
     departmentKo?: string | null;
     primaryMajor?: string | null;
-    doubleMajor?: string | null;
-    minor?: string | null;
     status: FeeStatus;
     coverageSemesters: number;
     paidAmount: number;

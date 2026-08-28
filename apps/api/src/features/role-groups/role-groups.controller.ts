@@ -77,11 +77,7 @@ export class RoleGroupsController {
       majorType:
         majorType === "PRIMARY"
           ? "PRIMARY"
-          : majorType === "DOUBLE"
-            ? "DOUBLE"
-            : majorType === "MINOR"
-              ? "MINOR"
-              : undefined,
+          : undefined,
       feeStatus:
         feeStatus === "PAID"
           ? "PAID"
