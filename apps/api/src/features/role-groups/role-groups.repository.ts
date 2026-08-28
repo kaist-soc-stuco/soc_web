@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 
 import { and, asc, desc, eq, ilike, inArray, notInArray, or, sql } from "drizzle-orm";
 
@@ -25,6 +25,7 @@ import type {
   RoleGroupMemberFilterRequest,
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
+import { PERMISSION_REGISTRY } from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
 
 @Injectable()
@@ -39,8 +40,6 @@ export class RoleGroupsRepository {
     return {
       academicStatus: row.academicStatus ?? null,
       createdAt: msToIso(row.createdAt.valueOf()),
-      departmentEn: row.departmentEn ?? null,
-      departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
       doubleMajor: row.doubleMajor ?? null,
       minor: row.minor ?? null,
@@ -77,6 +76,30 @@ export class RoleGroupsRepository {
       return;
     }
 
+    const allowedBits = new Set(
+      PERMISSION_REGISTRY.filter((permission) => !permission.isSystemOnly).map(
+        (permission) => permission.bit,
+      ),
+    );
+    const permissionRows = await tx
+      .select({
+        bitValue: permissions.bitValue,
+        isActive: permissions.isActive,
+        permissionId: permissions.permissionId,
+      })
+      .from(permissions)
+      .where(inArray(permissions.permissionId, normalizedPermissionIds));
+
+    if (
+      permissionRows.length !== normalizedPermissionIds.length ||
+      permissionRows.some(
+        (permission) =>
+          !permission.isActive || !allowedBits.has(Number(permission.bitValue)),
+      )
+    ) {
+      throw new BadRequestException("invalid_role_permission");
+    }
+
     await tx.insert(roleGroupPermissions).values(
       normalizedPermissionIds.map((permissionId) => ({
         permissionId,
@@ -89,6 +112,7 @@ export class RoleGroupsRepository {
     const rows = await this.db
       .select()
       .from(permissions)
+      .where(eq(permissions.isActive, true))
       .orderBy(asc(permissions.bitValue));
 
     return rows.map((row) => ({
@@ -118,7 +142,13 @@ export class RoleGroupsRepository {
         roleGroupPermissions,
         eq(roleGroups.roleGroupId, roleGroupPermissions.roleGroupId),
       )
-      .leftJoin(permissions, eq(roleGroupPermissions.permissionId, permissions.permissionId))
+      .leftJoin(
+        permissions,
+        and(
+          eq(roleGroupPermissions.permissionId, permissions.permissionId),
+          eq(permissions.isActive, true),
+        ),
+      )
       .orderBy(asc(roleGroups.roleGroupId), asc(permissions.bitValue));
 
     const userCountRows = await this.db
@@ -155,7 +185,7 @@ export class RoleGroupsRepository {
         const current = grouped.get(row.roleGroupId);
         if (current) {
           current.permissionIds.push(row.permissionId);
-          current.permissionMask += Number(row.permissionBitValue);
+          current.permissionMask |= Number(row.permissionBitValue);
         }
       }
     }
@@ -231,8 +261,6 @@ export class RoleGroupsRepository {
       .select({
         academicStatus: users.academicStatus,
         createdAt: users.createdAt,
-        departmentEn: users.departmentEn,
-        departmentKo: users.departmentKo,
         email: users.email,
         grantedAt: userRoleGroups.grantedAt,
         grantedBy: userRoleGroups.grantedBy,
@@ -259,8 +287,6 @@ export class RoleGroupsRepository {
     return rows.map((row) => ({
       academicStatus: row.academicStatus ?? null,
       createdAt: msToIso(row.createdAt.valueOf()),
-      departmentEn: row.departmentEn ?? null,
-      departmentKo: row.departmentKo ?? null,
       email: row.email,
       grantedAt: msToIso(row.grantedAt.valueOf()),
       grantedBy: row.grantedBy ?? null,
@@ -296,13 +322,9 @@ export class RoleGroupsRepository {
             ilike(users.nameEn, `%${query}%`),
             ilike(users.stdNo, `%${query}%`),
             ilike(users.email, `%${query}%`),
-            ilike(users.departmentKo, `%${query}%`),
-          )
-        : undefined,
-      input.department?.trim()
-        ? or(
-            ilike(users.departmentKo, `%${input.department.trim()}%`),
-            ilike(users.departmentEn, `%${input.department.trim()}%`),
+            ilike(users.primaryMajor, `%${query}%`),
+            ilike(users.doubleMajor, `%${query}%`),
+            ilike(users.minor, `%${query}%`),
           )
         : undefined,
       input.academicStatus?.trim()

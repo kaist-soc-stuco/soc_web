@@ -24,8 +24,6 @@ export interface AdminUserRecord {
   nameKo: string;
   nameEn: string | null;
   email: string;
-  departmentKo: string | null;
-  departmentEn: string | null;
   primaryMajor?: string | null;
   doubleMajor?: string | null;
   minor?: string | null;
@@ -57,8 +55,6 @@ export interface RoleGroupMemberRecord {
   nameKo: string;
   nameEn: string | null;
   email: string;
-  departmentKo: string | null;
-  departmentEn: string | null;
   primaryMajor?: string | null;
   doubleMajor?: string | null;
   minor?: string | null;

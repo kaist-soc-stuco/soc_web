@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient } from "@soc/api-client";
 import type {
   BulkProcessStudentFeePaymentsRequest,
-  BulkUpdateStudentFeeStatusRequest,
   FeePaymentMethod,
   FeePaymentType,
   FeeStatus,
@@ -11,9 +9,10 @@ import type {
   StudentFeeListOptions,
   StudentFeeListResponse,
   StudentFeeStatsResponse,
+  StudentFeeGoogleSheetsStatusResponse,
 } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
-import { ChevronDown, CreditCard, Download, FileUp } from "lucide-react";
+import { ChevronDown, CreditCard, ExternalLink, FileSpreadsheet, RefreshCw } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -45,7 +44,6 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
-import { downloadBlob } from "@/lib/download-blob";
 import { Permissions } from "@/lib/permissions";
 import { FeeStatisticsPanel, type PeriodPreset } from "./fee-statistics-panel";
 
@@ -124,10 +122,10 @@ export function FeeManagementPage() {
   const [paymentDate, setPaymentDate] = useState(nowIso().slice(0, 10));
   const [paymentNote, setPaymentNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const [spreadsheetInfoOpen, setSpreadsheetInfoOpen] = useState(false);
+  const [googleSheetsInfoOpen, setGoogleSheetsInfoOpen] = useState(false);
+  const [googleSheetsStatus, setGoogleSheetsStatus] = useState<StudentFeeGoogleSheetsStatusResponse | null>(null);
+  const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
   const [openFilterDropdown, setOpenFilterDropdown] = useState<"semester" | "major" | null>(null);
-  const [spreadsheetInputKey, setSpreadsheetInputKey] = useState(0);
-  const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
   const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
   const [detail, setDetail] = useState<StudentFeeDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -200,6 +198,19 @@ export function FeeManagementPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const loadGoogleSheetsStatus = useCallback(async () => {
+    if (sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
+    try {
+      setGoogleSheetsStatus(await apiClient.getStudentFeeGoogleSheetsStatus());
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : "Google Sheets 생성 상태를 불러오지 못했습니다.");
+    }
+  }, [apiClient, session, sessionLoading]);
+
+  useEffect(() => {
+    void loadGoogleSheetsStatus();
+  }, [loadGoogleSheetsStatus]);
 
   const loadStats = useCallback(async () => {
     if (sessionLoading || !Permissions.has(session?.permission ?? 0, Permissions.MANAGE_FINANCE)) return;
@@ -322,41 +333,23 @@ export function FeeManagementPage() {
     }
   };
 
-  const handleExport = async () => {
+  const syncGoogleSheets = async (direction: "to" | "from") => {
+    if (direction === "from" && !window.confirm("Google Sheets의 상태·수납액·적용 학기·비고를 사이트 원장 요약에 반영할까요?")) return;
     try {
+      setGoogleSheetsLoading(true);
       setOperationError(null);
-      const spreadsheet = await apiClient.downloadStudentFeeXlsx({
-        status: statusFilter === "ALL" ? undefined : statusFilter,
-        query,
-        referenceSemester,
-        majorCategory,
-        sortBy,
-        sortDirection,
-        userIds: selectedUserIds.size > 0 ? Array.from(selectedUserIds) : undefined,
-      });
-      downloadBlob(spreadsheet, `student-fee-${referenceSemester}.xlsx`);
-      setSuccessMessage(selectedUserIds.size > 0 ? `${selectedUserIds.size}명의 과비 정보를 내보냈습니다.` : "현재 필터의 과비 정보를 내보냈습니다.");
-    } catch (err) {
-      setOperationError(err instanceof Error ? err.message : "내보내기에 실패했습니다.");
-    }
-  };
-
-  const handleSpreadsheetUpload = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      setOperationError(null);
-      const parsed = parseFeeSpreadsheet(await file.arrayBuffer());
-      if (parsed.errors.length > 0) {
-        setOperationError(parsed.errors.join(" "));
-        return;
-      }
-      await apiClient.bulkUpdateStudentFeeStatuses({ updates: parsed.updates });
-      setSuccessMessage(`${parsed.updates.length}명의 과비 상태를 불러와 반영했습니다.`);
+      const result = direction === "to"
+        ? await apiClient.syncStudentFeesToGoogleSheets()
+        : await apiClient.syncStudentFeesFromGoogleSheets();
+      setSuccessMessage(direction === "to"
+        ? `${result.count}명의 과비 정보를 Google Sheets에 반영했습니다.`
+        : `${result.count}명의 과비 정보를 Google Sheets에서 가져왔습니다.`);
+      await loadGoogleSheetsStatus();
       await loadData();
     } catch (err) {
-      setOperationError(err instanceof Error ? err.message : "불러오기에 실패했습니다.");
+      setOperationError(err instanceof Error ? err.message : "Google Sheets 동기화에 실패했습니다.");
     } finally {
-      setSpreadsheetInputKey((value) => value + 1);
+      setGoogleSheetsLoading(false);
     }
   };
 
@@ -460,8 +453,7 @@ export function FeeManagementPage() {
                   onOpenChange={(open) => setOpenFilterDropdown(open ? "major" : null)}
                 />
                 <PageSearchField ariaLabel="학생 검색" className="w-full min-w-[220px] sm:w-64" onChange={(value) => updateFilter(setQuery, value)} onClear={() => updateFilter(setQuery, "")} placeholder="이름·학번·전공·이메일 검색" value={query} />
-                <Button type="button" variant="outline" onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" /> 내보내기{selectedUserIds.size > 0 ? ` (${selectedUserIds.size})` : ""}</Button>
-                <Button type="button" variant="outline" onClick={() => setSpreadsheetInfoOpen(true)}><FileUp aria-hidden="true" className="size-4" /> 불러오기</Button>
+                <Button type="button" variant="outline" onClick={() => setGoogleSheetsInfoOpen(true)}><FileSpreadsheet aria-hidden="true" className="size-4" /> Google Sheets</Button>
               </div>
             </div>
 
@@ -510,10 +502,24 @@ export function FeeManagementPage() {
           </AdminTableCard>}
         </AdminPageMain>
 
-        <input key={spreadsheetInputKey} ref={spreadsheetInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleSpreadsheetUpload(event.target.files?.[0])} />
-
-        <Modal open={spreadsheetInfoOpen} onClose={() => setSpreadsheetInfoOpen(false)} title="과비 데이터 불러오기" footer={<><Button type="button" variant="outline" onClick={() => setSpreadsheetInfoOpen(false)}>취소</Button><Button type="button" onClick={() => { setSpreadsheetInfoOpen(false); spreadsheetInputRef.current?.click(); }}><FileUp aria-hidden="true" /> 파일 선택</Button></>}>
-          <div className="space-y-3 text-sm font-normal leading-6 text-slate-600"><p>XLSX 형식을 확인한 뒤 기존 납부 상태를 반영합니다. 새 납부 원장 기록은 화면의 납부 처리에서 남겨 주세요.</p><ul className="list-disc space-y-1 pl-5"><li><code>userId</code> 또는 <code>stdNo</code> 열이 필요합니다.</li><li><code>status</code>, <code>paidAmount</code>, <code>coverageSemesters</code>, <code>note</code> 열을 지원합니다.</li><li>오류가 있는 행은 저장하지 않고 오류 내용을 보여줍니다.</li></ul></div>
+        <Modal open={googleSheetsInfoOpen} onClose={() => !googleSheetsLoading && setGoogleSheetsInfoOpen(false)} title="과비 관리 Google Sheets" footer={<Button type="button" variant="outline" disabled={googleSheetsLoading} onClick={() => setGoogleSheetsInfoOpen(false)}>닫기</Button>}>
+          {!googleSheetsStatus ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-slate-500"><RefreshCw aria-hidden="true" className="size-4 animate-spin" /> 시트 상태를 확인하고 있습니다.</div>
+          ) : !googleSheetsStatus.configured ? (
+            <div className="space-y-2 text-sm leading-6 text-slate-600"><p>서버에서 Google Sheets OAuth secret 파일을 읽지 못했습니다.</p><p className="text-xs text-slate-500"><code>google-oauth-client.json</code>과 <code>google-oauth-token.json</code>의 mount 설정을 확인해 주세요.</p></div>
+          ) : !googleSheetsStatus.created ? (
+            <div className="space-y-4 text-sm leading-6 text-slate-600"><p>등록된 OAuth refresh token으로 과비 관리 스프레드시트를 생성합니다.</p><p className="text-xs text-slate-500">시트는 토큰을 발급한 Google 계정의 Drive에 생성됩니다.</p><Button type="button" disabled={googleSheetsLoading} onClick={() => void syncGoogleSheets("to")}><FileSpreadsheet aria-hidden="true" /> {googleSheetsLoading ? "생성 중" : "과비 관리 시트 생성"}</Button></div>
+          ) : (
+            <div className="space-y-5 text-sm leading-6 text-slate-600">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3"><p className="font-medium text-emerald-900">과비 관리 시트 준비됨</p><p className="mt-1 text-xs text-emerald-800">마지막 동기화 {formatDateTime(googleSheetsStatus.lastSyncedAt)}</p></div>
+              <div className="flex flex-wrap gap-2">
+                {googleSheetsStatus.spreadsheetUrl ? <Button asChild variant="outline"><a href={googleSheetsStatus.spreadsheetUrl} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" /> 시트 열기</a></Button> : null}
+                <Button type="button" variant="outline" disabled={googleSheetsLoading} onClick={() => void syncGoogleSheets("to")}><RefreshCw aria-hidden="true" className={googleSheetsLoading ? "animate-spin" : ""} /> 사이트 → 시트</Button>
+                <Button type="button" disabled={googleSheetsLoading} onClick={() => void syncGoogleSheets("from")}><RefreshCw aria-hidden="true" className={googleSheetsLoading ? "animate-spin" : ""} /> 시트 → 사이트</Button>
+              </div>
+              <div className="space-y-2 text-xs text-slate-500"><p><strong className="font-medium text-slate-700">사이트 → 시트</strong>는 현재 전체 원장으로 시트 내용을 갱신합니다.</p><p><strong className="font-medium text-slate-700">시트 → 사이트</strong>는 상태·수납액·적용 학기·비고만 검증하여 요약 원장에 반영합니다. 납부 이력은 화면의 납부 처리에서 계속 기록해 주세요.</p></div>
+            </div>
+          )}
         </Modal>
 
         <Modal open={paymentModalOpen} onClose={() => !saving && setPaymentModalOpen(false)} title="과비 납부 처리" className="max-w-4xl" footer={<><Button type="button" variant="outline" disabled={saving} onClick={() => setPaymentModalOpen(false)}>취소</Button><Button type="button" disabled={saving} onClick={() => void submitPayments()}>{saving ? "반영 중" : "납부 확정"}</Button></>}>
@@ -526,45 +532,4 @@ export function FeeManagementPage() {
       </AdminPageShell>
     </AuthGuard>
   );
-}
-
-function normalizeFeeSpreadsheetHeader(value: unknown) {
-  return String(value ?? "").replace(/^\uFEFF/, "").trim().toLowerCase().replace(/\s+/g, "");
-}
-
-function parseFeeSpreadsheet(input: ArrayBuffer): { updates: BulkUpdateStudentFeeStatusRequest["updates"]; errors: string[] } {
-  let rows: unknown[][];
-  try {
-    const workbook = XLSX.read(input, { type: "array", cellDates: false, raw: false });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) return { updates: [], errors: ["과비 납부 시트가 없습니다."] };
-    rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, defval: "", raw: false });
-  } catch {
-    return { updates: [], errors: ["XLSX 파일을 읽지 못했습니다."] };
-  }
-  if (rows.length < 2) return { updates: [], errors: ["헤더와 한 개 이상의 데이터 행이 필요합니다."] };
-  const headers = rows[0].map(normalizeFeeSpreadsheetHeader);
-  const indexOf = (...aliases: string[]) => headers.findIndex((header) => aliases.includes(header));
-  const indexes = { userId: indexOf("userid", "사용자id"), stdNo: indexOf("stdno", "학번"), status: indexOf("status", "상태", "납부여부"), paidAmount: indexOf("paidamount", "납부금액", "실납부액", "수납액", "금액"), coverageSemesters: indexOf("coveragesemesters", "적용학기", "적용학기수"), note: indexOf("note", "비고", "메모") };
-  if (indexes.userId < 0 && indexes.stdNo < 0) return { updates: [], errors: ["userId 또는 학번 열이 필요합니다."] };
-  const errors: string[] = [];
-  const updates: BulkUpdateStudentFeeStatusRequest["updates"] = [];
-  rows.slice(1).forEach((row, lineIndex) => {
-    const value = (index: number) => index >= 0 ? String(row[index] ?? "").trim() : "";
-    const rawStatus = value(indexes.status).toUpperCase();
-    const status: FeeStatus | undefined = rawStatus === "PAID" || rawStatus === "완납" || rawStatus === "납부완료" ? "PAID" : rawStatus === "PARTIAL" || rawStatus === "부분" || rawStatus === "부분납부" ? "PARTIAL" : rawStatus === "UNPAID" || rawStatus === "미납" || rawStatus === "미납부" ? "UNPAID" : undefined;
-    const amountText = value(indexes.paidAmount).replace(/,/g, "");
-    const amount = amountText ? Number(amountText) : undefined;
-    const coverageText = value(indexes.coverageSemesters);
-    const coverageSemesters = coverageText ? Number(coverageText) : undefined;
-    const rowLabel = `${lineIndex + 2}행`;
-    if (!value(indexes.userId) && !value(indexes.stdNo)) errors.push(`${rowLabel}: userId 또는 학번이 없습니다.`);
-    if (rawStatus && !status) errors.push(`${rowLabel}: 상태 값이 올바르지 않습니다.`);
-    if (amount !== undefined && (!Number.isInteger(amount) || amount < 0)) errors.push(`${rowLabel}: 납부 금액은 0 이상의 정수여야 합니다.`);
-    if (coverageSemesters !== undefined && (!Number.isInteger(coverageSemesters) || coverageSemesters < 1 || coverageSemesters > 6)) errors.push(`${rowLabel}: 적용 학기 수는 1～6 사이여야 합니다.`);
-    if (!status && amount === undefined && coverageSemesters === undefined && indexes.note < 0) errors.push(`${rowLabel}: 변경할 값이 없습니다.`);
-    if (errors.some((error) => error.startsWith(`${rowLabel}:`))) return;
-    updates.push({ ...(value(indexes.userId) ? { userId: value(indexes.userId) } : {}), ...(value(indexes.stdNo) ? { stdNo: value(indexes.stdNo) } : {}), ...(status ? { status } : {}), ...(amount !== undefined ? { paidAmount: amount } : {}), ...(coverageSemesters !== undefined ? { coverageSemesters } : {}), ...(indexes.note >= 0 ? { note: value(indexes.note) || null } : {}) });
-  });
-  return { updates, errors };
 }

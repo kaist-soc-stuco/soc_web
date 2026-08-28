@@ -46,13 +46,13 @@ export class SiteContentController {
   constructor(private readonly siteContentService: SiteContentService) {}
 
   @Get("admin")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async listAdmin(): Promise<AdminSiteContentListResponse> {
     return { items: await this.siteContentService.listAdmin() };
   }
 
   @Get("blocks/admin")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async listContentBlocksAdmin(): Promise<ContentBlockListResponse> {
     return { items: await this.siteContentService.listContentBlocksAdmin() };
   }
@@ -63,7 +63,7 @@ export class SiteContentController {
   }
 
   @Post("blocks")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async createContentBlock(
     @Body(new ZodValidationPipe(CreateContentBlockSchema)) body: CreateContentBlockRequest,
     @Req() request: AuthenticatedRequest,
@@ -75,7 +75,7 @@ export class SiteContentController {
   }
 
   @Patch("blocks/reorder")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async reorderContentBlocks(
     @Body(new ZodValidationPipe(ReorderContentBlocksSchema)) body: ReorderContentBlocksRequest,
     @Req() request: AuthenticatedRequest,
@@ -89,7 +89,7 @@ export class SiteContentController {
   }
 
   @Patch("blocks/:contentBlockId")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async updateContentBlock(
     @Param("contentBlockId", ParseUUIDPipe) contentBlockId: string,
     @Body(new ZodValidationPipe(UpdateContentBlockSchema)) body: UpdateContentBlockRequest,
@@ -102,7 +102,7 @@ export class SiteContentController {
   }
 
   @Post("blocks/:contentBlockId/publish")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async publishContentBlock(
     @Param("contentBlockId", ParseUUIDPipe) contentBlockId: string,
     @Req() request: AuthenticatedRequest,
@@ -115,7 +115,7 @@ export class SiteContentController {
 
   @Delete("blocks/:contentBlockId")
   @HttpCode(204)
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async deleteContentBlock(
     @Param("contentBlockId", ParseUUIDPipe) contentBlockId: string,
     @Req() request: AuthenticatedRequest,
@@ -132,7 +132,7 @@ export class SiteContentController {
   }
 
   @Put(":key")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async upsert(
     @Param("key", new ZodValidationPipe(SiteContentKeySchema))
     key: SiteContentKey,
@@ -148,7 +148,7 @@ export class SiteContentController {
 
   @Delete(":key")
   @HttpCode(204)
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async delete(
     @Param("key", new ZodValidationPipe(SiteContentKeySchema))
     key: SiteContentKey,

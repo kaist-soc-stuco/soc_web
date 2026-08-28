@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { ArticleListItem } from "@soc/contracts";
 import { isoToDate, isoToMs, nowMs } from "@soc/shared";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Pin } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
@@ -179,7 +179,9 @@ export function BoardArticleTable({
   const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * postsPerPage + 1;
   const rangeEnd = Math.min(totalCount, currentPage * postsPerPage);
   const authorLabel = (post: ArticleListItem) =>
-    post.isAnonymous
+    post.isOfficial
+      ? "전산학부 집행위원회"
+      : post.isAnonymous
       ? lang === "ko"
         ? "익명"
         : "Anonymous"
@@ -210,6 +212,12 @@ export function BoardArticleTable({
             </div>
           ) : null}
           <div className={`flex min-w-0 items-center gap-2 text-left text-[length:var(--ui-text-section-size)] leading-5 tracking-tight text-app-text-strong md:pl-1 ${pinned ? "font-semibold" : "font-medium"}`}>
+            {pinned ? (
+              <Pin
+                className="size-3.5 shrink-0 rotate-45 text-brand-primary"
+                aria-label={lang === "ko" ? "고정된 게시글" : "Pinned post"}
+              />
+            ) : null}
             <span className="line-clamp-2 min-w-0 md:truncate">
               {lang === "ko" ? post.titleKo : post.titleEn || post.titleKo}
             </span>

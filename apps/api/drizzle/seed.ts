@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -8,6 +8,7 @@ import {
   articleAssets,
   articles,
   assets,
+  boardRoleGroups,
   boards,
   comments,
   contentBlocks,
@@ -21,7 +22,7 @@ import {
   userRoleGroups,
   users,
 } from "../src/infrastructure/postgres/postgres.schema";
-import { PERMISSION_REGISTRY } from "@soc/contracts";
+import { PERMISSION_REGISTRY, Permissions } from "@soc/contracts";
 
 const readRequiredEnv = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -56,8 +57,9 @@ type BoardSeed = {
   nameEn: string;
   descriptionKo: string;
   descriptionEn: string;
-  writePermissionId: number | null;
+  writeRoleGroupNames: string[];
   allowComment: boolean;
+  allowOfficialReply: boolean;
   allowSecret: boolean;
   allowLike: boolean;
   isActive: boolean;
@@ -83,8 +85,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Notice",
     descriptionKo: "집행위원회 및 학교의 중요한 공지사항을 확인하세요",
     descriptionEn: "Read important announcements from SOC and the school.",
-    writePermissionId: 1,
+    writeRoleGroupNames: ["공식 게시글 작성자"],
     allowComment: true,
+    allowOfficialReply: false,
     allowSecret: false,
     allowLike: true,
     isActive: true,
@@ -96,8 +99,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Event content",
     descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요",
     descriptionEn: "Discover events for School of Computing students.",
-    writePermissionId: 1,
+    writeRoleGroupNames: ["공식 게시글 작성자"],
     allowComment: true,
+    allowOfficialReply: false,
     allowSecret: false,
     allowLike: true,
     isActive: true,
@@ -109,8 +113,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "HoC",
     descriptionKo: "Hall of Code 프로젝트 및 활동 내역",
     descriptionEn: "Browse Hall of Code projects and activity updates.",
-    writePermissionId: 2,
+    writeRoleGroupNames: ["공식 게시글 작성자"],
     allowComment: true,
+    allowOfficialReply: false,
     allowSecret: false,
     allowLike: true,
     isActive: true,
@@ -122,8 +127,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Promotional Posts",
     descriptionKo: "집행위원회 및 학회의 홍보 게시물",
     descriptionEn: "Find promotions from SOC and student organizations.",
-    writePermissionId: 2,
+    writeRoleGroupNames: ["공식 게시글 작성자"],
     allowComment: true,
+    allowOfficialReply: false,
     allowSecret: false,
     allowLike: true,
     isActive: true,
@@ -135,8 +141,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Suggestions",
     descriptionKo: "학생들의 의견과 건의사항을 나눠주세요",
     descriptionEn: "Share feedback and suggestions with SOC.",
-    writePermissionId: null,
+    writeRoleGroupNames: ["일반 회원"],
     allowComment: true,
+    allowOfficialReply: true,
     allowSecret: true,
     allowLike: true,
     isActive: true,
@@ -148,8 +155,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Research Labs",
     descriptionKo: "각 연구실의 소식과 공지사항",
     descriptionEn: "Read news and announcements from research labs.",
-    writePermissionId: 2,
+    writeRoleGroupNames: ["공식 게시글 작성자"],
     allowComment: true,
+    allowOfficialReply: false,
     allowSecret: false,
     allowLike: true,
     isActive: true,
@@ -161,8 +169,9 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "FAQ",
     descriptionKo: "FAQ와 답변을 확인하세요",
     descriptionEn: "Browse frequently asked questions and answers.",
-    writePermissionId: 1,
+    writeRoleGroupNames: ["공식 게시글 작성자"],
     allowComment: false,
+    allowOfficialReply: false,
     allowSecret: false,
     allowLike: false,
     isActive: true,
@@ -185,14 +194,133 @@ async function seedPermissions() {
     });
   console.log(`Upserted ${PERMISSION_SEEDS.length} permission(s)`);
 }
+
+type RoleSeed = {
+  nameKo: string;
+  description: string;
+  permissionBits: number[];
+};
+
+const ROLE_GROUP_SEEDS: RoleSeed[] = [
+  {
+    nameKo: "일반 회원",
+    description: "로그인한 회원의 기본 게시판 참여 역할",
+    permissionBits: [Permissions.POST_CREATE, Permissions.COMMENT_CREATE],
+  },
+  {
+    nameKo: "공식 게시글 작성자",
+    description: "공식 게시글과 공지·고정글을 발행하는 역할",
+    permissionBits: [
+      Permissions.POST_CREATE,
+      Permissions.POST_OFFICIAL,
+      Permissions.POST_ANNOUNCEMENT,
+    ],
+  },
+  {
+    nameKo: "공식 답변 담당자",
+    description: "공식 답변이 허용된 게시판을 담당하는 역할",
+    permissionBits: [
+      Permissions.POST_OFFICIAL,
+      Permissions.MANAGE_SUGGESTION_REPLY,
+    ],
+  },
+  {
+    nameKo: "게시판 운영자",
+    description: "게시글·댓글 제재와 비밀글 열람을 담당하는 역할",
+    permissionBits: [
+      Permissions.VIEW_SECRET_POST,
+      Permissions.MODERATE_POST_COMMENT,
+    ],
+  },
+];
+
+async function findPermissionIdsByBits(bits: number[]): Promise<number[]> {
+  const rows = await db
+    .select({ permissionId: permissions.permissionId })
+    .from(permissions)
+    .where(
+      and(
+        eq(permissions.isActive, true),
+        inArray(permissions.bitValue, [...new Set(bits)]),
+      ),
+    );
+  return rows.map((row) => row.permissionId);
+}
+
+async function seedRoleGroups() {
+  const roleGroupIdByName = new Map<string, number>();
+
+  for (const roleSeed of ROLE_GROUP_SEEDS) {
+    const [roleGroup] = await db
+      .insert(roleGroups)
+      .values({
+        description: roleSeed.description,
+        isSystem: true,
+        nameKo: roleSeed.nameKo,
+      })
+      .onConflictDoUpdate({
+        target: roleGroups.nameKo,
+        set: {
+          description: roleSeed.description,
+          isSystem: true,
+          updatedAt: sql`now()`,
+        },
+      })
+      .returning({ roleGroupId: roleGroups.roleGroupId });
+
+    if (!roleGroup) throw new Error(`Failed to seed role group: ${roleSeed.nameKo}`);
+    roleGroupIdByName.set(roleSeed.nameKo, roleGroup.roleGroupId);
+
+    const permissionIds = await findPermissionIdsByBits(roleSeed.permissionBits);
+    await db
+      .delete(roleGroupPermissions)
+      .where(eq(roleGroupPermissions.roleGroupId, roleGroup.roleGroupId));
+    if (permissionIds.length > 0) {
+      await db.insert(roleGroupPermissions).values(
+        permissionIds.map((permissionId) => ({
+          permissionId,
+          roleGroupId: roleGroup.roleGroupId,
+        })),
+      );
+    }
+  }
+
+  return roleGroupIdByName;
+}
+
 async function seedBoards() {
+  const roleGroupsByName = await db
+    .select({ roleGroupId: roleGroups.roleGroupId, nameKo: roleGroups.nameKo })
+    .from(roleGroups)
+    .where(inArray(roleGroups.nameKo, [...new Set(BOARD_SEEDS.flatMap((board) => board.writeRoleGroupNames))]));
+  const roleGroupIdByName = new Map(
+    roleGroupsByName.map((roleGroup) => [roleGroup.nameKo, roleGroup.roleGroupId]),
+  );
+
   await db
     .insert(boards)
-    .values(BOARD_SEEDS)
+    .values(
+      BOARD_SEEDS.map((board) => ({
+        code: board.code,
+        nameKo: board.nameKo,
+        nameEn: board.nameEn,
+        descriptionKo: board.descriptionKo,
+        descriptionEn: board.descriptionEn,
+        writeAccessType: "ROLE_GROUP",
+        writePermissionId: null,
+        allowComment: board.allowComment,
+        allowOfficialReply: board.allowOfficialReply,
+        allowSecret: board.allowSecret,
+        allowLike: board.allowLike,
+        isActive: board.isActive,
+        sortOrder: board.sortOrder,
+      })),
+    )
     .onConflictDoUpdate({
       target: boards.code,
       set: {
         allowComment: sql`excluded.allow_comment`,
+        allowOfficialReply: sql`excluded.allow_official_reply`,
         allowLike: sql`excluded.allow_like`,
         allowSecret: sql`excluded.allow_secret`,
         descriptionKo: sql`excluded.description_ko`,
@@ -201,9 +329,39 @@ async function seedBoards() {
         nameEn: sql`excluded.name_en`,
         nameKo: sql`excluded.name_ko`,
         sortOrder: sql`excluded.sort_order`,
-        writePermissionId: sql`excluded.write_permission_id`,
+        writeAccessType: sql`excluded.write_access_type`,
+        writePermissionId: sql`NULL`,
       },
     });
+
+  for (const boardSeed of BOARD_SEEDS) {
+    // The seed client intentionally uses the plain Drizzle query API; it does
+    // not register a relational `query` schema. Keep this lookup consistent
+    // with the rest of the seed so board-role mappings work in the container.
+    const [board] = await db
+      .select({ boardId: boards.boardId })
+      .from(boards)
+      .where(eq(boards.code, boardSeed.code))
+      .limit(1);
+    if (!board) continue;
+
+    const roleGroupIds = boardSeed.writeRoleGroupNames.map((name) => {
+      const roleGroupId = roleGroupIdByName.get(name);
+      if (!roleGroupId) throw new Error(`Missing board role group: ${name}`);
+      return roleGroupId;
+    });
+
+    await db.delete(boardRoleGroups).where(eq(boardRoleGroups.boardId, board.boardId));
+    if (roleGroupIds.length > 0) {
+      await db.insert(boardRoleGroups).values(
+        [...new Set(roleGroupIds)].map((roleGroupId) => ({
+          boardId: board.boardId,
+          roleGroupId,
+        })),
+      );
+    }
+  }
+
   console.log(`Upserted ${BOARD_SEEDS.length} board(s)`);
 }
 
@@ -222,8 +380,6 @@ async function seedDevAdminRole() {
     .insert(users)
     .values({
       academicStatus: "재학",
-      departmentEn: "School of Computing",
-      departmentKo: "전산학부",
       email: "dev-admin@kaist.ac.kr",
       identityCode: "S",
       isActive: true,
@@ -231,6 +387,7 @@ async function seedDevAdminRole() {
       lastLoginAt: now,
       nameEn: "Development Admin",
       nameKo: "관리자",
+      primaryMajor: "전산학부",
       privacyConsentAt: now,
       stdNo: "20260001",
     })
@@ -238,8 +395,6 @@ async function seedDevAdminRole() {
       target: users.kaistUid,
       set: {
         academicStatus: sql`excluded.academic_status`,
-        departmentEn: sql`excluded.dept_en`,
-        departmentKo: sql`excluded.dept_ko`,
         email: sql`excluded.email`,
         identityCode: sql`excluded.identity_code`,
         isActive: sql`excluded.is_active`,
@@ -247,6 +402,7 @@ async function seedDevAdminRole() {
         nameEn: sql`excluded.name_en`,
         nameKo: sql`excluded.name_ko`,
         privacyConsentAt: sql`excluded.privacy_consent_at`,
+        primaryMajor: sql`excluded.primary_major`,
         stdNo: sql`excluded.std_no`,
         updatedAt: sql`now()`,
       },
@@ -743,8 +899,7 @@ async function upsertSeedAuthor() {
       name_ko,
       name_en,
       email,
-      dept_ko,
-      dept_en,
+      primary_major,
       academic_status,
       identity_code,
       is_active
@@ -755,7 +910,6 @@ async function upsertSeedAuthor() {
       'SOC Student Council',
       'student-council@kaist.ac.kr',
       '전산학부',
-      'School of Computing',
       '운영',
       'O',
       true
@@ -765,8 +919,7 @@ async function upsertSeedAuthor() {
       set name_ko = excluded.name_ko,
           name_en = excluded.name_en,
           email = excluded.email,
-          dept_ko = excluded.dept_ko,
-          dept_en = excluded.dept_en,
+          primary_major = excluded.primary_major,
           academic_status = excluded.academic_status,
           identity_code = excluded.identity_code,
           updated_at = now()
@@ -1926,6 +2079,7 @@ async function main() {
   console.log("Seed mode:", seedMode);
   try {
     await seedPermissions();
+    await seedRoleGroups();
     await seedBoards();
     if (seedMode === "demo") {
       await seedDevAdminRole();

@@ -53,7 +53,7 @@ export function PublicOperationalContent() {
   return (
     <>
       {notices.length ? (
-        <div className="fixed left-1/2 top-[calc(var(--ui-header-height)+12px)] z-[45] grid w-[min(960px,calc(100vw-32px))] -translate-x-1/2 gap-2">
+        <div className="relative grid w-full gap-2 border-b border-slate-200 bg-white px-4 py-2 md:px-8">
           {notices.map((notice) => {
             const noticeText = resolveContentBlockText(notice, lang);
             const isClosing = closing.includes(notice.contentBlockId);
@@ -63,7 +63,7 @@ export function PublicOperationalContent() {
                 key={notice.contentBlockId}
                 aria-hidden={isClosing}
                 aria-label="상단 공지"
-                className={`flex items-center gap-3 overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 px-4 py-2 shadow-[0_12px_35px_rgba(15,23,42,0.12)] backdrop-blur transition-[max-height,opacity,transform,padding] duration-200 ease-out ${
+                className={`mx-auto flex w-full max-w-7xl items-center gap-3 overflow-hidden rounded-lg border border-slate-200/90 bg-white px-4 py-2 transition-[max-height,opacity,transform,padding] duration-200 ease-out ${
                   isClosing
                     ? "pointer-events-none max-h-0 -translate-y-2 border-transparent px-4 py-0 opacity-0"
                     : "max-h-14 translate-y-0 opacity-100"

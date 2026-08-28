@@ -4,6 +4,8 @@ import type {
   BoardSummary,
   CommentEngagementKind,
   CommentItem,
+  CommentModerationRequest,
+  UserRestrictionCreateRequest,
 } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
 import { createElement, useEffect, useMemo, useState } from "react";
@@ -19,7 +21,11 @@ import {
   getBoardLabelFromMetadata,
   getBoardTitleFromMetadata,
 } from "@/lib/board-metadata";
-import { Permissions } from "@/lib/permissions";
+import {
+  canUseOfficialIdentityForBoard,
+  canWriteOfficialResponseForBoard,
+  Permissions,
+} from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
 export function useBoardDetailPageController(forcedCategory?: string) {
@@ -34,9 +40,11 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [isOfficialComment, setIsOfficialComment] = useState(false);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [isOfficialReply, setIsOfficialReply] = useState(false);
   const [replySubmitting, setReplySubmitting] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [commentActionSubmitting, setCommentActionSubmitting] =
@@ -44,6 +52,9 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const [engagementSubmitting, setEngagementSubmitting] =
     useState<ArticleEngagementKind | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [authorRestrictionOpen, setAuthorRestrictionOpen] = useState(false);
+  const [authorRestrictionSubmitting, setAuthorRestrictionSubmitting] =
+    useState(false);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const navigate = useNavigate();
@@ -83,18 +94,37 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const canManageComments = useMemo(() => {
     if (!board) return false;
     const permission = session?.permission ?? 0;
-    return Permissions.hasAny(permission, Permissions.MODERATOR, Permissions.ADMIN);
+    return Permissions.hasAny(permission, Permissions.MODERATE_POST_COMMENT, Permissions.SUPER_ADMIN);
   }, [board, session]);
 
   const canManageArticle = canEdit || canManageComments;
 
+  const canUseOfficialIdentity = Boolean(
+    board &&
+      canUseOfficialIdentityForBoard(board, session?.permission),
+  );
+
+  const canWriteOfficialResponse = Boolean(
+    board && canWriteOfficialResponseForBoard(board, session?.permission),
+  );
+
+  const officialResponseOnly = Boolean(
+    canWriteOfficialResponse &&
+      (board?.allowComment === false || article?.allowComment === false),
+  );
+
+  useEffect(() => {
+    if (!officialResponseOnly) return;
+    setIsOfficialComment(true);
+    setIsOfficialReply(true);
+  }, [officialResponseOnly]);
+
   const canCreateComment = useMemo(() => {
-    if (!board?.allowComment) return false;
-    if (!article?.allowComment) return false;
     if (!session?.canUsePersistentFeatures) return false;
 
-    return true;
-  }, [article, board, session]);
+    if (canWriteOfficialResponse) return true;
+    return Boolean(board?.allowComment && article?.allowComment);
+  }, [article, board, canWriteOfficialResponse, session]);
 
   const posterAsset = useMemo(
     () =>
@@ -193,8 +223,10 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     try {
       await apiClient.createComment(category, articleId, {
         content: commentText.trim(),
+        isOfficial: isOfficialComment || officialResponseOnly,
       });
       setCommentText("");
+      setIsOfficialComment(officialResponseOnly);
       await refreshComments();
     } catch {
       setCommentError(
@@ -219,6 +251,40 @@ export function useBoardDetailPageController(forcedCategory?: string) {
           ? "댓글 삭제에 실패했습니다."
           : "Failed to delete the comment.",
       );
+    }
+  };
+
+  const handleModerateComment = async (
+    commentId: string,
+    status: CommentModerationRequest["status"],
+    reason?: string,
+  ) => {
+    if (!articleId || !canManageComments) return;
+    setCommentActionSubmitting(commentId);
+    try {
+      await apiClient.moderateComment(category, articleId, commentId, {
+        status,
+        reason,
+      });
+      await refreshComments();
+      toast({
+        type: "success",
+        message:
+          status === "HIDDEN"
+            ? "댓글을 숨겼습니다."
+            : "댓글 숨김을 해제했습니다.",
+      });
+    } catch (error) {
+      setCommentError(
+        lang === "ko"
+          ? status === "HIDDEN"
+            ? "댓글을 숨기지 못했습니다."
+            : "댓글 숨김을 해제하지 못했습니다."
+          : "Failed to update comment visibility.",
+      );
+      throw error;
+    } finally {
+      setCommentActionSubmitting(null);
     }
   };
 
@@ -273,8 +339,10 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       await apiClient.createComment(category, articleId, {
         content: replyText.trim(),
         parentCommentId,
+        isOfficial: isOfficialReply || officialResponseOnly,
       });
       setReplyText("");
+      setIsOfficialReply(officialResponseOnly);
       setReplyTargetId(null);
       await refreshComments();
     } catch {
@@ -285,6 +353,24 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       );
     } finally {
       setReplySubmitting(false);
+    }
+  };
+
+  const handleRestrictAuthor = async (
+    input: UserRestrictionCreateRequest,
+  ) => {
+    if (!articleId || !article || !canManageComments) return;
+
+    setAuthorRestrictionSubmitting(true);
+    try {
+      await apiClient.restrictArticleAuthor(category, articleId, input);
+      setAuthorRestrictionOpen(false);
+      toast({
+        type: "success",
+        message: "작성자의 이용을 제한했습니다.",
+      });
+    } finally {
+      setAuthorRestrictionSubmitting(false);
     }
   };
 
@@ -486,6 +572,8 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     canEdit,
     canManageArticle,
     canManageComments,
+    canUseOfficialIdentity,
+    officialResponseOnly,
     category,
     commentError,
     commentActionSubmitting,
@@ -500,6 +588,8 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     handleCreateReply,
     handleDeleteArticle,
     handleDeleteComment,
+    handleModerateComment,
+    handleRestrictAuthor,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,
@@ -507,11 +597,18 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     loading,
     posterAsset,
     replySubmitting,
+    authorRestrictionOpen,
+    authorRestrictionSubmitting,
+    isOfficialComment,
+    isOfficialReply,
     replyTargetId,
     replyText,
     session,
     shareCopied,
     setCommentText,
+    setAuthorRestrictionOpen,
+    setIsOfficialComment,
+    setIsOfficialReply,
     setReplyTargetId,
     setReplyText,
     surveyDescription,

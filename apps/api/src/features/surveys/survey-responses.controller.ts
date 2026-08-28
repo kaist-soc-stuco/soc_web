@@ -13,7 +13,7 @@ import { SubmitResponseSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { Request } from "express";
 
-import { OptionalAuthGuard, RequirePermissions } from "../auth/guards";
+import { OptionalAuthGuard, RequireAnyPermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveyResponsesService } from "./survey-responses.service";
@@ -42,9 +42,12 @@ export class SurveyResponsesController {
   }
 
   @Get()
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
-  findAll(@Param("surveyId", ParseUUIDPipe) surveyId: string) {
-    return this.responsesService.findAll(surveyId);
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
+  findAll(
+    @Param("surveyId", ParseUUIDPipe) surveyId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.responsesService.findAll(surveyId, req.user);
   }
 
   @Get("mine")
@@ -67,17 +70,21 @@ export class SurveyResponsesController {
   }
 
   @Get("with-answers")
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
-  findAllWithAnswers(@Param("surveyId", ParseUUIDPipe) surveyId: string) {
-    return this.responsesService.findAllWithAnswers(surveyId);
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
+  findAllWithAnswers(
+    @Param("surveyId", ParseUUIDPipe) surveyId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.responsesService.findAllWithAnswers(surveyId, req.user);
   }
 
   @Get(":responseId")
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
   findDetail(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Param("responseId", ParseUUIDPipe) responseId: string,
+    @Req() req: AuthedRequest,
   ) {
-    return this.responsesService.findDetail(surveyId, responseId);
+    return this.responsesService.findDetail(surveyId, responseId, req.user);
   }
 }

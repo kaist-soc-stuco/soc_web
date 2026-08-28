@@ -8,7 +8,7 @@ import { Footer } from '@/components/organisms/footer';
 export function HomePage() {
   return (
     <div
-      className="home-page-shell home-viewport-height flex min-h-screen flex-col overflow-x-hidden bg-background lg:overflow-x-hidden lg:overflow-y-auto"
+      className="home-page-shell home-viewport-height flex min-h-screen flex-col overflow-x-clip bg-background"
     >
       <Header variant="home" />
       <div className="home-page-body -mt-[var(--ui-header-height)] flex flex-1 min-h-0">

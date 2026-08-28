@@ -79,11 +79,18 @@ export function Header({ variant = "default" }: HeaderProps) {
       : null;
   const canUseAdminDashboard = user
     ? Permissions.hasAny(
-        user.permission,
+      user.permission,
+        Permissions.MANAGE_BOARD_SETTINGS,
+        Permissions.MANAGE_PERMISSIONS,
         Permissions.MANAGE_SURVEY,
-        Permissions.MANAGE_CONTENT,
+        Permissions.MANAGE_POLL,
+        Permissions.MANAGE_SITE_CONTENT,
+        Permissions.MANAGE_CALENDAR,
+        Permissions.MANAGE_USERS,
         Permissions.MANAGE_FINANCE,
-        Permissions.ADMIN,
+        Permissions.MANAGE_CONTACTS,
+        Permissions.SEND_EMAIL,
+        Permissions.VIEW_AUDIT_LOG,
     )
     : false;
 

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, Optional } from "@nestjs/common";
 
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -12,6 +12,9 @@ import {
   assertSurveyQuestionDefinition,
 } from "./survey-definition-validation";
 import type { ReorderSurveyQuestionsRequest } from "@soc/contracts";
+import { assertSurveyKindPermission } from "./survey-permission";
+import type { SurveyPermissionCaller } from "./survey-permission";
+import { SurveysRepository } from "./surveys.repository";
 
 @Injectable()
 export class SurveyQuestionsService {
@@ -19,14 +22,30 @@ export class SurveyQuestionsService {
     private readonly questionsRepo: SurveyQuestionsRepository,
     private readonly sectionsRepo: SurveySectionsRepository,
     private readonly mutationPolicy: SurveyMutationPolicy,
+    @Optional() private readonly surveysRepo?: SurveysRepository,
   ) {}
+
+  private async assertCallerPermission(
+    surveyId: string,
+    caller: SurveyPermissionCaller | undefined,
+    tx: Parameters<SurveysRepository["findById"]>[1],
+  ): Promise<void> {
+    if (!caller) return;
+    const survey = this.surveysRepo
+      ? await this.surveysRepo.findById(surveyId, tx)
+      : null;
+    if (!survey) throw new NotFoundException("survey_not_found");
+    assertSurveyKindPermission(caller, survey.kind);
+  }
 
   async create(
     surveyId: string,
     sectionId: string,
     dto: CreateQuestionDto,
+    caller?: SurveyPermissionCaller,
   ): Promise<SurveyQuestionRecord> {
     return this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      await this.assertCallerPermission(surveyId, caller, tx);
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
       const question = await this.questionsRepo.insert(sectionId, dto, tx);
@@ -54,8 +73,10 @@ export class SurveyQuestionsService {
     sectionId: string,
     questionId: string,
     dto: UpdateQuestionDto,
+    caller?: SurveyPermissionCaller,
   ): Promise<SurveyQuestionRecord> {
     return this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      await this.assertCallerPermission(surveyId, caller, tx);
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
       const question = await this.questionsRepo.update(
@@ -84,8 +105,14 @@ export class SurveyQuestionsService {
     });
   }
 
-  async delete(surveyId: string, sectionId: string, questionId: string): Promise<void> {
+  async delete(
+    surveyId: string,
+    sectionId: string,
+    questionId: string,
+    caller?: SurveyPermissionCaller,
+  ): Promise<void> {
     await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      await this.assertCallerPermission(surveyId, caller, tx);
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
       const question = await this.questionsRepo.findById(questionId, sectionId, tx);
@@ -98,8 +125,10 @@ export class SurveyQuestionsService {
     surveyId: string,
     sectionId: string,
     input: ReorderSurveyQuestionsRequest,
+    caller?: SurveyPermissionCaller,
   ): Promise<SurveyQuestionRecord[]> {
     return this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      await this.assertCallerPermission(surveyId, caller, tx);
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
       const existing = await this.questionsRepo.findBySectionId(sectionId, tx);

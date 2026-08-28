@@ -28,13 +28,12 @@ export class AuthDevLoginService {
     const mockUser = await this.usersService.upsertUserFromConsent({
       academicStatus: "재학",
       consentedAt: now,
-      departmentEn: "School of Computing",
-      departmentKo: "전산학부",
       email: "dev-admin@kaist.ac.kr",
       identityCode: "S",
       kaistUid: "DEV0001",
       nameEn: "Development Admin",
       nameKo: "관리자",
+      primaryMajor: "전산학부",
       stdNo: "20260001",
     });
 

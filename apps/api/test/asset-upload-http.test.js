@@ -22,10 +22,6 @@ const {
 const {
   UsersService,
 } = require("../dist/apps/api/src/features/users/users.service.js");
-const {
-  AuthEligibilityService,
-} = require("../dist/apps/api/src/features/auth/auth-eligibility.service.js");
-
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
 const createUploadForm = (size, type = "text/plain") => {
@@ -77,9 +73,8 @@ const startUploadServer = async () => {
     findById: async () => ({
       userId: "upload-test-user",
       isActive: true,
-      departmentKo: "전산학부",
-      departmentEn: "School of Computing",
     }),
+    isUserRestricted: async () => false,
     resolvePermissionBitmaskByUserId: async () => 0,
   };
 
@@ -94,10 +89,6 @@ const startUploadServer = async () => {
         useValue: authSessionRepository,
       },
       { provide: UsersService, useValue: usersService },
-      {
-        provide: AuthEligibilityService,
-        useValue: { isEligibleUser: () => true },
-      },
     ],
   })(UploadTestModule);
 

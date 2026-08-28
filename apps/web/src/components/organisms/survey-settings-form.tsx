@@ -180,7 +180,7 @@ export function SurveySettingsForm({
                 <span
                   className="text-sm font-normal text-[#344054]"
                 >
-                  국문 전용
+                  한국어 사용자만
                 </span>
               </label>
             </div>

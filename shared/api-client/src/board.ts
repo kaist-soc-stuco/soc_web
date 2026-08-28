@@ -29,8 +29,13 @@ import type {
   CommentEngagementResponse,
   CommentDeleteResponse,
   CommentListResponse,
+  CommentModerationRequest,
+  CommentModerationResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
+  UserRestrictionCreateRequest,
+  UserRestrictionAppliedResponse,
+  UserRestrictionResponse,
 } from "@soc/contracts";
 
 import {
@@ -409,6 +414,23 @@ export const createBoardApi = ({
     );
   },
 
+  moderateComment: async (
+    code: string,
+    articleId: string,
+    commentId: string,
+    input: CommentModerationRequest,
+  ): Promise<CommentModerationResponse> => {
+    return requestJson<CommentModerationResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}/moderation`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   setCommentEngagement: async (
     code: string,
     articleId: string,
@@ -420,6 +442,37 @@ export const createBoardApi = ({
       `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/comments/${encodeURIComponent(commentId)}/engagements/${kind.toLowerCase()}`,
       {
         method: active ? "PUT" : "DELETE",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  restrictUser: async (
+    userId: string,
+    input: UserRestrictionCreateRequest,
+  ): Promise<UserRestrictionResponse> => {
+    return requestJson<UserRestrictionResponse>(
+      `${normalizedBaseUrl}/users/${encodeURIComponent(userId)}/restrictions`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  restrictArticleAuthor: async (
+    code: string,
+    articleId: string,
+    input: UserRestrictionCreateRequest,
+  ): Promise<UserRestrictionAppliedResponse> => {
+    return requestJson<UserRestrictionAppliedResponse>(
+      `${normalizedBaseUrl}/boards/${encodeURIComponent(code)}/articles/${encodeURIComponent(articleId)}/author-restriction`,
+      {
+        body: JSON.stringify(input),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       },
       { retryOnUnauthorized: true },
     );

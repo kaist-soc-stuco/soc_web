@@ -267,14 +267,6 @@ export function MyPageProfilePanel({
       lang === "ko" ? "전화번호" : "Phone",
       userInfo?.phoneNumber ?? userInfo?.userMobile ?? "-",
     ],
-    [
-      lang === "ko" ? "소속" : "Affiliation",
-      `${
-        (lang === "ko"
-          ? userInfo?.departmentKo || userInfo?.departmentEn
-          : userInfo?.departmentEn || userInfo?.departmentKo) ?? "-"
-      }${userInfo?.academicStatus ? ` (${userInfo.academicStatus})` : ""}`,
-    ],
     [lang === "ko" ? "상태" : "Status", userInfo?.academicStatus ?? "-"],
     [
       lang === "ko" ? "개인정보 동의" : "Privacy consent",

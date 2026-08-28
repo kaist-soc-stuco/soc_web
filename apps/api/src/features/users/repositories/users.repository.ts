@@ -12,6 +12,7 @@ import {
 import { REDIS_CLIENT } from "../../../infrastructure/redis/redis.provider";
 import {
   permissions,
+  roleGroups,
   roleGroupPermissions,
   studentFeePayments,
   studentFeeStatus,
@@ -58,8 +59,6 @@ type UserUpsertInput = {
   nameEn?: string | null;
   nameKo: string;
   stdNo?: string | null;
-  departmentEn?: string | null;
-  departmentKo?: string | null;
   primaryMajor?: string | null;
   doubleMajor?: string | null;
   minor?: string | null;
@@ -74,8 +73,6 @@ type UserUpsertInput = {
 
 type UserProfileUpdateInput = {
   academicStatus?: string | null;
-  departmentEn?: string | null;
-  departmentKo?: string | null;
   primaryMajor?: string | null;
   doubleMajor?: string | null;
   minor?: string | null;
@@ -157,8 +154,6 @@ export class UsersRepository {
       nameKo: row.nameKo,
       stdNo: row.stdNo ?? null,
       email: row.email,
-      departmentEn: row.departmentEn ?? null,
-      departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
       doubleMajor: row.doubleMajor ?? null,
       minor: row.minor ?? null,
@@ -180,8 +175,6 @@ export class UsersRepository {
     return {
       academicStatus: row.academicStatus ?? null,
       createdAt: msToIso(row.createdAt.valueOf()),
-      departmentEn: row.departmentEn ?? null,
-      departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
       doubleMajor: row.doubleMajor ?? null,
       minor: row.minor ?? null,
@@ -251,8 +244,6 @@ export class UsersRepository {
         nameEn: input.nameEn ?? null,
         nameKo: input.nameKo,
         stdNo: input.stdNo ?? null,
-        departmentEn: input.departmentEn ?? null,
-        departmentKo: input.departmentKo ?? null,
         primaryMajor: input.primaryMajor ?? null,
         doubleMajor: input.doubleMajor ?? null,
         minor: input.minor ?? null,
@@ -280,12 +271,6 @@ export class UsersRepository {
       updatedAt: now,
       ...(input.nameEn !== undefined ? { nameEn: input.nameEn } : {}),
       ...(input.stdNo !== undefined ? { stdNo: input.stdNo } : {}),
-      ...(input.departmentKo !== undefined
-        ? { departmentKo: input.departmentKo }
-        : {}),
-      ...(input.departmentEn !== undefined
-        ? { departmentEn: input.departmentEn }
-        : {}),
       ...(input.primaryMajor !== undefined
         ? { primaryMajor: input.primaryMajor }
         : {}),
@@ -320,6 +305,8 @@ export class UsersRepository {
           .where(eq(users.userId, existingByKaistUid.userId))
           .returning();
 
+        await this.ensureDefaultMemberRole(tx, updated.userId, now);
+
         return this.mapRowToUserRecord(updated);
       }
 
@@ -334,6 +321,8 @@ export class UsersRepository {
           .where(eq(users.userId, existingByEmail.userId))
           .returning();
 
+        await this.ensureDefaultMemberRole(tx, updated.userId, now);
+
         return this.mapRowToUserRecord(updated);
       }
 
@@ -347,20 +336,55 @@ export class UsersRepository {
           isActive: input.isActive ?? true,
           nameEn: input.nameEn ?? null,
           stdNo: input.stdNo ?? null,
-          departmentKo: input.departmentKo ?? null,
           primaryMajor: input.primaryMajor ?? null,
           doubleMajor: input.doubleMajor ?? null,
           minor: input.minor ?? null,
           gender: input.gender ?? null,
           phoneNumber: input.phoneNumber ?? null,
-          departmentEn: input.departmentEn ?? null,
           academicStatus: input.academicStatus ?? null,
           identityCode: input.identityCode ?? null,
           privacyConsentAt: input.privacyConsentAt ?? null,
         })
         .returning();
 
+      await this.ensureDefaultMemberRole(tx, inserted.userId, now);
+
       return this.mapRowToUserRecord(inserted);
+    });
+  }
+
+  /** 시드된 일반 회원 역할을 신규/재로그인 사용자에게 항상 연결합니다. */
+  private async ensureDefaultMemberRole(
+    tx: PostgresDatabase,
+    userId: string,
+    grantedAt: Date,
+  ): Promise<void> {
+    const defaultRole = await tx.query.roleGroups.findFirst({
+      where: eq(roleGroups.nameKo, "일반 회원"),
+    });
+
+    if (!defaultRole) {
+      // DB seed가 아직 실행되지 않은 초기 부트스트랩 단계에서는 다음 로그인 때 재시도합니다.
+      return;
+    }
+
+    const activeMembership = await tx.query.userRoleGroups.findFirst({
+      where: and(
+        eq(userRoleGroups.userId, userId),
+        eq(userRoleGroups.roleGroupId, defaultRole.roleGroupId),
+        eq(userRoleGroups.isActive, true),
+      ),
+    });
+
+    if (activeMembership) return;
+
+    await tx.insert(userRoleGroups).values({
+      grantedAt,
+      isActive: true,
+      roleGroupId: defaultRole.roleGroupId,
+      userId,
+      validFrom: grantedAt,
+      validTo: null,
     });
   }
 
@@ -372,8 +396,6 @@ export class UsersRepository {
   ): Promise<void> {
     const updateSet: {
       academicStatus?: string | null;
-      departmentEn?: string | null;
-      departmentKo?: string | null;
       primaryMajor?: string | null;
       doubleMajor?: string | null;
       minor?: string | null;
@@ -404,14 +426,6 @@ export class UsersRepository {
 
     if (input.stdNo !== undefined) {
       updateSet.stdNo = input.stdNo;
-    }
-
-    if (input.departmentKo !== undefined) {
-      updateSet.departmentKo = input.departmentKo;
-    }
-
-    if (input.departmentEn !== undefined) {
-      updateSet.departmentEn = input.departmentEn;
     }
 
     if (input.primaryMajor !== undefined) {
@@ -565,7 +579,9 @@ export class UsersRepository {
             ilike(users.nameEn, `%${normalizedQuery}%`),
             ilike(users.stdNo, `%${normalizedQuery}%`),
             ilike(users.email, `%${normalizedQuery}%`),
-            ilike(users.departmentKo, `%${normalizedQuery}%`),
+            ilike(users.primaryMajor, `%${normalizedQuery}%`),
+            ilike(users.doubleMajor, `%${normalizedQuery}%`),
+            ilike(users.minor, `%${normalizedQuery}%`),
           )
         : undefined,
       input.status === "active"
@@ -663,6 +679,23 @@ export class UsersRepository {
       await this.cachePermissionBitmask(userId, permissionBits);
 
       return permissionBits;
+  }
+
+  async listActiveRoleGroupIds(userId: string): Promise<number[]> {
+    const now = nowDate();
+    const rows = await this.db
+      .select({ roleGroupId: userRoleGroups.roleGroupId })
+      .from(userRoleGroups)
+      .where(
+        and(
+          eq(userRoleGroups.userId, userId),
+          eq(userRoleGroups.isActive, true),
+          or(isNull(userRoleGroups.validFrom), lte(userRoleGroups.validFrom, now)),
+          or(isNull(userRoleGroups.validTo), gte(userRoleGroups.validTo, now)),
+        ),
+      );
+
+    return [...new Set(rows.map((row) => row.roleGroupId))];
   }
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
@@ -1059,7 +1092,6 @@ export class UsersRepository {
         nameEn: users.nameEn,
         stdNo: users.stdNo,
         email: users.email,
-        departmentKo: users.departmentKo,
         primaryMajor: users.primaryMajor,
         doubleMajor: users.doubleMajor,
         minor: users.minor,
@@ -1123,7 +1155,6 @@ export class UsersRepository {
         nameEn: row.nameEn ?? undefined,
         stdNo: row.stdNo ?? undefined,
         email: row.email,
-        departmentKo: row.departmentKo,
         primaryMajor: row.primaryMajor,
         doubleMajor: row.doubleMajor,
         minor: row.minor,

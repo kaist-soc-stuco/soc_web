@@ -14,6 +14,7 @@ import { Permissions } from "@soc/contracts";
 import { AuthGuard } from "./auth.guard";
 
 const REQUIRED_PERMISSION_BITS_KEY = Symbol("requiredPermissionBits");
+const ANY_PERMISSION_BITS_KEY = Symbol("anyPermissionBits");
 
 @Injectable()
 export class PermissionBitsGuard implements CanActivate {
@@ -24,8 +25,12 @@ export class PermissionBitsGuard implements CanActivate {
       REQUIRED_PERMISSION_BITS_KEY,
       [context.getHandler(), context.getClass()],
     );
+    const anyBits = this.reflector.getAllAndOverride<number[] | undefined>(
+      ANY_PERMISSION_BITS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
-    if (!requiredBits || requiredBits.length === 0) {
+    if ((!requiredBits || requiredBits.length === 0) && (!anyBits || anyBits.length === 0)) {
       return true;
     }
 
@@ -39,7 +44,11 @@ export class PermissionBitsGuard implements CanActivate {
 
     const userMask = request.user.permission ?? 0;
 
-    if (!Permissions.has(userMask, ...requiredBits)) {
+    if (requiredBits && requiredBits.length > 0 && !Permissions.has(userMask, ...requiredBits)) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+
+    if (anyBits && anyBits.length > 0 && !Permissions.hasAny(userMask, ...anyBits)) {
       throw new ForbiddenException("insufficient_permission");
     }
 
@@ -50,6 +59,13 @@ export class PermissionBitsGuard implements CanActivate {
 export function RequirePermissions(...bits: number[]) {
   return applyDecorators(
     SetMetadata(REQUIRED_PERMISSION_BITS_KEY, bits),
+    UseGuards(AuthGuard, PermissionBitsGuard),
+  );
+}
+
+export function RequireAnyPermissions(...bits: number[]) {
+  return applyDecorators(
+    SetMetadata(ANY_PERMISSION_BITS_KEY, bits),
     UseGuards(AuthGuard, PermissionBitsGuard),
   );
 }

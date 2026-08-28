@@ -80,7 +80,6 @@ export class AuthController {
     this.authCookieService.setAuthCookies(response, result, request);
 
     return {
-      ssoUserInfo: result.ssoUserInfo,
       storageMode: result.storageMode,
       userId: result.userId,
     };
@@ -105,7 +104,6 @@ export class AuthController {
     }
 
     return {
-      ssoUserInfo: result.ssoUserInfo,
       storageMode: result.storageMode,
       temporarySession:
         result.storageMode === "temporary"

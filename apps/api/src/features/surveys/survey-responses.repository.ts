@@ -37,7 +37,6 @@ type SurveyResponseQueryRow = {
   updatedAt: Date;
   userNameKo: string | null;
   userEmail: string | null;
-  userDepartmentKo: string | null;
   userStdNo: string | null;
 };
 
@@ -154,7 +153,6 @@ export class SurveyResponsesRepository {
         ? {
             nameKo: row.userNameKo,
             email: row.userEmail,
-            departmentKo: row.userDepartmentKo,
             stdNo: row.userStdNo,
           }
         : null,
@@ -173,7 +171,6 @@ export class SurveyResponsesRepository {
     updatedAt: surveyResponses.updatedAt,
     userNameKo: users.nameKo,
     userEmail: users.email,
-    userDepartmentKo: users.departmentKo,
     userStdNo: users.stdNo,
   };
 
@@ -458,7 +455,6 @@ export class SurveyResponsesRepository {
               updatedAt: insertedResponse.updatedAt,
               userNameKo: null,
               userEmail: null,
-              userDepartmentKo: null,
               userStdNo: null,
             }),
           answers,
@@ -605,7 +601,6 @@ export class SurveyResponsesRepository {
             updatedAt: updatedResponse.updatedAt,
             userNameKo: null,
             userEmail: null,
-            userDepartmentKo: null,
             userStdNo: null,
           }),
         answers,

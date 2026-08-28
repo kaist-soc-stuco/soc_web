@@ -1,22 +1,61 @@
 import { createApiClient } from "@soc/api-client";
-import type { SsoUserInfo } from "@soc/contracts";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   clearStoredAuthState,
-  consumeAuthReturnPath,
   writeStoredAuthState,
 } from "@/lib/auth-storage";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast";
 
 const LAST_CONSUMED_RESULT_TOKEN_KEY = "soc.auth.last-consumed-result-token";
 
 type LoginStatus = "idle" | "starting" | "processing" | "failed";
+
+const resolveLoginFailureMessage = (reason: string | null, lang: "ko" | "en") => {
+  const messages: Record<string, { en: string; ko: string }> = {
+    account_expired: {
+      en: "This account is inactive and cannot sign in. Please contact the student council administrator.",
+      ko: "이 계정은 비활성화되어 로그인할 수 없습니다. 학생회 관리자에게 문의해 주세요.",
+    },
+    account_restricted: {
+      en: "This account is temporarily restricted from using the service. Please contact the student council administrator if you need help.",
+      ko: "이 계정은 현재 서비스 이용이 제한되어 있습니다. 도움이 필요하면 학생회 관리자에게 문의해 주세요.",
+    },
+    department_not_eligible: {
+      en: "This account is not eligible for the service. Please check that you are using the correct KAIST SSO account.",
+      ko: "서비스 이용 대상이 아닌 계정입니다. 올바른 KAIST SSO 계정인지 확인해 주세요.",
+    },
+    origin_required_or_mismatch: {
+      en: "The service address is not valid for sign-in. Please reopen the official site and try again.",
+      ko: "서비스 주소가 올바르지 않아 로그인할 수 없습니다. 공식 사이트 주소로 다시 접속해 주세요.",
+    },
+    invalid_or_expired_state: {
+      en: "The sign-in request expired. Please start sign-in again.",
+      ko: "로그인 요청이 만료되었습니다. 로그인을 다시 시도해 주세요.",
+    },
+    nonce_mismatch: {
+      en: "The sign-in response could not be verified. Please start sign-in again.",
+      ko: "로그인 응답을 확인하지 못했습니다. 로그인을 다시 시도해 주세요.",
+    },
+    missing_email: {
+      en: "Your SSO account did not provide an email address required by this service.",
+      ko: "SSO 계정에서 서비스 이용에 필요한 이메일을 받지 못했습니다.",
+    },
+    pending_login_not_found_or_expired: {
+      en: "The consent request expired. Please sign in again.",
+      ko: "동의 요청이 만료되었습니다. 로그인을 다시 시도해 주세요.",
+    },
+  };
+  const message = messages[reason ?? ""] ?? {
+    en: "Sign-in could not be completed. Please try again.",
+    ko: "로그인을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  };
+  return lang === "ko" ? message.ko : message.en;
+};
 
 const submitAuthorizeForm = (payload: {
   loginUrl: string;
@@ -52,7 +91,6 @@ export function LoginCallbackPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
@@ -69,53 +107,6 @@ export function LoginCallbackPage() {
   const [consentErrorMessage, setConsentErrorMessage] = useState<string | null>(
     null,
   );
-  const returnToPreviousPage = useCallback(
-    (message: string) => {
-      clearStoredAuthState();
-      toast({ type: "error", message });
-      const returnPath = consumeAuthReturnPath();
-      if (returnPath) {
-        navigate(returnPath, { replace: true });
-        return;
-      }
-      if (window.history.length > 1) {
-        navigate(-1);
-        return;
-      }
-      navigate("/", { replace: true });
-    },
-    [navigate, toast],
-  );
-
-  const logSsoAccountInfo = useCallback(async (ssoUserInfo?: SsoUserInfo) => {
-    if (ssoUserInfo !== undefined) {
-      console.groupCollapsed("[SOC SSO] 원본 userInfo 전체");
-      console.log("SSO userInfo 원본 객체", ssoUserInfo);
-      console.dir(ssoUserInfo);
-      console.table(ssoUserInfo);
-      console.groupEnd();
-      return;
-    }
-
-    try {
-      const response = await apiClient.getCurrentUser();
-
-      if (!response.user) {
-        console.log("[SOC SSO] 로그인 세션 정보", response);
-        return;
-      }
-
-      // 의도적으로 access/refresh token은 출력하지 않고, SSO에서
-      // 사용자 프로필로 저장된 계정 정보만 브라우저 콘솔에 표시합니다.
-      console.groupCollapsed("[SOC SSO] 로그인 계정 정보");
-      console.log("현재 SSO 계정", { ...response.user });
-      console.table({ ...response.user });
-      console.groupEnd();
-    } catch (error) {
-      console.warn("[SOC SSO] 계정 정보 조회 실패", error);
-    }
-  }, [apiClient]);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -145,13 +136,10 @@ export function LoginCallbackPage() {
         }
 
         submitAuthorizeForm(payload);
-      } catch (error) {
-        console.error(error);
-        returnToPreviousPage(
-          lang === "ko"
-            ? "로그인을 시작하지 못했습니다."
-            : "Failed to start sign-in.",
-        );
+      } catch {
+        clearStoredAuthState();
+        setErrorMessage(resolveLoginFailureMessage("login_start_failed", lang));
+        setStatus("failed");
       }
     };
 
@@ -177,21 +165,17 @@ export function LoginCallbackPage() {
 
       void apiClient
         .consumeLoginResult(resultToken)
-        .then(async (loginResult) => {
-          await logSsoAccountInfo(loginResult.ssoUserInfo);
+        .then(async () => {
           clearStoredAuthState();
           await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
           navigate("/", { replace: true });
         })
-        .catch((error) => {
-          console.error(error);
+        .catch(() => {
           consumedResultTokenRef.current.delete(resultToken);
           window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
-          returnToPreviousPage(
-            lang === "ko"
-              ? "로그인 결과를 처리하지 못했습니다."
-              : "Failed to process the sign-in result.",
-          );
+          clearStoredAuthState();
+          setErrorMessage(resolveLoginFailureMessage("login_result_failed", lang));
+          setStatus("failed");
         });
       return;
     }
@@ -199,7 +183,6 @@ export function LoginCallbackPage() {
     if (loginStatus === "success") {
       void queryClient
         .invalidateQueries({ queryKey: ["auth", "session"] })
-        .then(() => logSsoAccountInfo())
         .finally(() => navigate("/", { replace: true }));
       return;
     }
@@ -215,16 +198,14 @@ export function LoginCallbackPage() {
     }
 
     if (loginStatus === "error") {
-      returnToPreviousPage(
-        lang === "ko"
-          ? "로그인 중 오류가 발생했습니다."
-          : "An error occurred while signing in.",
-      );
+      clearStoredAuthState();
+      setErrorMessage(resolveLoginFailureMessage(searchParams.get("reason"), lang));
+      setStatus("failed");
       return;
     }
 
     void startLogin();
-  }, [apiClient, lang, location.search, logSsoAccountInfo, navigate, queryClient, returnToPreviousPage]);
+  }, [apiClient, lang, location.search, navigate, queryClient]);
 
   const submitConsentDecision = async (consent: boolean) => {
     if (!pendingConsentToken) {
@@ -249,21 +230,14 @@ export function LoginCallbackPage() {
         writeStoredAuthState({
           temporarySession: payload.temporarySession,
         });
-        await logSsoAccountInfo(payload.ssoUserInfo);
       } else {
         clearStoredAuthState();
-        await logSsoAccountInfo(payload.ssoUserInfo);
       }
 
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
       navigate("/", { replace: true });
-    } catch (error) {
-      console.error(error);
-      returnToPreviousPage(
-        lang === "ko"
-          ? "동의 처리 중 오류가 발생했습니다."
-          : "An error occurred while saving your consent choice.",
-      );
+    } catch {
+      setConsentErrorMessage(resolveLoginFailureMessage("pending_login_not_found_or_expired", lang));
     } finally {
       setConsentSubmitting(null);
     }
@@ -311,8 +285,8 @@ export function LoginCallbackPage() {
             <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-600">
               <p>
                 {lang === "ko"
-                  ? "SSO 로그인으로 받은 이름, 이메일, 학번 정보를 서비스 이용에 사용합니다."
-                  : "We use your name, email address, and student number received through SSO to provide this service."}
+                  ? "SSO 로그인으로 받은 이름, 이메일, 학번, 주전공 정보를 서비스 이용에 사용합니다."
+                  : "We use your name, email address, student number, and primary major received through SSO to provide this service."}
               </p>
               <p>
                 {lang === "ko"

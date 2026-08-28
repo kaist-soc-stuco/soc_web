@@ -11,9 +11,6 @@ import type { ConsentDecisionSchema } from "../schemas.js";
 
 export type AuthStorageMode = "temporary" | "persisted";
 
-/** The complete account object returned by the SSO provider. */
-export type SsoUserInfo = Record<string, unknown>;
-
 export interface LoginStartResponse {
   clientId: string;
   loginUrl: string;
@@ -53,13 +50,12 @@ export interface CurrentUserResponse {
     id: string;
     name?: string;
     permission: number;
+    roleGroupIds?: number[];
     email: string;
     nameKo: string;
     nameEn: string | null;
     userMobile: string | null;
     studentNumber: string | null;
-    departmentKo: string | null;
-    departmentEn: string | null;
     primaryMajor: string | null;
     doubleMajor: string | null;
     minor: string | null;
@@ -86,7 +82,6 @@ export interface TemporarySessionPayload {
 
 export interface ConsentDecisionResponse {
   storageMode: AuthStorageMode;
-  ssoUserInfo?: SsoUserInfo;
   temporarySession?: TemporarySessionPayload;
   userId?: string;
 }

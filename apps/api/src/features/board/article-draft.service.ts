@@ -11,13 +11,14 @@ import type {
   ArticleDraftSaveRequest,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
-
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleDraftRepository } from "./repositories/article-draft.repository";
+import { canUseOfficialIdentity, canWriteToBoard } from "./board-access";
 
 interface AuthenticatedUser {
   id: string;
   permission: number;
+  roleGroupIds?: number[];
 }
 
 const MAX_PAGE_SIZE = 100;
@@ -32,17 +33,31 @@ export class ArticleDraftService {
   private async assertBoardWritable(
     boardCode: string,
     user: AuthenticatedUser,
+    isOfficial: boolean,
+    isPinned: boolean,
   ) {
     const board = await this.boardRepository.findByCode(boardCode);
     if (!board || !board.isActive) {
       throw new NotFoundException("board_not_found");
     }
 
-    if (
-      board.writePermissionBit > 0 &&
-      !Permissions.has(user.permission, board.writePermissionBit)
-    ) {
+    if (!canWriteToBoard(board, user)) {
       throw new ForbiddenException("insufficient_permission");
+    }
+
+    if (isOfficial && !canUseOfficialIdentity(board, user)) {
+      throw new ForbiddenException("official_identity_not_allowed");
+    }
+
+    if (
+      isPinned &&
+      !Permissions.hasAny(
+        user.permission,
+        Permissions.POST_ANNOUNCEMENT,
+        Permissions.SUPER_ADMIN,
+      )
+    ) {
+      throw new ForbiddenException("announcement_permission_required");
     }
 
     return board;
@@ -56,7 +71,12 @@ export class ArticleDraftService {
       throw new BadRequestException("article_draft_empty");
     }
 
-    const board = await this.assertBoardWritable(input.boardCode, user);
+    const board = await this.assertBoardWritable(
+      input.boardCode,
+      user,
+      input.isOfficial,
+      input.isPinned,
+    );
 
     if (input.draftId) {
       const existing = await this.articleDraftRepository.findById(

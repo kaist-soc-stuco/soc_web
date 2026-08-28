@@ -7,7 +7,9 @@ import type {
   BoardCreateSchema,
   BoardReorderSchema,
   BoardUpdateSchema,
+  BoardWriteAccessTypeSchema,
   CommentCreateSchema,
+  CommentModerationSchema,
   CommentUpdateSchema,
 } from "../schemas.js";
 
@@ -18,9 +20,18 @@ export interface BoardSummary {
   nameEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  /** 글쓰기에 필요한 permission bit 값. 0이면 제한 없음. */
+  /** 레거시 호환용 작성 방식. 새 권한 판정은 writeRoleGroupIds를 사용합니다. */
+  writeAccessType: z.infer<typeof BoardWriteAccessTypeSchema>;
+  /** 레거시 호환용 permission bit 값. */
   writePermissionBit: number;
+  /** 이 역할 그룹에 속한 사용자만 게시글을 작성할 수 있습니다. */
+  writeRoleGroupIds: number[];
+  /** 현재 요청 사용자가 이 게시판에 작성할 수 있는지 여부. */
+  canWrite?: boolean;
+  /** 현재 요청 사용자가 공식 명의를 사용할 수 있는지 여부. */
+  canUseOfficialIdentity?: boolean;
   allowComment: boolean;
+  allowOfficialReply: boolean;
   allowSecret: boolean;
   allowLike: boolean;
   sortOrder: number;
@@ -68,6 +79,7 @@ export interface ArticleListItem {
   updatedAt: string;
   author: ArticleAuthorSummary;
   isAnonymous: boolean;
+  isOfficial: boolean;
   allowComment?: boolean;
   commentCount: number;
   viewCount: number;
@@ -137,6 +149,7 @@ export interface ArticleDetailResponse {
   updatedAt: string;
   author: ArticleAuthorSummary;
   isAnonymous: boolean;
+  isOfficial: boolean;
   allowComment: boolean;
   assets: ArticleAssetItem[];
   commentCount: number;
@@ -146,8 +159,8 @@ export interface ArticleDetailResponse {
   viewerHasLiked: boolean;
   viewerHasScrapped: boolean;
   survey?: SurveySummary | null;
-  prevArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
-  nextArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
+  prevArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean; isOfficial: boolean } | null;
+  nextArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean; isOfficial: boolean } | null;
   eventStartDate?: string | null;
   eventEndDate?: string | null;
   eventDescriptionKo?: string | null;
@@ -197,6 +210,7 @@ export interface ArticleDraftRecord {
   pinOrder?: number | null;
   isSecret: boolean;
   isAnonymous: boolean;
+  isOfficial: boolean;
   allowComment: boolean;
   isKoreanOnly: boolean;
   assets?: ArticleAssetRequest[];
@@ -267,6 +281,14 @@ export interface CommentCreateResponse {
 }
 
 export type CommentUpdateRequest = z.infer<typeof CommentUpdateSchema>;
+
+export type CommentModerationRequest = z.infer<typeof CommentModerationSchema>;
+
+export interface CommentModerationResponse {
+  commentId: string;
+  status: CommentStatus;
+  updatedAt: string;
+}
 
 export interface CommentUpdateResponse {
   commentId: string;

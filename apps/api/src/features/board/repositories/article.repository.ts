@@ -208,6 +208,7 @@ export class ArticleRepository {
         pinOrder: articles.pinOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
+        isOfficial: articles.isOfficial,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
@@ -266,6 +267,7 @@ export class ArticleRepository {
         pinOrder: row.pinOrder ?? null,
         isSecret: row.isSecret,
         isAnonymous: row.isAnonymous,
+        isOfficial: row.isOfficial,
         allowComment: row.allowComment,
         postedAt: msToIso(row.postedAt.valueOf()),
         updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -374,6 +376,7 @@ export class ArticleRepository {
         pinOrder: articles.pinOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
+        isOfficial: articles.isOfficial,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
@@ -435,6 +438,7 @@ export class ArticleRepository {
         pinOrder: row.pinOrder ?? null,
         isSecret: row.isSecret,
         isAnonymous: row.isAnonymous,
+        isOfficial: row.isOfficial,
         allowComment: row.allowComment,
         postedAt: msToIso(row.postedAt.valueOf()),
         updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -505,6 +509,7 @@ export class ArticleRepository {
         pinOrder: articles.pinOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
+        isOfficial: articles.isOfficial,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
@@ -552,6 +557,7 @@ export class ArticleRepository {
       pinOrder: row.pinOrder ?? null,
       isSecret: row.isSecret,
       isAnonymous: row.isAnonymous,
+      isOfficial: row.isOfficial,
       allowComment: row.allowComment,
       postedAt: msToIso(row.postedAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -596,6 +602,7 @@ export class ArticleRepository {
         pinOrder: articles.pinOrder,
         isSecret: articles.isSecret,
         isAnonymous: articles.isAnonymous,
+        isOfficial: articles.isOfficial,
         allowComment: articles.allowComment,
         postedAt: articles.postedAt,
         updatedAt: articles.updatedAt,
@@ -664,6 +671,7 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         isAnonymous: articles.isAnonymous,
+        isOfficial: articles.isOfficial,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -687,6 +695,7 @@ export class ArticleRepository {
         authorId: users.userId,
         authorName: users.nameKo,
         isAnonymous: articles.isAnonymous,
+        isOfficial: articles.isOfficial,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -715,6 +724,7 @@ export class ArticleRepository {
       pinOrder: row[0].pinOrder ?? null,
       isSecret: row[0].isSecret,
       isAnonymous: row[0].isAnonymous,
+      isOfficial: row[0].isOfficial,
       allowComment: row[0].allowComment,
       postedAt: msToIso(row[0].postedAt.valueOf()),
       updatedAt: msToIso(row[0].updatedAt.valueOf()),
@@ -763,6 +773,7 @@ export class ArticleRepository {
             titleEn: prevRow[0].titleEn ?? undefined,
             postedAt: msToIso(prevRow[0].postedAt.valueOf()),
             isAnonymous: prevRow[0].isAnonymous,
+            isOfficial: prevRow[0].isOfficial,
             author: {
               userId: String(prevRow[0].authorId ?? ""),
               name: prevRow[0].authorName ?? "unknown",
@@ -776,6 +787,7 @@ export class ArticleRepository {
             titleEn: nextRow[0].titleEn ?? undefined,
             postedAt: msToIso(nextRow[0].postedAt.valueOf()),
             isAnonymous: nextRow[0].isAnonymous,
+            isOfficial: nextRow[0].isOfficial,
             author: {
               userId: String(nextRow[0].authorId ?? ""),
               name: nextRow[0].authorName ?? "unknown",
@@ -841,6 +853,7 @@ export class ArticleRepository {
           pinOrder: input.payload.pinOrder ?? null,
           isSecret: input.payload.isSecret ?? false,
           isAnonymous: input.payload.isAnonymous ?? false,
+          isOfficial: input.payload.isOfficial ?? false,
           allowComment: input.payload.allowComment ?? true,
           postedAt: now,
           updatedAt: now,
@@ -879,11 +892,13 @@ export class ArticleRepository {
     articleId: string,
   ): Promise<{
     authorUserId: string;
+    isSecret: boolean;
     status: string;
   } | null> {
     const row = await this.db
       .select({
         authorUserId: articles.authorUserId,
+        isSecret: articles.isSecret,
         status: articles.status,
       })
       .from(articles)
@@ -896,6 +911,7 @@ export class ArticleRepository {
 
     return {
       authorUserId: String(row[0].authorUserId),
+      isSecret: row[0].isSecret,
       status: row[0].status,
     };
   }
@@ -906,11 +922,15 @@ export class ArticleRepository {
     visibilityScopes: VisibilityScope[],
   ): Promise<{
     allowComment: boolean;
+    authorUserId: string;
+    isSecret: boolean;
     status: string;
   } | null> {
     const row = await this.db
       .select({
         allowComment: articles.allowComment,
+        authorUserId: articles.authorUserId,
+        isSecret: articles.isSecret,
         status: articles.status,
       })
       .from(articles)
@@ -927,6 +947,8 @@ export class ArticleRepository {
 
     return {
       allowComment: row[0].allowComment,
+      authorUserId: String(row[0].authorUserId),
+      isSecret: row[0].isSecret,
       status: row[0].status,
     };
   }
@@ -948,6 +970,7 @@ export class ArticleRepository {
       pinOrder?: number | null;
       isSecret?: boolean;
       isAnonymous?: boolean;
+      isOfficial?: boolean;
       allowComment?: boolean;
       updatedAt: Date;
       eventStartDate?: Date | null;
@@ -992,6 +1015,10 @@ export class ArticleRepository {
 
     if (payload.isAnonymous !== undefined) {
       updateSet.isAnonymous = payload.isAnonymous;
+    }
+
+    if (payload.isOfficial !== undefined) {
+      updateSet.isOfficial = payload.isOfficial;
     }
 
     if (payload.allowComment !== undefined) {

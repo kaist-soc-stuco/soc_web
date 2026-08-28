@@ -80,7 +80,7 @@ export function UserManagementPage() {
 
   const canManageUsers = Permissions.has(
     session?.permission ?? 0,
-    Permissions.ADMIN,
+    Permissions.MANAGE_USERS,
   );
 
   useEffect(() => {
@@ -172,7 +172,7 @@ export function UserManagementPage() {
   };
 
   return (
-    <AuthGuard requirePermission={Permissions.ADMIN}>
+    <AuthGuard requirePermission={Permissions.MANAGE_USERS}>
       <AdminPageShell>
         <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
           <AdminPageHeader title="유저 관리" />
@@ -204,7 +204,7 @@ export function UserManagementPage() {
                   setQuery("");
                   setCurrentPage(1);
                 }}
-                placeholder="이름, 학번, 이메일, 소속 검색"
+                placeholder="이름, 학번, 전공, 이메일 검색"
                 value={query}
               />
             </AdminCardHeader>
@@ -243,7 +243,7 @@ export function UserManagementPage() {
                     </AdminSortableHead>
                     <AdminTableHead>학번</AdminTableHead>
                     <AdminTableHead>이메일</AdminTableHead>
-                    <AdminTableHead>소속 · 전공</AdminTableHead>
+                    <AdminTableHead>전공</AdminTableHead>
                     <AdminSortableHead
                       active={sortBy === "lastLoginAt"}
                       ascending={sortBy === "lastLoginAt" && sortDirection === "asc"}
@@ -282,7 +282,6 @@ export function UserManagementPage() {
                         </AdminTableCell>
                         <AdminTableCell className="py-2.5 truncate text-sm" title={user.email}>{user.email}</AdminTableCell>
                         <AdminTableCell className="py-2.5 text-sm">
-                          {user.departmentKo ? <div className="truncate">{user.departmentKo}</div> : null}
                           {major ? <div className="mt-0.5 truncate text-xs text-slate-500">{major}</div> : null}
                         </AdminTableCell>
                         <AdminTableCell className="py-2.5 text-sm">
@@ -368,7 +367,6 @@ function UserDetailDrawer({
               <UserDetailItem label="학번" value={displayStudentId(user)} />
               <UserDetailItem label="KAIST UID" value={user.kaistUid} />
               <UserDetailItem label="이메일" value={user.email} />
-              <UserDetailItem label="소속" value={user.departmentKo ?? "—"} />
               <UserDetailItem label="전공" value={major || "—"} />
               <UserDetailItem label="학적 상태" value={user.academicStatus ?? "—"} />
             </dl>

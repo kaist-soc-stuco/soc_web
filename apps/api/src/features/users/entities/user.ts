@@ -13,8 +13,6 @@ export interface UserRecord {
   nameKo: string;
   stdNo: string | null;
   email: string;
-  departmentEn: string | null;
-  departmentKo: string | null;
   primaryMajor: string | null;
   doubleMajor: string | null;
   minor: string | null;

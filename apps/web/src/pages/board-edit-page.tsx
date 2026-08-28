@@ -35,6 +35,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     backToArticle,
     canConfigurePostSettings,
     canManageTemplates,
+    canUseOfficialIdentity,
     category,
     contentEn,
     contentKo,
@@ -50,6 +51,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     handleStartNewDraft,
     handleUploadFiles,
     isAnonymous,
+    isOfficial,
     isAllDay,
     isEventAlwaysOpen,
     isKoreanOnly,
@@ -68,6 +70,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
+    setIsOfficial,
     setIsAllDay,
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
@@ -96,6 +99,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     contentKo,
     contentEn,
     isAnonymous,
+    isOfficial,
     isPinned,
     isSecret,
     allowComment,
@@ -115,6 +119,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     setContentKo(template.contentKo);
     setContentEn(template.contentEn);
     setIsAnonymous(template.isAnonymous);
+    setIsOfficial(Boolean(template.isOfficial));
     setIsPinned(template.isPinned);
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
@@ -180,10 +185,16 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
       selectedSurveyId={selectedSurveyId}
       surveys={surveys}
       isAnonymous={isAnonymous}
+      isOfficial={isOfficial}
       isPinned={isPinned}
       isSecret={isSecret}
       allowSecret={allowSecret}
       onAnonymousChange={setIsAnonymous}
+      canUseOfficialIdentity={canUseOfficialIdentity}
+      onOfficialChange={(checked) => {
+        setIsOfficial(checked);
+        if (checked) setIsAnonymous(false);
+      }}
       onPinnedChange={setIsPinned}
       onSecretChange={setIsSecret}
       anonymousLabel={lang === "ko" ? "익명으로 수정" : "Edit Anonymously"}

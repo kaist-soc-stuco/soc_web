@@ -14,7 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { permissions, users } from "./auth.schema";
+import { permissions, roleGroups, users } from "./auth.schema";
 
 export const boards = pgTable("board", {
   boardId: serial("board_id").primaryKey(),
@@ -23,14 +23,40 @@ export const boards = pgTable("board", {
   nameEn: varchar("name_en", { length: 100 }),
   descriptionKo: varchar("description_ko", { length: 255 }),
   descriptionEn: varchar("description_en", { length: 255 }),
+  writeAccessType: varchar("write_access_type", { length: 20 })
+    .notNull()
+    .default("AUTHENTICATED"),
   writePermissionId: integer("write_permission_id")
     .references(() => permissions.permissionId),
   allowComment: boolean("allow_comment").notNull().default(false),
+  allowOfficialReply: boolean("allow_official_reply").notNull().default(false),
   allowSecret: boolean("allow_secret").notNull().default(false),
   allowLike: boolean("allow_like").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
 });
+
+/** 게시판별 게시글 작성 가능 역할. 작성 권한(permission)과 게시판 범위를 분리합니다. */
+export const boardRoleGroups = pgTable(
+  "board_role_group",
+  {
+    boardId: integer("board_id")
+      .notNull()
+      .references(() => boards.boardId, { onDelete: "cascade" }),
+    roleGroupId: integer("role_group_id")
+      .notNull()
+      .references(() => roleGroups.roleGroupId, { onDelete: "cascade" }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.boardId, table.roleGroupId] }),
+    index("board_role_group_board_idx").on(table.boardId, table.isActive),
+    index("board_role_group_role_idx").on(table.roleGroupId, table.isActive),
+  ],
+);
 
 export const articles = pgTable("article", {
   articleId: serial("article_id").primaryKey(),
@@ -50,6 +76,7 @@ export const articles = pgTable("article", {
   pinOrder: integer("pin_order"),
   isSecret: boolean("is_secret").notNull().default(false),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
+  isOfficial: boolean("is_official").notNull().default(false),
   allowComment: boolean("allow_comment").notNull().default(true),
   viewCount: integer("view_count").notNull().default(0),
   postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
@@ -213,6 +240,9 @@ export const comments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    moderationReason: text("moderation_reason"),
+    moderatedByUserId: uuid("moderated_by_user_id").references(() => users.userId),
+    moderatedAt: timestamp("moderated_at", { withTimezone: true }),
   },
   (table) => [
     foreignKey({

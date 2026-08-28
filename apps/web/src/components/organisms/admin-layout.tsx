@@ -17,10 +17,17 @@ import { Button } from "@/components/ui/button";
 import { PopoverPanel } from "@/components/ui/popover-panel";
 
 const ADMIN_ACCESS_PERMISSIONS = [
+  Permissions.MANAGE_BOARD_SETTINGS,
+  Permissions.MANAGE_PERMISSIONS,
   Permissions.MANAGE_SURVEY,
-  Permissions.MANAGE_CONTENT,
+  Permissions.MANAGE_POLL,
+  Permissions.MANAGE_SITE_CONTENT,
+  Permissions.MANAGE_CALENDAR,
+  Permissions.MANAGE_USERS,
   Permissions.MANAGE_FINANCE,
-  Permissions.ADMIN,
+  Permissions.MANAGE_CONTACTS,
+  Permissions.SEND_EMAIL,
+  Permissions.VIEW_AUDIT_LOG,
 ];
 
 export function AdminLayout() {

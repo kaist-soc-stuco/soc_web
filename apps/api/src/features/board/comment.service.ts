@@ -11,6 +11,8 @@ import type {
   CommentEngagementKind,
   CommentEngagementResponse,
   CommentListResponse,
+  CommentModerationRequest,
+  CommentModerationResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
@@ -19,7 +21,14 @@ import { Permissions } from "@soc/contracts";
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import { CommentRepository } from "./repositories/comment.repository";
-import { getReadableArticleScopes } from "./article-access";
+import {
+  assertSecretArticleAccess,
+  getReadableArticleScopes,
+} from "./article-access";
+import {
+  canUseOfficialIdentity,
+  canWriteOfficialResponse,
+} from "./board-access";
 import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "./board.constants";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -32,6 +41,7 @@ interface CommentQueryParams {
 interface AuthenticatedUser {
   id: string;
   permission: number;
+  roleGroupIds?: number[];
 }
 
 const MAX_CONTENT_LENGTH = 50_000;
@@ -58,15 +68,16 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    const articleReadable = await this.articleRepository.isReadableArticle(
+    const article = await this.articleRepository.findCommentPermissionInfo(
       board.boardId,
       articleId,
       getReadableArticleScopes(currentUser),
     );
 
-    if (!articleReadable) {
+    if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
       throw new NotFoundException("article_not_found");
     }
+    assertSecretArticleAccess(article, currentUser);
 
     const page = params.page && params.page > 0 ? params.page : 1;
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
@@ -77,6 +88,14 @@ export class CommentService {
       page,
       limit,
       currentUser.user?.id,
+      Boolean(
+        currentUser.user &&
+          Permissions.hasAny(
+            currentUser.user.permission,
+            Permissions.MODERATE_POST_COMMENT,
+            Permissions.SUPER_ADMIN,
+          ),
+      ),
     );
 
     return {
@@ -125,7 +144,24 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    if (!board.allowComment) {
+    if (
+      !Permissions.hasAny(
+        user.permission,
+        Permissions.COMMENT_CREATE,
+        Permissions.SUPER_ADMIN,
+      ) &&
+      !canWriteOfficialResponse(board, user)
+    ) {
+      throw new ForbiddenException("comment_permission_required");
+    }
+
+    const mayWriteOfficialResponse = canWriteOfficialResponse(board, user);
+    if (payload.isOfficial && !mayWriteOfficialResponse) {
+      throw new ForbiddenException("official_reply_permission_required");
+    }
+    const isOfficialResponse = mayWriteOfficialResponse && payload.isOfficial === true;
+
+    if (!board.allowComment && !isOfficialResponse) {
       throw new ForbiddenException("comment_not_allowed");
     }
 
@@ -138,9 +174,14 @@ export class CommentService {
     if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
       throw new NotFoundException("article_not_found");
     }
+    assertSecretArticleAccess(article, { authenticated: true, user });
 
-    if (!article.allowComment) {
+    if (!article.allowComment && !isOfficialResponse) {
       throw new ForbiddenException("comment_not_allowed");
+    }
+
+    if (payload.isOfficial && !canUseOfficialIdentity(board, user)) {
+      throw new ForbiddenException("official_identity_not_allowed");
     }
 
     if (payload.parentCommentId) {
@@ -164,9 +205,7 @@ export class CommentService {
     const created = await this.commentRepository.createComment({
       articleId,
       authorUserId: user.id,
-      isOfficial:
-        code === "건의사항" &&
-        Permissions.hasAny(user.permission, Permissions.WRITE_REPLY, Permissions.ADMIN),
+      isOfficial: payload.isOfficial === true,
       payload,
     });
 
@@ -201,15 +240,16 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    const articleReadable = await this.articleRepository.isReadableArticle(
+    const article = await this.articleRepository.findCommentPermissionInfo(
       board.boardId,
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
     );
 
-    if (!articleReadable) {
+    if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
       throw new NotFoundException("article_not_found");
     }
+    assertSecretArticleAccess(article, { authenticated: true, user });
 
     const comment = await this.commentRepository.findPermissionInfo(
       commentId,
@@ -224,8 +264,8 @@ export class CommentService {
     const isOwner = comment.authorUserId === user.id;
     const isManager = Permissions.hasAny(
       user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
+      Permissions.MODERATE_POST_COMMENT,
+      Permissions.SUPER_ADMIN,
     );
 
     if (!isOwner && !isManager) {
@@ -247,15 +287,16 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    const articleReadable = await this.articleRepository.isReadableArticle(
+    const article = await this.articleRepository.findCommentPermissionInfo(
       board.boardId,
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
     );
 
-    if (!articleReadable) {
+    if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
       throw new NotFoundException("article_not_found");
     }
+    assertSecretArticleAccess(article, { authenticated: true, user });
 
     const comment = await this.commentRepository.findPermissionInfo(
       commentId,
@@ -270,8 +311,8 @@ export class CommentService {
     const isOwner = comment.authorUserId === user.id;
     const isManager = Permissions.hasAny(
       user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
+      Permissions.MODERATE_POST_COMMENT,
+      Permissions.SUPER_ADMIN,
     );
 
     if (!isOwner && !isManager) {
@@ -279,6 +320,58 @@ export class CommentService {
     }
 
     return this.commentRepository.softDeleteComment(commentId);
+  }
+
+  async moderateComment(
+    code: string,
+    articleId: string,
+    commentId: string,
+    payload: CommentModerationRequest,
+    user: AuthenticatedUser,
+  ): Promise<CommentModerationResponse> {
+    const board = await this.boardRepository.findByCode(code);
+
+    if (!board || !board.isActive) {
+      throw new NotFoundException("board_not_found");
+    }
+
+    if (
+      !Permissions.hasAny(
+        user.permission,
+        Permissions.MODERATE_POST_COMMENT,
+        Permissions.SUPER_ADMIN,
+      )
+    ) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+
+    const article = await this.articleRepository.findCommentPermissionInfo(
+      board.boardId,
+      articleId,
+      getReadableArticleScopes({ authenticated: true, user }),
+    );
+    if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
+      throw new NotFoundException("article_not_found");
+    }
+    assertSecretArticleAccess(article, { authenticated: true, user });
+
+    const comment = await this.commentRepository.findPermissionInfo(
+      commentId,
+      articleId,
+      board.boardId,
+    );
+    if (!comment || comment.status === COMMENT_STATUS.DELETED) {
+      throw new NotFoundException("comment_not_found");
+    }
+
+    const updated = await this.commentRepository.setModeration(
+      commentId,
+      payload.status,
+      user.id,
+      payload.reason,
+    );
+    if (!updated) throw new NotFoundException("comment_not_found");
+    return updated;
   }
 
   private async assertCommentActionAllowed(
@@ -293,15 +386,16 @@ export class CommentService {
       throw new NotFoundException("board_not_found");
     }
 
-    const articleReadable = await this.articleRepository.isReadableArticle(
+    const article = await this.articleRepository.findCommentPermissionInfo(
       board.boardId,
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
     );
 
-    if (!articleReadable) {
+    if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
       throw new NotFoundException("article_not_found");
     }
+    assertSecretArticleAccess(article, { authenticated: true, user });
 
     const comment = await this.commentRepository.findPermissionInfo(
       commentId,

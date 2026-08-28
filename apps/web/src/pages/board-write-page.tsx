@@ -36,6 +36,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     boardByCode,
     canConfigurePostSettings,
     canManageTemplates,
+    canUseOfficialIdentity,
     canWriteSelected,
     contentEn,
     contentKo,
@@ -51,6 +52,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     handleUploadThumbnail,
     handleUploadFiles,
     isAnonymous,
+    isOfficial,
     isAllDay,
     isEventAlwaysOpen,
     isKoreanOnly,
@@ -70,6 +72,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setEventEndDate,
     setEventStartDate,
     setIsAnonymous,
+    setIsOfficial,
     setIsAllDay,
     setIsEventAlwaysOpen,
     setIsKoreanOnly,
@@ -94,6 +97,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     contentKo,
     contentEn,
     isAnonymous,
+    isOfficial,
     isPinned,
     isSecret,
     allowComment,
@@ -113,6 +117,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setContentKo(template.contentKo);
     setContentEn(template.contentEn);
     setIsAnonymous(template.isAnonymous);
+    setIsOfficial(Boolean(template.isOfficial));
     setIsPinned(template.isPinned);
     setIsSecret(template.isSecret);
     setAllowComment(template.allowComment);
@@ -183,10 +188,16 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       selectedSurveyId={selectedSurveyId}
       surveys={surveys}
       isAnonymous={isAnonymous}
+      isOfficial={isOfficial}
       isPinned={isPinned}
       isSecret={isSecret}
       allowSecret={selectedBoard?.allowSecret ?? false}
       onAnonymousChange={setIsAnonymous}
+      canUseOfficialIdentity={canUseOfficialIdentity}
+      onOfficialChange={(checked) => {
+        setIsOfficial(checked);
+        if (checked) setIsAnonymous(false);
+      }}
       onPinnedChange={setIsPinned}
       onSecretChange={setIsSecret}
       stacked={isEvent}

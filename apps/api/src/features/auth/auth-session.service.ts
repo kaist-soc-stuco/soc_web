@@ -291,14 +291,11 @@ export class AuthSessionService {
         throw new UnauthorizedException("account_expired");
       }
 
-      if (!this.authEligibilityService.isEligibleUser(user)) {
-        await this.usersService.expireAccount(
-          user.userId,
-          "department_not_eligible",
-        );
+      if (await this.usersService.isUserRestricted(user.userId)) {
         await this.authSessionRepository.revoke(session.sessionId);
-        throw new UnauthorizedException("department_not_eligible");
+        throw new UnauthorizedException("account_restricted");
       }
+
     }
 
     if (!session.refreshJti || session.refreshJti !== claims.jti) {
@@ -343,7 +340,6 @@ export class AuthSessionService {
     accessToken?: string;
     refreshToken?: string;
     sessionId?: string;
-    ssoUserInfo?: Record<string, unknown>;
     storageMode: "temporary" | "persisted";
     userId?: string;
   }> {
@@ -368,8 +364,6 @@ export class AuthSessionService {
 
       const persistedUser = await this.usersService.upsertUserFromConsent({
         academicStatus: pendingUser.academicStatus,
-        departmentEn: pendingUser.departmentEn,
-        departmentKo: pendingUser.departmentKo,
         primaryMajor: pendingUser.primaryMajor,
         doubleMajor: pendingUser.doubleMajor,
         minor: pendingUser.minor,
@@ -391,7 +385,6 @@ export class AuthSessionService {
         accessToken: issued.accessToken,
         refreshToken: issued.refreshToken,
         sessionId: issued.session.sessionId,
-        ssoUserInfo: pendingUser.ssoUserInfo,
         storageMode: "persisted",
         userId: persistedUser.userId,
       };
@@ -407,7 +400,6 @@ export class AuthSessionService {
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
       sessionId: issued.session.sessionId,
-      ssoUserInfo: pendingUser.ssoUserInfo,
       storageMode: "temporary",
     };
   }
@@ -443,10 +435,7 @@ export class AuthSessionService {
 
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
-      if (
-        user?.isActive &&
-        this.authEligibilityService.isEligibleUser(user)
-      ) {
+      if (user?.isActive && !(await this.usersService.isUserRestricted(user.userId))) {
         permission = await this.usersService.resolvePermissionBitmaskByUserId(user.userId);
         userName = user.nameKo;
         nameKo = user.nameKo;
@@ -495,16 +484,24 @@ export class AuthSessionService {
       };
     }
 
-    if (!user.isActive || !this.authEligibilityService.isEligibleUser(user)) {
+    if (!user.isActive) {
       return {
         authenticated: false,
         storageMode: null,
       };
     }
 
-    const [permission, feeStatus] = await Promise.all([
+    if (await this.usersService.isUserRestricted(user.userId)) {
+      return {
+        authenticated: false,
+        storageMode: null,
+      };
+    }
+
+    const [permission, feeStatus, roleGroupIds] = await Promise.all([
       this.usersService.resolvePermissionBitmaskByUserId(user.userId),
       this.usersService.getStudentFeeStatus(user.userId),
+      this.usersService.listActiveRoleGroupIds(user.userId),
     ]);
 
     return {
@@ -514,13 +511,12 @@ export class AuthSessionService {
         id: user.userId,
         name: user.nameKo,
         permission,
+        roleGroupIds,
         email: user.email,
         nameKo: user.nameKo,
         nameEn: user.nameEn,
         userMobile: user.phoneNumber,
         studentNumber: user.stdNo,
-        departmentKo: user.departmentKo,
-        departmentEn: user.departmentEn,
         primaryMajor: user.primaryMajor,
         doubleMajor: user.doubleMajor,
         minor: user.minor,

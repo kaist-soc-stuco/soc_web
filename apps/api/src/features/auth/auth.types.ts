@@ -19,8 +19,6 @@ export type StorageMode = "temporary" | "persisted";
  */
 export interface PendingSsoUser {
   expiresAt: number;
-  /** Raw SSO userInfo is retained only for the one-time browser debug output. */
-  ssoUserInfo?: Record<string, unknown>;
   ssoSubject: string;
   kaistUid: string;
   nameKo: string;
@@ -160,13 +158,12 @@ export interface CurrentUserSummary {
     id: string;
     name?: string;
     permission: number;
+    roleGroupIds?: number[];
     email: string;
     nameKo: string;
     nameEn: string | null;
     userMobile: string | null;
     studentNumber: string | null;
-    departmentKo: string | null;
-    departmentEn: string | null;
     primaryMajor: string | null;
     doubleMajor: string | null;
     minor: string | null;

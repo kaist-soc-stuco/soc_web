@@ -121,7 +121,7 @@ const dateInputToday = () => {
 export function AuditLogPage() {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
-  const canViewAuditLogs = Permissions.has(session?.permission ?? 0, Permissions.ADMIN);
+  const canViewAuditLogs = Permissions.has(session?.permission ?? 0, Permissions.VIEW_AUDIT_LOG);
   const [data, setData] = useState<{ items: AuditLogRecord[]; page: number; pageSize: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -201,7 +201,7 @@ export function AuditLogPage() {
   };
 
   return (
-    <AuthGuard requirePermission={Permissions.ADMIN}>
+    <AuthGuard requirePermission={Permissions.VIEW_AUDIT_LOG}>
       <AdminPageShell>
         <AdminPageMain>
           <AdminPageHeader

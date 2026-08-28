@@ -96,7 +96,6 @@ export interface SurveyResponseRecord {
 export interface SurveyResponseUserRecord {
   nameKo: string | null;
   email: string | null;
-  departmentKo: string | null;
   stdNo: string | null;
 }
 

@@ -6,12 +6,14 @@ import {
   BulkUpdateStudentFeeStatusSchema,
   UpdateStudentFeeStatusSchema,
   UpdateUserActiveStatusSchema,
+  UserRestrictionCreateSchema,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 
 import { AuthGuard, RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { UsersService } from "./users.service";
+import { StudentFeeGoogleSheetsService } from "./student-fee-google-sheets.service";
 import type {
   FeeStatus,
   FeeMajorCategory,
@@ -20,6 +22,8 @@ import type {
   BulkProcessStudentFeePaymentsRequest,
   UpdateStudentFeeStatusRequest,
   UpdateUserActiveStatusRequest,
+  UserRestrictionCreateRequest,
+  UserRestrictionResponse,
 } from "@soc/contracts";
 
 /**
@@ -38,7 +42,10 @@ interface AuthenticatedRequest extends Request {
 
 @Controller("users")
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly studentFeeGoogleSheetsService: StudentFeeGoogleSheetsService,
+  ) {}
 
   @Get("me/articles")
   @UseGuards(AuthGuard)
@@ -113,20 +120,8 @@ export class UsersController {
     });
   }
 
-  /**
-    * 사용자 영구 저장 여부 확인용 예시 endpoint입니다.
-   */
-  @Get(":userId/persisted-profile")
-  @RequirePermissions(Permissions.MANAGE_FINANCE)
-  async getPersistedProfileStatus(@Param("userId") userId: string) {
-    return {
-      hasPersistedProfile: await this.usersService.hasPersistedProfile(userId),
-      userId,
-    };
-  }
-
   @Put(":userId/status")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.MANAGE_USERS)
   async updateUserActiveStatus(
     @Param("userId") userId: string,
     @Body(new ZodValidationPipe(UpdateUserActiveStatusSchema))
@@ -146,8 +141,23 @@ export class UsersController {
     };
   }
 
+  @Post(":userId/restrictions")
+  @UseGuards(AuthGuard)
+  async createUserRestriction(
+    @Param("userId") userId: string,
+    @Body(new ZodValidationPipe(UserRestrictionCreateSchema))
+    body: UserRestrictionCreateRequest,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UserRestrictionResponse> {
+    return this.usersService.createUserRestriction(userId, body, {
+      actorUserId: req.user?.id,
+      ipAddress: req.ip,
+      permission: req.user?.permission,
+    });
+  }
+
   @Get("admin/list")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.VIEW_USERS)
   async listAdminUsers(
     @Query("q") query?: string,
     @Query("page") page?: string,
@@ -178,7 +188,7 @@ export class UsersController {
   }
 
   @Get()
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.VIEW_USERS)
   async searchUsers(
     @Query("q") query?: string,
     @Query("limit") limit?: string,
@@ -289,13 +299,12 @@ export class UsersController {
       userIds?.split(",").filter(Boolean),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["사용자ID", "학번", "이름", "이메일", "소속", "주전공", "복수전공", "부전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "혜택대상", "납부일", "비고"],
+      ["사용자ID", "학번", "이름", "이메일", "주전공", "복수전공", "부전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "혜택대상", "납부일", "비고"],
       ...rows.map((row) => [
         row.userId,
         row.stdNo,
         row.nameKo,
         row.email,
-        row.departmentKo,
         row.primaryMajor,
         row.doubleMajor,
         row.minor,
@@ -312,7 +321,7 @@ export class UsersController {
       ]),
     ]);
     worksheet["!cols"] = [
-      { wch: 38 }, { wch: 14 }, { wch: 16 }, { wch: 32 }, { wch: 18 },
+      { wch: 38 }, { wch: 14 }, { wch: 16 }, { wch: 32 },
       { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
       { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 },
       { wch: 12 }, { wch: 22 }, { wch: 36 },
@@ -321,6 +330,30 @@ export class UsersController {
     XLSX.utils.book_append_sheet(workbook, worksheet, "과비 납부");
     const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
     return new StreamableFile(buffer);
+  }
+
+  @Get("fee-status/google/status")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async getStudentFeeGoogleSheetsStatus() {
+    return this.studentFeeGoogleSheetsService.getStatus();
+  }
+
+  @Post("fee-status/google/sync-to-google")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async syncStudentFeesToGoogleSheets(@Req() req: AuthenticatedRequest) {
+    return this.studentFeeGoogleSheetsService.syncToGoogleSheets(
+      req.user!.id,
+      req.ip,
+    );
+  }
+
+  @Post("fee-status/google/sync-from-google")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async syncStudentFeesFromGoogleSheets(@Req() req: AuthenticatedRequest) {
+    return this.studentFeeGoogleSheetsService.syncFromGoogleSheets(
+      req.user!.id,
+      req.ip,
+    );
   }
 
   @Post("fee-status/bulk")

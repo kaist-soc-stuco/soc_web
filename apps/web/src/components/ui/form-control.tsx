@@ -52,7 +52,7 @@ export const UiSelect = React.forwardRef<
   HTMLSelectElement,
   React.SelectHTMLAttributes<HTMLSelectElement>
 >(({ className, ...props }, ref) => (
-  <span className="relative inline-flex max-w-full">
+    <span className="relative flex w-full max-w-full">
     <select
       ref={ref}
       data-slot="select"

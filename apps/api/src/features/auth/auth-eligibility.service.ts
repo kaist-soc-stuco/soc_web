@@ -1,8 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
-import type { UserRecord } from "../users/entities/user";
-
 /**
  * 서비스 이용 대상 학과 정책을 한 곳에서 판단합니다.
  *
@@ -38,7 +36,4 @@ export class AuthEligibilityService {
     return candidates.some((candidate) => allowed.includes(candidate));
   }
 
-  isEligibleUser(user: Pick<UserRecord, "departmentKo" | "departmentEn">): boolean {
-    return this.isEligibleDepartment(user.departmentKo, user.departmentEn);
-  }
 }

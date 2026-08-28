@@ -1,5 +1,5 @@
 import { createApiClient } from "@soc/api-client";
-import { PERMISSION_REGISTRY, type BoardCreateRequest, type BoardSummary } from "@soc/contracts";
+import { type BoardCreateRequest, type BoardSummary, type RoleGroupRecord } from "@soc/contracts";
 import {
   closestCenter,
   DndContext,
@@ -26,7 +26,6 @@ import { useEffect, useMemo, useState } from "react";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableEmpty, AdminTableHead, AdminTableHeader } from "@/components/ui/admin-data-table";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
-import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { AdminCard, AdminFormField, AdminPageHeader, AdminPageMain, AdminPageShell, AdminStickyActionBar } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { Button } from "@/components/ui/button";
@@ -35,11 +34,6 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
-
-const permissionOptions = [
-  { bit: 0, label: "제한 없음" },
-  ...PERMISSION_REGISTRY.map((permission) => ({ bit: permission.bit, label: permission.labelKo })),
-];
 
 type BoardFormValues = BoardCreateRequest & { isActive: boolean };
 
@@ -54,11 +48,14 @@ const createEmptyForm = (sortOrder = 0): BoardFormValues => ({
   nameEn: "",
   nameKo: "",
   sortOrder,
+  writeAccessType: "ROLE_GROUP",
   writePermissionBit: 0,
+  writeRoleGroupIds: [],
+  allowOfficialReply: false,
 });
 
 export function BoardManagementPage() {
-  return <AuthGuard requirePermission={Permissions.ADMIN}><BoardManagementPageContent /></AuthGuard>;
+  return <AuthGuard requirePermission={Permissions.MANAGE_BOARD_SETTINGS}><BoardManagementPageContent /></AuthGuard>;
 }
 
 function BoardManagementPageContent() {
@@ -69,6 +66,7 @@ function BoardManagementPageContent() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [roleGroups, setRoleGroups] = useState<RoleGroupRecord[]>([]);
   const [savedOrder, setSavedOrder] = useState<string[]>([]);
   const [form, setForm] = useState<BoardFormValues>(createEmptyForm());
   const [editingCode, setEditingCode] = useState<string | null>(null);
@@ -87,9 +85,13 @@ function BoardManagementPageContent() {
   const loadBoards = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.getAdminBoards();
+      const [response, nextRoleGroups] = await Promise.all([
+        apiClient.getAdminBoards(),
+        apiClient.listRoleGroups(),
+      ]);
       const visibleBoards = response.items.filter((board) => board.code !== "_EVENT");
       setBoards(visibleBoards);
+      setRoleGroups(nextRoleGroups);
       setSavedOrder(visibleBoards.map((board) => board.code));
       setMessage(null);
     } catch {
@@ -120,7 +122,10 @@ function BoardManagementPageContent() {
       nameEn: board.nameEn ?? "",
       nameKo: board.nameKo,
       sortOrder: board.sortOrder,
-      writePermissionBit: board.writePermissionBit,
+      writeAccessType: "ROLE_GROUP",
+      writePermissionBit: 0,
+      writeRoleGroupIds: board.writeRoleGroupIds,
+      allowOfficialReply: board.allowOfficialReply,
     });
     setFormOpen(true);
   };
@@ -265,25 +270,49 @@ function BoardManagementPageContent() {
         <section className="space-y-4">
           <div><h3 className="text-sm font-semibold text-slate-900">기본 정보</h3><p className="mt-1 text-xs text-slate-500">게시판 식별자와 이름, 설명을 관리합니다.</p></div>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="md:col-span-2"><AdminFormField label="게시판 코드"><UiInput value={form.code} disabled={Boolean(editingCode)} onChange={(event) => setForm((current) => ({ ...current, code: event.currentTarget.value }))} placeholder="notice" /></AdminFormField></div>
-            <AdminFormField label="이름 (한글)"><UiInput value={form.nameKo} onChange={(event) => setForm((current) => ({ ...current, nameKo: event.currentTarget.value }))} /></AdminFormField>
-            <AdminFormField label="Name (English)"><UiInput value={form.nameEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} /></AdminFormField>
+            <div className="md:col-span-2"><AdminFormField label="게시판 코드 (URL에 반영됨)"><UiInput className="w-full" value={form.code} disabled={Boolean(editingCode)} onChange={(event) => setForm((current) => ({ ...current, code: event.currentTarget.value }))} placeholder="notice" /></AdminFormField></div>
+            <AdminFormField label="이름 (한글)"><UiInput className="w-full" value={form.nameKo} onChange={(event) => setForm((current) => ({ ...current, nameKo: event.currentTarget.value }))} /></AdminFormField>
+            <AdminFormField label="Name (English)"><UiInput className="w-full" value={form.nameEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} /></AdminFormField>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <AdminFormField label="설명 (한글)"><UiTextarea rows={4} maxLength={255} value={form.descriptionKo ?? ""} onChange={(event) => setForm((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} placeholder="게시판 설명을 입력하세요." /></AdminFormField>
-            <AdminFormField label="Description (English)"><UiTextarea rows={4} maxLength={255} value={form.descriptionEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, descriptionEn: event.currentTarget.value }))} placeholder="Describe this board in English." /></AdminFormField>
+            <AdminFormField label="설명 (한글)"><UiTextarea className="w-full" rows={4} maxLength={255} value={form.descriptionKo ?? ""} onChange={(event) => setForm((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} placeholder="게시판 설명을 입력하세요." /></AdminFormField>
+            <AdminFormField label="Description (English)"><UiTextarea className="w-full" rows={4} maxLength={255} value={form.descriptionEn ?? ""} onChange={(event) => setForm((current) => ({ ...current, descriptionEn: event.currentTarget.value }))} placeholder="Describe this board in English." /></AdminFormField>
           </div>
           <Toggle label="공개 여부" checked={form.isActive} onChange={(checked) => setForm((current) => ({ ...current, isActive: checked }))} />
         </section>
 
         <section className="space-y-4 border-t border-slate-100 pt-6">
-          <h3 className="text-sm font-semibold text-slate-900">작성 권한</h3>
-          <div className="max-w-sm"><PermissionSelect label="작성 권한" value={form.writePermissionBit} onChange={(value) => setForm((current) => ({ ...current, writePermissionBit: value }))} /></div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">작성 역할 매핑</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">역할 그룹의 게시글 작성 권한과 이 게시판의 매핑을 함께 만족해야 작성할 수 있습니다. 아무 역할도 선택하지 않으면 작성할 수 없습니다.</p>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {roleGroups.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-500">등록된 역할 그룹을 불러오는 중입니다.</p>
+            ) : roleGroups.map((roleGroup) => {
+              const checked = form.writeRoleGroupIds.includes(roleGroup.roleGroupId);
+              return <label key={roleGroup.roleGroupId} className={cn("flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition-colors", checked ? "border-brand-primary/40 bg-brand-primary/5" : "border-slate-200 hover:bg-slate-50")}>
+                <UiInput
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => setForm((current) => ({
+                    ...current,
+                    writeRoleGroupIds: checked
+                      ? current.writeRoleGroupIds.filter((id) => id !== roleGroup.roleGroupId)
+                      : [...current.writeRoleGroupIds, roleGroup.roleGroupId],
+                  }))}
+                  className="mt-0.5 size-4 accent-brand-primary"
+                  aria-label={`${roleGroup.nameKo} 작성 역할`}
+                />
+                <span className="min-w-0"><span className="block text-sm font-medium text-slate-900">{roleGroup.nameKo}</span><span className="mt-0.5 block text-xs leading-5 text-slate-500">{roleGroup.description || "역할 설명 없음"}</span></span>
+              </label>;
+            })}
+          </div>
         </section>
 
         <section className="space-y-4 border-t border-slate-100 pt-6">
           <div><h3 className="text-sm font-semibold text-slate-900">게시판 기능</h3><p className="mt-1 text-xs text-slate-500">필요한 기능만 켜서 사용합니다.</p></div>
-          <div className="grid gap-2 md:grid-cols-3"><Toggle label="댓글 허용" checked={form.allowComment} onChange={(checked) => setForm((current) => ({ ...current, allowComment: checked }))} /><Toggle label="비밀글 허용" checked={form.allowSecret} onChange={(checked) => setForm((current) => ({ ...current, allowSecret: checked }))} /><Toggle label="추천 및 스크랩" checked={form.allowLike} onChange={(checked) => setForm((current) => ({ ...current, allowLike: checked }))} /></div>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4"><Toggle label="댓글 허용" checked={form.allowComment} onChange={(checked) => setForm((current) => ({ ...current, allowComment: checked }))} /><Toggle label="공식 답변 허용" checked={form.allowOfficialReply} onChange={(checked) => setForm((current) => ({ ...current, allowOfficialReply: checked }))} /><Toggle label="비밀글 허용" checked={form.allowSecret} onChange={(checked) => setForm((current) => ({ ...current, allowSecret: checked }))} /><Toggle label="추천 및 스크랩" checked={form.allowLike} onChange={(checked) => setForm((current) => ({ ...current, allowLike: checked }))} /></div>
         </section>
 
       </div>
@@ -298,7 +327,7 @@ function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; di
   return <tr ref={setNodeRef} style={style} className={cn("transition-colors hover:bg-slate-50/60", isDragging && "relative z-0 opacity-0")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
     <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} title="드래그하여 순서 변경" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="flex size-7 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
     <AdminTableCell truncate><span className="admin-table-text-emphasis block truncate">{board.nameKo}</span><span className="admin-table-text mt-0.5 block truncate">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</span></AdminTableCell>
-    <AdminTableCell truncate>{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</AdminTableCell>
+    <AdminTableCell truncate>{[board.allowComment && "댓글", board.allowOfficialReply && "공식 답변", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</AdminTableCell>
     <AdminTableCell>{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</AdminTableCell>
   </tr>;
 }
@@ -307,13 +336,9 @@ function BoardDragPreview({ board, width }: { board: BoardSummary; width: number
   return <div style={{ width: width ?? undefined }} className="relative z-50 grid cursor-grabbing grid-cols-[52px_minmax(0,1.5fr)_minmax(180px,1.2fr)_100px] items-center rounded-lg border border-brand-primary/45 bg-white px-0 shadow-lg">
     <div className="flex h-16 items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
     <div className="min-w-0 px-4"><p className="truncate text-sm font-semibold text-slate-900">{board.nameKo}</p><p className="truncate text-xs text-slate-500">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</p></div>
-    <div className="truncate px-4 text-sm text-slate-700">{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</div>
+    <div className="truncate px-4 text-sm text-slate-700">{[board.allowComment && "댓글", board.allowOfficialReply && "공식 답변", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</div>
     <div className="px-4">{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</div>
   </div>;
-}
-
-function PermissionSelect({ label, onChange, value }: { label: string; onChange: (value: number) => void; value: number }) {
-  return <AdminFormField label={label}><AdminSelectDropdown ariaLabel={label} value={String(value)} onChange={(nextValue) => onChange(Number(nextValue))} options={permissionOptions.map((option) => ({ value: String(option.bit), label: option.label }))} /></AdminFormField>;
 }
 
 function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {

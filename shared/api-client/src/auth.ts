@@ -7,13 +7,11 @@ import type {
   LoginStartResponse,
   LogoutResponse,
   RefreshResponse,
-  SsoUserInfo,
 } from "@soc/contracts";
 
 import type { ApiClientContext } from "./core.js";
 
 export interface LoginResultResponse {
-  ssoUserInfo?: SsoUserInfo;
   storageMode: "persisted" | "temporary";
   userId?: string;
 }

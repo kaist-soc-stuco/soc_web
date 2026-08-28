@@ -131,6 +131,13 @@ export const SsoCallbackBodySchema = z.object({
 
   const BoardPermissionBitSchema = z.number().int().nonnegative();
 
+  export const BoardWriteAccessTypeSchema = z.enum([
+    "AUTHENTICATED",
+    "EXECUTIVE",
+    "PERMISSION",
+    "ROLE_GROUP",
+  ]);
+
   export const BoardCreateSchema = z.object({
     code: z
       .string()
@@ -142,8 +149,13 @@ export const SsoCallbackBodySchema = z.object({
     nameEn: z.string().trim().max(100).optional(),
     descriptionKo: z.string().trim().max(255).optional(),
     descriptionEn: z.string().trim().max(255).optional(),
+    /** @deprecated 새 게시판은 writeRoleGroupIds를 사용합니다. */
+    writeAccessType: BoardWriteAccessTypeSchema.default("ROLE_GROUP"),
+    /** @deprecated 새 게시판은 역할 매핑으로 작성 범위를 지정합니다. */
     writePermissionBit: BoardPermissionBitSchema.default(0),
+    writeRoleGroupIds: z.array(z.number().int().positive()).max(100).default([]),
     allowComment: z.boolean().default(true),
+    allowOfficialReply: z.boolean().default(false),
     allowSecret: z.boolean().default(false),
     allowLike: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
@@ -240,6 +252,7 @@ const ArticleAssetsSchema = z
   pinOrder: z.number().int().nullable().optional(),
   isSecret: z.boolean().optional(),
   isAnonymous: z.boolean().optional(),
+  isOfficial: z.boolean().optional(),
   allowComment: z.boolean().optional(),
   assets: ArticleAssetsSchema.optional(),
   eventStartDate: z.string().nullable().optional(),
@@ -258,6 +271,7 @@ export const ArticleUpdateSchema = z.object({
   pinOrder: z.number().int().nullable().optional(),
   isSecret: z.boolean().optional(),
   isAnonymous: z.boolean().optional(),
+  isOfficial: z.boolean().optional(),
   allowComment: z.boolean().optional(),
   assets: ArticleAssetsSchema.optional(),
   eventStartDate: z.string().nullable().optional(),
@@ -279,6 +293,7 @@ export const ArticleDraftSaveSchema = z.object({
   pinOrder: z.number().int().nullable().optional(),
   isSecret: z.boolean().default(false),
   isAnonymous: z.boolean().default(false),
+  isOfficial: z.boolean().default(false),
   allowComment: z.boolean().default(true),
   isKoreanOnly: z.boolean().default(false),
   assets: ArticleAssetsSchema.optional(),
@@ -296,10 +311,16 @@ export const ArticleDraftSaveSchema = z.object({
 export const CommentCreateSchema = z.object({
   parentCommentId: z.string().nullable().optional(),
   content: z.string().min(1).max(50_000),
+  isOfficial: z.boolean().optional(),
 });
 
 export const CommentUpdateSchema = z.object({
   content: z.string().min(1).max(50_000),
+});
+
+export const CommentModerationSchema = z.object({
+  status: z.enum(["PUBLISHED", "HIDDEN"]),
+  reason: z.string().trim().max(1_000).optional(),
 });
 
 // ─── Survey ──────────────────────────────────────────────────────────────────
@@ -469,7 +490,6 @@ export const AssignRoleGroupMemberSchema = z.object({
 
 export const RoleGroupMemberFilterSchema = z.object({
   q: z.string().optional(),
-  department: z.string().optional(),
   academicStatus: z.string().optional(),
   status: z.enum(["active", "inactive"]).optional(),
   page: z.number().int().positive().optional(),
@@ -482,6 +502,18 @@ export const ReplaceRoleGroupMembersSchema = z.object({
 
 export const UpdateUserActiveStatusSchema = z.object({
   isActive: z.boolean(),
+});
+
+export const UserRestrictionCreateSchema = z.object({
+  duration: z.enum(["1_DAY", "3_DAYS", "7_DAYS", "30_DAYS", "PERMANENT"]),
+  reasonCode: z.enum([
+    "ABUSE",
+    "SPAM",
+    "HARASSMENT",
+    "GUIDELINE_VIOLATION",
+    "OTHER",
+  ]),
+  reasonDetail: z.string().trim().max(1_000).optional(),
 });
 
 // ─── Finance ─────────────────────────────────────────────────────────────────

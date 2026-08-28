@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { isoToMs, nowMs } from "@soc/shared";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Pin } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatNumericDate } from "@/lib/date-display";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -58,6 +58,12 @@ function NoticeItem({
               isImportant ? "is-important" : ""
             }`}
           >
+            {isImportant ? (
+              <Pin
+                className="size-3.5 shrink-0 rotate-45 text-brand-primary"
+                aria-label={lang === "ko" ? "고정된 게시글" : "Pinned post"}
+              />
+            ) : null}
             <span className="min-w-0 truncate">{title}</span>
             {commentCount && commentCount > 0 ? (
               <span
@@ -192,7 +198,9 @@ export function NoticeBoard() {
             category: activeCategory,
             categoryLabel: getCategoryLabel(activeCategory),
             lang,
-            author: item.isAnonymous
+            author: item.isOfficial
+              ? "전산학부 집행위원회"
+              : item.isAnonymous
               ? lang === "ko"
                 ? "익명"
                 : "Anonymous"

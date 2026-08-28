@@ -6,8 +6,8 @@ const privacySections = [
   {
     titleKo: '수집하는 정보',
     titleEn: 'Information We Collect',
-    bodyKo: '전산학부 학생회 사이트는 SSO 로그인 과정에서 제공되는 이름, 이메일, 학번, 소속 등 서비스 운영에 필요한 기본 정보를 사용합니다.',
-    bodyEn: 'The School of Computing Student Council website uses basic information provided through SSO, including your name, email address, student number, and affiliation.',
+    bodyKo: '전산학부 학생회 사이트는 SSO 로그인 과정에서 제공되는 이름, 이메일, 학번, 주전공 등 서비스 운영에 필요한 기본 정보를 사용합니다.',
+    bodyEn: 'The School of Computing Student Council website uses basic information provided through SSO, including your name, email address, student number, and primary major.',
   },
   {
     titleKo: '이용 목적',
