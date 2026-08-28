@@ -41,6 +41,7 @@ function getQuestionTypeLabel(type: QuestionType, lang: string) {
     single_choice: { ko: "단일 선택", en: "Single choice" },
     multiple_choice: { ko: "복수 선택", en: "Multiple choice" },
     dropdown: { ko: "드롭다운", en: "Dropdown" },
+    rating: { ko: "등급", en: "Rating" },
     grid_single: { ko: "객관식 그리드", en: "Multiple choice grid" },
     grid_multiple: { ko: "체크박스 그리드", en: "Checkbox grid" },
     file_upload: { ko: "파일 업로드", en: "File upload" },
@@ -69,7 +70,8 @@ function isChoiceQuestion(type: QuestionType) {
   return (
     type === "single_choice" ||
     type === "multiple_choice" ||
-    type === "dropdown"
+    type === "dropdown" ||
+    type === "rating"
   );
 }
 
@@ -388,8 +390,8 @@ export function SurveyResultsContent({
             <span className="inline-flex items-center gap-1.5">
               <Languages className="h-3.5 w-3.5 text-kaist-darkgreen" />
               {lang === "ko"
-                ? "한국어 사용자만"
-                : "Korean Speakers Only"}
+                ? "한국어 전용"
+                : "Korean only"}
             </span>
           )}
         </div>

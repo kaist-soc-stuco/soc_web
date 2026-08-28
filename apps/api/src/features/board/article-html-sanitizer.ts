@@ -1,5 +1,13 @@
 import sanitizeHtml, { type IOptions } from "sanitize-html";
 
+const isSafeImageSource = (value: string | undefined) => {
+  const source = value?.trim() ?? "";
+  return (
+    /^https?:\/\//i.test(source) ||
+    /^\/(?:api\/)?(?:v\d+\/)?assets\/\d+\/content(?:[?#].*)?$/i.test(source)
+  );
+};
+
 const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
   allowedTags: [
     "p",
@@ -23,6 +31,7 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
     "hr",
     "a",
     "span",
+    "img",
   ],
   allowedAttributes: {
     a: [
@@ -36,6 +45,7 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
     ],
     ol: ["start"],
     span: ["style"],
+    img: ["src", "alt"],
   },
   allowedSchemes: ["http", "https", "mailto", "tel"],
   allowProtocolRelative: false,
@@ -49,6 +59,7 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
     },
   },
   parseStyleAttributes: true,
+  exclusiveFilter: (frame) => frame.tag === "img" && !isSafeImageSource(frame.attribs.src),
   transformTags: {
     a: (tagName, attributes) => {
       if (attributes.target === "_blank") {

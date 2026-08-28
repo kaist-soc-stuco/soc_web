@@ -164,6 +164,11 @@ export class GoogleSurveySheetsService {
       const value = typeof content.value === "string" ? content.value : "";
       return optionByValue.get(value) ?? value;
     }
+    if (question.questionType === "rating") {
+      return typeof content.rating === "string" || typeof content.rating === "number"
+        ? String(content.rating)
+        : "";
+    }
     if (question.questionType === "grid_single" || question.questionType === "grid_multiple") {
       return content.grid ? JSON.stringify(content.grid) : "";
     }

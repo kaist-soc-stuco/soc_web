@@ -1,7 +1,8 @@
-import type { ReactNode, RefObject } from "react";
+import type { ChangeEvent, ReactNode, RefObject } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import TiptapImage from "@tiptap/extension-image";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -45,6 +46,7 @@ export interface RichTextEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   fileInputRef?: RefObject<HTMLInputElement | null>;
+  onImageUpload?: (file: File) => Promise<string | null>;
   uploading?: boolean;
   lang?: string;
   title?: string;
@@ -71,6 +73,7 @@ export interface BilingualRichTextEditorProps {
   fileInputRef?: RefObject<HTMLInputElement | null>;
   isKoreanOnly: boolean;
   lang?: string;
+  onImageUpload?: (file: File) => Promise<string | null>;
   onContentEnChange: (value: string) => void;
   onContentKoChange: (value: string) => void;
   onTitleEnChange: (value: string) => void;
@@ -126,6 +129,7 @@ function useTiptapEditor({
   content,
   disabled,
   editorMinHeight,
+  onImageUpload,
   onChange,
   placeholder,
   spellCheck,
@@ -133,6 +137,7 @@ function useTiptapEditor({
   content: string;
   disabled: boolean;
   editorMinHeight: string;
+  onImageUpload?: (file: File) => Promise<string | null>;
   onChange: (content: string) => void;
   placeholder: string;
   spellCheck: boolean;
@@ -154,6 +159,10 @@ function useTiptapEditor({
         openOnClick: false,
         HTMLAttributes: { class: "text-kaist-darkgreen font-semibold" },
       }),
+      TiptapImage.configure({
+        allowBase64: false,
+        HTMLAttributes: { class: "rich-text-image" },
+      }),
       Placeholder.configure({
         placeholder,
         emptyEditorClass: "is-editor-empty",
@@ -169,6 +178,24 @@ function useTiptapEditor({
       attributes: {
         class: `${editorMinHeight} text-[length:var(--ui-text-section-size)] leading-normal text-slate-800`,
         spellcheck: spellCheck ? "true" : "false",
+      },
+      handlePaste: (view, event) => {
+        if (!onImageUpload) return false;
+
+        const imageFile = Array.from(event.clipboardData?.items ?? [])
+          .find((item) => item.kind === "file" && item.type.startsWith("image/"))
+          ?.getAsFile();
+        if (!imageFile) return false;
+
+        event.preventDefault();
+        void onImageUpload(imageFile)
+          .then((src) => {
+            if (!src || view.state.schema.nodes.image == null) return;
+            const image = view.state.schema.nodes.image.create({ src, alt: "" });
+            view.dispatch(view.state.tr.replaceSelectionWith(image).scrollIntoView());
+          })
+          .catch(() => undefined);
+        return true;
       },
     },
   });
@@ -431,6 +458,7 @@ function RichTextToolbar({
   editor,
   fileInputRef,
   lang,
+  onImageUpload,
   toolbarVariant = "default",
   toolbarSuffix,
   uploading,
@@ -441,6 +469,7 @@ function RichTextToolbar({
   editor: Editor;
   fileInputRef?: RefObject<HTMLInputElement | null>;
   lang: string;
+  onImageUpload?: (file: File) => Promise<string | null>;
   toolbarVariant?: "default" | "email";
   toolbarSuffix?: ReactNode;
   uploading: boolean;
@@ -451,6 +480,7 @@ function RichTextToolbar({
   const editorId = useId().replace(/:/g, "");
   const [colorPopover, setColorPopover] = useState<"text" | "background" | null>(null);
   const [fontSizeOpen, setFontSizeOpen] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const currentTextColor = editor.getAttributes("textStyle").color ?? "";
   const currentBackgroundColor = editor.getAttributes("textStyle").backgroundColor ?? "";
   const sizeValue = editor.getAttributes("textStyle").fontSize ?? DEFAULT_FONT_SIZE;
@@ -481,6 +511,16 @@ function RichTextToolbar({
     }
     const finalUrl = /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
     editor.chain().focus().extendMarkRange("link").setLink({ href: finalUrl }).run();
+  };
+
+  const handleImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !onImageUpload) return;
+
+    const src = await onImageUpload(file).catch(() => null);
+    if (!src || editor.isDestroyed) return;
+    editor.chain().focus().setImage({ src, alt: "" }).run();
   };
 
   return (
@@ -664,23 +704,37 @@ function RichTextToolbar({
         </DropdownMenu.Root>
       ) : null}
 
-      {fileInputRef ? (
+      {fileInputRef || onImageUpload ? (
         <>
           <ToolbarDivider />
-          <ToolbarButton
-            label={lang === "ko" ? "이미지 추가" : "Add image"}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            <Image />
-          </ToolbarButton>
-          <ToolbarButton
-            label={lang === "ko" ? "파일 첨부" : "Attach file"}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? <Loader2 className="animate-spin" /> : <FileText />}
-          </ToolbarButton>
+          {onImageUpload ? (
+            <>
+              <ToolbarButton
+                label={lang === "ko" ? "이미지 삽입" : "Insert image"}
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <Image />
+              </ToolbarButton>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                tabIndex={-1}
+                onChange={(event) => void handleImageSelection(event)}
+              />
+            </>
+          ) : null}
+          {fileInputRef ? (
+            <ToolbarButton
+              label={lang === "ko" ? "파일 첨부" : "Attach file"}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 className="animate-spin" /> : <FileText />}
+            </ToolbarButton>
+          ) : null}
         </>
       ) : null}
 
@@ -744,6 +798,7 @@ export function RichTextEditor({
   onChange,
   placeholder,
   fileInputRef,
+  onImageUpload,
   uploading = false,
   lang = "ko",
   title,
@@ -762,6 +817,7 @@ export function RichTextEditor({
     content,
     disabled,
     editorMinHeight: compact ? "min-h-[104px]" : "min-h-[380px]",
+    onImageUpload,
     onChange,
     placeholder: placeholder || (lang === "ko" ? "내용을 입력하세요..." : "Enter content..."),
     spellCheck,
@@ -783,6 +839,7 @@ export function RichTextEditor({
         editor={editor}
         fileInputRef={fileInputRef}
         lang={lang}
+        onImageUpload={onImageUpload}
         toolbarVariant={toolbarVariant}
         toolbarSuffix={toolbarSuffix}
         uploading={uploading}
@@ -823,6 +880,7 @@ export function BilingualRichTextEditor({
   fileInputRef,
   isKoreanOnly,
   lang = "ko",
+  onImageUpload,
   onContentEnChange,
   onContentKoChange,
   onTitleEnChange,
@@ -836,6 +894,7 @@ export function BilingualRichTextEditor({
     content: contentKo,
     disabled,
     editorMinHeight: "min-h-[300px]",
+    onImageUpload,
     onChange: onContentKoChange,
     placeholder: lang === "ko" ? "국문 내용을 입력하세요" : "Enter Korean content",
     spellCheck: true,
@@ -844,6 +903,7 @@ export function BilingualRichTextEditor({
     content: contentEn,
     disabled,
     editorMinHeight: "min-h-[300px]",
+    onImageUpload,
     onChange: onContentEnChange,
     placeholder: lang === "ko" ? "영문 내용을 입력하세요" : "Enter English content",
     spellCheck: true,
@@ -866,6 +926,7 @@ export function BilingualRichTextEditor({
         editor={activeEditor}
         fileInputRef={fileInputRef}
         lang={lang}
+        onImageUpload={onImageUpload}
         uploading={uploading}
       />
       <div className={cn("grid min-w-0", !isKoreanOnly && "md:grid-cols-2")}>

@@ -351,7 +351,7 @@ AWS에서 사용자가 해야 할 작업:
 - board 추가/비활성화/복구, secret 허용/차단, pinned ordering, QnA read-only 전환
 - 동일 사용자 조회수 1회, like/scrap 중복 요청, 권한 없는 대상 접근
 - 초안 fingerprint no-op, interval/autosave, pagehide best-effort, 충돌 복구
-- 국문 전용/한영 split editor, Markdown shortcut, color/font-size sanitize
+- 한국어 전용/한영 split editor, Markdown shortcut, color/font-size sanitize
 - S3 presign/complete/read/delete, local-to-S3 migration, orphan cleanup
 - multi-day calendar bar, ICS round-trip, duplicate import, search
 - academic eligibility login expiry, notification read state, user profile privacy

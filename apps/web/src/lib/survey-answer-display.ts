@@ -29,6 +29,11 @@ export function formatSurveyAnswer(
     return values.map((value) => localizedLabel(optionByValue.get(value), lang) || value).join(", ");
   }
 
+  if (question.questionType === "rating") {
+    const value = content.rating;
+    return typeof value === "string" || typeof value === "number" ? String(value) : "";
+  }
+
   if (question.questionType === "grid_single" || question.questionType === "grid_multiple") {
     const rows = question.config?.rows ?? [];
     const columns = question.config?.columns ?? [];

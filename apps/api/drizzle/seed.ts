@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, eq, sql } from "drizzle-orm";
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -20,8 +21,12 @@ import {
   surveys,
   userRoleGroups,
   users,
+  voteItems,
+  voteOptions,
+  voteVoters,
+  votes,
 } from "../src/infrastructure/postgres/postgres.schema";
-import { PERMISSION_REGISTRY } from "@soc/contracts";
+import { OPERATIONAL_SURVEY_IDS, PERMISSION_REGISTRY } from "@soc/contracts";
 
 const readRequiredEnv = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -448,6 +453,192 @@ type SurveySeed = {
   }>;
 };
 
+type OperationalSurveySeed = {
+  surveyId: string;
+  sectionId: string;
+  sectionTitleKo: string;
+  sectionTitleEn: string;
+  kind: "APPLICATION";
+  titleKo: string;
+  titleEn: string;
+  descriptionKo: string;
+  descriptionEn: string;
+  eligibleSocAffiliations: Array<"PRIMARY">;
+  academicEligibility: "ANY" | "ENROLLED_ONLY" | "ENROLLED_OR_LEAVE";
+  allowAnonymous: boolean;
+  allowMultipleResponses: boolean;
+  questions: Array<QuestionSeed & { id: string }>;
+};
+
+const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
+  {
+    surveyId: OPERATIONAL_SURVEY_IDS.cohortChatInvitation,
+    sectionId: "7a120000-0000-4000-8000-000000000001",
+    sectionTitleKo: "신청 정보",
+    sectionTitleEn: "Application details",
+    kind: "APPLICATION",
+    titleKo: "전산학부 학번톡 초대 요청",
+    titleEn: "SoC Cohort Chat Invitation Request",
+    descriptionKo: "전산학부 주전공 학생의 학번별 카카오톡 대화방 초대를 요청합니다.",
+    descriptionEn: "Request an invitation to the cohort KakaoTalk chat for School of Computing primary-major students.",
+    eligibleSocAffiliations: ["PRIMARY"],
+    academicEligibility: "ENROLLED_OR_LEAVE",
+    allowAnonymous: false,
+    allowMultipleResponses: false,
+    questions: [
+      {
+        id: "7a130000-0000-4000-8000-000000000001",
+        titleKo: "초대를 받을 카카오톡 ID 또는 전화번호",
+        titleEn: "KakaoTalk ID or phone number for the invitation",
+        descriptionKo: "초대 확인에 필요한 연락처만 입력해 주세요.",
+        descriptionEn: "Enter only the contact information needed for the invitation.",
+        questionType: "short_text",
+        sortOrder: 0,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000002",
+        titleKo: "입학 연도",
+        titleEn: "Admission year",
+        questionType: "short_text",
+        sortOrder: 1,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000003",
+        titleKo: "연락처를 학번톡 초대 목적으로 사용하는 데 동의합니다.",
+        titleEn: "I agree that my contact information may be used for the cohort chat invitation.",
+        questionType: "single_choice",
+        options: [{ value: "agree", labelKo: "동의합니다", labelEn: "I agree" }],
+        sortOrder: 2,
+      },
+    ],
+  },
+  {
+    surveyId: OPERATIONAL_SURVEY_IDS.promotionPostRequest,
+    sectionId: "7a120000-0000-4000-8000-000000000002",
+    sectionTitleKo: "신청 정보",
+    sectionTitleEn: "Application details",
+    kind: "APPLICATION",
+    titleKo: "학부 내 행사·동아리 홍보글 게시 요청",
+    titleEn: "SoC Event or Club Promotion Post Request",
+    descriptionKo: "전산학부 구성원을 대상으로 하는 행사·동아리 홍보글 게시를 요청합니다.",
+    descriptionEn: "Request publication of an event or club announcement for the School of Computing community.",
+    eligibleSocAffiliations: ["PRIMARY"],
+    academicEligibility: "ENROLLED_OR_LEAVE",
+    allowAnonymous: false,
+    allowMultipleResponses: true,
+    questions: [
+      {
+        id: "7a130000-0000-4000-8000-000000000011",
+        titleKo: "단체 또는 행사명",
+        titleEn: "Organization or event name",
+        questionType: "short_text",
+        sortOrder: 0,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000012",
+        titleKo: "담당자 연락처",
+        titleEn: "Contact information",
+        questionType: "short_text",
+        sortOrder: 1,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000013",
+        titleKo: "게시를 원하는 내용",
+        titleEn: "Requested post content",
+        questionType: "long_text",
+        sortOrder: 2,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000014",
+        titleKo: "게시 희망일",
+        titleEn: "Preferred publication date",
+        questionType: "date",
+        sortOrder: 3,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000015",
+        titleKo: "포스터와 참고 자료",
+        titleEn: "Poster and supporting files",
+        questionType: "file_upload",
+        config: {
+          maxFiles: 5,
+          maxSizeBytes: 20_000_000,
+          allowedMimeTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp"],
+        },
+        isRequired: false,
+        sortOrder: 4,
+      },
+    ],
+  },
+  {
+    surveyId: OPERATIONAL_SURVEY_IDS.corporatePartnership,
+    sectionId: "7a120000-0000-4000-8000-000000000003",
+    sectionTitleKo: "문의 정보",
+    sectionTitleEn: "Inquiry details",
+    kind: "APPLICATION",
+    titleKo: "기업 후원 및 제휴 문의",
+    titleEn: "Corporate Sponsorship and Partnership Inquiry",
+    descriptionKo: "행사 후원, 채용·기술 세션과 공동 프로그램 제안을 접수합니다.",
+    descriptionEn: "Submit proposals for event sponsorships, recruiting or technical sessions, and joint programs.",
+    eligibleSocAffiliations: [],
+    academicEligibility: "ANY",
+    allowAnonymous: true,
+    allowMultipleResponses: true,
+    questions: [
+      {
+        id: "7a130000-0000-4000-8000-000000000021",
+        titleKo: "기업 또는 기관명",
+        titleEn: "Company or organization",
+        questionType: "short_text",
+        sortOrder: 0,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000022",
+        titleKo: "담당자 이름과 직책",
+        titleEn: "Contact name and title",
+        questionType: "short_text",
+        sortOrder: 1,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000023",
+        titleKo: "회신 받을 이메일",
+        titleEn: "Reply email",
+        questionType: "short_text",
+        sortOrder: 2,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000024",
+        titleKo: "제안 유형",
+        titleEn: "Proposal type",
+        questionType: "dropdown",
+        options: [
+          { value: "sponsorship", labelKo: "행사 후원", labelEn: "Event sponsorship" },
+          { value: "career", labelKo: "채용·커리어", labelEn: "Recruiting and careers" },
+          { value: "technical", labelKo: "기술 세션", labelEn: "Technical session" },
+          { value: "partnership", labelKo: "공동 프로그램", labelEn: "Joint program" },
+          { value: "other", labelKo: "기타", labelEn: "Other" },
+        ],
+        sortOrder: 3,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000025",
+        titleKo: "제안 내용",
+        titleEn: "Proposal details",
+        questionType: "long_text",
+        sortOrder: 4,
+      },
+      {
+        id: "7a130000-0000-4000-8000-000000000026",
+        titleKo: "제안서 또는 참고 자료 링크",
+        titleEn: "Proposal or reference link",
+        questionType: "short_text",
+        isRequired: false,
+        sortOrder: 5,
+      },
+    ],
+  },
+];
+
 type EventSeed = {
   titleKo: string;
   titleEn: string;
@@ -736,6 +927,36 @@ async function cleanupSeedContent() {
   `);
 
   await db.execute(sql`
+    delete from vote_ballot
+    where vote_id in (
+      select vote_id from vote
+      where creator_id in (
+        select user_id from users
+        where kaist_uid = 'seed-council-author'
+      )
+    )
+  `);
+
+  await db.execute(sql`
+    delete from vote_tally
+    where vote_id in (
+      select vote_id from vote
+      where creator_id in (
+        select user_id from users
+        where kaist_uid = 'seed-council-author'
+      )
+    )
+  `);
+
+  await db.execute(sql`
+    delete from vote
+    where creator_id in (
+      select user_id from users
+      where kaist_uid = 'seed-council-author'
+    )
+  `);
+
+  await db.execute(sql`
     delete from asset
     where storage_key like '/uploads/assets/seed-%'
       and uploaded_by in (
@@ -1018,6 +1239,218 @@ async function createSurveyWithQuestions(
       })),
     );
   }
+}
+
+async function seedOperationalSurveys() {
+  for (const seed of OPERATIONAL_SURVEY_SEEDS) {
+    await db
+      .insert(surveys)
+      .values({
+        surveyId: seed.surveyId,
+        creatorId: null,
+        kind: seed.kind,
+        titleKo: seed.titleKo,
+        titleEn: seed.titleEn,
+        descriptionKo: seed.descriptionKo,
+        descriptionEn: seed.descriptionEn,
+        feeRequirementPolicy: "NONE",
+        eligibleSocAffiliations: seed.eligibleSocAffiliations,
+        academicEligibility: seed.academicEligibility,
+        allowAnonymous: seed.allowAnonymous,
+        allowMultipleResponses: seed.allowMultipleResponses,
+        allowResponseEdit: true,
+        isKoreanOnly: false,
+        isPublished: true,
+        lifecycleStatus: "PUBLISHED",
+        showOnCalendar: false,
+        resultVisibility: "PRIVATE",
+        isAlwaysOpen: true,
+        openAt: null,
+        closeAt: null,
+      })
+      .onConflictDoNothing({ target: surveys.surveyId });
+
+    await db
+      .insert(surveySections)
+      .values({
+        id: seed.sectionId,
+        surveyId: seed.surveyId,
+        titleKo: seed.sectionTitleKo,
+        titleEn: seed.sectionTitleEn,
+        sortOrder: 0,
+      })
+      .onConflictDoNothing({ target: surveySections.id });
+
+    for (const question of seed.questions) {
+      await db
+        .insert(surveyQuestions)
+        .values({
+          id: question.id,
+          sectionId: seed.sectionId,
+          titleKo: question.titleKo,
+          titleEn: question.titleEn,
+          descriptionKo: question.descriptionKo,
+          descriptionEn: question.descriptionEn,
+          questionType: question.questionType,
+          options: question.options,
+          config: question.config,
+          isRequired: question.isRequired ?? true,
+          sortOrder: question.sortOrder,
+        })
+        .onConflictDoNothing({ target: surveyQuestions.id });
+    }
+  }
+
+  console.log(`Seeded ${OPERATIONAL_SURVEY_SEEDS.length} operational application surveys`);
+}
+
+type SeedVoteItem = {
+  titleKo: string;
+  titleEn: string;
+  descriptionKo: string;
+  descriptionEn: string;
+  type: "SINGLE_CHOICE" | "MULTIPLE_CHOICE";
+  maxSelections: number;
+  options: Array<{ labelKo: string; labelEn: string }>;
+};
+
+function wrapSeedVoteKey(key: Buffer) {
+  const secret =
+    process.env.VOTE_BALLOT_ENCRYPTION_KEY?.trim() ||
+    readRequiredEnv("AUTH_PENDING_LOGIN_ENCRYPTION_KEY");
+  const masterKey = createHash("sha256")
+    .update(`soc-web:vote-ballot-key:v1:${secret}`, "utf8")
+    .digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", masterKey, iv);
+  const ciphertext = Buffer.concat([cipher.update(key), cipher.final()]);
+
+  return {
+    ciphertext: ciphertext.toString("base64url"),
+    iv: iv.toString("base64url"),
+    authTag: cipher.getAuthTag().toString("base64url"),
+  };
+}
+
+async function seedVotes(creatorId: string) {
+  const [devAdmin] = await db
+    .select({
+      userId: users.userId,
+      nameKo: users.nameKo,
+      stdNo: users.stdNo,
+      email: users.email,
+      primaryMajor: users.primaryMajor,
+      academicStatus: users.academicStatus,
+    })
+    .from(users)
+    .where(eq(users.kaistUid, "DEV0001"))
+    .limit(1);
+
+  if (!devAdmin) {
+    console.log("Dev admin not found, skipping vote seed");
+    return;
+  }
+
+  const startsAt = new Date("2026-08-24T09:00:00+09:00");
+  const endsAt = new Date("2026-09-07T23:59:00+09:00");
+  const wrappedVoteKey = wrapSeedVoteKey(randomBytes(32));
+  const [vote] = await db
+    .insert(votes)
+    .values({
+      creatorId,
+      titleKo: "2026 하반기 학생회 프로그램 선호도 투표",
+      titleEn: "Fall 2026 Student Council Program Poll",
+      descriptionKo: "이번 학기에 함께하고 싶은 학생회 프로그램을 선택해 주세요.",
+      descriptionEn: "Choose the student council programs you would like to join this semester.",
+      status: "PUBLISHED",
+      startsAt,
+      endsAt,
+      academicStatuses: ["재학", "휴학"],
+      feePayersOnly: false,
+      encryptedBallotKey: wrappedVoteKey.ciphertext,
+      keyIv: wrappedVoteKey.iv,
+      keyTag: wrappedVoteKey.authTag,
+      voterSnapshotAt: startsAt,
+    })
+    .returning({ voteId: votes.voteId });
+
+  if (!vote) {
+    throw new Error("Failed to create seed vote");
+  }
+
+  const items: SeedVoteItem[] = [
+    {
+      titleKo: "가장 참여하고 싶은 프로그램을 골라 주세요.",
+      titleEn: "Which program would you most like to join?",
+      descriptionKo: "가장 기대되는 프로그램 하나를 선택해 주세요.",
+      descriptionEn: "Select one program you are most interested in.",
+      type: "SINGLE_CHOICE",
+      maxSelections: 1,
+      options: [
+        { labelKo: "알고리즘 스터디", labelEn: "Algorithm study" },
+        { labelKo: "개발 워크숍", labelEn: "Development workshop" },
+        { labelKo: "선후배 네트워킹", labelEn: "Student-alumni networking" },
+      ],
+    },
+    {
+      titleKo: "관심 있는 활동 분야를 모두 골라 주세요.",
+      titleEn: "Which activity areas are you interested in?",
+      descriptionKo: "최대 두 개까지 선택할 수 있습니다.",
+      descriptionEn: "You can select up to two areas.",
+      type: "MULTIPLE_CHOICE",
+      maxSelections: 2,
+      options: [
+        { labelKo: "학업·스터디", labelEn: "Study" },
+        { labelKo: "진로·커리어", labelEn: "Career" },
+        { labelKo: "문화·교류", labelEn: "Culture and community" },
+        { labelKo: "복지", labelEn: "Welfare" },
+      ],
+    },
+  ];
+
+  for (const [sortOrder, item] of items.entries()) {
+    const [itemRow] = await db
+      .insert(voteItems)
+      .values({
+        voteId: vote.voteId,
+        titleKo: item.titleKo,
+        titleEn: item.titleEn,
+        descriptionKo: item.descriptionKo,
+        descriptionEn: item.descriptionEn,
+        type: item.type,
+        maxSelections: item.maxSelections,
+        sortOrder,
+      })
+      .returning({ itemId: voteItems.itemId });
+
+    if (!itemRow) {
+      throw new Error(`Failed to create seed vote item: ${item.titleKo}`);
+    }
+
+    await db.insert(voteOptions).values(
+      item.options.map((option, optionSortOrder) => ({
+        itemId: itemRow.itemId,
+        labelKo: option.labelKo,
+        labelEn: option.labelEn,
+        sortOrder: optionSortOrder,
+      })),
+    );
+  }
+
+  await db.insert(voteVoters).values({
+    voteId: vote.voteId,
+    userId: devAdmin.userId,
+    nameKo: devAdmin.nameKo,
+    studentNumber: devAdmin.stdNo,
+    email: devAdmin.email,
+    primaryMajor: devAdmin.primaryMajor,
+    academicStatus: devAdmin.academicStatus,
+    feeStatus: null,
+    status: "ELIGIBLE",
+    source: "FILTER",
+  });
+
+  console.log(`Seeded vote with ${items.length} items and one eligible voter`);
 }
 
 async function seedMockData() {
@@ -1920,6 +2353,8 @@ async function seedMockData() {
     null,
   );
   console.log("Seeded one survey containing every question type");
+
+  await seedVotes(seedAuthor.userId);
 }
 async function main() {
   const seedMode = process.env.SEED_MODE ??
@@ -1936,6 +2371,7 @@ async function main() {
   try {
     await seedPermissions();
     await seedBoards();
+    await seedOperationalSurveys();
     if (seedMode === "demo") {
       await seedDevAdminRole();
       await seedMockData();

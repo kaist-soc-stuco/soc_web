@@ -514,7 +514,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         await navigator.clipboard.writeText(shareUrl);
         setShareCopied(true);
         window.setTimeout(() => setShareCopied(false), 1800);
-        toast({ type: "success", message: lang === "ko" ? "링크를 복사했습니다." : "Link copied." });
+        toast({ type: "success", message: lang === "ko" ? "클립보드에 복사되었습니다." : "Link copied." });
         return;
       }
 

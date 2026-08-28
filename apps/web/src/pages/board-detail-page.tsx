@@ -11,7 +11,7 @@ import {
 import { useBoardDetailPageController } from "@/features/board-detail/use-board-detail-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
 import { Modal } from "@/components/ui/modal";
-import { UiTextarea } from "@/components/ui/form-control";
+import { UiInput } from "@/components/ui/form-control";
 import { Button } from "@/components/ui/button";
 
 export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCategory?: string; publicBasePath?: string } = {}) {
@@ -126,9 +126,10 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
       >
         <label className="block text-sm font-normal text-app-text-body">
           <span className="mb-2 block">{lang === "ko" ? "숨김 사유" : "Reason"}</span>
-          <UiTextarea
-            rows={4}
+          <UiInput
+            type="text"
             maxLength={500}
+            className="w-full"
             value={hideReason}
             onChange={(event) => setHideReason(event.currentTarget.value)}
             placeholder={lang === "ko" ? "운영 기록에 남길 사유를 입력하세요." : "Enter a reason for the audit record."}

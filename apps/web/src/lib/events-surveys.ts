@@ -2,6 +2,7 @@ import type {
   ArticleListItem,
   ComputedSurveyState,
   PublicCalendarEventItem,
+  SurveyParticipationEligibility,
   SurveyRecord,
 } from "@soc/contracts";
 import { isoToDate, isoToMs, localDate, msToTimeObj, nowDate, nowMs } from "@soc/shared";
@@ -31,10 +32,12 @@ export interface UnifiedItem {
   closesAt: string | null;
   surveyId?: string | null;
   feePayersOnly?: boolean;
+  allowAnonymous?: boolean;
   isKoreanOnly?: boolean;
   resultVisibility?: string;
   maxResponses?: number | null;
   responseCount?: number;
+  participationEligibility?: SurveyParticipationEligibility;
   visibilityScope?: ArticleListItem["visibilityScope"];
   isPinned?: boolean;
   pinOrder?: number | null;
@@ -261,10 +264,12 @@ export const buildUnifiedItems = (
     opensAt: survey.opensAt,
     closesAt: survey.closesAt,
     feePayersOnly: survey.feePayersOnly,
+    allowAnonymous: survey.allowAnonymous,
     isKoreanOnly: survey.isKoreanOnly,
     resultVisibility: survey.resultVisibility,
     maxResponses: survey.maxResponses,
     responseCount: survey.responseCount,
+    participationEligibility: survey.participationEligibility,
     visibilityScope: undefined,
     isPinned: false,
     pinOrder: null,

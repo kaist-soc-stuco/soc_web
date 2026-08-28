@@ -1,6 +1,5 @@
 import type {
   SurveyDetailResponse,
-  SurveyQuestionRecord,
 } from "@soc/contracts";
 import { CheckCircle2 } from "lucide-react";
 
@@ -16,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { resolveAssetUrl } from "@/lib/asset-url";
 
 interface SurveyResponseFormProps {
-  allQuestions: SurveyQuestionRecord[];
   answers: Record<string, AnswerValue>;
   isEditingExistingResponse: boolean;
   isPreview: boolean;
@@ -31,7 +29,6 @@ interface SurveyResponseFormProps {
 }
 
 export function SurveyResponseForm({
-  allQuestions,
   answers,
   isEditingExistingResponse,
   isPreview,
@@ -45,7 +42,7 @@ export function SurveyResponseForm({
   visibleSectionIds,
 }: SurveyResponseFormProps) {
   return (
-    <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+    <div className="animate-in fade-in duration-300">
       {isPreview && <PreviewNoticeView lang={lang} />}
       <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
         {isEditingExistingResponse && (
@@ -72,16 +69,18 @@ export function SurveyResponseForm({
               if (!sectionTitle && !sectionDescription) return null;
 
               return (
-                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.035)]">
                   {sectionTitle ? (
-                    <h2 className="text-base font-semibold leading-6 text-slate-950">
-                      {sectionTitle}
-                    </h2>
+                    <div className="bg-[#5545e8] px-5 py-3.5 text-white">
+                      <h2 className="text-base font-normal leading-6">
+                        {sectionTitle}
+                      </h2>
+                    </div>
                   ) : null}
                   {sectionDescription ? (
                     <RichTextContent
                       content={sectionDescription}
-                      className={`${sectionTitle ? "mt-1.5" : ""} text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-500`}
+                      className="px-5 py-4 text-[length:var(--ui-text-section-size)] font-normal leading-relaxed text-slate-600"
                     />
                   ) : null}
                 </div>
@@ -89,8 +88,6 @@ export function SurveyResponseForm({
             })()}
 
             {section.questions.map((question) => {
-              const questionIndex =
-                allQuestions.findIndex((item) => item.id === question.id) + 1;
               const questionError = questionErrors[question.id] ?? null;
               const questionImage = lang === "ko"
                 ? question.config?.imageUrlKo
@@ -100,17 +97,14 @@ export function SurveyResponseForm({
                 <div
                   key={question.id}
                   id={`survey-question-${question.id}`}
-                  className={`group scroll-mt-24 rounded-2xl border bg-white px-5 py-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] ${
+                  className={`group scroll-mt-24 rounded-2xl border bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.035)] transition-[border-color,box-shadow] ${
                     questionError
                       ? "border-rose-300 bg-rose-50/10 hover:border-rose-400"
                       : "border-slate-200 hover:border-kaist-darkgreen/20"
-                  } hover:shadow-[0_6px_18px_rgba(15,23,42,0.05)]`}
+                  } hover:shadow-[0_2px_5px_rgba(15,23,42,0.045)]`}
                 >
-                  <div className="mb-3.5 border-b border-slate-100 pb-3">
-                    <label className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-slate-950">
-                      <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
-                        {questionIndex}.
-                      </span>
+                  <div className="mb-3.5">
+                    <label className="block min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">
                       <span className="min-h-6 break-words leading-6">
                         {getLocalizedText(
                           lang,
@@ -136,7 +130,7 @@ export function SurveyResponseForm({
                         question.descriptionKo,
                         question.descriptionEn,
                       )}
-                      className="mb-4 text-[length:var(--ui-text-section-size)] font-medium leading-relaxed text-slate-500"
+                      className="mb-4 text-[length:var(--ui-text-section-size)] font-normal leading-relaxed text-slate-500"
                     />
                   )}
                   {questionImage ? (

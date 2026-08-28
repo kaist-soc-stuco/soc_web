@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 const ALLOWED_TAGS = new Set([
   "P",
@@ -22,6 +23,7 @@ const ALLOWED_TAGS = new Set([
   "HR",
   "A",
   "SPAN",
+  "IMG",
 ]);
 
 const SAFE_STYLE_VALUE = {
@@ -88,6 +90,32 @@ function sanitizeForDisplay(value: string) {
           }
           continue;
         }
+
+        if (element.tagName === "IMG" && name === "src") {
+          try {
+            const rawSource = attribute.value.trim();
+            if (
+              !/^https?:\/\//i.test(rawSource) &&
+              !/^\/(?:api\/)?(?:v\d+\/)?assets\/\d+\/content(?:[?#].*)?$/i.test(rawSource) &&
+              !/^asset:\d+$/.test(rawSource)
+            ) {
+              element.remove();
+              continue;
+            }
+            const resolved = resolveAssetUrl(rawSource);
+            const url = new URL(resolved, window.location.origin);
+            if (!["http:", "https:"].includes(url.protocol)) {
+              element.removeAttribute(attribute.name);
+            } else {
+              element.setAttribute("src", url.toString());
+            }
+          } catch {
+            element.removeAttribute(attribute.name);
+          }
+          continue;
+        }
+
+        if (element.tagName === "IMG" && name === "alt") continue;
 
         if (element.tagName === "A" && ["href", "target", "rel"].includes(name)) {
           if (name === "href") {

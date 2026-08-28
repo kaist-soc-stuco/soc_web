@@ -100,7 +100,7 @@ export function useEventsSurveysPageController({
   const calendarRangeTo = calendarRange.to.toISOString();
 
   const listQuery = useQuery({
-    queryKey: ["events-surveys", "list"],
+    queryKey: ["events-surveys", "list", session?.userId ?? "anonymous"],
     queryFn: async () => {
       const [surveysData, eventsData] = await Promise.all([
         apiClient.getPublicSurveys(),

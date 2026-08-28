@@ -21,6 +21,7 @@ import {
   getBoardWritePermissionBitFromMetadata,
 } from "@/lib/board-metadata";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
 import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
@@ -235,6 +236,48 @@ export function useBoardWritePageController(forcedCategory?: string) {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  };
+
+  const handleUploadInlineImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "본문 이미지는 이미지 파일만 선택할 수 있습니다."
+            : "Inline images must be image files.",
+      });
+      return null;
+    }
+
+    setUploading(true);
+    try {
+      const asset = await apiClient.uploadAsset(file);
+      setAssets((current) => [
+        ...current,
+        {
+          assetId: asset.assetId,
+          mimeType: asset.mimeType,
+          originalFilename: asset.originalFilename,
+          sizeBytes: asset.sizeBytes,
+          storageKey: asset.storageKey,
+          usageType: "IMAGE",
+        } satisfies AttachedAsset,
+      ]);
+      return resolveAssetUrl(asset.storageKey);
+    } catch (error) {
+      console.error(error);
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "본문 이미지 업로드에 실패했습니다."
+            : "Failed to upload the inline image.",
+      });
+      return null;
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -754,8 +797,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
         type: "error",
         message:
           lang === "ko"
-            ? "영문 제목과 내용을 입력하거나 '한국어 사용자만'을 선택해 주세요."
-            : "Enter an English title and content, or select 'Korean Speakers Only'.",
+            ? "영문 제목과 내용을 입력하거나 '한국어 전용'을 선택해 주세요."
+            : "Enter an English title and content, or select 'Korean only'.",
       });
       return;
     }
@@ -917,6 +960,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     handleSubmit,
     handleUploadThumbnail,
     handleUploadFiles,
+    handleUploadInlineImage,
     isAnonymous,
     isAllDay,
     isEventAlwaysOpen,

@@ -33,7 +33,7 @@
   --ui-brand-rail-width: 15rem;
   /* Fixed values prevent scrollbar/route changes from moving the desktop GNB. */
   --ui-nav-start-offset: 1.5rem;
-  --ui-nav-column-width: 11.5rem;
+  --ui-nav-column-width: 9.25rem;
   --ui-menu-divider: rgb(229 233 236);
   --ui-menu-item-text: rgb(52 64 84);
   --board-col-category: 5.5rem;

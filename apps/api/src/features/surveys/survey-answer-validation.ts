@@ -19,6 +19,17 @@ function hasDuplicateValues(values: readonly string[]): boolean {
   return new Set(values).size !== values.length;
 }
 
+function parseRating(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value === "string" && /^\d+$/.test(value)) return Number(value);
+  return null;
+}
+
+function ratingMax(question: SurveyQuestionRecord): number {
+  const configured = question.config?.ratingMax ?? 5;
+  return Number.isInteger(configured) && configured >= 2 && configured <= 10 ? configured : 5;
+}
+
 export function isSurveyAnswerEmpty(
   question: SurveyQuestionRecord,
   content: Record<string, unknown>,
@@ -42,6 +53,11 @@ export function isSurveyAnswerEmpty(
         ? [content.assetId]
         : [];
     return assetIds.length === 0;
+  }
+
+  if (question.questionType === "rating") {
+    const value = content.rating;
+    return value === undefined || value === null || (typeof value === "string" && value.trim().length === 0);
   }
 
   const value =
@@ -100,6 +116,13 @@ function validateAnswerContent(
         hasDuplicateValues(content.values as string[])
       ) {
         throw new BadRequestException("answer_option_invalid");
+      }
+      break;
+    }
+    case "rating": {
+      const value = parseRating(content.rating);
+      if (value === null || value < 1 || value > ratingMax(question)) {
+        throw new BadRequestException("answer_rating_invalid");
       }
       break;
     }

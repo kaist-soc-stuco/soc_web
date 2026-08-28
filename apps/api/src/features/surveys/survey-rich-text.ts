@@ -21,5 +21,5 @@ export function sanitizeSurveyRichText(
     .replace(/&nbsp;/gi, " ")
     .trim();
 
-  return textOnly ? sanitized : null;
+  return textOnly || /<img\b/i.test(sanitized) ? sanitized : null;
 }

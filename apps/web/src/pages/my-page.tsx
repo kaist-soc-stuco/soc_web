@@ -40,15 +40,17 @@ export function MyPage() {
       <Header />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 md:px-8 flex gap-8 items-start">
-        <MyPageSidebar
-          activeMenu={activeMenu}
-          lang={lang}
-          menuItems={menuItems}
-          onMenuChange={(menu) => {
-            setActiveMenu(menu);
-            setCurrentPage(1);
-          }}
-        />
+        {canUseMyPage ? (
+          <MyPageSidebar
+            activeMenu={activeMenu}
+            lang={lang}
+            menuItems={menuItems}
+            onMenuChange={(menu) => {
+              setActiveMenu(menu);
+              setCurrentPage(1);
+            }}
+          />
+        ) : null}
 
         <section className="flex-1 min-w-0">
           {initialLoading ? (

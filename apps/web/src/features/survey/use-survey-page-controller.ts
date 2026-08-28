@@ -88,7 +88,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
             : "Failed to load survey.",
         ),
       );
-  }, [surveyId, apiClient, lang]);
+  }, [surveyId, apiClient, lang, session?.userId]);
 
   const handleAnswerChange = (questionId: string, value: AnswerValue) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));

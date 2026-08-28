@@ -33,7 +33,7 @@ export function VoteListPage() {
         <PageContainer className="pb-16">
           <div className="mb-5 flex items-start gap-3 border-b border-slate-200 pb-5 text-sm font-normal text-[#344054]">
             <LockKeyhole className="mt-0.5 size-4 shrink-0 text-brand-primary" aria-hidden="true" />
-            <p>{lang === "ko" ? "투표 시작 시점에 확정된 전산학부 주전생 명부로 본인 인증하며, 투표 내용은 참여 기록과 분리해 저장합니다." : "Eligibility is verified against the School of Computing primary-major voter roll fixed at publication. Ballots are stored separately from participation records."}</p>
+            <p>{lang === "ko" ? "투표 시작 시점에 확정된 전산학부 주전공 학부생 명부로 본인 인증하며, 투표 내용은 참여 기록과 분리해 저장합니다." : "Eligibility is verified against the School of Computing primary-major voter roll fixed at publication. Ballots are stored separately from participation records."}</p>
           </div>
           {loading ? (
             <div className="py-20 text-center text-sm font-normal text-[#344054]">{lang === "ko" ? "불러오는 중..." : "Loading..."}</div>
@@ -50,7 +50,7 @@ export function VoteListPage() {
                   <h2 className="mt-5 text-xl font-semibold tracking-[-0.02em] text-[#172033]">{lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}</h2>
                   {(lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo) ? <p className="mt-2 line-clamp-2 text-sm font-normal leading-6 text-[#344054]">{lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo}</p> : null}
                   <div className="mt-6 flex items-center justify-between text-sm font-normal text-[#344054]">
-                    <span>{lang === "ko" ? `전산학부 주전생 · 참여 ${vote.votedCount}/${vote.eligibleCount}명` : `SoC primary majors · ${vote.votedCount}/${vote.eligibleCount} voted`}</span>
+                    <span>{lang === "ko" ? `전산학부 주전공 학부생 · 참여 ${vote.votedCount}/${vote.eligibleCount}명` : `SoC primary majors · ${vote.votedCount}/${vote.eligibleCount} voted`}</span>
                     <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                   </div>
                 </Link>

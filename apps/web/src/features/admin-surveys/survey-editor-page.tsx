@@ -42,12 +42,12 @@ import {
   SurveySettingsForm,
   type SurveySettingsFormValues,
 } from "@/components/organisms/survey-settings-form";
-import { QuestionEditorModal, QuestionFormState } from "@/components/organisms/question-editor-modal";
+import { QuestionFormState, QuestionInlineEditor } from "@/components/organisms/question-editor-modal";
 import {
   SectionEditorModal,
   type SectionFormState,
 } from "@/components/organisms/section-editor-modal";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Copy, Eye, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { UiInput } from "@/components/ui/form-control";
@@ -92,6 +92,7 @@ const QUESTION_TYPES = [
   { value: "single_choice", label: "단일 선택" },
   { value: "multiple_choice", label: "복수 선택" },
   { value: "dropdown", label: "드롭다운" },
+  { value: "rating", label: "등급" },
   { value: "grid_single", label: "객관식 그리드" },
   { value: "grid_multiple", label: "체크박스 그리드" },
   { value: "file_upload", label: "파일 업로드" },
@@ -146,7 +147,7 @@ const SurveySettingsSchema = z.object({
     if (!data.titleEn?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "영문 제목은 필수입니다 (한국어 사용자만 설정이 아닐 경우).",
+        message: "영문 제목은 필수입니다 (한국어 전용 설정이 아닐 경우).",
         path: ["titleEn"],
       });
     }
@@ -195,6 +196,7 @@ type QuestionRowContentProps = {
   isOngoing: boolean;
   dragHandle: ReactNode;
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 };
 
@@ -203,6 +205,7 @@ function QuestionRowContent({
   isOngoing,
   dragHandle,
   onEdit,
+  onDuplicate,
   onDelete,
 }: QuestionRowContentProps) {
   return (
@@ -237,6 +240,15 @@ function QuestionRowContent({
         {!isOngoing && (
           <IconButton
             size="sm"
+            aria-label={`${question.titleKo} 복제`}
+            onClick={onDuplicate}
+          >
+            <Copy className="size-4" />
+          </IconButton>
+        )}
+        {!isOngoing && (
+          <IconButton
+            size="sm"
             aria-label={`${question.titleKo} 삭제`}
             onClick={onDelete}
             className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
@@ -253,14 +265,20 @@ type SortableQuestionRowProps = {
   question: SurveyQuestionRecord;
   isOngoing: boolean;
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
+  isEditing?: boolean;
+  editor?: ReactNode;
 };
 
 function SortableQuestionRow({
   question,
   isOngoing,
   onEdit,
+  onDuplicate,
   onDelete,
+  isEditing = false,
+  editor,
 }: SortableQuestionRowProps) {
   const {
     attributes,
@@ -270,7 +288,7 @@ function SortableQuestionRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: question.id, disabled: isOngoing });
+  } = useSortable({ id: question.id, disabled: isOngoing || isEditing });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -294,19 +312,48 @@ function SortableQuestionRow({
     <div
       ref={setNodeRef}
       style={style}
+      role={isEditing ? undefined : "button"}
+      tabIndex={isEditing ? undefined : 0}
+      aria-label={isEditing ? undefined : `${question.titleKo} 문항 편집`}
+      onClick={
+        isEditing
+          ? undefined
+          : (event) => {
+              const target = event.target;
+              if (target instanceof Element && target.closest("button, a, input, select, textarea, [role='button']")) {
+                return;
+              }
+              onEdit();
+            }
+      }
+      onKeyDown={
+        isEditing
+          ? undefined
+          : (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onEdit();
+              }
+            }
+      }
       className={`${QUESTION_ROW_CLASS} transition-[background-color,border-color,box-shadow] duration-100 ${
-        isDragging
-          ? "relative z-0 opacity-0"
-          : "hover:border-slate-300 hover:bg-slate-50/60"
+        isEditing
+          ? "w-full cursor-default border-brand-primary/35 p-0"
+          : isDragging
+            ? "relative z-0 opacity-0"
+            : "cursor-pointer hover:border-slate-300 hover:bg-slate-50/60"
       }`}
     >
-      <QuestionRowContent
-        question={question}
-        isOngoing={isOngoing}
-        dragHandle={dragHandle}
-        onEdit={onEdit}
-        onDelete={onDelete}
-      />
+      {isEditing && editor ? editor : (
+        <QuestionRowContent
+          question={question}
+          isOngoing={isOngoing}
+          dragHandle={dragHandle}
+          onEdit={onEdit}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+        />
+      )}
     </div>
   );
 }
@@ -315,9 +362,10 @@ function QuestionDragOverlayRow({
   question,
   isOngoing,
   onEdit,
+  onDuplicate,
   onDelete,
   width,
-}: SortableQuestionRowProps & { width: number | null }) {
+}: Pick<SortableQuestionRowProps, "question" | "isOngoing" | "onEdit" | "onDuplicate" | "onDelete"> & { width: number | null }) {
   return (
     <div
       style={{ width: width ?? undefined }}
@@ -332,6 +380,7 @@ function QuestionDragOverlayRow({
           </span>
         }
         onEdit={onEdit}
+        onDuplicate={onDuplicate}
         onDelete={onDelete}
       />
     </div>
@@ -829,6 +878,40 @@ export function SurveyEditorPage() {
     }
   };
 
+  const handleDuplicateQuestion = async (sectionId: string, question: SurveyQuestionRecord) => {
+    if (!loadedSurveyId) return;
+    setError(null);
+
+    try {
+      await client.createQuestion(loadedSurveyId, sectionId, {
+        titleKo: `${question.titleKo} (복사본)`,
+        titleEn: question.titleEn ? `${question.titleEn} (Copy)` : undefined,
+        descriptionKo: question.descriptionKo ?? undefined,
+        descriptionEn: question.descriptionEn ?? undefined,
+        questionType: question.questionType,
+        options: question.options?.map((option) => ({ ...option })) ?? undefined,
+        config: question.config
+          ? {
+              ...question.config,
+              rows: question.config.rows?.map((option) => ({ ...option })),
+              columns: question.config.columns?.map((option) => ({ ...option })),
+              goToSectionByValue: question.config.goToSectionByValue
+                ? { ...question.config.goToSectionByValue }
+                : undefined,
+            }
+          : undefined,
+        answerRegex: question.answerRegex ?? undefined,
+        isRequired: question.isRequired,
+      });
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
+      toast({ type: "success", message: "문항이 복제되었습니다." });
+    } catch (err: unknown) {
+      console.error(err);
+      setError(getErrorMessage(err, "문항 복제 실패"));
+    }
+  };
+
   const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
     if (!loadedSurveyId) return;
     const question = sections
@@ -1149,16 +1232,46 @@ export function SurveyEditorPage() {
                               items={section.questions.map((question) => question.id)}
                               strategy={verticalListSortingStrategy}
                             >
-                              {section.questions.map((question) => (
-                                <SortableQuestionRow
-                                  key={question.id}
-                                  question={question}
-                                  isOngoing={isOngoing}
-                                  onEdit={() => openEditQuestion(section.id, question)}
-                                  onDelete={() => handleDeleteQuestion(section.id, question.id)}
-                                />
-                              ))}
+                              {section.questions.map((question) => {
+                                const isEditing = editingQuestion?.questionId === question.id;
+
+                                return (
+                                  <SortableQuestionRow
+                                    key={question.id}
+                                    question={question}
+                                    isOngoing={isOngoing}
+                                    isEditing={isEditing}
+                                    editor={
+                                      isEditing ? (
+                                        <QuestionInlineEditor
+                                          initial={editingQuestion.initial}
+                                          isKoreanOnly={isKoreanOnly}
+                                          isOngoing={isOngoing}
+                                          currentSectionId={section.id}
+                                          branchTargets={branchTargetsForEditing}
+                                          onSave={handleSaveQuestion}
+                                          onCancel={() => setEditingQuestion(null)}
+                                        />
+                                      ) : undefined
+                                    }
+                                    onEdit={() => openEditQuestion(section.id, question)}
+                                    onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
+                                    onDelete={() => void handleDeleteQuestion(section.id, question.id)}
+                                  />
+                                );
+                              })}
                             </SortableContext>
+                            {editingQuestion?.sectionId === section.id && !editingQuestion.questionId ? (
+                              <QuestionInlineEditor
+                                initial={editingQuestion.initial}
+                                isKoreanOnly={isKoreanOnly}
+                                isOngoing={isOngoing}
+                                currentSectionId={section.id}
+                                branchTargets={branchTargetsForEditing}
+                                onSave={handleSaveQuestion}
+                                onCancel={() => setEditingQuestion(null)}
+                              />
+                            ) : null}
                             {!isOngoing && (
                               <div className="pt-2">
                                 <Button variant="ghost"
@@ -1185,6 +1298,7 @@ export function SurveyEditorPage() {
                                 isOngoing={isOngoing}
                                 width={activeDragWidth}
                                 onEdit={() => undefined}
+                                onDuplicate={() => undefined}
                                 onDelete={() => undefined}
                               />
                             ) : null}
@@ -1227,18 +1341,6 @@ export function SurveyEditorPage() {
               </AdminCard>
             )}
         </main>
-
-        {editingQuestion && (
-          <QuestionEditorModal
-            initial={editingQuestion.initial}
-            isKoreanOnly={isKoreanOnly}
-            isOngoing={isOngoing}
-            currentSectionId={editingQuestion.sectionId}
-            branchTargets={branchTargetsForEditing}
-            onSave={handleSaveQuestion}
-            onCancel={() => setEditingQuestion(null)}
-          />
-        )}
 
         {editingSection && (
           <SectionEditorModal

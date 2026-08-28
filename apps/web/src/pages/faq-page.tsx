@@ -92,7 +92,7 @@ export function FaqPage() {
               {faqQuery.isPending ? (
                 <div className="min-h-48 divide-y divide-slate-100" aria-label="FAQ 불러오는 중">
                   {Array.from({ length: 5 }, (_, index) => (
-                    <div key={index} className="h-14 animate-pulse bg-slate-50/70" />
+                    <div key={index} className="h-14 bg-slate-50/70" />
                   ))}
                 </div>
               ) : filteredItems.length === 0 ? (

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useLanguage } from "@/hooks/use-language";
 
-export const ABOUT_SECTION_IDS = ["intro", "work", "people"] as const;
+export const ABOUT_SECTION_IDS = ["intro", "work", "people", "partnership"] as const;
 export type AboutSectionId = (typeof ABOUT_SECTION_IDS)[number];
 
 const LEGACY_ABOUT_SECTIONS: Record<string, AboutSectionId> = {

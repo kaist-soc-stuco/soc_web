@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiFormField, UiInput, UiSelect, UiTextarea } from "@/components/ui/form-control";
 import { AdminCard, AdminCardHeader, AdminPageHeader, AdminPageMain, AdminPageShell } from "@/components/ui/admin-page";
-import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
@@ -97,7 +96,7 @@ export function VoteEditorPage() {
   };
 
   const run = async (label: string, action: () => Promise<unknown>) => {
-    if (!id || !await confirm({ title: `${label}할까요?`, description: label === "게시" ? "현재 조건으로 전산학부 주전생 명부가 확정되고 문항 편집이 잠깁니다." : undefined, confirmLabel: label })) return;
+    if (!id || !await confirm({ title: `${label}할까요?`, description: label === "게시" ? "현재 조건으로 전산학부 주전공 학부생 명부가 확정되고 문항 편집이 잠깁니다." : undefined, confirmLabel: label })) return;
     setBusy(true);
     try { await action(); await load(id); toast({ type: "success", message: `${label}했습니다.` }); }
     catch { toast({ type: "error", message: `${label}하지 못했습니다.` }); }
@@ -125,7 +124,7 @@ export function VoteEditorPage() {
   return (
     <AuthGuard requirePermission={Permissions.MANAGE_VOTE}>
       <AdminPageShell><AdminPageMain>
-        <AdminPageHeader title={!id ? "새 투표" : editable ? "투표 편집" : "투표 관리"} actions={<div className="flex gap-2"><Button variant="outline" asChild><Link to="/admin/votes">목록</Link></Button>{vote ? <VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} /> : null}{editable ? <Button onClick={() => void save()} disabled={busy}>저장</Button> : null}{vote?.status === "DRAFT" ? <Button onClick={() => void run("게시", () => client.publishVote(id!))} disabled={busy}>게시</Button> : null}{vote?.status === "PUBLISHED" ? <Button onClick={() => void run("마감", () => client.closeVote(id!))} disabled={busy}>마감</Button> : null}{vote?.status === "CLOSED" ? <Button onClick={() => void run("집계", () => client.tallyVote(id!))} disabled={busy}>집계</Button> : null}{vote?.status === "TALLIED" && !vote.resultsPublishedAt ? <Button onClick={() => void run("결과 공개", () => client.publishVoteResults(id!))} disabled={busy}>결과 공개</Button> : null}</div>} />
+        <AdminPageHeader title={!id ? "새 투표" : "투표 관리"} actions={<div className="flex gap-2"><Button variant="outline" asChild><Link to="/admin/votes">목록</Link></Button>{editable ? <Button onClick={() => void save()} disabled={busy}>저장</Button> : null}{vote?.status === "DRAFT" ? <Button onClick={() => void run("게시", () => client.publishVote(id!))} disabled={busy}>게시</Button> : null}{vote?.status === "PUBLISHED" ? <Button onClick={() => void run("마감", () => client.closeVote(id!))} disabled={busy}>마감</Button> : null}{vote?.status === "CLOSED" ? <Button onClick={() => void run("집계", () => client.tallyVote(id!))} disabled={busy}>집계</Button> : null}{vote?.status === "TALLIED" && !vote.resultsPublishedAt ? <Button onClick={() => void run("결과 공개", () => client.publishVoteResults(id!))} disabled={busy}>결과 공개</Button> : null}</div>} />
 
         <AdminCard>
           <AdminCardHeader><h2 className="text-base font-medium text-[#172033]">기본 정보</h2></AdminCardHeader>
@@ -141,7 +140,7 @@ export function VoteEditorPage() {
         <AdminCard>
           <AdminCardHeader><div><h2 className="text-base font-medium text-[#172033]">선거인 조건</h2><p className="mt-1 text-xs font-normal text-[#344054]">게시하는 순간 조건에 맞는 명부를 고정합니다.</p></div></AdminCardHeader>
           <div className="grid gap-5 p-5 md:grid-cols-2">
-            <UiFormField label="소속"><UiInput value="전산학부 주전생" disabled /></UiFormField>
+            <UiFormField label="소속"><UiInput value="전산학부 주전공 학부생" disabled /></UiFormField>
             <UiFormField label="학적 상태"><div className="flex h-[var(--ui-control-height)] items-center gap-5 rounded-lg border border-slate-200 px-3">{["재학", "휴학"].map((status) => <label key={status} className="flex items-center gap-2 text-sm font-normal text-[#344054]"><input type="checkbox" disabled={!editable} checked={draft.academicStatuses.includes(status)} onChange={(e) => setDraft({ ...draft, academicStatuses: e.target.checked ? [...draft.academicStatuses, status] : draft.academicStatuses.filter((value) => value !== status) })} />{status}</label>)}</div></UiFormField>
             <UiFormField label="시작 학번"><UiInput disabled={!editable} placeholder="예: 20200000" value={draft.studentNumberFrom ?? ""} onChange={(e) => setDraft({ ...draft, studentNumberFrom: e.target.value })} /></UiFormField>
             <UiFormField label="종료 학번"><UiInput disabled={!editable} placeholder="예: 20269999" value={draft.studentNumberTo ?? ""} onChange={(e) => setDraft({ ...draft, studentNumberTo: e.target.value })} /></UiFormField>

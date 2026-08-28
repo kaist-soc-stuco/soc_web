@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react";
-import { Check, Grid2X2, Plus, Trash2 } from "lucide-react";
+import { Check, Grid2X2, ImagePlus, Plus, Trash2 } from "lucide-react";
 import type { QuestionType, SurveyQuestionConfig } from "@soc/contracts";
-import { RichTextEditor } from "./rich-text-editor";
 import { Button } from "@/components/ui/button";
-import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
-import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { SurveyImageField } from "@/components/ui/survey-image-field";
@@ -17,6 +14,7 @@ const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: "single_choice", label: "단일 선택" },
   { value: "multiple_choice", label: "복수 선택" },
   { value: "dropdown", label: "드롭다운" },
+  { value: "rating", label: "등급" },
   { value: "grid_single", label: "객관식 그리드" },
   { value: "grid_multiple", label: "체크박스 그리드" },
   { value: "file_upload", label: "파일 업로드" },
@@ -37,7 +35,7 @@ export interface QuestionFormState {
   config: SurveyQuestionConfig | null;
 }
 
-interface QuestionEditorModalProps {
+interface QuestionInlineEditorProps {
   initial: QuestionFormState;
   isKoreanOnly?: boolean;
   isOngoing?: boolean;
@@ -47,7 +45,47 @@ interface QuestionEditorModalProps {
   onCancel: () => void;
 }
 
-export function QuestionEditorModal({
+function CompactImagePicker({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value?: string | null;
+  onChange: (value: string | null) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative shrink-0">
+      <IconButton
+        type="button"
+        size="sm"
+        aria-label={`${label} ${value ? "변경" : "추가"}`}
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className={value ? "border-brand-primary/25 bg-emerald-50 text-brand-primary" : ""}
+      >
+        <ImagePlus className="size-4" />
+      </IconButton>
+      {open ? (
+        <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-elevated">
+          <SurveyImageField
+            label={label}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function QuestionInlineEditor({
   initial,
   isKoreanOnly = false,
   isOngoing = false,
@@ -55,7 +93,7 @@ export function QuestionEditorModal({
   branchTargets = [],
   onSave,
   onCancel,
-}: QuestionEditorModalProps) {
+}: QuestionInlineEditorProps) {
   const [form, setForm] = useState<QuestionFormState>(initial);
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +204,9 @@ export function QuestionEditorModal({
         ],
       });
     }
+    if (questionType === "rating") {
+      set("config", { ...(form.config ?? {}), ratingMax: form.config?.ratingMax ?? 5 });
+    }
   };
 
   const handleSave = () => {
@@ -226,282 +267,263 @@ export function QuestionEditorModal({
   };
 
   const inputCls =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm placeholder:text-[length:var(--ui-text-body-size)] outline-none transition-[border-color,box-shadow] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20 disabled:opacity-50 disabled:bg-gray-50 disabled:cursor-not-allowed";
+    "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70";
+  const compactInputCls =
+    "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-normal text-slate-900 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70";
+  const questionTypeLabel = QUESTION_TYPES.find((type) => type.value === form.questionType)?.label;
 
   return (
-    <AdminDrawer
-      open
-      onClose={onCancel}
-      title={isOngoing ? "문항 보기" : initial.titleKo ? "문항 편집" : "새 문항"}
-      width="max-w-4xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>취소</Button>
-            {!isOngoing ? (
-              <Button type="button" onClick={handleSave} className="gap-1.5 bg-brand-primary text-white hover:bg-brand-primary/90">
-                <Check className="size-4" /> 문항 저장
-              </Button>
-            ) : null}
-          </div>
+    <div className="rounded-xl border border-brand-primary/35 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-sm font-semibold text-slate-900">
+            {isOngoing ? "문항 보기" : initial.titleKo ? "문항 편집" : "새 문항"}
+          </span>
+          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+            {questionTypeLabel}
+          </span>
         </div>
-      }
-    >
-      <div className="space-y-6">
-
-        {/* 언어 탭 */}
         <SegmentedControl
           ariaLabel="문항 언어"
           role="tablist"
           value={activeTab}
           onChange={setActiveTab}
+          itemClassName="!h-8 !min-h-8 !px-2.5 !text-xs"
           options={[
             { value: "ko", label: "국문" },
             { value: "en", label: "영문", disabled: isKoreanOnly },
           ]}
         />
+      </div>
 
-        <div className="space-y-6">
-          <div>
-            {activeTab === "ko" ? (
-              <UiInput
-                key="qTitleKo"
-                className={inputCls}
-                placeholder="질문을 입력하세요"
-                value={form.titleKo}
-                onChange={(e) => set("titleKo", e.target.value)}
-              />
-            ) : (
-              <UiInput
-                key="qTitleEn"
-                className={inputCls}
-                placeholder="Enter your question in English"
-                value={form.titleEn}
-                onChange={(e) => set("titleEn", e.target.value)}
-              />
-            )}
-          </div>
-
-          <div>
-            {activeTab === "ko" ? (
-              <RichTextEditor
-                compact
-                disabled={isOngoing}
-                content={form.descriptionKo}
-                onChange={(value) => set("descriptionKo", value)}
-                lang="ko"
-              />
-            ) : (
-              <RichTextEditor
-                compact
-                disabled={isOngoing}
-                content={form.descriptionEn}
-                onChange={(value) => set("descriptionEn", value)}
-                lang="en"
-              />
-            )}
-          </div>
-          <SurveyImageField
-            label={activeTab === "ko" ? "문항 설명 이미지" : "Question description image"}
-            value={activeTab === "ko" ? form.config?.imageUrlKo : form.config?.imageUrlEn}
-            onChange={(value) => set("config", {
-              ...(form.config ?? {}),
-              [activeTab === "ko" ? "imageUrlKo" : "imageUrlEn"]: value,
-            })}
-            disabled={isOngoing}
-          />
-        </div>
-
-        <div className="space-y-6 pt-4 border-t border-gray-100">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <AdminFormField label="질문 유형 *">
-            <AdminSelectDropdown
-              value={form.questionType}
-              options={QUESTION_TYPES}
-              onChange={(val) => changeQuestionType(val as QuestionType)}
+      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
+        <div className="min-w-0">
+          <label className="mb-1.5 block text-xs font-medium text-slate-600">
+            {activeTab === "ko" ? "질문 제목" : "Question title"} <span className="text-rose-500">*</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <UiInput
+              autoFocus
+              className={`${inputCls} min-w-0 flex-1`}
+              placeholder={activeTab === "ko" ? "질문을 입력하세요" : "Enter your question"}
+              value={activeTab === "ko" ? form.titleKo : form.titleEn}
+              disabled={isOngoing}
+              onChange={(event) => set(activeTab === "ko" ? "titleKo" : "titleEn", event.target.value)}
+            />
+            <CompactImagePicker
+              label={activeTab === "ko" ? "문항 이미지" : "Question image"}
+              value={activeTab === "ko" ? form.config?.imageUrlKo : form.config?.imageUrlEn}
+              onChange={(value) => set("config", {
+                ...(form.config ?? {}),
+                [activeTab === "ko" ? "imageUrlKo" : "imageUrlEn"]: value,
+              })}
               disabled={isOngoing}
             />
-            </AdminFormField>
           </div>
-
-          {needsOptions && (
-            <div>
-              <div className="mb-3 text-xs font-medium leading-4 text-slate-600">선택지</div>
-              <div className="scrollbar-hidden mb-4 max-h-60 space-y-3 overflow-y-auto pr-1">
-                {form.options.map((opt, i) => (
-                  <div key={i} className="space-y-2 rounded-lg border border-slate-100 p-2">
-                    <div className="flex flex-wrap items-center gap-2 group sm:flex-nowrap">
-                    {activeTab === "ko" ? (
-                      <UiInput
-                        key={`labelKo-${i}`}
-                        className={`${inputCls} min-w-0 flex-1`}
-                        placeholder="선택지 라벨 (국문)"
-                        value={opt.labelKo}
-                        onChange={(e) => updateOption(i, "labelKo", e.target.value)}
-                      />
-                    ) : (
-                      <UiInput
-                        key={`labelEn-${i}`}
-                        className={`${inputCls} min-w-0 flex-1`}
-                        placeholder="Option label (English)"
-                        value={opt.labelEn}
-                        onChange={(e) => updateOption(i, "labelEn", e.target.value)}
-                      />
-                    )}
-                    {supportsBranching && branchTargets.length > 0 && (
-                      <AdminSelectDropdown
-                        ariaLabel={`${opt.labelKo || opt.value || "선택지"} 다음 섹션`}
-                        className="w-full shrink-0 sm:w-48"
-                        value={branchMap[opt.value] ?? ""}
-                        disabled={isOngoing || !opt.value.trim()}
-                        onChange={(target) => updateBranchTarget(opt.value, target)}
-                        options={[
-                          { value: "", label: "다음 섹션" },
-                          ...branchTargets
-                            .filter((target) => target.id !== currentSectionId)
-                            .map((target) => ({ value: target.id, label: target.titleKo })),
-                          { value: "SUBMIT", label: "여기서 제출 완료" },
-                        ]}
-                      />
-                    )}
-                    {!isOngoing && (
-                      <IconButton
-                        aria-label={`${opt.labelKo || opt.value || "선택지"} 삭제`}
-                        size="sm"
-                        onClick={() => removeOption(i)}
-                        className="text-kaist-grey hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </IconButton>
-                    )}
-                    </div>
-                    <SurveyImageField
-                      label={activeTab === "ko" ? "선택지 이미지" : "Option image"}
-                      value={activeTab === "ko" ? opt.imageUrlKo : opt.imageUrlEn}
-                      onChange={(value) => updateOption(i, activeTab === "ko" ? "imageUrlKo" : "imageUrlEn", value)}
-                      disabled={isOngoing}
-                    />
-                  </div>
-                ))}
-              </div>
-              {!isOngoing && (
-                <Button variant="ghost"
-                  onClick={addOption}
-                  className="inline-flex items-center gap-1.5 text-kaist-darkgreen text-xs font-bold hover:bg-kaist-lightgreen/20 px-3 py-2 rounded-xl transition-all border border-kaist-darkgreen/20"
-                >
-                  <Plus className="w-4 h-4" />
-                  선택지 추가
-                </Button>
-              )}
-            </div>
-          )}
-
-          {isGrid && (
-            <div className="space-y-5 rounded-xl border border-emerald-100 bg-emerald-50/30 p-4">
-              <div className="flex items-start gap-2.5">
-                <Grid2X2 className="mt-0.5 size-4 text-brand-primary" />
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900">그리드 구성</h4>
-                  <p className="mt-0.5 text-xs font-normal text-slate-500">행과 열의 내부 키는 자동으로 생성됩니다. 운영자는 화면에 보일 라벨만 입력하면 됩니다.</p>
-                </div>
-              </div>
-              {(["rows", "columns"] as const).map((kind) => (
-                <div key={kind}>
-                  <div className="mb-3 text-xs font-medium leading-4 text-slate-600">
-                    {kind === "rows" ? "행(질문 항목)" : "열(선택 척도)"}
-                  </div>
-                  <div className="mb-3 space-y-2">
-                    {(gridConfig[kind] ?? []).map((option, index) => (
-                      <div key={`${kind}-${index}`} className="flex items-center gap-2">
-                        <UiInput
-                          className={`${inputCls} flex-1`}
-                          placeholder={activeTab === "ko" ? "국문 라벨" : "English label"}
-                          value={activeTab === "ko" ? option.labelKo : option.labelEn}
-                          disabled={isOngoing}
-                          onChange={(event) => updateGridOption(kind, index, activeTab === "ko" ? "labelKo" : "labelEn", event.target.value)}
-                        />
-                        {!isOngoing && (
-                          <IconButton
-                            aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 삭제`}
-                            size="sm"
-                            onClick={() => removeGridOption(kind, index)}
-                            className="text-kaist-grey hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </IconButton>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {!isOngoing && (
-                    <Button variant="ghost" type="button" onClick={() => addGridOption(kind)} className="inline-flex items-center gap-1.5 rounded-xl border border-kaist-darkgreen/20 px-3 py-2 text-xs font-bold text-kaist-darkgreen transition hover:bg-kaist-lightgreen/20">
-                      <Plus className="h-4 w-4" /> {kind === "rows" ? "행 추가" : "열 추가"}
-                    </Button>
-                  )}
-                </div>
-              ))}
-
-              {(gridConfig.rows?.length ?? 0) > 0 && (gridConfig.columns?.length ?? 0) > 0 ? (
-                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                  <table className="w-full min-w-[520px] border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50">
-                        <th className="px-3 py-2 text-left font-semibold text-slate-500">미리보기</th>
-                        {(gridConfig.columns ?? []).map((column) => (
-                          <th key={column.value} className="px-3 py-2 text-center font-medium text-slate-600">{column.labelKo || "열"}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(gridConfig.rows ?? []).map((row) => (
-                        <tr key={row.value} className="border-b border-slate-100 last:border-b-0">
-                          <th className="px-3 py-2.5 text-left font-medium text-slate-700">{row.labelKo || "행"}</th>
-                          {(gridConfig.columns ?? []).map((column) => (
-                            <td key={`${row.value}-${column.value}`} className="px-3 py-2.5 text-center">
-                              <span className={`inline-block size-4 border border-slate-300 bg-white ${form.questionType === "grid_single" ? "rounded-full" : "rounded"}`} />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-kaist-grey/5">
-            <span className="text-sm font-bold text-kaist-black">필수 응답</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <UiInput
-                type="checkbox"
-                className="sr-only peer"
-                checked={form.isRequired}
-                onChange={(e) => set("isRequired", e.target.checked)}
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-kaist-darkgreen/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-kaist-darkgreen"></div>
-            </label>
-          </div>
-
-          {form.questionType === "short_text" && (
-            <AdminFormField label="응답 정규식 (선택)">
-              <UiInput
-                className={inputCls}
-                placeholder="예: ^[0-9]+$"
-                value={form.answerRegex}
-                onChange={(e) => set("answerRegex", e.target.value)}
-              />
-            </AdminFormField>
-          )}
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2.5 rounded-xl text-xs font-semibold animate-in fade-in slide-in-from-top-1">
-              {error}
-            </div>
-          )}
         </div>
-
+        <div className="min-w-0">
+          <label className="mb-1.5 block text-xs font-medium text-slate-600">질문 유형</label>
+          <AdminSelectDropdown
+            ariaLabel="질문 유형"
+            value={form.questionType}
+            options={QUESTION_TYPES}
+            onChange={(value) => changeQuestionType(value as QuestionType)}
+            disabled={isOngoing}
+            buttonClassName="!h-10 !text-sm"
+          />
+        </div>
       </div>
-    </AdminDrawer>
+
+      {needsOptions ? (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-xs font-medium text-slate-600">선택지</span>
+            {!isOngoing ? (
+              <Button type="button" variant="ghost" size="sm" onClick={addOption} className="!h-8 !px-2.5 !text-xs !font-medium text-brand-primary hover:bg-emerald-50">
+                <Plus className="size-3.5" /> 선택지 추가
+              </Button>
+            ) : null}
+          </div>
+          <div className="scrollbar-hidden max-h-64 space-y-2 overflow-y-auto pr-1">
+            {form.options.map((option, index) => (
+              <div key={`${option.value}-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/40 px-2 py-1.5">
+                <span className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white text-[length:var(--ui-text-micro-size)] text-slate-400 ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`} aria-hidden="true">
+                  {form.questionType === "multiple_choice" ? "✓" : ""}
+                </span>
+                <UiInput
+                  className={`${compactInputCls} min-w-[12rem] flex-1`}
+                  placeholder={activeTab === "ko" ? "선택지 라벨" : "Option label"}
+                  aria-label={`${index + 1}번 ${activeTab === "ko" ? "국문 라벨" : "영문 라벨"}`}
+                  value={activeTab === "ko" ? option.labelKo : option.labelEn}
+                  disabled={isOngoing}
+                  onChange={(event) => updateOption(index, activeTab === "ko" ? "labelKo" : "labelEn", event.target.value)}
+                />
+                <UiInput
+                  className={`${compactInputCls} w-28 shrink-0`}
+                  placeholder="값"
+                  aria-label={`${index + 1}번 내부 값`}
+                  value={option.value}
+                  disabled={isOngoing}
+                  onChange={(event) => updateOption(index, "value", event.target.value)}
+                />
+                {supportsBranching && branchTargets.length > 0 ? (
+                  <AdminSelectDropdown
+                    ariaLabel={`${option.labelKo || option.value || "선택지"} 다음 섹션`}
+                    className="w-full shrink-0 sm:w-40"
+                    value={branchMap[option.value] ?? ""}
+                    disabled={isOngoing || !option.value.trim()}
+                    onChange={(target) => updateBranchTarget(option.value, target)}
+                    options={[
+                      { value: "", label: "다음 섹션" },
+                      ...branchTargets
+                        .filter((target) => target.id !== currentSectionId)
+                        .map((target) => ({ value: target.id, label: target.titleKo })),
+                      { value: "SUBMIT", label: "여기서 제출 완료" },
+                    ]}
+                  />
+                ) : null}
+                <CompactImagePicker
+                  label={activeTab === "ko" ? "선택지 이미지" : "Option image"}
+                  value={activeTab === "ko" ? option.imageUrlKo : option.imageUrlEn}
+                  onChange={(value) => updateOption(index, activeTab === "ko" ? "imageUrlKo" : "imageUrlEn", value)}
+                  disabled={isOngoing}
+                />
+                {!isOngoing ? (
+                  <IconButton
+                    type="button"
+                    aria-label={`${option.labelKo || option.value || "선택지"} 삭제`}
+                    size="sm"
+                    onClick={() => removeOption(index)}
+                    className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                  >
+                    <Trash2 className="size-4" />
+                  </IconButton>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {isGrid ? (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Grid2X2 className="size-4 text-brand-primary" />
+            <h4 className="text-xs font-semibold text-slate-700">그리드 구성</h4>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(["rows", "columns"] as const).map((kind) => (
+              <div key={kind} className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/40 p-2.5">
+                <div className="mb-2 text-xs font-medium text-slate-600">
+                  {kind === "rows" ? "행(질문 항목)" : "열(선택 척도)"}
+                </div>
+                <div className="space-y-2">
+                  {(gridConfig[kind] ?? []).map((option, index) => (
+                    <div key={`${kind}-${index}`} className="flex items-center gap-2">
+                      <UiInput
+                        className={`${compactInputCls} w-24 shrink-0`}
+                        placeholder="값"
+                        aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 내부 값`}
+                        value={option.value}
+                        disabled={isOngoing}
+                        onChange={(event) => updateGridOption(kind, index, "value", event.target.value)}
+                      />
+                      <UiInput
+                        className={`${compactInputCls} min-w-0 flex-1`}
+                        placeholder={activeTab === "ko" ? "라벨" : "Label"}
+                        aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 라벨`}
+                        value={activeTab === "ko" ? option.labelKo : option.labelEn}
+                        disabled={isOngoing}
+                        onChange={(event) => updateGridOption(kind, index, activeTab === "ko" ? "labelKo" : "labelEn", event.target.value)}
+                      />
+                      {!isOngoing ? (
+                        <IconButton
+                          type="button"
+                          aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 삭제`}
+                          size="sm"
+                          onClick={() => removeGridOption(kind, index)}
+                          className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 className="size-4" />
+                        </IconButton>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                {!isOngoing ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => addGridOption(kind)} className="mt-2 !h-8 !px-2.5 !text-xs !font-medium text-brand-primary hover:bg-emerald-50">
+                    <Plus className="size-3.5" /> {kind === "rows" ? "행 추가" : "열 추가"}
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {form.questionType === "rating" ? (
+        <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-3">
+          <span className="text-xs font-medium text-slate-600">등급 개수</span>
+          <AdminSelectDropdown
+            ariaLabel="등급 개수"
+            value={String(form.config?.ratingMax ?? 5)}
+            options={Array.from({ length: 8 }, (_, index) => ({
+              value: String(index + 3),
+              label: `${index + 3}개`,
+            }))}
+            onChange={(value) => set("config", { ...(form.config ?? {}), ratingMax: Number(value) })}
+            disabled={isOngoing}
+            className="w-24"
+            buttonClassName="!h-9 !text-sm"
+          />
+          <span className="text-xs font-normal text-slate-400">별 아이콘으로 표시됩니다.</span>
+        </div>
+      ) : null}
+
+      {form.questionType === "short_text" ? (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <label className="flex items-center gap-3 text-xs font-medium text-slate-600">
+            <span className="shrink-0">응답 정규식 (선택)</span>
+            <UiInput
+              className={`${compactInputCls} min-w-0 flex-1`}
+              placeholder="예: ^[0-9]+$"
+              value={form.answerRegex}
+              disabled={isOngoing}
+              onChange={(event) => set("answerRegex", event.target.value)}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+          <UiInput
+            type="checkbox"
+            className="peer sr-only"
+            checked={form.isRequired}
+            disabled={isOngoing}
+            onChange={(event) => set("isRequired", event.target.checked)}
+          />
+          <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary/25 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-brand-primary peer-checked:after:translate-x-4" />
+          필수 응답
+        </label>
+        <div className="ml-auto flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+            {isOngoing ? "닫기" : "취소"}
+          </Button>
+          {!isOngoing ? (
+            <Button type="button" size="sm" onClick={handleSave} className="gap-1.5 bg-brand-primary text-white hover:bg-brand-primary/90">
+              <Check className="size-4" /> 문항 저장
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }

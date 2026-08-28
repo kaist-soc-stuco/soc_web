@@ -116,6 +116,7 @@ export class AssetRepository {
       .limit(1);
 
     const assetReference = `asset:${assetId}`;
+    const assetContentPath = `/assets/${assetId}/content`;
     const [publicSurveyImage] = await this.db
       .select({ surveyId: surveys.surveyId })
       .from(surveys)
@@ -126,6 +127,10 @@ export class AssetRepository {
         or(
           eq(surveys.descriptionImageUrlKo, assetReference),
           eq(surveys.descriptionImageUrlEn, assetReference),
+          sql`${surveys.descriptionKo}::text LIKE ${`%${assetContentPath}%`}`,
+          sql`${surveys.descriptionEn}::text LIKE ${`%${assetContentPath}%`}`,
+          sql`${surveySections.descriptionKo}::text LIKE ${`%${assetContentPath}%`}`,
+          sql`${surveySections.descriptionEn}::text LIKE ${`%${assetContentPath}%`}`,
           sql`${surveyQuestions.options}::text LIKE ${`%${assetReference}%`}`,
           sql`${surveyQuestions.config}::text LIKE ${`%${assetReference}%`}`,
         ),
@@ -280,6 +285,7 @@ export class AssetRepository {
     cutoff: Date,
     limit: number,
   ): Promise<Array<{ assetId: string; storageKey: string }>> {
+    const assetContentPath = sql`'/assets/' || ${assets.assetId}::text || '/content'`;
     const rows = await this.db
       .select({
         assetId: assets.assetId,
@@ -299,6 +305,17 @@ export class AssetRepository {
       .leftJoin(surveys, or(
         eq(surveys.descriptionImageUrlKo, sql`'asset:' || ${assets.assetId}::text`),
         eq(surveys.descriptionImageUrlEn, sql`'asset:' || ${assets.assetId}::text`),
+        sql`${surveys.descriptionKo}::text LIKE ('%' || ${assetContentPath} || '%')`,
+        sql`${surveys.descriptionEn}::text LIKE ('%' || ${assetContentPath} || '%')`,
+        sql`EXISTS (
+          SELECT 1
+          FROM "survey_sections" AS section
+          WHERE section."survey_id" = ${surveys.surveyId}
+            AND (
+              section."description_ko"::text LIKE ('%' || ${assetContentPath} || '%')
+              OR section."description_en"::text LIKE ('%' || ${assetContentPath} || '%')
+            )
+        )`,
       ))
       .leftJoin(surveyQuestions, sql`
         ${surveyQuestions.options}::text LIKE ('%asset:' || ${assets.assetId}::text || '%')

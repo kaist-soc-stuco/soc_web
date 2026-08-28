@@ -6,10 +6,10 @@ import {
   FileText,
   ListChecks,
   Lock,
-  UserCheck,
 } from "lucide-react";
 
 import { formatSurveyDateTime } from "./survey-answer-utils";
+import { SurveyParticipationNotice } from "./survey-participation-notice";
 
 function ResponseRecordedNotice({
   lang,
@@ -92,37 +92,12 @@ export function ClosedView({
   );
 }
 
-export function LoginRequiredView({
-  lang,
-  feePayersOnly,
-}: {
-  lang: string;
-  feePayersOnly?: boolean;
-}) {
+export function LoginRequiredView({ lang }: { lang: string }) {
   return (
-    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-md text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
-      <div className="w-16 h-16 rounded-2xl bg-kaist-lightgreen/20 flex items-center justify-center text-kaist-darkgreen mb-6 border border-kaist-lightgreen/30">
-        <UserCheck className="w-8 h-8" />
-      </div>
-      <h2 className="text-2xl font-bold text-kaist-black mb-3">
-        {lang === "ko" ? "로그인이 필요합니다" : "Login Required"}
-      </h2>
-      <p className="text-sm text-kaist-grey/80 leading-relaxed mb-8">
-        {feePayersOnly
-          ? lang === "ko"
-            ? "이 설문은 과비 납부 회원만 응답할 수 있습니다. 로그인하여 납부 여부를 확인해 주세요."
-            : "This survey is restricted to fee-paying members. Please log in to verify your status."
-          : lang === "ko"
-            ? "이 설문조사에 참여하기 위해서는 로그인이 필요합니다."
-            : "To participate in this survey, please log in to your account first."}
-      </p>
-      <a
-        href="/login"
-        className="w-full py-3 bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 text-white font-bold rounded-xl transition-all shadow-sm shadow-kaist-darkgreen/10 text-center text-sm"
-      >
-        {lang === "ko" ? "로그인 하러 가기" : "Go to Login"}
-      </a>
-    </div>
+    <SurveyParticipationNotice
+      eligibility={{ status: "LOGIN_REQUIRED", reasons: ["LOGIN_REQUIRED"] }}
+      lang={lang}
+    />
   );
 }
 

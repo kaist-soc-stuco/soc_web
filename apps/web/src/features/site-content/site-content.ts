@@ -72,7 +72,7 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
     group: "about",
     key: "about.roadmap.title",
     labelKo: "로드맵 제목",
-    valueKo: "전산학부 생활 로드맵",
+    valueKo: "전산학부 로드맵",
     valueEn: "School of Computing Journey Roadmap",
   },
   {

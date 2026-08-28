@@ -367,7 +367,7 @@ export function UserManagementPage() {
                   setQuery("");
                   setCurrentPage(1);
                 }}
-                placeholder="이름, 학번, 이메일, 소속 검색"
+                placeholder="이름, 학번, 이메일 검색"
                 value={query}
               />
             </AdminCardHeader>
@@ -404,7 +404,7 @@ export function UserManagementPage() {
                       이름
                     </AdminSortableHead>
                     <AdminTableHead>연락처</AdminTableHead>
-                    <AdminTableHead>소속 · 전공</AdminTableHead>
+                    <AdminTableHead>전공</AdminTableHead>
                     <AdminTableHead>동의 시각</AdminTableHead>
                     <AdminSortableHead
                       active={sortBy === "lastLoginAt"}
@@ -448,7 +448,6 @@ export function UserManagementPage() {
                           <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={user.phoneNumber ?? undefined}>{user.phoneNumber ?? ""}</div>
                         </AdminTableCell>
                         <AdminTableCell className="py-3">
-                          <div className="truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{user.departmentKo ?? ""}</div>
                           {major ? <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{major}</div> : null}
                         </AdminTableCell>
                         <AdminTableCell className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
@@ -626,7 +625,6 @@ function UserDetailDrawer({
               <UserDetailItem label="KAIST UID" value={user.kaistUid} />
               <UserDetailItem label="이메일" value={user.email} />
               <UserDetailItem label="전화번호" value={user.phoneNumber ?? ""} />
-              <UserDetailItem label="소속" value={user.departmentKo ?? "—"} />
               <UserDetailItem label="주전공" value={user.primaryMajor ?? "—"} />
               <UserDetailItem label="학적 상태" value={user.academicStatus ?? "—"} />
             </dl>

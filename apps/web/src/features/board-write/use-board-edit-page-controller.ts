@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
 import { hasAdminPermission } from "@/lib/permissions";
 
 import type { AttachedAsset } from "./board-write-form-sections";
@@ -370,6 +371,48 @@ export function useBoardEditPageController(forcedCategory?: string) {
     }
   };
 
+  const handleUploadInlineImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "본문 이미지는 이미지 파일만 선택할 수 있습니다."
+            : "Inline images must be image files.",
+      });
+      return null;
+    }
+
+    setUploading(true);
+    try {
+      const asset = await apiClient.uploadAsset(file);
+      setAssets((current) => [
+        ...current,
+        {
+          assetId: asset.assetId,
+          mimeType: asset.mimeType,
+          originalFilename: asset.originalFilename,
+          sizeBytes: asset.sizeBytes,
+          storageKey: asset.storageKey,
+          usageType: "IMAGE",
+        } satisfies AttachedAsset,
+      ]);
+      return resolveAssetUrl(asset.storageKey);
+    } catch (error) {
+      console.error(error);
+      toast({
+        type: "error",
+        message:
+          lang === "ko"
+            ? "본문 이미지 업로드에 실패했습니다."
+            : "Failed to upload the inline image.",
+      });
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleUploadThumbnail = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast({
@@ -430,8 +473,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
         type: "error",
         message:
           lang === "ko"
-            ? "영문 제목과 내용을 입력하거나 '한국어 사용자만'을 선택해 주세요."
-            : "Enter an English title and content, or select 'Korean Speakers Only'.",
+            ? "영문 제목과 내용을 입력하거나 '한국어 전용'을 선택해 주세요."
+            : "Enter an English title and content, or select 'Korean only'.",
       });
       return;
     }
@@ -595,6 +638,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     handleSaveDraft,
     handleUploadThumbnail,
     handleUploadFiles,
+    handleUploadInlineImage,
     isAnonymous,
     isAllDay,
     isEventAlwaysOpen,
