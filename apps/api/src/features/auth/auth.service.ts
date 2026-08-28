@@ -44,7 +44,6 @@ interface LoginResultPayload {
   accessToken: string;
   refreshToken: string;
   sessionId: string;
-  ssoUserInfo?: Record<string, unknown>;
   storageMode: "persisted" | "temporary";
   userId?: string;
 }
@@ -198,6 +197,9 @@ export class AuthService {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+          // The SSO token endpoint validates the public application origin even
+          // though this exchange is performed server-to-server.
+          Origin: new URL(config.redirectUri).origin,
         },
         body: new URLSearchParams({
           client_id: config.clientId,
@@ -266,7 +268,12 @@ export class AuthService {
       const departmentEn = this.readUserInfoString(userInfo, "std_dept_eng_nm");
       const primaryMajor =
         this.readUserInfoString(userInfo, "std_major_kor_nm") ??
-        this.readUserInfoString(userInfo, "major_kor");
+        this.readUserInfoString(userInfo, "std_major_kor") ??
+        this.readUserInfoString(userInfo, "major_kor") ??
+        this.readUserInfoString(userInfo, "std_major_eng_nm") ??
+        this.readUserInfoString(userInfo, "std_major_eng") ??
+        this.readUserInfoString(userInfo, "major_eng") ??
+        this.readUserInfoString(userInfo, "major");
       const doubleMajor =
         this.readUserInfoString(userInfo, "std_double_major_kor_nm") ??
         this.readUserInfoString(userInfo, "double_major_kor");
@@ -311,8 +318,6 @@ export class AuthService {
         if (nameKo || nameEn || userEmail) {
           await this.usersService.updateProfileFromSso(existingUser.userId, {
             academicStatus,
-            departmentEn,
-            departmentKo,
             primaryMajor,
             doubleMajor,
             minor,
@@ -338,7 +343,6 @@ export class AuthService {
           accessToken: issued.accessToken,
           refreshToken: issued.refreshToken,
           sessionId: issued.session.sessionId,
-          ssoUserInfo: userInfo,
           storageMode: "persisted",
           userId: existingUser.userId,
         });
@@ -361,7 +365,6 @@ export class AuthService {
         kaistUid,
         nameEn,
         nameKo,
-        ssoUserInfo: userInfo,
         ssoSubject,
         stdNo,
         primaryMajor,

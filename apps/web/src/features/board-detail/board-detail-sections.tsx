@@ -3,7 +3,7 @@ import type {
   ArticleAssetItem,
   ArticleEngagementKind,
 } from "@soc/contracts";
-import { ArrowLeft, Check, ClipboardCheck, Edit2, EllipsisVertical, Eye, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Check, ClipboardCheck, Edit2, EllipsisVertical, Eye, Pin, Share2, Trash2 } from "lucide-react";
 import { isoToDate } from "@soc/shared";
 import { Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -35,12 +35,14 @@ interface ArticleCardProps {
   article: ArticleDetailResponse;
   attachmentAssets: ArticleAssetItem[];
   canManageArticle: boolean;
+  canRestrictAuthor: boolean;
   category: string;
   content: string;
   editHref?: string;
   isAuthenticated: boolean;
   lang: string;
   onDeleteArticle: () => void;
+  onRestrictAuthor: () => void;
   onShare: () => void;
   onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   posterAsset?: ArticleAssetItem;
@@ -55,12 +57,14 @@ export function BoardDetailArticleCard({
   article,
   attachmentAssets,
   canManageArticle,
+  canRestrictAuthor,
   category,
   content,
   editHref,
   isAuthenticated,
   lang,
   onDeleteArticle,
+  onRestrictAuthor,
   onShare,
   onToggle,
   posterAsset,
@@ -73,13 +77,23 @@ export function BoardDetailArticleCard({
   return (
     <article className="w-full rounded-xl border border-card-border-subtle bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]">
       <header>
-        <h1 className="text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
-          {title}
-        </h1>
+        <div className="flex min-w-0 items-center gap-2">
+          {article.isPinned ? (
+            <Pin
+              className="size-4 shrink-0 rotate-45 text-brand-primary"
+              aria-label={lang === "ko" ? "고정된 게시글" : "Pinned post"}
+            />
+          ) : null}
+          <h1 className="min-w-0 text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
+            {title}
+          </h1>
+        </div>
         <div className="mt-3 flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-x-2 text-xs font-normal text-slate-400">
             <span>
-              {article.isAnonymous
+              {article.isOfficial
+                ? "전산학부 집행위원회"
+                : article.isAnonymous
                 ? lang === "ko"
                   ? "익명"
                   : "Anonymous"
@@ -113,7 +127,7 @@ export function BoardDetailArticleCard({
                   sideOffset={6}
                   collisionPadding={12}
                 >
-                  <AdminActionMenuPanel className="w-32 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
+                  <AdminActionMenuPanel className="w-40 !shadow-[0_4px_12px_rgb(15_23_42_/_0.08)]">
                     <DropdownMenu.Item asChild>
                       <AdminActionMenuLink
                         to={editHref ?? `/board/${category}/${article.articleId}/edit`}
@@ -122,6 +136,17 @@ export function BoardDetailArticleCard({
                         {lang === "ko" ? "수정" : "Edit"}
                       </AdminActionMenuLink>
                     </DropdownMenu.Item>
+                    {canRestrictAuthor ? (
+                      <DropdownMenu.Item asChild>
+                        <AdminActionMenuItem
+                          icon={<Ban />}
+                          tone="danger"
+                          onClick={onRestrictAuthor}
+                        >
+                          {lang === "ko" ? "작성자 제재" : "Restrict author"}
+                        </AdminActionMenuItem>
+                      </DropdownMenu.Item>
+                    ) : null}
                     <DropdownMenu.Item asChild>
                       <AdminActionMenuItem
                         icon={<Trash2 />}

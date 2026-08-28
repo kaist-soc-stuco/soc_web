@@ -1,8 +1,14 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
 import { AuditLogService } from "../audit/audit-log.service";
 import type { UserRecord } from "./entities/user";
 import { UsersRepository } from "./repositories/users.repository";
+import { UserRestrictionsRepository } from "./repositories/user-restrictions.repository";
 import type {
   AdminUserSortBy,
   EmailRecipientFilters,
@@ -28,12 +34,16 @@ import type {
   StudentFeeStatsOptions,
   StudentFeeStatusRecord,
   StudentFeeDetailResponse,
+  UserRestrictionCreateRequest,
+  UserRestrictionResponse,
 } from "@soc/contracts";
+import { Permissions } from "@soc/contracts";
 import { nowDate } from "@soc/shared";
 
 interface AuditMetadata {
   actorUserId?: string | null;
   ipAddress?: string | null;
+  permission?: number;
 }
 
 /**
@@ -44,6 +54,7 @@ export class UsersService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly userRestrictionsRepository: UserRestrictionsRepository,
   ) {}
 
   private normalizeListOptions(options: { page: number; limit: number }) {
@@ -68,14 +79,63 @@ export class UsersService {
     return this.usersRepository.findById(userId);
   }
 
+  async isUserRestricted(userId: string): Promise<boolean> {
+    return this.userRestrictionsRepository.isActive(userId);
+  }
+
+  async createUserRestriction(
+    userId: string,
+    input: UserRestrictionCreateRequest,
+    audit?: AuditMetadata,
+  ): Promise<UserRestrictionResponse> {
+    if (
+      !Permissions.hasAny(
+        audit?.permission ?? 0,
+        Permissions.MODERATE_POST_COMMENT,
+        Permissions.SUPER_ADMIN,
+      )
+    ) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+
+    if (!audit?.actorUserId) {
+      throw new ForbiddenException("actor_required");
+    }
+
+    if (audit.actorUserId === userId) {
+      throw new BadRequestException("self_restriction_not_allowed");
+    }
+
+    const target = await this.usersRepository.findById(userId);
+    if (!target) throw new NotFoundException("user_not_found");
+
+    const restriction = await this.userRestrictionsRepository.create(
+      userId,
+      audit.actorUserId,
+      input,
+    );
+    await this.auditLogService.record({
+      action: "user.restriction.create",
+      actorUserId: audit.actorUserId,
+      ipAddress: audit.ipAddress ?? null,
+      payload: {
+        duration: input.duration,
+        reasonCode: input.reasonCode,
+        reasonDetail: input.reasonDetail ?? null,
+      },
+      targetId: userId,
+      targetType: "user",
+    });
+
+    return restriction;
+  }
+
   async upsertUserFromConsent(input: {
     kaistUid: string;
     nameEn?: string;
     nameKo: string;
     email: string;
     academicStatus?: string;
-    departmentEn?: string;
-    departmentKo?: string;
     primaryMajor?: string;
     doubleMajor?: string;
     minor?: string;
@@ -88,8 +148,6 @@ export class UsersService {
     const now = nowDate();
     return this.usersRepository.upsertByKaistUid({
       academicStatus: input.academicStatus,
-      departmentEn: input.departmentEn,
-      departmentKo: input.departmentKo,
       primaryMajor: input.primaryMajor,
       doubleMajor: input.doubleMajor,
       minor: input.minor,
@@ -108,6 +166,10 @@ export class UsersService {
 
   async resolvePermissionBitmaskByUserId(userId: string): Promise<number> {
     return this.usersRepository.resolvePermissionBitmaskByUserId(userId);
+  }
+
+  async listActiveRoleGroupIds(userId: string): Promise<number[]> {
+    return this.usersRepository.listActiveRoleGroupIds(userId);
   }
 
   async invalidatePermissionCache(userId: string): Promise<void> {
@@ -177,21 +239,11 @@ export class UsersService {
     return this.usersRepository.listAdminUsers(input);
   }
 
-  /**
-   * 현재 사용자가 개인정보를 영구 저장한 상태인지 확인합니다.
-   */
-  async hasPersistedProfile(userId: string): Promise<boolean> {
-    const foundByInternalId = await this.usersRepository.findById(userId);
-    return Boolean(foundByInternalId?.isActive);
-  }
-
   /** SSO 최신 정보로 프로필을 부분 갱신합니다. */
   async updateProfileFromSso(
     userId: string,
     input: {
       academicStatus?: string;
-      departmentEn?: string;
-      departmentKo?: string;
       primaryMajor?: string;
       doubleMajor?: string;
       minor?: string;

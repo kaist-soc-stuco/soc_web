@@ -13,7 +13,7 @@ import {
 import { CreateSurveySchema, UpdateSurveySchema } from "@soc/contracts";
 import { Request } from "express";
 
-import { RequirePermissions, OptionalAuthGuard } from "../auth/guards";
+import { RequireAnyPermissions, OptionalAuthGuard } from "../auth/guards";
 import { Permissions } from "@soc/contracts";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
@@ -34,9 +34,9 @@ export class SurveysController {
   constructor(private readonly surveysService: SurveysService) {}
 
   @Get()
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
-  findAll() {
-    return this.surveysService.findAll();
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
+  findAll(@Req() req: AuthedRequest) {
+    return this.surveysService.findAll(req.user);
   }
 
   @Get("list/public")
@@ -57,35 +57,36 @@ export class SurveysController {
   }
 
   @Post()
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
   create(
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(CreateSurveySchema)) dto: CreateSurveyDto,
   ) {
-    return this.surveysService.create(req.user.id, dto);
+    return this.surveysService.create(req.user.id, dto, req.user);
   }
 
   @Patch(":id")
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
   update(
     @Param("id", ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(UpdateSurveySchema)) dto: UpdateSurveyDto,
+    @Req() req: AuthedRequest,
   ) {
-    return this.surveysService.update(id, dto);
+    return this.surveysService.update(id, dto, req.user);
   }
 
   @Delete(":id")
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
-  delete(@Param("id", ParseUUIDPipe) id: string) {
-    return this.surveysService.delete(id);
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
+  delete(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
+    return this.surveysService.delete(id, req.user);
   }
 
   @Post(":id/duplicate")
-  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  @RequireAnyPermissions(Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)
   duplicate(
     @Req() req: AuthedRequest,
     @Param("id", ParseUUIDPipe) id: string,
   ) {
-    return this.surveysService.duplicate(id, req.user.id);
+    return this.surveysService.duplicate(id, req.user.id, req.user);
   }
 }

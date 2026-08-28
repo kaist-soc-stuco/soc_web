@@ -15,6 +15,8 @@ import type {
   ArticleUpdateRequest,
   ArticleUpdateResponse,
   ArticleDeleteResponse,
+  UserRestrictionCreateRequest,
+  UserRestrictionAppliedResponse,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { isoToDate, localDate, msToIso, nowDate, nowMs } from "@soc/shared";
@@ -22,12 +24,18 @@ import { isoToDate, localDate, msToIso, nowDate, nowMs } from "@soc/shared";
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import {
+  assertSecretArticleAccess,
   assertArticleScopeAssignable,
   getReadableArticleScopes,
 } from "./article-access";
+import {
+  canUseOfficialIdentity,
+  canWriteToBoard,
+} from "./board-access";
 import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
 import { sanitizeArticleHtml } from "./article-html-sanitizer";
+import { UsersService } from "../users/users.service";
 
 interface ArticleQueryParams {
   page?: number;
@@ -43,6 +51,7 @@ interface ArticleQueryParams {
 interface AuthenticatedUser {
   id: string;
   permission: number;
+  roleGroupIds?: number[];
 }
 
 const MAX_CONTENT_LENGTH = 50_000;
@@ -57,10 +66,18 @@ const canReadSecretArticle = (
   if (currentUser.user?.id === article.author.userId) return true;
   return Boolean(currentUser.user && Permissions.hasAny(
     currentUser.user.permission,
-    Permissions.MODERATOR,
-    Permissions.ADMIN,
+    Permissions.VIEW_SECRET_POST,
+    Permissions.SUPER_ADMIN,
   ));
 };
+
+/** 익명 작성자의 계정 식별자는 모든 공개 응답에서 제거합니다. */
+const maskAnonymousAuthor = <
+  T extends { isAnonymous: boolean; author: { userId: string; name: string } },
+>(item: T): T =>
+  item.isAnonymous
+    ? { ...item, author: { userId: "", name: "익명" } }
+    : item;
 
 const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
   ...item,
@@ -89,6 +106,7 @@ export class ArticleService {
   constructor(
     private readonly boardRepository: BoardRepository,
     private readonly articleRepository: ArticleRepository,
+    private readonly usersService: UsersService,
   ) {}
 
   async getArticles(
@@ -118,9 +136,11 @@ export class ArticleService {
     );
 
     const visibleItems = result.items.map((item) =>
-      canReadSecretArticle(item, currentUser)
-        ? item
-        : maskSecretListItem(item),
+      maskAnonymousAuthor(
+        canReadSecretArticle(item, currentUser)
+          ? item
+          : maskSecretListItem(item),
+      ),
     );
 
     return {
@@ -183,11 +203,11 @@ export class ArticleService {
     );
     const visibleItems = result.items.map((item) => {
       const board = boardById.get(item.boardId);
-      return board && canReadSecretArticle(item, currentUser)
-        ? item
-        : board
-          ? maskSecretListItem(item)
-          : item;
+      const visibleItem =
+        board && canReadSecretArticle(item, currentUser)
+          ? item
+          : maskSecretListItem(item);
+      return maskAnonymousAuthor(visibleItem);
     });
 
     return {
@@ -233,7 +253,65 @@ export class ArticleService {
       if (wasRecorded) article.viewCount += 1;
     }
 
-    return article;
+    return maskAnonymousAuthor({
+      ...article,
+      prevArticle: article.prevArticle
+        ? maskAnonymousAuthor(article.prevArticle)
+        : article.prevArticle,
+      nextArticle: article.nextArticle
+        ? maskAnonymousAuthor(article.nextArticle)
+        : article.nextArticle,
+    });
+  }
+
+  /**
+   * 익명 게시글도 서버 내부의 작성자 FK를 기준으로 제재합니다.
+   * 작성자 ID는 이 메서드의 응답이나 공개 게시글 DTO로 반환하지 않습니다.
+   */
+  async restrictArticleAuthor(
+    code: string,
+    articleId: string,
+    input: UserRestrictionCreateRequest,
+    user: AuthenticatedUser,
+    ipAddress?: string,
+  ): Promise<UserRestrictionAppliedResponse> {
+    if (
+      !Permissions.hasAny(
+        user.permission,
+        Permissions.MODERATE_POST_COMMENT,
+        Permissions.SUPER_ADMIN,
+      )
+    ) {
+      throw new ForbiddenException("insufficient_permission");
+    }
+
+    const board = await this.boardRepository.findByCode(code);
+    if (!board || !board.isActive) {
+      throw new NotFoundException("board_not_found");
+    }
+
+    const article = await this.articleRepository.findPermissionInfo(
+      board.boardId,
+      articleId,
+    );
+    if (!article || article.status === ARTICLE_STATUS.DELETED) {
+      throw new NotFoundException("article_not_found");
+    }
+
+    const restriction = await this.usersService.createUserRestriction(article.authorUserId, input, {
+      actorUserId: user.id,
+      ipAddress,
+      permission: user.permission,
+    });
+
+    return {
+      restrictionId: restriction.restrictionId,
+      duration: restriction.duration,
+      reasonCode: restriction.reasonCode,
+      reasonDetail: restriction.reasonDetail,
+      expiresAt: restriction.expiresAt,
+      createdAt: restriction.createdAt,
+    };
   }
 
   async createArticle(
@@ -278,10 +356,26 @@ export class ArticleService {
     }
 
     if (
-      board.writePermissionBit > 0 &&
-      !Permissions.has(user.permission, board.writePermissionBit)
+      payload.isPinned &&
+      !Permissions.hasAny(
+        user.permission,
+        Permissions.POST_ANNOUNCEMENT,
+        Permissions.SUPER_ADMIN,
+      )
     ) {
+      throw new ForbiddenException("announcement_permission_required");
+    }
+
+    if (!canWriteToBoard(board, user)) {
       throw new ForbiddenException("insufficient_permission");
+    }
+
+    if (payload.isOfficial && !canUseOfficialIdentity(board, user)) {
+      throw new ForbiddenException("official_identity_not_allowed");
+    }
+
+    if (payload.isOfficial) {
+      sanitizedPayload.isAnonymous = false;
     }
 
     return this.articleRepository.createArticle({
@@ -340,6 +434,25 @@ export class ArticleService {
       throw new ForbiddenException("secret_post_not_allowed");
     }
 
+    if (
+      payload.isPinned === true &&
+      !Permissions.hasAny(
+        user.permission,
+        Permissions.POST_ANNOUNCEMENT,
+        Permissions.SUPER_ADMIN,
+      )
+    ) {
+      throw new ForbiddenException("announcement_permission_required");
+    }
+
+    if (payload.isOfficial && !canUseOfficialIdentity(board, user)) {
+      throw new ForbiddenException("official_identity_not_allowed");
+    }
+
+    if (payload.isOfficial) {
+      sanitizedPayload.isAnonymous = false;
+    }
+
     const article = await this.articleRepository.findPermissionInfo(
       board.boardId,
       articleId,
@@ -350,10 +463,13 @@ export class ArticleService {
     }
 
     const isOwner = article.authorUserId === user.id;
+    if (!isOwner) {
+      assertSecretArticleAccess(article, { authenticated: true, user });
+    }
     const isManager = Permissions.hasAny(
       user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
+      Permissions.MODERATE_POST_COMMENT,
+      Permissions.SUPER_ADMIN,
     );
 
     if (!isOwner && !isManager) {
@@ -389,10 +505,13 @@ export class ArticleService {
     }
 
     const isOwner = article.authorUserId === user.id;
+    if (!isOwner) {
+      assertSecretArticleAccess(article, { authenticated: true, user });
+    }
     const isManager = Permissions.hasAny(
       user.permission,
-      Permissions.MODERATOR,
-      Permissions.ADMIN,
+      Permissions.MODERATE_POST_COMMENT,
+      Permissions.SUPER_ADMIN,
     );
 
     if (!isOwner && !isManager) {

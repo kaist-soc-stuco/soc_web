@@ -20,8 +20,6 @@ export const users = pgTable("users", {
   nameEn: varchar("name_en", { length: 100 }),
   email: varchar("email", { length: 255 }).notNull().unique(),
   privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }),
-  departmentKo: varchar("dept_ko", { length: 100 }),
-  departmentEn: varchar("dept_en", { length: 100 }),
   primaryMajor: varchar("primary_major", { length: 100 }),
   doubleMajor: varchar("double_major", { length: 100 }),
   minor: varchar("minor", { length: 100 }),
@@ -47,6 +45,26 @@ export const permissions = pgTable("permission", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const userRestrictions = pgTable("user_restriction", {
+  restrictionId: serial("restriction_id").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.userId, { onDelete: "cascade" }),
+  duration: varchar("duration", { length: 20 }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  reasonCode: varchar("reason_code", { length: 40 }).notNull(),
+  reasonDetail: text("reason_detail"),
+  createdByUserId: uuid("created_by_user_id")
+    .notNull()
+    .references(() => users.userId),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedByUserId: uuid("revoked_by_user_id").references(() => users.userId),
+}, (table) => [
+  index("user_restriction_active_idx").on(table.userId, table.revokedAt, table.expiresAt),
+  index("user_restriction_created_by_idx").on(table.createdByUserId, table.createdAt),
+]);
 
 export const roleGroups = pgTable("role_group", {
   roleGroupId: serial("role_group_id").primaryKey(),

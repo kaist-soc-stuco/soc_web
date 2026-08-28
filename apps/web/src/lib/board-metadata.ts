@@ -29,7 +29,9 @@ export interface BoardFallbackMetadata {
   descriptionKo: string;
   labelEn: string;
   titleKo: string;
+  writeAccessType: "AUTHENTICATED";
   writePermissionBit: number;
+  writeRoleGroupIds: number[];
 }
 
 export type BoardMetadata = Pick<
@@ -42,48 +44,59 @@ export type BoardMetadata = Pick<
   | "descriptionKo"
   | "nameEn"
   | "nameKo"
+  | "writeAccessType"
   | "writePermissionBit"
+  | "writeRoleGroupIds"
+  | "canWrite"
+  | "canUseOfficialIdentity"
+  | "allowOfficialReply"
 >;
 
 const BOARD_FALLBACK_METADATA: Record<
   BoardCode,
-  Omit<BoardFallbackMetadata, "writePermissionBit">
+  Omit<BoardFallbackMetadata, "writeAccessType" | "writePermissionBit">
 > = {
   공지: {
     descriptionKo: "전산학부의 다양한 소식을 확인하세요.",
     descriptionEn: "Get updates from the School of Computing.",
     labelEn: "Notice",
     titleKo: "공지",
+    writeRoleGroupIds: [],
   },
   HoC: {
     descriptionKo: "Hall of Code 프로젝트 및 활동 내역을 확인하세요.",
     descriptionEn: "Hall of Code projects and activity logs.",
     labelEn: "HoC",
     titleKo: "HoC",
+    writeRoleGroupIds: [],
   },
   홍보글: {
     descriptionKo: "집행위원회 및 학회 홍보 게시물을 확인하세요.",
     descriptionEn: "Promotional posts from the Student Council and societies.",
     labelEn: "Promotional Posts",
     titleKo: "홍보글",
+    writeRoleGroupIds: [],
   },
   건의사항: {
     descriptionKo: "학생들의 의견과 건의사항을 공유하는 공간입니다.",
     descriptionEn: "Share opinions and suggestions with the council.",
     labelEn: "Suggestions",
     titleKo: "건의사항",
+    writeRoleGroupIds: [],
   },
   연구실: {
     descriptionKo: "각 연구실의 소식과 공지사항을 확인하세요.",
     descriptionEn: "News and announcements from research labs.",
     labelEn: "Research Labs",
     titleKo: "연구실",
+    writeRoleGroupIds: [],
   },
   FAQ: {
     descriptionKo: "FAQ와 답변을 확인하세요.",
     descriptionEn: "Browse frequently asked questions and answers.",
     labelEn: "FAQ",
     titleKo: "FAQ",
+    writeRoleGroupIds: [],
   },
 };
 
@@ -94,7 +107,9 @@ export const getBoardFallbackMetadata = (
   if (metadata) {
     return {
       ...metadata,
+      writeAccessType: "AUTHENTICATED",
       writePermissionBit: FALLBACK_WRITE_PERMISSION_BIT,
+      writeRoleGroupIds: [],
     };
   }
 
@@ -103,7 +118,9 @@ export const getBoardFallbackMetadata = (
     descriptionEn: `${code} board.`,
     labelEn: code,
     titleKo: code,
+    writeAccessType: "AUTHENTICATED",
     writePermissionBit: FALLBACK_WRITE_PERMISSION_BIT,
+    writeRoleGroupIds: [],
   };
 };
 
@@ -137,7 +154,12 @@ export const getFallbackBoards = (): BoardMetadata[] =>
       allowComment: true,
       allowLike: true,
       allowSecret: code === "건의사항",
+      writeAccessType: metadata.writeAccessType,
       writePermissionBit: metadata.writePermissionBit,
+      writeRoleGroupIds: metadata.writeRoleGroupIds,
+      canWrite: false,
+      canUseOfficialIdentity: false,
+      allowOfficialReply: code === "건의사항",
     };
   });
 
@@ -189,6 +211,26 @@ export const getBoardDescriptionFromMetadata = (
 };
 
 export const getBoardWritePermissionBitFromMetadata = (
-  board: BoardMetadata | null | undefined,
+  board: Pick<BoardMetadata, "writePermissionBit"> | null | undefined,
   code: string,
 ): number => board?.writePermissionBit ?? getBoardWritePermissionBit(code);
+
+export const getBoardWriteAccessTypeFromMetadata = (
+  board:
+    | Pick<BoardMetadata, "writeAccessType" | "writePermissionBit">
+    | null
+    | undefined,
+  code: string,
+): BoardMetadata["writeAccessType"] => {
+  if (
+    board?.writeAccessType === "EXECUTIVE" ||
+    board?.writeAccessType === "PERMISSION" ||
+    board?.writeAccessType === "ROLE_GROUP"
+  ) {
+    return board.writeAccessType;
+  }
+
+  return getBoardWritePermissionBitFromMetadata(board, code) > 0
+    ? "PERMISSION"
+    : "AUTHENTICATED";
+};

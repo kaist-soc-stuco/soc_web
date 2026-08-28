@@ -60,7 +60,7 @@ export function SurveyResponseDetailPage() {
   };
 
   return (
-    <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
+    <AuthGuard requireAnyPermission={[Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL]}>
       <AdminPageShell>
         <AdminPageMain>
           <AdminPageHeader
@@ -127,8 +127,8 @@ export function SurveyResponseDetailPage() {
                   </div>
                   <span className="hidden text-slate-200 md:inline">|</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-normal text-[#344054]">소속 / 학번</span>
-                    <span>{response.user ? `${response.user.departmentKo ?? "—"}${response.user.stdNo ? ` / ${response.user.stdNo}` : ""}` : "—"}</span>
+                    <span className="text-xs font-normal text-[#344054]">학번</span>
+                    <span>{response.user?.stdNo ?? "—"}</span>
                   </div>
                   <span className="hidden text-slate-200 md:inline">|</span>
                   <div className="flex items-center gap-2">

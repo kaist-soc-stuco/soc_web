@@ -22,8 +22,14 @@ import type {
   ArticleUpdateResponse,
   ArticleDeleteResponse,
   ArticleEngagementResponse,
+  UserRestrictionCreateRequest,
+  UserRestrictionAppliedResponse,
 } from "@soc/contracts";
-import { ArticleCreateSchema, ArticleUpdateSchema } from "@soc/contracts";
+import {
+  ArticleCreateSchema,
+  ArticleUpdateSchema,
+  UserRestrictionCreateSchema,
+} from "@soc/contracts";
 import { Request, Response } from "express";
 
 import { AuthGuard } from "../auth/guards";
@@ -37,6 +43,7 @@ interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     permission: number;
+    roleGroupIds?: number[];
   };
 }
 
@@ -122,6 +129,24 @@ export class ArticleController {
     @Req() request: AuthenticatedRequest,
   ): Promise<ArticleDeleteResponse> {
     return this.articleService.deleteArticle(code, articleId, request.user!);
+  }
+
+  @Post(":articleId/author-restriction")
+  @UseGuards(AuthGuard)
+  async restrictArticleAuthor(
+    @Param("code") code: string,
+    @Param("articleId") articleId: string,
+    @Body(new ZodValidationPipe(UserRestrictionCreateSchema))
+    body: UserRestrictionCreateRequest,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<UserRestrictionAppliedResponse> {
+    return this.articleService.restrictArticleAuthor(
+      code,
+      articleId,
+      body,
+      request.user!,
+      request.ip,
+    );
   }
 
   @Put(":articleId/engagements/:kind")

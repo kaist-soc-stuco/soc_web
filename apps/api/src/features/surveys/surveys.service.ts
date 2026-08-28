@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { isoToMs, nowMs } from "@soc/shared";
-import { Permissions } from "@soc/contracts";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -13,6 +12,10 @@ import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveyResponsesRepository } from "./survey-responses.repository";
 import { SurveyMutationPolicy } from "./survey-mutation-policy";
 import { assertPublishableSurveyDefinition } from "./survey-definition-validation";
+import {
+  assertSurveyKindPermission,
+  hasSurveyKindPermission,
+} from "./survey-permission";
 
 import type { SurveyRecordWithState } from "./entities/survey.entity";
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
@@ -61,16 +64,17 @@ export class SurveysService {
     return "open";
   }
 
-  private hasManageSurvey(caller?: { permission: number }): boolean {
-    return Boolean(
-      caller && Permissions.has(caller.permission, Permissions.MANAGE_SURVEY),
-    );
+  private hasManageSurvey(caller?: SurveyCaller, kind = "SURVEY"): boolean {
+    return hasSurveyKindPermission(caller, kind);
   }
 
-  async findAll(): Promise<SurveyRecordWithState[]> {
+  async findAll(caller?: SurveyCaller): Promise<SurveyRecordWithState[]> {
     const surveys = await this.surveysRepo.findAll();
+    const manageableSurveys = surveys.filter((survey) =>
+      hasSurveyKindPermission(caller, survey.kind),
+    );
     const responseCounts = await Promise.all(
-      surveys.map(async (survey) => ({
+      manageableSurveys.map(async (survey) => ({
         surveyId: survey.id,
         responseCount: await this.responsesRepo.countSubmitted(survey.id),
       })),
@@ -78,7 +82,7 @@ export class SurveysService {
 
     const responseCountMap = new Map(responseCounts.map((item) => [item.surveyId, item.responseCount]));
 
-    return surveys.map((s) => {
+    return manageableSurveys.map((s) => {
       const computedState = this.computeState(s);
       return { ...s, computedState, responseCount: responseCountMap.get(s.id) ?? 0 };
     });
@@ -110,7 +114,7 @@ export class SurveysService {
 
   async findDetail(id: string, caller?: SurveyCaller): Promise<SurveyDetailResponse> {
     const survey = await this.findById(id);
-    const isManagerPreview = !survey.isPublished && this.hasManageSurvey(caller);
+    const isManagerPreview = !survey.isPublished && this.hasManageSurvey(caller, survey.kind);
 
     if (!survey.isPublished && !isManagerPreview) {
       throw new NotFoundException("survey_not_found");
@@ -144,7 +148,12 @@ export class SurveysService {
     };
   }
 
-  async create(creatorId: string, dto: CreateSurveyDto): Promise<SurveyRecordWithState> {
+  async create(
+    creatorId: string,
+    dto: CreateSurveyDto,
+    caller?: SurveyCaller,
+  ): Promise<SurveyRecordWithState> {
+    if (caller) assertSurveyKindPermission(caller, dto.kind);
     if (dto.isPublished) {
       throw new BadRequestException("survey_publish_requires_saved_definition");
     }
@@ -153,10 +162,22 @@ export class SurveysService {
     return { ...survey, computedState, responseCount: 0 };
   }
 
-  async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecordWithState> {
+  async update(
+    id: string,
+    dto: UpdateSurveyDto,
+    caller?: SurveyCaller,
+  ): Promise<SurveyRecordWithState> {
     return this.mutationPolicy.withSurveyLock(id, async (tx) => {
       const current = await this.surveysRepo.findById(id, tx);
       if (!current) throw new NotFoundException("survey_not_found");
+      if (caller) {
+        // A kind change must be authorized for both sides. Otherwise a poll
+        // manager could load and convert a regular survey (or vice versa).
+        assertSurveyKindPermission(caller, current.kind);
+        if (dto.kind && dto.kind !== current.kind) {
+          assertSurveyKindPermission(caller, dto.kind);
+        }
+      }
       await this.mutationPolicy.assertMeaningMutable(tx, id, current, dto);
 
       const isAlwaysOpen = dto.isAlwaysOpen ?? current.isAlwaysOpen;
@@ -193,17 +214,27 @@ export class SurveysService {
     });
   }
 
-  async delete(id: string): Promise<void> {
-    await this.mutationPolicy.withHardDelete(id, (tx) =>
-      this.surveysRepo.delete(id, tx),
-    );
+  async delete(id: string, caller?: SurveyCaller): Promise<void> {
+    await this.mutationPolicy.withHardDelete(id, async (tx) => {
+      if (caller) {
+        const current = await this.surveysRepo.findById(id, tx);
+        if (!current) throw new NotFoundException("survey_not_found");
+        assertSurveyKindPermission(caller, current.kind);
+      }
+      return this.surveysRepo.delete(id, tx);
+    });
   }
 
-  async duplicate(id: string, creatorId: string): Promise<SurveyRecordWithState> {
+  async duplicate(
+    id: string,
+    creatorId: string,
+    caller?: SurveyCaller,
+  ): Promise<SurveyRecordWithState> {
     return this.mutationPolicy.withSurveyLock(id, async (tx) => {
       // Duplication is a manager operation and reads the saved survey directly.
       const original = await this.surveysRepo.findById(id, tx);
       if (!original) throw new NotFoundException("survey_not_found");
+      if (caller) assertSurveyKindPermission(caller, original.kind);
 
       const sections = await this.sectionsRepo.findBySurveyId(id, tx);
       const sectionsWithQuestions = await Promise.all(
@@ -324,8 +355,7 @@ export class SurveysService {
     const survey = await this.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
 
-    const hasAdminPermission =
-      caller && Permissions.has(caller.permission, Permissions.MANAGE_SURVEY);
+    const hasAdminPermission = this.hasManageSurvey(caller, survey.kind);
 
     if (!survey.isPublished && !hasAdminPermission) {
       throw new NotFoundException("survey_not_found");

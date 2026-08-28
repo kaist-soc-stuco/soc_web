@@ -49,10 +49,9 @@ function formatResponseEmail(response: SurveyResponseRecord) {
   return response.user?.email ?? "—";
 }
 
-function formatResponseDepartment(response: SurveyResponseRecord) {
+function formatResponseStudentNumber(response: SurveyResponseRecord) {
   if (!response.user) return "—";
-  const parts = [response.user.departmentKo, response.user.stdNo].filter(Boolean);
-  return parts.length > 0 ? parts.join(" / ") : "—";
+  return response.user.stdNo ?? "—";
 }
 
 // Convert timestamp to 24-hour single line format
@@ -133,7 +132,7 @@ export function SurveyResponseListPage() {
         "No.",
         "이름",
         "이메일",
-        "소속 / 학번",
+        "학번",
         "제출 시각",
         "상태",
         ...allQuestions.map((q) => q.titleKo),
@@ -149,7 +148,7 @@ export function SurveyResponseListPage() {
           String(data.length - idx),
           formatResponseName(r),
           formatResponseEmail(r),
-          formatResponseDepartment(r),
+          formatResponseStudentNumber(r),
           r.submittedAt ? format24hDateTime(r.submittedAt) : "—",
           r.status,
           ...answerCols,
@@ -211,7 +210,7 @@ export function SurveyResponseListPage() {
 
   // Generate page items exactly as `< 1 2 3 ... 29 >`
   return (
-    <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
+    <AuthGuard requireAnyPermission={[Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL]}>
       <AdminPageShell>
         <AdminPageMain className="gap-5">
           <Breadcrumbs breadcrumbs={[{ label: "설문조사 관리", to: "/admin/surveys" }, { label: "설문 응답" }]} />
@@ -321,7 +320,7 @@ export function SurveyResponseListPage() {
                         <AdminTableHead className="text-center">No.</AdminTableHead>
                         <AdminTableHead className="text-center">이름</AdminTableHead>
                         <AdminTableHead>이메일</AdminTableHead>
-                        <AdminTableHead className="text-center">소속 / 학번</AdminTableHead>
+                        <AdminTableHead className="text-center">학번</AdminTableHead>
                         <AdminTableHead className="text-center">제출일시</AdminTableHead>
                         <AdminTableHead className="text-center">작업</AdminTableHead>
                       </tr>
@@ -348,9 +347,9 @@ export function SurveyResponseListPage() {
                               {formatResponseEmail(r)}
                             </AdminTableCell>
 
-                            {/* 소속 / 학번 (center-aligned) */}
+                            {/* 학번 (center-aligned) */}
                             <AdminTableCell className="text-center">
-                              {formatResponseDepartment(r)}
+                              {formatResponseStudentNumber(r)}
                             </AdminTableCell>
 
                             {/* 제출일시 (center-aligned, single line, 24h format, treated date & time equally) */}

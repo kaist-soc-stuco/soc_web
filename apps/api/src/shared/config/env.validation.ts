@@ -136,6 +136,8 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       "GOOGLE_CALENDAR_SYNC_ENABLED",
       false,
     ),
+    GOOGLE_SHEETS_OAUTH_CLIENT_FILE: asOptionalString(config.GOOGLE_SHEETS_OAUTH_CLIENT_FILE),
+    GOOGLE_SHEETS_OAUTH_TOKEN_FILE: asOptionalString(config.GOOGLE_SHEETS_OAUTH_TOKEN_FILE),
     KAIST_CALENDAR_SYNC_ENABLED: asOptionalBoolean(
       config.KAIST_CALENDAR_SYNC_ENABLED,
       "KAIST_CALENDAR_SYNC_ENABLED",

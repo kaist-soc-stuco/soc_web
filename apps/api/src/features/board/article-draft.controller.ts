@@ -26,6 +26,7 @@ interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     permission: number;
+    roleGroupIds?: number[];
   };
 }
 

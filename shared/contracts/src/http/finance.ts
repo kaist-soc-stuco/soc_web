@@ -98,7 +98,6 @@ export interface StudentFeeListResponse {
     nameEn?: string;
     stdNo?: string;
     email: string;
-    departmentKo?: string | null;
     primaryMajor?: string | null;
     doubleMajor?: string | null;
     minor?: string | null;
@@ -171,4 +170,19 @@ export interface StudentFeeStatsOptions {
 export interface BulkUpdateStudentFeeStatusResponse {
   updated: StudentFeeStatusRecord[];
   count: number;
+}
+
+export interface StudentFeeGoogleSheetsStatusResponse {
+  configured: boolean;
+  created: boolean;
+  spreadsheetId: string | null;
+  spreadsheetUrl: string | null;
+  lastSyncedAt: string | null;
+}
+
+export interface StudentFeeGoogleSheetsSyncResponse {
+  count: number;
+  direction: "TO_GOOGLE_SHEETS" | "FROM_GOOGLE_SHEETS";
+  spreadsheetUrl: string;
+  syncedAt: string;
 }

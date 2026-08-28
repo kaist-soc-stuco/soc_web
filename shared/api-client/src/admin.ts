@@ -42,6 +42,8 @@ import type {
   StudentFeeDetailResponse,
   StudentFeeStatsResponse,
   StudentFeeStatsOptions,
+  StudentFeeGoogleSheetsStatusResponse,
+  StudentFeeGoogleSheetsSyncResponse,
   StudentFeeStatusRecord,
   UpdateContactRequest,
   UpdateRoleGroupRequest,
@@ -508,6 +510,30 @@ export const createAdminApi = ({
     return requestBlob(
       `${usersBaseUrl}/fee-status/export.xlsx${query ? `?${query}` : ""}`,
       { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getStudentFeeGoogleSheetsStatus: async (): Promise<StudentFeeGoogleSheetsStatusResponse> => {
+    return requestJson<StudentFeeGoogleSheetsStatusResponse>(
+      `${usersBaseUrl}/fee-status/google/status`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  syncStudentFeesToGoogleSheets: async (): Promise<StudentFeeGoogleSheetsSyncResponse> => {
+    return requestJson<StudentFeeGoogleSheetsSyncResponse>(
+      `${usersBaseUrl}/fee-status/google/sync-to-google`,
+      { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  syncStudentFeesFromGoogleSheets: async (): Promise<StudentFeeGoogleSheetsSyncResponse> => {
+    return requestJson<StudentFeeGoogleSheetsSyncResponse>(
+      `${usersBaseUrl}/fee-status/google/sync-from-google`,
+      { method: "POST" },
       { retryOnUnauthorized: true },
     );
   },

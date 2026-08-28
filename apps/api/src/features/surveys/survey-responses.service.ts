@@ -20,6 +20,8 @@ import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
+import { assertSurveyKindPermission } from "./survey-permission";
+import type { SurveyPermissionCaller } from "./survey-permission";
 import { isoToMs, nowMs } from "@soc/shared";
 
 @Injectable()
@@ -32,6 +34,16 @@ export class SurveyResponsesService {
     @Optional() private readonly sectionsRepo?: SurveySectionsRepository,
     @Optional() private readonly questionsRepo?: SurveyQuestionsRepository,
   ) {}
+
+  private async getManagedSurvey(
+    surveyId: string,
+    caller?: SurveyPermissionCaller,
+  ) {
+    const survey = await this.surveysRepo.findById(surveyId);
+    if (!survey) throw new NotFoundException("survey_not_found");
+    if (caller) assertSurveyKindPermission(caller, survey.kind);
+    return survey;
+  }
 
   private async validateUploadedAssets(
     answers: SubmitResponseDto["answers"],
@@ -249,15 +261,19 @@ export class SurveyResponsesService {
     return questions.flat();
   }
 
-  async findAll(surveyId: string): Promise<SurveyResponseRecord[]> {
-    const survey = await this.surveysRepo.findById(surveyId);
-    if (!survey) throw new NotFoundException("survey_not_found");
+  async findAll(
+    surveyId: string,
+    caller?: SurveyPermissionCaller,
+  ): Promise<SurveyResponseRecord[]> {
+    await this.getManagedSurvey(surveyId, caller);
     return this.responsesRepo.findBySurveyId(surveyId);
   }
 
-  async findAllWithAnswers(surveyId: string): Promise<Array<SurveyResponseRecord & { answers: SurveyAnswerRecord[] }>> {
-    const survey = await this.surveysRepo.findById(surveyId);
-    if (!survey) throw new NotFoundException("survey_not_found");
+  async findAllWithAnswers(
+    surveyId: string,
+    caller?: SurveyPermissionCaller,
+  ): Promise<Array<SurveyResponseRecord & { answers: SurveyAnswerRecord[] }>> {
+    await this.getManagedSurvey(surveyId, caller);
     const responses = await this.responsesRepo.findBySurveyId(surveyId);
     const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);
 
@@ -275,7 +291,12 @@ export class SurveyResponsesService {
     }));
   }
 
-  async findDetail(surveyId: string, responseId: string): Promise<ResponseDetailResponse> {
+  async findDetail(
+    surveyId: string,
+    responseId: string,
+    caller?: SurveyPermissionCaller,
+  ): Promise<ResponseDetailResponse> {
+    await this.getManagedSurvey(surveyId, caller);
     const response = await this.responsesRepo.findById(responseId, surveyId);
     if (!response) throw new NotFoundException("response_not_found");
     const answers = await this.responsesRepo.findAnswersByResponseId(responseId);

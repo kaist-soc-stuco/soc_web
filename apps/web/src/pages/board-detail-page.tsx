@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
 
 import { Header } from "@/components/organisms/header";
+import { AuthorRestrictionModal } from "@/components/ui/author-restriction-modal";
 import { CommentSection } from "@/components/ui/comment-section";
 import {
   BoardDetailArticleCard,
@@ -17,11 +18,15 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
     canCreateComment,
     canManageArticle,
     canManageComments,
+    canUseOfficialIdentity,
+    officialResponseOnly,
     category,
     commentActionSubmitting,
     commentError,
     commentSubmitting,
     commentText,
+    isOfficialComment,
+    isOfficialReply,
     comments,
     commentsLoading,
     content,
@@ -30,6 +35,8 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
     handleCreateReply,
     handleDeleteArticle,
     handleDeleteComment,
+    handleModerateComment,
+    handleRestrictAuthor,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,
@@ -41,7 +48,12 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
     replyText,
     session,
     shareCopied,
+    authorRestrictionOpen,
+    authorRestrictionSubmitting,
     setCommentText,
+    setAuthorRestrictionOpen,
+    setIsOfficialComment,
+    setIsOfficialReply,
     setReplyTargetId,
     setReplyText,
     surveyDescription,
@@ -92,12 +104,14 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             article={article}
             attachmentAssets={attachmentAssets}
             canManageArticle={canManageArticle}
+            canRestrictAuthor={canManageComments}
             editHref={publicBasePath ? `${publicBasePath}/${article.articleId}/edit` : undefined}
             category={category}
             content={content}
             isAuthenticated={Boolean(session?.canUsePersistentFeatures)}
             lang={lang}
             onDeleteArticle={() => void handleDeleteArticle()}
+            onRestrictAuthor={() => setAuthorRestrictionOpen(true)}
             onShare={() => void handleShareArticle()}
             onToggle={(kind, active) =>
               void handleSetArticleEngagement(kind, active)
@@ -115,6 +129,8 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             commentsLoading={commentsLoading}
             canManageComments={canManageComments}
             canCreateComment={canCreateComment}
+            canUseOfficialIdentity={canUseOfficialIdentity}
+            officialResponseOnly={officialResponseOnly}
             currentUserId={session?.userId ?? null}
             commentText={commentText}
             commentError={commentError}
@@ -126,6 +142,11 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             onCreateComment={handleCreateComment}
             onCreateReply={handleCreateReply}
             onDeleteComment={handleDeleteComment}
+            onModerateComment={handleModerateComment}
+            isOfficialComment={isOfficialComment}
+            isOfficialReply={isOfficialReply}
+            onOfficialCommentChange={setIsOfficialComment}
+            onOfficialReplyChange={setIsOfficialReply}
             onSetCommentEngagement={handleSetCommentEngagement}
             onReplyTextChange={setReplyText}
             onReplyTargetChange={setReplyTargetId}
@@ -136,6 +157,21 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
 
         </div>
       </main>
+
+      <AuthorRestrictionModal
+        open={authorRestrictionOpen}
+        onClose={() => setAuthorRestrictionOpen(false)}
+        onSubmit={handleRestrictAuthor}
+        submitting={authorRestrictionSubmitting}
+        isAnonymous={article.isAnonymous}
+        targetLabel={
+          article.isAnonymous
+            ? "익명 작성자"
+            : article.isOfficial
+              ? "전산학부 집행위원회 공식 명의 작성자"
+              : article.author.name
+        }
+      />
 
     </PageShell>
   );

@@ -4,7 +4,7 @@ import { Permissions } from "@soc/contracts";
 import type { AssignRoleGroupMemberRequest, ReplaceRoleGroupMembersRequest } from "@soc/contracts";
 import { Request } from "express";
 
-import { RequirePermissions } from "../auth/guards";
+import { RequireAnyPermissions, RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { CreateRoleGroupDto } from "./dto/create-role-group.dto";
@@ -16,7 +16,7 @@ type AuthenticatedRequest = Request & {
 };
 
 @Controller("role-groups")
-@RequirePermissions(Permissions.ADMIN)
+@RequireAnyPermissions(Permissions.MANAGE_PERMISSIONS, Permissions.MANAGE_BOARD_SETTINGS)
 export class RoleGroupsController {
   constructor(private readonly roleGroupsService: RoleGroupsService) {}
 
@@ -31,6 +31,7 @@ export class RoleGroupsController {
   }
 
   @Post()
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   create(
     @Body(new ZodValidationPipe(CreateRoleGroupSchema)) dto: CreateRoleGroupDto,
     @Req() request: AuthenticatedRequest,
@@ -42,6 +43,7 @@ export class RoleGroupsController {
   }
 
   @Patch(":roleGroupId")
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   update(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Body(new ZodValidationPipe(UpdateRoleGroupSchema)) dto: UpdateRoleGroupDto,
@@ -54,15 +56,16 @@ export class RoleGroupsController {
   }
 
   @Get(":roleGroupId/users")
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   listMembers(@Param("roleGroupId", ParseIntPipe) roleGroupId: number) {
     return this.roleGroupsService.listRoleGroupMembers(roleGroupId);
   }
 
   @Get(":roleGroupId/users/candidates")
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   listCandidates(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Query("q") q?: string,
-    @Query("department") department?: string,
     @Query("academicStatus") academicStatus?: string,
     @Query("status") status?: string,
     @Query("page") page?: string,
@@ -70,7 +73,6 @@ export class RoleGroupsController {
   ) {
     return this.roleGroupsService.listRoleGroupCandidates(roleGroupId, {
       q,
-      department,
       academicStatus,
       status: status === "active" || status === "inactive" ? status : undefined,
       page: page ? Number(page) : 1,
@@ -79,6 +81,7 @@ export class RoleGroupsController {
   }
 
   @Post(":roleGroupId/users")
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   addMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Body(new ZodValidationPipe(AssignRoleGroupMemberSchema))
@@ -92,6 +95,7 @@ export class RoleGroupsController {
   }
 
   @Put(":roleGroupId/users")
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   replaceMembers(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Body(new ZodValidationPipe(ReplaceRoleGroupMembersSchema))
@@ -105,6 +109,7 @@ export class RoleGroupsController {
   }
 
   @Delete(":roleGroupId/users/:userId")
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   removeMember(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Param("userId") userId: string,
@@ -117,6 +122,7 @@ export class RoleGroupsController {
   }
 
   @Delete(":roleGroupId")
+  @RequirePermissions(Permissions.MANAGE_PERMISSIONS)
   delete(
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Req() request: AuthenticatedRequest,

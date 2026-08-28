@@ -32,20 +32,20 @@ export class BulkEmailController {
   constructor(private readonly bulkEmailService: BulkEmailService) {}
 
   @Get("history")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async getHistory(): Promise<BulkEmailListResponse> {
     const items = await this.bulkEmailService.getHistory();
     return { items };
   }
 
   @Get("templates")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async getTemplates() {
     return { items: await this.bulkEmailService.getTemplates() };
   }
 
   @Post("templates")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async createTemplate(
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(CreateBulkEmailTemplateSchema)) body: CreateBulkEmailTemplateRequest,
@@ -54,7 +54,7 @@ export class BulkEmailController {
   }
 
   @Patch("templates/:templateId")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async updateTemplate(
     @Param("templateId") templateId: string,
     @Body(new ZodValidationPipe(UpdateBulkEmailTemplateSchema)) body: UpdateBulkEmailTemplateRequest,
@@ -63,19 +63,19 @@ export class BulkEmailController {
   }
 
   @Delete("templates/:templateId")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async deleteTemplate(@Param("templateId") templateId: string) {
     return this.bulkEmailService.deleteTemplate(templateId);
   }
 
   @Get("drafts")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async getDrafts(@Req() req: AuthedRequest): Promise<BulkEmailDraftListResponse> {
     return this.bulkEmailService.getDrafts(req.user.id);
   }
 
   @Post("drafts")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async saveDraft(
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(SaveBulkEmailDraftSchema)) body: SaveBulkEmailDraftRequest,
@@ -84,7 +84,7 @@ export class BulkEmailController {
   }
 
   @Delete("drafts/:draftId")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async deleteDraft(
     @Req() req: AuthedRequest,
     @Param("draftId") draftId: string,
@@ -93,7 +93,7 @@ export class BulkEmailController {
   }
 
   @Post("send")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async sendBulkEmail(
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(SendBulkEmailSchema)) body: SendBulkEmailRequest,
@@ -102,7 +102,7 @@ export class BulkEmailController {
   }
 
   @Post("test")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async sendTestEmail(
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(SendBulkEmailSchema)) body: SendBulkEmailRequest,
@@ -111,7 +111,7 @@ export class BulkEmailController {
   }
 
   @Post(":emailId/cancel")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async cancelScheduled(
     @Req() req: AuthedRequest,
     @Param("emailId") emailId: string,
@@ -120,7 +120,7 @@ export class BulkEmailController {
   }
 
   @Post(":emailId/retry")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async retryFailed(
     @Req() req: AuthedRequest,
     @Param("emailId") emailId: string,
@@ -129,7 +129,7 @@ export class BulkEmailController {
   }
 
   @Post("preview")
-  @RequirePermissions(Permissions.ADMIN)
+  @RequirePermissions(Permissions.SEND_EMAIL)
   async previewRecipients(
     @Body(new ZodValidationPipe(SendBulkEmailSchema)) body: SendBulkEmailRequest,
   ): Promise<BulkEmailPreviewResponse> {

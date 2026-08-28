@@ -16,6 +16,7 @@ export interface BoardTemplateSnapshot {
   contentKo: string;
   contentEn: string;
   isAnonymous: boolean;
+  isOfficial: boolean;
   isPinned: boolean;
   isSecret: boolean;
   allowComment: boolean;

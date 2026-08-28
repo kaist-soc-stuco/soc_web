@@ -8,7 +8,6 @@ import { Request } from "express";
 import { isExpired } from "@soc/shared";
 
 import { UsersService } from "../../users/users.service";
-import { AuthEligibilityService } from "../auth-eligibility.service";
 import { AuthSessionRepository } from "../auth-session.repository";
 import { AUTH_SESSION_COOKIE_NAME } from "../auth.tokens";
 
@@ -17,6 +16,7 @@ interface AuthenticatedRequest {
   user?: {
     id: string;
     permission: number;
+    roleGroupIds?: number[];
   };
 }
 
@@ -25,7 +25,6 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly usersService: UsersService,
-    private readonly authEligibilityService: AuthEligibilityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -61,19 +60,20 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException("account_expired");
     }
 
-    if (!this.authEligibilityService.isEligibleUser(user)) {
-      await this.usersService.expireAccount(
-        user.userId,
-        "department_not_eligible",
-      );
-      await this.authSessionRepository.revoke(sessionId);
-      throw new UnauthorizedException("department_not_eligible");
+    if (await this.usersService.isUserRestricted(user.userId)) {
+      throw new UnauthorizedException("account_restricted");
     }
 
     request.user = {
       id: user.userId,
       permission:
         await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
+      // Keep guard test doubles and older embedders fail-closed while the
+      // role-group lookup is being rolled out.
+      roleGroupIds:
+        typeof this.usersService.listActiveRoleGroupIds === "function"
+          ? await this.usersService.listActiveRoleGroupIds(user.userId)
+          : [],
     };
 
     return true;

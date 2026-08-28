@@ -140,7 +140,7 @@ const formatDateTime = (value: string | null) => value
 const effectiveStatus = (block: ContentBlockRecord): ContentBlockStatus => block.status;
 
 export function SiteContentPage() {
-  return <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}><SiteContentPageContent /></AuthGuard>;
+  return <AuthGuard requirePermission={Permissions.MANAGE_SITE_CONTENT}><SiteContentPageContent /></AuthGuard>;
 }
 
 function SiteContentPageContent() {
@@ -401,16 +401,16 @@ function SiteContentPageContent() {
 
     <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={categoryMeta[category].createLabel} className="max-w-xl" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{saving ? "등록 중" : "등록"}</Button></>}>
       <div className="grid gap-4">
-        {!isImageOnlyType(createDraft.type) ? <AdminFormField label="한국어 제목"><UiInput value={createDraft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleKo: value })); }} placeholder="공개 화면에 표시할 제목" /></AdminFormField> : null}
-        {!isImageOnlyType(createDraft.type) ? <AdminFormField label="English title"><UiInput value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}
-        {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="한국어 본문"><UiTextarea className="min-h-24" value={createDraft.bodyKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyKo: value })); }} /></AdminFormField> : null}
-        {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
+        {!isImageOnlyType(createDraft.type) ? <AdminFormField label="한국어 제목"><UiInput className="w-full" value={createDraft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleKo: value })); }} placeholder="공개 화면에 표시할 제목" /></AdminFormField> : null}
+        {!isImageOnlyType(createDraft.type) ? <AdminFormField label="English title"><UiInput className="w-full" value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}
+        {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="한국어 본문"><UiTextarea className="w-full min-h-24" value={createDraft.bodyKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyKo: value })); }} /></AdminFormField> : null}
+        {!isImageOnlyType(createDraft.type) && createDraft.type !== "QUICK_LINK" ? <AdminFormField label="English body"><UiTextarea className="w-full min-h-24" value={createDraft.bodyEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, bodyEn: value })); }} /></AdminFormField> : null}
         {createDraft.type === "PLEDGE" ? <AdminFormField label="이행 상태"><AdminSelectDropdown ariaLabel="이행 상태" value={createDraft.pledgeStatus ?? "PLANNED"} options={pledgeStatusOptions} onChange={(value) => setCreateDraft((current) => ({ ...current, pledgeStatus: value as BlockDraft["pledgeStatus"] }))} /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) && createDraft.type !== "PLEDGE" ? <AdminFormField label="링크 URL"><div className="relative"><Link2 aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><UiInput type="url" className="w-full pl-9" value={createDraft.linkUrl} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, linkUrl: value })); }} placeholder="https://" /></div></AdminFormField> : null}
         {isImageOnlyType(createDraft.type) ? <ContentImageInput spec={getImageSpec(createDraft.type)!} previewBorderless={createDraft.type === "ORGANIZATION_CHART"} value={createDraft.imageUrl} secondaryValue={createDraft.type === "ORGANIZATION_CHART" ? createDraft.imageUrlEn : undefined} secondaryLabel={createDraft.type === "ORGANIZATION_CHART" ? "English organization chart" : undefined} uploading={imageUploading} onSelect={(file) => requestImageCrop("create", createDraft.type, file)} onSecondarySelect={(file) => requestImageCrop("create", createDraft.type, file, "en")} onRemove={() => setCreateDraft((current) => ({ ...current, imageUrl: "" }))} onSecondaryRemove={() => setCreateDraft((current) => ({ ...current, imageUrlEn: "" }))} /> : null}
       </div>
     </Modal>
-    {cropRequest ? <ImageCropModal aspectRatio={getImageSpec(cropRequest.type)!.width / getImageSpec(cropRequest.type)!.height} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
+    {cropRequest ? <ImageCropModal allowFreeAspectRatio={cropRequest.type === "ORGANIZATION_CHART"} aspectRatio={getImageSpec(cropRequest.type)!.width / getImageSpec(cropRequest.type)!.height} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
   </AdminPageShell>;
 }
 
@@ -433,7 +433,7 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
       <div className="flex flex-wrap gap-2">
         <label className={cn("inline-flex h-[var(--ui-control-height)] cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-[length:var(--ui-control-font-size)] font-normal text-[#172033] transition-colors hover:bg-slate-50", uploading && "pointer-events-none opacity-60")}>
           <ImageUp aria-hidden="true" className="size-4" />
-          {uploading ? "업로드 중" : slotValue ? "이미지 교체" : "이미지 선택"}
+          {uploading ? "업로드 중" : "이미지 선택"}
           <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
         </label>
         {slotValue && remove ? <Button type="button" variant="ghost" onClick={remove} disabled={uploading}>이미지 제거</Button> : null}

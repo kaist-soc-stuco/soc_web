@@ -290,7 +290,7 @@ export function SurveyListPage() {
 
   // Generate page items exactly as `< 1 2 3 ... 13 >`
   return (
-    <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
+    <AuthGuard requireAnyPermission={[Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL]}>
       <AdminPageShell>
         {ConfirmDialog}
         <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">

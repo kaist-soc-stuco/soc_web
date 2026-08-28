@@ -7,6 +7,7 @@ import type {
   CommentEngagementKind,
   CommentEngagementResponse,
   CommentItem,
+  CommentModerationResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
@@ -33,11 +34,27 @@ export class CommentRepository {
     page: number,
     limit: number,
     viewerUserId?: string,
+    includeHidden = false,
   ): Promise<{ items: CommentItem[]; total: number }> {
     const offset = (page - 1) * limit;
+    const hiddenWithVisibleReply = sql<boolean>`exists (
+      select 1
+      from "comment" child_comment
+      where child_comment."parent_comment_id" = ${comments.commentId}
+        and child_comment."status" = ${COMMENT_STATUS.PUBLISHED}
+    )`;
+    const visibilityFilter = includeHidden
+      ? sql`${comments.status} in (${COMMENT_STATUS.PUBLISHED}, ${COMMENT_STATUS.HIDDEN})`
+      : sql`(
+          ${comments.status} = ${COMMENT_STATUS.PUBLISHED}
+          or (
+            ${comments.status} = ${COMMENT_STATUS.HIDDEN}
+            and ${hiddenWithVisibleReply}
+          )
+        )`;
     const baseFilter = and(
       eq(comments.articleId, Number(articleId)),
-      eq(comments.status, COMMENT_STATUS.PUBLISHED),
+      visibilityFilter,
     );
 
     const totalResult = await this.db
@@ -84,22 +101,29 @@ export class CommentRepository {
 
     return {
       total: Number(totalResult[0]?.count ?? 0),
-      items: rows.map((row) => ({
+      items: rows.map((row) => {
+        const maskedHiddenComment = !includeHidden && row.status === COMMENT_STATUS.HIDDEN;
+        return {
         commentId: String(row.commentId),
         articleId: String(row.articleId),
         parentCommentId: row.parentCommentId ? String(row.parentCommentId) : null,
-        content: row.content,
+        content: maskedHiddenComment
+          ? "관리자에 의해 숨김 처리된 댓글입니다."
+          : row.content,
         status: row.status as CommentItem["status"],
         createdAt: msToIso(row.createdAt.valueOf()),
         updatedAt: msToIso(row.updatedAt.valueOf()),
         author: {
-          userId: String(row.authorId ?? ""),
-          name: row.authorName ?? "unknown",
+          userId: maskedHiddenComment ? "" : String(row.authorId ?? ""),
+          name: maskedHiddenComment
+            ? "숨김 처리된 댓글"
+            : row.authorName ?? "unknown",
         },
         likeCount: Number(row.likeCount ?? 0),
         viewerHasLiked: Boolean(row.viewerHasLiked),
-        isOfficial: row.isOfficial,
-      })),
+        isOfficial: maskedHiddenComment ? false : row.isOfficial,
+      };
+      }),
     };
   }
 
@@ -347,6 +371,38 @@ export class CommentRepository {
     return {
       commentId,
       updatedAt: msToIso(now.valueOf()),
+    };
+  }
+
+  async setModeration(
+    commentId: string,
+    status: "PUBLISHED" | "HIDDEN",
+    moderatedByUserId: string,
+    reason?: string,
+  ): Promise<CommentModerationResponse | null> {
+    const now = nowDate();
+    const [updated] = await this.db
+      .update(comments)
+      .set({
+        status,
+        moderationReason: status === COMMENT_STATUS.HIDDEN ? reason?.trim() || null : null,
+        moderatedByUserId: status === COMMENT_STATUS.HIDDEN ? moderatedByUserId : null,
+        moderatedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(comments.commentId, Number(commentId)))
+      .returning({
+        commentId: comments.commentId,
+        status: comments.status,
+        updatedAt: comments.updatedAt,
+      });
+
+    if (!updated) return null;
+
+    return {
+      commentId: String(updated.commentId),
+      status: updated.status as CommentModerationResponse["status"],
+      updatedAt: msToIso(updated.updatedAt.valueOf()),
     };
   }
 

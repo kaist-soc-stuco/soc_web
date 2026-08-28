@@ -523,10 +523,13 @@ interface BoardWriteSettingsProps {
   selectedSurveyId: string;
   surveys: SurveyRecord[];
   isAnonymous: boolean;
+  isOfficial: boolean;
   isPinned: boolean;
   isSecret: boolean;
   allowSecret: boolean;
   onAnonymousChange: (checked: boolean) => void;
+  canUseOfficialIdentity: boolean;
+  onOfficialChange: (checked: boolean) => void;
   onPinnedChange: (checked: boolean) => void;
   onSecretChange: (checked: boolean) => void;
   anonymousLabel?: string;
@@ -543,10 +546,13 @@ export function BoardWriteSettings({
   selectedSurveyId,
   surveys,
   isAnonymous,
+  isOfficial,
   isPinned,
   isSecret,
   allowSecret,
   onAnonymousChange,
+  canUseOfficialIdentity,
+  onOfficialChange,
   onPinnedChange,
   onSecretChange,
   anonymousLabel,
@@ -594,6 +600,31 @@ export function BoardWriteSettings({
         <div
           className="w-full self-center space-y-3"
         >
+          {canUseOfficialIdentity && (
+            <label className="flex items-center gap-2.5 cursor-pointer group">
+              <div
+                className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
+                  isOfficial
+                    ? "bg-kaist-darkgreen border-kaist-darkgreen text-white"
+                    : "border-slate-300 bg-white group-hover:border-kaist-darkgreen"
+                }`}
+              >
+                {isOfficial && (
+                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                )}
+              </div>
+              <UiInput
+                type="checkbox"
+                className="hidden"
+                checked={isOfficial}
+                onChange={(event) => onOfficialChange(event.target.checked)}
+              />
+              <span className="text-xs font-bold text-slate-700">
+                {lang === "ko" ? "공식 명의로 작성" : "Write officially"}
+              </span>
+            </label>
+          )}
+
           <div
             className={
               stacked
@@ -618,9 +649,10 @@ export function BoardWriteSettings({
                   type="checkbox"
                   className="hidden"
                   checked={isAnonymous}
+                  disabled={isOfficial}
                   onChange={(event) => onAnonymousChange(event.target.checked)}
                 />
-                <span className="text-xs font-bold text-slate-700">
+                <span className={`text-xs font-bold ${isOfficial ? "text-slate-400" : "text-slate-700"}`}>
                   {anonymousLabel ??
                     (lang === "ko" ? "익명으로 작성" : "Write Anonymously")}
                 </span>

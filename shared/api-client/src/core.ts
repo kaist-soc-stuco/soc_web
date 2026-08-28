@@ -14,8 +14,11 @@ export interface ListQueryOptions {
 }
 
 export class ApiClientHttpError extends Error {
-  constructor(public readonly status: number) {
-    super(`HTTP ${status}`);
+  constructor(
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(code ? `HTTP ${status}: ${code}` : `HTTP ${status}`);
     this.name = "ApiClientHttpError";
   }
 }
@@ -120,12 +123,23 @@ const resolveResourceBaseUrl = (
 const isAuthExpiredStatus = (status: number): boolean =>
   status === 401 || status === 403;
 
-const redirectToLogin = (): void => {
+const LOGIN_FAILURE_REASONS = new Set([
+  "account_expired",
+  "account_restricted",
+  "department_not_eligible",
+  "session_expired",
+  "session_expired_or_revoked",
+]);
+
+const redirectToLogin = (reason = "session_expired"): void => {
   if (typeof window === "undefined") {
     return;
   }
 
-  const target = "/login?status=error&reason=session_expired";
+  const normalizedReason = LOGIN_FAILURE_REASONS.has(reason)
+    ? reason
+    : "session_expired";
+  const target = `/login?status=error&reason=${encodeURIComponent(normalizedReason)}`;
   const current = `${window.location.pathname}${window.location.search}`;
 
   if (current === target) {
@@ -135,9 +149,21 @@ const redirectToLogin = (): void => {
   window.location.assign(target);
 };
 
+const readError = async (response: Response): Promise<ApiClientHttpError> => {
+  let code: string | undefined;
+  try {
+    const payload = (await response.clone().json()) as { code?: unknown };
+    code = typeof payload?.code === "string" ? payload.code : undefined;
+  } catch {
+    // Some proxies return an HTML/plain-text error body. The HTTP status is
+    // still sufficient for callers that only need status-based handling.
+  }
+  return new ApiClientHttpError(response.status, code);
+};
+
 const readJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    throw new ApiClientHttpError(response.status);
+    throw await readError(response);
   }
 
   return response.json() as Promise<T>;
@@ -180,10 +206,10 @@ export const createApiClientContext = ({
         });
 
         if (!response.ok) {
-          const error = new ApiClientHttpError(response.status);
+          const error = await readError(response);
 
           if (isAuthExpiredStatus(response.status)) {
-            redirectToLogin();
+            redirectToLogin(error.code);
           }
 
           throw error;
@@ -241,14 +267,14 @@ export const createApiClientContext = ({
       });
 
       if (!retriedResponse.ok) {
-        throw new ApiClientHttpError(retriedResponse.status);
+        throw await readError(retriedResponse);
       }
 
       return;
     }
 
     if (!response.ok) {
-      throw new ApiClientHttpError(response.status);
+      throw await readError(response);
     }
   };
 

@@ -417,7 +417,7 @@ export function SurveyEditorPage() {
         return;
       }
       const userPermission = session.permission ?? 0;
-      if (!(userPermission & Permissions.MANAGE_SURVEY)) {
+      if (!Permissions.hasAny(userPermission, Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL)) {
         alert("권한이 없습니다.");
         navigate("/");
         return;
@@ -875,7 +875,7 @@ export function SurveyEditorPage() {
     : null;
 
   return (
-    <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
+    <AuthGuard requireAnyPermission={[Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL]}>
       <AdminPageShell>
         {ConfirmDialog}
         <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-editor-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">

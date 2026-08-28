@@ -6,21 +6,18 @@ import type {
   ArticleDraftSaveRequest,
   SurveyRecord,
 } from "@soc/contracts";
-import {
-  hasPermission,
-  msToIso,
-  nowMs,
-} from "@soc/shared";
+import { msToIso, nowMs } from "@soc/shared";
 
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
-import {
-  getBoardWritePermissionBitFromMetadata,
-} from "@/lib/board-metadata";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { hasAdminPermission } from "@/lib/permissions";
+import {
+  canUseOfficialIdentityForBoard,
+  canWriteToBoard,
+  hasAdminPermission,
+} from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
 import type { AttachedAsset } from "./board-write-form-sections";
@@ -33,8 +30,6 @@ import {
 type BoardWriteLocationState = {
   initialCategory?: string;
 };
-
-const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항"]);
 
 const getDraftFingerprint = (payload: Omit<ArticleDraftSaveRequest, "fingerprint" | "draftId" | "expectedVersion">) => {
   const serialized = JSON.stringify(payload);
@@ -62,6 +57,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
   );
 
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isOfficial, setIsOfficial] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [isSecret, setIsSecret] = useState(false);
   const [allowComment, setAllowComment] = useState(true);
@@ -107,22 +103,14 @@ export function useBoardWritePageController(forcedCategory?: string) {
     return boards
       .filter((board) => forcedCategory ? board.code === forcedCategory : board.code !== "_EVENT")
       .filter((board) => {
-        const requiredPermission = getBoardWritePermissionBitFromMetadata(
-          board,
-          board.code,
-        );
-        return (
-          requiredPermission === 0 ||
-          hasPermission(userPermission, requiredPermission)
-        );
+        return canWriteToBoard(board, userPermission);
       })
       .map((board) => board.code);
   }, [boardCatalogSource, boards, canUseWriteFeatures, forcedCategory, userPermission]);
   const canWriteSelected =
     canUseWriteFeatures && writableBoardCodes.includes(selectedCategory);
   const canManageTemplates = hasAdminPermission(userPermission);
-  const canConfigurePostSettings =
-    !PUBLIC_WRITE_BOARD_CODES.has(selectedCategory);
+  const canConfigurePostSettings = Boolean(boardByCode.get(selectedCategory));
 
   useEffect(() => {
     if (!canUseWriteFeatures || writableBoardCodes.length === 0) return;
@@ -144,6 +132,10 @@ export function useBoardWritePageController(forcedCategory?: string) {
   ]);
 
   const selectedBoard = boardByCode.get(selectedCategory);
+  const canUseOfficialIdentity = Boolean(
+    selectedBoard &&
+      canUseOfficialIdentityForBoard(selectedBoard, userPermission),
+  );
 
   useEffect(() => {
     if (canConfigurePostSettings) return;
@@ -152,6 +144,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setIsPinned(false);
     setSelectedSurveyId("");
   }, [canConfigurePostSettings]);
+
+  useEffect(() => {
+    if (!canUseOfficialIdentity) {
+      setIsOfficial(false);
+    }
+  }, [canUseOfficialIdentity]);
 
   useEffect(() => {
     if (selectedBoard?.allowComment === false) {
@@ -270,6 +268,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setContentKo(draft.contentKo || "");
     setContentEn(draft.contentEn || "");
     setIsAnonymous(draft.isAnonymous);
+    setIsOfficial(draft.isOfficial);
     setIsPinned(draft.isPinned);
     setIsSecret(draft.isSecret);
     setAllowComment(draft.allowComment);
@@ -363,6 +362,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       contentKo,
       contentEn,
       isAnonymous,
+      isOfficial,
       isPinned,
       isSecret,
       allowComment,
@@ -387,6 +387,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       isPinned,
       isSecret,
       isAnonymous,
+      isOfficial,
       allowComment,
       isKoreanOnly,
       assets: assets.map((asset, index) => ({
@@ -448,6 +449,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         setContentKo(draft.contentKo || "");
         setContentEn(draft.contentEn || "");
         setIsAnonymous(draft.isAnonymous);
+        setIsOfficial(draft.isOfficial);
         setIsPinned(draft.isPinned);
         setIsSecret(draft.isSecret);
         setAllowComment(draft.allowComment);
@@ -493,6 +495,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       setContentKo(parsed.contentKo || "");
       setContentEn(parsed.contentEn || "");
       setIsAnonymous(parsed.isAnonymous ?? false);
+      setIsOfficial(parsed.isOfficial ?? false);
       setIsPinned(parsed.isPinned ?? false);
       setIsSecret(parsed.isSecret ?? false);
       setAllowComment(parsed.allowComment ?? true);
@@ -541,6 +544,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setContentKo("");
     setContentEn("");
     setIsAnonymous(false);
+    setIsOfficial(false);
     setIsPinned(false);
     setIsSecret(false);
     setAllowComment(true);
@@ -624,6 +628,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     titleEn,
     contentEn,
     isAnonymous,
+    isOfficial,
     isPinned,
     isSecret,
     allowComment,
@@ -656,6 +661,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     contentKo,
     contentEn,
     isAnonymous,
+    isOfficial,
     isPinned,
     isSecret,
     allowComment,
@@ -726,6 +732,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         contentEn: isKoreanOnly ? undefined : contentEn,
         visibilityScope: "PUBLIC",
         isAnonymous: canConfigurePostSettings ? isAnonymous : false,
+        isOfficial: canUseOfficialIdentity ? isOfficial : false,
         isPinned: canConfigurePostSettings ? isPinned : false,
         isSecret: selectedBoard?.allowSecret ? isSecret : false,
         allowComment: selectedBoard?.allowComment === false ? false : allowComment,
@@ -828,6 +835,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     boardByCode,
     canConfigurePostSettings,
     canManageTemplates,
+    canUseOfficialIdentity,
     canWriteSelected,
     contentEn,
     contentKo,
@@ -847,6 +855,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     handleUploadThumbnail,
     handleUploadFiles,
     isAnonymous,
+    isOfficial,
     isAllDay,
     isEventAlwaysOpen,
     isSecret,
@@ -866,6 +875,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setEventStartDate,
     setAllowComment,
     setIsAnonymous,
+    setIsOfficial,
     setIsAllDay,
     setIsEventAlwaysOpen,
     setIsKoreanOnly,

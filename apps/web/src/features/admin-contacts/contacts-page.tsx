@@ -51,7 +51,7 @@ import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./Executiv
 const CONTACT_LIST_PAGE_SIZE = 500;
 
 export function ExecutiveDirectoryPage() {
-  return <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}><ContactsPageContent /></AuthGuard>;
+  return <AuthGuard requirePermission={Permissions.MANAGE_CONTACTS}><ContactsPageContent /></AuthGuard>;
 }
 
 export const ContactsPage = ExecutiveDirectoryPage;

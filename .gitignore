@@ -55,5 +55,8 @@ lerna-debug.log*
 
 images/
 
-# Local service-account credentials
-secrets/google-calendar-service-account.json
+# Local Google credentials and other runtime secrets
+secrets/
+google-calendar-service-account.json
+google-oauth-client.json
+google-oauth-token.json

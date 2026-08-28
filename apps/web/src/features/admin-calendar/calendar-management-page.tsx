@@ -114,7 +114,7 @@ function formatPeriod(event: CalendarEventRecord) {
 
 export function CalendarManagementPage() {
   return (
-    <AuthGuard requirePermission={Permissions.MANAGE_CONTENT}>
+    <AuthGuard requirePermission={Permissions.MANAGE_CALENDAR}>
       <CalendarManagementContent />
     </AuthGuard>
   );

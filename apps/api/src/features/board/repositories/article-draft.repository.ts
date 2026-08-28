@@ -65,6 +65,7 @@ const mapRow = (row: DraftSelectRow): ArticleDraftRecord => {
     pinOrder: toOptionalNumber(payload.pinOrder),
     isSecret: toOptionalBoolean(payload.isSecret, false),
     isAnonymous: toOptionalBoolean(payload.isAnonymous, false),
+    isOfficial: toOptionalBoolean(payload.isOfficial, false),
     allowComment: toOptionalBoolean(payload.allowComment, true),
     isKoreanOnly: toOptionalBoolean(payload.isKoreanOnly, false),
     assets,

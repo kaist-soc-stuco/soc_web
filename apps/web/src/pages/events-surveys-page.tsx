@@ -58,12 +58,12 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
         <PageHeader
           actions={
             currentTab === "survey" &&
-            Permissions.has(session?.permission ?? 0, Permissions.MANAGE_SURVEY) ? (
+            Permissions.hasAny(session?.permission ?? 0, Permissions.MANAGE_SURVEY, Permissions.MANAGE_POLL) ? (
               <Button asChild>
                 <Link to="/admin/surveys/new">{lang === "ko" ? "등록" : "Create"}</Link>
               </Button>
             ) : currentTab === "event" &&
-              Permissions.has(session?.permission ?? 0, Permissions.WRITE_NOTICE) ? (
+              Permissions.has(session?.permission ?? 0, Permissions.POST_CREATE) ? (
               <Button asChild>
                 <Link to="/events/write">
                   {lang === "ko" ? "행사 등록" : "Create event"}

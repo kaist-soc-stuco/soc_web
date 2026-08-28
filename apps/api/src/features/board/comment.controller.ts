@@ -18,11 +18,14 @@ import type {
   CommentDeleteResponse,
   CommentEngagementResponse,
   CommentListResponse,
+  CommentModerationRequest,
+  CommentModerationResponse,
   CommentUpdateRequest,
   CommentUpdateResponse,
 } from "@soc/contracts";
 import {
   CommentCreateSchema,
+  CommentModerationSchema,
   CommentUpdateSchema,
 } from "@soc/contracts";
 import { Request } from "express";
@@ -38,6 +41,7 @@ interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     permission: number;
+    roleGroupIds?: number[];
   };
 }
 
@@ -115,6 +119,25 @@ export class CommentController {
       code,
       articleId,
       commentId,
+      request.user!,
+    );
+  }
+
+  @Patch(":commentId/moderation")
+  @UseGuards(AuthGuard)
+  async moderateComment(
+    @Param("code") code: string,
+    @Param("articleId") articleId: string,
+    @Param("commentId") commentId: string,
+    @Body(new ZodValidationPipe(CommentModerationSchema))
+    body: CommentModerationRequest,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<CommentModerationResponse> {
+    return this.commentService.moderateComment(
+      code,
+      articleId,
+      commentId,
+      body,
       request.user!,
     );
   }

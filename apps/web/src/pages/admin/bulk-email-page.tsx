@@ -153,7 +153,7 @@ const EXECUTION_HISTORY_STATUSES = new Set<BulkEmailRecord["status"]>([
 
 export function BulkEmailPage() {
   return (
-    <AuthGuard requirePermission={Permissions.ADMIN}>
+    <AuthGuard requirePermission={Permissions.SEND_EMAIL}>
       <BulkEmailPageContent />
     </AuthGuard>
   );

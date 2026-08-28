@@ -36,7 +36,7 @@ export class ContactsController {
   }
 
   @Get("manage/export.xlsx")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.VIEW_CONTACTS)
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="executive_contacts.xlsx"')
   async exportManagedContacts(
@@ -79,7 +79,7 @@ export class ContactsController {
   }
 
   @Get("manage")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.VIEW_CONTACTS)
   async getManagedContacts(
     @Req() request: AuthenticatedRequest,
     @Query("q") query?: string,
@@ -97,7 +97,7 @@ export class ContactsController {
   }
 
   @Post()
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async createContact(
     @Body(new ZodValidationPipe(CreateContactSchema)) body: CreateContactRequest,
   ): Promise<ContactRecord> {
@@ -105,7 +105,7 @@ export class ContactsController {
   }
 
   @Post("bulk")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async bulkImportContacts(
     @Body(new ZodValidationPipe(BulkImportContactsSchema))
     body: BulkImportContactsRequest,
@@ -114,7 +114,7 @@ export class ContactsController {
   }
 
   @Patch("order")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async reorderContacts(
     @Body(new ZodValidationPipe(ReorderContactsSchema))
     body: ReorderContactsRequest,
@@ -123,7 +123,7 @@ export class ContactsController {
   }
 
   @Patch(":id")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async updateContact(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(UpdateContactSchema)) body: UpdateContactRequest,
@@ -132,7 +132,7 @@ export class ContactsController {
   }
 
   @Delete(":id")
-  @RequirePermissions(Permissions.MANAGE_CONTENT)
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async deleteContact(@Param("id") id: string): Promise<{ success: boolean }> {
     await this.contactsService.delete(id);
     return { success: true };
