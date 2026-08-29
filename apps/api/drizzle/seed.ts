@@ -27,7 +27,12 @@ import {
   voteVoters,
   votes,
 } from "../src/infrastructure/postgres/postgres.schema";
-import { OPERATIONAL_SURVEY_IDS, PERMISSION_REGISTRY } from "@soc/contracts";
+import {
+  INITIAL_ADMIN_ROLE_GROUP_NAME,
+  OPERATIONAL_SURVEY_IDS,
+  PERMISSION_REGISTRY,
+  PermissionCode,
+} from "@soc/contracts";
 
 const readRequiredEnv = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -220,6 +225,48 @@ async function seedBoards() {
       },
     });
   console.log(`Upserted ${BOARD_SEEDS.length} board(s)`);
+}
+
+async function seedInitialAdminRole() {
+  const superAdminPermission = PERMISSION_SEEDS.find(
+    (permission) => permission.code === PermissionCode.SUPER_ADMIN,
+  );
+
+  if (!superAdminPermission) {
+    throw new Error("SUPER_ADMIN permission is missing from the registry");
+  }
+
+  const [roleGroup] = await db
+    .insert(roleGroups)
+    .values({
+      description: "초기 운영 관리자에게 부여되는 시스템 역할",
+      isSystem: true,
+      nameKo: INITIAL_ADMIN_ROLE_GROUP_NAME,
+    })
+    .onConflictDoUpdate({
+      target: roleGroups.nameKo,
+      set: {
+        description: "초기 운영 관리자에게 부여되는 시스템 역할",
+        isSystem: true,
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning({ roleGroupId: roleGroups.roleGroupId });
+
+  if (!roleGroup) {
+    throw new Error("Failed to upsert the initial administrator role group");
+  }
+
+  await db
+    .delete(roleGroupPermissions)
+    .where(eq(roleGroupPermissions.roleGroupId, roleGroup.roleGroupId));
+
+  await db.insert(roleGroupPermissions).values({
+    permissionId: superAdminPermission.permissionId,
+    roleGroupId: roleGroup.roleGroupId,
+  });
+
+  console.log("Upserted the initial administrator system role");
 }
 
 async function seedDevAdminRole() {
@@ -2392,6 +2439,7 @@ async function main() {
   console.log("Seed mode:", seedMode);
   try {
     await seedPermissions();
+    await seedInitialAdminRole();
     await seedBoards();
     await seedOperationalSurveys();
     if (seedMode === "demo") {

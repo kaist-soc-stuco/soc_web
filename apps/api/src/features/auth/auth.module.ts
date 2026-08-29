@@ -9,6 +9,8 @@ import { PendingLoginRepository } from "./pending-login.repository";
 import { AuthSessionRepository } from "./auth-session.repository";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
+import { InitialAdminRepository } from "./initial-admin.repository";
+import { InitialAdminService } from "./initial-admin.service";
 import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "./guards";
 import { AuthEligibilityService } from "./auth-eligibility.service";
 
@@ -22,6 +24,8 @@ import { AuthEligibilityService } from "./auth-eligibility.service";
     AuthEligibilityService,
     AuthCookieService,
     AuthService,
+    InitialAdminRepository,
+    InitialAdminService,
     AuthSessionRepository,
     AuthSessionService,
     PendingLoginRepository,

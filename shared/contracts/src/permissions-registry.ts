@@ -280,3 +280,9 @@ export const Permissions = {
 
 /** Every authenticated member receives these non-administrative capabilities. */
 export const DEFAULT_AUTHENTICATED_PERMISSION_BITS = Permissions.WRITE_LAB;
+
+/**
+ * reference seed와 최초 관리자 자동 부여가 함께 사용하는 시스템 역할 이름입니다.
+ * 시스템 역할은 관리자 UI에서 수정하거나 삭제할 수 없습니다.
+ */
+export const INITIAL_ADMIN_ROLE_GROUP_NAME = "최고 관리자";

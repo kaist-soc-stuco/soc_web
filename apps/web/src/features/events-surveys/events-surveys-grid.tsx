@@ -1,6 +1,5 @@
 import type {
   ArticleEngagementKind,
-  SurveyParticipationEligibility,
 } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
 import { CalendarDays, Clock } from "lucide-react";
@@ -8,7 +7,6 @@ import { Link } from "react-router-dom";
 
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
 import { stripRichText } from "@/components/ui/rich-text-content";
-import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
 import {
   getCardPeriodText,
   isClosedItem,
@@ -165,19 +163,6 @@ export function EventsSurveysGrid({
         );
         const closed = isClosedItem(item);
         const href = getItemHref(item);
-        const participationEligibility: SurveyParticipationEligibility | undefined =
-          item.kind !== "EVENT"
-            ? item.participationEligibility ??
-              (!isAuthenticated && !item.allowAnonymous
-                ? { status: "LOGIN_REQUIRED", reasons: ["LOGIN_REQUIRED"] }
-                : undefined)
-            : undefined;
-        const participationBlocked = Boolean(
-          participationEligibility &&
-            item.computedState === "open" &&
-            (participationEligibility.status === "LOGIN_REQUIRED" ||
-              participationEligibility.status === "NOT_ELIGIBLE"),
-        );
         const eyebrow = [
           getStatusText(item, lang),
           getApplicationText(item, lang),
@@ -192,7 +177,7 @@ export function EventsSurveysGrid({
         return (
           <div
             key={item.id}
-            className={`interaction-card group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
+            className={`interaction-card group flex w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${item.kind === "SURVEY" ? "h-[15.5rem]" : "h-full"} ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
           >
             {item.kind === "EVENT" ? (
               <Link
@@ -234,7 +219,7 @@ export function EventsSurveysGrid({
                     {title}
                   </h3>
                   {desc ? (
-                    <p className={`${item.kind === "SURVEY" ? "mt-2.5" : "mt-1.5"} line-clamp-2 text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body`}>
+                    <p className={`${item.kind === "SURVEY" ? "mt-2.5 min-h-[3.375rem] line-clamp-3" : "mt-1.5 line-clamp-2"} text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body`}>
                       {desc}
                     </p>
                   ) : null}
@@ -258,14 +243,6 @@ export function EventsSurveysGrid({
                   />
                 ) : null}
               </div>
-
-              {participationBlocked && participationEligibility ? (
-                <SurveyParticipationNotice
-                  compact
-                  eligibility={participationEligibility}
-                  lang={lang}
-                />
-              ) : null}
 
               <Link
                 aria-label={`${title} ${getCardPeriodText(item, lang)}`}

@@ -17,7 +17,17 @@ pnpm build
 
 ## DB Migration And Seed
 
-2026-08-28에 개발 단계의 migration 이력을 현재 스키마 기준 `apps/api/drizzle/0000_baseline.sql` 하나로 squash했다. 이 baseline은 빈 PostgreSQL에 적용하는 것을 전제로 한다. squash 이전 migration 기록이 남은 DB를 그대로 업그레이드하지 말고, 운영 배포 전 백업 정책을 확인한 뒤 새 DB에 baseline을 적용한다.
+`apps/api/drizzle/0000_baseline.sql`은 빈 PostgreSQL용 기준 스키마이며, 이후 번호의 migration을 순서대로 적용합니다. 운영 DB에는 적용 이력이 남은 migration 파일을 삭제하거나 다시 squash하지 않습니다. 최초 운영 배포는 개발 DB volume을 복사하지 말고 빈 DB에서 migration 전체를 재현합니다.
+
+운영 최초 배포:
+
+```bash
+docker compose --env-file .env -f infra/docker/compose.prod.yml run --rm db-migrate
+docker compose --env-file .env -f infra/docker/compose.prod.yml run --rm \
+  -e SEED_MODE=reference api pnpm db:seed
+```
+
+reference seed는 권한·게시판·상시 신청형 설문과 `최고 관리자` 시스템 역할만 생성하며 개발 사용자나 샘플 콘텐츠를 만들지 않습니다. `.env`의 `INITIAL__ADMIN_STDNOS`에 쉼표로 구분한 8자리 학번을 설정하면 해당 사용자가 SSO로 영구 계정을 만들거나 다시 로그인할 때 `최고 관리자` 역할이 부여됩니다. 목록에서 학번을 제거해도 이미 부여된 역할은 자동 회수하지 않으므로 관리자 화면에서 명시적으로 회수합니다.
 
 로컬 compose 기준:
 
@@ -39,6 +49,7 @@ SEED_MODE=demo pnpm --filter @soc/api db:seed
 
 - `No schema changes, nothing to migrate` 또는 `migrations applied successfully`
 - `Upserted 16 permission(s)`
+- `Upserted the initial administrator system role`
 - `Upserted 7 board(s)`
 - `Seeded ... articles`
 - `Seed finished`
@@ -55,6 +66,19 @@ SEED_MODE=demo pnpm --filter @soc/api db:seed
 4. 설문 관리자 권한 사용자가 미공개 설문 preview와 비공개 결과를 볼 수 있는지 확인합니다.
 5. 회비 납부자 전용 설문/행사는 백엔드 응답 기준으로 차단되는지 확인합니다.
 6. production에서는 mock login endpoint가 막혀 있어야 합니다.
+7. `INITIAL__ADMIN_STDNOS`에 포함된 학번은 첫 개인정보 동의 직후 최고 관리자 메뉴에 접근할 수 있어야 합니다.
+8. 목록에 없는 일반 사용자는 기본 권한만 받아야 합니다.
+
+## Backup And Restore Rehearsal
+
+배포 및 migration 직전 PostgreSQL 백업을 만들고, 별도 임시 DB에서 복원 여부를 확인합니다. 백업 파일과 `VOTE_BALLOT_ENCRYPTION_KEY`는 함께 보존해야 기존 투표 데이터를 복호화할 수 있습니다.
+
+```bash
+docker compose --env-file .env -f infra/docker/compose.prod.yml exec -T postgres \
+  pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "soc-web-$(date +%Y%m%d-%H%M).dump"
+```
+
+Google OAuth client/token, 서비스 계정 파일과 S3 데이터도 DB와 별도로 백업합니다. 백업 파일은 Git 저장소와 웹 서버 공개 경로에 두지 않습니다.
 
 관련 자동 테스트:
 
@@ -91,10 +115,10 @@ docker compose -p soc_web -f compose.yml logs --tail=200 postgres
 운영 compose:
 
 ```bash
-docker compose -p soc_web -f infra/docker/compose.prod.yml ps
-docker compose -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 api
-docker compose -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 web
-docker compose -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 postgres
+docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml ps
+docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 api
+docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 web
+docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 postgres
 ```
 
 실시간 확인:

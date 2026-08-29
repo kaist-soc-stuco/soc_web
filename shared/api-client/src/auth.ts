@@ -7,13 +7,11 @@ import type {
   LoginStartResponse,
   LogoutResponse,
   RefreshResponse,
-  SsoUserInfo,
 } from "@soc/contracts";
 
 import type { ApiClientContext } from "./core.js";
 
 export interface LoginResultResponse {
-  ssoUserInfo?: SsoUserInfo;
   storageMode: "persisted" | "temporary";
   userId?: string;
 }
@@ -21,11 +19,6 @@ export interface LoginResultResponse {
 export interface MockLoginResponse {
   storageMode: "persisted";
   userId: string;
-}
-
-export interface AccessCheckResponse {
-  mode: "persisted" | "temporary";
-  ok: boolean;
 }
 
 export interface TemporaryAuthRequest {
@@ -52,18 +45,6 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
       : "";
     return requestJson<LoginSessionResponse>(
       `${authBaseUrl}/session${query}`,
-      {
-        method: "GET",
-      },
-      {
-        retryOnUnauthorized: true,
-      },
-    );
-  },
-
-  checkAccessToken: async (): Promise<AccessCheckResponse> => {
-    return requestJson<AccessCheckResponse>(
-      `${authBaseUrl}/access-check`,
       {
         method: "GET",
       },

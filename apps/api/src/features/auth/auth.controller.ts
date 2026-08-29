@@ -80,7 +80,6 @@ export class AuthController {
     this.authCookieService.setAuthCookies(response, result, request);
 
     return {
-      ssoUserInfo: result.ssoUserInfo,
       storageMode: result.storageMode,
       userId: result.userId,
     };
@@ -105,7 +104,6 @@ export class AuthController {
     }
 
     return {
-      ssoUserInfo: result.ssoUserInfo,
       storageMode: result.storageMode,
       temporarySession:
         result.storageMode === "temporary"
@@ -128,22 +126,6 @@ export class AuthController {
     @Query("sessionId") querySessionId: string | undefined,
   ) {
     return this.authSessionService.getSession(cookieSessionId ?? querySessionId);
-  }
-
-  /**
-   * access token 유효성을 확인하는 테스트용 endpoint입니다.
-   */
-  @Get("access-check")
-  async checkAccessToken(
-    @Cookies(AUTH_ACCESS_COOKIE_NAME) cookieAccessToken: string | undefined,
-  ) {
-    const claims =
-      this.authSessionService.validateAccessToken(cookieAccessToken);
-
-    return {
-      mode: claims.mode,
-      ok: true,
-    };
   }
 
   /**
