@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
@@ -13,8 +13,16 @@ export class VoteCryptoService {
   private readonly masterKey: Buffer;
 
   constructor(config: ConfigService) {
-    const secret =
-      config.get<string>("VOTE_BALLOT_ENCRYPTION_KEY") ??
+    const configuredSecret = config
+      .get<string>("VOTE_BALLOT_ENCRYPTION_KEY")
+      ?.trim();
+    if (!configuredSecret && config.get<string>("NODE_ENV") === "production") {
+      throw new InternalServerErrorException(
+        "VOTE_BALLOT_ENCRYPTION_KEY_is_required_in_production",
+      );
+    }
+
+    const secret = configuredSecret ||
       config.getOrThrow<string>("AUTH_PENDING_LOGIN_ENCRYPTION_KEY");
     this.masterKey = createHash("sha256")
       .update(`soc-web:vote-ballot-key:v1:${secret}`, "utf8")

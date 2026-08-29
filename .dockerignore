@@ -3,3 +3,9 @@
 **/node_modules
 **/dist
 .DS_Store
+.env
+.env.*
+!.env.example
+secrets/
+apps/api/uploads/
+tmp/

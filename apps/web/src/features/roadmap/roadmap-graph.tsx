@@ -12,7 +12,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { Search, X } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -42,11 +42,8 @@ const LANE_GAP = 22;
 
 interface CourseNodeData extends Record<string, unknown> {
   course: RoadmapCourse;
-  dimmed: boolean;
   duplicate: boolean;
   lang: RoadmapLanguage;
-  relation: "current" | "previous" | "next" | null;
-  selected: boolean;
 }
 
 interface LaneNodeData extends Record<string, unknown> {
@@ -111,11 +108,8 @@ function buildLayout(lang: RoadmapLanguage): LayoutResult {
         },
         data: {
           course: item,
-          dimmed: false,
           duplicate: false,
           lang,
-          relation: null,
-          selected: false,
         },
         draggable: false,
         selectable: true,
@@ -145,13 +139,44 @@ const LaneCard = memo(function LaneCard({ data }: NodeProps<LaneNode>) {
   );
 });
 
+interface RoadmapInteractionContextValue {
+  activeCourseCode: string | null;
+  nextCodes: ReadonlySet<string>;
+  previousCodes: ReadonlySet<string>;
+  selectedCourseCode: string | null;
+  selectedTrackIds: ReadonlySet<string>;
+  setHoveredCourseCode: (courseCode: string | null) => void;
+}
+
+const RoadmapInteractionContext = createContext<RoadmapInteractionContextValue | null>(null);
+
 const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
-  const { course, dimmed, duplicate, lang, relation, selected } = data;
+  const { course, duplicate, lang } = data;
+  const interaction = useContext(RoadmapInteractionContext);
+  const relation =
+    course.code === interaction?.activeCourseCode
+      ? "current"
+      : interaction?.previousCodes.has(course.code)
+        ? "previous"
+        : interaction?.nextCodes.has(course.code)
+          ? "next"
+          : null;
+  const relationDimmed = Boolean(interaction?.activeCourseCode && !relation);
+  const trackDimmed = Boolean(
+    interaction &&
+      interaction.selectedTrackIds.size > 0 &&
+      !course.tracks.some((trackId) => interaction.selectedTrackIds.has(trackId)) &&
+      !relation,
+  );
+  const dimmed = relationDimmed || trackDimmed;
+  const selected = course.code === interaction?.selectedCourseCode;
 
   return (
     <div
+      onMouseEnter={() => interaction?.setHoveredCourseCode(course.code)}
+      onMouseLeave={() => interaction?.setHoveredCourseCode(null)}
       className={cn(
-        "group relative h-full w-full rounded-lg border bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[opacity,border-color,box-shadow,transform] duration-150",
+        "group relative h-full w-full rounded-lg border bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[opacity,border-color,box-shadow] duration-150",
         selected
           ? "border-kaist-darkgreen shadow-[0_0_0_2px_rgba(0,92,74,0.13)]"
           : relation === "previous"
@@ -160,7 +185,7 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
               ? "border-sky-500 shadow-[0_0_0_1px_rgba(14,165,233,0.15)]"
               : relation === "current"
                 ? "border-kaist-darkgreen"
-                : "border-slate-200 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md",
+                : "border-slate-200 hover:border-slate-400 hover:shadow-md",
         dimmed && "opacity-[0.14]",
       )}
     >
@@ -244,36 +269,30 @@ export function RoadmapGraph({
 
   const nodes = useMemo<GraphNode[]>(
     () =>
-      layout.nodes.map((node) => {
-        if (node.type !== "course") return node;
-        const code = node.data.course.code;
-        const relation =
-          code === activeCourseCode
-            ? "current"
-            : previousCodes.has(code)
-              ? "previous"
-              : nextCodes.has(code)
-                ? "next"
-                : null;
-        const relationDimmed = Boolean(activeCourseCode && !relation);
-        const trackDimmed = Boolean(
-          selectedTrackIds.size > 0 &&
-            !node.data.course.tracks.some((trackId) => selectedTrackIds.has(trackId)) &&
-            !relation,
-        );
+      layout.nodes.map((node) =>
+        node.type === "course"
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                duplicate: (layout.instancesByCode.get(node.data.course.code)?.length ?? 0) > 1,
+              },
+            }
+          : node,
+      ),
+    [layout],
+  );
 
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            dimmed: relationDimmed || trackDimmed,
-            duplicate: (layout.instancesByCode.get(code)?.length ?? 0) > 1,
-            relation,
-            selected: code === selectedCourseCode,
-          },
-        };
-      }),
-    [activeCourseCode, layout, nextCodes, previousCodes, selectedCourseCode, selectedTrackIds],
+  const interactionValue = useMemo<RoadmapInteractionContextValue>(
+    () => ({
+      activeCourseCode,
+      nextCodes,
+      previousCodes,
+      selectedCourseCode,
+      selectedTrackIds,
+      setHoveredCourseCode,
+    }),
+    [activeCourseCode, nextCodes, previousCodes, selectedCourseCode, selectedTrackIds],
   );
 
   const edges = useMemo<Edge[]>(
@@ -291,6 +310,8 @@ export function RoadmapGraph({
             source,
             target,
             type: "smoothstep",
+            focusable: false,
+            interactionWidth: 0,
             markerEnd: {
               type: MarkerType.ArrowClosed,
               width: 13,
@@ -299,10 +320,12 @@ export function RoadmapGraph({
             },
             style: {
               opacity: activeCourseCode && !highlighted ? 0.08 : highlighted ? 1 : 0.34,
+              pointerEvents: "none",
               stroke: highlighted ? "#0f766e" : "#94a3b8",
               strokeWidth: highlighted ? 2 : 1.25,
             },
-            zIndex: highlighted ? 4 : 0,
+            selectable: false,
+            zIndex: 0,
             ariaLabel:
               lang === "ko"
                 ? `${relation.source}에서 ${relation.target}로 이어지는 권장 수강 순서`
@@ -498,42 +521,40 @@ export function RoadmapGraph({
         </div>
 
         <div className="h-[calc(100svh-13rem)] min-h-[38rem] max-h-[54rem] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-          <ReactFlow<GraphNode, Edge>
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onInit={setFlow}
-            onNodeClick={(_, node) => {
-              if (node.type === "course") focusCourse(node.data.course.code);
-            }}
-            onNodeMouseEnter={(_, node) => {
-              if (node.type === "course") setHoveredCourseCode(node.data.course.code);
-            }}
-            onNodeMouseLeave={() => setHoveredCourseCode(null)}
-            onPaneClick={() => onSelectedCourseChange(null)}
-            defaultViewport={{ x: 16, y: 16, zoom: 0.72 }}
-            minZoom={0.28}
-            maxZoom={1.7}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            elementsSelectable
-            panOnDrag
-            panOnScroll
-            zoomOnScroll={false}
-            zoomOnPinch
-            deleteKeyCode={null}
-            selectionKeyCode={null}
-            multiSelectionKeyCode={null}
-            ariaLabelConfig={{
-              "controls.ariaLabel": lang === "ko" ? "지도 조작" : "Map controls",
-              "controls.fitView.ariaLabel": lang === "ko" ? "전체 보기" : "Fit view",
-              "controls.zoomIn.ariaLabel": lang === "ko" ? "확대" : "Zoom in",
-              "controls.zoomOut.ariaLabel": lang === "ko" ? "축소" : "Zoom out",
-            }}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#cbd5e1" />
-            <Controls showInteractive={false} position="bottom-left" />
-          </ReactFlow>
+          <RoadmapInteractionContext.Provider value={interactionValue}>
+            <ReactFlow<GraphNode, Edge>
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onInit={setFlow}
+              onNodeClick={(_, node) => {
+                if (node.type === "course") focusCourse(node.data.course.code);
+              }}
+              onPaneClick={() => onSelectedCourseChange(null)}
+              defaultViewport={{ x: 16, y: 16, zoom: 0.72 }}
+              minZoom={0.28}
+              maxZoom={1.7}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable
+              panOnDrag
+              panOnScroll
+              zoomOnScroll={false}
+              zoomOnPinch
+              deleteKeyCode={null}
+              selectionKeyCode={null}
+              multiSelectionKeyCode={null}
+              ariaLabelConfig={{
+                "controls.ariaLabel": lang === "ko" ? "지도 조작" : "Map controls",
+                "controls.fitView.ariaLabel": lang === "ko" ? "전체 보기" : "Fit view",
+                "controls.zoomIn.ariaLabel": lang === "ko" ? "확대" : "Zoom in",
+                "controls.zoomOut.ariaLabel": lang === "ko" ? "축소" : "Zoom out",
+              }}
+            >
+              <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#cbd5e1" />
+              <Controls showInteractive={false} position="bottom-left" />
+            </ReactFlow>
+          </RoadmapInteractionContext.Provider>
         </div>
       </div>
 

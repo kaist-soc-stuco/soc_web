@@ -17,6 +17,7 @@ import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
 import { AuthEligibilityService } from "./auth-eligibility.service";
+import { InitialAdminService } from "./initial-admin.service";
 
 interface SsoConfig {
   clientId: string;
@@ -44,7 +45,6 @@ interface LoginResultPayload {
   accessToken: string;
   refreshToken: string;
   sessionId: string;
-  ssoUserInfo?: Record<string, unknown>;
   storageMode: "persisted" | "temporary";
   userId?: string;
 }
@@ -86,6 +86,7 @@ export class AuthService {
     private readonly authSessionService: AuthSessionService,
     private readonly pendingLoginRepository: PendingLoginRepository,
     private readonly authEligibilityService: AuthEligibilityService,
+    private readonly initialAdminService: InitialAdminService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
     this.startConfig = this.loadStartConfig();
@@ -318,6 +319,11 @@ export class AuthService {
           });
         }
 
+        await this.initialAdminService.ensureRoleForUser(
+          existingUser.userId,
+          stdNo,
+        );
+
         const issued = await this.authSessionService.issuePersistedSession(
           existingUser.userId,
         );
@@ -330,7 +336,6 @@ export class AuthService {
           accessToken: issued.accessToken,
           refreshToken: issued.refreshToken,
           sessionId: issued.session.sessionId,
-          ssoUserInfo: userInfo,
           storageMode: "persisted",
           userId: existingUser.userId,
         });
@@ -353,7 +358,6 @@ export class AuthService {
         kaistUid,
         nameEn,
         nameKo,
-        ssoUserInfo: userInfo,
         ssoSubject,
         stdNo,
         primaryMajor,

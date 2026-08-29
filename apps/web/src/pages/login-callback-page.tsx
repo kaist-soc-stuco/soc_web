@@ -1,5 +1,4 @@
 import { createApiClient } from "@soc/api-client";
-import type { SsoUserInfo } from "@soc/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -87,35 +86,6 @@ export function LoginCallbackPage() {
     [navigate, toast],
   );
 
-  const logSsoAccountInfo = useCallback(async (ssoUserInfo?: SsoUserInfo) => {
-    if (ssoUserInfo !== undefined) {
-      console.groupCollapsed("[SoC SSO] 원본 userInfo 전체");
-      console.log("SSO userInfo 원본 객체", ssoUserInfo);
-      console.dir(ssoUserInfo);
-      console.table(ssoUserInfo);
-      console.groupEnd();
-      return;
-    }
-
-    try {
-      const response = await apiClient.getCurrentUser();
-
-      if (!response.user) {
-        console.log("[SoC SSO] 로그인 세션 정보", response);
-        return;
-      }
-
-      // 의도적으로 access/refresh token은 출력하지 않고, SSO에서
-      // 사용자 프로필로 저장된 계정 정보만 브라우저 콘솔에 표시합니다.
-      console.groupCollapsed("[SoC SSO] 로그인 계정 정보");
-      console.log("현재 SSO 계정", { ...response.user });
-      console.table({ ...response.user });
-      console.groupEnd();
-    } catch (error) {
-      console.warn("[SoC SSO] 계정 정보 조회 실패", error);
-    }
-  }, [apiClient]);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -177,8 +147,7 @@ export function LoginCallbackPage() {
 
       void apiClient
         .consumeLoginResult(resultToken)
-        .then(async (loginResult) => {
-          await logSsoAccountInfo(loginResult.ssoUserInfo);
+        .then(async () => {
           clearStoredAuthState();
           await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
           navigate("/", { replace: true });
@@ -199,7 +168,6 @@ export function LoginCallbackPage() {
     if (loginStatus === "success") {
       void queryClient
         .invalidateQueries({ queryKey: ["auth", "session"] })
-        .then(() => logSsoAccountInfo())
         .finally(() => navigate("/", { replace: true }));
       return;
     }
@@ -234,7 +202,7 @@ export function LoginCallbackPage() {
     }
 
     void startLogin();
-  }, [apiClient, lang, location.search, logSsoAccountInfo, navigate, queryClient, returnToPreviousPage]);
+  }, [apiClient, lang, location.search, navigate, queryClient, returnToPreviousPage]);
 
   const submitConsentDecision = async (consent: boolean) => {
     if (!pendingConsentToken) {
@@ -259,10 +227,8 @@ export function LoginCallbackPage() {
         writeStoredAuthState({
           temporarySession: payload.temporarySession,
         });
-        await logSsoAccountInfo(payload.ssoUserInfo);
       } else {
         clearStoredAuthState();
-        await logSsoAccountInfo(payload.ssoUserInfo);
       }
 
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });

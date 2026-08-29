@@ -25,6 +25,7 @@ import { AuthSessionRepository } from "./auth-session.repository";
 import { PendingLoginRepository } from "./pending-login.repository";
 import { AuthEligibilityService } from "./auth-eligibility.service";
 import { UsersService } from "../users/users.service";
+import { InitialAdminService } from "./initial-admin.service";
 import {
   AUTH_ACCESS_TOKEN_TTL_SECONDS,
   AUTH_REFRESH_TOKEN_TTL_SECONDS,
@@ -42,6 +43,7 @@ export class AuthSessionService {
     private readonly pendingLoginRepository: PendingLoginRepository,
     private readonly usersService: UsersService,
     private readonly authEligibilityService: AuthEligibilityService,
+    private readonly initialAdminService: InitialAdminService,
   ) {}
 
   /** JWT 서명/검증에 사용할 필수 시크릿을 반환합니다. */
@@ -343,7 +345,6 @@ export class AuthSessionService {
     accessToken?: string;
     refreshToken?: string;
     sessionId?: string;
-    ssoUserInfo?: Record<string, unknown>;
     storageMode: "temporary" | "persisted";
     userId?: string;
   }> {
@@ -382,6 +383,11 @@ export class AuthSessionService {
         consentedAt: now,
       });
 
+      await this.initialAdminService.ensureRoleForUser(
+        persistedUser.userId,
+        pendingUser.stdNo,
+      );
+
       const issued = await this.issuePersistedSession(persistedUser.userId);
       await this.pendingLoginRepository.delete(input.pendingLoginToken);
 
@@ -389,7 +395,6 @@ export class AuthSessionService {
         accessToken: issued.accessToken,
         refreshToken: issued.refreshToken,
         sessionId: issued.session.sessionId,
-        ssoUserInfo: pendingUser.ssoUserInfo,
         storageMode: "persisted",
         userId: persistedUser.userId,
       };
@@ -405,7 +410,6 @@ export class AuthSessionService {
       accessToken: issued.accessToken,
       refreshToken: issued.refreshToken,
       sessionId: issued.session.sessionId,
-      ssoUserInfo: pendingUser.ssoUserInfo,
       storageMode: "temporary",
     };
   }

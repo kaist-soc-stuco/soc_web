@@ -48,6 +48,8 @@ cp .env.example .env
 - `VITE_API_BASE_URL`: 프론트엔드 API base URL. nginx를 통해 접근하면 `/api` 사용
 - `AUTH_JWT_SECRET`: JWT 서명 secret. 운영에서는 반드시 교체
 - `AUTH_PENDING_LOGIN_ENCRYPTION_KEY`: SSO pending login 암호화 키. 32자 이상의 랜덤 문자열 권장
+- `VOTE_BALLOT_ENCRYPTION_KEY`: 투표 데이터 전용 암호화 키. 인증 키와 분리하고 DB 백업과 함께 보관
+- `INITIAL__ADMIN_STDNOS`: 최초 SSO 로그인 시 최고 관리자 역할을 부여할 8자리 학번 목록. 쉼표로 구분
 - `REDIS_AUTH_TTL_SECONDS`: 임시 로그인 세션 TTL
 - `POSTGRES_*`: PostgreSQL 접속 정보
 - `REDIS_URL`: Redis 접속 URL
@@ -59,7 +61,7 @@ cp .env.example .env
 - `CHANNELTALK_PLUGIN_KEY`: Channel Talk 웹 SDK plugin key
 - `CHANNELTALK_SECRET_KEY`: Channel Talk member hash 생성용 secret. 브라우저에 노출하지 않음
 - `EMAIL_DRY_RUN`: 개발 환경에서 메일을 실제 발송하지 않고 처리 기록만 남길지 여부. 기본값 true
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`, `EMAIL_FROM`: 운영 SMTP 발송 설정
+- `DOORAY_SMTP_HOST`, `DOORAY_SMTP_PORT`, `DOORAY_SMTP_USER`, `DOORAY_SMTP_PASSWORD`, `DOORAY_SMTP_SECURE`, `EMAIL_FROM`: 운영 SMTP 발송 설정
 
 관리자 기능에는 연락망 CSV 일괄 업로드, 과비 납부율/납부금액 집계와 행 선택 일괄처리, F26 미납자 메일 템플릿이 포함되어 있습니다. 개발 모드에서 F26 메일을 보내면 드라이런 기록이 생성되고, 운영에서 실제 발송하려면 SMTP 설정과 `EMAIL_DRY_RUN=false`가 필요합니다.
 
@@ -121,7 +123,7 @@ docker compose --env-file .env -f infra/docker/compose.prod.yml config
 docker compose --env-file .env -f infra/docker/compose.prod.yml up -d --build
 ```
 
-현재 운영 compose는 단일 서버 배포를 전제로 하며, 업로드 파일은 로컬 Docker volume에 저장합니다. 자동 업로드 정리는 단일 API 인스턴스에서만 `ASSET_ORPHAN_CLEANUP_ENABLED=true`로 켜세요. API replica, 외부 오브젝트 스토리지, CDN이 필요해지는 시점에는 별도 worker 또는 distributed lock 설계를 먼저 추가하세요.
+현재 운영 compose는 단일 서버 배포를 전제로 합니다. `ASSET_STORAGE_PROVIDER=s3`를 권장하며, local fallback을 사용할 때는 호스트의 `apps/api/uploads` 경로도 별도로 백업해야 합니다. 자동 업로드 정리는 단일 API 인스턴스에서만 `ASSET_ORPHAN_CLEANUP_ENABLED=true`로 켜세요. API replica가 필요해지는 시점에는 별도 worker 또는 distributed lock 설계를 먼저 추가하세요.
 
 ## 자주 쓰는 명령
 

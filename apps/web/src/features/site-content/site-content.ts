@@ -76,14 +76,6 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
     valueEn: "School of Computing Journey Roadmap",
   },
   {
-    group: "about",
-    key: "about.roadmap.description",
-    labelKo: "로드맵 설명",
-    multiline: true,
-    valueKo: "수업 이수만이 아니라 프로젝트, 연구, 커뮤니티와 진로 탐색을 함께 계획하는 참고 가이드입니다.",
-    valueEn: "A reference guide for planning coursework alongside projects, research, community, and career exploration.",
-  },
-  {
     group: "footer",
     key: "footer.description",
     labelKo: "푸터 설명",

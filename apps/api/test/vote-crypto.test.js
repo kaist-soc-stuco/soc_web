@@ -34,3 +34,19 @@ test("two identical ballots receive different ciphertext and receipts", () => {
   assert.notEqual(first.ciphertext + first.authTag, second.ciphertext + second.authTag);
   assert.notEqual(crypto.createReceipt().code, crypto.createReceipt().code);
 });
+
+test("production refuses to reuse the pending-login key for vote ballots", () => {
+  const productionConfig = {
+    get(name) {
+      return name === "NODE_ENV" ? "production" : undefined;
+    },
+    getOrThrow() {
+      return "pending-login-key";
+    },
+  };
+
+  assert.throws(
+    () => new VoteCryptoService(productionConfig),
+    /VOTE_BALLOT_ENCRYPTION_KEY_is_required_in_production/,
+  );
+});
