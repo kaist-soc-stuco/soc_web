@@ -9,6 +9,15 @@ import type { UpdateSectionDto } from "./dto/update-section.dto";
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import type { ReorderSurveySectionsRequest } from "@soc/contracts";
 import { assertSurveyBranchDefinitions } from "./survey-definition-validation";
+import { AuditLogService } from "../audit/audit-log.service";
+
+const surveySectionAuditSnapshot = (section: SurveySectionRecord): Record<string, unknown> => ({
+  id: section.id,
+  surveyId: section.surveyId,
+  titleKo: section.titleKo,
+  titleEn: section.titleEn,
+  sortOrder: section.sortOrder,
+});
 
 @Injectable()
 export class SurveySectionsService {
@@ -16,6 +25,7 @@ export class SurveySectionsService {
     private readonly sectionsRepo: SurveySectionsRepository,
     private readonly mutationPolicy: SurveyMutationPolicy,
     @Optional() private readonly questionsRepo?: SurveyQuestionsRepository,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   private async assertBranchDefinitions(surveyId: string, tx: Parameters<SurveySectionsRepository["findBySurveyId"]>[1]) {
@@ -28,18 +38,31 @@ export class SurveySectionsService {
     assertSurveyBranchDefinitions(withQuestions);
   }
 
-  async create(surveyId: string, dto: CreateSectionDto): Promise<SurveySectionRecord> {
-    return this.mutationPolicy.withStructureMutation(surveyId, (tx) =>
+  async create(
+    surveyId: string,
+    dto: CreateSectionDto,
+    actorUserId?: string,
+  ): Promise<SurveySectionRecord> {
+    const created = await this.mutationPolicy.withStructureMutation(surveyId, (tx) =>
       this.sectionsRepo.insert(surveyId, dto, tx),
     );
+    await this.auditLogService?.record({
+      action: "survey.section.create",
+      actorUserId: actorUserId ?? null,
+      targetId: created.id,
+      targetType: "survey_section",
+      payload: { created: surveySectionAuditSnapshot(created) },
+    });
+    return created;
   }
 
   async update(
     surveyId: string,
     sectionId: string,
     dto: UpdateSectionDto,
+    actorUserId?: string,
   ): Promise<SurveySectionRecord> {
-    return this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+    const updated = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
       const section = await this.sectionsRepo.update(
         sectionId,
         surveyId,
@@ -52,12 +75,22 @@ export class SurveySectionsService {
       }
       return section;
     });
+    await this.auditLogService?.record({
+      action: "survey.section.update",
+      actorUserId: actorUserId ?? null,
+      targetId: updated.id,
+      targetType: "survey_section",
+      payload: { after: surveySectionAuditSnapshot(updated) },
+    });
+    return updated;
   }
 
-  async delete(surveyId: string, sectionId: string): Promise<void> {
+  async delete(surveyId: string, sectionId: string, actorUserId?: string): Promise<void> {
+    let deletedSection: SurveySectionRecord | null = null;
     await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
+      deletedSection = section;
 
       if (this.questionsRepo) {
         const siblingSections = await this.sectionsRepo.findBySurveyId(surveyId, tx);
@@ -75,13 +108,23 @@ export class SurveySectionsService {
       }
       await this.sectionsRepo.delete(sectionId, surveyId, tx);
     });
+    await this.auditLogService?.record({
+      action: "survey.section.delete",
+      actorUserId: actorUserId ?? null,
+      targetId: sectionId,
+      targetType: "survey_section",
+      payload: deletedSection
+        ? { deleted: surveySectionAuditSnapshot(deletedSection) }
+        : undefined,
+    });
   }
 
   async reorder(
     surveyId: string,
     input: ReorderSurveySectionsRequest,
+    actorUserId?: string,
   ): Promise<SurveySectionRecord[]> {
-    return this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+    const reordered = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
       const existing = await this.sectionsRepo.findBySurveyId(surveyId, tx);
       const existingIds = new Set(existing.map((section) => section.id));
       if (
@@ -94,5 +137,13 @@ export class SurveySectionsService {
       await this.assertBranchDefinitions(surveyId, tx);
       return reordered.sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
     });
+    await this.auditLogService?.record({
+      action: "survey.section.reorder",
+      actorUserId: actorUserId ?? null,
+      targetId: surveyId,
+      targetType: "survey",
+      payload: { surveyId, count: reordered.length },
+    });
+    return reordered;
   }
 }

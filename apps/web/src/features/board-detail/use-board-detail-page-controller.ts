@@ -5,6 +5,7 @@ import type {
   CommentEngagementKind,
   CommentItem,
 } from "@soc/contracts";
+import { normalizeBoardCode } from "@soc/contracts";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import { createElement, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -25,11 +26,11 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 const COMMENT_PAGE_SIZE = 10;
 
 export function useBoardDetailPageController(forcedCategory?: string) {
-  const { category: routeCategory = "공지", articleId } = useParams<{
+  const { category: routeCategory = "notice", articleId } = useParams<{
     category: string;
     articleId: string;
   }>();
-  const category = forcedCategory ?? routeCategory;
+  const category = normalizeBoardCode(forcedCategory ?? routeCategory);
   const [article, setArticle] = useState<ArticleDetailResponse | null>(null);
   const [board, setBoard] = useState<BoardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +100,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     if (!session?.canUsePersistentFeatures) return false;
 
     const canWriteOfficialReply =
-      category === "건의사항" &&
+      category === "suggestions" &&
       Permissions.has(session.permission ?? 0, Permissions.WRITE_REPLY);
     if (canWriteOfficialReply) return true;
     if (!board?.allowComment) return false;
@@ -111,7 +112,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const canViewCommentSection = Boolean(
     canCreateComment ||
       (board?.allowComment && article?.allowComment) ||
-      (category === "건의사항" &&
+      (category === "suggestions" &&
         Permissions.has(session?.permission ?? 0, Permissions.WRITE_REPLY)),
   );
 

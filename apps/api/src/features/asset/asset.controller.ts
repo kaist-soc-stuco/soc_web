@@ -26,6 +26,7 @@ import type {
 import { Request, Response } from "express";
 
 import { AuthGuard, RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { Cookies } from "../../shared/decorators/cookies.decorator";
 import { AUTH_ACCESS_COOKIE_NAME } from "../auth/auth.tokens";
 import { AuthSessionService } from "../auth/auth-session.service";
@@ -77,6 +78,7 @@ export class AssetController {
   async getContent(
     @Param("assetId") assetId: string,
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken: string | undefined,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<StreamableFile> {
     if (!/^\d+$/.test(assetId)) {
@@ -85,7 +87,10 @@ export class AssetController {
 
     const currentUser =
       await this.authSessionService.getOptionalCurrentUser(accessToken);
-    const file = await this.assetService.getFile(assetId, currentUser);
+    const file = await this.assetService.getFile(assetId, currentUser, {
+      actorUserId: currentUser.user?.id ?? null,
+      ipAddress: request.ip ?? null,
+    });
     const headers = buildAssetResponseHeaders(file);
 
     for (const [name, value] of Object.entries(headers)) {
@@ -129,6 +134,7 @@ export class AssetController {
     return this.assetService.uploadFile({
       file,
       userId: request.user.id,
+      audit: auditMetadataFromRequest(request),
     });
   }
 
@@ -159,6 +165,7 @@ export class AssetController {
       mimeType: body.mimeType,
       sizeBytes: body.sizeBytes,
       userId: request.user.id,
+      audit: auditMetadataFromRequest(request),
     });
   }
 
@@ -181,22 +188,26 @@ export class AssetController {
     return this.assetService.completeDirectUpload({
       storageKey: body.storageKey,
       userId: request.user.id,
+      audit: auditMetadataFromRequest(request),
     });
   }
 
   @Post("cleanup-orphans")
   @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
-  async cleanupOrphans() {
-    return this.assetService.cleanupUnlinkedAssets();
+  async cleanupOrphans(@Req() request: AuthenticatedRequest) {
+    return this.assetService.cleanupUnlinkedAssets(auditMetadataFromRequest(request));
   }
 
   @Post("migrate-local")
   @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
-  async migrateLocal(@Body() body: { limit?: number }) {
+  async migrateLocal(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: { limit?: number },
+  ) {
     const rawLimit = Number(body?.limit ?? 100);
     const limit = Number.isInteger(rawLimit)
       ? Math.min(Math.max(rawLimit, 1), 500)
       : 100;
-    return this.assetService.migrateLocalAssets(limit);
+    return this.assetService.migrateLocalAssets(limit, auditMetadataFromRequest(request));
   }
 }

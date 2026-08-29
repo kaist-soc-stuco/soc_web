@@ -1,4 +1,5 @@
 import {
+  getRoadmapLegacyCourseCode,
   normalizeRoadmapCourseCode,
   type RoadmapCourseCategory,
 } from "@soc/contracts";
@@ -99,7 +100,7 @@ export const ROADMAP_REFERENCE_COURSES: ReferenceCourse[] = COURSE_ROWS.map(
     const courseCode = normalizeRoadmapCourseCode(code);
     return {
       courseCode,
-      legacyCourseCode: courseCode === code ? null : code,
+      legacyCourseCode: courseCode === code ? getRoadmapLegacyCourseCode(courseCode) : code,
       nameKo,
       nameEn,
       category,

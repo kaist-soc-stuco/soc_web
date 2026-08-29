@@ -15,6 +15,8 @@ import type {
 export const ROADMAP_LEGACY_COURSE_CODE_MAP: Record<string, string> = {
   CS101: "CS10001",
   CS109: "CS10009",
+  CS103: "CS10003",
+  MAS109: "MAS10009",
   CS202: "CS20002",
   CS204: "CS20004",
   CS206: "CS20006",
@@ -84,6 +86,15 @@ export function normalizeRoadmapCourseCode(value: string): string {
   return ROADMAP_LEGACY_COURSE_CODE_MAP[normalized] ?? normalized;
 }
 
+/** Returns the preferred historical alias for a canonical roadmap code. */
+export function getRoadmapLegacyCourseCode(value: string): string | null {
+  const normalized = normalizeRoadmapCourseCode(value);
+  const match = Object.entries(ROADMAP_LEGACY_COURSE_CODE_MAP).find(
+    ([, currentCode]) => currentCode === normalized,
+  );
+  return match?.[0] ?? null;
+}
+
 export type RoadmapCourseCategory =
   | "basic-required"
   | "basic-elective"
@@ -101,8 +112,6 @@ export interface RoadmapCourseRecord {
   semesters: string;
   trackIds: string[];
   ai: boolean;
-  positionX: number;
-  positionY: number;
   isVisible: boolean;
   source: string;
   prerequisiteCourseCodes: string[];

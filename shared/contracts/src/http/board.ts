@@ -8,10 +8,26 @@ import type {
   ArticleUpdateSchema,
   BoardCreateSchema,
   BoardReorderSchema,
+  BoardWriteAccessScopeSchema,
   BoardUpdateSchema,
   CommentCreateSchema,
   CommentUpdateSchema,
 } from "../schemas.js";
+
+/** Canonical public board identifiers. Display names remain localized labels. */
+export const BOARD_CODE_ALIASES: Record<string, string> = {
+  "공지": "notice",
+  HoC: "hoc",
+  "홍보글": "promotions",
+  "건의사항": "suggestions",
+  "연구실": "labs",
+  FAQ: "faq",
+};
+
+export function normalizeBoardCode(value: string): string {
+  const code = value.trim();
+  return BOARD_CODE_ALIASES[code] ?? code;
+}
 
 export interface BoardSummary {
   boardId: number;
@@ -20,7 +36,9 @@ export interface BoardSummary {
   nameEn?: string;
   descriptionKo?: string;
   descriptionEn?: string;
-  /** 글쓰기에 필요한 permission bit 값. 0이면 제한 없음. */
+  /** 게시글 작성 범위. */
+  writeAccessScope: z.infer<typeof BoardWriteAccessScopeSchema>;
+  /** 권한 선택 시 필요한 permission bit 값. 그 외 범위에서는 0입니다. */
   writePermissionBit: number;
   allowComment: boolean;
   allowSecret: boolean;
@@ -30,6 +48,8 @@ export interface BoardSummary {
   sortOrder: number;
   isActive: boolean;
 }
+
+export type BoardWriteAccessScope = z.infer<typeof BoardWriteAccessScopeSchema>;
 
 export interface BoardListResponse {
   items: BoardSummary[];

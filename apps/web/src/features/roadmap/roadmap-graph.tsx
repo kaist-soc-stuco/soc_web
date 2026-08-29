@@ -86,7 +86,6 @@ function buildLayout(
   lanes: readonly RoadmapLane[],
   visibleCourseCodes: ReadonlySet<string> | null,
   displayCodeByCourse: ReadonlyMap<string, string>,
-  positionByCourse?: ReadonlyMap<string, { x: number; y: number }>,
 ): LayoutResult {
   const canonicalNodeByCode = new Map<string, string>();
   const instancesByCode = new Map<string, string[]>();
@@ -134,12 +133,8 @@ function buildLayout(
         id: instanceId,
         type: "course",
         position: {
-          x:
-            positionByCourse?.get(code)?.x ??
-            LANE_LABEL_WIDTH + (index % COURSES_PER_ROW) * (COURSE_WIDTH + COURSE_GAP_X),
-          y:
-            positionByCourse?.get(code)?.y ??
-            offsetY + 48 + Math.floor(index / COURSES_PER_ROW) * (COURSE_HEIGHT + COURSE_GAP_Y),
+          x: LANE_LABEL_WIDTH + (index % COURSES_PER_ROW) * (COURSE_WIDTH + COURSE_GAP_X),
+          y: offsetY + 48 + Math.floor(index / COURSES_PER_ROW) * (COURSE_HEIGHT + COURSE_GAP_Y),
         },
         data: {
           course: item,
@@ -229,7 +224,14 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
       <Handle className="!h-px !w-px !border-0 !bg-transparent !opacity-0" position={Position.Right} type="source" />
 
       <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-semibold tabular-nums text-slate-500">{displayCode}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-xs font-semibold tabular-nums text-slate-500">{displayCode}</span>
+          {course.ai ? (
+            <span className="shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-bold leading-none text-sky-700">
+              AI
+            </span>
+          ) : null}
+        </span>
         <span className="flex min-h-2.5 items-center gap-1" aria-hidden="true">
           {course.tracks.map((trackId) => {
             const track = ROADMAP_TRACKS.find((item) => item.id === trackId);
@@ -246,11 +248,6 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
         <span>{course.semesters}</span>
         <span className="tabular-nums">{course.credits}</span>
       </div>
-      {course.ai ? (
-        <span className="absolute bottom-2.5 right-3 rounded bg-sky-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-bold text-sky-700">
-          AI
-        </span>
-      ) : null}
       {duplicate ? (
         <span className="sr-only">
           {lang === "ko" ? "여러 분야에 표시되는 과목" : "Course shown in multiple fields"}
@@ -426,18 +423,6 @@ export function RoadmapGraph({
     ]),
     [hasRemoteCatalog, importedCourseCodes, offeringsByCourse, remoteCourses],
   );
-  const positionByCourse = useMemo(
-    () =>
-      new Map(
-        (importedOfferingsResponse?.courses ?? [])
-          .filter((course) => course.positionX !== 0 || course.positionY !== 0)
-          .map((course) => [
-            normalizeRoadmapCourseCode(course.courseCode),
-            { x: course.positionX, y: course.positionY },
-          ]),
-      ),
-    [importedOfferingsResponse?.courses],
-  );
   const roadmapCourseByCode = useMemo(
     () => new Map(roadmapCourses.map((course) => [course.code, course])),
     [roadmapCourses],
@@ -460,18 +445,13 @@ export function RoadmapGraph({
   const displayCodeByCourse = useMemo(() => {
     const displayCodes = new Map<string, string>();
     for (const course of roadmapCourses) {
-      const offerings = offeringsByCourse.get(course.code) ?? [];
-      const selectedOffering =
-        offerings.find((offering) => offering.term === selectedTerm) ?? offerings[0];
-      const section = selectedOffering?.section;
       // The course master is the source of truth for the card code. An
-      // offering can contain a historical code (for example CS.40700 in
-      // spring 2026), but the roadmap must consistently show the current
-      // code. Keep section information as the only offering-specific suffix.
-      displayCodes.set(course.code, `${course.code}${section ? ` (${section})` : ""}`);
+      // offering's section or historical ERP code must not leak into the
+      // roadmap card label (for example, "CS10001 (A)" must stay "CS10001").
+      displayCodes.set(course.code, course.code);
     }
     return displayCodes;
-  }, [offeringsByCourse, roadmapCourses, selectedTerm]);
+  }, [roadmapCourses]);
   const termOfferings = useMemo(
     () => effectiveOfferings.filter((offering) => offering.term === selectedTerm),
     [effectiveOfferings, selectedTerm],
@@ -482,8 +462,8 @@ export function RoadmapGraph({
   );
   const visibleCourseCodes = offeredOnly ? offeredCourseCodes : null;
   const layout = useMemo(
-    () => buildLayout(lang, roadmapCourses, roadmapLanes, visibleCourseCodes, displayCodeByCourse, positionByCourse),
-    [displayCodeByCourse, lang, positionByCourse, roadmapCourses, roadmapLanes, visibleCourseCodes],
+    () => buildLayout(lang, roadmapCourses, roadmapLanes, visibleCourseCodes, displayCodeByCourse),
+    [displayCodeByCourse, lang, roadmapCourses, roadmapLanes, visibleCourseCodes],
   );
 
   useEffect(() => {

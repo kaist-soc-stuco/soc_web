@@ -98,7 +98,7 @@ export function AboutLandingHero({ lang }: { lang: string }) {
               {lang === "ko" ? "행사·일정" : "Events & calendar"}
               <ArrowRight aria-hidden="true" />
             </Link>
-            <Link className="about-hero-cta about-hero-cta-secondary select-none" to="/board/건의사항">
+            <Link className="about-hero-cta about-hero-cta-secondary select-none" to="/board/suggestions">
               {lang === "ko" ? "건의사항" : "Suggestions"}
               <ArrowRight aria-hidden="true" />
             </Link>
@@ -212,13 +212,13 @@ function WorkSection({ lang }: { lang: string }) {
   const introBody = useLocalizedSiteContent("about.intro.body");
   const scopes: ScopeItem[] = lang === "ko"
     ? [
-        { title: "학생 의견", description: "학생 의견을 접수하고 공식 답변과 처리 현황을 공개", href: "/board/건의사항", icon: MessageCircle },
-        { title: "학술·진로", description: "학술·진로 정보를 나누고 교류 프로그램을 운영", href: "/board/HoC", icon: BookOpen },
+        { title: "학생 의견", description: "학생 의견을 접수하고 공식 답변과 처리 현황을 공개", href: "/board/suggestions", icon: MessageCircle },
+        { title: "학술·진로", description: "학술·진로 정보를 나누고 교류 프로그램을 운영", href: "/board/hoc", icon: BookOpen },
         { title: "행사·설문", description: "행사·설문을 운영하고 참여에 필요한 정보를 안내", href: "/events", icon: Calendar },
       ]
     : [
-        { title: "Student feedback", description: "Collect feedback and publish official responses and progress", href: "/board/건의사항", icon: MessageCircle },
-        { title: "Academics & careers", description: "Share academic and career information through exchange programs", href: "/board/HoC", icon: BookOpen },
+        { title: "Student feedback", description: "Collect feedback and publish official responses and progress", href: "/board/suggestions", icon: MessageCircle },
+        { title: "Academics & careers", description: "Share academic and career information through exchange programs", href: "/board/hoc", icon: BookOpen },
         { title: "Events & surveys", description: "Run events and surveys with clear participation guidance", href: "/events", icon: Calendar },
       ];
 

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Copy, Grid2X2, Grip, ImagePlus, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { Copy, ImagePlus, Trash2 } from "lucide-react";
 import type { QuestionType, SurveyQuestionConfig } from "@soc/contracts";
 import { Button } from "@/components/ui/button";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -11,8 +11,8 @@ import { SurveyImageField } from "@/components/ui/survey-image-field";
 const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: "short_text", label: "단답형" },
   { value: "long_text", label: "장문형" },
-  { value: "single_choice", label: "단일 선택" },
-  { value: "multiple_choice", label: "복수 선택" },
+  { value: "single_choice", label: "객관식" },
+  { value: "multiple_choice", label: "체크박스" },
   { value: "dropdown", label: "드롭다운" },
   { value: "rating", label: "등급" },
   { value: "grid_single", label: "객관식 그리드" },
@@ -22,6 +22,68 @@ const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: "time", label: "시간" },
   { value: "datetime", label: "날짜+시간" },
 ];
+
+const isGridQuestionType = (questionType: QuestionType) =>
+  questionType === "grid_single" || questionType === "grid_multiple";
+
+const createDefaultGridOption = (kind: "rows" | "columns", index: number) => {
+  const isRow = kind === "rows";
+  const prefix = isRow ? "row" : "col";
+  const koreanPrefix = isRow ? "행" : "열";
+
+  return {
+    value: `${prefix}_${index}`,
+    labelKo: `${koreanPrefix}${index}`,
+    labelEn: `${prefix}${index}`,
+  };
+};
+
+const createDefaultGridConfig = () => ({
+  rows: [createDefaultGridOption("rows", 1), createDefaultGridOption("rows", 2)],
+  columns: [
+    createDefaultGridOption("columns", 1),
+    createDefaultGridOption("columns", 2),
+  ],
+});
+
+const normalizeGridOptions = (
+  kind: "rows" | "columns",
+  items: NonNullable<SurveyQuestionConfig["rows"]>,
+) => {
+  const defaults = createDefaultGridConfig()[kind];
+  const usedValues = new Set<string>();
+  const prefix = kind === "rows" ? "row" : "col";
+
+  return items.map((item, index) => {
+    const defaultItem = defaults[index] ?? createDefaultGridOption(kind, index + 1);
+    let value = item.value?.trim() || defaultItem.value;
+    let suffix = index + 1;
+    while (usedValues.has(value)) {
+      value = `${prefix}_${suffix}`;
+      suffix += 1;
+    }
+    usedValues.add(value);
+
+    return {
+      ...item,
+      value,
+      labelKo: item.labelKo?.trim() || defaultItem.labelKo,
+      labelEn: item.labelEn?.trim() || defaultItem.labelEn,
+    };
+  });
+};
+
+const normalizeGridConfig = (config: SurveyQuestionConfig | null) => {
+  const defaults = createDefaultGridConfig();
+  const rows = config?.rows?.length ? config.rows : defaults.rows;
+  const columns = config?.columns?.length ? config.columns : defaults.columns;
+
+  return {
+    ...(config ?? {}),
+    rows: normalizeGridOptions("rows", rows),
+    columns: normalizeGridOptions("columns", columns),
+  };
+};
 
 export interface QuestionFormState {
   titleKo: string;
@@ -42,6 +104,7 @@ interface QuestionInlineEditorProps {
   branchTargets?: Array<{ id: string; titleKo: string }>;
   isNewQuestion?: boolean;
   dragHandle?: ReactNode;
+  commitRef?: MutableRefObject<(() => boolean) | null>;
   onDuplicate?: () => void;
   onDelete?: () => void;
   onSave: (q: QuestionFormState) => void | Promise<void>;
@@ -96,22 +159,31 @@ export function QuestionInlineEditor({
   branchTargets = [],
   isNewQuestion = false,
   dragHandle,
+  commitRef,
   onDuplicate,
   onDelete,
   onSave,
   onCancel,
 }: QuestionInlineEditorProps) {
-  const [form, setForm] = useState<QuestionFormState>({
+  const [form, setForm] = useState<QuestionFormState>(() => ({
     ...initial,
+    config: isGridQuestionType(initial.questionType)
+      ? normalizeGridConfig(initial.config)
+      : initial.config,
     answerValidationEnabled:
       initial.answerValidationEnabled ||
       Boolean(initial.answerRegex.trim() || initial.config?.validationErrorMessage?.trim()),
-  });
+  }));
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [error, setError] = useState<string | null>(null);
-  const editorRef = useRef<HTMLDivElement>(null);
   const savingRef = useRef(false);
-  const saveRef = useRef<() => void>(() => undefined);
+  const focusNewOptionRef = useRef(false);
+  const lastOptionLabelRef = useRef<HTMLInputElement | null>(null);
+  const focusNewGridOptionRef = useRef<"rows" | "columns" | null>(null);
+  const lastGridLabelRef = useRef<Record<"rows" | "columns", HTMLInputElement | null>>({
+    rows: null,
+    columns: null,
+  });
 
   useEffect(() => {
     if (isKoreanOnly && activeTab === "en") {
@@ -124,7 +196,7 @@ export function QuestionInlineEditor({
 
   const needsOptions = ["single_choice", "multiple_choice", "dropdown"].includes(form.questionType);
   const supportsBranching = form.questionType === "single_choice" || form.questionType === "dropdown";
-  const isGrid = form.questionType === "grid_single" || form.questionType === "grid_multiple";
+  const isGrid = isGridQuestionType(form.questionType);
   const supportsValidation = form.questionType === "short_text" || form.questionType === "long_text";
   const gridConfig = form.config ?? { rows: [], columns: [] };
   const branchMap = form.config?.goToSectionByValue ?? {};
@@ -164,8 +236,17 @@ export function QuestionInlineEditor({
     return `${prefix}_${index}`;
   };
 
+  const createOption = (items: QuestionFormState["options"]) => ({
+    value: nextUniqueValue(items, "option"),
+    labelKo: "",
+    labelEn: "",
+    imageUrlKo: null,
+    imageUrlEn: null,
+  });
+
   const addOption = () => {
-    set("options", [...form.options, { value: nextUniqueValue(form.options, "option"), labelKo: "", labelEn: "", imageUrlKo: null, imageUrlEn: null }]);
+    focusNewOptionRef.current = true;
+    set("options", [...form.options, createOption(form.options)]);
   };
 
   const removeOption = (i: number) => {
@@ -190,7 +271,7 @@ export function QuestionInlineEditor({
   const updateGridOption = (
     kind: "rows" | "columns",
     index: number,
-    field: "value" | "labelKo" | "labelEn",
+    field: "labelKo" | "labelEn",
     value: string,
   ) => {
     const next = [...(gridConfig[kind] ?? [])];
@@ -199,11 +280,13 @@ export function QuestionInlineEditor({
   };
 
   const addGridOption = (kind: "rows" | "columns") => {
-    const prefix = kind === "rows" ? "row" : "column";
     const items = gridConfig[kind] ?? [];
+    const next = createDefaultGridOption(kind, items.length + 1);
+    next.value = nextUniqueValue(items, kind === "rows" ? "row" : "col");
+    focusNewGridOptionRef.current = kind;
     set("config", {
       ...gridConfig,
-      [kind]: [...items, { value: nextUniqueValue(items, prefix), labelKo: "", labelEn: "" }],
+      [kind]: [...items, next],
     });
   };
 
@@ -216,20 +299,16 @@ export function QuestionInlineEditor({
 
   const changeQuestionType = (questionType: QuestionType) => {
     set("questionType", questionType);
+    if (
+      ["single_choice", "multiple_choice", "dropdown"].includes(questionType) &&
+      form.options.length === 0
+    ) {
+      set("options", [createOption(form.options)]);
+    }
     let nextConfig = form.config ? { ...form.config } : null;
     let shouldUpdateConfig = false;
-    if ((questionType === "grid_single" || questionType === "grid_multiple") && !nextConfig) {
-      nextConfig = {
-        rows: [
-          { value: "row_1", labelKo: "항목 1", labelEn: "Item 1" },
-          { value: "row_2", labelKo: "항목 2", labelEn: "Item 2" },
-        ],
-        columns: [
-          { value: "column_1", labelKo: "선택 1", labelEn: "Choice 1" },
-          { value: "column_2", labelKo: "선택 2", labelEn: "Choice 2" },
-          { value: "column_3", labelKo: "선택 3", labelEn: "Choice 3" },
-        ],
-      };
+    if (isGridQuestionType(questionType)) {
+      nextConfig = normalizeGridConfig(nextConfig);
       shouldUpdateConfig = true;
     }
     if (questionType === "rating") {
@@ -262,103 +341,93 @@ export function QuestionInlineEditor({
   };
 
   const handleSave = () => {
-    if (!form.titleKo.trim()) {
-      setError("국문 제목은 필수입니다.");
-      setActiveTab("ko");
-      return;
-    }
-    if (!isKoreanOnly && !form.titleEn.trim()) {
-      setError("영문 제목은 필수입니다.");
-      setActiveTab("en");
-      return;
-    }
+    const usedOptionValues = new Set<string>();
+    const normalizedOptions = form.options.map((option, index) => {
+      let value = option.value.trim() || `option_${index + 1}`;
+      if (usedOptionValues.has(value)) {
+        let suffix = index + 1;
+        while (usedOptionValues.has(`option_${suffix}`)) suffix += 1;
+        value = `option_${suffix}`;
+      }
+      usedOptionValues.add(value);
+      return { ...option, value };
+    });
+    const normalizedForm: QuestionFormState = {
+      ...form,
+      options: normalizedOptions,
+      config: isGrid ? normalizeGridConfig(form.config) : form.config,
+      titleKo: form.titleKo.trim() || "질문",
+      titleEn: form.titleEn.trim() || (isKoreanOnly ? "" : "Question"),
+    };
 
     if (needsOptions) {
       if (form.options.length === 0) {
         setError("최소 하나의 선택지가 필요합니다.");
-        return;
+        return false;
       }
       for (let i = 0; i < form.options.length; i++) {
-        const opt = form.options[i];
-        if (!opt.value.trim() || !opt.labelKo.trim()) {
-          setError(`선택지 ${i + 1}의 값과 국문 라벨은 필수입니다.`);
-          return;
+        const opt = normalizedOptions[i];
+        if (!opt.labelKo.trim()) {
+          setError(`선택지 ${i + 1}의 국문 라벨은 필수입니다.`);
+          return false;
         }
         if (!isKoreanOnly && !opt.labelEn.trim()) {
           setError(`선택지 ${i + 1}의 영문 라벨은 필수입니다.`);
-          return;
+          return false;
         }
       }
-      const optionValues = form.options.map((option) => option.value.trim());
+      const optionValues = normalizedOptions.map((option) => option.value.trim());
       if (new Set(optionValues).size !== optionValues.length) {
         setError("선택지 값은 서로 달라야 합니다.");
-        return;
-      }
-    }
-
-    if (isGrid) {
-      if (!gridConfig.rows?.length || !gridConfig.columns?.length) {
-        setError("그리드는 행과 열을 각각 하나 이상 입력해야 합니다.");
-        return;
-      }
-      if ([...(gridConfig.rows ?? []), ...(gridConfig.columns ?? [])].some((item) => !item.value.trim() || !item.labelKo.trim())) {
-        setError("그리드 행·열의 값과 국문 라벨은 모두 입력해야 합니다.");
-        return;
-      }
-      for (const [label, items] of [["행", gridConfig.rows ?? []], ["열", gridConfig.columns ?? []]] as const) {
-        const values = items.map((item) => item.value.trim());
-        if (new Set(values).size !== values.length) {
-          setError(`그리드 ${label} 값은 서로 달라야 합니다.`);
-          return;
-        }
+        return false;
       }
     }
 
     if (supportsValidation && form.answerValidationEnabled) {
       if (!form.answerRegex.trim()) {
         setError("응답 검증을 사용하려면 정규식을 입력해주세요.");
-        return;
+        return false;
       }
       try {
         new RegExp(form.answerRegex.trim());
       } catch {
         setError("응답 검증 정규식이 올바르지 않습니다.");
-        return;
+        return false;
       }
     }
 
     setError(null);
-    if (savingRef.current) return;
+    if (savingRef.current) return false;
     savingRef.current = true;
     void Promise.resolve()
-      .then(() => onSave(form))
+      .then(() => onSave(normalizedForm))
       .finally(() => {
         savingRef.current = false;
       });
+    return true;
   };
 
-  saveRef.current = handleSave;
+  useEffect(() => {
+    if (!commitRef) return;
+    const commit = handleSave;
+    commitRef.current = commit;
+    return () => {
+      if (commitRef.current === commit) commitRef.current = null;
+    };
+  });
 
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && editorRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest(".ui-select-dropdown-menu")) return;
-      // A non-focusable surface does not move focus on its own. Explicitly
-      // blur the active control so clicking anywhere outside the card also
-      // clears the editor's focus ring immediately.
-      const activeElement = document.activeElement;
-      if (activeElement instanceof HTMLElement) activeElement.blur();
-      if (isOngoing) {
-        onCancel();
-        return;
-      }
-      saveRef.current();
-    };
+    if (!focusNewOptionRef.current) return;
+    focusNewOptionRef.current = false;
+    lastOptionLabelRef.current?.focus();
+  }, [form.options.length]);
 
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [isOngoing, onCancel]);
+  useEffect(() => {
+    const kind = focusNewGridOptionRef.current;
+    if (!kind) return;
+    focusNewGridOptionRef.current = null;
+    lastGridLabelRef.current[kind]?.focus();
+  }, [gridConfig.rows?.length, gridConfig.columns?.length]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -378,15 +447,15 @@ export function QuestionInlineEditor({
     "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-normal text-slate-900 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      ref={editorRef}
-      className="animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-l-4 border-brand-primary/45 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5"
+      className="animate-in fade-in slide-in-from-top-2 flex items-start gap-3 overflow-hidden rounded-xl border border-l-4 border-brand-primary/45 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5"
     >
       {dragHandle ? (
-        <div className="mb-2 flex justify-center" aria-label="문항 순서 이동">
+        <div className="shrink-0 pt-1" aria-label="문항 순서 이동">
           {dragHandle}
         </div>
       ) : null}
-      <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+      <div className="min-w-0 flex-1">
+        <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
         <UiInput
           autoFocus={isNewQuestion}
           aria-label="국문 질문"
@@ -423,48 +492,34 @@ export function QuestionInlineEditor({
 
       {needsOptions ? (
         <div className="mt-4 border-t border-slate-100 pt-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium text-slate-600">선택지</span>
-            <div className="flex items-center gap-1">
-              <SegmentedControl
-                ariaLabel="선택지 언어"
-                role="tablist"
-                value={activeTab}
-                onChange={setActiveTab}
-                itemClassName="!h-7 !min-h-7 !px-2.5 !text-xs"
-                options={[
-                  { value: "ko", label: "국문" },
-                  { value: "en", label: "영문", disabled: isKoreanOnly },
-                ]}
-              />
-              {!isOngoing ? (
-                <Button type="button" variant="ghost" size="sm" onClick={addOption} className="!h-8 !px-2.5 !text-xs !font-medium text-brand-primary hover:bg-emerald-50">
-                  <Plus className="size-3.5" /> 선택지 추가
-                </Button>
-              ) : null}
-            </div>
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+            <span className="text-xs font-medium text-slate-600">선택지 라벨</span>
+            <SegmentedControl
+              ariaLabel="선택지 언어"
+              role="tablist"
+              value={activeTab}
+              onChange={setActiveTab}
+              itemClassName="!h-7 !min-h-7 !px-2.5 !text-xs"
+              options={[
+                { value: "ko", label: "국문" },
+                { value: "en", label: "영문", disabled: isKoreanOnly },
+              ]}
+            />
           </div>
           <div className="scrollbar-hidden max-h-64 space-y-2 overflow-y-auto pr-1">
             {form.options.map((option, index) => (
-              <div key={`${option.value}-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50/70 px-2 py-1.5">
+              <div key={`${option.value}-${index}`} className="group flex min-w-0 flex-wrap items-center gap-2 px-1 py-1">
                 <span className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white text-[length:var(--ui-text-micro-size)] text-slate-400 ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`} aria-hidden="true">
                   {form.questionType === "multiple_choice" ? "✓" : ""}
                 </span>
                 <UiInput
-                  className={`${compactInputCls} min-w-[12rem] flex-1`}
-                  placeholder={activeTab === "ko" ? "선택지 라벨" : "영문 선택지 라벨"}
+                  ref={index === form.options.length - 1 ? lastOptionLabelRef : undefined}
+                  className="!h-9 min-w-[12rem] flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                  placeholder={activeTab === "ko" ? `옵션 ${index + 1}` : `Option ${index + 1}`}
                   aria-label={`${index + 1}번 ${activeTab === "ko" ? "국문 라벨" : "영문 라벨"}`}
                   value={activeTab === "ko" ? option.labelKo : option.labelEn}
                   disabled={isOngoing || (activeTab === "en" && isKoreanOnly)}
                   onChange={(event) => updateOption(index, activeTab === "ko" ? "labelKo" : "labelEn", event.target.value)}
-                />
-                <UiInput
-                  className={`${compactInputCls} w-28 shrink-0`}
-                  placeholder="값"
-                  aria-label={`${index + 1}번 내부 값`}
-                  value={option.value}
-                  disabled={isOngoing}
-                  onChange={(event) => updateOption(index, "value", event.target.value)}
                 />
                 {supportsBranching && branchTargets.length > 0 ? (
                   <AdminSelectDropdown
@@ -489,87 +544,104 @@ export function QuestionInlineEditor({
                   disabled={isOngoing || (activeTab === "en" && isKoreanOnly)}
                 />
                 {!isOngoing ? (
-                  <IconButton
-                    type="button"
-                    aria-label={`${option.labelKo || option.value || "선택지"} 삭제`}
-                    size="sm"
-                    onClick={() => removeOption(index)}
-                    className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
-                  >
-                    <Trash2 className="size-4" />
-                  </IconButton>
+                  form.options.length > 1 ? (
+                    <IconButton
+                      type="button"
+                      aria-label={`${option.labelKo || option.value || "선택지"} 삭제`}
+                      size="sm"
+                      onClick={() => removeOption(index)}
+                      className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <Trash2 className="size-4" />
+                    </IconButton>
+                  ) : null
                 ) : null}
               </div>
             ))}
+            {!isOngoing ? (
+              <div className="flex min-w-0 items-center gap-2 px-1 py-1">
+                <span className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 text-[length:var(--ui-text-micro-size)] text-slate-300 ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`} aria-hidden="true" />
+                <UiInput
+                  type="text"
+                  readOnly
+                  aria-label="선택지 추가"
+                  placeholder="옵션 추가 또는 '기타' 추가"
+                  disabled={isOngoing}
+                  onFocus={addOption}
+                  className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none transition-colors placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
 
       {isGrid ? (
         <div className="mt-4 border-t border-slate-100 pt-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Grid2X2 className="size-4 text-brand-primary" />
-              <h4 className="text-xs font-semibold text-slate-700">그리드 구성</h4>
-            </div>
-            <SegmentedControl
-              ariaLabel="그리드 언어"
-              role="tablist"
-              value={activeTab}
-              onChange={setActiveTab}
-              itemClassName="!h-7 !min-h-7 !px-2.5 !text-xs"
-              options={[
-                { value: "ko", label: "국문" },
-                { value: "en", label: "영문", disabled: isKoreanOnly },
-              ]}
-            />
-          </div>
           <div className="grid gap-3 md:grid-cols-2">
-            {(["rows", "columns"] as const).map((kind) => (
-              <div key={kind} className="min-w-0 rounded-lg bg-slate-50/70 p-2.5">
-                <div className="mb-2 text-xs font-medium text-slate-600">
-                  {kind === "rows" ? "행(질문 항목)" : "열(선택 척도)"}
+            {(["rows", "columns"] as const).map((kind) => {
+              const items = gridConfig[kind] ?? [];
+              const isRow = kind === "rows";
+              return (
+                <div key={kind} className="min-w-0">
+                  <div className="mb-2 text-xs font-medium text-slate-600">
+                    {isRow ? "행" : "열"}
+                  </div>
+                  <div className="space-y-1">
+                    {items.map((option, index) => (
+                      <div key={`${kind}-${index}`} className="flex min-w-0 items-center gap-2 px-1 py-1">
+                        <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-500" aria-hidden="true">
+                          {index + 1}
+                        </span>
+                        <UiInput
+                          ref={index === items.length - 1 ? (element) => { lastGridLabelRef.current[kind] = element; } : undefined}
+                          className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                          placeholder={`${isRow ? "행" : "열"}${index + 1}`}
+                          aria-label={`${isRow ? "행" : "열"} ${index + 1} 국문 라벨`}
+                          value={option.labelKo}
+                          disabled={isOngoing}
+                          onChange={(event) => updateGridOption(kind, index, "labelKo", event.target.value)}
+                        />
+                        <UiInput
+                          className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                          placeholder={`${isRow ? "row" : "col"}${index + 1}`}
+                          aria-label={`${isRow ? "행" : "열"} ${index + 1} 영문 라벨`}
+                          value={option.labelEn ?? ""}
+                          disabled={isOngoing || isKoreanOnly}
+                          onChange={(event) => updateGridOption(kind, index, "labelEn", event.target.value)}
+                        />
+                        {!isOngoing && items.length > 1 ? (
+                          <IconButton
+                            type="button"
+                            aria-label={`${isRow ? "행" : "열"} ${index + 1} 삭제`}
+                            size="sm"
+                            onClick={() => removeGridOption(kind, index)}
+                            className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                          >
+                            <Trash2 className="size-4" />
+                          </IconButton>
+                        ) : null}
+                      </div>
+                    ))}
+                    {!isOngoing ? (
+                      <div className="flex min-w-0 items-center gap-2 px-1 py-1">
+                        <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-300" aria-hidden="true">
+                          {items.length + 1}
+                        </span>
+                        <UiInput
+                          type="text"
+                          readOnly
+                          aria-label={isRow ? "행 추가" : "열 추가"}
+                          placeholder={isRow ? "행 추가" : "열 추가"}
+                          onFocus={() => addGridOption(kind)}
+                          className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none transition-colors placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {(gridConfig[kind] ?? []).map((option, index) => (
-                    <div key={`${kind}-${index}`} className="flex items-center gap-2">
-                      <UiInput
-                        className={`${compactInputCls} w-24 shrink-0`}
-                        placeholder="값"
-                        aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 내부 값`}
-                        value={option.value}
-                        disabled={isOngoing}
-                        onChange={(event) => updateGridOption(kind, index, "value", event.target.value)}
-                      />
-                      <UiInput
-                        className={`${compactInputCls} min-w-0 flex-1`}
-                        placeholder={activeTab === "ko" ? "라벨" : "Label"}
-                        aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 라벨`}
-                        value={activeTab === "ko" ? option.labelKo : option.labelEn}
-                        disabled={isOngoing || (activeTab === "en" && isKoreanOnly)}
-                        onChange={(event) => updateGridOption(kind, index, activeTab === "ko" ? "labelKo" : "labelEn", event.target.value)}
-                      />
-                      {!isOngoing ? (
-                        <IconButton
-                          type="button"
-                          aria-label={`${kind === "rows" ? "행" : "열"} ${index + 1} 삭제`}
-                          size="sm"
-                          onClick={() => removeGridOption(kind, index)}
-                          className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
-                        >
-                          <Trash2 className="size-4" />
-                        </IconButton>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-                {!isOngoing ? (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => addGridOption(kind)} className="mt-2 !h-8 !px-2.5 !text-xs !font-medium text-brand-primary hover:bg-emerald-50">
-                    <Plus className="size-3.5" /> {kind === "rows" ? "행 추가" : "열 추가"}
-                  </Button>
-                ) : null}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -645,6 +717,7 @@ export function QuestionInlineEditor({
           {error}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

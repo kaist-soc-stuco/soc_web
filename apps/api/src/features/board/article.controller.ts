@@ -69,7 +69,7 @@ export class ArticleController {
         limit,
         q,
         searchBy,
-        includeContentPreview: code === "FAQ",
+        includeContentPreview: code === "faq",
       },
       currentUser,
     );

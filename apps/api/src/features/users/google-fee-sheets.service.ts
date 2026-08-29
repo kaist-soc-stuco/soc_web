@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleInit, Optional } from "@nestjs/common";
 import type {
   StudentFeeListOptions,
   StudentFeeSpreadsheetSyncResponse,
@@ -10,7 +10,10 @@ import {
   GOOGLE_SHEET_RESOURCE,
   GoogleSpreadsheetSyncQueueService,
 } from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
+import { resolveFeeReferenceSemester } from "./fee-semester";
 import { UsersService } from "./users.service";
+import { AuditLogService } from "../audit/audit-log.service";
+import type { AuditMetadata } from "../audit/audit-context";
 
 const SHEET_TITLE = "과비 납부";
 const SPREADSHEET_PURPOSE = "student-fees";
@@ -33,6 +36,7 @@ export class GoogleFeeSheetsService implements OnModuleInit {
     private readonly sheets: GoogleSheetsClient,
     private readonly usersService: UsersService,
     private readonly syncQueue: GoogleSpreadsheetSyncQueueService,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   onModuleInit(): void {
@@ -41,17 +45,29 @@ export class GoogleFeeSheetsService implements OnModuleInit {
     );
   }
 
-  async getReference() {
+  async getReference(audit?: AuditMetadata) {
     const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
       title: "KAIST SOC 과비 납부",
       sheetTitle: SHEET_TITLE,
       purpose: SPREADSHEET_PURPOSE,
     });
     await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
+    await this.auditLogService?.record({
+      action: "student_fee.spreadsheet.connect",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { operation: "get_or_create", spreadsheetId: spreadsheet.spreadsheetId },
+      targetId: spreadsheet.spreadsheetId,
+      targetType: "student_fee_status",
+    });
     return spreadsheet;
   }
 
-  async sync(options: FeeSpreadsheetSyncOptions = {}): Promise<StudentFeeSpreadsheetSyncResponse> {
+  async sync(
+    options: FeeSpreadsheetSyncOptions = {},
+    audit?: AuditMetadata,
+  ): Promise<StudentFeeSpreadsheetSyncResponse> {
+    const referenceSemester = resolveFeeReferenceSemester(options.referenceSemester);
     const rows = await this.usersService.exportStudentsByFeeStatus(
       options.status,
       options.sortBy,
@@ -59,7 +75,7 @@ export class GoogleFeeSheetsService implements OnModuleInit {
       options.query,
       options.paymentYear,
       options.majorCategory,
-      options.referenceSemester,
+      referenceSemester,
       options.userIds,
     );
     const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
@@ -84,7 +100,8 @@ export class GoogleFeeSheetsService implements OnModuleInit {
         "기준 금액",
         "납부 유형",
         "결제 수단",
-        "혜택 대상",
+        "기준 학기",
+        "기준 학기 혜택 자격",
         "납부일",
         "비고",
       ],
@@ -101,20 +118,32 @@ export class GoogleFeeSheetsService implements OnModuleInit {
         row.requiredAmount ?? "",
         row.paymentType ?? "",
         row.paymentMethod ?? "",
+        referenceSemester,
         row.eligible ? "예" : "아니오",
         row.paidAt ?? "",
         row.note ?? "",
       ]),
-      dateTimeColumns: [13],
-      columnWidths: [270, 105, 110, 240, 160, 100, 115, 145, 115, 115, 180, 140, 105, 155, 260],
+      dateTimeColumns: [14],
+      columnWidths: [270, 105, 110, 240, 160, 100, 115, 145, 115, 115, 180, 140, 105, 180, 155, 260],
       protectionDescription: "KAIST SOC · 과비 납부 (읽기 전용)",
     });
 
-    return {
+    const result = {
       spreadsheetId: spreadsheet.spreadsheetId,
       spreadsheetUrl: spreadsheet.spreadsheetUrl,
       syncedCount: rows.length,
       syncedAt: nowIso(),
     };
+    if (audit) {
+      await this.auditLogService?.record({
+        action: "student_fee.spreadsheet.sync",
+        actorUserId: audit.actorUserId ?? null,
+        ipAddress: audit.ipAddress ?? null,
+        payload: { syncedCount: result.syncedCount, spreadsheetId: result.spreadsheetId },
+        targetId: result.spreadsheetId,
+        targetType: "student_fee_status",
+      });
+    }
+    return result;
   }
 }

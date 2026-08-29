@@ -6,8 +6,8 @@ import type {
   ArticleDraftSaveRequest,
   SurveyRecord,
 } from "@soc/contracts";
+import { normalizeBoardCode } from "@soc/contracts";
 import {
-  hasPermission,
   msToIso,
   nowMs,
 } from "@soc/shared";
@@ -17,9 +17,7 @@ import { useToast } from "@/components/ui/toast";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
-import {
-  getBoardWritePermissionBitFromMetadata,
-} from "@/lib/board-metadata";
+import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { hasAdminPermission } from "@/lib/permissions";
@@ -36,7 +34,7 @@ type BoardWriteLocationState = {
   initialCategory?: string;
 };
 
-const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항"]);
+const PUBLIC_WRITE_BOARD_CODES = new Set(["suggestions"]);
 
 const parseHomeOrder = (value: string): number | null => {
   const parsed = Number(value);
@@ -64,9 +62,12 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const routeInitialCategory = (
     location.state as BoardWriteLocationState | null
   )?.initialCategory;
+  const initialCategory = normalizeBoardCode(
+    forcedCategory ?? routeCategory ?? routeInitialCategory ?? "notice",
+  );
   const routeDraftId = new URLSearchParams(location.search).get("draftId");
   const [selectedCategory, setSelectedCategory] = useState<string>(
-    forcedCategory ?? routeCategory ?? routeInitialCategory ?? "공지",
+    initialCategory,
   );
 
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -118,17 +119,22 @@ export function useBoardWritePageController(forcedCategory?: string) {
     return boards
       .filter((board) => forcedCategory ? board.code === forcedCategory : board.code !== "_EVENT")
       .filter((board) => {
-        const requiredPermission = getBoardWritePermissionBitFromMetadata(
-          board,
-          board.code,
-        );
-        return (
-          requiredPermission === 0 ||
-          hasPermission(userPermission, requiredPermission)
-        );
+        return canWriteBoardFromMetadata(board, board.code, {
+          permission: userPermission,
+          primaryMajor: session?.primaryMajor,
+          feeStatus: session?.feeStatus,
+        });
       })
       .map((board) => board.code);
-  }, [boardCatalogSource, boards, canUseWriteFeatures, forcedCategory, userPermission]);
+  }, [
+    boardCatalogSource,
+    boards,
+    canUseWriteFeatures,
+    forcedCategory,
+    session?.feeStatus,
+    session?.primaryMajor,
+    userPermission,
+  ]);
   const canWriteSelected =
     canUseWriteFeatures && writableBoardCodes.includes(selectedCategory);
   const canManageTemplates = hasAdminPermission(userPermission);
@@ -171,7 +177,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
   }, [selectedCategory]);
 
   useEffect(() => {
-    if (selectedCategory === "건의사항") {
+    if (selectedCategory === "suggestions") {
       setAllowComment(true);
       return;
     }
@@ -347,7 +353,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         : String(draft.homeOrder),
     );
     setIsSecret(draft.isSecret);
-    setAllowComment(selectedCategory === "건의사항" ? true : draft.allowComment);
+    setAllowComment(selectedCategory === "suggestions" ? true : draft.allowComment);
     setIsKoreanOnly(draft.isKoreanOnly);
     setIsEventAlwaysOpen(
       !draft.eventStartDate &&
@@ -468,7 +474,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       homeOrder: selectedCategory === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
       isSecret,
       isAnonymous,
-      allowComment: selectedCategory === "건의사항" ? true : allowComment,
+      allowComment: selectedCategory === "suggestions" ? true : allowComment,
       isKoreanOnly,
       assets: assets.map((asset, index) => ({
         assetId: asset.assetId,
@@ -539,7 +545,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
             : String(draft.homeOrder),
         );
         setIsSecret(draft.isSecret);
-        setAllowComment(selectedCategory === "건의사항" ? true : draft.allowComment);
+        setAllowComment(selectedCategory === "suggestions" ? true : draft.allowComment);
         setIsKoreanOnly(draft.isKoreanOnly);
         setIsEventAlwaysOpen(
           !draft.eventStartDate && !draft.eventEndDate &&
@@ -592,7 +598,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       );
       setIsSecret(parsed.isSecret ?? false);
       setAllowComment(
-        selectedCategory === "건의사항" ? true : parsed.allowComment ?? true,
+        selectedCategory === "suggestions" ? true : parsed.allowComment ?? true,
       );
       setIsKoreanOnly(parsed.isKoreanOnly ?? false);
       const parsedIsAllDay =
@@ -844,7 +850,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         homeOrder: selectedCategory === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
         isSecret: selectedBoard?.allowSecret ? isSecret : false,
         allowComment:
-          selectedCategory === "건의사항"
+          selectedCategory === "suggestions"
             ? true
             : selectedBoard?.allowComment === false
               ? false

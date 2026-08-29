@@ -69,7 +69,7 @@ export function useSearchPageController() {
       }),
       apiClient.getPublicSurveys(),
       apiClient
-        .getArticles("FAQ", {
+        .getArticles("faq", {
           page: 1,
           limit: 60,
           q: query,

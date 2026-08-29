@@ -11,6 +11,7 @@ import {
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { ContactsService } from "./contacts.service";
 import type {
@@ -64,7 +65,7 @@ export class ContactsController {
   ): Promise<StreamableFile> {
     const items = await this.contactsService.exportManaged(
       parseContactListOptions({ query, cohort, department, privacyConsented }),
-      request.user?.id,
+      auditMetadataFromRequest(request),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
       ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
@@ -125,88 +126,104 @@ export class ContactsController {
   ): Promise<ContactListResponse> {
     return this.contactsService.findManaged(
       parseContactListOptions({ query, cohort, department, privacyConsented, page, pageSize }),
-      request.user?.id,
+      auditMetadataFromRequest(request),
     );
   }
 
   @Post()
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async createContact(
+    @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(CreateContactSchema)) body: CreateContactRequest,
   ): Promise<ContactRecord> {
-    return this.contactsService.create(body);
+    return this.contactsService.create(body, auditMetadataFromRequest(request));
   }
 
   @Post("spreadsheet/sync")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
-  async syncContactSpreadsheet(): Promise<ContactSpreadsheetSyncResponse> {
-    return this.googleContactSheetsService.sync();
+  async syncContactSpreadsheet(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ContactSpreadsheetSyncResponse> {
+    return this.googleContactSheetsService.sync(auditMetadataFromRequest(request));
   }
 
   @Get("spreadsheet")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
-  async getContactSpreadsheet(): Promise<{
+  async getContactSpreadsheet(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{
     spreadsheetId: string;
     spreadsheetUrl: string;
   }> {
-    return this.googleContactSheetsService.getReference();
+    return this.googleContactSheetsService.getReference(auditMetadataFromRequest(request));
   }
 
   @Post("departments")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async createContactDepartment(
+    @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(CreateContactDepartmentSchema)) body: CreateContactDepartmentRequest,
   ): Promise<ContactDepartmentRecord> {
-    return this.contactsService.createDepartment(body);
+    return this.contactsService.createDepartment(body, auditMetadataFromRequest(request));
   }
 
   @Patch("departments/:id")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async updateContactDepartment(
+    @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(UpdateContactDepartmentSchema)) body: UpdateContactDepartmentRequest,
   ): Promise<ContactDepartmentRecord> {
-    return this.contactsService.updateDepartment(id, body);
+    return this.contactsService.updateDepartment(id, body, auditMetadataFromRequest(request));
   }
 
   @Delete("departments/:id")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
-  async deleteContactDepartment(@Param("id") id: string): Promise<{ success: boolean }> {
-    await this.contactsService.deleteDepartment(id);
+  async deleteContactDepartment(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+  ): Promise<{ success: boolean }> {
+    await this.contactsService.deleteDepartment(id, auditMetadataFromRequest(request));
     return { success: true };
   }
 
   @Post("bulk")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async bulkImportContacts(
+    @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(BulkImportContactsSchema))
     body: BulkImportContactsRequest,
   ): Promise<BulkImportContactsResponse> {
-    return this.contactsService.bulkImport(body);
+    return this.contactsService.bulkImport(body, auditMetadataFromRequest(request));
   }
 
   @Patch("order")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async reorderContacts(
+    @Req() request: AuthenticatedRequest,
     @Body(new ZodValidationPipe(ReorderContactsSchema))
     body: ReorderContactsRequest,
   ): Promise<ContactRecord[]> {
-    return this.contactsService.reorder(body);
+    return this.contactsService.reorder(body, auditMetadataFromRequest(request));
   }
 
   @Patch(":id")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async updateContact(
+    @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(UpdateContactSchema)) body: UpdateContactRequest,
   ): Promise<ContactRecord> {
-    return this.contactsService.update(id, body);
+    return this.contactsService.update(id, body, auditMetadataFromRequest(request));
   }
 
   @Delete(":id")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
-  async deleteContact(@Param("id") id: string): Promise<{ success: boolean }> {
-    await this.contactsService.delete(id);
+  async deleteContact(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+  ): Promise<{ success: boolean }> {
+    await this.contactsService.delete(id, auditMetadataFromRequest(request));
     return { success: true };
   }
 }

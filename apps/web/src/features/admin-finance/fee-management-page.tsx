@@ -13,7 +13,7 @@ import type {
   StudentFeeStatsResponse,
 } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
-import { ChevronDown, CreditCard, FileUp } from "lucide-react";
+import { ChevronDown, CreditCard, FileUp, Sheet } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -468,16 +468,19 @@ export function FeeManagementPage() {
         <AdminPageMain className="gap-5">
           <AdminPageHeader
             title="과비 관리"
-            actions={spreadsheetUrl ? (
-              <a
-                href={spreadsheetUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline"
+            actions={(
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!spreadsheetUrl}
+                onClick={() => {
+                  if (spreadsheetUrl) window.open(spreadsheetUrl, "_blank", "noopener,noreferrer");
+                }}
               >
+                <Sheet className="size-4" aria-hidden="true" />
                 Google Sheets에서 보기 ↗
-              </a>
-            ) : null}
+              </Button>
+            )}
           />
 
           <SegmentedControl

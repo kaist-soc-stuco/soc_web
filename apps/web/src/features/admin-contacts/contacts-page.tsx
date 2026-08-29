@@ -36,7 +36,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createPortal } from "react-dom";
-import { GripVertical, Mail, Pencil, Phone, Plus, Trash2, Upload } from "lucide-react";
+import { GripVertical, Mail, Pencil, Phone, Plus, Sheet, Trash2, Upload } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -385,16 +385,19 @@ function ContactsPageContent() {
     }
   };
 
-  const pageSpreadsheetLink = spreadsheetUrl ? (
-    <a
-      href={spreadsheetUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline"
+  const pageSpreadsheetLink = (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={!spreadsheetUrl}
+      onClick={() => {
+        if (spreadsheetUrl) window.open(spreadsheetUrl, "_blank", "noopener,noreferrer");
+      }}
     >
+      <Sheet className="size-4" aria-hidden="true" />
       Google Sheets에서 보기 ↗
-    </a>
-  ) : null;
+    </Button>
+  );
 
   const headerActions = activeTab === "members" ? (
     <>

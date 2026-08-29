@@ -112,10 +112,10 @@ export function NoticeBoard() {
   const [lastLoadedNotices, setLastLoadedNotices] = useState<NoticeItemProps[]>([]);
 
   const tabs = [
-    { code: "공지", labelKo: "공지", labelEn: "Notice" },
-    { code: "HoC", labelKo: "HoC", labelEn: "HoC" },
-    { code: "홍보글", labelKo: "홍보글", labelEn: "Promotional Posts" },
-    { code: "연구실", labelKo: "연구실", labelEn: "Research Labs" },
+    { code: "notice", labelKo: "공지", labelEn: "Notice" },
+    { code: "hoc", labelKo: "HoC", labelEn: "HoC" },
+    { code: "promotions", labelKo: "홍보글", labelEn: "Promotional Posts" },
+    { code: "labs", labelKo: "연구실", labelEn: "Research Labs" },
   ];
 
   const apiClient = useMemo(
@@ -153,7 +153,7 @@ export function NoticeBoard() {
         // Filter out items with blank/empty titles
         const items = res.items
           .filter(
-            (item) => item.boardCode !== "_EVENT" && item.boardCode !== "FAQ",
+            (item) => item.boardCode !== "_EVENT" && item.boardCode !== "faq",
           )
           .filter((item) => item.titleKo && item.titleKo.trim() !== "")
           .sort((a, b) => {
@@ -176,7 +176,7 @@ export function NoticeBoard() {
             date: formatDate(item.postedAt),
             isImportant: item.isPinned,
             isNew: (() => {
-              if (activeCategory !== "공지") {
+              if (activeCategory !== "notice") {
                 return false;
               }
               return isoToMs(item.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;

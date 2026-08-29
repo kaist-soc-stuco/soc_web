@@ -24,8 +24,8 @@ export class SurveyQuestionsRepository {
     return {
       id: row.id,
       sectionId: row.sectionId,
-      titleKo: row.titleKo,
-      titleEn: row.titleEn,
+      titleKo: row.titleKo.trim() || "질문",
+      titleEn: row.titleEn?.trim() || null,
       descriptionKo: row.descriptionKo,
       descriptionEn: row.descriptionEn,
       questionType: row.questionType as QuestionType,

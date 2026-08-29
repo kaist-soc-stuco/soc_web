@@ -36,6 +36,7 @@ import type {
 import type { Request } from "express";
 
 import { RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { RoadmapService } from "./roadmap.service";
 
@@ -91,6 +92,7 @@ export class RoadmapController {
       file,
       requireActor(request),
       parseImportDecisions(decisions),
+      auditMetadataFromRequest(request),
     );
   }
 
@@ -103,7 +105,7 @@ export class RoadmapController {
     @Req() request: AuthenticatedRequest,
   ): Promise<RoadmapOfferingImportResponse> {
     validateFile(file);
-    return this.roadmapService.importWorkbook(file, requireActor(request));
+    return this.roadmapService.importWorkbook(file, requireActor(request), {}, auditMetadataFromRequest(request));
   }
 
   @Post("admin/courses")
@@ -112,7 +114,7 @@ export class RoadmapController {
     @Body(new ZodValidationPipe(CreateRoadmapCourseSchema)) body: CreateRoadmapCourseRequest,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.roadmapService.createCourse(body, requireActor(request));
+    return this.roadmapService.createCourse(body, requireActor(request), auditMetadataFromRequest(request));
   }
 
   @Patch("admin/courses/:courseCode")
@@ -122,7 +124,7 @@ export class RoadmapController {
     @Body(new ZodValidationPipe(UpdateRoadmapCourseSchema)) body: UpdateRoadmapCourseRequest,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.roadmapService.updateCourse(courseCode, body, requireActor(request));
+    return this.roadmapService.updateCourse(courseCode, body, requireActor(request), auditMetadataFromRequest(request));
   }
 
   @Post("admin/offerings")
@@ -131,7 +133,7 @@ export class RoadmapController {
     @Body(new ZodValidationPipe(CreateRoadmapOfferingSchema)) body: CreateRoadmapOfferingRequest,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.roadmapService.createOffering(body, requireActor(request));
+    return this.roadmapService.createOffering(body, requireActor(request), auditMetadataFromRequest(request));
   }
 
   @Patch("admin/offerings/:offeringId")
@@ -141,7 +143,7 @@ export class RoadmapController {
     @Body(new ZodValidationPipe(UpdateRoadmapOfferingSchema)) body: UpdateRoadmapOfferingRequest,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.roadmapService.updateOffering(offeringId, body, requireActor(request));
+    return this.roadmapService.updateOffering(offeringId, body, requireActor(request), auditMetadataFromRequest(request));
   }
 
   @Delete("admin/offerings/:offeringId")
@@ -150,7 +152,7 @@ export class RoadmapController {
     @Param("offeringId", ParseUUIDPipe) offeringId: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<{ success: boolean }> {
-    await this.roadmapService.deleteOffering(offeringId, requireActor(request));
+    await this.roadmapService.deleteOffering(offeringId, requireActor(request), auditMetadataFromRequest(request));
     return { success: true };
   }
 }

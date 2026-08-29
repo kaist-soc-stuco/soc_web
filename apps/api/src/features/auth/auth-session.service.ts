@@ -479,14 +479,22 @@ export class AuthSessionService {
     let userName: string | undefined;
     let nameKo: string | undefined;
     let nameEn: string | null | undefined;
+    let primaryMajor: string | null | undefined;
+    let feeStatus: "PAID" | "PARTIAL" | "UNPAID" | null | undefined;
 
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
       if (user?.isActive) {
-        permission = await this.usersService.resolvePermissionBitmaskByUserId(user.userId);
+        const [resolvedPermission, resolvedFeeStatus] = await Promise.all([
+          this.usersService.resolvePermissionBitmaskByUserId(user.userId),
+          this.usersService.getStudentFeeStatus(user.userId),
+        ]);
+        permission = resolvedPermission;
         userName = user.nameKo;
         nameKo = user.nameKo;
         nameEn = user.nameEn;
+        primaryMajor = user.primaryMajor;
+        feeStatus = resolvedFeeStatus?.status ?? null;
       }
     }
 
@@ -506,6 +514,8 @@ export class AuthSessionService {
       userName,
       nameKo,
       nameEn,
+      primaryMajor,
+      feeStatus,
     };
   }
 

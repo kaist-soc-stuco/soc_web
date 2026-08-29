@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleInit, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { ContactSpreadsheetSyncResponse } from "@soc/contracts";
 import { nowIso } from "@soc/shared";
@@ -9,6 +9,8 @@ import {
   GoogleSpreadsheetSyncQueueService,
 } from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 import { ContactsRepository } from "./contacts.repository";
+import { AuditLogService } from "../audit/audit-log.service";
+import type { AuditMetadata } from "../audit/audit-context";
 
 const SHEET_TITLE = "연락망";
 const SPREADSHEET_PURPOSE = "executive-contacts";
@@ -20,6 +22,7 @@ export class GoogleContactSheetsService implements OnModuleInit {
     private readonly sheets: GoogleSheetsClient,
     private readonly contactsRepo: ContactsRepository,
     private readonly syncQueue: GoogleSpreadsheetSyncQueueService,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   onModuleInit(): void {
@@ -32,7 +35,7 @@ export class GoogleContactSheetsService implements OnModuleInit {
     await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.CONTACTS);
   }
 
-  async getReference() {
+  async getReference(audit?: AuditMetadata) {
     const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
       configuredSpreadsheetId: this.config.get<string>("GOOGLE_CONTACTS_SPREADSHEET_ID"),
       title: "KAIST SOC 집행위 연락망",
@@ -40,10 +43,18 @@ export class GoogleContactSheetsService implements OnModuleInit {
       purpose: SPREADSHEET_PURPOSE,
     });
     await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.CONTACTS);
+    await this.auditLogService?.record({
+      action: "executive_contact.spreadsheet.connect",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { operation: "get_or_create", spreadsheetId: spreadsheet.spreadsheetId },
+      targetId: spreadsheet.spreadsheetId,
+      targetType: "executive_contact",
+    });
     return spreadsheet;
   }
 
-  async sync(): Promise<ContactSpreadsheetSyncResponse> {
+  async sync(audit?: AuditMetadata): Promise<ContactSpreadsheetSyncResponse> {
     const contacts = await this.contactsRepo.findManaged({ page: 1, pageSize: 500 });
     const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
       configuredSpreadsheetId: this.config.get<string>("GOOGLE_CONTACTS_SPREADSHEET_ID"),
@@ -83,12 +94,23 @@ export class GoogleContactSheetsService implements OnModuleInit {
       protectionDescription: "KAIST SOC · 집행부원 연락망 (읽기 전용)",
     });
 
-    return {
+    const result = {
       spreadsheetId: spreadsheet.spreadsheetId,
       spreadsheetUrl: spreadsheet.spreadsheetUrl,
       syncedCount: contacts.items.length,
       syncedAt: nowIso(),
     };
+    if (audit) {
+      await this.auditLogService?.record({
+        action: "executive_contact.spreadsheet.sync",
+        actorUserId: audit.actorUserId ?? null,
+        ipAddress: audit.ipAddress ?? null,
+        payload: { syncedCount: result.syncedCount, spreadsheetId: result.spreadsheetId },
+        targetId: result.spreadsheetId,
+        targetType: "executive_contact",
+      });
+    }
+    return result;
   }
 }
 

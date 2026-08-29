@@ -37,6 +37,7 @@ import { isoToDate } from "@soc/shared";
 import type { Request } from "express";
 
 import { RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { CalendarService } from "./calendar.service";
 import { seoulYear } from "./calendar.utils";
@@ -96,15 +97,20 @@ export class CalendarController {
     @Body(new ZodValidationPipe(CalendarEventPresentationUpdateSchema))
     body: CalendarEventPresentationUpdateRequest,
   ): Promise<CalendarEventRecord> {
-    return this.calendarService.updateEventPresentation(request.user!.id, id, body);
+    return this.calendarService.updateEventPresentation(
+      request.user!.id,
+      id,
+      body,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Get("manual/export")
   @RequirePermissions(Permissions.MANAGE_CALENDAR)
   @Header("Content-Type", "text/calendar; charset=utf-8")
   @Header("Content-Disposition", "attachment; filename=\"soc-calendar.ics\"")
-  async exportIcs(): Promise<string> {
-    return this.calendarService.exportIcs();
+  async exportIcs(@Req() request: AuthenticatedRequest): Promise<string> {
+    return this.calendarService.exportIcs(auditMetadataFromRequest(request));
   }
 
   @Post("manual")
@@ -114,7 +120,11 @@ export class CalendarController {
     @Body(new ZodValidationPipe(CalendarEventCreateSchema))
     body: CalendarEventCreateRequest,
   ): Promise<CalendarEventRecord> {
-    return this.calendarService.createManualEvent(request.user!.id, body);
+    return this.calendarService.createManualEvent(
+      request.user!.id,
+      body,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Post("manual/sync-external")
@@ -122,25 +132,34 @@ export class CalendarController {
   async syncExternalCalendarIcs(
     @Req() request: AuthenticatedRequest,
   ): Promise<CalendarExternalSyncResponse> {
-    return this.calendarService.syncExternalCalendarIcs(request.user!.id);
+    return this.calendarService.syncExternalCalendarIcs(
+      request.user!.id,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Post("manual/sync-kaist")
   @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async syncKaistAcademicCalendar(
+    @Req() request: AuthenticatedRequest,
     @Query("year") year?: string,
   ): Promise<CalendarKaistSyncResponse> {
     const parsedYear = year === undefined ? seoulYear() : Number(year);
     if (!Number.isInteger(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
       throw new BadRequestException("Invalid year");
     }
-    return this.calendarService.syncKaistAcademicCalendar(parsedYear);
+    return this.calendarService.syncKaistAcademicCalendar(
+      parsedYear,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Post("manual/sync-google")
   @RequirePermissions(Permissions.MANAGE_CALENDAR)
-  async syncGoogleCalendars(): Promise<CalendarGoogleSyncResponse> {
-    return this.calendarService.syncGoogleCalendars();
+  async syncGoogleCalendars(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<CalendarGoogleSyncResponse> {
+    return this.calendarService.syncGoogleCalendars(auditMetadataFromRequest(request));
   }
 
   @Post("manual/import")
@@ -150,25 +169,38 @@ export class CalendarController {
     @Body(new ZodValidationPipe(CalendarIcsImportSchema))
     body: CalendarIcsImportRequest,
   ): Promise<CalendarIcsImportResponse> {
-    return this.calendarService.importIcs(request.user!.id, body.ics);
+    return this.calendarService.importIcs(
+      request.user!.id,
+      body.ics,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Patch("manual/:id")
   @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async updateManualEvent(
+    @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(CalendarEventUpdateSchema))
     body: CalendarEventUpdateRequest,
   ): Promise<CalendarEventRecord> {
-    return this.calendarService.updateManualEvent(id, body);
+    return this.calendarService.updateManualEvent(
+      id,
+      body,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Delete("manual/:id")
   @RequirePermissions(Permissions.MANAGE_CALENDAR)
   async archiveManualEvent(
+    @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
   ): Promise<{ ok: true; calendarEventId: string }> {
-    return this.calendarService.archiveManualEvent(id);
+    return this.calendarService.archiveManualEvent(
+      id,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Get("holidays")

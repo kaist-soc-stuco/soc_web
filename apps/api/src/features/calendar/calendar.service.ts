@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { and, eq, gte, ilike, inArray, isNotNull, lte, or } from "drizzle-orm";
@@ -36,6 +37,8 @@ import {
 } from "../../infrastructure/postgres/postgres.schema";
 import { CalendarSyncService } from "./calendar-sync.service";
 import { addSeoulDays, formatSeoulDate } from "./calendar.utils";
+import { AuditLogService } from "../audit/audit-log.service";
+import type { AuditMetadata } from "../audit/audit-context";
 
 const HOLIDAY_API_URL =
   "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo";
@@ -60,6 +63,7 @@ export class CalendarService {
     @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
     private readonly configService: ConfigService,
     private readonly calendarSyncService: CalendarSyncService,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   async listPublicCalendarEvents(
@@ -197,6 +201,7 @@ export class CalendarService {
   async createManualEvent(
     userId: string,
     input: CalendarEventCreateRequest,
+    audit?: AuditMetadata,
   ): Promise<CalendarEventRecord> {
     const [row] = await this.db
       .insert(calendarEvents)
@@ -217,16 +222,27 @@ export class CalendarService {
       .returning();
 
     await this.calendarSyncService.enqueueEvent(row.calendarEventId);
-    return this.mapManualEvent(row);
+    const result = this.mapManualEvent(row);
+    await this.auditLogService?.record({
+      action: "calendar_event.create",
+      actorUserId: audit?.actorUserId ?? userId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { after: safeCalendarSnapshot(result) },
+      targetId: result.calendarEventId,
+      targetType: "calendar_event",
+    });
+    return result;
   }
 
   async updateManualEvent(
     id: string,
     input: CalendarEventUpdateRequest,
+    audit?: AuditMetadata,
   ): Promise<CalendarEventRecord> {
     const eventId = this.parseId(id);
     const current = await this.findManualEvent(eventId);
     if (!current) throw new NotFoundException("calendar_event_not_found");
+    const currentSnapshot = safeCalendarSnapshot(this.mapManualEvent(current));
 
     const startAt = input.startAt ? this.parseDate(input.startAt) : current.startAt;
     const endAt = input.endAt ? this.parseDate(input.endAt) : current.endAt;
@@ -261,13 +277,30 @@ export class CalendarService {
 
     if (!row) throw new NotFoundException("calendar_event_not_found");
     await this.calendarSyncService.enqueueEvent(row.calendarEventId);
-    return this.mapManualEvent(row);
+    const result = this.mapManualEvent(row);
+    await this.auditLogService?.record({
+      action: "calendar_event.update",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        before: currentSnapshot,
+        after: safeCalendarSnapshot(result),
+        changedFields: Object.keys(input),
+      },
+      targetId: result.calendarEventId,
+      targetType: "calendar_event",
+    });
+    return result;
   }
 
-  async archiveManualEvent(id: string): Promise<{ ok: true; calendarEventId: string }> {
+  async archiveManualEvent(
+    id: string,
+    audit?: AuditMetadata,
+  ): Promise<{ ok: true; calendarEventId: string }> {
     const eventId = this.parseId(id);
     const current = await this.findManualEvent(eventId);
     if (!current) throw new NotFoundException("calendar_event_not_found");
+    const currentSnapshot = safeCalendarSnapshot(this.mapManualEvent(current));
     const [row] = await this.db
       .update(calendarEvents)
       .set({
@@ -286,6 +319,17 @@ export class CalendarService {
 
     if (!row) throw new NotFoundException("calendar_event_not_found");
     await this.calendarSyncService.enqueueEvent(eventId);
+    await this.auditLogService?.record({
+      action: "calendar.archive",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        before: currentSnapshot,
+        after: { isHiddenByAdmin: true },
+      },
+      targetId: String(row.calendarEventId),
+      targetType: "calendar_event",
+    });
     return { ok: true, calendarEventId: String(row.calendarEventId) };
   }
 
@@ -293,6 +337,7 @@ export class CalendarService {
     userId: string,
     id: string,
     input: CalendarEventPresentationUpdateRequest,
+    audit?: AuditMetadata,
   ): Promise<CalendarEventRecord> {
     const eventId = this.parseId(id);
     const [current] = await this.db
@@ -322,10 +367,33 @@ export class CalendarService {
       await this.calendarSyncService.enqueueEvent(row.calendarEventId);
     }
     const holidayDates = await this.loadKoreanHolidayDates([row]);
-    return this.mapManualEvent(row, holidayDates);
+    const result = this.mapManualEvent(row, holidayDates);
+    await this.auditLogService?.record({
+      action: "calendar.presentation.update",
+      actorUserId: audit?.actorUserId ?? userId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        before: {
+          categoryOverride: current.categoryOverride,
+          isHiddenByAdmin: current.isHiddenByAdmin,
+        },
+        after: {
+          categoryOverride: row.categoryOverride,
+          isHiddenByAdmin: row.isHiddenByAdmin,
+        },
+        changedFields: Object.keys(input),
+      },
+      targetId: result.calendarEventId,
+      targetType: "calendar_event",
+    });
+    return result;
   }
 
-  async importIcs(userId: string, ics: string): Promise<CalendarIcsImportResponse> {
+  async importIcs(
+    userId: string,
+    ics: string,
+    audit?: AuditMetadata,
+  ): Promise<CalendarIcsImportResponse> {
     const parsed = parseIcsEvents(ics);
     if (parsed.length === 0) {
       throw new BadRequestException("ics_event_not_found");
@@ -342,7 +410,15 @@ export class CalendarService {
     const newItems = parsed.filter((item) => !item.sourceUid || !existingUids.has(item.sourceUid));
 
     if (newItems.length === 0) {
-      return { importedCount: 0, skippedCount: parsed.length, items: [] };
+      const result = { importedCount: 0, skippedCount: parsed.length, items: [] };
+      await this.auditLogService?.record({
+        action: "calendar_event.import",
+        actorUserId: audit?.actorUserId ?? userId,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: { importedCount: result.importedCount, skippedCount: result.skippedCount },
+        targetType: "calendar_event",
+      });
+      return result;
     }
 
     const rows = await this.db
@@ -368,24 +444,36 @@ export class CalendarService {
       await this.calendarSyncService.enqueueEvent(row.calendarEventId);
     }
 
-    return {
+    const result = {
       importedCount: rows.length,
       skippedCount: parsed.length - rows.length,
       items,
     };
+    await this.auditLogService?.record({
+      action: "calendar_event.import",
+      actorUserId: audit?.actorUserId ?? userId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { importedCount: result.importedCount, skippedCount: result.skippedCount },
+      targetType: "calendar_event",
+    });
+    return result;
   }
 
   async syncKaistAcademicCalendar(
     year: number,
+    audit?: AuditMetadata,
   ): Promise<CalendarKaistSyncResponse> {
-    return this.calendarSyncService.syncKaistAcademicCalendar(year);
+    return this.calendarSyncService.syncKaistAcademicCalendar(year, audit);
   }
 
-  async syncGoogleCalendars(): Promise<CalendarGoogleSyncResponse> {
-    return this.calendarSyncService.syncGoogleCalendars();
+  async syncGoogleCalendars(audit?: AuditMetadata): Promise<CalendarGoogleSyncResponse> {
+    return this.calendarSyncService.syncGoogleCalendars(audit);
   }
 
-  async syncExternalCalendarIcs(userId: string): Promise<CalendarExternalSyncResponse> {
+  async syncExternalCalendarIcs(
+    userId: string,
+    audit?: AuditMetadata,
+  ): Promise<CalendarExternalSyncResponse> {
     const configuredSources = (this.configService.get<string>("CALENDAR_EXTERNAL_ICS_URLS") ?? "")
       .split(",")
       .map((value) => value.trim())
@@ -407,7 +495,7 @@ export class CalendarService {
       try {
         const response = await fetch(source, { signal: AbortSignal.timeout(15_000) });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const result = await this.importIcs(userId, await response.text());
+        const result = await this.importIcs(userId, await response.text(), audit);
         importedCount += result.importedCount;
         skippedCount += result.skippedCount;
       } catch (error) {
@@ -418,15 +506,28 @@ export class CalendarService {
       }
     }
 
-    return {
+    const result = {
       sourceCount: configuredSources.length,
       importedCount,
       skippedCount,
       failedSources,
     };
+    await this.auditLogService?.record({
+      action: "calendar.sync.external",
+      actorUserId: audit?.actorUserId ?? userId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        failedSourceCount: result.failedSources.length,
+        importedCount: result.importedCount,
+        skippedCount: result.skippedCount,
+        sourceCount: result.sourceCount,
+      },
+      targetType: "calendar",
+    });
+    return result;
   }
 
-  async exportIcs(): Promise<string> {
+  async exportIcs(audit?: AuditMetadata): Promise<string> {
     const rows = await this.db
       .select()
       .from(calendarEvents)
@@ -468,7 +569,15 @@ export class CalendarService {
     }
 
     lines.push("END:VCALENDAR");
-    return `${lines.join("\r\n")}\r\n`;
+    const result = `${lines.join("\r\n")}\r\n`;
+    await this.auditLogService?.record({
+      action: "calendar.export",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { eventCount: rows.length, format: "ics" },
+      targetType: "calendar",
+    });
+    return result;
   }
 
   async listKoreanHolidays(
@@ -888,6 +997,22 @@ export class CalendarService {
       return "invalid-source";
     }
   }
+}
+
+function safeCalendarSnapshot(event: CalendarEventRecord) {
+  return {
+    category: event.category,
+    categoryOverride: event.categoryOverride ?? null,
+    endAt: event.endAt,
+    isActive: event.isActive,
+    isAllDay: event.isAllDay,
+    isAlways: event.isAlways,
+    isHiddenByAdmin: event.isHiddenByAdmin,
+    locationConfigured: Boolean(event.location),
+    sourceType: event.sourceType,
+    startAt: event.startAt,
+    titleKo: event.titleKo,
+  };
 }
 
 interface ParsedIcsEvent {

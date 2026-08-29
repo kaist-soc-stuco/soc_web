@@ -716,7 +716,7 @@ export function BoardWriteSettings({
               </label>
             )}
 
-            {boardCode !== "건의사항" ? (
+            {boardCode !== "suggestions" ? (
               <label className="flex items-center gap-2.5 cursor-pointer group">
                 <div
                   className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${

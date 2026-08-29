@@ -11,7 +11,9 @@ import {
 import { Permissions } from "@soc/contracts";
 
 import { AuthGuard, RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
+import { resolveFeeReferenceSemester } from "./fee-semester";
 import { UsersService } from "./users.service";
 import { GoogleFeeSheetsService } from "./google-fee-sheets.service";
 import type {
@@ -285,6 +287,7 @@ export class UsersController {
   @Post("fee-status/spreadsheet/sync")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async syncStudentFeeSpreadsheet(
+    @Req() req: AuthenticatedRequest,
     @Query("status") status?: string,
     @Query("sortBy") sortBy?: string,
     @Query("sortDirection") sortDirection?: string,
@@ -314,16 +317,18 @@ export class UsersController {
       majorCategory: feeMajorCategory,
       referenceSemester,
       userIds: userIds?.split(",").filter(Boolean),
-    });
+    }, auditMetadataFromRequest(req));
   }
 
   @Get("fee-status/spreadsheet")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
-  async getStudentFeeSpreadsheet(): Promise<{
+  async getStudentFeeSpreadsheet(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{
     spreadsheetId: string;
     spreadsheetUrl: string;
   }> {
-    return this.googleFeeSheetsService.getReference();
+    return this.googleFeeSheetsService.getReference(auditMetadataFromRequest(req));
   }
 
   @Get("fee-status/export.xlsx")
@@ -331,6 +336,7 @@ export class UsersController {
   @Header("Content-Disposition", 'attachment; filename="student_fee_status.xlsx"')
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async exportStudentFeeStatus(
+    @Req() req: AuthenticatedRequest,
     @Query("status") status?: string,
     @Query("sortBy") sortBy?: string,
     @Query("sortDirection") sortDirection?: string,
@@ -350,6 +356,7 @@ export class UsersController {
     const feeMajorCategory: FeeMajorCategory | undefined =
       majorCategory === "PRIMARY" ? majorCategory : undefined;
     const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
+    const resolvedReferenceSemester = resolveFeeReferenceSemester(referenceSemester);
     const rows = await this.usersService.exportStudentsByFeeStatus(
       feeStatus,
       feeSortBy,
@@ -357,11 +364,12 @@ export class UsersController {
       query,
       year,
       feeMajorCategory,
-      referenceSemester,
+      resolvedReferenceSemester,
       userIds?.split(",").filter(Boolean),
+      auditMetadataFromRequest(req),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["사용자ID", "학번", "이름", "이메일", "소속", "주전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "혜택대상", "납부일", "비고"],
+      ["사용자ID", "학번", "이름", "이메일", "소속", "주전공", "상태", "적용학기수", "적용시작학기", "수납액", "기준금액", "납부유형", "결제수단", "기준 학기", "기준 학기 혜택 자격", "납부일", "비고"],
       ...rows.map((row) => [
         row.userId,
         row.stdNo,
@@ -376,6 +384,7 @@ export class UsersController {
         row.requiredAmount,
         row.paymentType,
         row.paymentMethod,
+        resolvedReferenceSemester,
         row.eligible ? "예" : "아니오",
         row.paidAt,
         row.note,
@@ -383,9 +392,9 @@ export class UsersController {
     ]);
     worksheet["!cols"] = [
       { wch: 38 }, { wch: 14 }, { wch: 16 }, { wch: 32 }, { wch: 18 },
-      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
-      { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 18 },
-      { wch: 12 }, { wch: 22 }, { wch: 36 },
+      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 },
+      { wch: 12 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 24 },
+      { wch: 18 }, { wch: 36 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "과비 납부");

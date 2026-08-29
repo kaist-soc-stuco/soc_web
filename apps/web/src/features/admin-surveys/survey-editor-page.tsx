@@ -47,7 +47,7 @@ import {
   SectionEditorModal,
   type SectionFormState,
 } from "@/components/organisms/section-editor-modal";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, Grip, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { UiInput } from "@/components/ui/form-control";
@@ -89,8 +89,8 @@ const isAllDayRange = (openAt: string | null, closeAt: string | null) => {
 const QUESTION_TYPES = [
   { value: "short_text", label: "단답형" },
   { value: "long_text", label: "장문형" },
-  { value: "single_choice", label: "단일 선택" },
-  { value: "multiple_choice", label: "복수 선택" },
+  { value: "single_choice", label: "객관식" },
+  { value: "multiple_choice", label: "체크박스" },
   { value: "dropdown", label: "드롭다운" },
   { value: "rating", label: "등급" },
   { value: "grid_single", label: "객관식 그리드" },
@@ -102,7 +102,7 @@ const QUESTION_TYPES = [
 ];
 
 const SurveySettingsSchema = z.object({
-  titleKo: z.string().min(1, "국문 제목은 필수입니다.").max(255),
+  titleKo: z.string().max(255),
   titleEn: z.string().max(255).optional(),
   descriptionKo: z.string().optional(),
   descriptionEn: z.string().optional(),
@@ -143,16 +143,6 @@ const SurveySettingsSchema = z.object({
       path: ["allowAnonymous"],
     });
   }
-  if (!data.isKoreanOnly) {
-    if (!data.titleEn?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "영문 제목은 필수입니다 (한국어 전용 설정이 아닐 경우).",
-        path: ["titleEn"],
-      });
-    }
-  }
-
   if (!data.isAlwaysOpen) {
     if (!data.openAt?.trim()) {
       ctx.addIssue({
@@ -189,6 +179,27 @@ const getErrorMessage = (err: unknown, fallback: string) =>
 
 const QUESTION_ROW_CLASS =
   "group flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm";
+
+function QuestionDragHandleIcon() {
+  return (
+    <span aria-hidden="true" className="grid h-4 w-3 grid-cols-2 grid-rows-3 place-items-center gap-x-0.5 gap-y-0.5">
+      {Array.from({ length: 6 }, (_, index) => (
+        <span key={index} className="size-1 rounded-full bg-current" />
+      ))}
+    </span>
+  );
+}
+
+function isInteractiveQuestionRowTarget(
+  target: EventTarget | null,
+  currentTarget: Element,
+): boolean {
+  if (!(target instanceof Element)) return false;
+  const interactiveTarget = target.closest(
+    "button, a, input, select, textarea, [role='button']",
+  );
+  return Boolean(interactiveTarget && interactiveTarget !== currentTarget);
+}
 
 type QuestionRowContentProps = {
   question: SurveyQuestionRecord;
@@ -265,7 +276,7 @@ function SortableQuestionRow({
       {...listeners}
       className="flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing"
     >
-      <Grip className="size-4" />
+      <QuestionDragHandleIcon />
     </button>
   );
 
@@ -276,14 +287,25 @@ function SortableQuestionRow({
       role={isEditing ? undefined : "button"}
       tabIndex={isEditing ? undefined : 0}
       aria-label={isEditing ? undefined : `${question.titleKo} 문항 편집`}
+      onPointerDown={
+        isEditing
+          ? undefined
+          : (event) => {
+              if (event.button !== 0 || isInteractiveQuestionRowTarget(event.target, event.currentTarget)) {
+                return;
+              }
+              // Switch the editor before the browser moves focus away from the
+              // current input. This keeps the clicked row under the pointer
+              // instead of collapsing the current card first.
+              event.preventDefault();
+              onEdit();
+            }
+      }
       onClick={
         isEditing
           ? undefined
           : (event) => {
-              const target = event.target;
-              if (target instanceof Element && target.closest("button, a, input, select, textarea, [role='button']")) {
-                return;
-              }
+              if (isInteractiveQuestionRowTarget(event.target, event.currentTarget)) return;
               onEdit();
             }
       }
@@ -333,7 +355,7 @@ function QuestionDragOverlayRow({
         isOngoing={isOngoing}
         dragHandle={
           <span className="flex size-7 shrink-0 items-center justify-center text-brand-primary">
-            <Grip className="size-4" />
+            <QuestionDragHandleIcon />
           </span>
         }
       />
@@ -439,6 +461,7 @@ export function SurveyEditorPage() {
   );
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
+  const questionCommitRef = useRef<(() => boolean) | null>(null);
   const creatingDraftRef = useRef<Promise<string> | null>(null);
   const initialDraftLoadAttemptedRef = useRef(false);
 
@@ -543,11 +566,12 @@ export function SurveyEditorPage() {
       ? []
       : values.eligibleSocAffiliations;
     const academicEligibility = allowAnonymous ? "ANY" : values.academicEligibility;
+    const isPublishing = options?.publish ?? values.isPublished;
 
     return {
       kind: values.kind,
-      titleKo: values.titleKo.trim() || (allowPlaceholder ? "제목 없는 설문" : ""),
-      titleEn: values.titleEn?.trim() || undefined,
+      titleKo: values.titleKo.trim() || "설문조사",
+      titleEn: values.titleEn?.trim() || (!values.isKoreanOnly && isPublishing ? "Survey" : undefined),
       descriptionKo: values.descriptionKo?.trim() || undefined,
       descriptionEn: values.descriptionEn?.trim() || undefined,
       descriptionImageUrlKo: values.descriptionImageUrlKo ?? null,
@@ -783,7 +807,13 @@ export function SurveyEditorPage() {
     }
   };
 
+  const commitEditingQuestion = () => {
+    if (!editingQuestion || !questionCommitRef.current) return true;
+    return questionCommitRef.current();
+  };
+
   const openNewQuestion = (sectionId: string) => {
+    if (!commitEditingQuestion()) return;
     setEditingQuestion({
       sectionId,
       initial: emptyQuestion(),
@@ -791,6 +821,8 @@ export function SurveyEditorPage() {
   };
 
   const openEditQuestion = (sectionId: string, q: SurveyQuestionRecord) => {
+    if (editingQuestion?.questionId === q.id) return;
+    if (!commitEditingQuestion()) return;
     setEditingQuestion({
       sectionId,
       questionId: q.id,
@@ -818,14 +850,15 @@ export function SurveyEditorPage() {
   const handleSaveQuestion = async (qForm: QuestionFormState) => {
     if (!loadedSurveyId || !editingQuestion) return;
     setError(null);
-    const { sectionId, questionId } = editingQuestion;
+    const editingSnapshot = editingQuestion;
+    const { sectionId, questionId } = editingSnapshot;
     const questionConfig = qForm.config ? { ...qForm.config } : undefined;
     if (!qForm.answerValidationEnabled && questionConfig) {
       delete questionConfig.validationErrorMessage;
     }
     const body = {
-      titleKo: qForm.titleKo.trim(),
-      titleEn: qForm.titleEn.trim() || undefined,
+      titleKo: qForm.titleKo.trim() || "질문",
+      titleEn: qForm.titleEn.trim() || (isKoreanOnly ? undefined : "Question"),
       descriptionKo: "",
       descriptionEn: "",
       questionType: qForm.questionType,
@@ -845,15 +878,7 @@ export function SurveyEditorPage() {
       }
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
-      setEditingQuestion((current) => {
-        if (
-          current?.sectionId === sectionId &&
-          current.questionId === questionId
-        ) {
-          return null;
-        }
-        return current;
-      });
+      setEditingQuestion((current) => (current === editingSnapshot ? null : current));
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "문항 저장 실패"));
@@ -894,25 +919,82 @@ export function SurveyEditorPage() {
     }
   };
 
+  const handleUndoDeleteQuestion = async ({
+    sectionId,
+    question,
+  }: {
+    sectionId: string;
+    question: SurveyQuestionRecord;
+  }) => {
+    if (!loadedSurveyId) return;
+    setError(null);
+    try {
+      const restored = await client.createQuestion(loadedSurveyId, sectionId, {
+        titleKo: question.titleKo,
+        titleEn: question.titleEn ?? undefined,
+        descriptionKo: question.descriptionKo ?? "",
+        descriptionEn: question.descriptionEn ?? "",
+        questionType: question.questionType,
+        options: question.options?.map((option) => ({ ...option })) ?? undefined,
+        config: question.config
+          ? {
+              ...question.config,
+              rows: question.config.rows?.map((option) => ({ ...option })),
+              columns: question.config.columns?.map((option) => ({ ...option })),
+              goToSectionByValue: question.config.goToSectionByValue
+                ? { ...question.config.goToSectionByValue }
+                : undefined,
+            }
+          : undefined,
+        answerRegex: question.answerRegex ?? undefined,
+        isRequired: question.isRequired,
+        sortOrder: question.sortOrder,
+      });
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      const restoredSection = updated.sections.find((section) => section.id === sectionId);
+      if (!restoredSection) throw new Error("복구할 섹션을 찾을 수 없습니다.");
+
+      const questions = [...restoredSection.questions].filter((item) => item.id !== restored.id);
+      const insertIndex = Math.min(Math.max(question.sortOrder, 0), questions.length);
+      questions.splice(insertIndex, 0, restored);
+      const reordered = await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {
+        items: questions.map((item, sortOrder) => ({ id: item.id, sortOrder })),
+      });
+      const orderedQuestions = [...reordered].sort(
+        (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
+      );
+      setSections(updated.sections.map((section) =>
+        section.id === sectionId ? { ...section, questions: orderedQuestions } : section,
+      ));
+      toast({ type: "success", message: "항목을 복구했습니다." });
+    } catch (err: unknown) {
+      console.error(err);
+      setError(getErrorMessage(err, "항목을 복구하지 못했습니다."));
+    }
+  };
+
   const handleDeleteQuestion = async (sectionId: string, questionId: string) => {
     if (!loadedSurveyId) return;
     const question = sections
       .find((section) => section.id === sectionId)
       ?.questions.find((item) => item.id === questionId);
-    const confirmed = await requestConfirm({
-      confirmLabel: "삭제",
-      title: "문항 삭제",
-      description: <>정말 <strong className="font-semibold text-slate-900">“{question?.titleKo || "이 문항"}”</strong> 문항을 삭제하시겠습니까?</>,
-      warning: "(삭제된 문항과 응답 데이터는 영구히 복구할 수 없습니다.)",
-      tone: "danger",
-    });
-    if (!confirmed) return;
+    if (!question) return;
 
     setError(null);
     try {
       await client.deleteQuestion(loadedSurveyId, sectionId, questionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
+      setEditingQuestion((current) => current?.questionId === questionId ? null : current);
+      toast({
+        type: "success",
+        message: "항목이 삭제되었습니다.",
+        duration: 7000,
+        action: {
+          label: "실행취소",
+          onClick: () => void handleUndoDeleteQuestion({ sectionId, question }),
+        },
+      });
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "문항 삭제 실패"));
@@ -1237,6 +1319,7 @@ export function SurveyEditorPage() {
                                               branchTargets={branchTargetsForEditing}
                                               isNewQuestion={false}
                                               dragHandle={dragHandle}
+                                              commitRef={questionCommitRef}
                                               onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
                                               onDelete={() => void handleDeleteQuestion(section.id, question.id)}
                                               onSave={handleSaveQuestion}
@@ -1258,13 +1341,14 @@ export function SurveyEditorPage() {
                                 currentSectionId={section.id}
                                 branchTargets={branchTargetsForEditing}
                                 isNewQuestion
+                                commitRef={questionCommitRef}
                                 onSave={handleSaveQuestion}
                                 onCancel={() => setEditingQuestion(null)}
                               />
                             ) : null}
                             {!isOngoing && (
                               <div className="pt-2">
-                                <Button variant="ghost"
+                                <Button type="button" variant="ghost"
                                   onClick={() => openNewQuestion(section.id)}
                                   className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
                                 >

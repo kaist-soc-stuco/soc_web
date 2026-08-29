@@ -418,6 +418,7 @@ export class UsersService {
     majorCategory?: FeeMajorCategory,
     referenceSemester?: string,
     userIds?: string[],
+    audit?: AuditMetadata,
   ): Promise<StudentFeeListResponse["students"]> {
     const pageSize = 1_000;
     const first = await this.listStudentsByFeeStatus(
@@ -448,6 +449,24 @@ export class UsersService {
         userIds,
       );
       items.push(...next.students);
+    }
+    if (audit) {
+      await this.auditLogService.record({
+        action: "student_fee.export",
+        actorUserId: audit.actorUserId ?? null,
+        ipAddress: audit.ipAddress ?? null,
+        payload: {
+          count: items.length,
+          filters: {
+            majorCategory: majorCategory ?? null,
+            paymentYear: paymentYear ?? null,
+            referenceSemester: referenceSemester ?? null,
+            status: status ?? null,
+            userCount: userIds?.length ?? null,
+          },
+        },
+        targetType: "student_fee_status",
+      });
     }
     return items;
   }

@@ -130,6 +130,13 @@ export const SsoCallbackBodySchema = z.object({
   // ─── Board / Article ─────────────────────────────────────────────────────────
 
   const BoardPermissionBitSchema = z.number().int().nonnegative();
+  export const BoardWriteAccessScopeSchema = z.enum([
+    "ANYONE",
+    "AUTHENTICATED",
+    "PRIMARY_MAJOR",
+    "FEE_PAYER",
+    "PERMISSION",
+  ]);
 
   export const BoardCreateSchema = z.object({
     code: z
@@ -142,6 +149,7 @@ export const SsoCallbackBodySchema = z.object({
     nameEn: z.string().trim().max(100).optional(),
     descriptionKo: z.string().trim().max(255).optional(),
     descriptionEn: z.string().trim().max(255).optional(),
+    writeAccessScope: BoardWriteAccessScopeSchema.default("ANYONE"),
     writePermissionBit: BoardPermissionBitSchema.default(0),
     allowComment: z.boolean().default(true),
     allowSecret: z.boolean().default(false),
@@ -342,10 +350,11 @@ const SurveyImageReferenceSchema = z.string().trim().max(2_000).refine(
   (value) => /^asset:\d+$/.test(value) || z.string().url().safeParse(value).success,
   "survey_image_invalid",
 );
+const SurveyTitleKoSchema = z.string().max(255).transform((value) => value.trim() || "설문조사");
 
 const SurveyFieldsSchema = z.object({
   kind: SurveyKindSchema,
-  titleKo: z.string().min(1).max(255),
+  titleKo: SurveyTitleKoSchema,
   titleEn: z.string().max(255).optional(),
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,
@@ -456,7 +465,7 @@ export const QuestionConfigSchema = z.object({
 });
 
 export const CreateQuestionSchema = z.object({
-  titleKo: z.string().min(1),
+  titleKo: z.string().max(255).transform((value) => value.trim() || "질문"),
   titleEn: z.string().optional(),
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,
@@ -746,8 +755,6 @@ const RoadmapCourseFieldsSchema = z.object({
   semesters: z.string().trim().max(20).default("S/F"),
   trackIds: z.array(z.string().trim().min(1).max(50)).max(30).default([]),
   ai: z.boolean().default(false),
-  positionX: z.number().finite().default(0),
-  positionY: z.number().finite().default(0),
   isVisible: z.boolean().default(true),
   prerequisiteCourseCodes: z.array(z.string().trim().min(2).max(64)).max(100).default([]),
 });
@@ -781,8 +788,6 @@ export const RoadmapImportDecisionSchema = z.object({
   nameEn: z.string().trim().max(255).optional(),
   semesters: z.string().trim().max(20).optional(),
   credits: z.string().trim().max(40).optional(),
-  positionX: z.number().finite().optional(),
-  positionY: z.number().finite().optional(),
 }).strict();
 
 export const RoadmapImportCommitSchema = z.object({

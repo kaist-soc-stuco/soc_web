@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
 import { and, eq, inArray, lte } from "drizzle-orm";
@@ -20,6 +20,8 @@ import {
   SEOUL_TIME_ZONE,
   seoulYear,
 } from "./calendar.utils";
+import { AuditLogService } from "../audit/audit-log.service";
+import type { AuditMetadata } from "../audit/audit-context";
 
 const MANUAL_SOURCE = "MANUAL";
 const KAIST_SOURCE = "KAIST_ACADEMIC";
@@ -42,6 +44,7 @@ export class CalendarSyncService {
     private readonly configService: ConfigService,
     private readonly kaistSource: KaistAcademicCalendarSource,
     private readonly googleCalendar: GoogleCalendarClient,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   async enqueueEvent(calendarEventId: number): Promise<boolean> {
@@ -102,7 +105,7 @@ export class CalendarSyncService {
     return true;
   }
 
-  async syncKaistAcademicCalendar(year: number): Promise<{
+  async syncKaistAcademicCalendar(year: number, audit?: AuditMetadata): Promise<{
     year: number;
     fetchedCount: number;
     insertedCount: number;
@@ -211,7 +214,7 @@ export class CalendarSyncService {
       }
     }
 
-    return {
+    const result = {
       year,
       fetchedCount: fetched.items.length,
       insertedCount,
@@ -221,9 +224,27 @@ export class CalendarSyncService {
       googleQueuedCount,
       failedMonths: fetched.failedMonths,
     };
+    await this.auditLogService?.record({
+      action: "calendar.sync.kaist",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        archivedCount: result.archivedCount,
+        failedMonths: result.failedMonths,
+        fetchedCount: result.fetchedCount,
+        googleQueuedCount: result.googleQueuedCount,
+        insertedCount: result.insertedCount,
+        source: audit ? "admin" : "scheduler",
+        unchangedCount: result.unchangedCount,
+        updatedCount: result.updatedCount,
+        year: result.year,
+      },
+      targetType: "calendar",
+    });
+    return result;
   }
 
-  async syncGoogleCalendars(): Promise<{
+  async syncGoogleCalendars(audit?: AuditMetadata): Promise<{
     queuedCount: number;
     processedCount: number;
     succeededCount: number;
@@ -250,7 +271,15 @@ export class CalendarSyncService {
       if (result.processedCount === 0) break;
     }
 
-    return { queuedCount, processedCount, succeededCount, failedCount };
+    const result = { queuedCount, processedCount, succeededCount, failedCount };
+    await this.auditLogService?.record({
+      action: "calendar.sync.google",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { ...result, source: audit ? "admin" : "scheduler" },
+      targetType: "calendar",
+    });
+    return result;
   }
 
   async processPendingJobs(limit = 50): Promise<{

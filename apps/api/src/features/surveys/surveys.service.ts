@@ -20,7 +20,7 @@ import { SurveyResponsesRepository } from "./survey-responses.repository";
 import { SurveyMutationPolicy } from "./survey-mutation-policy";
 import { assertPublishableSurveyDefinition } from "./survey-definition-validation";
 
-import type { SurveyRecordWithState } from "./entities/survey.entity";
+import type { SurveyRecord, SurveyRecordWithState } from "./entities/survey.entity";
 import type { SurveySectionRecord } from "./entities/survey-section.entity";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateSurveyDto } from "./dto/create-survey.dto";
@@ -30,6 +30,7 @@ import { UsersService } from "../users/users.service";
 import { getSurveyEligibilityFailures } from "./survey-eligibility";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
+import { AuditLogService } from "../audit/audit-log.service";
 
 interface SurveyCaller {
   id?: string;
@@ -51,6 +52,26 @@ type EligibilityContext = {
   feeStatus: EligibilityFeeStatus;
 };
 
+const surveyAuditSnapshot = (survey: SurveyRecord): Record<string, unknown> => ({
+  id: survey.id,
+  titleKo: survey.titleKo,
+  titleEn: survey.titleEn,
+  kind: survey.kind,
+  isPublished: survey.isPublished,
+  isKoreanOnly: survey.isKoreanOnly,
+  feePayersOnly: survey.feePayersOnly,
+  academicEligibility: survey.academicEligibility,
+  eligibleSocAffiliations: survey.eligibleSocAffiliations,
+  allowAnonymous: survey.allowAnonymous,
+  allowMultipleResponses: survey.allowMultipleResponses,
+  allowResponseEdit: survey.allowResponseEdit,
+  resultVisibility: survey.resultVisibility,
+  connectedPostId: survey.connectedPostId,
+  isAlwaysOpen: survey.isAlwaysOpen,
+  opensAt: survey.opensAt,
+  closesAt: survey.closesAt,
+});
+
 @Injectable()
 export class SurveysService {
   private readonly logger = new Logger(SurveysService.name);
@@ -63,6 +84,7 @@ export class SurveysService {
     private readonly mutationPolicy: SurveyMutationPolicy,
     @Optional() private readonly usersService?: UsersService,
     @Optional() private readonly surveySheetsService?: GoogleSurveySheetsService,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   private computeState(survey: {
@@ -321,14 +343,29 @@ export class SurveysService {
     await this.assertConnectedArticleAvailable(dto.connectedArticleId);
     const survey = await this.surveysRepo.insert(creatorId, dto);
     const computedState = this.computeState(survey);
+    await this.auditLogService?.record({
+      action: "survey.create",
+      actorUserId: creatorId,
+      targetId: survey.id,
+      targetType: "survey",
+      payload: { created: surveyAuditSnapshot(survey) },
+    });
     return { ...survey, computedState, responseCount: 0 };
   }
 
-  async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecordWithState> {
+  async update(
+    id: string,
+    dto: UpdateSurveyDto,
+    actorUserId?: string,
+  ): Promise<SurveyRecordWithState> {
+    let auditBefore: SurveyRecord | null = null;
+    let auditWasPublished = false;
     let publishedForTheFirstTime = false;
     const updated = await this.mutationPolicy.withSurveyLock(id, async (tx) => {
       const current = await this.surveysRepo.findById(id, tx);
       if (!current) throw new NotFoundException("survey_not_found");
+      auditBefore = current;
+      auditWasPublished = current.isPublished;
 
       this.assertAudienceConfiguration({
         feePayersOnly:
@@ -377,6 +414,22 @@ export class SurveysService {
       };
     });
 
+    const isUnpublished = auditWasPublished && dto.isPublished === false;
+    await this.auditLogService?.record({
+      action: publishedForTheFirstTime
+        ? "survey.publish"
+        : isUnpublished
+          ? "survey.unpublish"
+          : "survey.update",
+      actorUserId: actorUserId ?? null,
+      targetId: id,
+      targetType: "survey",
+      payload: {
+        ...(auditBefore ? { before: surveyAuditSnapshot(auditBefore) } : {}),
+        after: surveyAuditSnapshot(updated),
+      },
+    });
+
     if (!publishedForTheFirstTime || !this.surveySheetsService) return updated;
 
     try {
@@ -384,7 +437,7 @@ export class SurveysService {
       // call. A Sheets outage must not turn a successful survey publication
       // into a failed mutation; the connection status is persisted by the
       // Sheets service and can be retried from the response page.
-      const connected = await this.surveySheetsService.connect(id);
+      const connected = await this.surveySheetsService.connect(id, actorUserId);
       if (connected) {
         return {
           ...updated,
@@ -415,14 +468,27 @@ export class SurveysService {
     return updated;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.mutationPolicy.withHardDelete(id, (tx) =>
-      this.surveysRepo.delete(id, tx),
-    );
+  async delete(id: string, actorUserId?: string): Promise<void> {
+    let deletedSurvey: SurveyRecord | null = null;
+    await this.mutationPolicy.withHardDelete(id, async (tx) => {
+      if (this.auditLogService) {
+        deletedSurvey = await this.surveysRepo.findById(id, tx);
+      }
+      await this.surveysRepo.delete(id, tx);
+    });
+    await this.auditLogService?.record({
+      action: "survey.delete",
+      actorUserId: actorUserId ?? null,
+      targetId: id,
+      targetType: "survey",
+      payload: deletedSurvey
+        ? { deleted: surveyAuditSnapshot(deletedSurvey) }
+        : undefined,
+    });
   }
 
   async duplicate(id: string, creatorId: string): Promise<SurveyRecordWithState> {
-    return this.mutationPolicy.withSurveyLock(id, async (tx) => {
+    const duplicated = await this.mutationPolicy.withSurveyLock(id, async (tx) => {
       // Duplication is a manager operation and reads the saved survey directly.
       const original = await this.surveysRepo.findById(id, tx);
       if (!original) throw new NotFoundException("survey_not_found");
@@ -532,6 +598,17 @@ export class SurveysService {
       const computedState = this.computeState(newSurvey);
       return { ...newSurvey, computedState, responseCount: 0 };
     });
+    await this.auditLogService?.record({
+      action: "survey.duplicate",
+      actorUserId: creatorId,
+      targetId: duplicated.id,
+      targetType: "survey",
+      payload: {
+        sourceSurveyId: id,
+        created: surveyAuditSnapshot(duplicated),
+      },
+    });
+    return duplicated;
   }
 
   async findSectionWithQuestions(

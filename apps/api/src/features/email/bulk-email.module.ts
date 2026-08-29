@@ -8,9 +8,10 @@ import { UsersModule } from "../users/users.module";
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
 import { EmailDeliveryModule } from "./email-delivery.module";
 import { AssetModule } from "../asset/asset.module";
+import { AuditLogModule } from "../audit/audit-log.module";
 
 @Module({
-  imports: [AuthModule, UsersModule, PostgresModule, AssetModule, EmailDeliveryModule],
+  imports: [AuthModule, UsersModule, PostgresModule, AssetModule, EmailDeliveryModule, AuditLogModule],
   controllers: [BulkEmailController],
   providers: [BulkEmailRepository, BulkEmailTemplateRepository, BulkEmailService],
   exports: [BulkEmailService, BulkEmailRepository],

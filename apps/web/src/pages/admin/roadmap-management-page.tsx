@@ -10,7 +10,7 @@ import type {
   RoadmapOfferingRecord,
   UpdateRoadmapCourseRequest,
 } from "@soc/contracts";
-import { FileSpreadsheet, Plus, Save, Trash2, Upload } from "lucide-react";
+import { Plus, Save, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -25,8 +25,6 @@ import {
 } from "@/components/ui/admin-data-table";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import {
-  AdminCard,
-  AdminCardHeader,
   AdminFormField,
   AdminMetaText,
   AdminPageHeader,
@@ -82,8 +80,6 @@ const emptyCourseForm = (): CourseForm => ({
   semesters: "S/F",
   trackIds: [],
   ai: false,
-  positionX: 0,
-  positionY: 0,
   isVisible: true,
   prerequisiteCourseCodes: "",
 });
@@ -98,8 +94,6 @@ interface CourseForm {
   semesters: string;
   trackIds: string[];
   ai: boolean;
-  positionX: number;
-  positionY: number;
   isVisible: boolean;
   prerequisiteCourseCodes: string;
 }
@@ -142,7 +136,7 @@ function RoadmapManagementPageContent() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>("courses");
   const [search, setSearch] = useState("");
-  const [selectedTerm, setSelectedTerm] = useState("2026-fall");
+  const [selectedTerm, setSelectedTerm] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [editorCourse, setEditorCourse] = useState<RoadmapCourseRecord | null>(null);
@@ -157,9 +151,9 @@ function RoadmapManagementPageContent() {
       const response = await apiClient.getAdminRoadmapOfferings();
       setData(response);
       setSelectedTerm((current) =>
-        response.terms.some((term) => term.term === current)
+        current && response.terms.some((term) => term.term === current)
           ? current
-          : response.terms[0]?.term ?? current,
+          : response.terms[0]?.term ?? "",
       );
     } catch {
       toast({ type: "error", message: "로드맵 정보를 불러오지 못했습니다." });
@@ -244,7 +238,7 @@ function RoadmapManagementPageContent() {
         message:
           code === "roadmap_import_no_eligible_rows"
             ? "가져올 수 있는 전산학부 학사과정 과목이 없습니다."
-            : "엑셀을 분석하지 못했습니다. 파일 형식과 내용을 확인해 주세요.",
+            : "개설 교과목 목록을 불러오지 못했습니다. 파일 형식과 내용을 확인해 주세요.",
       });
     }
   };
@@ -260,10 +254,10 @@ function RoadmapManagementPageContent() {
       await queryClient.invalidateQueries({ queryKey: ["roadmap", "offerings"] });
       toast({
         type: "success",
-        message: `${result.importedCount}개 개설 정보를 Import했습니다.${result.skippedCount > 0 ? ` ${result.skippedCount}개 행은 제외되었습니다.` : ""}`,
+        message: `${result.importedCount}개 개설 정보를 불러왔습니다.${result.skippedCount > 0 ? ` ${result.skippedCount}개 행은 제외되었습니다.` : ""}`,
       });
     } catch {
-      toast({ type: "error", message: "엑셀 Import에 실패했습니다." });
+      toast({ type: "error", message: "개설 교과목 목록을 불러오지 못했습니다." });
     } finally {
       setImporting(false);
     }
@@ -278,32 +272,11 @@ function RoadmapManagementPageContent() {
             <>
               <input ref={inputRef} type="file" accept={EXCEL_ACCEPT} className="sr-only" onChange={(event) => void handleImportFile(event)} />
               <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
-                <Upload aria-hidden="true" /> 엑셀 Import
+                <Upload aria-hidden="true" /> 불러오기 (전체개설교과목 목록)
               </Button>
             </>
           }
         />
-
-        <AdminCard>
-          <AdminCardHeader className="items-start">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                <FileSpreadsheet aria-hidden="true" className="size-4" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-slate-900">개설 과목 Import</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  모든 시트를 읽어 전산학부·학사과정 과목만 반영하고, 졸업연구·개별연구·논문연구 등 연구 과목은 제외합니다.
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 gap-5 text-right">
-              <div><AdminMetaText>전체 교과목</AdminMetaText><p className="mt-1 font-semibold tabular-nums">{data.courses.length}</p></div>
-              <div><AdminMetaText>개설 학기</AdminMetaText><p className="mt-1 font-semibold tabular-nums">{data.terms.length}</p></div>
-              <div><AdminMetaText>개설 분반</AdminMetaText><p className="mt-1 font-semibold tabular-nums">{data.items.length}</p></div>
-            </div>
-          </AdminCardHeader>
-        </AdminCard>
 
         <AdminTableCard
           toolbar={
@@ -313,10 +286,10 @@ function RoadmapManagementPageContent() {
                   <button type="button" role="tab" aria-selected={activeTab === "courses"} onClick={() => setActiveTab("courses")} className={cn("rounded-md px-3 py-2 text-sm font-medium", activeTab === "courses" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}>전체 교과목</button>
                   <button type="button" role="tab" aria-selected={activeTab === "offerings"} onClick={() => setActiveTab("offerings")} className={cn("rounded-md px-3 py-2 text-sm font-medium", activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}>학기별 개설 관리</button>
                 </div>
-                <AdminSearchField className="w-full sm:w-72" value={search} onValueChange={setSearch} placeholder="과목코드·과목명·교수 검색" aria-label="로드맵 검색" />
-                {activeTab === "offerings" ? <AdminSelectDropdown ariaLabel="개설 학기" value={selectedTerm} options={termOptions} onChange={setSelectedTerm} className="w-36" /> : null}
               </AdminToolbarGroup>
-              <AdminToolbarGroup>
+              <AdminToolbarGroup className="ml-auto w-full justify-end sm:w-auto">
+                {activeTab === "offerings" ? <AdminSelectDropdown ariaLabel="개설 학기" value={selectedTerm} options={termOptions} onChange={setSelectedTerm} className="w-36" /> : null}
+                <AdminSearchField className="min-w-0 w-full sm:w-72" value={search} onValueChange={setSearch} placeholder="과목코드·과목명·교수 검색" aria-label="로드맵 검색" />
                 {activeTab === "courses" ? <Button type="button" size="sm" onClick={openNewCourse}><Plus aria-hidden="true" /> 과목 추가</Button> : null}
               </AdminToolbarGroup>
             </AdminToolbar>
@@ -364,18 +337,16 @@ function RoadmapManagementPageContent() {
 function CourseTable({ courses, loading, onOpen }: { courses: RoadmapCourseRecord[]; loading: boolean; onOpen: (course: RoadmapCourseRecord) => void }) {
   return (
     <AdminDataTable minWidth="68rem">
-      <colgroup><col style={{ width: 130 }} /><col style={{ width: 230 }} /><col style={{ width: 150 }} /><col style={{ width: 100 }} /><col style={{ width: 190 }} /><col style={{ width: 190 }} /><col style={{ width: 100 }} /></colgroup>
-      <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead>교육 분야</AdminTableHead><AdminTableHead>학점</AdminTableHead><AdminTableHead>선수 과목</AdminTableHead><AdminTableHead>후수 과목</AdminTableHead><AdminTableHead>위치</AdminTableHead></tr></AdminTableHeader>
+      <colgroup><col style={{ width: 130 }} /><col style={{ width: 250 }} /><col style={{ width: 180 }} /><col style={{ width: 100 }} /><col style={{ width: 220 }} /></colgroup>
+      <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead>교육 분야</AdminTableHead><AdminTableHead>학점</AdminTableHead><AdminTableHead>선수 과목</AdminTableHead></tr></AdminTableHeader>
       <AdminTableBody>
-        {loading && courses.length === 0 ? <AdminTableEmpty colSpan={7}>불러오는 중...</AdminTableEmpty> : courses.length === 0 ? <AdminTableEmpty colSpan={7}>등록된 전체 교과목이 없습니다.</AdminTableEmpty> : courses.map((course) => (
+        {loading && courses.length === 0 ? <AdminTableEmpty colSpan={5}>불러오는 중...</AdminTableEmpty> : courses.length === 0 ? <AdminTableEmpty colSpan={5}>등록된 전체 교과목이 없습니다.</AdminTableEmpty> : courses.map((course) => (
           <tr key={course.courseId} tabIndex={0} role="button" onClick={() => onOpen(course)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(course); } }} className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50/70 focus:bg-slate-50/70 focus:outline-none">
-            <AdminTableCell className="font-semibold tabular-nums text-slate-900">{course.courseCode}{course.legacyCourseCode ? <span className="mt-1 block text-xs font-normal text-slate-400">구 {course.legacyCourseCode}</span> : null}</AdminTableCell>
+            <AdminTableCell className="font-semibold tabular-nums text-slate-900">{course.courseCode}</AdminTableCell>
             <AdminTableCell truncate><span className="font-medium text-slate-900">{course.nameKo}</span>{course.nameEn ? <span className="mt-1 block truncate text-xs text-slate-400">{course.nameEn}</span> : null}</AdminTableCell>
-            <AdminTableCell truncate>{course.trackIds.length > 0 ? course.trackIds.map((id) => TRACKS.find(([trackId]) => trackId === id)?.[1] ?? id).join(", ") : "—"}</AdminTableCell>
-            <AdminTableCell className="tabular-nums">{course.credits || "—"}</AdminTableCell>
-            <AdminTableCell truncate>{course.prerequisiteCourseCodes.join(", ") || "—"}</AdminTableCell>
-            <AdminTableCell truncate>{course.postrequisiteCourseCodes.join(", ") || "—"}</AdminTableCell>
-            <AdminTableCell className="tabular-nums text-xs text-slate-500">{course.positionX}, {course.positionY}</AdminTableCell>
+            <AdminTableCell truncate>{course.trackIds.length > 0 ? course.trackIds.map((id) => TRACKS.find(([trackId]) => trackId === id)?.[1] ?? id).join(", ") : ""}</AdminTableCell>
+            <AdminTableCell className="tabular-nums">{course.credits || ""}</AdminTableCell>
+            <AdminTableCell truncate>{course.prerequisiteCourseCodes.join(", ") || ""}</AdminTableCell>
           </tr>
         ))}
       </AdminTableBody>
@@ -385,20 +356,20 @@ function CourseTable({ courses, loading, onOpen }: { courses: RoadmapCourseRecor
 
 function OfferingTable({ offerings, loading, onOpen }: { offerings: RoadmapOfferingRecord[]; loading: boolean; onOpen: (offering: RoadmapOfferingRecord) => void }) {
   return (
-    <AdminDataTable minWidth="76rem">
-      <colgroup><col style={{ width: 130 }} /><col style={{ width: 240 }} /><col style={{ width: 80 }} /><col style={{ width: 150 }} /><col style={{ width: 190 }} /><col style={{ width: 190 }} /><col style={{ width: 110 }} /><col style={{ width: 100 }} /></colgroup>
-      <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead>분반</AdminTableHead><AdminTableHead>담당교수</AdminTableHead><AdminTableHead>강의시간</AdminTableHead><AdminTableHead>강의실</AdminTableHead><AdminTableHead>수강 / 정원</AdminTableHead><AdminTableHead>강의 방식</AdminTableHead></tr></AdminTableHeader>
+    <AdminDataTable minWidth="74rem">
+      <colgroup><col style={{ width: 130 }} /><col style={{ width: 220 }} /><col style={{ width: 58 }} /><col style={{ width: 120 }} /><col style={{ width: 145 }} /><col style={{ width: 360 }} /><col style={{ width: 110 }} /><col style={{ width: 130 }} /></colgroup>
+      <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead className="text-center">분반</AdminTableHead><AdminTableHead className="text-center">담당교수</AdminTableHead><AdminTableHead className="text-center">강의시간</AdminTableHead><AdminTableHead>강의실</AdminTableHead><AdminTableHead className="text-center">수강 / 정원</AdminTableHead><AdminTableHead className="text-left">강의 방식</AdminTableHead></tr></AdminTableHeader>
       <AdminTableBody>
         {loading && offerings.length === 0 ? <AdminTableEmpty colSpan={8}>불러오는 중...</AdminTableEmpty> : offerings.length === 0 ? <AdminTableEmpty colSpan={8}>선택한 학기의 개설 정보가 없습니다.</AdminTableEmpty> : offerings.map((offering) => (
           <tr key={offering.offeringId} tabIndex={0} role="button" onClick={() => onOpen(offering)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(offering); } }} className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50/70 focus:bg-slate-50/70 focus:outline-none">
-            <AdminTableCell className="font-semibold tabular-nums text-slate-900">{offering.courseCode}<span className="mt-1 block text-xs font-normal text-slate-400">{offering.currentCode}</span></AdminTableCell>
+            <AdminTableCell className="font-semibold tabular-nums text-slate-900">{offering.courseCode}</AdminTableCell>
             <AdminTableCell truncate className="font-medium text-slate-900">{offering.nameKo}</AdminTableCell>
-            <AdminTableCell>{offering.section || "—"}</AdminTableCell>
-            <AdminTableCell truncate>{offering.instructor || "—"}</AdminTableCell>
-            <AdminTableCell truncate className="whitespace-pre-line text-xs">{offering.time || "—"}</AdminTableCell>
-            <AdminTableCell truncate className="whitespace-pre-line text-xs">{offering.room || "—"}</AdminTableCell>
-            <AdminTableCell className="tabular-nums">{offering.enrolled ?? "—"} / {offering.capacity ?? "—"}</AdminTableCell>
-            <AdminTableCell truncate>{offering.delivery || "—"}</AdminTableCell>
+            <AdminTableCell className="text-center">{offering.section || ""}</AdminTableCell>
+            <AdminTableCell truncate className="text-center">{offering.instructor || ""}</AdminTableCell>
+            <AdminTableCell truncate className="whitespace-pre-line text-center text-xs">{offering.time || ""}</AdminTableCell>
+            <AdminTableCell truncate className="whitespace-pre-line text-xs">{offering.room || ""}</AdminTableCell>
+            <AdminTableCell className="text-center tabular-nums">{formatEnrollment(offering.enrolled, offering.capacity)}</AdminTableCell>
+            <AdminTableCell truncate className="text-left">{offering.delivery || ""}</AdminTableCell>
           </tr>
         ))}
       </AdminTableBody>
@@ -439,8 +410,6 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
       semesters: form.semesters.trim(),
       trackIds: form.trackIds,
       ai: form.ai,
-      positionX: Number(form.positionX) || 0,
-      positionY: Number(form.positionY) || 0,
       isVisible: form.isVisible,
       prerequisiteCourseCodes: splitCodes(form.prerequisiteCourseCodes),
     } satisfies CreateRoadmapCourseRequest;
@@ -499,7 +468,7 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
         <button type="button" role="tab" aria-selected={tab === "master"} onClick={() => setTab("master")} className={cn("flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "master" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>기본 정보 (마스터)</button>
         <button type="button" role="tab" aria-selected={tab === "offerings"} onClick={() => setTab("offerings")} className={cn("flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>학기별 개설 ({offerings.length})</button>
       </div>
-      {tab === "master" ? <MasterCourseForm form={form} onChange={setForm} courseCodeEditable={isNew} /> : <OfferingEditor defaultTerm={selectedTerm} draft={offeringDraft} onDraftChange={setOfferingDraft} onNew={() => { setSelectedOfferingId(null); setOfferingDraft(blankOffering(course?.courseCode ?? form.courseCode, selectedTerm)); }} offerings={offerings} onSelect={(offering) => { setSelectedOfferingId(offering.offeringId); setOfferingDraft(offeringToForm(offering)); }} onSave={() => void saveOffering()} onDelete={() => void removeOffering()} saving={saving} />}
+      {tab === "master" ? <MasterCourseForm form={form} onChange={setForm} courseCodeEditable={isNew} /> : <OfferingEditor defaultTerm={selectedTerm} draft={offeringDraft} onDraftChange={setOfferingDraft} onNew={(term) => { setSelectedOfferingId(null); setOfferingDraft(blankOffering(course?.courseCode ?? form.courseCode, term)); }} offerings={offerings} onSelect={(offering) => { setSelectedOfferingId(offering.offeringId); setOfferingDraft(offeringToForm(offering)); }} onSave={() => void saveOffering()} onDelete={() => void removeOffering()} saving={saving} />}
     </Modal>
   );
 }
@@ -510,13 +479,12 @@ function MasterCourseForm({ form, onChange, courseCodeEditable }: { form: Course
       <div className="grid gap-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <AdminFormField label="과목코드 *"><UiInput value={form.courseCode} onChange={(event) => set("courseCode", event.currentTarget.value)} disabled={!courseCodeEditable} placeholder="예: CS20300" /></AdminFormField>
-        <AdminFormField label="구 코드"><UiInput value={form.legacyCourseCode} onChange={(event) => set("legacyCourseCode", event.currentTarget.value)} placeholder="예: CS230" /></AdminFormField>
+        <AdminFormField label="구 코드"><UiInput value={form.legacyCourseCode} onChange={(event) => set("legacyCourseCode", event.currentTarget.value)} disabled={!courseCodeEditable} placeholder="예: CS230" /></AdminFormField>
         <AdminFormField label="국문 과목명 *"><UiInput value={form.nameKo} onChange={(event) => set("nameKo", event.currentTarget.value)} /></AdminFormField>
         <AdminFormField label="영문 과목명"><UiInput value={form.nameEn} onChange={(event) => set("nameEn", event.currentTarget.value)} /></AdminFormField>
         <AdminFormField label="교육 분야"><AdminSelectDropdown value={form.category} options={CATEGORY_OPTIONS} onChange={(value) => set("category", value as RoadmapCourseCategory)} ariaLabel="교육 분야" /></AdminFormField>
         <AdminFormField label="강·실·학"><UiInput value={form.credits} onChange={(event) => set("credits", event.currentTarget.value)} placeholder="3:0:3(0)" /></AdminFormField>
         <AdminFormField label="개설 학기"><UiInput value={form.semesters} onChange={(event) => set("semesters", event.currentTarget.value)} placeholder="S/F" /></AdminFormField>
-        <div className="grid grid-cols-2 gap-3"><AdminFormField label="React Flow X"><UiInput type="number" value={form.positionX} onChange={(event) => set("positionX", Number(event.currentTarget.value))} /></AdminFormField><AdminFormField label="React Flow Y"><UiInput type="number" value={form.positionY} onChange={(event) => set("positionY", Number(event.currentTarget.value))} /></AdminFormField></div>
       </div>
       <AdminFormField label="선수 과목" hint="과목코드를 쉼표로 구분해 입력하면 연결 관계가 저장됩니다."><UiInput value={form.prerequisiteCourseCodes} onChange={(event) => set("prerequisiteCourseCodes", event.currentTarget.value)} placeholder="CS10001, CS20004" /></AdminFormField>
       <div><p className="mb-2 text-xs font-normal text-[#344054]">교육 분야(트랙)</p><div className="grid gap-2 sm:grid-cols-3">{TRACKS.map(([id, label]) => <label key={id} className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.trackIds.includes(id)} onChange={(event) => set("trackIds", event.currentTarget.checked ? [...form.trackIds, id] : form.trackIds.filter((current) => current !== id))} className="size-4 accent-emerald-700" />{label}</label>)}</div></div>
@@ -525,13 +493,114 @@ function MasterCourseForm({ form, onChange, courseCodeEditable }: { form: Course
   );
 }
 
-function OfferingEditor({ defaultTerm, draft, onDraftChange, onNew, offerings, onSelect, onSave, onDelete, saving }: { defaultTerm: string; draft: OfferingForm | null; onDraftChange: (draft: OfferingForm | null) => void; onNew: () => void; offerings: RoadmapOfferingRecord[]; onSelect: (offering: RoadmapOfferingRecord) => void; onSave: () => void; onDelete: () => void; saving: boolean }) {
-  const set = <K extends keyof OfferingForm>(key: K, value: OfferingForm[K]) => { if (draft) onDraftChange({ ...draft, [key]: value }); };
+function OfferingEditor({
+  defaultTerm,
+  draft,
+  onDraftChange,
+  onNew,
+  offerings,
+  onSelect,
+  onSave,
+  onDelete,
+  saving,
+}: {
+  defaultTerm: string;
+  draft: OfferingForm | null;
+  onDraftChange: (draft: OfferingForm | null) => void;
+  onNew: (term: string) => void;
+  offerings: RoadmapOfferingRecord[];
+  onSelect: (offering: RoadmapOfferingRecord) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  saving: boolean;
+}) {
+  const offeringTerms = useMemo(() => {
+    const terms = [...new Set(offerings.map((offering) => offering.term))];
+    if (defaultTerm && !terms.includes(defaultTerm)) terms.push(defaultTerm);
+    return terms.sort((left, right) => right.localeCompare(left));
+  }, [defaultTerm, offerings]);
+  const [offeringTerm, setOfferingTerm] = useState(
+    defaultTerm || offeringTerms[0] || "",
+  );
+
+  useEffect(() => {
+    setOfferingTerm((current) =>
+      current && offeringTerms.includes(current)
+        ? current
+        : offeringTerms[0] || defaultTerm,
+    );
+  }, [defaultTerm, offeringTerms]);
+
+  const visibleOfferings = offerings.filter((offering) => offering.term === offeringTerm);
+  const set = <K extends keyof OfferingForm>(key: K, value: OfferingForm[K]) => {
+    if (draft) onDraftChange({ ...draft, [key]: value });
+  };
+
   return (
     <div className="grid gap-4">
-      <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-slate-900">개설 분반 및 강의 정보</p><Button type="button" size="sm" variant="outline" onClick={onNew}><Plus aria-hidden="true" /> 분반 추가</Button></div>
-      <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">{offerings.length === 0 ? <p className="px-3 py-6 text-center text-sm text-slate-500">등록된 개설 정보가 없습니다.</p> : offerings.map((offering) => <button type="button" key={offering.offeringId} onClick={() => onSelect(offering)} className={cn("grid w-full grid-cols-[7rem_minmax(0,1fr)_4rem] gap-3 px-3 py-3 text-left text-sm hover:bg-slate-50", draft && offering.offeringId === (draft as OfferingForm & { offeringId?: string }).offeringId && "bg-emerald-50")}><span className="font-medium text-slate-700">{formatTerm(offering.term)}</span><span className="min-w-0 truncate text-slate-900">{offering.nameKo}<span className="ml-2 text-xs text-slate-400">{offering.currentCode}</span></span><span className="text-center text-slate-500">{offering.section || "—"}</span></button>)}</div>
-      {draft ? <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50/60 p-4"><div className="grid gap-4 sm:grid-cols-3"><AdminFormField label="학기 *"><UiInput value={draft.term} onChange={(event) => set("term", event.currentTarget.value)} placeholder="2026-fall" /></AdminFormField><AdminFormField label="신 코드 *"><UiInput value={draft.currentCode} onChange={(event) => set("currentCode", event.currentTarget.value)} /></AdminFormField><AdminFormField label="분반"><UiInput value={draft.section} onChange={(event) => set("section", event.currentTarget.value)} /></AdminFormField><AdminFormField label="과목명 *" className="sm:col-span-2"><UiInput value={draft.nameKo} onChange={(event) => set("nameKo", event.currentTarget.value)} /></AdminFormField><AdminFormField label="담당교수"><UiInput value={draft.instructor} onChange={(event) => set("instructor", event.currentTarget.value)} /></AdminFormField><AdminFormField label="강의시간"><UiTextarea className="min-h-20" value={draft.time} onChange={(event) => set("time", event.currentTarget.value)} /></AdminFormField><AdminFormField label="강의실"><UiTextarea className="min-h-20" value={draft.room} onChange={(event) => set("room", event.currentTarget.value)} /></AdminFormField><AdminFormField label="강의 방식"><UiInput value={draft.delivery} onChange={(event) => set("delivery", event.currentTarget.value)} /></AdminFormField><AdminFormField label="강·실·학"><UiInput value={draft.credits} onChange={(event) => set("credits", event.currentTarget.value)} /></AdminFormField><AdminFormField label="정원"><UiInput type="number" value={draft.capacity} onChange={(event) => set("capacity", event.currentTarget.value)} /></AdminFormField><AdminFormField label="수강인원"><UiInput type="number" value={draft.enrolled} onChange={(event) => set("enrolled", event.currentTarget.value)} /></AdminFormField></div><label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={draft.inEnglish} onChange={(event) => set("inEnglish", event.currentTarget.checked)} className="size-4 accent-emerald-700" />영어 강의</label><div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={saving} onClick={onDelete}><Trash2 aria-hidden="true" /> 삭제</Button><Button type="button" disabled={saving} onClick={onSave}><Save aria-hidden="true" /> 저장</Button></div></div> : <p className="text-xs text-slate-500">분반을 선택하거나 추가하면 한 곳에서 개설 정보를 편집할 수 있습니다.</p>}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-medium text-slate-900">개설 분반 및 강의 정보</p>
+        <div className="flex items-center gap-2">
+          <AdminSelectDropdown
+            ariaLabel="개설 정보 학기"
+            value={offeringTerm}
+            options={offeringTerms.map((term) => ({ value: term, label: formatTerm(term) }))}
+            onChange={setOfferingTerm}
+            className="w-36"
+          />
+          <Button type="button" size="sm" variant="outline" onClick={() => onNew(offeringTerm)}>
+            <Plus aria-hidden="true" /> 분반 추가
+          </Button>
+        </div>
+      </div>
+      <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        {visibleOfferings.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-slate-500">등록된 개설 정보가 없습니다.</p>
+        ) : (
+          visibleOfferings.map((offering) => (
+            <button
+              type="button"
+              key={offering.offeringId}
+              onClick={() => onSelect(offering)}
+              className={cn(
+                "grid w-full grid-cols-[7rem_minmax(0,1fr)_4rem] gap-3 px-3 py-3 text-left text-sm hover:bg-slate-50",
+                draft &&
+                  offering.offeringId ===
+                    (draft as OfferingForm & { offeringId?: string }).offeringId &&
+                  "bg-emerald-50",
+              )}
+            >
+              <span className="font-medium text-slate-700">{formatTerm(offering.term)}</span>
+              <span className="min-w-0 truncate text-slate-900">
+                {offering.nameKo}
+                <span className="ml-2 text-xs text-slate-400">{offering.currentCode}</span>
+              </span>
+              <span className="text-center text-slate-500">{offering.section || ""}</span>
+            </button>
+          ))
+        )}
+      </div>
+      {draft ? (
+        <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <AdminFormField label="학기 *"><UiInput value={draft.term} onChange={(event) => set("term", event.currentTarget.value)} placeholder="2026-fall" /></AdminFormField>
+            <AdminFormField label="신 코드 *"><UiInput value={draft.currentCode} onChange={(event) => set("currentCode", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="분반"><UiInput value={draft.section} onChange={(event) => set("section", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="과목명 *" className="sm:col-span-2"><UiInput value={draft.nameKo} onChange={(event) => set("nameKo", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="담당교수"><UiInput value={draft.instructor} onChange={(event) => set("instructor", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="강의시간"><UiTextarea className="min-h-20" value={draft.time} onChange={(event) => set("time", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="강의실"><UiTextarea className="min-h-20" value={draft.room} onChange={(event) => set("room", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="강의 방식"><UiInput value={draft.delivery} onChange={(event) => set("delivery", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="강·실·학"><UiInput value={draft.credits} onChange={(event) => set("credits", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="정원"><UiInput type="number" value={draft.capacity} onChange={(event) => set("capacity", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="수강인원"><UiInput type="number" value={draft.enrolled} onChange={(event) => set("enrolled", event.currentTarget.value)} /></AdminFormField>
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={draft.inEnglish} onChange={(event) => set("inEnglish", event.currentTarget.checked)} className="size-4 accent-emerald-700" />영어 강의</label>
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={saving} onClick={onDelete}><Trash2 aria-hidden="true" /> 삭제</Button><Button type="button" disabled={saving} onClick={onSave}><Save aria-hidden="true" /> 저장</Button></div>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">분반을 선택하거나 추가하면 한 곳에서 개설 정보를 편집할 수 있습니다.</p>
+      )}
     </div>
   );
 }
@@ -543,7 +612,7 @@ function ImportPreviewModal({ importing, onClose, onCommit, preview }: { importi
     setDecisions(Object.fromEntries(preview.newCourses.map((course) => [course.courseCode, { action: "ADD_TO_ROADMAP", category: "major-elective", trackIds: [] }])));
   }, [preview]);
   return (
-    <Modal open={Boolean(preview)} onClose={onClose} title="엑셀 Import 검토" className="max-w-3xl" bodyClassName="space-y-5" footer={preview ? <><Button type="button" variant="outline" onClick={onClose} disabled={importing}>취소</Button><Button type="button" onClick={() => onCommit(decisions)} disabled={importing}>{importing ? "반영 중..." : "이번 학기 반영"}</Button></> : null}>
+    <Modal open={Boolean(preview)} onClose={onClose} title="전체개설교과목 목록 불러오기 검토" className="max-w-3xl" bodyClassName="space-y-5" footer={preview ? <><Button type="button" variant="outline" onClick={onClose} disabled={importing}>취소</Button><Button type="button" onClick={() => onCommit(decisions)} disabled={importing}>{importing ? "반영 중..." : "이번 학기 반영"}</Button></> : null}>
       {preview ? <><div className="grid grid-cols-3 gap-3"><Stat label="학기" value={preview.terms.map(formatTerm).join(", ")} /><Stat label="개설 정보" value={`${preview.importedCount}건`} /><Stat label="신규 과목" value={`${preview.newCourses.length}개`} /></div><p className="text-sm leading-6 text-slate-600">새 학기는 자동으로 추가되고, 신규 과목은 로드맵 표시 여부와 교육 분야를 확인한 뒤 반영합니다. 연구 과목은 자동 제외됩니다.</p>{preview.newCourses.length === 0 ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">새로 추가되는 전체 교과목이 없습니다. 기존 마스터와 개설 정보만 갱신합니다.</div> : <div className="overflow-hidden rounded-lg border border-slate-200"><div className="grid grid-cols-[minmax(0,1fr)_10rem_6rem] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500"><span>신규 과목</span><span>교육 분야</span><span>로드맵</span></div>{preview.newCourses.map((course) => { const decision = decisions[course.courseCode]; return <div key={course.courseCode} className="grid grid-cols-[minmax(0,1fr)_10rem_6rem] items-center gap-3 border-b border-slate-100 px-3 py-3 last:border-0"><div className="min-w-0"><p className="truncate text-sm font-medium text-slate-900">{course.nameKo}</p><p className="mt-1 text-xs tabular-nums text-slate-500">{course.courseCode} · {course.currentCode} · {course.term}</p></div><AdminSelectDropdown value={decision?.category ?? "major-elective"} options={CATEGORY_OPTIONS} onChange={(value) => setDecisions((current) => ({ ...current, [course.courseCode]: { ...current[course.courseCode], category: value as RoadmapCourseCategory } }))} ariaLabel={`${course.nameKo} 교육 분야`} /><label className="inline-flex items-center justify-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={decision?.action === "ADD_TO_ROADMAP"} onChange={(event) => setDecisions((current) => ({ ...current, [course.courseCode]: { ...current[course.courseCode], action: event.currentTarget.checked ? "ADD_TO_ROADMAP" : "SKIP" } }))} className="size-4 accent-emerald-700" />표시</label></div>; })}</div>}{preview.warnings.length > 0 ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">{preview.warnings.join(" · ")}</div> : null}</> : null}
     </Modal>
   );
@@ -551,10 +620,14 @@ function ImportPreviewModal({ importing, onClose, onCommit, preview }: { importi
 
 function Stat({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3"><AdminMetaText>{label}</AdminMetaText><p className="mt-1 truncate text-sm font-semibold text-slate-900">{value}</p></div>; }
 
-function courseToForm(course: RoadmapCourseRecord): CourseForm { return { courseCode: course.courseCode, legacyCourseCode: course.legacyCourseCode ?? "", nameKo: course.nameKo, nameEn: course.nameEn, category: course.category, credits: course.credits, semesters: course.semesters, trackIds: course.trackIds, ai: course.ai, positionX: course.positionX, positionY: course.positionY, isVisible: course.isVisible, prerequisiteCourseCodes: course.prerequisiteCourseCodes.join(", ") }; }
+function courseToForm(course: RoadmapCourseRecord): CourseForm { return { courseCode: course.courseCode, legacyCourseCode: course.legacyCourseCode ?? "", nameKo: course.nameKo, nameEn: course.nameEn, category: course.category, credits: course.credits, semesters: course.semesters, trackIds: course.trackIds, ai: course.ai, isVisible: course.isVisible, prerequisiteCourseCodes: course.prerequisiteCourseCodes.join(", ") }; }
 function splitCodes(value: string): string[] { return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))]; }
 function blankOffering(courseCode: string, term: string): OfferingForm { return { term, courseCode, currentCode: "", nameKo: "", section: "", instructor: "", credits: "", time: "", room: "", capacity: "", enrolled: "", delivery: "", inEnglish: false }; }
 function offeringToForm(offering: RoadmapOfferingRecord): OfferingForm & { offeringId?: string } { return { offeringId: offering.offeringId, term: offering.term, courseCode: offering.courseCode, currentCode: offering.currentCode, nameKo: offering.nameKo, section: offering.section ?? "", instructor: offering.instructor ?? "", credits: offering.credits ?? "", time: offering.time ?? "", room: offering.room ?? "", capacity: offering.capacity === null ? "" : String(offering.capacity), enrolled: offering.enrolled === null ? "" : String(offering.enrolled), delivery: offering.delivery ?? "", inEnglish: offering.inEnglish }; }
 function offeringToRequest(form: OfferingForm): CreateRoadmapOfferingRequest { return { term: form.term.trim(), courseCode: form.courseCode.trim(), currentCode: form.currentCode.trim(), nameKo: form.nameKo.trim(), section: form.section.trim() || null, instructor: form.instructor.trim() || null, credits: form.credits.trim() || null, time: form.time.trim() || null, room: form.room.trim() || null, capacity: form.capacity.trim() ? Number(form.capacity) : null, enrolled: form.enrolled.trim() ? Number(form.enrolled) : null, delivery: form.delivery.trim() || null, inEnglish: form.inEnglish }; }
-function makeCourseFromOffering(offering: RoadmapOfferingRecord): RoadmapCourseRecord { return { courseId: `offering-${offering.courseCode}`, courseCode: offering.courseCode, legacyCourseCode: null, nameKo: offering.nameKo, nameEn: "", category: "major-elective", credits: offering.credits ?? "", semesters: offering.term.endsWith("-spring") ? "S" : "F", trackIds: [], ai: false, positionX: 0, positionY: 0, isVisible: true, source: "IMPORT", prerequisiteCourseCodes: [], postrequisiteCourseCodes: [], createdAt: offering.importedAt, updatedAt: offering.importedAt }; }
+function makeCourseFromOffering(offering: RoadmapOfferingRecord): RoadmapCourseRecord { return { courseId: `offering-${offering.courseCode}`, courseCode: offering.courseCode, legacyCourseCode: null, nameKo: offering.nameKo, nameEn: "", category: "major-elective", credits: offering.credits ?? "", semesters: offering.term.endsWith("-spring") ? "S" : "F", trackIds: [], ai: false, isVisible: true, source: "IMPORT", prerequisiteCourseCodes: [], postrequisiteCourseCodes: [], createdAt: offering.importedAt, updatedAt: offering.importedAt }; }
+function formatEnrollment(enrolled: number | null, capacity: number | null): string {
+  if (enrolled === null && capacity === null) return "";
+  return `${enrolled ?? ""} / ${capacity ?? ""}`;
+}
 function formatTerm(term: string): string { const match = term.match(/^(20\d{2})-(spring|fall)$/i); return match ? `${match[1]} ${match[2].toLocaleLowerCase() === "spring" ? "봄학기" : "가을학기"}` : term; }

@@ -135,8 +135,6 @@ export function SurveyResponseListPage() {
     }
   };
 
-  const canRetrySheetConnection = survey?.spreadsheetSyncStatus === "ERROR";
-
   // Dynamic Client-Side Filtering, Searching, and Sorting
   const filteredResponses = useMemo(() => {
     let result = [...responses];
@@ -192,21 +190,15 @@ export function SurveyResponseListPage() {
                 <ChevronLeft className="size-4" />
                 목록으로
               </Button>
-              {survey?.spreadsheetUrl ? (
-                <a
-                  href={survey.spreadsheetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline"
-                >
-                  Google Sheets에서 보기 ↗
-                </a>
-              ) : canRetrySheetConnection ? (
-                <Button variant="outline" onClick={handleSheet} disabled={sheetBusy}>
-                  <Sheet className="size-4" />
-                  <span>Google Sheets 재시도</span>
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSheet}
+                disabled={sheetBusy || !survey}
+              >
+                <Sheet className="size-4" />
+                <span>Google Sheets에서 보기 ↗</span>
+              </Button>
               </>
             }
           />

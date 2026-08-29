@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, OnModuleInit, Optional } from "@nestjs/common";
 
 import { GoogleSheetsClient } from "../../infrastructure/google/google-sheets.client";
 import {
@@ -11,6 +11,7 @@ import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveyResponsesRepository } from "./survey-responses.repository";
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
+import { AuditLogService } from "../audit/audit-log.service";
 
 const SHEET_TITLE = "응답";
 
@@ -25,6 +26,7 @@ export class GoogleSurveySheetsService implements OnModuleInit {
     private readonly questionsRepo: SurveyQuestionsRepository,
     private readonly responsesRepo: SurveyResponsesRepository,
     private readonly syncQueue: GoogleSpreadsheetSyncQueueService,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   onModuleInit(): void {
@@ -37,7 +39,7 @@ export class GoogleSurveySheetsService implements OnModuleInit {
     await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.SURVEY, surveyId);
   }
 
-  async connect(surveyId: string) {
+  async connect(surveyId: string, actorUserId?: string) {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
 
@@ -63,7 +65,19 @@ export class GoogleSurveySheetsService implements OnModuleInit {
     }
 
     await this.refresh(surveyId, true);
-    return this.surveysRepo.findById(surveyId);
+    const connected = await this.surveysRepo.findById(surveyId);
+    await this.auditLogService?.record({
+      action: "survey.spreadsheet.connect",
+      actorUserId: actorUserId ?? null,
+      targetId: surveyId,
+      targetType: "survey",
+      payload: {
+        surveyId,
+        spreadsheetId: connected?.spreadsheetId ?? null,
+        syncStatus: connected?.spreadsheetSyncStatus ?? null,
+      },
+    });
+    return connected;
   }
 
   private async markConnectionError(surveyId: string, error: unknown): Promise<void> {

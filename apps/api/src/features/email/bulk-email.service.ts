@@ -7,6 +7,7 @@ import {
   NotImplementedException,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { BulkEmailRepository, type BulkEmailStoredRecord } from "./bulk-email.repository";
@@ -28,6 +29,8 @@ import type {
 import { UsersService } from "../users/users.service";
 import sanitizeHtml from "sanitize-html";
 import { isoToDate, nowDate, nowMs } from "@soc/shared";
+import { AuditLogService } from "../audit/audit-log.service";
+import type { AuditMetadata } from "../audit/audit-context";
 
 export const BULK_EMAIL_DELIVERY_NOT_CONFIGURED =
   "bulk_email_delivery_not_configured";
@@ -111,6 +114,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly assetService: AssetService,
     private readonly templateRepo?: BulkEmailTemplateRepository,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   onModuleInit(): void {
@@ -162,31 +166,71 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   async createTemplate(
     creatorId: string,
     dto: CreateBulkEmailTemplateRequest,
+    audit?: AuditMetadata,
   ): Promise<BulkEmailTemplate> {
     if (!this.templateRepo) {
       throw new NotImplementedException(BULK_EMAIL_DELIVERY_NOT_CONFIGURED);
     }
-    return this.templateRepo.create(creatorId, dto);
+    const template = await this.templateRepo.create(creatorId, dto);
+    await this.auditLogService?.record({
+      action: "bulk_email.template.create",
+      actorUserId: audit?.actorUserId ?? creatorId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        after: {
+          contentType: template.contentType,
+          name: template.name,
+          recipientType: template.recipientType,
+        },
+      },
+      targetId: template.id,
+      targetType: "bulk_email_template",
+    });
+    return template;
   }
 
   async updateTemplate(
     id: string,
     dto: UpdateBulkEmailTemplateRequest,
+    audit?: AuditMetadata,
   ): Promise<BulkEmailTemplate> {
     if (!this.templateRepo) {
       throw new NotImplementedException(BULK_EMAIL_DELIVERY_NOT_CONFIGURED);
     }
     const updated = await this.templateRepo.update(id, dto);
     if (!updated) throw new NotFoundException("bulk_email_template_not_found");
+    await this.auditLogService?.record({
+      action: "bulk_email.template.update",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        after: {
+          contentType: updated.contentType,
+          name: updated.name,
+          recipientType: updated.recipientType,
+        },
+        changedFields: Object.keys(dto),
+      },
+      targetId: updated.id,
+      targetType: "bulk_email_template",
+    });
     return updated;
   }
 
-  async deleteTemplate(id: string): Promise<{ success: boolean }> {
+  async deleteTemplate(id: string, audit?: AuditMetadata): Promise<{ success: boolean }> {
     if (!this.templateRepo) {
       throw new NotImplementedException(BULK_EMAIL_DELIVERY_NOT_CONFIGURED);
     }
     const deleted = await this.templateRepo.delete(id);
     if (!deleted) throw new NotFoundException("bulk_email_template_not_found");
+    await this.auditLogService?.record({
+      action: "bulk_email.template.delete",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { deleted: true },
+      targetId: id,
+      targetType: "bulk_email_template",
+    });
     return { success: true };
   }
 
@@ -200,6 +244,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   async saveDraft(
     senderId: string,
     dto: SaveBulkEmailDraftRequest,
+    audit?: AuditMetadata,
   ): Promise<BulkEmailRecord> {
     if (!this.usersService || !this.emailDeliveryService || !this.assetService) {
       throw new NotImplementedException(BULK_EMAIL_DELIVERY_NOT_CONFIGURED);
@@ -210,20 +255,45 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     if (!saved) {
       throw new NotFoundException("bulk_email_draft_not_found");
     }
+    await this.auditLogService?.record({
+      action: dto.draftId ? "bulk_email.draft.update" : "bulk_email.draft.create",
+      actorUserId: audit?.actorUserId ?? senderId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        attachmentCount: saved.attachmentCount,
+        changedFields: ["subject", "content", "contentType", "recipientType", "filters", "attachments"],
+        recipientType: saved.recipientType,
+      },
+      targetId: saved.id,
+      targetType: "bulk_email_draft",
+    });
     return saved;
   }
 
-  async deleteDraft(senderId: string, draftId: string): Promise<{ success: boolean }> {
+  async deleteDraft(
+    senderId: string,
+    draftId: string,
+    audit?: AuditMetadata,
+  ): Promise<{ success: boolean }> {
     const deleted = await this.bulkEmailRepo.deleteDraft(senderId, draftId);
     if (!deleted) {
       throw new NotFoundException("bulk_email_draft_not_found");
     }
+    await this.auditLogService?.record({
+      action: "bulk_email.draft.delete",
+      actorUserId: audit?.actorUserId ?? senderId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { deleted: true },
+      targetId: draftId,
+      targetType: "bulk_email_draft",
+    });
     return { success: true };
   }
 
   async sendBulkEmail(
     senderId: string,
     dto: SendBulkEmailRequest,
+    audit?: AuditMetadata,
   ): Promise<SendBulkEmailResponse> {
     // Keeps manually constructed legacy service tests fail-closed while the
     // Nest container always supplies all collaborators in the real module.
@@ -265,6 +335,19 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (scheduledAt) {
+      await this.auditLogService?.record({
+        action: "bulk_email.schedule",
+        actorUserId: audit?.actorUserId ?? senderId,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          attachmentCount: attachmentAssetIds.length,
+          recipientCount: recipients.length,
+          recipientType,
+          scheduledAt: scheduledAt.toISOString(),
+        },
+        targetId: emailId,
+        targetType: "bulk_email",
+      });
       return {
         success: true,
         recipientCount: recipients.length,
@@ -288,14 +371,40 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
         },
       });
 
-      return {
+      const result: SendBulkEmailResponse = {
         success: true,
         recipientCount: recipients.length,
         emailId,
         deliveryMode: delivery.dryRun ? "dry_run" : "sent",
       };
+      await this.auditLogService?.record({
+        action: "bulk_email.send",
+        actorUserId: audit?.actorUserId ?? senderId,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          attachmentCount: attachmentAssetIds.length,
+          deliveryMode: result.deliveryMode,
+          recipientCount: result.recipientCount,
+          recipientType,
+        },
+        targetId: emailId,
+        targetType: "bulk_email",
+      });
+      return result;
     } catch (error) {
       await this.markFailed(emailId, error);
+      await this.auditLogService?.record({
+        action: "bulk_email.send_failed",
+        actorUserId: audit?.actorUserId ?? senderId,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          error: auditErrorCode(error),
+          recipientCount: recipients.length,
+          recipientType,
+        },
+        targetId: emailId,
+        targetType: "bulk_email",
+      });
       this.logger.error(`Bulk email delivery failed for ${emailId}`, error);
       throw error;
     }
@@ -304,6 +413,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   async sendTestEmail(
     senderId: string,
     dto: SendBulkEmailRequest,
+    audit?: AuditMetadata,
   ): Promise<SendBulkEmailTestResponse> {
     if (!this.usersService || !this.emailDeliveryService || !this.assetService) {
       throw new NotImplementedException(BULK_EMAIL_DELIVERY_NOT_CONFIGURED);
@@ -332,11 +442,24 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
     });
 
-    return {
+    const result: SendBulkEmailTestResponse = {
       success: true,
       recipientEmail,
       deliveryMode: delivery.dryRun ? "dry_run" : "sent",
     };
+    await this.auditLogService?.record({
+      action: "bulk_email.test_send",
+      actorUserId: audit?.actorUserId ?? senderId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        attachmentCount: dto.attachmentAssetIds?.length ?? 0,
+        deliveryMode: result.deliveryMode,
+        recipientCount: 1,
+      },
+      targetId: senderId,
+      targetType: "bulk_email",
+    });
+    return result;
   }
 
   async processScheduledEmails(): Promise<void> {
@@ -351,8 +474,30 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
 
         try {
           await this.deliverStored(record);
+          await this.auditLogService?.record({
+            action: "bulk_email.send",
+            payload: {
+              deliveryMode: "sent",
+              recipientCount: record.recipientCount,
+              recipientType: record.recipientType,
+              source: "scheduler",
+            },
+            targetId: record.id,
+            targetType: "bulk_email",
+          });
         } catch (error) {
           await this.markFailed(record.id, error);
+          await this.auditLogService?.record({
+            action: "bulk_email.send_failed",
+            payload: {
+              error: auditErrorCode(error),
+              recipientCount: record.recipientCount,
+              recipientType: record.recipientType,
+              source: "scheduler",
+            },
+            targetId: record.id,
+            targetType: "bulk_email",
+          });
           this.logger.error(`Scheduled bulk email failed for ${record.id}`, error);
         }
       }
@@ -366,17 +511,37 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async cancelScheduled(senderId: string, emailId: string): Promise<BulkEmailRecord> {
+  async cancelScheduled(
+    senderId: string,
+    emailId: string,
+    audit?: AuditMetadata,
+  ): Promise<BulkEmailRecord> {
     const cancelled = await this.bulkEmailRepo.cancelScheduled(senderId, emailId);
     if (!cancelled) {
       throw new ConflictException("bulk_email_not_scheduled_or_not_owned");
     }
     const record = await this.bulkEmailRepo.findById(emailId);
     if (!record) throw new NotFoundException("bulk_email_not_found");
+    await this.auditLogService?.record({
+      action: "bulk_email.cancel",
+      actorUserId: audit?.actorUserId ?? senderId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        recipientCount: record.recipientCount,
+        recipientType: record.recipientType,
+        status: record.status,
+      },
+      targetId: record.id,
+      targetType: "bulk_email",
+    });
     return record;
   }
 
-  async retryFailed(senderId: string, emailId: string): Promise<SendBulkEmailResponse> {
+  async retryFailed(
+    senderId: string,
+    emailId: string,
+    audit?: AuditMetadata,
+  ): Promise<SendBulkEmailResponse> {
     const record = await this.bulkEmailRepo.claimFailedForRetry(senderId, emailId);
     if (!record) {
       throw new ConflictException("bulk_email_not_failed_or_not_owned");
@@ -406,14 +571,40 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
           attachmentAssetIds: record.attachmentAssetIds,
         },
       });
-      return {
+      const result: SendBulkEmailResponse = {
         success: true,
         recipientCount: recipients.length,
         emailId: record.id,
         deliveryMode: delivery.dryRun ? "dry_run" : "sent",
       };
+      await this.auditLogService?.record({
+        action: "bulk_email.retry",
+        actorUserId: audit?.actorUserId ?? senderId,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          deliveryMode: result.deliveryMode,
+          recipientCount: result.recipientCount,
+          recipientType: record.recipientType,
+        },
+        targetId: record.id,
+        targetType: "bulk_email",
+      });
+      return result;
     } catch (error) {
       await this.markFailed(record.id, error);
+      await this.auditLogService?.record({
+        action: "bulk_email.send_failed",
+        actorUserId: audit?.actorUserId ?? senderId,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          error: auditErrorCode(error),
+          recipientCount: recipients.length,
+          recipientType: record.recipientType,
+          retry: true,
+        },
+        targetId: record.id,
+        targetType: "bulk_email",
+      });
       throw error;
     }
   }
@@ -545,6 +736,18 @@ function parseScheduledAt(value: string | undefined): Date | null {
     throw new BadRequestException("bulk_email_schedule_must_be_in_future");
   }
   return parsed;
+}
+
+function auditErrorCode(error: unknown): string {
+  if (error instanceof BadRequestException || error instanceof ConflictException) {
+    const response = error.getResponse();
+    if (typeof response === "string") return response.slice(0, 120);
+    if (response && typeof response === "object" && "message" in response) {
+      const message = (response as { message?: unknown }).message;
+      return typeof message === "string" ? message.slice(0, 120) : error.name;
+    }
+  }
+  return error instanceof Error ? error.name : "unknown_error";
 }
 
 function responseForExistingRecord(record: BulkEmailStoredRecord): SendBulkEmailResponse {

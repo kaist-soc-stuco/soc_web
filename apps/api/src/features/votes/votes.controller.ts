@@ -13,6 +13,7 @@ import {
 import type { Request } from "express";
 
 import { AuthGuard, OptionalAuthGuard, RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { AuditLogService } from "../audit/audit-log.service";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { VotesService } from "./votes.service";
@@ -35,7 +36,7 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async create(@Req() req: AuthedRequest, @Body(new ZodValidationPipe(CreateVoteSchema)) body: CreateVoteRequest) {
     const result = await this.service.create(req.user.id, body);
-    await this.audit.record({ action: "vote.create", actorUserId: req.user.id, targetId: result.id, targetType: "vote" });
+    await this.audit.record({ action: "vote.create", ...auditMetadataFromRequest(req), targetId: result.id, targetType: "vote" });
     return result;
   }
 
@@ -47,7 +48,7 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async addVoters(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest, @Body(new ZodValidationPipe(VoteVoterMutationSchema)) body: VoteVoterMutationRequest) {
     const result = await this.service.addVoters(id, body);
-    await this.audit.record({ action: "vote.voter.add", actorUserId: req.user.id, payload: result, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.voter.add", ...auditMetadataFromRequest(req), payload: { count: result.added }, targetId: id, targetType: "vote" });
     return result;
   }
 
@@ -55,7 +56,7 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async excludeVoters(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest, @Body(new ZodValidationPipe(VoteVoterMutationSchema)) body: VoteVoterMutationRequest) {
     const result = await this.service.excludeVoters(id, body);
-    await this.audit.record({ action: "vote.voter.exclude", actorUserId: req.user.id, payload: result, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.voter.exclude", ...auditMetadataFromRequest(req), payload: { count: result.excluded }, targetId: id, targetType: "vote" });
     return result;
   }
 
@@ -63,7 +64,7 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async update(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest, @Body(new ZodValidationPipe(UpdateVoteSchema)) body: UpdateVoteRequest) {
     const result = await this.service.update(id, body);
-    await this.audit.record({ action: "vote.update", actorUserId: req.user.id, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.update", ...auditMetadataFromRequest(req), payload: { changedFields: Object.keys(body) }, targetId: id, targetType: "vote" });
     return result;
   }
 
@@ -71,14 +72,14 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async delete(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     await this.service.delete(id);
-    await this.audit.record({ action: "vote.delete", actorUserId: req.user.id, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.delete", ...auditMetadataFromRequest(req), targetId: id, targetType: "vote" });
   }
 
   @Post("admin/:id/publish")
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async publish(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     const result = await this.service.publish(id);
-    await this.audit.record({ action: "vote.publish", actorUserId: req.user.id, payload: { eligibleCount: result.eligibleCount }, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.publish", ...auditMetadataFromRequest(req), payload: { eligibleCount: result.eligibleCount }, targetId: id, targetType: "vote" });
     return result;
   }
 
@@ -86,7 +87,7 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async close(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     const result = await this.service.close(id);
-    await this.audit.record({ action: "vote.close", actorUserId: req.user.id, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.close", ...auditMetadataFromRequest(req), targetId: id, targetType: "vote" });
     return result;
   }
 
@@ -94,7 +95,7 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async tally(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     const result = await this.service.tally(id);
-    await this.audit.record({ action: "vote.tally", actorUserId: req.user.id, payload: { totalBallots: result.totalBallots }, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.tally", ...auditMetadataFromRequest(req), payload: { totalBallots: result.totalBallots }, targetId: id, targetType: "vote" });
     return result;
   }
 
@@ -102,7 +103,7 @@ export class VotesController {
   @RequirePermissions(Permissions.MANAGE_VOTE)
   async publishResults(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     const result = await this.service.publishResults(id);
-    await this.audit.record({ action: "vote.results.publish", actorUserId: req.user.id, targetId: id, targetType: "vote" });
+    await this.audit.record({ action: "vote.results.publish", ...auditMetadataFromRequest(req), targetId: id, targetType: "vote" });
     return result;
   }
 
@@ -119,8 +120,16 @@ export class VotesController {
 
   @Post(":id/ballots")
   @UseGuards(AuthGuard)
-  submit(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest, @Body(new ZodValidationPipe(SubmitVoteBallotSchema)) body: SubmitVoteBallotRequest) {
-    return this.service.submit(id, req.user.id, body);
+  async submit(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest, @Body(new ZodValidationPipe(SubmitVoteBallotSchema)) body: SubmitVoteBallotRequest) {
+    const result = await this.service.submit(id, req.user.id, body);
+    await this.audit.record({
+      action: "vote.submit",
+      ...auditMetadataFromRequest(req),
+      payload: { submittedAt: result.submittedAt },
+      targetId: id,
+      targetType: "vote",
+    });
+    return result;
   }
 
   @Get(":id")

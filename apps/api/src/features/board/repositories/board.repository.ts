@@ -3,14 +3,38 @@ import { asc, eq, inArray, sql } from "drizzle-orm";
 import type {
   BoardCreateRequest,
   BoardSummary,
+  BoardWriteAccessScope,
   BoardUpdateRequest,
 } from "@soc/contracts";
+import { normalizeBoardCode } from "@soc/contracts";
 
 import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../../infrastructure/postgres/postgres.provider";
 import { articleDrafts, boards, permissions } from "../../../infrastructure/postgres/postgres.schema";
+
+const BOARD_WRITE_ACCESS_SCOPES = new Set<BoardWriteAccessScope>([
+  "ANYONE",
+  "AUTHENTICATED",
+  "PRIMARY_MAJOR",
+  "FEE_PAYER",
+  "PERMISSION",
+]);
+
+const normalizeWriteAccessScope = (
+  value: string | null | undefined,
+  writePermissionId: number | null,
+): BoardWriteAccessScope => {
+  if (value && BOARD_WRITE_ACCESS_SCOPES.has(value as BoardWriteAccessScope)) {
+    return value as BoardWriteAccessScope;
+  }
+
+  // Older rows have no scope column. Preserve their existing behavior while
+  // the migration is applied: a permission FK means a selected permission;
+  // a null FK means a signed-in user can write.
+  return writePermissionId ? "PERMISSION" : "AUTHENTICATED";
+};
 
 @Injectable()
 export class BoardRepository {
@@ -54,13 +78,16 @@ export class BoardRepository {
     }
 
     return rows.map((row) => ({
+      // Keep the scope and legacy bit in sync for consumers that still read
+      // the bit field directly.
+      writeAccessScope: normalizeWriteAccessScope(row.writeAccessScope, row.writePermissionId),
       boardId: row.boardId,
       code: row.code,
       nameKo: row.nameKo,
       nameEn: row.nameEn ?? undefined,
       descriptionKo: row.descriptionKo ?? undefined,
       descriptionEn: row.descriptionEn ?? undefined,
-      writePermissionBit: row.writePermissionId
+      writePermissionBit: normalizeWriteAccessScope(row.writeAccessScope, row.writePermissionId) === "PERMISSION" && row.writePermissionId
         ? bitMap.get(row.writePermissionId) ?? 0
         : 0,
       allowComment: row.allowComment,
@@ -92,8 +119,9 @@ export class BoardRepository {
   }
 
   async findByCode(code: string): Promise<BoardSummary | null> {
+    const normalizedCode = normalizeBoardCode(code);
     const row = await this.db.query.boards.findFirst({
-      where: eq(boards.code, code),
+      where: eq(boards.code, normalizedCode),
     });
 
     if (!row) return null;
@@ -120,17 +148,26 @@ export class BoardRepository {
   }
 
   private async permissionIdsForInput(
-    input: Pick<BoardCreateRequest, "writePermissionBit">,
+    input: Pick<BoardCreateRequest, "writeAccessScope" | "writePermissionBit">,
   ): Promise<{
     writePermissionId: number | null;
   }> {
-    const [writePermissionId] = await this.resolvePermissionIds([input.writePermissionBit]);
+    const [writePermissionId] = await this.resolvePermissionIds([
+      input.writeAccessScope === "PERMISSION" ? input.writePermissionBit : 0,
+    ]);
 
     return { writePermissionId };
   }
 
   async create(input: BoardCreateRequest): Promise<BoardSummary> {
-    const permissionIds = await this.permissionIdsForInput(input);
+    const writeAccessScope =
+      input.writeAccessScope === "ANYONE" && input.writePermissionBit > 0
+        ? "PERMISSION"
+        : input.writeAccessScope;
+    const permissionIds = await this.permissionIdsForInput({
+      writeAccessScope,
+      writePermissionBit: input.writePermissionBit,
+    });
     const [row] = await this.db
       .insert(boards)
       .values({
@@ -139,6 +176,7 @@ export class BoardRepository {
         nameEn: input.nameEn ?? null,
         descriptionKo: input.descriptionKo ?? null,
         descriptionEn: input.descriptionEn ?? null,
+        writeAccessScope,
         ...permissionIds,
         allowComment: input.allowComment,
         allowSecret: input.allowSecret,
@@ -154,6 +192,7 @@ export class BoardRepository {
   }
 
   async update(code: string, input: BoardUpdateRequest): Promise<BoardSummary | null> {
+    const normalizedCode = normalizeBoardCode(code);
     const set: Partial<typeof boards.$inferInsert> = {};
 
     if (input.nameKo !== undefined) set.nameKo = input.nameKo;
@@ -167,23 +206,36 @@ export class BoardRepository {
     if (input.sortOrder !== undefined) set.sortOrder = input.sortOrder;
     if (input.isActive !== undefined) set.isActive = input.isActive;
 
-    if (input.writePermissionBit !== undefined) {
-      const current = await this.findByCode(code);
+    if (input.writeAccessScope !== undefined || input.writePermissionBit !== undefined) {
+      const current = await this.findByCode(normalizedCode);
       if (!current) return null;
+      const writeAccessScope =
+        input.writeAccessScope === undefined
+          ? input.writePermissionBit !== undefined
+            ? input.writePermissionBit > 0
+              ? "PERMISSION"
+              : "ANYONE"
+            : current.writeAccessScope
+          : input.writeAccessScope;
+      const writePermissionBit =
+        writeAccessScope === "PERMISSION"
+          ? input.writePermissionBit ?? current.writePermissionBit
+          : 0;
       const permissionIds = await this.permissionIdsForInput({
-        writePermissionBit: input.writePermissionBit ?? current.writePermissionBit,
+        writeAccessScope,
+        writePermissionBit,
       });
-      Object.assign(set, permissionIds);
+      Object.assign(set, { writeAccessScope, ...permissionIds });
     }
 
     if (Object.keys(set).length === 0) {
-      return this.findByCode(code);
+      return this.findByCode(normalizedCode);
     }
 
     const [row] = await this.db
       .update(boards)
       .set(set)
-      .where(eq(boards.code, code))
+      .where(eq(boards.code, normalizedCode))
       .returning();
     if (!row) return null;
 
@@ -192,10 +244,11 @@ export class BoardRepository {
   }
 
   async archive(code: string): Promise<BoardSummary | null> {
+    const normalizedCode = normalizeBoardCode(code);
     const [row] = await this.db
       .update(boards)
       .set({ isActive: false })
-      .where(eq(boards.code, code))
+      .where(eq(boards.code, normalizedCode))
       .returning();
     if (!row) return null;
 
@@ -204,9 +257,10 @@ export class BoardRepository {
   }
 
   async delete(code: string): Promise<BoardSummary | null> {
+    const normalizedCode = normalizeBoardCode(code);
     const deleted = await this.db.transaction(async (tx) => {
       const board = await tx.query.boards.findFirst({
-        where: eq(boards.code, code),
+        where: eq(boards.code, normalizedCode),
       });
       if (!board) return null;
 
@@ -231,7 +285,7 @@ export class BoardRepository {
         await tx
           .update(boards)
           .set({ sortOrder: item.sortOrder })
-          .where(eq(boards.code, item.code));
+          .where(eq(boards.code, normalizeBoardCode(item.code)));
       }
     });
   }

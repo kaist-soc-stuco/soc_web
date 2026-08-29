@@ -1,7 +1,6 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { createApiClient } from "@soc/api-client";
-import { hasPermission } from "@soc/shared";
 import { useQuery } from "@tanstack/react-query";
 
 import { Header } from "@/components/organisms/header";
@@ -20,7 +19,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { getBoardWritePermissionBitFromMetadata } from "@/lib/board-metadata";
+import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 import {
   BoardCategoryNavigation,
@@ -100,18 +99,18 @@ export function FaqPage() {
     [],
   );
   const { boards, source: boardCatalogSource } = useBoardCatalog(apiClient);
-  const faqBoard = boards.find((board) => board.code === "FAQ");
-  const faqWritePermissionBit = faqBoard
-    ? getBoardWritePermissionBitFromMetadata(faqBoard, "FAQ")
-    : Number.MAX_SAFE_INTEGER;
+  const faqBoard = boards.find((board) => board.code === "faq");
   const canWriteFaq =
     boardCatalogSource === "server" &&
     hasPersistedProfile(session ?? null) &&
-    (faqWritePermissionBit === 0 ||
-      hasPermission(session?.permission ?? 0, faqWritePermissionBit));
+    canWriteBoardFromMetadata(faqBoard, "faq", {
+      permission: session?.permission ?? 0,
+      primaryMajor: session?.primaryMajor,
+      feeStatus: session?.feeStatus,
+    });
   const faqQuery = useQuery({
     queryKey: ["faq-articles"],
-    queryFn: () => apiClient.getArticles("FAQ", { page: 1, limit: 100 }),
+    queryFn: () => apiClient.getArticles("faq", { page: 1, limit: 100 }),
   });
   const items = faqQuery.data?.items ?? [];
   const filteredItems = useMemo(() => {
@@ -159,7 +158,7 @@ export function FaqPage() {
           titleId="faq-page-title"
         />
 
-        <BoardCategoryNavigation boards={boards} category="FAQ" lang={lang} />
+        <BoardCategoryNavigation boards={boards} category="faq" lang={lang} />
 
         <PageContainer className="pb-8">
           <DataViewCard aria-label={lang === "ko" ? "FAQ 목록" : "FAQ list"}>
@@ -171,7 +170,7 @@ export function FaqPage() {
                 onSearchQueryChange={setSearchQuery}
                 searchQuery={searchQuery}
                 totalCount={filteredItems.length}
-                writeState={{ initialCategory: "FAQ" }}
+                writeState={{ initialCategory: "faq" }}
               />
             </DataViewToolbar>
             <DataViewBody>

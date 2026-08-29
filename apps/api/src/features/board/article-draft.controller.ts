@@ -19,6 +19,7 @@ import { ArticleDraftSaveSchema } from "@soc/contracts";
 import { Request } from "express";
 
 import { AuthGuard } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { ArticleDraftService } from "./article-draft.service";
 
@@ -62,7 +63,11 @@ export class ArticleDraftController {
     body: ArticleDraftSaveRequest,
     @Req() request: AuthenticatedRequest,
   ): Promise<ArticleDraftRecord> {
-    return this.articleDraftService.save(body, request.user!);
+    return this.articleDraftService.save(
+      body,
+      request.user!,
+      auditMetadataFromRequest(request),
+    );
   }
 
   @Post(":draftId")
@@ -75,6 +80,7 @@ export class ArticleDraftController {
     return this.articleDraftService.save(
       { ...body, draftId },
       request.user!,
+      auditMetadataFromRequest(request),
     );
   }
 
@@ -83,6 +89,10 @@ export class ArticleDraftController {
     @Param("draftId") draftId: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<{ ok: true }> {
-    return this.articleDraftService.delete(draftId, request.user!);
+    return this.articleDraftService.delete(
+      draftId,
+      request.user!,
+      auditMetadataFromRequest(request),
+    );
   }
 }

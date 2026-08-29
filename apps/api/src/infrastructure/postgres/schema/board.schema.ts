@@ -23,6 +23,9 @@ export const boards = pgTable("board", {
   nameEn: varchar("name_en", { length: 100 }),
   descriptionKo: varchar("description_ko", { length: 255 }),
   descriptionEn: varchar("description_en", { length: 255 }),
+  writeAccessScope: varchar("write_access_scope", { length: 30 })
+    .notNull()
+    .default("ANYONE"),
   writePermissionId: integer("write_permission_id")
     .references(() => permissions.permissionId),
   allowComment: boolean("allow_comment").notNull().default(false),

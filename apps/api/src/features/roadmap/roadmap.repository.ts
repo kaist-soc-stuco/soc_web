@@ -24,7 +24,10 @@ import {
   roadmapOfferings,
   roadmapTerms,
 } from "../../infrastructure/postgres/postgres.schema";
-import { normalizeRoadmapCourseCode } from "@soc/contracts";
+import {
+  getRoadmapLegacyCourseCode,
+  normalizeRoadmapCourseCode,
+} from "@soc/contracts";
 import type { RoadmapImportRow } from "./roadmap-importer";
 
 export type RoadmapImportDecision = {
@@ -34,8 +37,6 @@ export type RoadmapImportDecision = {
   nameEn?: string;
   semesters?: string;
   credits?: string;
-  positionX?: number;
-  positionY?: number;
 };
 
 @Injectable()
@@ -143,11 +144,10 @@ export class RoadmapRepository {
           category: input.category,
           courseCode,
           credits: input.credits,
-          legacyCourseCode: input.legacyCourseCode ?? null,
+          legacyCourseCode:
+            input.legacyCourseCode ?? getRoadmapLegacyCourseCode(courseCode),
           nameEn: input.nameEn,
           nameKo: input.nameKo,
-          positionX: Math.round(input.positionX),
-          positionY: Math.round(input.positionY),
           semesters: input.semesters,
           source: "MANUAL",
           trackIds: input.trackIds,
@@ -180,7 +180,10 @@ export class RoadmapRepository {
 
       const values: Partial<typeof roadmapCourses.$inferInsert> = { updatedAt: nowDate() };
       if (input.courseCode !== undefined) values.courseCode = updatedCode;
-      if (input.legacyCourseCode !== undefined) values.legacyCourseCode = input.legacyCourseCode;
+      if (input.legacyCourseCode !== undefined) {
+        values.legacyCourseCode =
+          input.legacyCourseCode ?? getRoadmapLegacyCourseCode(updatedCode);
+      }
       if (input.nameKo !== undefined) values.nameKo = input.nameKo;
       if (input.nameEn !== undefined) values.nameEn = input.nameEn;
       if (input.category !== undefined) values.category = input.category;
@@ -188,8 +191,6 @@ export class RoadmapRepository {
       if (input.semesters !== undefined) values.semesters = input.semesters;
       if (input.trackIds !== undefined) values.trackIds = input.trackIds;
       if (input.ai !== undefined) values.ai = input.ai;
-      if (input.positionX !== undefined) values.positionX = Math.round(input.positionX);
-      if (input.positionY !== undefined) values.positionY = Math.round(input.positionY);
       if (input.isVisible !== undefined) values.isVisible = input.isVisible;
 
       const [updated] = await tx
@@ -320,11 +321,10 @@ export class RoadmapRepository {
           category: decision?.category ?? "major-elective",
           courseCode,
           credits: decision?.credits ?? row.credits ?? "",
-          legacyCourseCode: row.legacyCourseCode,
+          legacyCourseCode:
+            row.legacyCourseCode ?? getRoadmapLegacyCourseCode(courseCode),
           nameEn: decision?.nameEn ?? "",
           nameKo: row.nameKo,
-          positionX: Math.round(decision?.positionX ?? 0),
-          positionY: Math.round(decision?.positionY ?? 0),
           semesters: decision?.semesters ?? "S/F",
           source: "IMPORT",
           trackIds: decision?.trackIds ?? [],
@@ -426,11 +426,9 @@ function mapCourse(
     credits: row.credits,
     createdAt: msToIso(row.createdAt.valueOf()),
     isVisible: row.isVisible,
-    legacyCourseCode: row.legacyCourseCode ?? null,
+    legacyCourseCode: row.legacyCourseCode ?? getRoadmapLegacyCourseCode(row.courseCode),
     nameEn: row.nameEn,
     nameKo: row.nameKo,
-    positionX: row.positionX,
-    positionY: row.positionY,
     postrequisiteCourseCodes,
     prerequisiteCourseCodes,
     semesters: row.semesters,

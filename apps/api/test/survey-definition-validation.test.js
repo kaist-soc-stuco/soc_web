@@ -58,14 +58,29 @@ test("rejects publishing an empty survey definition", () => {
   );
 });
 
-test("requires complete options and grid axes", () => {
+test("requires options and grid axes", () => {
   expectBadRequest(
-    () => assertSurveyQuestionDefinition(question({ questionType: "single_choice", options: [{ value: "a", labelKo: "A" }] })),
-    "survey_choice_requires_two_options",
+    () => assertSurveyQuestionDefinition(question({ questionType: "single_choice", options: [] })),
+    "survey_choice_requires_option",
+  );
+  assert.doesNotThrow(() =>
+    assertSurveyQuestionDefinition(question({
+      questionType: "single_choice",
+      options: [{ value: "a", labelKo: "A" }],
+    })),
   );
   expectBadRequest(
     () => assertSurveyQuestionDefinition(question({ questionType: "grid_single", config: { rows: [], columns: [] } })),
     "survey_grid_requires_rows",
+  );
+  assert.doesNotThrow(() =>
+    assertSurveyQuestionDefinition(question({
+      questionType: "grid_single",
+      config: {
+        rows: [{ value: "row_1", labelKo: "행1" }],
+        columns: [{ value: "col_1", labelKo: "열1" }],
+      },
+    })),
   );
 });
 
