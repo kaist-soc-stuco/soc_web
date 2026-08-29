@@ -134,17 +134,20 @@ export class AuthService {
     }
 
     const user = await this.usersService.findById(userId);
-    const secretKey = this.configService
-      .get<string>("CHANNELTALK_SECRET_KEY")
+    const memberHashSecret = this.configService
+      .get<string>("CHANNELTALK_MEMBER_HASH_SECRET")
       ?.trim();
 
-    if (!user || !secretKey) {
+    if (!user || !memberHashSecret) {
       return baseConfig;
     }
 
-    if (!/^[0-9a-f]+$/i.test(secretKey) || secretKey.length % 2 !== 0) {
+    if (
+      !/^[0-9a-f]+$/i.test(memberHashSecret) ||
+      memberHashSecret.length % 2 !== 0
+    ) {
       this.logger.warn(
-        "CHANNELTALK_SECRET_KEY is not a valid hexadecimal secret; using anonymous Channel Talk boot.",
+        "CHANNELTALK_MEMBER_HASH_SECRET is not a valid hexadecimal secret; using anonymous Channel Talk boot.",
       );
       return baseConfig;
     }
@@ -152,7 +155,7 @@ export class AuthService {
     const memberId = user.userId;
     const memberHash = createHmac(
       "sha256",
-      Buffer.from(secretKey, "hex"),
+      Buffer.from(memberHashSecret, "hex"),
     )
       .update(memberId)
       .digest("hex");

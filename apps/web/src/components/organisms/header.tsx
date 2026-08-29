@@ -30,7 +30,6 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { clearStoredAuthState, rememberAuthReturnPath } from "@/lib/auth-storage";
-import { getTemporaryAuthRequest } from "@/lib/auth-session";
 import { getBoardLabelFromMetadata, isLegacyPublicBoardCode } from "@/lib/board-metadata";
 import { Permissions } from "@/lib/permissions";
 
@@ -46,6 +45,7 @@ type HeaderNavItem = {
 };
 
 export function Header({ variant = "default" }: HeaderProps) {
+  const headerRef = useRef<HTMLElement>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -64,6 +64,36 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [loginStarting, setLoginStarting] = useState(false);
   const [mockLoginStarting, setMockLoginStarting] = useState(false);
   const { lang, setLanguage } = useLanguage();
+
+  const [homeHeaderScrolled, setHomeHeaderScrolled] = useState(false);
+
+  useEffect(() => {
+    if (variant !== "home" || typeof window === "undefined") {
+      setHomeHeaderScrolled(false);
+      return;
+    }
+
+    const updateHeaderMode = () => {
+      const hero = document.querySelector<HTMLElement>("[data-home-hero]");
+      const headerHeight = headerRef.current?.getBoundingClientRect().height ?? 0;
+      const shouldUseScrolledMode = Boolean(
+        hero && hero.getBoundingClientRect().bottom <= headerHeight,
+      );
+
+      setHomeHeaderScrolled(shouldUseScrolledMode);
+    };
+
+    updateHeaderMode();
+    window.addEventListener("scroll", updateHeaderMode, { passive: true });
+    window.addEventListener("resize", updateHeaderMode);
+
+    return () => {
+      window.removeEventListener("scroll", updateHeaderMode);
+      window.removeEventListener("resize", updateHeaderMode);
+    };
+  }, [variant]);
+
+  const homeHeaderDark = variant === "home" && !homeHeaderScrolled;
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -202,7 +232,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   };
 
   const handleLogout = async () => {
-    await apiClient.logout(getTemporaryAuthRequest());
+    await apiClient.logout();
     clearStoredAuthState();
     await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     window.location.assign("/");
@@ -378,9 +408,12 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   return (
     <header
+      ref={headerRef}
       className={
         variant === "home"
-          ? "site-header-home sticky top-0 z-50 w-full"
+          ? `site-header-home sticky top-0 z-50 w-full ${
+              homeHeaderScrolled ? "home-header-scrolled" : ""
+            }`
           : "sticky top-0 z-50 shrink-0 border-b border-[var(--ui-menu-divider)] bg-white"
       }
       onMouseLeave={() => setHoveredIndex(null)}
@@ -388,11 +421,11 @@ export function Header({ variant = "default" }: HeaderProps) {
       <div className="flex h-[var(--ui-header-height)] w-full items-stretch justify-between">
         <div className="flex items-stretch">
           <div className="site-header-brand flex w-[var(--ui-brand-rail-width)] shrink-0 items-center px-6">
-            <Logo inverse={variant === "home"} />
+            <Logo inverse={homeHeaderDark} />
           </div>
 
           <nav
-            className="site-primary-nav hidden items-stretch xl:flex"
+            className="site-primary-nav select-none hidden items-stretch xl:flex"
             aria-label={lang === "ko" ? "주요 메뉴" : "Primary navigation"}
             onMouseMove={(event) => {
               const item = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-index]");
@@ -435,10 +468,10 @@ export function Header({ variant = "default" }: HeaderProps) {
                     <ChevronDown
                       aria-hidden="true"
                       className={`ml-1 h-3.5 w-3.5 transition-transform duration-200 ease-out ${
-                        variant === "home" ? "text-white/60" : "text-slate-400"
+                        homeHeaderDark ? "text-white/60" : "text-slate-400"
                       } ${
                         hoveredIndex === index
-                          ? variant === "home"
+                          ? homeHeaderDark
                             ? "rotate-180 text-white"
                             : "rotate-180 text-kaist-darkgreen-main"
                           : ""
@@ -451,7 +484,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     role="menu"
                     aria-label={`${item.label} ${lang === "ko" ? "하위 메뉴" : "submenu"}`}
                     className={`absolute left-0 top-full z-50 w-full origin-top overflow-hidden rounded-b border-x border-b border-t transition-[opacity,transform,visibility] duration-200 ease-out ${
-                      variant === "home"
+                      homeHeaderDark
                         ? "border-white/15 bg-[rgba(8,29,23,0.84)] shadow-[0_18px_36px_-22px_rgba(0,0,0,0.72)] backdrop-blur-xl backdrop-saturate-150"
                         : "border-[var(--ui-menu-divider)] bg-white shadow-[0_10px_18px_-20px_rgba(15,23,42,0.38)]"
                     } ${
@@ -469,7 +502,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                           <li
                             key={child.href}
                             className={`mx-4 border-b last:border-b-0 ${
-                              variant === "home" ? "border-white/10" : "border-slate-100"
+                              homeHeaderDark ? "border-white/10" : "border-slate-100"
                             }`}
                           >
                             <Link
@@ -479,7 +512,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                               tabIndex={hoveredIndex === index ? 0 : -1}
                               onClick={closePopovers}
                               className={`flex h-11 items-center justify-center whitespace-nowrap px-1 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
-                                variant === "home"
+                                homeHeaderDark
                                   ? childActive
                                     ? "text-white focus-visible:ring-white/30"
                                     : "text-white/78 hover:text-white focus-visible:text-white focus-visible:ring-white/30"
@@ -565,8 +598,8 @@ export function Header({ variant = "default" }: HeaderProps) {
             variant="ghost"
             size="sm"
             onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-            className={`hidden h-9 gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium shadow-none md:flex ${
-              variant === "home"
+            className={`hidden h-9 gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium shadow-none transition-colors duration-300 md:flex ${
+              homeHeaderDark
                 ? "text-white hover:bg-white/10 [&_svg]:text-white/70"
                 : "text-slate-700 hover:bg-slate-100 [&_svg]:text-slate-500"
             }`}
@@ -729,8 +762,8 @@ export function Header({ variant = "default" }: HeaderProps) {
                 type="button"
                 onClick={() => void handleStartLogin()}
                 disabled={loginStarting}
-                className={`hidden cursor-pointer items-center whitespace-nowrap rounded-md border-0 bg-transparent px-2.5 py-1.5 text-sm font-semibold tracking-tight transition-none disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base ${
-                  variant === "home"
+                className={`hidden cursor-pointer items-center whitespace-nowrap rounded-md border-0 bg-transparent px-2.5 py-1.5 text-sm font-semibold tracking-tight transition-colors duration-300 disabled:cursor-wait disabled:opacity-70 md:flex lg:text-base ${
+                  homeHeaderDark
                     ? "text-white hover:bg-white/10 hover:text-white"
                     : "text-kaist-black hover:bg-slate-100 hover:text-kaist-darkgreen-main"
                 }`}

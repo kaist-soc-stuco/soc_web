@@ -47,6 +47,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     fileInputRef,
     handleCategoryChange,
     handleStartNewDraft,
+    handleSaveDraft,
     handleSubmit,
     handleUploadThumbnail,
     handleUploadFiles,
@@ -234,6 +235,8 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
           titleKo={titleKo}
           fileInputRef={fileInputRef}
           uploading={uploading}
+          onSave={handleSaveDraft}
+          onSubmit={handleSubmit}
         />
       </div>
 

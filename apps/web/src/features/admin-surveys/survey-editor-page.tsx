@@ -339,9 +339,9 @@ function SortableQuestionRow({
       className={`${QUESTION_ROW_CLASS} transition-[background-color,border-color,box-shadow] duration-100 ${
         isEditing
           ? "w-full cursor-default border-brand-primary/35 p-0"
-          : isDragging
-            ? "relative z-0 opacity-0"
-            : "cursor-pointer hover:border-slate-300 hover:bg-slate-50/60"
+            : isDragging
+            ? "relative z-0 select-none opacity-0"
+            : "cursor-pointer select-none hover:border-slate-300 hover:bg-slate-50/60"
       }`}
     >
       {isEditing && editor ? editor : (
@@ -369,7 +369,7 @@ function QuestionDragOverlayRow({
   return (
     <div
       style={{ width: width ?? undefined }}
-      className={`${QUESTION_ROW_CLASS} relative z-50 cursor-grabbing border-brand-primary/45 shadow-lg`}
+      className={`${QUESTION_ROW_CLASS} relative z-50 select-none cursor-grabbing border-brand-primary/45 shadow-lg`}
     >
       <QuestionRowContent
         question={question}
@@ -506,6 +506,13 @@ export function SurveyEditorPage() {
         try {
           const detail: SurveyDetailResponse = await client.getSurveyDetail(surveyId);
           const allDay = isAllDayRange(detail.opensAt, detail.closesAt);
+          const allowAnonymous = detail.allowAnonymous ?? false;
+          const eligibleSocAffiliations = allowAnonymous
+            ? []
+            : detail.eligibleSocAffiliations ?? [];
+          const academicEligibility = allowAnonymous
+            ? "ANY"
+            : detail.academicEligibility ?? "ANY";
           form.reset({
             titleKo: detail.titleKo,
             titleEn: detail.titleEn ?? "",
@@ -518,10 +525,10 @@ export function SurveyEditorPage() {
             ) ? detail.kind as SurveySettingsFormValues["kind"] : "SURVEY",
             resultVisibility:
               detail.resultVisibility === "PUBLIC" ? "PUBLIC" : "PRIVATE",
-            feePayersOnly: detail.feePayersOnly,
-            eligibleSocAffiliations: detail.eligibleSocAffiliations ?? [],
-            academicEligibility: detail.academicEligibility ?? "ANY",
-            allowAnonymous: detail.allowAnonymous ?? false,
+            feePayersOnly: allowAnonymous ? false : detail.feePayersOnly,
+            eligibleSocAffiliations,
+            academicEligibility,
+            allowAnonymous,
             isKoreanOnly: detail.isKoreanOnly ?? false,
             allowMultipleResponses: detail.allowMultipleResponses ?? false,
             allowResponseEdit: detail.allowResponseEdit ?? false,
@@ -576,6 +583,12 @@ export function SurveyEditorPage() {
     const maxResponseCount = values.maxResponseCount?.trim()
       ? Number(values.maxResponseCount)
       : undefined;
+    const allowAnonymous = Boolean(values.allowAnonymous);
+    const feePayersOnly = allowAnonymous ? false : Boolean(values.feePayersOnly);
+    const eligibleSocAffiliations = allowAnonymous
+      ? []
+      : values.eligibleSocAffiliations;
+    const academicEligibility = allowAnonymous ? "ANY" : values.academicEligibility;
 
     return {
       kind: values.kind,
@@ -585,10 +598,10 @@ export function SurveyEditorPage() {
       descriptionEn: values.descriptionEn?.trim() || undefined,
       descriptionImageUrlKo: values.descriptionImageUrlKo ?? null,
       descriptionImageUrlEn: values.descriptionImageUrlEn ?? null,
-      feeRequirementPolicy: values.feePayersOnly ? "PAID_ONLY" : "NONE",
-      eligibleSocAffiliations: values.eligibleSocAffiliations,
-      academicEligibility: values.academicEligibility,
-      allowAnonymous: values.allowAnonymous,
+      feeRequirementPolicy: feePayersOnly ? "PAID_ONLY" : "NONE",
+      eligibleSocAffiliations,
+      academicEligibility,
+      allowAnonymous,
       allowMultipleResponses: values.allowMultipleResponses,
       allowResponseEdit: values.allowMultipleResponses ? false : values.allowResponseEdit,
       isKoreanOnly: values.isKoreanOnly,
@@ -1057,6 +1070,7 @@ export function SurveyEditorPage() {
         {ConfirmDialog}
         <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-editor-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
 
+          <div className="sticky top-16 z-40 -mx-5 bg-[#f7f9fc]/95 px-5 pt-1 backdrop-blur md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
             eyebrow={
               <button
@@ -1102,7 +1116,7 @@ export function SurveyEditorPage() {
                 ) : null}
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   disabled={saving}
                   className="gap-1.5"
                   onClick={() => void form.handleSubmit((values) => handleSaveSettings(values))()}
@@ -1122,6 +1136,7 @@ export function SurveyEditorPage() {
               </>
             }
           />
+          </div>
 
           {draftBannerVisible && loadedLifecycleStatus === "DRAFT" ? (
             <DraftRestoredBanner

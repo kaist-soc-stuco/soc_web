@@ -223,13 +223,14 @@ function BoardManagementPageContent() {
 
       <AdminCard>
         <DndContext
+          autoScroll={false}
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
         >
-          <AdminDataTable minWidth={780} className={loading && boards.length > 0 ? "opacity-60 transition-opacity" : undefined}>
+          <AdminDataTable minWidth={780} isDragging={Boolean(activeBoardCode)} className={loading && boards.length > 0 ? "opacity-60 transition-opacity" : undefined}>
             <colgroup><col style={{ width: 52 }} /><col style={{ width: 360 }} /><col style={{ width: 280 }} /><col style={{ width: 100 }} /></colgroup>
             <AdminTableHeader><tr><AdminTableHead><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>게시판</AdminTableHead><AdminTableHead>운영 설정</AdminTableHead><AdminTableHead>상태</AdminTableHead></tr></AdminTableHeader>
             <AdminTableBody>
@@ -300,7 +301,7 @@ function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; di
 }
 
 function BoardDragPreview({ board, width }: { board: BoardSummary; width: number | null }) {
-  return <div style={{ width: width ?? undefined }} className="relative z-50 grid cursor-grabbing grid-cols-[52px_minmax(0,1.5fr)_minmax(180px,1.2fr)_100px] items-center rounded-lg border border-brand-primary/45 bg-white px-0 shadow-lg">
+  return <div style={{ width: width ?? undefined }} className="relative z-50 grid select-none cursor-grabbing grid-cols-[52px_minmax(0,1.5fr)_minmax(180px,1.2fr)_100px] items-center rounded-lg border border-brand-primary/45 bg-white px-0 shadow-lg">
     <div className="flex h-16 items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
     <div className="min-w-0 px-4"><p className="truncate text-sm font-semibold text-slate-900">{board.nameKo}</p><p className="truncate text-xs text-slate-500">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</p></div>
     <div className="truncate px-4 text-sm text-slate-700">{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</div>

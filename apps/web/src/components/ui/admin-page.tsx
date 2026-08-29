@@ -13,7 +13,7 @@ interface AdminPageShellProps extends ComponentProps<"div"> {
 
 export function AdminPageShell({ children, className, ...props }: AdminPageShellProps) {
   return (
-    <div className={cn("admin-page min-h-full max-w-full overflow-x-hidden bg-[#f7f9fc] text-[#172033]", className)} {...props}>
+    <div className={cn("admin-page min-h-full max-w-full overflow-x-clip bg-[#f7f9fc] text-[#172033]", className)} {...props}>
       {children}
     </div>
   );

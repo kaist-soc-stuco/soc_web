@@ -16,6 +16,7 @@ export function SearchPage() {
     calendarEvents,
     error,
     eventArticles,
+    faqArticles,
     filter,
     handleSubmit,
     inputValue,
@@ -27,6 +28,7 @@ export function SearchPage() {
     searchBy,
     setSearchBy,
     surveys,
+    votes,
     totalCount,
   } = useSearchPageController();
 
@@ -48,10 +50,12 @@ export function SearchPage() {
           activeFilter={filter}
           boardCount={boardArticles.length}
           eventCount={eventArticles.length + calendarEvents.length}
+          faqCount={faqArticles.length}
           lang={lang}
           onFilterChange={setFilter}
           surveyCount={surveys.length}
           totalCount={totalCount}
+          voteCount={votes.length}
           visible={Boolean(query)}
         />
         <SearchStatus
@@ -67,12 +71,14 @@ export function SearchPage() {
           calendarEvents={calendarEvents}
           error={error}
           eventArticles={eventArticles}
+          faqArticles={faqArticles}
           filter={filter}
           lang={lang}
           loading={loading}
           query={query}
           surveys={surveys}
           totalCount={totalCount}
+          votes={votes}
         />
       </main>
 

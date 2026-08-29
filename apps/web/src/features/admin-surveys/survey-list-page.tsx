@@ -183,13 +183,7 @@ export function SurveyListPage() {
   };
 
 
-  const handleDuplicate = async (id: string, title: string) => {
-    const confirmed = await requestConfirm({
-      confirmLabel: "복제",
-      title: `"${title}" 설문조사를 복제하시겠습니까?`,
-    });
-    if (!confirmed) return;
-
+  const handleDuplicate = async (id: string) => {
     setDuplicating(id);
     try {
       await client.duplicateSurvey(id);
@@ -375,7 +369,7 @@ export function SurveyListPage() {
             ) : null}
 
             {!showInitialLoading && filteredSurveys.length > 0 ? (
-              <AdminDataTable minWidth={1152}>
+              <AdminDataTable minWidth={1264}>
                 <colgroup>
                   <col style={{ width: 360 }} />
                   <col style={{ width: 110 }} />
@@ -383,9 +377,7 @@ export function SurveyListPage() {
                   <col style={{ width: 120 }} />
                   <col style={{ width: 190 }} />
                   <col style={{ width: 190 }} />
-                  <col style={{ width: 104 }} />
-                  <col style={{ width: 72 }} />
-                  <col style={{ width: 72 }} />
+                  <col style={{ width: 184 }} />
                 </colgroup>
                 <AdminTableHeader>
                   <tr>
@@ -417,8 +409,6 @@ export function SurveyListPage() {
                       최근 수정
                     </AdminSortableHead>
                     <AdminTableHead className="text-center">응답</AdminTableHead>
-                    <AdminTableHead><span className="sr-only">편집</span></AdminTableHead>
-                    <AdminTableHead><span className="sr-only">더보기</span></AdminTableHead>
                   </tr>
                 </AdminTableHeader>
                 <AdminTableBody>
@@ -449,9 +439,10 @@ export function SurveyListPage() {
                           {formatRelativeTime(survey.updatedAt)}
                         </AdminTableCell>
                         <AdminTableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-50/80 p-0.5">
                             <IconButton
                               size="sm"
+                              tone="table-action"
                               aria-label={`${survey.titleKo} 응답 목록`}
                               onClick={() => navigate(`/admin/surveys/${survey.id}/responses`)}
                             >
@@ -459,27 +450,25 @@ export function SurveyListPage() {
                             </IconButton>
                             <IconButton
                               size="sm"
+                              tone="table-action"
                               aria-label={`${survey.titleKo} 결과 요약`}
                               onClick={() => navigate(`/survey/${survey.id}/results`)}
                             >
                               <BarChart3 className="size-4" />
                             </IconButton>
+                            <IconButton
+                              size="sm"
+                              tone="table-action"
+                              aria-label={`${survey.titleKo} 편집`}
+                              onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)}
+                            >
+                              <Edit2 className="size-4" />
+                            </IconButton>
+                            <AdminRowActions
+                              label={`${survey.titleKo} 작업 메뉴`}
+                              onClick={(event) => openRowDropdown(survey.id, event.currentTarget)}
+                            />
                           </div>
-                        </AdminTableCell>
-                        <AdminTableCell className="text-center">
-                          <IconButton
-                            size="sm"
-                            aria-label={`${survey.titleKo} 편집`}
-                            onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)}
-                          >
-                            <Edit2 className="size-4" />
-                          </IconButton>
-                        </AdminTableCell>
-                        <AdminTableCell className="text-center">
-                          <AdminRowActions
-                            label={`${survey.titleKo} 작업 메뉴`}
-                            onClick={(event) => openRowDropdown(survey.id, event.currentTarget)}
-                          />
                         </AdminTableCell>
                       </tr>
                     );
@@ -504,7 +493,7 @@ export function SurveyListPage() {
                     onClick={() => {
                       setActiveRowDropdown(null);
                       const target = surveys.find((survey) => survey.id === activeRowDropdown.id);
-                      if (target) handleDuplicate(target.id, target.titleKo);
+                      if (target) void handleDuplicate(target.id);
                     }}
                     disabled={duplicating === activeRowDropdown.id}
                   >

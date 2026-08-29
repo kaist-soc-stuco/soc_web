@@ -73,6 +73,60 @@
     cursor: pointer;
   }
 
+  /* Controls should feel like controls, not selectable document text. Keep
+     text-entry and rich-content surfaces opt-in selectable below. */
+  :where(
+    button,
+    button *,
+    label,
+    label *,
+    select,
+    summary,
+    summary *,
+    [role="button"],
+    [role="button"] *,
+    [role="tab"],
+    [role="tab"] *,
+    [role="menuitem"],
+    [role="menuitem"] *,
+    [role="option"],
+    [role="option"] *,
+    [role="switch"],
+    [role="switch"] *,
+    [role="checkbox"],
+    [role="checkbox"] *,
+    [role="radio"],
+    [role="radio"] *,
+    [data-interactive],
+    [data-interactive] *,
+    [data-dnd-handle],
+    [data-dnd-handle] *
+  ) {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  :where(
+    nav,
+    nav *,
+    [role="menu"],
+    [role="menu"] *,
+    [role="listbox"],
+    [role="listbox"] *,
+    [role="tablist"],
+    [role="tablist"] *
+  ) {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Text-entry controls and editable content must remain copyable/selectable
+     even when wrapped by a label or interactive form shell. */
+  :where(input, textarea, [contenteditable="true"], [contenteditable="true"] *) {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
   button:disabled,
   [aria-disabled="true"] {
     cursor: not-allowed;
@@ -84,6 +138,9 @@
   canvas {
     display: block;
     max-width: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
   }
 
   a {

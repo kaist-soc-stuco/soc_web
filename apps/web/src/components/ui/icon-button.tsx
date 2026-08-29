@@ -21,7 +21,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       ref={ref}
       type={type}
       className={cn(
-        "ui-icon-button interaction-button inline-flex shrink-0 items-center justify-center rounded-lg text-slate-600 disabled:pointer-events-none disabled:opacity-45",
+        "ui-icon-button interaction-button select-none inline-flex shrink-0 items-center justify-center rounded-lg text-slate-600 disabled:pointer-events-none disabled:opacity-45",
         sizeClasses[size],
         tone === "outline"
           ? "border border-slate-200 bg-white shadow-card hover:bg-slate-50 hover:text-slate-900"

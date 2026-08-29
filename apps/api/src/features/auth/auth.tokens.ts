@@ -8,9 +8,20 @@
 
 export const AUTH_ACCESS_TOKEN_TTL_SECONDS = 30 * 60;
 export const AUTH_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
-export const AUTH_TEMPORARY_REFRESH_TTL_SECONDS = 8 * 60 * 60;
+/**
+ * 개인정보 저장에 동의하지 않은 세션은 refresh token을 발급하지 않고
+ * 짧은 수명의 access token만 사용합니다.
+ */
+export const AUTH_TEMPORARY_ACCESS_TOKEN_TTL_SECONDS = 10 * 60;
 
 export const AUTH_ACCESS_COOKIE_NAME = "soc_access_token";
 export const AUTH_REFRESH_COOKIE_NAME = "soc_refresh_token";
 export const AUTH_SESSION_COOKIE_NAME = "soc_session_id";
 export const AUTH_TEMPORARY_STORAGE_KEY = "soc.auth.temporary-session";
+
+export const extractBearerToken = (
+  authorization?: string,
+): string | undefined => {
+  const match = authorization?.match(/^Bearer\s+(\S+)$/i);
+  return match?.[1];
+};

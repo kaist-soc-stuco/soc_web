@@ -21,6 +21,7 @@ import { SurveysService } from "./surveys.service";
 import { CreateSurveyDto } from "./dto/create-survey.dto";
 import { UpdateSurveyDto } from "./dto/update-survey.dto";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
+import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 
 interface AuthedRequest extends Request {
   user: { id: string; permission: number };
@@ -28,7 +29,14 @@ interface AuthedRequest extends Request {
 
 interface OptionalAuthedRequest extends Request {
   user?: { id: string; permission: number };
+  temporaryUser?: TemporaryAccessTokenClaims;
 }
+
+const getSurveyCaller = (request: OptionalAuthedRequest) =>
+  request.user ??
+  (request.temporaryUser
+    ? { permission: 0, temporaryClaims: request.temporaryUser }
+    : undefined);
 
 @Controller("surveys")
 export class SurveysController {
@@ -46,19 +54,19 @@ export class SurveysController {
   @Get("list/public")
   @UseGuards(OptionalAuthGuard)
   findPublic(@Req() req: OptionalAuthedRequest) {
-    return this.surveysService.findPublished(req.user);
+    return this.surveysService.findPublished(getSurveyCaller(req));
   }
 
   @Get(":id")
   @UseGuards(OptionalAuthGuard)
   findDetail(@Param("id", ParseUUIDPipe) id: string, @Req() req: OptionalAuthedRequest) {
-    return this.surveysService.findDetail(id, req.user);
+    return this.surveysService.findDetail(id, getSurveyCaller(req));
   }
 
   @Get(":id/analytics")
   @UseGuards(OptionalAuthGuard)
   getAnalytics(@Param("id", ParseUUIDPipe) id: string, @Req() req: OptionalAuthedRequest) {
-    return this.surveysService.getAnalytics(id, req.user);
+    return this.surveysService.getAnalytics(id, getSurveyCaller(req));
   }
 
   @Post()

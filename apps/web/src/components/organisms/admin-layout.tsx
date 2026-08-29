@@ -11,7 +11,6 @@ import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { clearStoredAuthState } from "@/lib/auth-storage";
-import { getTemporaryAuthRequest } from "@/lib/auth-session";
 import { Permissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { PopoverPanel } from "@/components/ui/popover-panel";
@@ -67,7 +66,7 @@ export function AdminLayout() {
 
   const handleLogout = async () => {
     const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
-    await client.logout(getTemporaryAuthRequest());
+    await client.logout();
     clearStoredAuthState();
     await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     window.location.href = "/";
@@ -91,7 +90,7 @@ export function AdminLayout() {
   );
 
   const adminHeader = (
-    <header className="z-50 flex h-16 shrink-0 items-center justify-between border-b border-[#e5eaf0] bg-white/95 px-6 backdrop-blur">
+    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between border-b border-[#e5eaf0] bg-white/95 px-6 backdrop-blur">
       <div className="flex min-w-0 shrink-0 items-center gap-6">
         <Logo />
         <span className="hidden border-l border-slate-200 pl-6 text-sm font-semibold text-slate-800 md:inline">
@@ -115,7 +114,7 @@ export function AdminLayout() {
             </Button>
 
             {dropdownOpen && (
-              <PopoverPanel className="right-0 top-full w-52 rounded-lg p-1">
+              <PopoverPanel className="right-0 top-full w-52 select-none rounded-lg p-1">
                 <Button variant="ghost"
                   type="button"
                   className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
@@ -136,7 +135,7 @@ export function AdminLayout() {
     <AuthGuard
       requireAnyPermission={ADMIN_ACCESS_PERMISSIONS}
       fallback={
-        <div className="flex min-h-screen max-w-full flex-col overflow-x-hidden bg-[#f7f9fc]">
+        <div className="flex min-h-screen max-w-full flex-col overflow-x-clip bg-[#f7f9fc]">
           {adminHeader}
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
             <AdminSidebar />
@@ -145,7 +144,7 @@ export function AdminLayout() {
         </div>
       }
     >
-      <div className="flex min-h-screen max-w-full flex-col overflow-x-hidden bg-[#f7f9fc]">
+      <div className="flex min-h-screen max-w-full flex-col overflow-x-clip bg-[#f7f9fc]">
         {adminHeader}
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <AdminSidebar />

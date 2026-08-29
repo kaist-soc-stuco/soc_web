@@ -18,14 +18,14 @@ export function TextInput({
   return (
     <div
       className={cn(
-        "interaction-control flex h-10 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-slate-700",
+        "interaction-control select-none flex h-10 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-slate-700",
         containerClassName,
       )}
     >
       {leading ? <span className="flex shrink-0 text-slate-400">{leading}</span> : null}
       <input
         className={cn(
-          "min-w-0 flex-1 bg-transparent text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400",
+          "select-text min-w-0 flex-1 bg-transparent text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400",
           className,
         )}
         {...props}

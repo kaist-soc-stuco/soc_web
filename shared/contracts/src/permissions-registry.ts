@@ -26,7 +26,6 @@ export const PermissionCode = {
   VIEW_AUDIT_LOG: "VIEW_AUDIT_LOG",
   MANAGE_ROLES: "MANAGE_ROLES",
   MANAGE_VOTE: "MANAGE_VOTE",
-  SUPER_ADMIN: "SUPER_ADMIN",
 } as const;
 
 export type PermissionCode = (typeof PermissionCode)[keyof typeof PermissionCode];
@@ -156,13 +155,6 @@ export const PERMISSION_REGISTRY: readonly PermissionDefinition[] = [
     labelEn: "Manage votes",
     description: "전산학부 주전공 학부생 대상 비밀투표를 만들고 명부·투표율·결과를 관리할 수 있습니다.",
   },
-  {
-    code: PermissionCode.SUPER_ADMIN,
-    bit: 16384,
-    labelKo: "최고 관리자",
-    labelEn: "Super administrator",
-    description: "모든 운영 권한을 부여받는 비상용 최고 관리자 권한입니다.",
-  },
 ] as const;
 
 // ─── Lookup helpers ──────────────────────────────────────────────────────────
@@ -183,8 +175,6 @@ export const bitOf = (code: PermissionCode): number =>
 export const codeOf = (bit: number): PermissionCode | undefined =>
   _codeByBit.get(bit) as PermissionCode | undefined;
 
-const SUPER_ADMIN_BIT = bitOf(PermissionCode.SUPER_ADMIN);
-
 // ─── Bitmask Wrapper ─────────────────────────────────────────────────────────
 
 /**
@@ -195,20 +185,15 @@ const SUPER_ADMIN_BIT = bitOf(PermissionCode.SUPER_ADMIN);
  * import { Permissions, PermissionCode } from "@soc/contracts";
  *
  * // bit 값으로 직접 체크
- * Permissions.has(userMask, Permissions.SUPER_ADMIN);
- *
- * // code 문자열로 체크
- * Permissions.hasCode(userMask, PermissionCode.SUPER_ADMIN);
- *
  * // 복수 체크 (AND — 모두 만족해야 함)
  * Permissions.has(userMask, Permissions.WRITE_OFFICIAL, Permissions.MODERATE_CONTENT);
  *
  * // 하나라도 만족하면 OK (OR)
- * Permissions.hasAny(userMask, Permissions.SUPER_ADMIN, Permissions.MODERATE_CONTENT);
+ * Permissions.hasAny(userMask, Permissions.WRITE_OFFICIAL, Permissions.MODERATE_CONTENT);
  *
  * // 권한 부여/해제
  * const newMask = Permissions.grant(mask, Permissions.WRITE_OFFICIAL);
- * const revoked = Permissions.revoke(mask, Permissions.SUPER_ADMIN);
+ * const revoked = Permissions.revoke(mask, Permissions.WRITE_OFFICIAL);
  * ```
  */
 export const Permissions = {
@@ -227,7 +212,6 @@ export const Permissions = {
   SEND_BULK_EMAIL: 2048,
   VIEW_AUDIT_LOG: 4096,
   MANAGE_ROLES: 8192,
-  SUPER_ADMIN: 16384,
   MANAGE_VOTE: 32768,
 
   // ── Checks ─────────────────────────────────────────────────────────────
@@ -235,7 +219,6 @@ export const Permissions = {
   /** mask가 주어진 모든 bit를 포함하는지 확인합니다 (AND). */
   has(mask: number, ...bits: number[]): boolean {
     if (bits.length === 0) return true;
-    if ((mask & SUPER_ADMIN_BIT) === SUPER_ADMIN_BIT) return true;
     const required = bits.reduce((acc, b) => acc | b, 0);
     return required === 0 || (mask & required) === required;
   },
@@ -243,7 +226,6 @@ export const Permissions = {
   /** mask가 주어진 bit 중 하나라도 포함하는지 확인합니다 (OR). */
   hasAny(mask: number, ...bits: number[]): boolean {
     if (bits.length === 0) return true;
-    if ((mask & SUPER_ADMIN_BIT) === SUPER_ADMIN_BIT) return true;
     const combined = bits.reduce((acc, b) => acc | b, 0);
     return combined === 0 || (mask & combined) !== 0;
   },

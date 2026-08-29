@@ -60,7 +60,8 @@ cp .env.example .env.production
 - `ASSET_ORPHAN_CLEANUP_INTERVAL_HOURS`: 연결되지 않은 업로드 파일을 자동 점검하는 주기. 기본값 6
 - `SSO_LOGIN_URL`, `SSO_REDIRECT_URI`, `SSO_CLIENT_ID`, `SSO_AUTH_API_URL`, `SSO_CLIENT_SECRET`: KAIST SSO 연동 설정
 - `CHANNELTALK_PLUGIN_KEY`: Channel Talk 웹 SDK plugin key
-- `CHANNELTALK_SECRET_KEY`: Channel Talk member hash 생성용 secret. 브라우저에 노출하지 않음
+- `CHANNELTALK_SECRET_KEY`: Channel Talk 버튼·외부 연동용 Access Secret. 브라우저에 노출하지 않음
+- `CHANNELTALK_MEMBER_HASH_SECRET`: 고객 정보 암호화 화면에서 발급한 Member Hash 전용 secret. 서버에서만 사용
 - `EMAIL_DRY_RUN`: 개발 환경에서 메일을 실제 발송하지 않고 처리 기록만 남길지 여부. 기본값 true
 - `DOORAY_SMTP_HOST`, `DOORAY_SMTP_PORT`, `DOORAY_SMTP_USER`, `DOORAY_SMTP_PASSWORD`, `DOORAY_SMTP_SECURE`, `EMAIL_FROM`: 운영 SMTP 발송 설정
 
@@ -144,4 +145,5 @@ pnpm db:seed
 - `docs/ARCHITECTURE_REVIEW_AND_PRIORITIES.md`: 구조 리뷰와 개선 우선순위
 - `docs/CURRENT_ARCHITECTURE_REVIEW.md`: 현재 폴더 구조와 아키텍처 리뷰
 - `docs/SECURITY_PERMISSION_REVIEW.md`: 로그인/세션/권한/보안 점검
+- `docs/ALF_OPERATIONS_GUIDE.md`: Channel Talk ALF FAQ·규칙·상담원 연결·배포 절차
 - `docs/REMAINING_WORK.md`: 안정화 잔여 작업 목록

@@ -20,7 +20,7 @@ export const AdminActionMenuPanel = forwardRef<
       ref={ref}
       role="menu"
       className={cn(
-        "w-40 overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-[0_8px_24px_rgb(15_23_42_/_0.10)]",
+        "select-none w-40 overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-[0_8px_24px_rgb(15_23_42_/_0.10)]",
         className,
       )}
       {...props}
@@ -74,7 +74,7 @@ export function AdminActionMenuLink({
 }) {
   return (
     <Link
-      className={cn(menuItemClass, menuItemToneClass(tone), className)}
+      className={cn("select-none", menuItemClass, menuItemToneClass(tone), className)}
       {...props}
     >
       {icon ? <span className="inline-flex size-4 shrink-0 items-center justify-center [&_svg]:size-4">{icon}</span> : null}

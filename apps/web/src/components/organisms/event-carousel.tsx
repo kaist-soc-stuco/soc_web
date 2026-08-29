@@ -216,7 +216,7 @@ function EventCard({
       to={`/events/${encodeURIComponent(event.id)}`}
       draggable={false}
       onDragStart={(dragEvent) => dragEvent.preventDefault()}
-      className={`home-portal-event-card group ${enter ? "home-event-card-enter" : ""}`}
+      className={`home-portal-event-card select-none group ${enter ? "home-event-card-enter" : ""}`}
       style={style}
     >
       <div className="home-portal-event-media">
@@ -452,7 +452,7 @@ export function EventCarousel() {
         <div className="group relative">
               <div
                 ref={viewportRef}
-                className={`touch-pan-y overflow-hidden ${isDragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
+                className={`touch-pan-y select-none overflow-hidden ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={finishPointerDrag}

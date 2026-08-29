@@ -152,7 +152,7 @@ export function SuccessView({
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+            className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
@@ -160,7 +160,7 @@ export function SuccessView({
         )}
         <Link
           to="/surveys"
-          className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+          className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
           {lang === "ko" ? "설문 목록으로" : "Back to surveys"}
@@ -213,7 +213,7 @@ export function AlreadySubmittedView({
         {canViewResults && (
           <Link
             to={`/survey/${surveyId}/results`}
-            className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+            className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
           >
             <FileText className="h-4 w-4" />
             {lang === "ko" ? "결과 보기" : "View results"}
@@ -221,7 +221,7 @@ export function AlreadySubmittedView({
         )}
         <Link
           to="/surveys"
-          className="inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
+          className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
           {lang === "ko" ? "설문 목록으로" : "Back to surveys"}

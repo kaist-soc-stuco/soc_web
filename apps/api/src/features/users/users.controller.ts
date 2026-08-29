@@ -13,6 +13,7 @@ import { Permissions } from "@soc/contracts";
 import { AuthGuard, RequirePermissions } from "../auth/guards";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { UsersService } from "./users.service";
+import { GoogleFeeSheetsService } from "./google-fee-sheets.service";
 import type {
   FeeStatus,
   FeeMajorCategory,
@@ -40,7 +41,10 @@ interface AuthenticatedRequest extends Request {
 
 @Controller("users")
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly googleFeeSheetsService: GoogleFeeSheetsService,
+  ) {}
 
   @Get("me/articles")
   @UseGuards(AuthGuard)
@@ -275,6 +279,41 @@ export class UsersController {
       dateTo: /^\d{4}-\d{2}-\d{2}$/.test(dateTo ?? "") ? dateTo : legacyYear ? `${legacyYear}-12-31` : undefined,
       bucket: normalizedBucket,
       referenceSemester: /^\d{4}-[12]$/.test(referenceSemester ?? "") ? referenceSemester : undefined,
+    });
+  }
+
+  @Post("fee-status/spreadsheet/sync")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async syncStudentFeeSpreadsheet(
+    @Query("status") status?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDirection") sortDirection?: string,
+    @Query("q") query?: string,
+    @Query("paymentYear") paymentYear?: string,
+    @Query("referenceSemester") referenceSemester?: string,
+    @Query("majorCategory") majorCategory?: string,
+    @Query("userIds") userIds?: string,
+  ) {
+    const feeStatus: FeeStatus | undefined =
+      status === "PAID" || status === "PARTIAL" || status === "UNPAID" ? status : undefined;
+    const feeSortBy =
+      sortBy === "studentId" || sortBy === "status" || sortBy === "paidAt" || sortBy === "name"
+        ? sortBy
+        : "name";
+    const feeSortDirection = sortDirection === "desc" ? "desc" : "asc";
+    const feeMajorCategory: FeeMajorCategory | undefined =
+      majorCategory === "PRIMARY" ? majorCategory : undefined;
+    const year = paymentYear && /^\d{4}$/.test(paymentYear) ? Number(paymentYear) : undefined;
+
+    return this.googleFeeSheetsService.sync({
+      status: feeStatus,
+      sortBy: feeSortBy,
+      sortDirection: feeSortDirection,
+      query,
+      paymentYear: year,
+      majorCategory: feeMajorCategory,
+      referenceSemester,
+      userIds: userIds?.split(",").filter(Boolean),
     });
   }
 

@@ -35,9 +35,9 @@ export function SurveyPage() {
   } = useSurveyPageController(id);
 
   const isPreview = Boolean(survey?.isPreview || (survey && !survey.isPublished));
-  const sessionAuthenticated = Boolean(
-    session?.authenticated && session.canUsePersistentFeatures,
-  );
+  // A temporary consent session is authenticated for eligibility checks, but
+  // it still cannot access persistent account features.
+  const sessionAuthenticated = Boolean(session?.authenticated);
   const shouldEmbedTerminalState = Boolean(
     survey &&
       !sessionLoading &&

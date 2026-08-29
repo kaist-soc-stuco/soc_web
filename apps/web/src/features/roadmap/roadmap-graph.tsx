@@ -11,10 +11,10 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { Search, X } from "lucide-react";
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Maximize2, Minimize2, Search, X } from "lucide-react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { IconButton } from "@/components/ui/icon-button";
 import { TextInput } from "@/components/ui/text-input";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,13 @@ import {
   type RoadmapCourse,
   type RoadmapLanguage,
 } from "./roadmap-data";
+import {
+  ROADMAP_OFFERINGS,
+  ROADMAP_OFFERINGS_BY_COURSE,
+  ROADMAP_TERM_LABELS,
+  type RoadmapOffering,
+  type RoadmapOfferingTerm,
+} from "./roadmap-offerings";
 
 import "@xyflow/react/dist/style.css";
 
@@ -44,6 +51,7 @@ interface CourseNodeData extends Record<string, unknown> {
   course: RoadmapCourse;
   duplicate: boolean;
   lang: RoadmapLanguage;
+  offeringCount: number;
 }
 
 interface LaneNodeData extends Record<string, unknown> {
@@ -62,14 +70,23 @@ interface LayoutResult {
   nodes: GraphNode[];
 }
 
-function buildLayout(lang: RoadmapLanguage): LayoutResult {
+function buildLayout(
+  lang: RoadmapLanguage,
+  visibleCourseCodes: ReadonlySet<string> | null,
+  offeringCounts: ReadonlyMap<string, number>,
+): LayoutResult {
   const canonicalNodeByCode = new Map<string, string>();
   const instancesByCode = new Map<string, string[]>();
   const nodes: GraphNode[] = [];
   let offsetY = 0;
 
   ROADMAP_LANES.forEach((lane) => {
-    const rowCount = Math.ceil(lane.courses.length / COURSES_PER_ROW);
+    const courseCodes = lane.courses.filter(
+      (code) => !visibleCourseCodes || visibleCourseCodes.has(code),
+    );
+    if (courseCodes.length === 0) return;
+
+    const rowCount = Math.ceil(courseCodes.length / COURSES_PER_ROW);
     const laneHeight = 62 + rowCount * (COURSE_HEIGHT + COURSE_GAP_Y);
     const track = lane.trackId
       ? ROADMAP_TRACKS.find((item) => item.id === lane.trackId)
@@ -90,7 +107,7 @@ function buildLayout(lang: RoadmapLanguage): LayoutResult {
       style: { height: laneHeight, width: LANE_WIDTH },
     });
 
-    lane.courses.forEach((code, index) => {
+    courseCodes.forEach((code, index) => {
       const item = ROADMAP_COURSE_BY_CODE.get(code);
       if (!item) return;
 
@@ -110,6 +127,7 @@ function buildLayout(lang: RoadmapLanguage): LayoutResult {
           course: item,
           duplicate: false,
           lang,
+          offeringCount: offeringCounts.get(item.code) ?? 0,
         },
         draggable: false,
         selectable: true,
@@ -129,7 +147,7 @@ function buildLayout(lang: RoadmapLanguage): LayoutResult {
 const LaneCard = memo(function LaneCard({ data }: NodeProps<LaneNode>) {
   return (
     <div
-      className="h-full w-full rounded-xl border border-slate-200/80 bg-white/70"
+      className="select-none h-full w-full rounded-xl border border-slate-200/80 bg-white/70"
       style={{ borderTopColor: data.color, borderTopWidth: 3 }}
     >
       <div className="flex h-full w-[9.5rem] items-start px-5 pt-5">
@@ -151,7 +169,7 @@ interface RoadmapInteractionContextValue {
 const RoadmapInteractionContext = createContext<RoadmapInteractionContextValue | null>(null);
 
 const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
-  const { course, duplicate, lang } = data;
+  const { course, duplicate, lang, offeringCount } = data;
   const interaction = useContext(RoadmapInteractionContext);
   const relation =
     course.code === interaction?.activeCourseCode
@@ -176,7 +194,7 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
       onMouseEnter={() => interaction?.setHoveredCourseCode(course.code)}
       onMouseLeave={() => interaction?.setHoveredCourseCode(null)}
       className={cn(
-        "group relative h-full w-full rounded-lg border bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[opacity,border-color,box-shadow] duration-150",
+        "roadmap-course-card select-none group relative h-full w-full rounded-lg border bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[opacity,border-color,box-shadow] duration-150",
         selected
           ? "border-kaist-darkgreen shadow-[0_0_0_2px_rgba(0,92,74,0.13)]"
           : relation === "previous"
@@ -210,6 +228,11 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
         <span>{course.semesters}</span>
         <span className="tabular-nums">{course.credits}</span>
       </div>
+      {offeringCount > 0 ? (
+        <span className="absolute bottom-2.5 left-3 rounded bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-emerald-700">
+          {lang === "ko" ? `개설 ${offeringCount}` : `${offeringCount} offered`}
+        </span>
+      ) : null}
       {course.ai ? (
         <span className="absolute bottom-2.5 right-3 rounded bg-sky-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-bold text-sky-700">
           AI
@@ -226,6 +249,20 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
 
 const nodeTypes = { course: CourseCard, lane: LaneCard };
 
+function getCourseSearchText(course: RoadmapCourse) {
+  const offerings = ROADMAP_OFFERINGS_BY_COURSE.get(course.code) ?? [];
+  return [
+    course.code,
+    course.name.ko,
+    course.name.en,
+    ...offerings.flatMap((offering) => [
+      offering.currentCode,
+      offering.nameKo,
+      offering.instructor ?? "",
+    ]),
+  ].join(" ");
+}
+
 interface RoadmapGraphProps {
   lang: RoadmapLanguage;
   onSelectedCourseChange: (courseCode: string | null) => void;
@@ -237,12 +274,67 @@ export function RoadmapGraph({
   onSelectedCourseChange,
   selectedCourseCode,
 }: RoadmapGraphProps) {
-  const layout = useMemo(() => buildLayout(lang), [lang]);
   const [hoveredCourseCode, setHoveredCourseCode] = useState<string | null>(null);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(() => new Set());
   const [searchText, setSearchText] = useState("");
+  const [selectedTerm, setSelectedTerm] = useState<RoadmapOfferingTerm>("2026-fall");
+  const [offeredOnly, setOfferedOnly] = useState(false);
   const [flow, setFlow] = useState<ReactFlowInstance<GraphNode, Edge> | null>(null);
+  const flowViewportRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const activeCourseCode = hoveredCourseCode ?? selectedCourseCode;
+
+  const termOfferings = useMemo(
+    () =>
+      selectedTerm === "all"
+        ? ROADMAP_OFFERINGS
+        : ROADMAP_OFFERINGS.filter((offering) => offering.term === selectedTerm),
+    [selectedTerm],
+  );
+  const offeringCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const offering of termOfferings) {
+      counts.set(offering.courseCode, (counts.get(offering.courseCode) ?? 0) + 1);
+    }
+    return counts;
+  }, [termOfferings]);
+  const offeredCourseCodes = useMemo(
+    () => new Set(termOfferings.map((offering) => offering.courseCode)),
+    [termOfferings],
+  );
+  const visibleCourseCodes = offeredOnly ? offeredCourseCodes : null;
+  const layout = useMemo(
+    () => buildLayout(lang, visibleCourseCodes, offeringCounts),
+    [lang, offeringCounts, visibleCourseCodes],
+  );
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === flowViewportRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const flowViewport = flowViewportRef.current;
+    if (!flowViewport) return;
+
+    try {
+      if (document.fullscreenElement === flowViewport) {
+        await document.exitFullscreen();
+      } else if (isFullscreen) {
+        setIsFullscreen(false);
+      } else {
+        setIsFullscreen(true);
+        await flowViewport.requestFullscreen();
+      }
+    } catch {
+      // Keep the CSS fallback mode when the browser does not allow the
+      // native Fullscreen API in an embedded preview.
+    }
+  }, [isFullscreen]);
 
   const previousCodes = useMemo(
     () =>
@@ -340,7 +432,7 @@ export function RoadmapGraph({
     const query = searchText.trim().toLocaleLowerCase();
     if (!query) return [];
     return ROADMAP_COURSES.filter((item) =>
-      `${item.code} ${item.name.ko} ${item.name.en}`.toLocaleLowerCase().includes(query),
+      getCourseSearchText(item).toLocaleLowerCase().includes(query),
     ).slice(0, 6);
   }, [searchText]);
 
@@ -386,10 +478,11 @@ export function RoadmapGraph({
     const query = searchText.trim().toLocaleLowerCase();
     const matchesQuery =
       !query ||
-      `${item.code} ${item.name.ko} ${item.name.en}`.toLocaleLowerCase().includes(query);
+      getCourseSearchText(item).toLocaleLowerCase().includes(query);
     const matchesTrack =
       selectedTrackIds.size === 0 || item.tracks.some((trackId) => selectedTrackIds.has(trackId));
-    return matchesQuery && matchesTrack;
+    const matchesAvailability = !offeredOnly || offeredCourseCodes.has(item.code);
+    return matchesQuery && matchesTrack && matchesAvailability;
   });
 
   return (
@@ -401,6 +494,13 @@ export function RoadmapGraph({
           aria-label={lang === "ko" ? "과목 검색" : "Search courses"}
           placeholder={lang === "ko" ? "과목 코드 또는 과목명 검색" : "Search by code or title"}
           leading={<Search aria-hidden="true" className="size-4" />}
+        />
+        <RoadmapOfferingControls
+          lang={lang}
+          offeredOnly={offeredOnly}
+          selectedTerm={selectedTerm}
+          onOfferedOnlyChange={setOfferedOnly}
+          onTermChange={setSelectedTerm}
         />
         <div className="mt-3 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {ROADMAP_TRACKS.map((track) => {
@@ -430,6 +530,7 @@ export function RoadmapGraph({
             <CourseDetails
               courseCode={selectedCourseCode}
               lang={lang}
+              selectedTerm={selectedTerm}
               onClose={() => onSelectedCourseChange(null)}
               onCourseClick={onSelectedCourseChange}
             />
@@ -491,36 +592,55 @@ export function RoadmapGraph({
             />
             {searchMatches.length > 0 ? (
               <div className="absolute left-0 right-0 top-[calc(100%+0.375rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
-                {searchMatches.map((item) => (
-                  <button
-                    key={item.code}
-                    type="button"
-                    onClick={() => focusCourse(item.code)}
-                    className="flex min-h-12 w-full items-center gap-3 border-b border-slate-100 px-3 text-left last:border-b-0 hover:bg-slate-50"
-                  >
-                    <span className="w-14 shrink-0 text-xs font-semibold text-slate-500">{item.code}</span>
-                    <span className="truncate text-sm font-medium text-slate-900">{item.name[lang]}</span>
-                  </button>
-                ))}
+                {searchMatches.map((item) => {
+                  const offering = ROADMAP_OFFERINGS_BY_COURSE.get(item.code)?.[0];
+                  return (
+                    <button
+                      key={item.code}
+                      type="button"
+                      onClick={() => focusCourse(item.code)}
+                      className="flex min-h-12 w-full items-center gap-3 border-b border-slate-100 px-3 text-left last:border-b-0 hover:bg-slate-50"
+                    >
+                      <span className="w-14 shrink-0 text-xs font-semibold text-slate-500">{item.code}</span>
+                      <span className="min-w-0 truncate text-sm font-medium text-slate-900">
+                        <span className="block truncate">{item.name[lang]}</span>
+                        {offering ? (
+                          <span className="mt-0.5 block truncate text-[length:var(--ui-text-micro-size)] font-medium text-slate-400">
+                            {offering.currentCode}
+                            {offering.instructor ? ` · ${offering.instructor}` : ""}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-xs font-medium text-slate-500 sm:inline">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <RoadmapOfferingControls
+              lang={lang}
+              offeredOnly={offeredOnly}
+              selectedTerm={selectedTerm}
+              onOfferedOnlyChange={setOfferedOnly}
+              onTermChange={setSelectedTerm}
+            />
+            <span className="hidden min-h-9 items-center text-xs font-medium text-slate-500 sm:inline-flex">
               {lang === "ko" ? "드래그 이동 · Ctrl/⌘ + 휠 확대" : "Drag to pan · Ctrl/⌘ + wheel to zoom"}
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void flow?.fitView({ duration: 240, padding: 0.05 })}
-            >
-              {lang === "ko" ? "전체 보기" : "Fit view"}
-            </Button>
           </div>
         </div>
 
-        <div className="h-[calc(100svh-13rem)] min-h-[38rem] max-h-[54rem] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+        <div ref={flowViewportRef} className={cn("roadmap-flow-viewport relative h-[calc(100svh-13rem)] min-h-[38rem] max-h-[54rem] overflow-hidden rounded-xl border border-slate-200 bg-slate-50", isFullscreen && "roadmap-flow-viewport--fullscreen")}>
+          <button
+            type="button"
+            onClick={() => void toggleFullscreen()}
+            aria-label={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
+            title={isFullscreen ? (lang === "ko" ? "전체 화면 닫기" : "Exit full screen") : (lang === "ko" ? "전체 화면" : "Full screen")}
+            className="absolute right-3 top-3 z-10 inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/25"
+          >
+            {isFullscreen ? <Minimize2 aria-hidden="true" className="size-4" /> : <Maximize2 aria-hidden="true" className="size-4" />}
+          </button>
           <RoadmapInteractionContext.Provider value={interactionValue}>
             <ReactFlow<GraphNode, Edge>
               nodes={nodes}
@@ -546,67 +666,118 @@ export function RoadmapGraph({
               multiSelectionKeyCode={null}
               ariaLabelConfig={{
                 "controls.ariaLabel": lang === "ko" ? "지도 조작" : "Map controls",
-                "controls.fitView.ariaLabel": lang === "ko" ? "전체 보기" : "Fit view",
                 "controls.zoomIn.ariaLabel": lang === "ko" ? "확대" : "Zoom in",
                 "controls.zoomOut.ariaLabel": lang === "ko" ? "축소" : "Zoom out",
               }}
             >
               <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#cbd5e1" />
-              <Controls showInteractive={false} position="bottom-left" />
+              <Controls showFitView={false} showInteractive={false} position="bottom-left" />
             </ReactFlow>
           </RoadmapInteractionContext.Provider>
         </div>
       </div>
 
-      <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start">
-        <section aria-labelledby="roadmap-track-filter" className="border-b border-slate-200 pb-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="roadmap-track-filter" className="text-sm font-semibold text-slate-900">
-              {lang === "ko" ? "교육 분야" : "Fields"}
-            </h2>
-            {selectedTrackIds.size > 0 ? (
-              <button
-                type="button"
-                onClick={() => setSelectedTrackIds(new Set())}
-                className="text-xs font-semibold text-kaist-darkgreen hover:underline"
-              >
-                {lang === "ko" ? "전체" : "All"}
-              </button>
-            ) : null}
+      <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start" aria-live="polite">
+        {selectedCourseCode ? (
+          <div key="course-details" className="roadmap-side-panel__view">
+            <div className="mb-4 border-b border-slate-200 pb-3">
+              <h2 className="text-sm font-semibold text-slate-900">
+                {lang === "ko" ? "과목 상세 정보" : "Course details"}
+              </h2>
+            </div>
+            <CourseDetails
+              courseCode={selectedCourseCode}
+              lang={lang}
+              selectedTerm={selectedTerm}
+              onClose={() => onSelectedCourseChange(null)}
+              onCourseClick={focusCourse}
+            />
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-1.5 xl:grid-cols-1">
-            {ROADMAP_TRACKS.map((track) => {
-              const selected = selectedTrackIds.has(track.id);
-              return (
+        ) : (
+          <section key="track-legend" className="roadmap-side-panel__view border-b border-slate-200 pb-5" aria-labelledby="roadmap-track-filter">
+            <div className="flex min-h-9 items-center justify-between gap-3">
+              <h2 id="roadmap-track-filter" className="text-sm font-semibold text-slate-900">
+                {lang === "ko" ? "교육 분야" : "Fields"}
+              </h2>
+              {selectedTrackIds.size > 0 ? (
                 <button
-                  key={track.id}
                   type="button"
-                  aria-pressed={selected}
-                  onClick={() => toggleTrack(track.id)}
-                  className={cn(
-                    "flex min-h-9 items-center gap-2 rounded-md px-2.5 text-left text-xs font-medium transition-colors",
-                    selected
-                      ? "bg-slate-100 text-slate-950"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                  )}
+                  onClick={() => setSelectedTrackIds(new Set())}
+                  className="text-xs font-semibold text-kaist-darkgreen hover:underline"
                 >
-                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: track.color }} />
-                  <span className="truncate">{track.label[lang]}</span>
+                  {lang === "ko" ? "전체" : "All"}
                 </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <CourseDetails
-          courseCode={selectedCourseCode}
-          lang={lang}
-          onClose={() => onSelectedCourseChange(null)}
-          onCourseClick={focusCourse}
-        />
+              ) : null}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-1.5 xl:grid-cols-1">
+              {ROADMAP_TRACKS.map((track) => {
+                const selected = selectedTrackIds.has(track.id);
+                return (
+                  <button
+                    key={track.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleTrack(track.id)}
+                    className={cn(
+                      "flex min-h-9 items-center gap-2 rounded-md px-2.5 text-left text-xs font-medium transition-colors",
+                      selected
+                        ? "bg-slate-100 text-slate-950"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    )}
+                  >
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: track.color }} />
+                    <span className="truncate">{track.label[lang]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </aside>
       </div>
     </>
+  );
+}
+
+function RoadmapOfferingControls({
+  lang,
+  offeredOnly,
+  selectedTerm,
+  onOfferedOnlyChange,
+  onTermChange,
+}: {
+  lang: RoadmapLanguage;
+  offeredOnly: boolean;
+  selectedTerm: RoadmapOfferingTerm;
+  onOfferedOnlyChange: (value: boolean) => void;
+  onTermChange: (value: RoadmapOfferingTerm) => void;
+}) {
+  const options: { value: RoadmapOfferingTerm; label: string }[] = ([
+    "all",
+    "2026-spring",
+    "2026-fall",
+  ] as RoadmapOfferingTerm[]).map((value) => ({ value, label: ROADMAP_TERM_LABELS[value][lang] }));
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <SelectDropdown
+        ariaLabel={lang === "ko" ? "개설 학기" : "Offering semester"}
+        value={selectedTerm}
+        options={options}
+        onChange={(value) => onTermChange(value as RoadmapOfferingTerm)}
+        className="w-36 shrink-0"
+        buttonClassName="h-9 !min-h-9 text-xs"
+      />
+      <label className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
+        <input
+          type="checkbox"
+          checked={offeredOnly}
+          onChange={(event) => onOfferedOnlyChange(event.currentTarget.checked)}
+          className="size-3.5 accent-emerald-700"
+        />
+        <span>{lang === "ko" ? "개설 과목만 보기" : "Show offered only"}</span>
+      </label>
+    </div>
   );
 }
 
@@ -615,15 +786,26 @@ interface CourseDetailsProps {
   lang: RoadmapLanguage;
   onClose: () => void;
   onCourseClick: (code: string) => void;
+  selectedTerm: RoadmapOfferingTerm;
 }
 
-function CourseDetails({ courseCode, lang, onClose, onCourseClick }: CourseDetailsProps) {
+function CourseDetails({ courseCode, lang, onClose, onCourseClick, selectedTerm }: CourseDetailsProps) {
+  const [activeTab, setActiveTab] = useState<"overview" | "offerings">("overview");
   const item = courseCode ? ROADMAP_COURSE_BY_CODE.get(courseCode) : undefined;
+  const allOfferings = item ? ROADMAP_OFFERINGS_BY_COURSE.get(item.code) ?? [] : [];
+  const offerings =
+    selectedTerm === "all"
+      ? allOfferings
+      : allOfferings.filter((offering) => offering.term === selectedTerm);
   const previous = item
     ? ROADMAP_RELATIONS.filter((relation) => relation.target === item.code).map(
         (relation) => relation.source,
       )
     : [];
+
+  useEffect(() => {
+    setActiveTab("overview");
+  }, [courseCode]);
   const next = item
     ? ROADMAP_RELATIONS.filter((relation) => relation.source === item.code).map(
         (relation) => relation.target,
@@ -657,7 +839,38 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick }: CourseDetai
         </IconButton>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200 py-4 text-xs">
+      <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label={lang === "ko" ? "과목 상세 탭" : "Course detail tabs"}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "overview"}
+          onClick={() => setActiveTab("overview")}
+          className={cn(
+            "min-h-8 rounded-md px-2 text-xs font-semibold transition-colors",
+            activeTab === "overview" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+          )}
+        >
+          {lang === "ko" ? "기본 정보" : "Overview"}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "offerings"}
+          onClick={() => setActiveTab("offerings")}
+          className={cn(
+            "min-h-8 rounded-md px-2 text-xs font-semibold transition-colors",
+            activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+          )}
+        >
+          {lang === "ko" ? `개설 분반 (${offerings.length})` : `Offerings (${offerings.length})`}
+        </button>
+      </div>
+
+      {activeTab === "offerings" ? (
+        <OfferingList offerings={offerings} lang={lang} />
+      ) : (
+        <>
+          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200 py-4 text-xs">
         <div>
           <dt className="font-medium text-slate-400">{lang === "ko" ? "구분" : "Category"}</dt>
           <dd className="mt-1 font-semibold text-slate-800">{CATEGORY_LABELS[item.category][lang]}</dd>
@@ -674,9 +887,9 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick }: CourseDetai
           <dt className="font-medium text-slate-400">{lang === "ko" ? "AI 중점" : "AI focus"}</dt>
           <dd className="mt-1 font-semibold text-slate-800">{item.ai ? (lang === "ko" ? "해당" : "Yes") : "—"}</dd>
         </div>
-      </dl>
+          </dl>
 
-      <div className="mt-4">
+          <div className="mt-4">
         <h3 className="text-xs font-semibold text-slate-500">{lang === "ko" ? "교육 분야" : "Fields"}</h3>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {item.tracks.map((trackId) => {
@@ -689,23 +902,143 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick }: CourseDetai
             ) : null;
           })}
         </div>
-      </div>
+          </div>
 
-      <RelationList
-        title={lang === "ko" ? "먼저 들으면 좋은 과목" : "Recommended before"}
-        codes={previous}
-        lang={lang}
-        tone="previous"
-        onCourseClick={onCourseClick}
-      />
-      <RelationList
-        title={lang === "ko" ? "다음에 이어지는 과목" : "Recommended next"}
-        codes={next}
-        lang={lang}
-        tone="next"
-        onCourseClick={onCourseClick}
-      />
+          <RelationList
+            title={lang === "ko" ? "먼저 들으면 좋은 과목" : "Recommended before"}
+            codes={previous}
+            lang={lang}
+            tone="previous"
+            onCourseClick={onCourseClick}
+          />
+          <RelationList
+            title={lang === "ko" ? "다음에 이어지는 과목" : "Recommended next"}
+            codes={next}
+            lang={lang}
+            tone="next"
+            onCourseClick={onCourseClick}
+          />
+        </>
+      )}
     </section>
+  );
+}
+
+function OfferingList({
+  offerings,
+  lang,
+}: {
+  offerings: RoadmapOffering[];
+  lang: RoadmapLanguage;
+}) {
+  if (offerings.length === 0) {
+    return (
+      <p className="mt-4 rounded-lg border border-dashed border-slate-200 px-3 py-5 text-center text-xs leading-5 text-slate-500">
+        {lang === "ko" ? "선택한 학기에 개설된 정보가 없습니다." : "No offering is available for this semester."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-2">
+      {offerings.map((offering) => {
+        const enrollment =
+          offering.capacity !== null
+            ? `${offering.enrolled ?? "—"} / ${offering.capacity}`
+            : offering.enrolled !== null
+              ? String(offering.enrolled)
+              : null;
+
+        return (
+          <article
+            key={`${offering.term}-${offering.currentCode}-${offering.nameKo}-${offering.section ?? "none"}`}
+            className="rounded-lg border border-slate-200 bg-white p-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-emerald-700">
+                    {ROADMAP_TERM_LABELS[offering.term][lang]}
+                  </span>
+                  <span className="text-xs font-semibold tabular-nums text-slate-500">
+                    {offering.currentCode}
+                  </span>
+                  {offering.inEnglish ? (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-slate-600">
+                      {lang === "ko" ? "영어" : "English"}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1.5 break-keep text-xs font-semibold leading-5 text-slate-900">
+                  {offering.nameKo}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full border border-slate-200 px-2 py-1 text-[length:var(--ui-text-micro-size)] font-semibold text-slate-600">
+                {offering.section
+                  ? lang === "ko"
+                    ? `${offering.section}분반`
+                    : `Section ${offering.section}`
+                  : lang === "ko"
+                    ? "분반 미정"
+                    : "Section —"}
+              </span>
+            </div>
+
+            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[length:var(--ui-text-micro-size)]">
+              <OfferingDetailField
+                label={lang === "ko" ? "담당교수" : "Instructor"}
+                value={offering.instructor}
+              />
+              <OfferingDetailField
+                label={lang === "ko" ? "강의 방식" : "Format"}
+                value={offering.delivery}
+              />
+              <OfferingDetailField
+                label={lang === "ko" ? "강·실·학" : "L·Lab·Cr"}
+                value={offering.credits}
+              />
+              <OfferingDetailField
+                label={lang === "ko" ? "수강 / 정원" : "Enrolled / capacity"}
+                value={enrollment}
+              />
+              <OfferingDetailField
+                className="col-span-2"
+                label={lang === "ko" ? "강의시간" : "Schedule"}
+                value={offering.time}
+                preserveWhitespace
+              />
+              <OfferingDetailField
+                className="col-span-2"
+                label={lang === "ko" ? "강의실" : "Room"}
+                value={offering.room}
+                preserveWhitespace
+              />
+            </dl>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function OfferingDetailField({
+  className,
+  label,
+  preserveWhitespace = false,
+  value,
+}: {
+  className?: string;
+  label: string;
+  preserveWhitespace?: boolean;
+  value: string | null;
+}) {
+  if (!value) return null;
+
+  return (
+    <div className={className}>
+      <dt className="font-medium text-slate-400">{label}</dt>
+      <dd className={cn("mt-0.5 break-keep font-medium text-slate-700", preserveWhitespace && "whitespace-pre-line")}>{value}</dd>
+    </div>
   );
 }
 
@@ -722,30 +1055,28 @@ function RelationList({
   title: string;
   tone: "previous" | "next";
 }) {
+  if (codes.length === 0) return null;
+
   return (
     <div className="mt-5">
       <h3 className="text-xs font-semibold text-slate-500">{title}</h3>
-      {codes.length > 0 ? (
-        <div className="mt-2 space-y-1">
-          {codes.map((code) => {
-            const item = ROADMAP_COURSE_BY_CODE.get(code);
-            return item ? (
-              <button
-                key={code}
-                type="button"
-                onClick={() => onCourseClick(code)}
-                className="flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-slate-50"
-              >
-                <span className={cn("h-5 w-0.5 rounded-full", tone === "previous" ? "bg-amber-500" : "bg-sky-500")} />
-                <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">{code}</span>
-                <span className="truncate text-xs font-medium text-slate-800">{item.name[lang]}</span>
-              </button>
-            ) : null;
-          })}
-        </div>
-      ) : (
-        <p className="mt-2 text-xs text-slate-400">{lang === "ko" ? "표시된 연결 없음" : "No mapped connection"}</p>
-      )}
+      <div className="mt-2 space-y-1">
+        {codes.map((code) => {
+          const item = ROADMAP_COURSE_BY_CODE.get(code);
+          return item ? (
+            <button
+              key={code}
+              type="button"
+              onClick={() => onCourseClick(code)}
+              className="flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-slate-100"
+            >
+              <span className={cn("h-5 w-0.5 rounded-full", tone === "previous" ? "bg-amber-500" : "bg-sky-500")} />
+              <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">{code}</span>
+              <span className="truncate text-xs font-medium text-slate-800">{item.name[lang]}</span>
+            </button>
+          ) : null;
+        })}
+      </div>
     </div>
   );
 }

@@ -26,7 +26,7 @@ export function NotFoundPage() {
               : "This page does not exist or has been removed. Please check that the address is correct and try again."}
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button asChild variant="default" size="lg" className="font-semibold">
+            <Button asChild variant="default" size="lg" className="select-none font-semibold">
               <Link to="/">
                 <Home aria-hidden="true" className="size-4" />
                 {lang === "ko" ? "홈으로 이동" : "Go home"}
@@ -36,7 +36,7 @@ export function NotFoundPage() {
               type="button"
               variant="outline"
               size="lg"
-              className="font-semibold"
+              className="select-none font-semibold"
               onClick={() => window.history.back()}
             >
               <ArrowLeft aria-hidden="true" className="size-4" />

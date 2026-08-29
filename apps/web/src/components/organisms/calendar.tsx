@@ -114,7 +114,7 @@ export function Calendar() {
 
   return (
     <section className="home-bento-card flex min-h-[24rem] min-w-0 flex-col overflow-hidden">
-      <header className="flex h-11 shrink-0 items-center justify-between border-b border-slate-100 px-4">
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-100 px-4">
         <h3 className="text-sm font-semibold tracking-[-0.01em] text-[#172033]">
           {lang === "ko" ? "다가오는 일정" : "Upcoming schedule"}
         </h3>
@@ -136,16 +136,16 @@ export function Calendar() {
             const ddayLabel = getScheduleDdayLabel(item);
             const showDdayBadge = ddayLabel !== null && ddayLabel !== "D-Day";
             return (
-              <li key={item.id}>
+              <li key={item.id} className="min-w-0 overflow-hidden">
                 <Link
                   to={`/calendar?selected=${toIsoDate(item.startAt)}`}
-                  className="home-schedule-row flex h-full min-h-[2.5rem] items-center gap-4 px-4 py-1.5 hover:bg-slate-50/80"
+                  className="home-schedule-row flex h-full min-h-[2.5rem] min-w-0 items-center gap-4 overflow-hidden px-4 py-1.5 hover:bg-slate-50/80"
                 >
                   <time className="w-[6.75rem] shrink-0 whitespace-nowrap text-[0.8125rem] font-normal tabular-nums text-[#667085]">
                     {formatScheduleRange(item)}
                   </time>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-normal text-[#172033]">{title}</p>
+                    <p className="block min-w-0 truncate text-sm font-normal text-[#172033]">{title}</p>
                   </div>
                   {showDdayBadge ? <span className="home-editorial-dday shrink-0">{ddayLabel}</span> : null}
                 </Link>

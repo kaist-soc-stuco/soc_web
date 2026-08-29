@@ -1,7 +1,10 @@
 import type { LoginSessionResponse } from "@soc/contracts";
 import { ApiClientHttpError } from "@soc/api-client";
 
-import { clearStoredAuthState, readStoredAuthState } from "@/lib/auth-storage";
+import {
+  clearStoredAuthState,
+  readStoredAuthState,
+} from "@/lib/auth-storage";
 
 /**
  * 현재 로그인 세션을 표현하는 프런트 공용 타입/헬퍼입니다.
@@ -22,25 +25,9 @@ export interface SessionApiClient {
 }
 
 export const getTemporarySessionId = (): string | undefined => {
-  return readStoredAuthState()?.temporarySession?.sessionId;
-};
-
-export const getTemporaryAuthRequest = ():
-  | {
-      refreshToken?: string;
-      sessionId?: string;
-    }
-  | undefined => {
-  const temporarySession = readStoredAuthState()?.temporarySession;
-
-  if (!temporarySession?.refreshToken && !temporarySession?.sessionId) {
-    return undefined;
-  }
-
-  return {
-    refreshToken: temporarySession.refreshToken,
-    sessionId: temporarySession.sessionId,
-  };
+  // Temporary sessions are stateless JWTs; the bearer token is attached by
+  // the shared API client and no server-side session ID is issued.
+  return undefined;
 };
 
 /**
@@ -52,7 +39,11 @@ export const getAuthSessionSummary = async (
   const temporarySessionId = getTemporarySessionId();
 
   try {
-    return await apiClient.getSession(temporarySessionId);
+    const session = await apiClient.getSession(temporarySessionId);
+    if (!session.authenticated && readStoredAuthState()?.temporarySession) {
+      clearStoredAuthState();
+    }
+    return session;
   } catch (error) {
     if (
       error instanceof ApiClientHttpError &&

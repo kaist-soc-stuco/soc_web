@@ -154,7 +154,7 @@ function ContentModerationPageContent() {
                     <AdminTableCell truncate>{article.authorName}</AdminTableCell>
                     <AdminTableCell><span className="line-clamp-2 font-normal">{article.hiddenReason}</span></AdminTableCell>
                     <AdminTableCell>{formatDate(article.hiddenAt)}</AdminTableCell>
-                    <AdminTableCell>
+                    <AdminTableCell className="text-center align-middle">
                       <Button type="button" variant="ghost" size="sm" disabled={restoringId === article.articleId} onClick={() => void restore(article)}>
                         <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
                       </Button>
@@ -175,7 +175,7 @@ function ContentModerationPageContent() {
                     <AdminTableCell><span className="line-clamp-2 font-normal text-app-text-strong">{comment.content}</span></AdminTableCell>
                     <AdminTableCell truncate>{comment.authorName}</AdminTableCell>
                     <AdminTableCell><span className="line-clamp-2 font-normal">{comment.hiddenReason}</span></AdminTableCell>
-                    <AdminTableCell>
+                    <AdminTableCell className="text-center align-middle">
                       <Button type="button" variant="ghost" size="sm" disabled={restoringId === `comment:${comment.commentId}`} onClick={() => void restoreComment(comment)}>
                         <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
                       </Button>

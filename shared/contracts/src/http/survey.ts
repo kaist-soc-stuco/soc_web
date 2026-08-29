@@ -214,6 +214,15 @@ export interface SurveyQuestionAnalyticsItem {
   rawAnswersHidden: boolean;
 }
 
+export interface SurveyAnalyticsSection {
+  sectionId: string;
+  titleKo: string;
+  titleEn: string | null;
+  descriptionKo: string | null;
+  descriptionEn: string | null;
+  questions: SurveyQuestionAnalyticsItem[];
+}
+
 export interface SurveyAnalyticsResponse {
   surveyId: string;
   kind: string;
@@ -231,4 +240,5 @@ export interface SurveyAnalyticsResponse {
   titleEn: string | null;
   totalResponses: number;
   questions: SurveyQuestionAnalyticsItem[];
+  sections?: SurveyAnalyticsSection[];
 }

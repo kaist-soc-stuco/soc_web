@@ -26,6 +26,7 @@ import {
   AUTH_ACCESS_COOKIE_NAME,
   AUTH_REFRESH_COOKIE_NAME,
   AUTH_SESSION_COOKIE_NAME,
+  extractBearerToken,
 } from "./auth.tokens";
 
 interface ChannelTalkRequest extends Request {
@@ -108,10 +109,8 @@ export class AuthController {
       temporarySession:
         result.storageMode === "temporary"
           ? {
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-            sessionId: result.sessionId,
-          }
+              accessToken: result.accessToken,
+            }
           : undefined,
       userId: result.userId,
     };
@@ -124,8 +123,12 @@ export class AuthController {
   async getSession(
     @Cookies(AUTH_SESSION_COOKIE_NAME) cookieSessionId: string | undefined,
     @Query("sessionId") querySessionId: string | undefined,
+    @Req() request: Request,
   ) {
-    return this.authSessionService.getSession(cookieSessionId ?? querySessionId);
+    return this.authSessionService.getSession(
+      cookieSessionId ?? querySessionId,
+      extractBearerToken(request.headers.authorization),
+    );
   }
 
   /**
@@ -134,8 +137,11 @@ export class AuthController {
   @Get("me")
   async getCurrentUser(
     @Cookies(AUTH_ACCESS_COOKIE_NAME) cookieAccessToken: string | undefined,
+    @Req() request: Request,
   ) {
-    return this.authSessionService.getCurrentUser(cookieAccessToken);
+    return this.authSessionService.getCurrentUser(
+      cookieAccessToken ?? extractBearerToken(request.headers.authorization),
+    );
   }
 
   /**
@@ -153,27 +159,13 @@ export class AuthController {
       sessionId: body?.sessionId,
     });
 
-    if (result.storageMode === "persisted") {
-      this.authCookieService.setAuthCookies(response, {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        sessionId: result.sessionId,
-      }, request);
-
-      return {
-        storageMode: result.storageMode,
-      };
-    }
-
-    this.authCookieService.clearAuthCookies(response, request);
-
+    this.authCookieService.setAuthCookies(response, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      sessionId: result.sessionId,
+    }, request);
     return {
       storageMode: result.storageMode,
-      temporarySession: {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        sessionId: result.sessionId,
-      },
     };
   }
 

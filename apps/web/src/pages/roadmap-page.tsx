@@ -37,10 +37,7 @@ export function RoadmapPage() {
           titleId="roadmap-page-title"
           className="mb-0"
           containerClassName="max-w-[100rem]"
-        />
-
-        <PageContainer className="max-w-[100rem] pb-16">
-          <div className="mb-6 flex justify-end border-b border-slate-200 pb-5">
+          actions={
             <a
               href={ROADMAP_SOURCE.url}
               target="_blank"
@@ -50,8 +47,10 @@ export function RoadmapPage() {
               {lang === "ko" ? "2025.04.22 원본 로드맵" : "Source roadmap · 2025.04.22"}
               <ExternalLink aria-hidden="true" className="size-3.5" />
             </a>
-          </div>
+          }
+        />
 
+        <PageContainer className="max-w-[100rem] pb-16">
           <RoadmapGraph
             lang={lang}
             selectedCourseCode={selectedCourseCode}

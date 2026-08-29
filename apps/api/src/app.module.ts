@@ -13,6 +13,7 @@ import { UsersHttpModule } from './features/users/users-http.module';
 import { RoleGroupsModule } from "./features/role-groups/role-groups.module";
 import { PostgresModule } from './infrastructure/postgres/postgres.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
+import { GoogleModule } from './infrastructure/google/google.module';
 import { validateEnv } from './shared/config/env.validation';
 import { BoardModule } from "./features/board/board.module";
 import { AssetModule } from "./features/asset/asset.module";
@@ -42,6 +43,7 @@ const devOnlyModules =
     }),
     PostgresModule,
     RedisModule,
+    GoogleModule,
     AuthModule,
     AssetModule,
     BoardModule,

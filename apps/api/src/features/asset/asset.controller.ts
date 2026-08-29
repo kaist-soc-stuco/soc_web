@@ -185,13 +185,13 @@ export class AssetController {
   }
 
   @Post("cleanup-orphans")
-  @RequirePermissions(Permissions.SUPER_ADMIN)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async cleanupOrphans() {
     return this.assetService.cleanupUnlinkedAssets();
   }
 
   @Post("migrate-local")
-  @RequirePermissions(Permissions.SUPER_ADMIN)
+  @RequirePermissions(Permissions.MANAGE_SITE_CONTENT)
   async migrateLocal(@Body() body: { limit?: number }) {
     const rawLimit = Number(body?.limit ?? 100);
     const limit = Number.isInteger(rawLimit)
