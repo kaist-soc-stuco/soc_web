@@ -3,7 +3,6 @@ import { Request } from "express";
 import { isExpired } from "@soc/shared";
 
 import { UsersService } from "../../users/users.service";
-import { AuthEligibilityService } from "../auth-eligibility.service";
 import { AuthSessionRepository } from "../auth-session.repository";
 import { AUTH_SESSION_COOKIE_NAME } from "../auth.tokens";
 
@@ -17,7 +16,6 @@ export class OptionalAuthGuard implements CanActivate {
   constructor(
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly usersService: UsersService,
-    private readonly authEligibilityService: AuthEligibilityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -41,7 +39,7 @@ export class OptionalAuthGuard implements CanActivate {
     }
 
     const user = await this.usersService.findById(session.userId);
-    if (user?.isActive && this.authEligibilityService.isEligibleUser(user)) {
+    if (user?.isActive) {
       request.user = {
         id: user.userId,
         permission:

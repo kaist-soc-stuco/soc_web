@@ -36,10 +36,11 @@ docs/       개발 규칙, UI/UX 규칙, 구조 개선 우선순위
 
 ## 환경 변수
 
-루트의 `.env`를 사용합니다.
+로컬 개발은 루트의 `.env`, 운영 Compose는 `.env.production`을 사용합니다.
 
 ```bash
 cp .env.example .env
+cp .env.example .env.production
 ```
 
 주요 값:
@@ -67,7 +68,7 @@ cp .env.example .env
 
 업로드 후 게시글에 연결되지 않은 파일은 관리자 권한으로 `POST /v1/assets/cleanup-orphans`를 호출해 정리할 수 있습니다. 자동 정리는 `ASSET_ORPHAN_CLEANUP_ENABLED=true`인 API 프로세스에서만 실행하세요.
 
-운영 배포 전에는 `.env.example`의 개발용 secret과 SSO 테스트 값을 실제 발급 값으로 교체해야 합니다.
+운영 배포 전에는 `.env.production`의 `NODE_ENV=production`, `SEED_MODE=reference`, 실제 HTTPS origin과 SSO redirect, 운영 전용 secret을 확인해야 합니다. `.env`와 `.env.production`은 모두 Git에 커밋하지 않습니다.
 
 ## 설치
 
@@ -119,8 +120,8 @@ NGINX_PORT=18080 docker compose --env-file .env -f infra/docker/compose.local.ym
 운영용 이미지는 `infra/docker/compose.prod.yml`을 사용합니다.
 
 ```bash
-docker compose --env-file .env -f infra/docker/compose.prod.yml config
-docker compose --env-file .env -f infra/docker/compose.prod.yml up -d --build
+docker compose --env-file .env.production -f infra/docker/compose.prod.yml config
+docker compose --env-file .env.production -f infra/docker/compose.prod.yml up -d --build
 ```
 
 현재 운영 compose는 단일 서버 배포를 전제로 합니다. `ASSET_STORAGE_PROVIDER=s3`를 권장하며, local fallback을 사용할 때는 호스트의 `apps/api/uploads` 경로도 별도로 백업해야 합니다. 자동 업로드 정리는 단일 API 인스턴스에서만 `ASSET_ORPHAN_CLEANUP_ENABLED=true`로 켜세요. API replica가 필요해지는 시점에는 별도 worker 또는 distributed lock 설계를 먼저 추가하세요.

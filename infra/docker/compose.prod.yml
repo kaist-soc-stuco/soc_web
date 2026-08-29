@@ -10,7 +10,7 @@ services:
       context: ../..
       dockerfile: apps/api/Dockerfile.prod
     env_file:
-      - ../../.env
+      - ../../.env.production
     environment:
       NODE_ENV: production
       POSTGRES_HOST: postgres

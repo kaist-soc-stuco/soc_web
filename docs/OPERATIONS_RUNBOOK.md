@@ -22,12 +22,12 @@ pnpm build
 운영 최초 배포:
 
 ```bash
-docker compose --env-file .env -f infra/docker/compose.prod.yml run --rm db-migrate
-docker compose --env-file .env -f infra/docker/compose.prod.yml run --rm \
+docker compose --env-file .env.production -f infra/docker/compose.prod.yml run --rm db-migrate
+docker compose --env-file .env.production -f infra/docker/compose.prod.yml run --rm \
   -e SEED_MODE=reference api pnpm db:seed
 ```
 
-reference seed는 권한·게시판·상시 신청형 설문과 `최고 관리자` 시스템 역할만 생성하며 개발 사용자나 샘플 콘텐츠를 만들지 않습니다. `.env`의 `INITIAL__ADMIN_STDNOS`에 쉼표로 구분한 8자리 학번을 설정하면 해당 사용자가 SSO로 영구 계정을 만들거나 다시 로그인할 때 `최고 관리자` 역할이 부여됩니다. 목록에서 학번을 제거해도 이미 부여된 역할은 자동 회수하지 않으므로 관리자 화면에서 명시적으로 회수합니다.
+reference seed는 권한·게시판·상시 신청형 설문과 `최고 관리자` 시스템 역할만 생성하며 개발 사용자나 샘플 콘텐츠를 만들지 않습니다. `.env.production`의 `INITIAL__ADMIN_STDNOS`에 쉼표로 구분한 8자리 학번을 설정하면 해당 사용자가 SSO로 영구 계정을 만들거나 다시 로그인할 때 `최고 관리자` 역할이 부여됩니다. 목록에서 학번을 제거해도 이미 부여된 역할은 자동 회수하지 않으므로 관리자 화면에서 명시적으로 회수합니다.
 
 로컬 compose 기준:
 
@@ -74,7 +74,7 @@ SEED_MODE=demo pnpm --filter @soc/api db:seed
 배포 및 migration 직전 PostgreSQL 백업을 만들고, 별도 임시 DB에서 복원 여부를 확인합니다. 백업 파일과 `VOTE_BALLOT_ENCRYPTION_KEY`는 함께 보존해야 기존 투표 데이터를 복호화할 수 있습니다.
 
 ```bash
-docker compose --env-file .env -f infra/docker/compose.prod.yml exec -T postgres \
+docker compose --env-file .env.production -f infra/docker/compose.prod.yml exec -T postgres \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "soc-web-$(date +%Y%m%d-%H%M).dump"
 ```
 
@@ -115,10 +115,10 @@ docker compose -p soc_web -f compose.yml logs --tail=200 postgres
 운영 compose:
 
 ```bash
-docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml ps
-docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 api
-docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 web
-docker compose --env-file .env -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 postgres
+docker compose --env-file .env.production -p soc_web -f infra/docker/compose.prod.yml ps
+docker compose --env-file .env.production -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 api
+docker compose --env-file .env.production -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 web
+docker compose --env-file .env.production -p soc_web -f infra/docker/compose.prod.yml logs --tail=200 postgres
 ```
 
 실시간 확인:

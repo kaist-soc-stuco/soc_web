@@ -1,13 +1,13 @@
 # Production Deployment Checklist
 
-이 문서는 실제 공개 직전 한 번씩 확인하는 체크리스트입니다. 운영 서버에는 개발 PC의 `.env`, PostgreSQL volume, uploads 디렉터리를 그대로 복사하지 않습니다.
+이 문서는 실제 공개 직전 한 번씩 확인하는 체크리스트입니다. 운영 서버에는 개발 PC의 `.env`, PostgreSQL volume, uploads 디렉터리를 그대로 복사하지 않습니다. 운영 설정은 별도의 `.env.production`에 둡니다.
 
 ## 1. Source And Build
 
 - [ ] 작업 트리가 깨끗하고 배포할 commit/tag가 확정되어 있다.
 - [ ] `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`가 통과한다.
 - [ ] `pnpm audit --prod`에 알려진 취약점이 없다.
-- [ ] `docker compose --env-file .env -f infra/docker/compose.prod.yml config --quiet`가 통과한다.
+- [ ] `docker compose --env-file .env.production -f infra/docker/compose.prod.yml config --quiet`가 통과한다.
 - [ ] 운영 이미지를 빌드하고 `/health`가 `status: ok`를 반환한다.
 
 ## 2. Production Environment
@@ -17,7 +17,7 @@
 - [ ] JWT, pending login, 투표 암호화 키는 서로 다른 충분히 긴 비밀값을 사용한다.
 - [ ] `INITIAL__ADMIN_STDNOS`에 최초 관리자 8자리 학번만 쉼표로 구분해 넣는다.
 - [ ] 초기 smoke test 전에는 `EMAIL_DRY_RUN=true`, `BULK_EMAIL_SCHEDULER_ENABLED=false`로 둔다.
-- [ ] `.env`와 `secrets/` 파일 권한을 운영 계정만 읽을 수 있게 제한한다.
+- [ ] `.env.production`과 `secrets/` 파일 권한을 운영 계정만 읽을 수 있게 제한한다.
 
 ## 3. Database And Administrator
 

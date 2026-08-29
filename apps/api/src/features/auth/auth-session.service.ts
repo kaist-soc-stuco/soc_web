@@ -23,7 +23,6 @@ import type {
 } from "./auth.types";
 import { AuthSessionRepository } from "./auth-session.repository";
 import { PendingLoginRepository } from "./pending-login.repository";
-import { AuthEligibilityService } from "./auth-eligibility.service";
 import { UsersService } from "../users/users.service";
 import { InitialAdminService } from "./initial-admin.service";
 import {
@@ -42,7 +41,6 @@ export class AuthSessionService {
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly pendingLoginRepository: PendingLoginRepository,
     private readonly usersService: UsersService,
-    private readonly authEligibilityService: AuthEligibilityService,
     private readonly initialAdminService: InitialAdminService,
   ) {}
 
@@ -293,14 +291,6 @@ export class AuthSessionService {
         throw new UnauthorizedException("account_expired");
       }
 
-      if (!this.authEligibilityService.isEligibleUser(user)) {
-        await this.usersService.expireAccount(
-          user.userId,
-          "department_not_eligible",
-        );
-        await this.authSessionRepository.revoke(session.sessionId);
-        throw new UnauthorizedException("department_not_eligible");
-      }
     }
 
     if (!session.refreshJti || session.refreshJti !== claims.jti) {
@@ -358,15 +348,6 @@ export class AuthSessionService {
     }
 
     if (input.consent) {
-      if (
-        !this.authEligibilityService.isEligibleDepartment(
-          pendingUser.departmentKo,
-          pendingUser.departmentEn,
-        )
-      ) {
-        throw new UnauthorizedException("department_not_eligible");
-      }
-
       const persistedUser = await this.usersService.upsertUserFromConsent({
         academicStatus: pendingUser.academicStatus,
         departmentEn: pendingUser.departmentEn,
@@ -445,10 +426,7 @@ export class AuthSessionService {
 
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
-      if (
-        user?.isActive &&
-        this.authEligibilityService.isEligibleUser(user)
-      ) {
+      if (user?.isActive) {
         permission = await this.usersService.resolvePermissionBitmaskByUserId(user.userId);
         userName = user.nameKo;
         nameKo = user.nameKo;
@@ -497,7 +475,7 @@ export class AuthSessionService {
       };
     }
 
-    if (!user.isActive || !this.authEligibilityService.isEligibleUser(user)) {
+    if (!user.isActive) {
       return {
         authenticated: false,
         storageMode: null,
