@@ -4,7 +4,6 @@ import type { QuestionType, SurveyQuestionConfig } from "@soc/contracts";
 import { Button } from "@/components/ui/button";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { SurveyImageField } from "@/components/ui/survey-image-field";
 
@@ -174,7 +173,6 @@ export function QuestionInlineEditor({
       initial.answerValidationEnabled ||
       Boolean(initial.answerRegex.trim() || initial.config?.validationErrorMessage?.trim()),
   }));
-  const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [error, setError] = useState<string | null>(null);
   const savingRef = useRef(false);
   const focusNewOptionRef = useRef(false);
@@ -184,12 +182,6 @@ export function QuestionInlineEditor({
     rows: null,
     columns: null,
   });
-
-  useEffect(() => {
-    if (isKoreanOnly && activeTab === "en") {
-      setActiveTab("ko");
-    }
-  }, [isKoreanOnly, activeTab]);
 
   const set = <K extends keyof QuestionFormState>(key: K, val: QuestionFormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -208,6 +200,16 @@ export function QuestionInlineEditor({
       imageUrlKo: value,
       imageUrlEn: value,
     });
+  };
+
+  const updateOptionImage = (index: number, value: string | null) => {
+    const next = [...form.options];
+    next[index] = {
+      ...next[index],
+      imageUrlKo: value,
+      imageUrlEn: value,
+    };
+    set("options", next);
   };
 
   const updateBranchTarget = (optionValue: string, target: string) => {
@@ -238,8 +240,8 @@ export function QuestionInlineEditor({
 
   const createOption = (items: QuestionFormState["options"]) => ({
     value: nextUniqueValue(items, "option"),
-    labelKo: "",
-    labelEn: "",
+    labelKo: `옵션 ${items.length + 1}`,
+    labelEn: `Option ${items.length + 1}`,
     imageUrlKo: null,
     imageUrlEn: null,
   });
@@ -350,7 +352,12 @@ export function QuestionInlineEditor({
         value = `option_${suffix}`;
       }
       usedOptionValues.add(value);
-      return { ...option, value };
+      return {
+        ...option,
+        value,
+        labelKo: option.labelKo.trim() || `옵션 ${index + 1}`,
+        labelEn: option.labelEn.trim() || `Option ${index + 1}`,
+      };
     });
     const normalizedForm: QuestionFormState = {
       ...form,
@@ -364,17 +371,6 @@ export function QuestionInlineEditor({
       if (form.options.length === 0) {
         setError("최소 하나의 선택지가 필요합니다.");
         return false;
-      }
-      for (let i = 0; i < form.options.length; i++) {
-        const opt = normalizedOptions[i];
-        if (!opt.labelKo.trim()) {
-          setError(`선택지 ${i + 1}의 국문 라벨은 필수입니다.`);
-          return false;
-        }
-        if (!isKoreanOnly && !opt.labelEn.trim()) {
-          setError(`선택지 ${i + 1}의 영문 라벨은 필수입니다.`);
-          return false;
-        }
       }
       const optionValues = normalizedOptions.map((option) => option.value.trim());
       if (new Set(optionValues).size !== optionValues.length) {
@@ -441,38 +437,50 @@ export function QuestionInlineEditor({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onCancel]);
 
-  const inputCls =
-    "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70";
+  const titleInputCls =
+    "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-sm font-normal text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
   const compactInputCls =
     "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-normal text-slate-900 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      className="animate-in fade-in slide-in-from-top-2 flex items-start gap-3 overflow-hidden rounded-xl border border-l-4 border-brand-primary/45 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5"
+      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-l-4 border-brand-primary/45 bg-white p-4 pb-2 pt-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5 md:pb-2 md:pt-4"
     >
       {dragHandle ? (
-        <div className="shrink-0 pt-1" aria-label="문항 순서 이동">
+        <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="문항 순서 이동">
           {dragHandle}
         </div>
       ) : null}
       <div className="min-w-0 flex-1">
         <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-        <UiInput
-          autoFocus={isNewQuestion}
-          aria-label="국문 질문"
-          className={`${inputCls} min-w-0`}
-          placeholder="질문"
-          value={form.titleKo}
-          disabled={isOngoing}
-          onChange={(event) => set("titleKo", event.target.value)}
-        />
-        <UiInput
-          aria-label="영문 질문"
-          className={`${inputCls} min-w-0`}
-          placeholder="Question"
-          value={form.titleEn}
-          disabled={isOngoing || isKoreanOnly}
-          onChange={(event) => set("titleEn", event.target.value)}
-        />
+        <div className="group relative min-w-0">
+          <UiInput
+            autoFocus={isNewQuestion}
+            aria-label="국문 질문"
+            className={`${titleInputCls} min-w-0`}
+            placeholder="질문"
+            value={form.titleKo}
+            disabled={isOngoing}
+            onChange={(event) => set("titleKo", event.target.value)}
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 left-1/2 h-0.5 w-0 -translate-x-1/2 bg-brand-primary transition-[width] duration-200 ease-out group-focus-within:w-full"
+          />
+        </div>
+        <div className="group relative min-w-0">
+          <UiInput
+            aria-label="영문 질문"
+            className={`${titleInputCls} min-w-0`}
+            placeholder="Question"
+            value={form.titleEn}
+            disabled={isOngoing || isKoreanOnly}
+            onChange={(event) => set("titleEn", event.target.value)}
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 left-1/2 h-0.5 w-0 -translate-x-1/2 bg-brand-primary transition-[width] duration-200 ease-out group-focus-within:w-full"
+          />
+        </div>
         <CompactImagePicker
           label="문항 이미지"
           value={questionImage}
@@ -491,40 +499,32 @@ export function QuestionInlineEditor({
       </div>
 
       {needsOptions ? (
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-            <span className="text-xs font-medium text-slate-600">선택지 라벨</span>
-            <SegmentedControl
-              ariaLabel="선택지 언어"
-              role="tablist"
-              value={activeTab}
-              onChange={setActiveTab}
-              itemClassName="!h-7 !min-h-7 !px-2.5 !text-xs"
-              options={[
-                { value: "ko", label: "국문" },
-                { value: "en", label: "영문", disabled: isKoreanOnly },
-              ]}
-            />
-          </div>
+        <div className="mt-4 pt-1">
           <div className="scrollbar-hidden max-h-64 space-y-2 overflow-y-auto pr-1">
             {form.options.map((option, index) => (
-              <div key={`${option.value}-${index}`} className="group flex min-w-0 flex-wrap items-center gap-2 px-1 py-1">
-                <span className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white text-[length:var(--ui-text-micro-size)] text-slate-400 ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`} aria-hidden="true">
-                  {form.questionType === "multiple_choice" ? "✓" : ""}
-                </span>
+              <div key={`${option.value}-${index}`} className="group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 px-1 py-1">
+                <span className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`} aria-hidden="true" />
                 <UiInput
                   ref={index === form.options.length - 1 ? lastOptionLabelRef : undefined}
-                  className="!h-9 min-w-[12rem] flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
-                  placeholder={activeTab === "ko" ? `옵션 ${index + 1}` : `Option ${index + 1}`}
-                  aria-label={`${index + 1}번 ${activeTab === "ko" ? "국문 라벨" : "영문 라벨"}`}
-                  value={activeTab === "ko" ? option.labelKo : option.labelEn}
-                  disabled={isOngoing || (activeTab === "en" && isKoreanOnly)}
-                  onChange={(event) => updateOption(index, activeTab === "ko" ? "labelKo" : "labelEn", event.target.value)}
+                  className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                  placeholder={`옵션 ${index + 1}`}
+                  aria-label={`${index + 1}번 국문 옵션`}
+                  value={option.labelKo}
+                  disabled={isOngoing}
+                  onChange={(event) => updateOption(index, "labelKo", event.target.value)}
+                />
+                <UiInput
+                  className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                  placeholder={`Option ${index + 1}`}
+                  aria-label={`${index + 1}번 영문 옵션`}
+                  value={option.labelEn}
+                  disabled={isOngoing || isKoreanOnly}
+                  onChange={(event) => updateOption(index, "labelEn", event.target.value)}
                 />
                 {supportsBranching && branchTargets.length > 0 ? (
                   <AdminSelectDropdown
                     ariaLabel={`${option.labelKo || option.value || "선택지"} 다음 섹션`}
-                    className="w-full shrink-0 sm:w-40"
+                    className="col-span-full w-full shrink-0 sm:col-span-1 sm:w-40"
                     value={branchMap[option.value] ?? ""}
                     disabled={isOngoing || !option.value.trim()}
                     onChange={(target) => updateBranchTarget(option.value, target)}
@@ -539,9 +539,9 @@ export function QuestionInlineEditor({
                 ) : null}
                 <CompactImagePicker
                   label="선택지 이미지"
-                  value={activeTab === "ko" ? option.imageUrlKo : option.imageUrlEn}
-                  onChange={(value) => updateOption(index, activeTab === "ko" ? "imageUrlKo" : "imageUrlEn", value)}
-                  disabled={isOngoing || (activeTab === "en" && isKoreanOnly)}
+                  value={option.imageUrlKo ?? option.imageUrlEn ?? null}
+                  onChange={(value) => updateOptionImage(index, value)}
+                  disabled={isOngoing}
                 />
                 {!isOngoing ? (
                   form.options.length > 1 ? (
@@ -565,7 +565,7 @@ export function QuestionInlineEditor({
                   type="text"
                   readOnly
                   aria-label="선택지 추가"
-                  placeholder="옵션 추가 또는 '기타' 추가"
+                  placeholder="옵션 추가"
                   disabled={isOngoing}
                   onFocus={addOption}
                   className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none transition-colors placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
@@ -577,7 +577,7 @@ export function QuestionInlineEditor({
       ) : null}
 
       {isGrid ? (
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 pt-1">
           <div className="grid gap-3 md:grid-cols-2">
             {(["rows", "columns"] as const).map((kind) => {
               const items = gridConfig[kind] ?? [];
@@ -647,7 +647,7 @@ export function QuestionInlineEditor({
       ) : null}
 
       {form.questionType === "rating" ? (
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-3 pt-1">
           <span className="text-xs font-medium text-slate-600">등급 개수</span>
           <AdminSelectDropdown
             ariaLabel="등급 개수"
