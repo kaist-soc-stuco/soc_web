@@ -12,7 +12,6 @@ import { AuthService } from "./auth.service";
 import { InitialAdminRepository } from "./initial-admin.repository";
 import { InitialAdminService } from "./initial-admin.service";
 import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "./guards";
-import { AuthEligibilityService } from "./auth-eligibility.service";
 
 @Module({
   imports: [PostgresModule, RedisModule, UsersModule],
@@ -21,7 +20,6 @@ import { AuthEligibilityService } from "./auth-eligibility.service";
     AuthGuard,
     OptionalAuthGuard,
     PermissionBitsGuard,
-    AuthEligibilityService,
     AuthCookieService,
     AuthService,
     InitialAdminRepository,
@@ -37,7 +35,6 @@ import { AuthEligibilityService } from "./auth-eligibility.service";
     AuthCookieService,
     AuthSessionRepository,
     AuthSessionService,
-    AuthEligibilityService,
   ],
 })
 export class AuthModule {}

@@ -16,7 +16,6 @@ import { REDIS_CLIENT } from "../../infrastructure/redis/redis.provider";
 import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
-import { AuthEligibilityService } from "./auth-eligibility.service";
 import { InitialAdminService } from "./initial-admin.service";
 
 interface SsoConfig {
@@ -85,7 +84,6 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly authSessionService: AuthSessionService,
     private readonly pendingLoginRepository: PendingLoginRepository,
-    private readonly authEligibilityService: AuthEligibilityService,
     private readonly initialAdminService: InitialAdminService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
@@ -279,24 +277,7 @@ export class AuthService {
         return this.buildFrontendRedirect("error", "missing_email");
       }
 
-      const eligibleDepartment =
-        this.authEligibilityService.isEligibleDepartment(
-          departmentKo,
-          departmentEn,
-        );
-
       const existingUser = await this.usersService.findByKaistUid(kaistUid);
-
-      if (!eligibleDepartment) {
-        if (existingUser?.isActive) {
-          await this.usersService.expireAccount(
-            existingUser.userId,
-            "department_not_eligible",
-          );
-        }
-
-        return this.buildFrontendRedirect("error", "department_not_eligible");
-      }
 
       if (existingUser) {
         if (!existingUser.isActive) {
