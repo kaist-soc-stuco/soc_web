@@ -193,7 +193,7 @@ export class SurveyResponsesService {
       throw new ConflictException("survey_capacity_full");
     }
 
-    await this.surveySheetsService?.refresh(surveyId);
+    await this.surveySheetsService?.enqueueRefresh(surveyId);
     return { ...submission.response, answers: submission.answers };
   }
 
@@ -274,7 +274,7 @@ export class SurveyResponsesService {
     });
 
     if (update.status === "updated") {
-      await this.surveySheetsService?.refresh(surveyId);
+      await this.surveySheetsService?.enqueueRefresh(surveyId);
       return { ...update.response, answers: update.answers };
     }
     if (

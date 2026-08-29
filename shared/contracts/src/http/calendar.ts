@@ -32,6 +32,8 @@ export interface PublicCalendarEventItem {
   dateType: CalendarEventDateType;
   startAt?: string;
   endAt?: string;
+  isAllDay?: boolean;
+  isAlways?: boolean;
   location?: string | null;
   calendarEventId?: string | null;
   category?: CalendarEventCategory;
@@ -51,11 +53,14 @@ export interface CalendarEventRecord {
   endAt: string;
   location?: string | null;
   sourceUid?: string | null;
-  sourceType: "MANUAL" | "KAIST_ACADEMIC";
+  sourceType: "ARTICLE" | "MANUAL" | "KAIST_ACADEMIC";
+  articleId?: string | null;
   sourceYear?: number | null;
   isReadOnly: boolean;
   isActive: boolean;
   isHiddenByAdmin: boolean;
+  isAllDay: boolean;
+  isAlways: boolean;
   category: CalendarEventCategory;
   categoryOverride?: CalendarEventCategory | null;
   createdByUserId?: string | null;

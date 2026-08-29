@@ -22,6 +22,8 @@ export const calendarEvents = pgTable("calendar_event", {
   descriptionEn: text("description_en"),
   startAt: timestamp("start_at", { withTimezone: true }).notNull(),
   endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+  isAllDay: boolean("is_all_day").notNull().default(false),
+  isAlways: boolean("is_always").notNull().default(false),
   location: varchar("location", { length: 255 }),
   sourceUid: varchar("source_uid", { length: 255 }),
   sourceType: varchar("source_type", { length: 32 }).notNull().default("MANUAL"),

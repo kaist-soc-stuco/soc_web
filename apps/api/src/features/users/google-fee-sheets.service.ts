@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnModuleInit } from "@nestjs/common";
 import type {
   StudentFeeListOptions,
   StudentFeeSpreadsheetSyncResponse,
@@ -6,6 +6,10 @@ import type {
 import { nowIso } from "@soc/shared";
 
 import { GoogleSheetsClient } from "../../infrastructure/google/google-sheets.client";
+import {
+  GOOGLE_SHEET_RESOURCE,
+  GoogleSpreadsheetSyncQueueService,
+} from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 import { UsersService } from "./users.service";
 
 const SHEET_TITLE = "과비 납부";
@@ -24,11 +28,28 @@ type FeeSpreadsheetSyncOptions = Pick<
 >;
 
 @Injectable()
-export class GoogleFeeSheetsService {
+export class GoogleFeeSheetsService implements OnModuleInit {
   constructor(
     private readonly sheets: GoogleSheetsClient,
     private readonly usersService: UsersService,
+    private readonly syncQueue: GoogleSpreadsheetSyncQueueService,
   ) {}
+
+  onModuleInit(): void {
+    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.STUDENT_FEES, () =>
+      this.sync().then(() => undefined),
+    );
+  }
+
+  async getReference() {
+    const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
+      title: "KAIST SOC 과비 납부",
+      sheetTitle: SHEET_TITLE,
+      purpose: SPREADSHEET_PURPOSE,
+    });
+    await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
+    return spreadsheet;
+  }
 
   async sync(options: FeeSpreadsheetSyncOptions = {}): Promise<StudentFeeSpreadsheetSyncResponse> {
     const rows = await this.usersService.exportStudentsByFeeStatus(

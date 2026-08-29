@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { Copy, Grid2X2, GripVertical, ImagePlus, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Copy, Grid2X2, Grip, ImagePlus, Plus, Trash2 } from "lucide-react";
 import type { QuestionType, SurveyQuestionConfig } from "@soc/contracts";
 import { Button } from "@/components/ui/button";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
-import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { UiInput } from "@/components/ui/form-control";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { SurveyImageField } from "@/components/ui/survey-image-field";
@@ -26,8 +26,6 @@ const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
 export interface QuestionFormState {
   titleKo: string;
   titleEn: string;
-  descriptionKo: string;
-  descriptionEn: string;
   questionType: QuestionType;
   options: { value: string; labelKo: string; labelEn: string; imageUrlKo?: string | null; imageUrlEn?: string | null }[];
   answerRegex: string;
@@ -43,6 +41,7 @@ interface QuestionInlineEditorProps {
   currentSectionId?: string;
   branchTargets?: Array<{ id: string; titleKo: string }>;
   isNewQuestion?: boolean;
+  dragHandle?: ReactNode;
   onDuplicate?: () => void;
   onDelete?: () => void;
   onSave: (q: QuestionFormState) => void | Promise<void>;
@@ -96,6 +95,7 @@ export function QuestionInlineEditor({
   currentSectionId,
   branchTargets = [],
   isNewQuestion = false,
+  dragHandle,
   onDuplicate,
   onDelete,
   onSave,
@@ -128,6 +128,15 @@ export function QuestionInlineEditor({
   const supportsValidation = form.questionType === "short_text" || form.questionType === "long_text";
   const gridConfig = form.config ?? { rows: [], columns: [] };
   const branchMap = form.config?.goToSectionByValue ?? {};
+  const questionImage = form.config?.imageUrlKo ?? form.config?.imageUrlEn ?? null;
+
+  const updateQuestionImage = (value: string | null) => {
+    set("config", {
+      ...(form.config ?? {}),
+      imageUrlKo: value,
+      imageUrlEn: value,
+    });
+  };
 
   const updateBranchTarget = (optionValue: string, target: string) => {
     const nextMap = { ...branchMap };
@@ -335,6 +344,11 @@ export function QuestionInlineEditor({
       const target = event.target;
       if (target instanceof Node && editorRef.current?.contains(target)) return;
       if (target instanceof Element && target.closest(".ui-select-dropdown-menu")) return;
+      // A non-focusable surface does not move focus on its own. Explicitly
+      // blur the active control so clicking anywhere outside the card also
+      // clears the editor's focus ring immediately.
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) activeElement.blur();
       if (isOngoing) {
         onCancel();
         return;
@@ -367,86 +381,42 @@ export function QuestionInlineEditor({
       ref={editorRef}
       className="animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-l-4 border-brand-primary/45 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5"
     >
-      <div className="mb-3 flex justify-center text-slate-300" aria-hidden="true">
-        <GripVertical className="size-5" />
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-xs font-medium text-slate-600">
-            국문 제목 <span className="text-rose-500">*</span>
-          </label>
-          <div className="flex items-center gap-2">
-            <UiInput
-              autoFocus={isNewQuestion}
-              className={`${inputCls} min-w-0 flex-1`}
-              placeholder="질문을 입력하세요"
-              value={form.titleKo}
-              disabled={isOngoing}
-              onChange={(event) => set("titleKo", event.target.value)}
-            />
-            <CompactImagePicker
-              label="국문 문항 이미지"
-              value={form.config?.imageUrlKo}
-              onChange={(value) => set("config", { ...(form.config ?? {}), imageUrlKo: value })}
-              disabled={isOngoing}
-            />
-          </div>
+      {dragHandle ? (
+        <div className="mb-2 flex justify-center" aria-label="문항 순서 이동">
+          {dragHandle}
         </div>
-        <div className="min-w-0">
-          <label className="mb-1.5 block text-xs font-medium text-slate-600">
-            영문 제목 {!isKoreanOnly ? <span className="text-rose-500">*</span> : <span className="text-slate-400">(선택)</span>}
-          </label>
-          <div className="flex items-center gap-2">
-            <UiInput
-              className={`${inputCls} min-w-0 flex-1`}
-              placeholder="영문 질문을 입력하세요"
-              value={form.titleEn}
-              disabled={isOngoing || isKoreanOnly}
-              onChange={(event) => set("titleEn", event.target.value)}
-            />
-            <CompactImagePicker
-              label="영문 문항 이미지"
-              value={form.config?.imageUrlEn}
-              onChange={(value) => set("config", { ...(form.config ?? {}), imageUrlEn: value })}
-              disabled={isOngoing || isKoreanOnly}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <label className="min-w-0 text-xs font-medium text-slate-600">
-          국문 설명 <span className="font-normal text-slate-400">(선택)</span>
-          <UiTextarea
-            className="mt-1.5 min-h-16 w-full rounded-lg border-slate-200 px-3 py-2 text-sm font-normal leading-5 text-slate-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15"
-            placeholder="질문에 대한 설명을 입력하세요"
-            value={form.descriptionKo}
-            disabled={isOngoing}
-            onChange={(event) => set("descriptionKo", event.target.value)}
-          />
-        </label>
-        <label className="min-w-0 text-xs font-medium text-slate-600">
-          영문 설명 <span className="font-normal text-slate-400">(선택)</span>
-          <UiTextarea
-            className="mt-1.5 min-h-16 w-full rounded-lg border-slate-200 px-3 py-2 text-sm font-normal leading-5 text-slate-900 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15"
-            placeholder="Add a description (optional)"
-            value={form.descriptionEn}
-            disabled={isOngoing || isKoreanOnly}
-            onChange={(event) => set("descriptionEn", event.target.value)}
-          />
-        </label>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-xs font-medium text-slate-600">질문 유형</span>
+      ) : null}
+      <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+        <UiInput
+          autoFocus={isNewQuestion}
+          aria-label="국문 질문"
+          className={`${inputCls} min-w-0`}
+          placeholder="질문"
+          value={form.titleKo}
+          disabled={isOngoing}
+          onChange={(event) => set("titleKo", event.target.value)}
+        />
+        <UiInput
+          aria-label="영문 질문"
+          className={`${inputCls} min-w-0`}
+          placeholder="Question"
+          value={form.titleEn}
+          disabled={isOngoing || isKoreanOnly}
+          onChange={(event) => set("titleEn", event.target.value)}
+        />
+        <CompactImagePicker
+          label="문항 이미지"
+          value={questionImage}
+          onChange={updateQuestionImage}
+          disabled={isOngoing}
+        />
         <AdminSelectDropdown
           ariaLabel="질문 유형"
           value={form.questionType}
           options={QUESTION_TYPES}
           onChange={(value) => changeQuestionType(value as QuestionType)}
           disabled={isOngoing}
-          className="w-full sm:w-52"
+          className="w-full md:w-48"
           buttonClassName="!h-10 !text-sm"
         />
       </div>
@@ -623,88 +593,84 @@ export function QuestionInlineEditor({
         </div>
       ) : null}
 
-      {supportsValidation ? (
-        <div className="mt-4 border-t border-slate-100 pt-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-slate-700">응답 검증(정규식)</p>
-              <p className="mt-0.5 text-xs text-slate-400">입력값이 정규식과 일치하는지 확인합니다.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.answerValidationEnabled}
-              aria-label="응답 검증(정규식)"
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <QuestionSwitch
+              checked={form.isRequired}
               disabled={isOngoing}
-              onClick={() => toggleAnswerValidation(!form.answerValidationEnabled)}
-              className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/25 disabled:cursor-not-allowed disabled:opacity-50 ${form.answerValidationEnabled ? "bg-brand-primary" : "bg-slate-200"}`}
-            >
-              <span className={`absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${form.answerValidationEnabled ? "translate-x-4" : "translate-x-0"}`} />
-            </button>
+              label="필수 응답"
+              onChange={(checked) => set("isRequired", checked)}
+            />
+            {supportsValidation ? (
+              <QuestionSwitch
+                checked={form.answerValidationEnabled}
+                disabled={isOngoing}
+                label="응답 검증"
+                onChange={toggleAnswerValidation}
+              />
+            ) : null}
           </div>
-          <div className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out ${form.answerValidationEnabled ? "grid-rows-[1fr] opacity-100" : "pointer-events-none grid-rows-[0fr] opacity-0"}`}>
-            <div className="min-h-0 overflow-hidden">
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="text-xs font-medium text-slate-600">
-                  정규식
-                  <UiInput
-                    className={`${compactInputCls} mt-1.5 w-full`}
-                    placeholder="예: ^[0-9]+$"
-                    value={form.answerRegex}
-                    disabled={isOngoing}
-                    onChange={(event) => set("answerRegex", event.target.value)}
-                  />
-                </label>
-                <label className="text-xs font-medium text-slate-600">
-                  오류 메시지
-                  <UiInput
-                    className={`${compactInputCls} mt-1.5 w-full`}
-                    placeholder="입력 형식을 확인해 주세요."
-                    value={form.config?.validationErrorMessage ?? ""}
-                    disabled={isOngoing}
-                    onChange={(event) => set("config", { ...(form.config ?? {}), validationErrorMessage: event.target.value })}
-                  />
-                </label>
-              </div>
-            </div>
+          <div className="ml-auto flex items-center gap-1">
+            {!isNewQuestion && !isOngoing && onDuplicate ? (
+              <IconButton type="button" size="sm" aria-label="문항 복제" onClick={onDuplicate}>
+                <Copy className="size-4" />
+              </IconButton>
+            ) : null}
+            {!isNewQuestion && !isOngoing && onDelete ? (
+              <IconButton type="button" size="sm" aria-label="문항 삭제" onClick={onDelete} className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600">
+                <Trash2 className="size-4" />
+              </IconButton>
+            ) : null}
           </div>
         </div>
-      ) : null}
+        {supportsValidation ? (
+          <div className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out ${form.answerValidationEnabled ? "mt-3 grid-rows-[1fr] opacity-100" : "pointer-events-none grid-rows-[0fr] opacity-0"}`}>
+            <div className="min-h-0 overflow-hidden">
+              <UiInput
+                aria-label="정규식"
+                className={`${compactInputCls} w-full max-w-xl`}
+                placeholder="정규식 (예: ^[0-9]+$)"
+                value={form.answerRegex}
+                disabled={isOngoing}
+                onChange={(event) => set("answerRegex", event.target.value)}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {error ? (
         <div role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
           {error}
         </div>
       ) : null}
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-        <div className="flex items-center gap-1">
-          {!isNewQuestion && !isOngoing && onDuplicate ? (
-            <IconButton type="button" size="sm" aria-label="문항 복제" onClick={onDuplicate}>
-              <Copy className="size-4" />
-            </IconButton>
-          ) : null}
-          {!isNewQuestion && !isOngoing && onDelete ? (
-            <IconButton type="button" size="sm" aria-label="문항 삭제" onClick={onDelete} className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600">
-              <Trash2 className="size-4" />
-            </IconButton>
-          ) : null}
-          <span className="ml-1 text-xs text-slate-400">
-            {isOngoing ? "읽기 전용 문항" : isNewQuestion ? "바깥 영역을 클릭하면 문항이 등록됩니다." : "바깥 영역을 클릭하면 변경사항이 저장됩니다."}
-          </span>
-        </div>
-        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-          <UiInput
-            type="checkbox"
-            className="peer sr-only"
-            checked={form.isRequired}
-            disabled={isOngoing}
-            onChange={(event) => set("isRequired", event.target.checked)}
-          />
-          <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary/25 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-brand-primary peer-checked:after:translate-x-4" />
-          필수 응답
-        </label>
-      </div>
     </div>
+  );
+}
+
+function QuestionSwitch({
+  checked,
+  disabled = false,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className={`inline-flex select-none items-center gap-2 text-xs font-medium text-slate-700 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+      <UiInput
+        type="checkbox"
+        className="peer sr-only"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary/25 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-brand-primary peer-checked:after:translate-x-4" />
+      {label}
+    </label>
   );
 }

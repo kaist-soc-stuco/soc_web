@@ -1,21 +1,47 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { ContactSpreadsheetSyncResponse } from "@soc/contracts";
 import { nowIso } from "@soc/shared";
 
 import { GoogleSheetsClient } from "../../infrastructure/google/google-sheets.client";
+import {
+  GOOGLE_SHEET_RESOURCE,
+  GoogleSpreadsheetSyncQueueService,
+} from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 import { ContactsRepository } from "./contacts.repository";
 
 const SHEET_TITLE = "연락망";
 const SPREADSHEET_PURPOSE = "executive-contacts";
 
 @Injectable()
-export class GoogleContactSheetsService {
+export class GoogleContactSheetsService implements OnModuleInit {
   constructor(
     private readonly config: ConfigService,
     private readonly sheets: GoogleSheetsClient,
     private readonly contactsRepo: ContactsRepository,
+    private readonly syncQueue: GoogleSpreadsheetSyncQueueService,
   ) {}
+
+  onModuleInit(): void {
+    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.CONTACTS, () =>
+      this.sync().then(() => undefined),
+    );
+  }
+
+  async enqueueSync(): Promise<void> {
+    await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.CONTACTS);
+  }
+
+  async getReference() {
+    const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
+      configuredSpreadsheetId: this.config.get<string>("GOOGLE_CONTACTS_SPREADSHEET_ID"),
+      title: "KAIST SOC 집행위 연락망",
+      sheetTitle: SHEET_TITLE,
+      purpose: SPREADSHEET_PURPOSE,
+    });
+    await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.CONTACTS);
+    return spreadsheet;
+  }
 
   async sync(): Promise<ContactSpreadsheetSyncResponse> {
     const contacts = await this.contactsRepo.findManaged({ page: 1, pageSize: 500 });

@@ -173,6 +173,8 @@ export const SsoCallbackBodySchema = z.object({
     descriptionEn: z.string().max(10_000).optional(),
     startAt: CalendarDateTimeSchema,
     endAt: CalendarDateTimeSchema,
+    isAllDay: z.boolean().optional().default(false),
+    isAlways: z.boolean().optional().default(false),
     location: z.string().trim().max(255).optional(),
     sourceUid: z.string().trim().max(255).optional(),
   });

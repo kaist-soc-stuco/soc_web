@@ -317,6 +317,15 @@ export class UsersController {
     });
   }
 
+  @Get("fee-status/spreadsheet")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  async getStudentFeeSpreadsheet(): Promise<{
+    spreadsheetId: string;
+    spreadsheetUrl: string;
+  }> {
+    return this.googleFeeSheetsService.getReference();
+  }
+
   @Get("fee-status/export.xlsx")
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="student_fee_status.xlsx"')

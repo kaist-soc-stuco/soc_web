@@ -479,6 +479,17 @@ export const createAdminApi = ({
     );
   },
 
+  getContactsSpreadsheet: async (): Promise<{
+    spreadsheetId: string;
+    spreadsheetUrl: string;
+  }> => {
+    return requestJson(
+      `${contactsBaseUrl}/spreadsheet`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   downloadContactsXlsx: async (
     options?: Omit<ContactListOptions, "page" | "pageSize">,
   ): Promise<Blob> => {
@@ -610,6 +621,17 @@ export const createAdminApi = ({
     return requestJson<StudentFeeSpreadsheetSyncResponse>(
       `${usersBaseUrl}/fee-status/spreadsheet/sync${query ? `?${query}` : ""}`,
       { method: "POST" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  getStudentFeeSpreadsheet: async (): Promise<{
+    spreadsheetId: string;
+    spreadsheetUrl: string;
+  }> => {
+    return requestJson(
+      `${usersBaseUrl}/fee-status/spreadsheet`,
+      { method: "GET" },
       { retryOnUnauthorized: true },
     );
   },

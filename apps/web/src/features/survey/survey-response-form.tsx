@@ -161,20 +161,6 @@ export function SurveyResponseForm({
                       </span>
                     </label>
                   </div>
-                  {getLocalizedText(
-                    lang,
-                    question.descriptionKo,
-                    question.descriptionEn,
-                  ) && (
-                    <RichTextContent
-                      content={getLocalizedText(
-                        lang,
-                        question.descriptionKo,
-                        question.descriptionEn,
-                      )}
-                      className="mb-4 text-[length:var(--ui-text-section-size)] font-normal leading-relaxed text-slate-500"
-                    />
-                  )}
                   {questionImage ? (
                     <img
                       src={resolveAssetUrl(questionImage)}

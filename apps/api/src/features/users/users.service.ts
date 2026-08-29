@@ -33,6 +33,10 @@ import type {
 } from "@soc/contracts";
 import { isoToDate, nowDate } from "@soc/shared";
 import { EmailDeliveryService } from "../email/email-delivery.service";
+import {
+  GOOGLE_SHEET_RESOURCE,
+  GoogleSpreadsheetSyncQueueService,
+} from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 
 interface AuditMetadata {
   actorUserId?: string | null;
@@ -50,6 +54,7 @@ export class UsersService {
     private readonly usersRepository: UsersRepository,
     private readonly auditLogService: AuditLogService,
     @Optional() private readonly emailDeliveryService?: EmailDeliveryService,
+    private readonly googleSheetsQueue?: GoogleSpreadsheetSyncQueueService,
   ) {}
 
   private normalizeListOptions(options: { page: number; limit: number }) {
@@ -301,6 +306,8 @@ export class UsersService {
       targetType: "student_fee_status",
     });
 
+    await this.googleSheetsQueue?.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
+
     return record;
   }
 
@@ -366,6 +373,8 @@ export class UsersService {
       payload: { count: result.count, paymentIds: result.payments.map((payment) => payment.paymentId) },
       targetType: "student_fee_payment",
     });
+
+    await this.googleSheetsQueue?.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
 
     return result;
   }

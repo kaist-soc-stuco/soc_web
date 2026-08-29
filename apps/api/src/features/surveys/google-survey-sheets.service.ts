@@ -1,6 +1,10 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
 
 import { GoogleSheetsClient } from "../../infrastructure/google/google-sheets.client";
+import {
+  GOOGLE_SHEET_RESOURCE,
+  GoogleSpreadsheetSyncQueueService,
+} from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
 import { SurveyQuestionsRepository } from "./survey-questions.repository";
@@ -11,7 +15,7 @@ import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 const SHEET_TITLE = "응답";
 
 @Injectable()
-export class GoogleSurveySheetsService {
+export class GoogleSurveySheetsService implements OnModuleInit {
   private readonly logger = new Logger(GoogleSurveySheetsService.name);
 
   constructor(
@@ -20,7 +24,18 @@ export class GoogleSurveySheetsService {
     private readonly sectionsRepo: SurveySectionsRepository,
     private readonly questionsRepo: SurveyQuestionsRepository,
     private readonly responsesRepo: SurveyResponsesRepository,
+    private readonly syncQueue: GoogleSpreadsheetSyncQueueService,
   ) {}
+
+  onModuleInit(): void {
+    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.SURVEY, (surveyId) =>
+      this.refresh(surveyId, true),
+    );
+  }
+
+  async enqueueRefresh(surveyId: string): Promise<void> {
+    await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.SURVEY, surveyId);
+  }
 
   async connect(surveyId: string) {
     const survey = await this.surveysRepo.findById(surveyId);

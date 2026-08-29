@@ -239,7 +239,7 @@ function ArticleCombobox({
       {isOpen ? (
         <div
           role="listbox"
-          className="absolute inset-x-0 top-full z-30 mt-2 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-[0_8px_24px_rgb(15_23_42_/_0.10)]"
+          className="scrollbar-hidden absolute inset-x-0 bottom-full z-30 mb-2 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-[0_8px_24px_rgb(15_23_42_/_0.10)]"
         >
           <button
             type="button"
@@ -526,7 +526,6 @@ export function SurveySettingsForm({
             <section className="space-y-3" aria-labelledby="survey-basic-settings">
               <div>
                 <h3 id="survey-basic-settings" className="text-sm font-semibold text-[#172033]">기본 설정</h3>
-                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">설문 유형과 결과 공개 범위를 정합니다.</p>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <AdminFormField label="유형 *">
@@ -563,7 +562,6 @@ export function SurveySettingsForm({
             <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-schedule-settings">
               <div>
                 <h3 id="survey-schedule-settings" className="text-sm font-semibold text-[#172033]">일정 및 기간</h3>
-                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">응답을 받을 기간과 최대 응답 수를 설정합니다.</p>
               </div>
               <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                 <SettingCheckbox
@@ -616,7 +614,6 @@ export function SurveySettingsForm({
             <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-audience-settings">
               <div>
                 <h3 id="survey-audience-settings" className="text-sm font-semibold text-[#172033]">참여 대상 및 접근</h3>
-                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">익명 응답과 로그인 사용자 제한은 동시에 적용되지 않습니다.</p>
               </div>
               <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                 <SettingCheckbox
@@ -687,7 +684,6 @@ export function SurveySettingsForm({
             <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-response-settings">
               <div>
                 <h3 id="survey-response-settings" className="text-sm font-semibold text-[#172033]">응답 규칙</h3>
-                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">복수 응답과 제출 후 수정 중 하나만 선택할 수 있습니다.</p>
               </div>
               <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                 <SettingCheckbox
@@ -716,7 +712,6 @@ export function SurveySettingsForm({
             <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-display-settings">
               <div>
                 <h3 id="survey-display-settings" className="text-sm font-semibold text-[#172033]">노출 및 연결</h3>
-                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">홈 캘린더 노출 여부와 연결할 게시글을 관리합니다.</p>
               </div>
               <SettingCheckbox
                 checked={showOnCalendar}

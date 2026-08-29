@@ -47,7 +47,7 @@ import {
   SectionEditorModal,
   type SectionFormState,
 } from "@/components/organisms/section-editor-modal";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, Grip, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { UiInput } from "@/components/ui/form-control";
@@ -174,8 +174,6 @@ const SurveySettingsSchema = z.object({
 const emptyQuestion = (): QuestionFormState => ({
   titleKo: "",
   titleEn: "",
-  descriptionKo: "",
-  descriptionEn: "",
   questionType: "short_text",
   options: [],
   answerRegex: "",
@@ -233,7 +231,7 @@ type SortableQuestionRowProps = {
   isOngoing: boolean;
   onEdit: () => void;
   isEditing?: boolean;
-  editor?: ReactNode;
+  editor?: (dragHandle: ReactNode) => ReactNode;
 };
 
 function SortableQuestionRow({
@@ -251,7 +249,7 @@ function SortableQuestionRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: question.id, disabled: isOngoing || isEditing });
+  } = useSortable({ id: question.id, disabled: isOngoing });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -267,7 +265,7 @@ function SortableQuestionRow({
       {...listeners}
       className="flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing"
     >
-      <GripVertical className="size-4" />
+      <Grip className="size-4" />
     </button>
   );
 
@@ -301,7 +299,7 @@ function SortableQuestionRow({
       }
       className={
         isEditing
-          ? "w-full cursor-default border-0 bg-transparent p-0 shadow-none"
+          ? `w-full cursor-default border-0 bg-transparent p-0 shadow-none ${isDragging ? "relative z-0 opacity-0" : ""}`
           : `${QUESTION_ROW_CLASS} transition-[background-color,border-color,box-shadow] duration-100 ${
               isDragging
                 ? "relative z-0 select-none opacity-0"
@@ -309,7 +307,7 @@ function SortableQuestionRow({
             }`
       }
     >
-      {isEditing && editor ? editor : (
+      {isEditing && editor ? editor(dragHandle) : (
         <QuestionRowContent
           question={question}
           isOngoing={isOngoing}
@@ -335,7 +333,7 @@ function QuestionDragOverlayRow({
         isOngoing={isOngoing}
         dragHandle={
           <span className="flex size-7 shrink-0 items-center justify-center text-brand-primary">
-            <GripVertical className="size-4" />
+            <Grip className="size-4" />
           </span>
         }
       />
@@ -799,8 +797,6 @@ export function SurveyEditorPage() {
       initial: {
         titleKo: q.titleKo,
         titleEn: q.titleEn ?? "",
-        descriptionKo: q.descriptionKo ?? "",
-        descriptionEn: q.descriptionEn ?? "",
         questionType: q.questionType,
         options: (q.options ?? []).map((opt) => ({
           value: opt.value,
@@ -830,8 +826,8 @@ export function SurveyEditorPage() {
     const body = {
       titleKo: qForm.titleKo.trim(),
       titleEn: qForm.titleEn.trim() || undefined,
-      descriptionKo: qForm.descriptionKo.trim() || undefined,
-      descriptionEn: qForm.descriptionEn.trim() || undefined,
+      descriptionKo: "",
+      descriptionEn: "",
       questionType: qForm.questionType,
       options: qForm.options.length > 0 ? qForm.options : undefined,
       config: questionConfig && Object.keys(questionConfig).length > 0 ? questionConfig : undefined,
@@ -872,8 +868,8 @@ export function SurveyEditorPage() {
       await client.createQuestion(loadedSurveyId, sectionId, {
         titleKo: `${question.titleKo} (복사본)`,
         titleEn: question.titleEn ? `${question.titleEn} (Copy)` : undefined,
-        descriptionKo: question.descriptionKo ?? undefined,
-        descriptionEn: question.descriptionEn ?? undefined,
+        descriptionKo: "",
+        descriptionEn: "",
         questionType: question.questionType,
         options: question.options?.map((option) => ({ ...option })) ?? undefined,
         config: question.config
@@ -1128,7 +1124,7 @@ export function SurveyEditorPage() {
             options={[
               { value: "settings", label: "기본 정보" },
               { value: "content", label: `문항 구성${sections.length ? ` · ${sections.reduce((count, section) => count + section.questions.length, 0)}` : ""}` },
-              { value: "delivery", label: "배포 설정" },
+              { value: "delivery", label: "설정" },
             ]}
           />
 
@@ -1231,20 +1227,23 @@ export function SurveyEditorPage() {
                                     isOngoing={isOngoing}
                                     isEditing={isEditing}
                                     editor={
-                                      isEditing ? (
-                                        <QuestionInlineEditor
-                                          initial={editingQuestion.initial}
-                                          isKoreanOnly={isKoreanOnly}
-                                          isOngoing={isOngoing}
-                                          currentSectionId={section.id}
-                                          branchTargets={branchTargetsForEditing}
-                                          isNewQuestion={false}
-                                          onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
-                                          onDelete={() => void handleDeleteQuestion(section.id, question.id)}
-                                          onSave={handleSaveQuestion}
-                                          onCancel={() => setEditingQuestion(null)}
-                                        />
-                                      ) : undefined
+                                      isEditing
+                                        ? (dragHandle) => (
+                                            <QuestionInlineEditor
+                                              initial={editingQuestion.initial}
+                                              isKoreanOnly={isKoreanOnly}
+                                              isOngoing={isOngoing}
+                                              currentSectionId={section.id}
+                                              branchTargets={branchTargetsForEditing}
+                                              isNewQuestion={false}
+                                              dragHandle={dragHandle}
+                                              onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
+                                              onDelete={() => void handleDeleteQuestion(section.id, question.id)}
+                                              onSave={handleSaveQuestion}
+                                              onCancel={() => setEditingQuestion(null)}
+                                            />
+                                          )
+                                        : undefined
                                     }
                                     onEdit={() => openEditQuestion(section.id, question)}
                                   />
@@ -1270,7 +1269,7 @@ export function SurveyEditorPage() {
                                   className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
                                 >
                                   <Plus className="w-4 h-4" />
-                                  질문 추가하기
+                                  문항 추가하기
                                 </Button>
                               </div>
                             )}

@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import * as XLSX from "xlsx";
 import { createApiClient } from "@soc/api-client";
 import type {
-  SurveyAnswerRecord,
   SurveyAnalyticsResponse,
   SurveyDetailResponse,
   SurveyQuestionRecord,
@@ -12,7 +10,6 @@ import type {
 } from "@soc/contracts";
 import { isoToDate, isoToMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
-import { downloadBlob } from "@/lib/download-blob";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminCard, AdminEmptyState, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
 import { SurveyRespondentDrawer } from "@/components/organisms/survey-respondent-drawer";
@@ -26,14 +23,10 @@ import { hasSurveyManagePermission, Permissions } from "@/lib/permissions";
 import { 
   ChevronLeft,
   Eye,
-  Download,
-  ExternalLink,
-  RefreshCw,
   Sheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { formatSurveyAnswer } from "@/lib/survey-answer-display";
 import {
   AdminDataTable,
   AdminTableBody,
@@ -72,13 +65,6 @@ function format24hDateTime(dateIso: string | null) {
   const minute = String(d.getMinutes()).padStart(2, "0");
 
   return `${year}.${month}.${day} ${hour}:${minute}`;
-}
-
-function stringifyAnswerContent(
-  answer: SurveyAnswerRecord | undefined,
-  question: SurveyQuestionRecord,
-) {
-  return formatSurveyAnswer(answer, question);
 }
 
 export function SurveyResponseListPage() {
@@ -129,53 +115,6 @@ export function SurveyResponseListPage() {
     fetchSurveyAndResponses();
   }, [surveyId, client, session, sessionLoading]);
 
-  const handleExport = async () => {
-    if (!surveyId) return;
-    try {
-      const detail = await client.getSurveyDetail(surveyId);
-      const allQuestions = detail.sections.flatMap((s) => s.questions);
-      const data = await client.listResponsesWithAnswers(surveyId);
-
-      const headers = [
-        "No.",
-        "이름",
-        "이메일",
-        "소속 / 학번",
-        "제출 시각",
-        "상태",
-        ...allQuestions.map((q) => q.titleKo),
-      ];
-
-      const rows = data.map((r, idx) => {
-        const answerCols = allQuestions.map((q) => {
-          const ans = r.answers.find((a) => a.questionId === q.id);
-          return stringifyAnswerContent(ans, q);
-        });
-
-        return [
-          String(data.length - idx),
-          formatResponseName(r),
-          formatResponseEmail(r),
-          formatResponseDepartment(r),
-          r.submittedAt ? format24hDateTime(r.submittedAt) : "—",
-          r.status,
-          ...answerCols,
-        ];
-      });
-
-      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-      worksheet["!cols"] = headers.map((header) => ({ wch: header.length > 18 ? 24 : 16 }));
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "응답 목록");
-      const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      downloadBlob(blob, `survey_responses_${surveyId}.xlsx`);
-    } catch (err) {
-      console.error(err);
-      toast({ type: "error", message: "응답을 내보내지 못했습니다." });
-    }
-  };
-
   const handleSheet = async () => {
     if (!surveyId || sheetBusy) return;
     if (survey?.spreadsheetUrl) {
@@ -197,19 +136,6 @@ export function SurveyResponseListPage() {
   };
 
   const canRetrySheetConnection = survey?.spreadsheetSyncStatus === "ERROR";
-
-  const handleSheetSync = async () => {
-    if (!surveyId || sheetBusy) return;
-    setSheetBusy(true);
-    try {
-      const updated = await client.syncSurveySpreadsheet(surveyId);
-      setSurvey((current) => current ? { ...current, ...updated } : current);
-    } catch {
-      toast({ type: "error", message: "Google Sheets 동기화에 실패했습니다." });
-    } finally {
-      setSheetBusy(false);
-    }
-  };
 
   // Dynamic Client-Side Filtering, Searching, and Sorting
   const filteredResponses = useMemo(() => {
@@ -266,25 +192,20 @@ export function SurveyResponseListPage() {
                 <ChevronLeft className="size-4" />
                 목록으로
               </Button>
-              <Button onClick={handleExport}>
-                <Download className="size-4" />
-                <span>내보내기</span>
-              </Button>
-              {survey?.spreadsheetUrl || canRetrySheetConnection ? (
+              {survey?.spreadsheetUrl ? (
+                <a
+                  href={survey.spreadsheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline"
+                >
+                  Google Sheets에서 보기 ↗
+                </a>
+              ) : canRetrySheetConnection ? (
                 <Button variant="outline" onClick={handleSheet} disabled={sheetBusy}>
                   <Sheet className="size-4" />
-                  <span>{survey?.spreadsheetUrl ? "Google Sheets 열기" : "Google Sheets 재시도"}</span>
-                  {survey?.spreadsheetUrl ? <ExternalLink className="size-3.5" /> : null}
+                  <span>Google Sheets 재시도</span>
                 </Button>
-              ) : null}
-              {survey?.spreadsheetUrl ? (
-                <IconButton
-                  aria-label="Google Sheets 지금 동기화"
-                  onClick={handleSheetSync}
-                  disabled={sheetBusy}
-                >
-                  <RefreshCw className="size-4" />
-                </IconButton>
               ) : null}
               </>
             }

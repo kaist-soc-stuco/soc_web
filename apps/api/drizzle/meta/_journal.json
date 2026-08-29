@@ -71,6 +71,20 @@
       "when": 1788011451631,
       "tag": "0009_fast_punisher",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788020245580,
+      "tag": "0010_shiny_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788022106614,
+      "tag": "0011_typical_khan",
+      "breakpoints": true
     }
   ]
 }

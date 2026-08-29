@@ -3,6 +3,7 @@ import type { ContactListOptions, ContactListResponse } from "@soc/contracts";
 import { AuditLogService } from "../audit/audit-log.service";
 import { ContactsRepository } from "./contacts.repository";
 import { UsersService } from "../users/users.service";
+import { GoogleContactSheetsService } from "./google-contact-sheets.service";
 import type {
   BulkImportContactsRequest,
   BulkImportContactsResponse,
@@ -22,6 +23,7 @@ export class ContactsService {
     private readonly contactsRepo: ContactsRepository,
     private readonly auditLogService: AuditLogService,
     private readonly usersService: UsersService,
+    private readonly googleSheets: GoogleContactSheetsService,
   ) {}
 
   async findAll(): Promise<ContactRecord[]> {
@@ -43,7 +45,9 @@ export class ContactsService {
 
   async createDepartment(dto: CreateContactDepartmentRequest): Promise<ContactDepartmentRecord> {
     try {
-      return await this.contactsRepo.insertDepartment(dto);
+      const department = await this.contactsRepo.insertDepartment(dto);
+      await this.googleSheets.enqueueSync();
+      return department;
     } catch (error) {
       if (isUniqueViolation(error)) throw new ConflictException("contact_department_exists");
       throw error;
@@ -57,6 +61,7 @@ export class ContactsService {
     try {
       const department = await this.contactsRepo.updateDepartment(id, dto);
       if (!department) throw new NotFoundException("contact_department_not_found");
+      await this.googleSheets.enqueueSync();
       return department;
     } catch (error) {
       if (isUniqueViolation(error)) throw new ConflictException("contact_department_exists");
@@ -72,6 +77,7 @@ export class ContactsService {
       throw new ConflictException("contact_department_in_use");
     }
     await this.contactsRepo.deleteDepartment(id);
+    await this.googleSheets.enqueueSync();
   }
 
   async searchPortalMembers(query?: string, limit = 20) {
@@ -98,17 +104,23 @@ export class ContactsService {
   }
 
   async create(dto: CreateContactRequest): Promise<ContactRecord> {
-    return this.contactsRepo.insert(dto);
+    const contact = await this.contactsRepo.insert(dto);
+    await this.googleSheets.enqueueSync();
+    return contact;
   }
 
   async bulkImport(
     dto: BulkImportContactsRequest,
   ): Promise<BulkImportContactsResponse> {
-    return this.contactsRepo.bulkImport(dto);
+    const result = await this.contactsRepo.bulkImport(dto);
+    await this.googleSheets.enqueueSync();
+    return result;
   }
 
   async reorder(dto: ReorderContactsRequest): Promise<ContactRecord[]> {
-    return this.contactsRepo.reorder(dto.items);
+    const contacts = await this.contactsRepo.reorder(dto.items);
+    await this.googleSheets.enqueueSync();
+    return contacts;
   }
 
   async update(id: string, dto: UpdateContactRequest): Promise<ContactRecord> {
@@ -116,6 +128,7 @@ export class ContactsService {
     if (!contact) {
       throw new NotFoundException("contact_not_found");
     }
+    await this.googleSheets.enqueueSync();
     return contact;
   }
 
@@ -125,6 +138,7 @@ export class ContactsService {
       throw new NotFoundException("contact_not_found");
     }
     await this.contactsRepo.delete(id);
+    await this.googleSheets.enqueueSync();
   }
 
   private async purgeRevoked(actorUserId?: string): Promise<void> {
@@ -137,6 +151,7 @@ export class ContactsService {
       payload: { removedCount, reason: "privacy_consent_revoked" },
       targetType: "executive_contact",
     });
+    await this.googleSheets.enqueueSync();
   }
 }
 
