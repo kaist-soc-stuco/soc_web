@@ -178,13 +178,13 @@ const getErrorMessage = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
 
 const QUESTION_ROW_CLASS =
-  "group flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm";
+  "group relative flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 pb-2 pt-4 text-sm";
 
 function QuestionDragHandleIcon() {
   return (
-    <span aria-hidden="true" className="grid h-4 w-3 grid-cols-2 grid-rows-3 place-items-center gap-x-0.5 gap-y-0.5">
+    <span aria-hidden="true" className="grid h-2 w-3 grid-cols-3 grid-rows-2 place-items-center gap-x-0.5 gap-y-0.5">
       {Array.from({ length: 6 }, (_, index) => (
-        <span key={index} className="size-1 rounded-full bg-current" />
+        <span key={index} className="size-0.5 rounded-full bg-current" />
       ))}
     </span>
   );
@@ -203,37 +203,30 @@ function isInteractiveQuestionRowTarget(
 
 type QuestionRowContentProps = {
   question: SurveyQuestionRecord;
-  isOngoing: boolean;
-  dragHandle: ReactNode;
 };
 
 function QuestionRowContent({
   question,
-  isOngoing,
-  dragHandle,
 }: QuestionRowContentProps) {
   return (
-    <>
-      <div className="flex min-w-0 items-center gap-3">
-        {!isOngoing && dragHandle}
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-semibold text-slate-900">
-            {question.titleKo}
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm font-semibold text-slate-900">
+          {question.titleKo}
+        </span>
+        {question.titleEn && (
+          <span className="hidden truncate text-xs font-semibold text-kaist-grey/60 md:inline">
+            ({question.titleEn})
           </span>
-          {question.titleEn && (
-            <span className="hidden truncate text-xs font-semibold text-kaist-grey/60 md:inline">
-              ({question.titleEn})
-            </span>
-          )}
-          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-medium text-slate-600">
-            {QUESTION_TYPES.find((type) => type.value === question.questionType)?.label}
-          </span>
-          {question.isRequired && (
-            <span className="shrink-0 text-[length:var(--ui-text-micro-size)] font-bold text-red-500">*필수</span>
-          )}
-        </div>
+        )}
+        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-medium text-slate-600">
+          {QUESTION_TYPES.find((type) => type.value === question.questionType)?.label}
+        </span>
+        {question.isRequired && (
+          <span className="shrink-0 text-[length:var(--ui-text-micro-size)] font-bold text-red-500">*</span>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -274,7 +267,7 @@ function SortableQuestionRow({
       aria-label={`${question.titleKo} 순서 이동`}
       {...attributes}
       {...listeners}
-      className="flex size-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing"
+      className="flex size-4 shrink-0 touch-none select-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing"
     >
       <QuestionDragHandleIcon />
     </button>
@@ -330,11 +323,14 @@ function SortableQuestionRow({
       }
     >
       {isEditing && editor ? editor(dragHandle) : (
-        <QuestionRowContent
-          question={question}
-          isOngoing={isOngoing}
-          dragHandle={dragHandle}
-        />
+        <>
+          {!isOngoing ? (
+            <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2">
+              {dragHandle}
+            </div>
+          ) : null}
+          <QuestionRowContent question={question} />
+        </>
       )}
     </div>
   );
@@ -350,15 +346,12 @@ function QuestionDragOverlayRow({
       style={{ width: width ?? undefined }}
       className={`${QUESTION_ROW_CLASS} relative z-50 select-none cursor-grabbing border-brand-primary/45 shadow-lg`}
     >
-      <QuestionRowContent
-        question={question}
-        isOngoing={isOngoing}
-        dragHandle={
-          <span className="flex size-7 shrink-0 items-center justify-center text-brand-primary">
-            <QuestionDragHandleIcon />
-          </span>
-        }
-      />
+      {!isOngoing ? (
+        <span className="absolute left-1/2 top-0 z-10 flex size-4 -translate-x-1/2 items-center justify-center text-brand-primary">
+          <QuestionDragHandleIcon />
+        </span>
+      ) : null}
+      <QuestionRowContent question={question} />
     </div>
   );
 }
