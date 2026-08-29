@@ -3,8 +3,10 @@ import type { Request } from "express";
 import * as XLSX from "xlsx";
 import {
   BulkImportContactsSchema,
+  CreateContactDepartmentSchema,
   CreateContactSchema,
   ReorderContactsSchema,
+  UpdateContactDepartmentSchema,
   UpdateContactSchema,
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
@@ -16,10 +18,16 @@ import type {
   BulkImportContactsResponse,
   ContactListResponse,
   ContactRecord,
+  ContactDepartmentListResponse,
+  ContactDepartmentRecord,
   CreateContactRequest,
+  CreateContactDepartmentRequest,
   ReorderContactsRequest,
+  UpdateContactDepartmentRequest,
   UpdateContactRequest,
+  ContactSpreadsheetSyncResponse,
 } from "@soc/contracts";
+import { GoogleContactSheetsService } from "./google-contact-sheets.service";
 
 interface AuthenticatedRequest extends Request {
   user?: { id: string };
@@ -27,7 +35,10 @@ interface AuthenticatedRequest extends Request {
 
 @Controller("contacts")
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(
+    private readonly contactsService: ContactsService,
+    private readonly googleContactSheetsService: GoogleContactSheetsService,
+  ) {}
 
   @Get()
   async getContacts(): Promise<ContactListResponse> {
@@ -42,25 +53,24 @@ export class ContactsController {
   async exportManagedContacts(
     @Req() request: AuthenticatedRequest,
     @Query("q") query?: string,
-    @Query("gender") gender?: string,
     @Query("cohort") cohort?: string,
     @Query("department") department?: string,
     @Query("privacyConsented") privacyConsented?: string,
   ): Promise<StreamableFile> {
     const items = await this.contactsService.exportManaged(
-      parseContactListOptions({ query, gender, cohort, department, privacyConsented }),
+      parseContactListOptions({ query, cohort, department, privacyConsented }),
       request.user?.id,
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["이름", "영문명", "부서", "영문부서", "직책", "영문직책", "성별", "기수", "이메일", "전화번호", "개인정보동의", "표시순서"],
+      ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
       ...items.map((item) => [
         item.nameKo,
         item.nameEn,
+        item.studentNumber,
         item.departmentKo,
         item.departmentEn,
         item.roleKo,
         item.roleEn,
-        item.gender,
         item.cohort,
         item.email,
         item.phoneNumber,
@@ -69,8 +79,8 @@ export class ContactsController {
       ]),
     ]);
     worksheet["!cols"] = [
-      { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 22 },
-      { wch: 10 }, { wch: 10 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
+      { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 22 },
+      { wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
@@ -78,12 +88,30 @@ export class ContactsController {
     return new StreamableFile(buffer);
   }
 
+  @Get("manage/departments")
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
+  async getManagedContactDepartments(): Promise<ContactDepartmentListResponse> {
+    return this.contactsService.findDepartments(true);
+  }
+
+  @Get("portal-members")
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
+  async searchPortalMembers(
+    @Query("q") query?: string,
+    @Query("limit") limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : 20;
+    return this.contactsService.searchPortalMembers(
+      query,
+      Number.isFinite(parsedLimit) ? parsedLimit : 20,
+    );
+  }
+
   @Get("manage")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async getManagedContacts(
     @Req() request: AuthenticatedRequest,
     @Query("q") query?: string,
-    @Query("gender") gender?: string,
     @Query("cohort") cohort?: string,
     @Query("department") department?: string,
     @Query("privacyConsented") privacyConsented?: string,
@@ -91,7 +119,7 @@ export class ContactsController {
     @Query("pageSize") pageSize?: string,
   ): Promise<ContactListResponse> {
     return this.contactsService.findManaged(
-      parseContactListOptions({ query, gender, cohort, department, privacyConsented, page, pageSize }),
+      parseContactListOptions({ query, cohort, department, privacyConsented, page, pageSize }),
       request.user?.id,
     );
   }
@@ -102,6 +130,36 @@ export class ContactsController {
     @Body(new ZodValidationPipe(CreateContactSchema)) body: CreateContactRequest,
   ): Promise<ContactRecord> {
     return this.contactsService.create(body);
+  }
+
+  @Post("spreadsheet/sync")
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
+  async syncContactSpreadsheet(): Promise<ContactSpreadsheetSyncResponse> {
+    return this.googleContactSheetsService.sync();
+  }
+
+  @Post("departments")
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
+  async createContactDepartment(
+    @Body(new ZodValidationPipe(CreateContactDepartmentSchema)) body: CreateContactDepartmentRequest,
+  ): Promise<ContactDepartmentRecord> {
+    return this.contactsService.createDepartment(body);
+  }
+
+  @Patch("departments/:id")
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
+  async updateContactDepartment(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(UpdateContactDepartmentSchema)) body: UpdateContactDepartmentRequest,
+  ): Promise<ContactDepartmentRecord> {
+    return this.contactsService.updateDepartment(id, body);
+  }
+
+  @Delete("departments/:id")
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
+  async deleteContactDepartment(@Param("id") id: string): Promise<{ success: boolean }> {
+    await this.contactsService.deleteDepartment(id);
+    return { success: true };
   }
 
   @Post("bulk")
@@ -141,7 +199,6 @@ export class ContactsController {
 
 function parseContactListOptions(input: {
   query?: string;
-  gender?: string;
   cohort?: string;
   department?: string;
   privacyConsented?: string;
@@ -153,7 +210,6 @@ function parseContactListOptions(input: {
   const parsedPageSize = input.pageSize ? Number(input.pageSize) : undefined;
   return {
     q: input.query?.trim() || undefined,
-    gender: input.gender?.trim() || undefined,
     department: input.department?.trim() || undefined,
     cohort:
       parsedCohort !== undefined && Number.isInteger(parsedCohort) && parsedCohort > 0

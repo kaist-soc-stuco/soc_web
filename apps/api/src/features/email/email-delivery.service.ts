@@ -23,6 +23,7 @@ export class EmailDeliveryService {
       filename: string;
       content: Buffer;
       contentType: string;
+      cid?: string;
     }>;
   }): Promise<{ dryRun: boolean }> {
     const dryRun = this.configService.get<boolean>(

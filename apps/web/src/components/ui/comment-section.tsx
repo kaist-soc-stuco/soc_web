@@ -3,7 +3,7 @@ import type {
   CommentItem,
 } from "@soc/contracts";
 import { isoToDate, nowDate } from "@soc/shared";
-import { ArrowUp, Edit2, EyeOff, Heart, Loader2, Trash2 } from "lucide-react";
+import { ArrowUp, Edit2, Eye, EyeOff, Heart, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ type CommentSectionProps = {
   onCreateReply: (parentCommentId: string) => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
   onHideComment: (commentId: string, reason: string) => Promise<void>;
+  onRestoreComment: (commentId: string) => Promise<void>;
   onCommentPageChange: (page: number) => void;
   onUpdateComment: (commentId: string, content: string) => Promise<void>;
   onSetCommentEngagement: (
@@ -74,6 +75,7 @@ export function CommentSection({
   onCreateReply,
   onDeleteComment,
   onHideComment,
+  onRestoreComment,
   onCommentPageChange,
   onUpdateComment,
   onSetCommentEngagement,
@@ -129,6 +131,7 @@ export function CommentSection({
                     lang={lang}
                     onDeleteComment={onDeleteComment}
                     onHideComment={onHideComment}
+                    onRestoreComment={onRestoreComment}
                     onUpdateComment={onUpdateComment}
                     onSetCommentEngagement={onSetCommentEngagement}
                     onReplyToggle={() =>
@@ -170,6 +173,7 @@ export function CommentSection({
                       lang={lang}
                       onDeleteComment={onDeleteComment}
                       onHideComment={onHideComment}
+                      onRestoreComment={onRestoreComment}
                       onUpdateComment={onUpdateComment}
                       onSetCommentEngagement={onSetCommentEngagement}
                       onReplyToggle={() => undefined}
@@ -237,6 +241,7 @@ function CommentRow({
   lang,
   onDeleteComment,
   onHideComment,
+  onRestoreComment,
   onUpdateComment,
   onSetCommentEngagement,
   onReplyToggle,
@@ -252,6 +257,7 @@ function CommentRow({
   lang: string;
   onDeleteComment: (commentId: string) => Promise<void>;
   onHideComment: (commentId: string, reason: string) => Promise<void>;
+  onRestoreComment: (commentId: string) => Promise<void>;
   onUpdateComment: (commentId: string, content: string) => Promise<void>;
   onSetCommentEngagement: (
     commentId: string,
@@ -264,6 +270,7 @@ function CommentRow({
   const likeActionKey = `${comment.commentId}:LIKE`;
   const likeActive = isAuthenticated && comment.viewerHasLiked;
   const canHide = canModerate && comment.status === "PUBLISHED";
+  const canRestore = canModerate && comment.status === "HIDDEN";
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [hideModalOpen, setHideModalOpen] = useState(false);
   const [hideReason, setHideReason] = useState("");
@@ -369,9 +376,9 @@ function CommentRow({
                 {lang === "ko" ? "답글" : "Reply"}
               </Button>
             ) : null}
-            {(canDelete || canHide) && (
+            {(canDelete || canHide || canRestore) && (
               <div className="relative">
-                <Button
+                {canDelete ? <Button
                   type="button"
                   variant="ghost"
                   size="icon"
@@ -389,7 +396,25 @@ function CommentRow({
                   title={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                 >
                   {canDelete ? <Trash2 className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
-                </Button>
+                </Button> : null}
+                {canHide || canRestore ? <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
+                  onClick={() => {
+                    if (canRestore) {
+                      void onRestoreComment(comment.commentId);
+                      return;
+                    }
+                    setHideReason("");
+                    setHideModalOpen(true);
+                  }}
+                  className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  title={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
+                >
+                  {canRestore ? <Eye className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
+                </Button> : null}
               </div>
             )}
             {canDelete ? (

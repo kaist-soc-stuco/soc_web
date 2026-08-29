@@ -75,9 +75,11 @@ const BULK_EMAIL_TEMPLATES: BulkEmailTemplate[] = [
 ];
 
 type DeliveryAttachment = {
+  assetId: string;
   filename: string;
   content: Buffer;
   contentType: string;
+  cid?: string;
 };
 
 type EmailCompose = {
@@ -326,8 +328,8 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       recipients: [recipientEmail],
       subject,
       content: dto.contentType === "html" ? stripHtml(content) : content,
-      ...(dto.contentType === "html" ? { html: sanitizeHtml(content) } : {}),
-      ...(attachments.length ? { attachments } : {}),
+      ...(dto.contentType === "html" ? { html: sanitizeBulkEmailHtml(inlineImageSources(content, attachments)) } : {}),
+      ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
     });
 
     return {
@@ -463,9 +465,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
               ? stripHtml(input.compose.content)
               : input.compose.content,
           ...(input.compose.contentType === "html"
-            ? { html: sanitizeHtml(input.compose.content) }
+            ? { html: sanitizeBulkEmailHtml(inlineImageSources(input.compose.content, attachments)) }
             : {}),
-          ...(attachments.length ? { attachments } : {}),
+          ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
         });
 
     await this.bulkEmailRepo.updateStatus(
@@ -488,8 +490,8 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
           recipients: [recipient.email],
           subject,
           content: compose.contentType === "html" ? stripHtml(content) : content,
-          ...(compose.contentType === "html" ? { html: sanitizeHtml(content) } : {}),
-          ...(attachments.length ? { attachments } : {}),
+          ...(compose.contentType === "html" ? { html: sanitizeBulkEmailHtml(inlineImageSources(content, attachments)) } : {}),
+          ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
         });
       }),
     );
@@ -509,9 +511,11 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       assetIds.map(async (assetId) => {
         const file = await this.assetService.getOwnedFile(assetId, userId);
         return {
+          assetId,
           filename: file.originalFilename,
           content: file.buffer,
           contentType: file.mimeType,
+          ...(file.mimeType.startsWith("image/") ? { cid: `soc-asset-${assetId}` } : {}),
           sizeBytes: file.sizeBytes,
         };
       }),
@@ -559,6 +563,28 @@ function responseForExistingRecord(record: BulkEmailStoredRecord): SendBulkEmail
 
 function stripHtml(value: string): string {
   return sanitizeHtml(value, { allowedTags: [], allowedAttributes: {} }).replace(/\s+/g, " ").trim();
+}
+
+function sanitizeBulkEmailHtml(value: string): string {
+  return sanitizeHtml(value, {
+    allowedSchemes: ["http", "https", "mailto", "cid"],
+  });
+}
+
+function inlineImageSources(value: string, attachments: DeliveryAttachment[]): string {
+  return attachments.reduce((html, attachment) => {
+    if (!attachment.cid || !attachment.contentType.startsWith("image/")) return html;
+    const assetId = attachment.assetId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const sourcePattern = new RegExp(
+      `(?:https?:\\/\\/[^"'\\s<>]+)?(?:\\/api\\/v1|\\/v1|\\/api)?\\/assets\\/${assetId}\\/content|asset:${assetId}`,
+      "g",
+    );
+    return html.replace(sourcePattern, `cid:${attachment.cid}`);
+  }, value);
+}
+
+function toMailAttachments(attachments: DeliveryAttachment[]) {
+  return attachments.map(({ assetId: _assetId, ...attachment }) => attachment);
 }
 
 function hasBulkEmailTemplateTokens(value: string): boolean {

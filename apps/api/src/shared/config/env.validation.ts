@@ -135,6 +135,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       config.GOOGLE_OAUTH_CLIENT_KEY_FILE,
     ),
     GOOGLE_OAUTH_TOKEN_FILE: asOptionalString(config.GOOGLE_OAUTH_TOKEN_FILE),
+    GOOGLE_CONTACTS_SPREADSHEET_ID: asOptionalString(config.GOOGLE_CONTACTS_SPREADSHEET_ID),
     GOOGLE_SURVEY_RESULTS_FOLDER_ID: asOptionalString(
       config.GOOGLE_SURVEY_RESULTS_FOLDER_ID,
     ),

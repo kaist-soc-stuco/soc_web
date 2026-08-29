@@ -1,16 +1,20 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
-import { executiveContacts } from "../../infrastructure/postgres/postgres.schema";
+import { executiveContactDepartments, executiveContacts } from "../../infrastructure/postgres/postgres.schema";
 import type {
   BulkImportContactsRequest,
   BulkImportContactsResponse,
   ContactRecord,
+  ContactDepartmentRecord,
+  ContactDepartmentListResponse,
   ContactListOptions,
   ContactListResponse,
+  CreateContactDepartmentRequest,
   CreateContactRequest,
   ReorderContactsRequest,
   UpdateContactRequest,
+  UpdateContactDepartmentRequest,
 } from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
 
@@ -27,8 +31,7 @@ export class ContactsRepository {
       departmentEn: row.departmentEn ?? null,
       roleKo: row.roleKo,
       roleEn: row.roleEn,
-      avatarStorageKey: row.avatarStorageKey ?? null,
-      gender: row.gender ?? null,
+      studentNumber: row.studentNumber ?? null,
       cohort: row.cohort ?? null,
       email: row.email,
       phoneNumber: row.phoneNumber,
@@ -47,12 +50,105 @@ export class ContactsRepository {
     return rows.map((row) => this.map(row));
   }
 
+  private mapDepartment(
+    row: typeof executiveContactDepartments.$inferSelect,
+  ): ContactDepartmentRecord {
+    return {
+      id: row.id,
+      nameKo: row.nameKo,
+      nameEn: row.nameEn,
+      sortOrder: row.sortOrder,
+      isActive: row.isActive,
+      createdAt: msToIso(row.createdAt.valueOf()),
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+    };
+  }
+
+  async findDepartments(includeInactive = false): Promise<ContactDepartmentListResponse> {
+    const rows = await this.db
+      .select()
+      .from(executiveContactDepartments)
+      .where(includeInactive ? undefined : eq(executiveContactDepartments.isActive, true))
+      .orderBy(asc(executiveContactDepartments.sortOrder), asc(executiveContactDepartments.nameKo));
+    return { items: rows.map((row) => this.mapDepartment(row)) };
+  }
+
+  async findDepartmentById(id: string): Promise<ContactDepartmentRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(executiveContactDepartments)
+      .where(eq(executiveContactDepartments.id, id));
+    return row ? this.mapDepartment(row) : null;
+  }
+
+  async insertDepartment(dto: CreateContactDepartmentRequest): Promise<ContactDepartmentRecord> {
+    const [sortOrderRow] = await this.db
+      .select({ maxSortOrder: sql<number | null>`max(${executiveContactDepartments.sortOrder})` })
+      .from(executiveContactDepartments);
+    const [row] = await this.db
+      .insert(executiveContactDepartments)
+      .values({
+        nameKo: dto.nameKo,
+        nameEn: dto.nameEn ?? "",
+        sortOrder: dto.sortOrder ?? Number(sortOrderRow?.maxSortOrder ?? -1) + 1,
+        isActive: dto.isActive ?? true,
+        updatedAt: nowDate(),
+      })
+      .returning();
+    return this.mapDepartment(row);
+  }
+
+  async updateDepartment(
+    id: string,
+    dto: UpdateContactDepartmentRequest,
+  ): Promise<ContactDepartmentRecord | null> {
+    const current = await this.findDepartmentById(id);
+    if (!current) return null;
+    const nameKo = dto.nameKo ?? current.nameKo;
+    const nameEn = dto.nameEn ?? current.nameEn;
+    const set: Partial<typeof executiveContactDepartments.$inferInsert> = {
+      updatedAt: nowDate(),
+    };
+    if (dto.nameKo !== undefined) set.nameKo = nameKo;
+    if (dto.nameEn !== undefined) set.nameEn = nameEn;
+    if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
+    if (dto.isActive !== undefined) set.isActive = dto.isActive;
+
+    const result = await this.db.transaction(async (tx) => {
+      if (dto.nameKo !== undefined || dto.nameEn !== undefined) {
+        await tx
+          .update(executiveContacts)
+          .set({ departmentKo: nameKo, departmentEn: nameEn || null, updatedAt: nowDate() })
+          .where(
+            or(
+              eq(executiveContacts.departmentKo, current.nameKo),
+              current.nameEn ? eq(executiveContacts.departmentEn, current.nameEn) : undefined,
+            ),
+          );
+      }
+      const [row] = await tx
+        .update(executiveContactDepartments)
+        .set(set)
+        .where(eq(executiveContactDepartments.id, id))
+        .returning();
+      return row;
+    });
+    return result ? this.mapDepartment(result) : null;
+  }
+
+  async deleteDepartment(id: string): Promise<boolean> {
+    const [row] = await this.db
+      .delete(executiveContactDepartments)
+      .where(eq(executiveContactDepartments.id, id))
+      .returning({ id: executiveContactDepartments.id });
+    return Boolean(row);
+  }
+
   async findManaged(input: ContactListOptions = {}): Promise<ContactListResponse> {
     const page = Math.max(input.page ?? 1, 1);
     const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 500);
     const offset = (page - 1) * pageSize;
     const normalizedQuery = input.q?.trim() ?? "";
-    const normalizedGender = input.gender?.trim() ?? "";
     const conditions: Array<SQL | undefined> = [
       normalizedQuery
         ? or(
@@ -64,9 +160,9 @@ export class ContactsRepository {
             ilike(executiveContacts.roleEn, `%${normalizedQuery}%`),
             ilike(executiveContacts.email, `%${normalizedQuery}%`),
             ilike(executiveContacts.phoneNumber, `%${normalizedQuery}%`),
+            ilike(executiveContacts.studentNumber, `%${normalizedQuery}%`),
           )
         : undefined,
-      normalizedGender ? ilike(executiveContacts.gender, `%${normalizedGender}%`) : undefined,
       input.cohort !== undefined ? eq(executiveContacts.cohort, input.cohort) : undefined,
         input.department
         ? or(
@@ -130,8 +226,7 @@ export class ContactsRepository {
         departmentEn: dto.departmentEn ?? null,
         roleKo: dto.roleKo,
         roleEn: dto.roleEn,
-        avatarStorageKey: dto.avatarStorageKey ?? null,
-        gender: dto.gender ?? null,
+        studentNumber: dto.studentNumber ?? null,
         cohort: dto.cohort ?? null,
         email: dto.email ?? null,
         phoneNumber: dto.phoneNumber ?? null,
@@ -166,8 +261,7 @@ export class ContactsRepository {
             departmentEn: item.departmentEn ?? null,
             roleKo: item.roleKo,
             roleEn: item.roleEn,
-            avatarStorageKey: item.avatarStorageKey ?? null,
-            gender: item.gender ?? null,
+            studentNumber: item.studentNumber ?? null,
             cohort: item.cohort ?? null,
             email: item.email ?? null,
             phoneNumber: item.phoneNumber ?? null,
@@ -207,8 +301,7 @@ export class ContactsRepository {
     if (dto.departmentEn !== undefined) set.departmentEn = dto.departmentEn;
     if (dto.roleKo !== undefined) set.roleKo = dto.roleKo;
     if (dto.roleEn !== undefined) set.roleEn = dto.roleEn;
-    if (dto.avatarStorageKey !== undefined) set.avatarStorageKey = dto.avatarStorageKey;
-    if (dto.gender !== undefined) set.gender = dto.gender;
+    if (dto.studentNumber !== undefined) set.studentNumber = dto.studentNumber;
     if (dto.cohort !== undefined) set.cohort = dto.cohort;
     if (dto.email !== undefined) set.email = dto.email;
     if (dto.phoneNumber !== undefined) set.phoneNumber = dto.phoneNumber;

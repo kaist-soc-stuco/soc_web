@@ -54,7 +54,7 @@ type ImageContentBlockType = "HERO" | "LOGO" | "ORGANIZATION_CHART";
 const isImageOnlyType = (type: ContentBlockType): type is ImageContentBlockType => type === "HERO" || type === "LOGO" || type === "ORGANIZATION_CHART";
 
 const IMAGE_SPECS: Record<"HERO" | "LOGO" | "ORGANIZATION_CHART", { height: number; label: string; width: number }> = {
-  HERO: { height: 1600, label: "히어로 이미지", width: 900 },
+  HERO: { height: 600, label: "히어로 이미지", width: 1600 },
   LOGO: { height: 100, label: "로고 이미지", width: 400 },
   ORGANIZATION_CHART: { height: 900, label: "조직도 이미지", width: 1600 },
 };
@@ -441,7 +441,7 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
   );
 
   const hasSecondary = Boolean(secondaryLabel && onSecondarySelect);
-  return <AdminFormField label={hasSecondary ? "조직도 이미지" : `${spec.label} (${spec.width} × ${spec.height}) *`}>
+  return <AdminFormField label={`${spec.label} (${spec.width} × ${spec.height}) *`}>
     <div className="grid gap-5">
       {renderSlot(hasSecondary ? "한국어 조직도" : null, value, onSelect, onRemove)}
       {hasSecondary ? renderSlot(secondaryLabel!, secondaryValue ?? "", onSecondarySelect!, onSecondaryRemove) : null}

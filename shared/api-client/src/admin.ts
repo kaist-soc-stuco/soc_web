@@ -20,6 +20,10 @@ import type {
   ContactListResponse,
   ContactListOptions,
   ContactRecord,
+  ContactDepartmentListResponse,
+  ContactDepartmentRecord,
+  ContactSpreadsheetSyncResponse,
+  CreateContactDepartmentRequest,
   CreateContactRequest,
   ReorderContactsRequest,
   CreateRoleGroupRequest,
@@ -44,6 +48,7 @@ import type {
   StudentFeeStatsOptions,
   StudentFeeStatusRecord,
   UpdateContactRequest,
+  UpdateContactDepartmentRequest,
   UpdateRoleGroupRequest,
   UpdateStudentFeeStatusRequest,
   UpdateUserActiveStatusRequest,
@@ -419,7 +424,6 @@ export const createAdminApi = ({
   ): Promise<ContactListResponse> => {
     const params = new URLSearchParams();
     if (options?.q?.trim()) params.set("q", options.q.trim());
-    if (options?.gender?.trim()) params.set("gender", options.gender.trim());
     if (options?.cohort !== undefined) params.set("cohort", String(options.cohort));
     if (options?.department?.trim()) params.set("department", options.department.trim());
     if (options?.privacyConsented !== undefined) {
@@ -435,12 +439,43 @@ export const createAdminApi = ({
     );
   },
 
+  getManagedContactDepartments: async (): Promise<ContactDepartmentListResponse> => {
+    return requestJson<ContactDepartmentListResponse>(
+      `${contactsBaseUrl}/manage/departments`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  searchContactPortalMembers: async (
+    query?: string,
+    limit = 20,
+  ): Promise<AdminUserRecord[]> => {
+    const params = new URLSearchParams();
+    if (query?.trim()) params.set("q", query.trim());
+    params.set("limit", String(limit));
+    return requestJson<AdminUserRecord[]>(
+      `${contactsBaseUrl}/portal-members?${params.toString()}`,
+      { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  syncContactsSpreadsheet: async (): Promise<ContactSpreadsheetSyncResponse> => {
+    return requestJson<ContactSpreadsheetSyncResponse>(
+      `${contactsBaseUrl}/spreadsheet/sync`,
+      {
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
   downloadContactsXlsx: async (
     options?: Omit<ContactListOptions, "page" | "pageSize">,
   ): Promise<Blob> => {
     const params = new URLSearchParams();
     if (options?.q?.trim()) params.set("q", options.q.trim());
-    if (options?.gender?.trim()) params.set("gender", options.gender.trim());
     if (options?.cohort !== undefined) params.set("cohort", String(options.cohort));
     if (options?.department?.trim()) params.set("department", options.department.trim());
     if (options?.privacyConsented !== undefined) {
@@ -597,6 +632,43 @@ export const createAdminApi = ({
         headers: { "Content-Type": "application/json" },
         method: "POST",
       },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  createContactDepartment: async (
+    body: CreateContactDepartmentRequest,
+  ): Promise<ContactDepartmentRecord> => {
+    return requestJson<ContactDepartmentRecord>(
+      `${contactsBaseUrl}/departments`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  updateContactDepartment: async (
+    id: string,
+    body: UpdateContactDepartmentRequest,
+  ): Promise<ContactDepartmentRecord> => {
+    return requestJson<ContactDepartmentRecord>(
+      `${contactsBaseUrl}/departments/${encodeURIComponent(id)}`,
+      {
+        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  deleteContactDepartment: async (id: string): Promise<{ success: boolean }> => {
+    return requestJson<{ success: boolean }>(
+      `${contactsBaseUrl}/departments/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
       { retryOnUnauthorized: true },
     );
   },

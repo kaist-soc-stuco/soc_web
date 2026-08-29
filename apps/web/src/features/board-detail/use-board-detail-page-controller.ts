@@ -347,6 +347,27 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     }
   };
 
+  const handleRestoreComment = async (commentId: string) => {
+    if (!articleId || !canModerate) return;
+    setCommentError(null);
+    setCommentActionSubmitting(commentId);
+    try {
+      await apiClient.restoreComment(category, articleId, commentId);
+      await refreshComments();
+      toast({
+        type: "success",
+        message: lang === "ko" ? "댓글 숨김을 해제했습니다." : "Comment restored.",
+      });
+    } catch {
+      toast({
+        type: "error",
+        message: lang === "ko" ? "댓글 숨김을 해제하지 못했습니다." : "Failed to restore the comment.",
+      });
+    } finally {
+      setCommentActionSubmitting(null);
+    }
+  };
+
   const handleHideArticle = async (reason: string) => {
     if (!articleId || !canModerate) return false;
     try {
@@ -359,6 +380,22 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       return true;
     } catch {
       toast({ type: "error", message: lang === "ko" ? "게시글을 숨기지 못했습니다." : "Failed to hide the post." });
+      return false;
+    }
+  };
+
+  const handleRestoreArticle = async () => {
+    if (!articleId || !canModerate) return false;
+    try {
+      const response = await apiClient.restoreArticle(category, articleId);
+      setArticle((current) => (current ? { ...current, status: response.status } : current));
+      toast({
+        type: "success",
+        message: lang === "ko" ? "게시글 숨김을 해제했습니다." : "Post restored.",
+      });
+      return true;
+    } catch {
+      toast({ type: "error", message: lang === "ko" ? "게시글 숨김을 해제하지 못했습니다." : "Failed to restore the post." });
       return false;
     }
   };
@@ -614,8 +651,10 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     handleDeleteArticle,
     handleUpdateComment,
     handleHideArticle,
+    handleRestoreArticle,
     handleDeleteComment,
     handleHideComment,
+    handleRestoreComment,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,

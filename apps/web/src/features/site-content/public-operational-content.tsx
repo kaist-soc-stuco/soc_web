@@ -1,5 +1,5 @@
 import { ExternalLink, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -34,18 +34,6 @@ export function PublicOperationalContent() {
     [data?.items, dismissed],
   );
   const notices = visible.filter((block) => block.type === "TOP_BANNER");
-  const hasVisibleNotice = notices.some(
-    (notice) => !closing.includes(notice.contentBlockId),
-  );
-
-  useEffect(() => {
-    document.documentElement.classList.toggle(
-      "has-public-top-banner",
-      hasVisibleNotice && isHome,
-    );
-    return () => document.documentElement.classList.remove("has-public-top-banner");
-  }, [hasVisibleNotice, isHome]);
-
   const dismiss = (contentBlockId: string) => {
     if (closing.includes(contentBlockId)) return;
 
@@ -65,9 +53,7 @@ export function PublicOperationalContent() {
   return (
     <>
       {notices.length ? (
-        <div
-          className="fixed left-0 right-0 top-[var(--ui-header-height)] z-[45] grid gap-0"
-        >
+        <div className="relative z-[55] grid gap-0">
           {notices.map((notice) => {
             const noticeText = resolveContentBlockText(notice, lang);
             const isClosing = closing.includes(notice.contentBlockId);

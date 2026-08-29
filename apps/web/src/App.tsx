@@ -207,12 +207,13 @@ export function App() {
           <Route path="/surveys" element={<EventsSurveysPage view="survey" />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
-          <Route path="/about/faq" element={<FaqPage />} />
+          <Route path="/board/faq" element={<FaqPage />} />
+          <Route path="/about/faq" element={<Navigate to="/board/faq" replace />} />
           <Route path="/about/pledges" element={<Navigate to="/about#work" replace />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/calendar" element={<EventsSurveysPage view="calendar" />} />
           <Route path="/board" element={<BoardPage />} />
-          <Route path="/board/FAQ" element={<Navigate to="/about/faq" replace />} />
+          <Route path="/board/FAQ" element={<Navigate to="/board/faq" replace />} />
           <Route path="/board/_EVENT" element={<Navigate to="/events" replace />} />
           <Route path="/board/_EVENT/write" element={<Navigate to="/events/write" replace />} />
           <Route
