@@ -234,7 +234,7 @@ export const createBoardApi = ({
     input: ArticleCreateRequest,
   ): Promise<ArticleCreateResponse> => {
     return requestJson<ArticleCreateResponse>(
-      `${normalizedBaseUrl}/boards/FAQ/articles/admin`,
+      `${normalizedBaseUrl}/boards/faq/articles/admin`,
       {
         body: JSON.stringify(input),
         headers: { "Content-Type": "application/json" },
@@ -249,7 +249,7 @@ export const createBoardApi = ({
     input: ArticleUpdateRequest,
   ): Promise<ArticleUpdateResponse> => {
     return requestJson<ArticleUpdateResponse>(
-      `${normalizedBaseUrl}/boards/FAQ/articles/${encodeURIComponent(articleId)}/admin`,
+      `${normalizedBaseUrl}/boards/faq/articles/${encodeURIComponent(articleId)}/admin`,
       {
         body: JSON.stringify(input),
         headers: { "Content-Type": "application/json" },
@@ -261,7 +261,7 @@ export const createBoardApi = ({
 
   deleteFaqArticle: async (articleId: string): Promise<ArticleDeleteResponse> => {
     return requestJson<ArticleDeleteResponse>(
-      `${normalizedBaseUrl}/boards/FAQ/articles/${encodeURIComponent(articleId)}/admin`,
+      `${normalizedBaseUrl}/boards/faq/articles/${encodeURIComponent(articleId)}/admin`,
       { method: "DELETE" },
       { retryOnUnauthorized: true },
     );
@@ -271,7 +271,7 @@ export const createBoardApi = ({
     input: FaqReorderRequest,
   ): Promise<FaqReorderResponse> => {
     return requestJson<FaqReorderResponse>(
-      `${normalizedBaseUrl}/boards/FAQ/articles/admin/reorder`,
+      `${normalizedBaseUrl}/boards/faq/articles/admin/reorder`,
       {
         body: JSON.stringify(input),
         headers: { "Content-Type": "application/json" },

@@ -122,12 +122,20 @@ export class CommentService {
     }
 
     await this.assertCommentActionAllowed(code, articleId, commentId, user);
-    return this.commentRepository.setCommentEngagement(
+    const response = await this.commentRepository.setCommentEngagement(
       commentId,
       user.id,
       kind,
       active,
     );
+    await this.auditLogService.record({
+      action: "comment.engagement.like",
+      actorUserId: user.id,
+      targetId: commentId,
+      targetType: "comment",
+      payload: { articleId, boardCode: code, active: response.active },
+    });
+    return response;
   }
 
   async createComment(
@@ -151,7 +159,7 @@ export class CommentService {
     }
 
     const isOfficialReply =
-      code === "건의사항" &&
+      code === "suggestions" &&
       Permissions.has(user.permission, Permissions.WRITE_REPLY);
 
     if (!board.allowComment && !isOfficialReply) {
@@ -195,6 +203,22 @@ export class CommentService {
       authorUserId: user.id,
       isOfficial: isOfficialReply,
       payload,
+    });
+
+    await this.auditLogService.record({
+      action: "comment.create",
+      actorUserId: user.id,
+      targetId: created.commentId,
+      targetType: "comment",
+      payload: {
+        created: {
+          commentId: created.commentId,
+          articleId,
+          boardCode: code,
+          isReply: Boolean(payload.parentCommentId),
+          isOfficial: isOfficialReply,
+        },
+      },
     });
 
     const notificationTargets = await this.commentRepository.findNotificationTargets(
@@ -253,7 +277,22 @@ export class CommentService {
       throw new ForbiddenException("insufficient_permission");
     }
 
-    return this.commentRepository.updateComment(commentId, payload);
+    const updated = await this.commentRepository.updateComment(commentId, payload);
+    await this.auditLogService.record({
+      action: "comment.update",
+      actorUserId: user.id,
+      targetId: commentId,
+      targetType: "comment",
+      payload: {
+        after: {
+          commentId,
+          articleId,
+          boardCode: code,
+          changedFields: ["content"],
+        },
+      },
+    });
+    return updated;
   }
 
   async deleteComment(
@@ -293,7 +332,15 @@ export class CommentService {
       throw new ForbiddenException("insufficient_permission");
     }
 
-    return this.commentRepository.softDeleteComment(commentId);
+    const result = await this.commentRepository.softDeleteComment(commentId);
+    await this.auditLogService.record({
+      action: "comment.delete",
+      actorUserId: user.id,
+      targetId: commentId,
+      targetType: "comment",
+      payload: { deleted: { commentId, articleId, boardCode: code } },
+    });
+    return result;
   }
 
   async listHiddenComments(user: AuthenticatedUser): Promise<HiddenCommentListResponse> {

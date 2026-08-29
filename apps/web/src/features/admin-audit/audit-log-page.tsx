@@ -26,6 +26,18 @@ type AuditPayload = Record<string, unknown>;
 
 const domainOptions = [
   { value: "", label: "전체 도메인" },
+  { value: "asset", label: "첨부 파일" },
+  { value: "article_draft", label: "게시글 초안" },
+  { value: "audit_log", label: "운영 로그" },
+  { value: "auth", label: "인증" },
+  { value: "board", label: "게시판 설정" },
+  { value: "bulk_email", label: "일괄 이메일" },
+  { value: "bulk_email_draft", label: "이메일 초안" },
+  { value: "bulk_email_template", label: "이메일 양식" },
+  { value: "calendar", label: "일정" },
+  { value: "calendar_event", label: "일정" },
+  { value: "roadmap_course", label: "로드맵 과목" },
+  { value: "roadmap_offering", label: "로드맵 개설 정보" },
   { value: "student_fee_status", label: "과비" },
   { value: "student_fee_payment", label: "과비 수납" },
   { value: "user", label: "유저" },
@@ -34,6 +46,14 @@ const domainOptions = [
   { value: "content_block", label: "콘텐츠" },
   { value: "site_content", label: "사이트" },
   { value: "executive_contact", label: "집행위 연락망" },
+  { value: "article", label: "게시글" },
+  { value: "comment", label: "댓글" },
+  { value: "survey", label: "설문" },
+  { value: "survey_section", label: "설문 섹션" },
+  { value: "survey_question", label: "설문 문항" },
+  { value: "survey_response", label: "설문 응답" },
+  { value: "survey_answer_file", label: "설문 응답 파일" },
+  { value: "vote", label: "투표" },
 ];
 
 const fieldLabels: Record<string, string> = {

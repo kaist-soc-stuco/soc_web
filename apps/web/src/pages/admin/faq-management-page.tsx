@@ -88,7 +88,7 @@ function FaqManagementPageContent() {
   const loadItems = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiClient.getArticles("FAQ", { page: 1, limit: 100 });
+      const response = await apiClient.getArticles("faq", { page: 1, limit: 100 });
       setItems([...response.items].sort(compareFaqOrder));
     } catch {
       toast({ type: "error", message: "FAQ 목록을 불러오지 못했습니다." });

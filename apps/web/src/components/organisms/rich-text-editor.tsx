@@ -702,7 +702,6 @@ function RichTextToolbar({
 }) {
   const editorId = useId().replace(/:/g, "");
   const [colorPopover, setColorPopover] = useState<"text" | "background" | null>(null);
-  const [fontSizeOpen, setFontSizeOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const currentTextColor = editor.getAttributes("textStyle").color ?? "";
   const currentBackgroundColor = editor.getAttributes("textStyle").backgroundColor ?? "";
@@ -712,14 +711,6 @@ function RichTextToolbar({
     : variableToken
       ? [{ label: variableLabel || variableToken, token: variableToken }]
       : [];
-
-  useEffect(() => {
-    const closeFontSizeMenu = () => setFontSizeOpen(false);
-    editor.on("focus", closeFontSizeMenu);
-    return () => {
-      editor.off("focus", closeFontSizeMenu);
-    };
-  }, [editor]);
 
   const setLink = () => {
     promptForLink(editor, lang);
@@ -744,8 +735,6 @@ function RichTextToolbar({
       <SelectDropdown
         id={`${editorId}-font-size`}
         ariaLabel={lang === "ko" ? "글자 크기" : "Font size"}
-        open={fontSizeOpen}
-        onOpenChange={setFontSizeOpen}
         value={sizeValue}
         onChange={(value) => {
           editor.chain().focus().setFontSize(value).run();

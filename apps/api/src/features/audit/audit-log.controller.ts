@@ -1,10 +1,16 @@
-import { Controller, Get, Header, Query, StreamableFile } from "@nestjs/common";
+import { Controller, Get, Header, Query, Req, StreamableFile } from "@nestjs/common";
+import type { Request } from "express";
 import * as XLSX from "xlsx";
 import { Permissions } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
 
 import { RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "./audit-context";
 import { AuditLogService } from "./audit-log.service";
+
+interface AuthenticatedRequest extends Request {
+  user?: { id: string };
+}
 
 @Controller("audit-logs")
   @RequirePermissions(Permissions.VIEW_AUDIT_LOG)
@@ -43,6 +49,7 @@ export class AuditLogController {
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="audit-logs.xlsx"')
   async exportAuditLogs(
+    @Req() request: AuthenticatedRequest,
     @Query("action") action?: string,
     @Query("q") query?: string,
     @Query("sortBy") sortBy?: string,
@@ -86,6 +93,20 @@ export class AuditLogController {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "운영 로그");
     const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
+    const audit = auditMetadataFromRequest(request);
+    await this.auditLogService.record({
+      action: "audit.export",
+      actorUserId: audit.actorUserId ?? null,
+      ipAddress: audit.ipAddress ?? null,
+      payload: {
+        action: action ?? null,
+        exportedCount: items.length,
+        targetType: targetType ?? null,
+        dateFrom: normalizeDateStart(dateFrom) ?? null,
+        dateTo: normalizeDateEnd(dateTo) ?? null,
+      },
+      targetType: "audit_log",
+    });
     return new StreamableFile(buffer);
   }
 }

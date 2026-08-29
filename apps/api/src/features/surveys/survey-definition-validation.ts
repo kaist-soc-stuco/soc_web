@@ -10,9 +10,6 @@ const CHOICE_TYPES = new Set(["single_choice", "multiple_choice", "dropdown"]);
 const GRID_TYPES = new Set(["grid_single", "grid_multiple"]);
 
 export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): void {
-  if (!question.titleKo.trim()) {
-    throw new BadRequestException("survey_question_title_required");
-  }
   if (question.questionType === "file_upload") {
     const maxFiles = question.config?.maxFiles ?? 1;
     const maxSizeBytes = question.config?.maxSizeBytes ?? 10_000_000;
@@ -29,15 +26,15 @@ export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): 
       throw new BadRequestException("survey_rating_scale_invalid");
     }
   }
-  if (CHOICE_TYPES.has(question.questionType) && (question.options?.length ?? 0) < 2) {
-    throw new BadRequestException("survey_choice_requires_two_options");
+  if (CHOICE_TYPES.has(question.questionType) && (question.options?.length ?? 0) < 1) {
+    throw new BadRequestException("survey_choice_requires_option");
   }
   if (GRID_TYPES.has(question.questionType)) {
     if ((question.config?.rows?.length ?? 0) < 1) {
       throw new BadRequestException("survey_grid_requires_rows");
     }
-    if ((question.config?.columns?.length ?? 0) < 2) {
-      throw new BadRequestException("survey_grid_requires_two_columns");
+    if ((question.config?.columns?.length ?? 0) < 1) {
+      throw new BadRequestException("survey_grid_requires_columns");
     }
   }
   if (question.answerRegex) {

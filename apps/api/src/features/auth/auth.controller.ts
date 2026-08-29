@@ -6,6 +6,7 @@ import {
   Query,
   Req,
   Res,
+  Optional,
   UseGuards,
 } from "@nestjs/common";
 import { Response } from "express";
@@ -21,6 +22,7 @@ import {
 import { AuthCookieService } from "./auth-cookie.service";
 import { AuthSessionService } from "./auth-session.service";
 import { AuthService } from "./auth.service";
+import { AuditLogService } from "../audit/audit-log.service";
 import { OptionalAuthGuard } from "./guards";
 import {
   AUTH_ACCESS_COOKIE_NAME,
@@ -42,6 +44,7 @@ export class AuthController {
     private readonly authCookieService: AuthCookieService,
     private readonly authService: AuthService,
     private readonly authSessionService: AuthSessionService,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) { }
 
   /**
@@ -64,9 +67,21 @@ export class AuthController {
   @Post("login")
   async handleLoginCallback(
     @Body() body: SsoCallbackBodyDto,
+    @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
     const redirectUrl = await this.authService.handleLoginCallback(body);
+    const redirect = new URL(redirectUrl, "http://localhost");
+    await this.auditLogService?.record({
+      action: "auth.sso.callback",
+      actorUserId: null,
+      ipAddress: request.ip ?? null,
+      payload: {
+        reason: redirect.searchParams.get("reason") ?? "unknown",
+        status: redirect.searchParams.get("status") ?? "unknown",
+      },
+      targetType: "auth",
+    });
     response.redirect(302, redirectUrl);
   }
 
@@ -79,6 +94,14 @@ export class AuthController {
     // Redirect 이후 1회성 resultToken을 소비해 쿠키 세팅에 필요한 값을 회수합니다.
     const result = await this.authService.consumeLoginResult(resultToken);
     this.authCookieService.setAuthCookies(response, result, request);
+    await this.auditLogService?.record({
+      action: "auth.login.success",
+      actorUserId: result.userId ?? null,
+      ipAddress: request.ip ?? null,
+      payload: { storageMode: result.storageMode },
+      targetId: result.userId ?? null,
+      targetType: result.userId ? "user" : "auth",
+    });
 
     return {
       storageMode: result.storageMode,
@@ -103,6 +126,18 @@ export class AuthController {
     } else {
       this.authCookieService.clearAuthCookies(response, request);
     }
+
+    await this.auditLogService?.record({
+      action: "auth.login.consent",
+      actorUserId: result.userId ?? null,
+      ipAddress: request.ip ?? null,
+      payload: {
+        consent: body.consent,
+        storageMode: result.storageMode,
+      },
+      targetId: result.userId ?? null,
+      targetType: result.userId ? "user" : "auth",
+    });
 
     return {
       storageMode: result.storageMode,
@@ -184,6 +219,13 @@ export class AuthController {
     });
 
     this.authCookieService.clearAuthCookies(response, request);
+    await this.auditLogService?.record({
+      action: "auth.logout",
+      actorUserId: null,
+      ipAddress: request.ip ?? null,
+      payload: { sessionIdProvided: Boolean(cookieSessionId ?? body?.sessionId) },
+      targetType: "auth",
+    });
     return result;
   }
 }

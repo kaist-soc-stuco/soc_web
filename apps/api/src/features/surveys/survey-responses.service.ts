@@ -24,6 +24,7 @@ import { isoToMs, nowMs } from "@soc/shared";
 import { getSurveyEligibilityFailure } from "./survey-eligibility";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
+import { AuditLogService } from "../audit/audit-log.service";
 
 interface SurveyCaller {
   id?: string;
@@ -41,6 +42,7 @@ export class SurveyResponsesService {
     @Optional() private readonly questionsRepo?: SurveyQuestionsRepository,
     @Optional() private readonly assetRepository?: AssetRepository,
     @Optional() private readonly surveySheetsService?: GoogleSurveySheetsService,
+    @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
   private async validateUploadedAssets(
@@ -193,6 +195,20 @@ export class SurveyResponsesService {
       throw new ConflictException("survey_capacity_full");
     }
 
+    await this.auditLogService?.record({
+      action: "survey_response.submit",
+      actorUserId: caller?.id ?? null,
+      targetId: submission.response.id,
+      targetType: "survey_response",
+      payload: {
+        created: {
+          surveyId,
+          surveyTitleKo: survey.titleKo,
+          isAnonymous: !caller?.id,
+          answerCount: submission.answers.length,
+        },
+      },
+    });
     await this.surveySheetsService?.enqueueRefresh(surveyId);
     return { ...submission.response, answers: submission.answers };
   }
@@ -274,6 +290,19 @@ export class SurveyResponsesService {
     });
 
     if (update.status === "updated") {
+      await this.auditLogService?.record({
+        action: "survey_response.update",
+        actorUserId: caller.id,
+        targetId: update.response.id,
+        targetType: "survey_response",
+        payload: {
+          after: {
+            surveyId,
+            surveyTitleKo: survey.titleKo,
+            answerCount: update.answers.length,
+          },
+        },
+      });
       await this.surveySheetsService?.enqueueRefresh(surveyId);
       return { ...update.response, answers: update.answers };
     }

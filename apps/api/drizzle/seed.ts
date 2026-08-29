@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -33,9 +33,11 @@ import {
 } from "../src/infrastructure/postgres/postgres.schema";
 import {
   INITIAL_ADMIN_ROLE_GROUP_NAME,
+  getRoadmapLegacyCourseCode,
   normalizeRoadmapCourseCode,
   OPERATIONAL_SURVEY_IDS,
   PERMISSION_REGISTRY,
+  type BoardWriteAccessScope,
 } from "@soc/contracts";
 import {
   ROADMAP_REFERENCE_COURSES,
@@ -76,6 +78,7 @@ type BoardSeed = {
   nameEn: string;
   descriptionKo: string;
   descriptionEn: string;
+  writeAccessScope: BoardWriteAccessScope;
   writePermissionId: number | null;
   allowComment: boolean;
   allowSecret: boolean;
@@ -99,11 +102,12 @@ const PERMISSION_SEEDS = PERMISSION_REGISTRY.map((def) => ({
 }));
 const BOARD_SEEDS: BoardSeed[] = [
   {
-    code: "공지",
+    code: "notice",
     nameKo: "공지",
     nameEn: "Notice",
     descriptionKo: "집행위원회 및 학교의 중요한 공지사항을 확인하세요",
     descriptionEn: "Read important announcements from SoC Student Council and the school.",
+    writeAccessScope: "PERMISSION",
     writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
@@ -118,6 +122,7 @@ const BOARD_SEEDS: BoardSeed[] = [
     nameEn: "Events",
     descriptionKo: "전산학부의 다양한 행사 정보를 확인하세요",
     descriptionEn: "Discover events for School of Computing students.",
+    writeAccessScope: "PERMISSION",
     writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
@@ -127,11 +132,12 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 1,
   },
   {
-    code: "HoC",
+    code: "hoc",
     nameKo: "HoC",
     nameEn: "HoC",
     descriptionKo: "Hall of Code 프로젝트 및 활동 내역",
     descriptionEn: "Browse Hall of Code projects and activity updates.",
+    writeAccessScope: "PERMISSION",
     writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
@@ -141,11 +147,12 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 2,
   },
   {
-    code: "홍보글",
+    code: "promotions",
     nameKo: "홍보글",
     nameEn: "Promotional Posts",
     descriptionKo: "집행위원회 및 학회의 홍보 게시물",
     descriptionEn: "Find promotions from SoC Student Council and student organizations.",
+    writeAccessScope: "PERMISSION",
     writePermissionId: 1,
     allowComment: true,
     allowSecret: false,
@@ -155,11 +162,12 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 3,
   },
   {
-    code: "건의사항",
+    code: "suggestions",
     nameKo: "건의사항",
     nameEn: "Suggestions",
     descriptionKo: "학생들의 의견과 건의사항을 나눠주세요",
     descriptionEn: "Share feedback and suggestions with SoC Student Council.",
+    writeAccessScope: "AUTHENTICATED",
     writePermissionId: null,
     allowComment: true,
     allowSecret: true,
@@ -169,11 +177,12 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 4,
   },
   {
-    code: "연구실",
+    code: "labs",
     nameKo: "연구실",
     nameEn: "Research Labs",
     descriptionKo: "각 연구실의 소식과 공지사항",
     descriptionEn: "Read news and announcements from research labs.",
+    writeAccessScope: "AUTHENTICATED",
     writePermissionId: null,
     allowComment: true,
     allowSecret: false,
@@ -183,11 +192,12 @@ const BOARD_SEEDS: BoardSeed[] = [
     sortOrder: 5,
   },
   {
-    code: "FAQ",
+    code: "faq",
     nameKo: "FAQ",
     nameEn: "FAQ",
     descriptionKo: "FAQ와 답변을 확인하세요",
     descriptionEn: "Browse frequently asked questions and answers.",
+    writeAccessScope: "PERMISSION",
     writePermissionId: 1,
     allowComment: false,
     allowSecret: false,
@@ -513,6 +523,7 @@ async function seedBoards() {
         nameEn: sql`excluded.name_en`,
         nameKo: sql`excluded.name_ko`,
         sortOrder: sql`excluded.sort_order`,
+        writeAccessScope: sql`excluded.write_access_scope`,
         writePermissionId: sql`excluded.write_permission_id`,
       },
     });
@@ -1360,7 +1371,7 @@ async function seedReferenceFaqs() {
   const [faqBoard] = await db
     .select({ boardId: boards.boardId })
     .from(boards)
-    .where(eq(boards.code, "FAQ"))
+    .where(eq(boards.code, "faq"))
     .limit(1);
   if (!faqBoard) {
     throw new Error("FAQ board is missing while seeding reference FAQs");
@@ -2100,8 +2111,6 @@ async function seedReferenceRoadmap() {
         legacyCourseCode: course.legacyCourseCode,
         nameEn: course.nameEn,
         nameKo: course.nameKo,
-        positionX: 0,
-        positionY: 0,
         semesters: course.semesters,
         source: "REFERENCE",
         trackIds: course.trackIds,
@@ -2109,6 +2118,23 @@ async function seedReferenceRoadmap() {
         updatedAt: new Date(),
       })
       .onConflictDoNothing({ target: roadmapCourses.courseCode });
+  }
+
+  // Backfill aliases for canonical courses that were seeded before the
+  // historical-code map was complete (for example CS10003 -> CS103).
+  for (const course of ROADMAP_REFERENCE_COURSES) {
+    const legacyCourseCode =
+      course.legacyCourseCode ?? getRoadmapLegacyCourseCode(course.courseCode);
+    if (!legacyCourseCode) continue;
+    await db
+      .update(roadmapCourses)
+      .set({ legacyCourseCode, updatedAt: new Date() })
+      .where(
+        and(
+          eq(roadmapCourses.courseCode, course.courseCode),
+          isNull(roadmapCourses.legacyCourseCode),
+        ),
+      );
   }
 
   const referenceOfferings = await db
@@ -2183,7 +2209,7 @@ async function seedMockData() {
   const [noticeBoard] = await db
     .select({ boardId: boards.boardId })
     .from(boards)
-    .where(eq(boards.code, "공지"))
+    .where(eq(boards.code, "notice"))
     .limit(1);
 
   const [eventBoard] = await db

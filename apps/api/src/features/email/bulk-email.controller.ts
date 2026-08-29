@@ -7,6 +7,7 @@ import {
 } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { BulkEmailService } from "./bulk-email.service";
 import type { Request } from "express";
@@ -50,22 +51,23 @@ export class BulkEmailController {
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(CreateBulkEmailTemplateSchema)) body: CreateBulkEmailTemplateRequest,
   ) {
-    return this.bulkEmailService.createTemplate(req.user.id, body);
+    return this.bulkEmailService.createTemplate(req.user.id, body, auditMetadataFromRequest(req));
   }
 
   @Patch("templates/:templateId")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async updateTemplate(
+    @Req() req: AuthedRequest,
     @Param("templateId") templateId: string,
     @Body(new ZodValidationPipe(UpdateBulkEmailTemplateSchema)) body: UpdateBulkEmailTemplateRequest,
   ) {
-    return this.bulkEmailService.updateTemplate(templateId, body);
+    return this.bulkEmailService.updateTemplate(templateId, body, auditMetadataFromRequest(req));
   }
 
   @Delete("templates/:templateId")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
-  async deleteTemplate(@Param("templateId") templateId: string) {
-    return this.bulkEmailService.deleteTemplate(templateId);
+  async deleteTemplate(@Req() req: AuthedRequest, @Param("templateId") templateId: string) {
+    return this.bulkEmailService.deleteTemplate(templateId, auditMetadataFromRequest(req));
   }
 
   @Get("drafts")
@@ -80,7 +82,7 @@ export class BulkEmailController {
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(SaveBulkEmailDraftSchema)) body: SaveBulkEmailDraftRequest,
   ): Promise<BulkEmailRecord> {
-    return this.bulkEmailService.saveDraft(req.user.id, body);
+    return this.bulkEmailService.saveDraft(req.user.id, body, auditMetadataFromRequest(req));
   }
 
   @Delete("drafts/:draftId")
@@ -89,7 +91,7 @@ export class BulkEmailController {
     @Req() req: AuthedRequest,
     @Param("draftId") draftId: string,
   ): Promise<{ success: boolean }> {
-    return this.bulkEmailService.deleteDraft(req.user.id, draftId);
+    return this.bulkEmailService.deleteDraft(req.user.id, draftId, auditMetadataFromRequest(req));
   }
 
   @Post("send")
@@ -98,7 +100,7 @@ export class BulkEmailController {
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(SendBulkEmailSchema)) body: SendBulkEmailRequest,
   ): Promise<SendBulkEmailResponse> {
-    return this.bulkEmailService.sendBulkEmail(req.user.id, body);
+    return this.bulkEmailService.sendBulkEmail(req.user.id, body, auditMetadataFromRequest(req));
   }
 
   @Post("test")
@@ -107,7 +109,7 @@ export class BulkEmailController {
     @Req() req: AuthedRequest,
     @Body(new ZodValidationPipe(SendBulkEmailSchema)) body: SendBulkEmailRequest,
   ): Promise<SendBulkEmailTestResponse> {
-    return this.bulkEmailService.sendTestEmail(req.user.id, body);
+    return this.bulkEmailService.sendTestEmail(req.user.id, body, auditMetadataFromRequest(req));
   }
 
   @Post(":emailId/cancel")
@@ -116,7 +118,7 @@ export class BulkEmailController {
     @Req() req: AuthedRequest,
     @Param("emailId") emailId: string,
   ): Promise<BulkEmailRecord> {
-    return this.bulkEmailService.cancelScheduled(req.user.id, emailId);
+    return this.bulkEmailService.cancelScheduled(req.user.id, emailId, auditMetadataFromRequest(req));
   }
 
   @Post(":emailId/retry")
@@ -125,7 +127,7 @@ export class BulkEmailController {
     @Req() req: AuthedRequest,
     @Param("emailId") emailId: string,
   ): Promise<SendBulkEmailResponse> {
-    return this.bulkEmailService.retryFailed(req.user.id, emailId);
+    return this.bulkEmailService.retryFailed(req.user.id, emailId, auditMetadataFromRequest(req));
   }
 
   @Post("preview")

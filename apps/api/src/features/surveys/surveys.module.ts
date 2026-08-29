@@ -4,6 +4,7 @@ import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
 import { AssetModule } from "../asset/asset.module";
+import { AuditLogModule } from "../audit/audit-log.module";
 
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -23,7 +24,7 @@ import { SurveyQuestionsController } from "./survey-questions.controller";
 import { SurveyResponsesController } from "./survey-responses.controller";
 
 @Module({
-  imports: [PostgresModule, AuthModule, UsersModule, AssetModule],
+  imports: [PostgresModule, AuthModule, UsersModule, AssetModule, AuditLogModule],
   controllers: [
     SurveysController,
     SurveySectionsController,

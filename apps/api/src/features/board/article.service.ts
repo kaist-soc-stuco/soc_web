@@ -33,6 +33,7 @@ import {
 import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
 import { sanitizeArticleHtml } from "./article-html-sanitizer";
+import { canWriteBoard } from "./board-write-access";
 import { AuditLogService } from "../audit/audit-log.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { UsersService } from "../users/users.service";
@@ -55,7 +56,7 @@ interface AuthenticatedUser {
 
 const MAX_CONTENT_LENGTH = 50_000;
 const MAX_PAGE_SIZE = 100;
-const PUBLIC_NON_AGGREGATE_BOARD_CODES = new Set(["_EVENT", "FAQ"]);
+const PUBLIC_NON_AGGREGATE_BOARD_CODES = new Set(["_EVENT", "faq"]);
 
 const canReadSecretArticle = (
   article: Pick<ArticleListItem, "isSecret" | "author">,
@@ -95,13 +96,19 @@ const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
 
 @Injectable()
 export class ArticleService {
+  private readonly auditLogService: AuditLogService;
+
   constructor(
     private readonly boardRepository: BoardRepository,
     private readonly articleRepository: ArticleRepository,
-    private readonly auditLogService: AuditLogService,
+    @Optional() auditLogService: AuditLogService | undefined,
     @Optional() private readonly notificationsService?: NotificationsService,
     @Optional() private readonly usersService?: UsersService,
-  ) {}
+  ) {
+    this.auditLogService = auditLogService ?? {
+      record: async () => undefined,
+    } as unknown as AuditLogService;
+  }
 
   async getArticles(
     code: string,
@@ -320,18 +327,34 @@ export class ArticleService {
       throw new ForbiddenException("comment_not_allowed");
     }
 
-    if (
-      board.writePermissionBit > 0 &&
-      !Permissions.has(user.permission, board.writePermissionBit)
-    ) {
+    if (!(await canWriteBoard(board, user, this.usersService))) {
       throw new ForbiddenException("insufficient_permission");
     }
 
-    return this.articleRepository.createArticle({
+    const created = await this.articleRepository.createArticle({
       boardId: board.boardId,
       authorUserId: user.id,
       payload: sanitizedPayload,
     });
+    await this.auditLogService.record({
+      action: "article.create",
+      actorUserId: user.id,
+      targetId: created.articleId,
+      targetType: "article",
+      payload: {
+        created: {
+          titleKo: payload.titleKo,
+          titleEn: payload.titleEn ?? null,
+          boardCode: code,
+          boardId: board.boardId,
+          visibilityScope: payload.visibilityScope,
+          isSecret: payload.isSecret ?? false,
+          isAnonymous: payload.isAnonymous ?? false,
+          allowComment: payload.allowComment ?? true,
+        },
+      },
+    });
+    return created;
   }
 
   async updateArticle(
@@ -401,12 +424,27 @@ export class ArticleService {
       throw new ForbiddenException("insufficient_permission");
     }
 
-    return this.articleRepository.updateArticle(
+    const updated = await this.articleRepository.updateArticle(
       board.boardId,
       articleId,
       sanitizedPayload,
       user.id,
     );
+    await this.auditLogService.record({
+      action: "article.update",
+      actorUserId: user.id,
+      targetId: articleId,
+      targetType: "article",
+      payload: {
+        after: {
+          boardCode: code,
+          changedFields: Object.keys(sanitizedPayload),
+          ...(sanitizedPayload.titleKo !== undefined ? { titleKo: sanitizedPayload.titleKo } : {}),
+          ...(sanitizedPayload.titleEn !== undefined ? { titleEn: sanitizedPayload.titleEn } : {}),
+        },
+      },
+    });
+    return updated;
   }
 
   async deleteArticle(
@@ -437,6 +475,13 @@ export class ArticleService {
 
     const result = await this.articleRepository.softDeleteArticle(board.boardId, articleId);
     await this.notificationsService?.removeForArticle(code, articleId);
+    await this.auditLogService.record({
+      action: "article.delete",
+      actorUserId: user.id,
+      targetId: articleId,
+      targetType: "article",
+      payload: { deleted: { articleId, boardCode: code } },
+    });
     return result;
   }
 
@@ -470,12 +515,27 @@ export class ArticleService {
       throw new BadRequestException("faq_update_empty");
     }
 
-    return this.articleRepository.updateArticle(
+    const updated = await this.articleRepository.updateArticle(
       board.boardId,
       articleId,
       sanitizedPayload,
       user.id,
     );
+    await this.auditLogService.record({
+      action: "article.update",
+      actorUserId: user.id,
+      targetId: articleId,
+      targetType: "article",
+      payload: {
+        after: {
+          boardCode: "faq",
+          changedFields: Object.keys(sanitizedPayload),
+          ...(sanitizedPayload.titleKo !== undefined ? { titleKo: sanitizedPayload.titleKo } : {}),
+          ...(sanitizedPayload.titleEn !== undefined ? { titleEn: sanitizedPayload.titleEn } : {}),
+        },
+      },
+    });
+    return updated;
   }
 
   async createFaqArticle(
@@ -488,7 +548,7 @@ export class ArticleService {
     if (!contentKo.trim()) throw new BadRequestException("content_empty_after_sanitization");
     const contentEn = payload.contentEn ? sanitizeArticleHtml(payload.contentEn) : undefined;
 
-    return this.articleRepository.createArticle({
+    const created = await this.articleRepository.createArticle({
       boardId: board.boardId,
       authorUserId: user.id,
       payload: {
@@ -505,6 +565,23 @@ export class ArticleService {
         assets: payload.assets,
       },
     });
+    await this.auditLogService.record({
+      action: "article.create",
+      actorUserId: user.id,
+      targetId: created.articleId,
+      targetType: "article",
+      payload: {
+        created: {
+          titleKo: payload.titleKo,
+          titleEn: payload.titleEn ?? null,
+          boardCode: "faq",
+          boardId: board.boardId,
+          visibilityScope: "PUBLIC",
+          allowComment: false,
+        },
+      },
+    });
+    return created;
   }
 
   async deleteFaqArticle(
@@ -518,7 +595,14 @@ export class ArticleService {
       throw new NotFoundException("article_not_found");
     }
     const result = await this.articleRepository.softDeleteArticle(board.boardId, articleId);
-    await this.notificationsService?.removeForArticle("FAQ", articleId);
+      await this.notificationsService?.removeForArticle("faq", articleId);
+    await this.auditLogService.record({
+      action: "article.delete",
+      actorUserId: user.id,
+      targetId: articleId,
+      targetType: "article",
+      payload: { deleted: { articleId, boardCode: "faq" } },
+    });
     return result;
   }
 
@@ -535,11 +619,17 @@ export class ArticleService {
       throw new BadRequestException("faq_reorder_article_invalid");
     }
     await this.articleRepository.reorderFaqArticles(input.items);
+    await this.auditLogService.record({
+      action: "article.reorder",
+      actorUserId: user.id,
+      targetType: "article",
+      payload: { boardCode: "faq", count: input.items.length },
+    });
     return { ok: true };
   }
 
   private async getFaqBoard() {
-    const board = await this.boardRepository.findByCode("FAQ");
+    const board = await this.boardRepository.findByCode("faq");
     if (!board || !board.isActive) throw new NotFoundException("board_not_found");
     return board;
   }
@@ -692,12 +782,25 @@ export class ArticleService {
       user.id,
     );
 
-    return {
+    const response = {
       articleId,
       kind,
       active: kind === "LIKE" ? summary.viewerHasLiked : summary.viewerHasScrapped,
       ...summary,
     };
+    await this.auditLogService.record({
+      action: `article.engagement.${kind === "LIKE" ? "like" : "scrap"}`,
+      actorUserId: user.id,
+      targetId: articleId,
+      targetType: "article",
+      payload: {
+        articleId,
+        titleKo: article.titleKo,
+        boardCode: code,
+        active: response.active,
+      },
+    });
+    return response;
   }
 
   async searchArticles(

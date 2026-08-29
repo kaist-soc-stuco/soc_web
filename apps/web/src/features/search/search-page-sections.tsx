@@ -285,7 +285,7 @@ function ArticleResults({
     <SectionShell count={articles.length} title={lang === "ko" ? "게시판" : "Board"}>
       {articles.map((article) => {
         const board = boardById.get(article.boardId);
-        const boardCode = article.boardCode ?? board?.code ?? "공지";
+        const boardCode = article.boardCode ?? board?.code ?? "notice";
         const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
         const snippet = getSnippet(
           lang === "ko" ? article.snippetKo : article.snippetEn || article.snippetKo,

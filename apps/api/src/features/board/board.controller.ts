@@ -7,7 +7,9 @@ import {
   Param,
   Patch,
   Post,
+  Req,
 } from "@nestjs/common";
+import type { Request } from "express";
 import {
   BoardCreateSchema,
   BoardReorderSchema,
@@ -25,6 +27,7 @@ import type {
 } from "@soc/contracts";
 
 import { RequirePermissions } from "../auth/guards";
+import { auditMetadataFromRequest } from "../audit/audit-context";
 import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 import { BoardService } from "./board.service";
 
@@ -46,17 +49,19 @@ export class BoardController {
   @Post()
   @RequirePermissions(Permissions.MANAGE_BOARDS)
   async createBoard(
+    @Req() request: Request & { user?: { id: string } },
     @Body(new ZodValidationPipe(BoardCreateSchema)) body: BoardCreateRequest,
   ): Promise<BoardSummary> {
-    return this.boardService.createBoard(body);
+    return this.boardService.createBoard(body, auditMetadataFromRequest(request));
   }
 
   @Patch("admin/order")
   @RequirePermissions(Permissions.MANAGE_BOARDS)
   async reorderBoards(
+    @Req() request: Request & { user?: { id: string } },
     @Body(new ZodValidationPipe(BoardReorderSchema)) body: BoardReorderRequest,
   ): Promise<BoardListResponse> {
-    return this.boardService.reorderBoards(body);
+    return this.boardService.reorderBoards(body, auditMetadataFromRequest(request));
   }
 
   @Get(":code")
@@ -67,25 +72,32 @@ export class BoardController {
   @Patch(":code")
   @RequirePermissions(Permissions.MANAGE_BOARDS)
   async updateBoard(
+    @Req() request: Request & { user?: { id: string } },
     @Param("code") code: string,
     @Body(new ZodValidationPipe(BoardUpdateSchema)) body: BoardUpdateRequest,
   ): Promise<BoardSummary> {
-    return this.boardService.updateBoard(code, body);
+    return this.boardService.updateBoard(code, body, auditMetadataFromRequest(request));
   }
 
   @Delete(":code/permanent")
   @HttpCode(200)
   @RequirePermissions(Permissions.MANAGE_BOARDS)
-  async deleteBoard(@Param("code") code: string): Promise<BoardDeleteResponse> {
-    const board = await this.boardService.deleteBoard(code);
+  async deleteBoard(
+    @Req() request: Request & { user?: { id: string } },
+    @Param("code") code: string,
+  ): Promise<BoardDeleteResponse> {
+    const board = await this.boardService.deleteBoard(code, auditMetadataFromRequest(request));
     return { ok: true, boardId: board.boardId };
   }
 
   @Delete(":code")
   @HttpCode(200)
   @RequirePermissions(Permissions.MANAGE_BOARDS)
-  async archiveBoard(@Param("code") code: string): Promise<BoardArchiveResponse> {
-    const board = await this.boardService.archiveBoard(code);
+  async archiveBoard(
+    @Req() request: Request & { user?: { id: string } },
+    @Param("code") code: string,
+  ): Promise<BoardArchiveResponse> {
+    const board = await this.boardService.archiveBoard(code, auditMetadataFromRequest(request));
     return { ok: true, boardId: board.boardId, isActive: false };
   }
 }

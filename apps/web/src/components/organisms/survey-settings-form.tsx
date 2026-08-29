@@ -69,12 +69,14 @@ const appendInlineImage = (content: string, src: string) =>
 
 function SettingCheckbox({
   checked,
+  className,
   disabled = false,
   hint,
   label,
   onChange,
 }: {
   checked: boolean;
+  className?: string;
   disabled?: boolean;
   hint?: string;
   label: string;
@@ -82,7 +84,7 @@ function SettingCheckbox({
 }) {
   return (
     <label
-      className={`flex min-w-0 items-start gap-2.5 rounded-lg px-2 py-2 transition-colors ${
+      className={`flex min-w-0 items-start gap-2.5 rounded-lg px-2 py-2 transition-colors ${className ?? ""} ${
         disabled
           ? "cursor-not-allowed opacity-50"
           : "cursor-pointer hover:bg-slate-50"
@@ -620,7 +622,6 @@ export function SurveySettingsForm({
                   checked={allowAnonymous}
                   disabled={isOngoing}
                   label="로그인 없이 응답 허용"
-                  hint="소속·학적·과비 조건을 자동으로 해제합니다."
                   onChange={(checked) => {
                     if (isOngoing) return;
                     setValue("allowAnonymous", checked, { shouldDirty: true, shouldValidate: true });
@@ -635,7 +636,6 @@ export function SurveySettingsForm({
                   checked={feePayersOnly}
                   disabled={isOngoing}
                   label="과비 납부자만 응답 가능"
-                  hint={allowAnonymous ? "선택하면 로그인 응답으로 전환됩니다." : undefined}
                   onChange={(checked) => {
                     if (isOngoing) return;
                     setValue("feePayersOnly", checked, { shouldDirty: true, shouldValidate: true });
@@ -643,20 +643,14 @@ export function SurveySettingsForm({
                   }}
                 />
               </div>
-              <div className="grid grid-cols-1 gap-4 rounded-lg bg-slate-50/70 p-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-[#344054]">전산학부 소속 조건</p>
-                  <label className={`flex items-center gap-2 ${isOngoing ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-                    <UiInput
-                      type="checkbox"
-                      className="size-4 rounded border-slate-300 accent-brand-primary"
-                      checked={eligibleSocAffiliations.includes("PRIMARY")}
-                      disabled={isOngoing}
-                      onChange={() => toggleSocAffiliation("PRIMARY")}
-                    />
-                    <span className="text-sm font-normal text-[#344054]">주전공</span>
-                  </label>
-                </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <SettingCheckbox
+                  checked={eligibleSocAffiliations.includes("PRIMARY")}
+                  className="sm:self-end"
+                  disabled={isOngoing}
+                  label="전산학부 주전공"
+                  onChange={() => toggleSocAffiliation("PRIMARY")}
+                />
                 <AdminFormField label="학적 조건">
                   <Controller
                     name="academicEligibility"

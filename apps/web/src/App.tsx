@@ -220,7 +220,7 @@ export function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/board/faq" element={<FaqPage />} />
-          <Route path="/board/faq/:articleId" element={<BoardDetailPage forcedCategory="FAQ" publicBasePath="/board/faq" />} />
+          <Route path="/board/faq/:articleId" element={<BoardDetailPage forcedCategory="faq" publicBasePath="/board/faq" />} />
           <Route path="/about/faq" element={<Navigate to="/board/faq" replace />} />
           <Route path="/about/pledges" element={<Navigate to="/about#work" replace />} />
           <Route path="/search" element={<SearchPage />} />

@@ -27,8 +27,6 @@ export const roadmapCourses = pgTable(
     semesters: varchar("semesters", { length: 20 }).notNull().default("S/F"),
     trackIds: jsonb("track_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
     ai: boolean("ai").notNull().default(false),
-    positionX: integer("position_x").notNull().default(0),
-    positionY: integer("position_y").notNull().default(0),
     isVisible: boolean("is_visible").notNull().default(true),
     source: varchar("source", { length: 20 }).notNull().default("MANUAL"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

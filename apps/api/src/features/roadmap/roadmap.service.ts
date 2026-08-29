@@ -12,6 +12,7 @@ import type {
 } from "@soc/contracts";
 
 import { AuditLogService } from "../audit/audit-log.service";
+import type { AuditMetadata } from "../audit/audit-context";
 import { parseRoadmapWorkbook, type RoadmapImportResult } from "./roadmap-importer";
 import { RoadmapRepository, type RoadmapImportDecision } from "./roadmap.repository";
 
@@ -79,6 +80,7 @@ export class RoadmapService {
     file: { buffer: Buffer; originalname: string },
     actorUserId: string,
     decisions: RoadmapImportCommitRequest["decisions"] = {},
+    audit?: AuditMetadata,
   ): Promise<RoadmapOfferingImportResponse> {
     const fileName = normalizeFileName(file.originalname);
     const parsed = this.parse(file.buffer, fileName);
@@ -98,6 +100,7 @@ export class RoadmapService {
     await this.auditLogService.record({
       action: "roadmap_offerings.import",
       actorUserId,
+      ipAddress: audit?.ipAddress ?? null,
       payload: {
         fileName,
         importedCount: parsed.rows.length,
@@ -116,11 +119,12 @@ export class RoadmapService {
     };
   }
 
-  async createCourse(input: CreateRoadmapCourseRequest, actorUserId: string) {
+  async createCourse(input: CreateRoadmapCourseRequest, actorUserId: string, audit?: AuditMetadata) {
     const course = await this.roadmapRepository.createCourse(input);
     await this.auditLogService.record({
       action: "roadmap_course.create",
       actorUserId,
+      ipAddress: audit?.ipAddress ?? null,
       payload: { courseCode: course.courseCode },
       targetId: course.courseId,
       targetType: "roadmap_course",
@@ -132,12 +136,14 @@ export class RoadmapService {
     courseCode: string,
     input: UpdateRoadmapCourseRequest,
     actorUserId: string,
+    audit?: AuditMetadata,
   ) {
     const course = await this.roadmapRepository.updateCourse(courseCode, input);
     if (!course) throw new NotFoundException("roadmap_course_not_found");
     await this.auditLogService.record({
       action: "roadmap_course.update",
       actorUserId,
+      ipAddress: audit?.ipAddress ?? null,
       payload: { courseCode: course.courseCode },
       targetId: course.courseId,
       targetType: "roadmap_course",
@@ -145,11 +151,12 @@ export class RoadmapService {
     return course;
   }
 
-  async createOffering(input: CreateRoadmapOfferingRequest, actorUserId: string) {
+  async createOffering(input: CreateRoadmapOfferingRequest, actorUserId: string, audit?: AuditMetadata) {
     const offering = await this.roadmapRepository.createOffering(input, actorUserId);
     await this.auditLogService.record({
       action: "roadmap_offering.create",
       actorUserId,
+      ipAddress: audit?.ipAddress ?? null,
       payload: { courseCode: offering.courseCode, term: offering.term },
       targetId: offering.offeringId,
       targetType: "roadmap_offering",
@@ -161,12 +168,14 @@ export class RoadmapService {
     offeringId: string,
     input: UpdateRoadmapOfferingRequest,
     actorUserId: string,
+    audit?: AuditMetadata,
   ) {
     const offering = await this.roadmapRepository.updateOffering(offeringId, input);
     if (!offering) throw new NotFoundException("roadmap_offering_not_found");
     await this.auditLogService.record({
       action: "roadmap_offering.update",
       actorUserId,
+      ipAddress: audit?.ipAddress ?? null,
       payload: { courseCode: offering.courseCode, term: offering.term },
       targetId: offering.offeringId,
       targetType: "roadmap_offering",
@@ -174,12 +183,13 @@ export class RoadmapService {
     return offering;
   }
 
-  async deleteOffering(offeringId: string, actorUserId: string): Promise<void> {
+  async deleteOffering(offeringId: string, actorUserId: string, audit?: AuditMetadata): Promise<void> {
     const deleted = await this.roadmapRepository.deleteOffering(offeringId);
     if (!deleted) throw new NotFoundException("roadmap_offering_not_found");
     await this.auditLogService.record({
       action: "roadmap_offering.delete",
       actorUserId,
+      ipAddress: audit?.ipAddress ?? null,
       payload: { offeringId },
       targetId: offeringId,
       targetType: "roadmap_offering",

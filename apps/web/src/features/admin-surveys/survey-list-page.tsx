@@ -64,6 +64,22 @@ function format24hDateTime(dateIso: string | null) {
   };
 }
 
+function formatSurveyPeriod(survey: SurveyRecord) {
+  if (survey.isAlwaysOpen || !survey.opensAt) return "상시";
+
+  const start = format24hDateTime(survey.opensAt);
+  if (!start) return "상시";
+
+  const startLabel = `${start.dateStr} ${start.timeStr}`;
+  const end = format24hDateTime(survey.closesAt);
+  if (!end) return `${startLabel} ~`;
+
+  const endDate = end.dateStr.slice(0, 4) === start.dateStr.slice(0, 4)
+    ? end.dateStr.slice(5)
+    : end.dateStr;
+  return `${startLabel} ~ ${endDate} ${end.timeStr}`;
+}
+
 // Convert timestamp to Korean relative time
 function formatRelativeTime(dateIso: string | null) {
   if (!dateIso) return "—";
@@ -369,13 +385,13 @@ export function SurveyListPage() {
             ) : null}
 
             {!showInitialLoading && filteredSurveys.length > 0 ? (
-              <AdminDataTable minWidth={1264}>
+              <AdminDataTable minWidth={1304}>
                 <colgroup>
                   <col style={{ width: 360 }} />
                   <col style={{ width: 110 }} />
                   <col style={{ width: 110 }} />
                   <col style={{ width: 120 }} />
-                  <col style={{ width: 190 }} />
+                  <col style={{ width: 230 }} />
                   <col style={{ width: 190 }} />
                   <col style={{ width: 184 }} />
                 </colgroup>
@@ -398,7 +414,7 @@ export function SurveyListPage() {
                       ascending={sortBy === "opensAt" && sortDirection === "asc"}
                       onClick={() => handleSortChange("opensAt")}
                     >
-                      시작
+                      일시
                     </AdminSortableHead>
                     <AdminSortableHead
                       className="text-center"
@@ -413,7 +429,6 @@ export function SurveyListPage() {
                 </AdminTableHeader>
                 <AdminTableBody>
                   {paginatedSurveys.map((survey) => {
-                    const start = format24hDateTime(survey.opensAt);
                     return (
                       <tr key={survey.id} className="interaction-row transition-colors hover:bg-slate-50/60">
                         <AdminTableCell className="pl-5" truncate>
@@ -433,7 +448,7 @@ export function SurveyListPage() {
                           {survey.responseCount ?? 0}명
                         </AdminTableCell>
                         <AdminTableCell className="text-center tabular-nums whitespace-nowrap">
-                          {start ? `${start.dateStr} ${start.timeStr}` : "상시"}
+                          {formatSurveyPeriod(survey)}
                         </AdminTableCell>
                         <AdminTableCell className="text-center whitespace-nowrap">
                           {formatRelativeTime(survey.updatedAt)}

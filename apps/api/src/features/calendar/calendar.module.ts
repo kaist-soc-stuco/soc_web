@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { PostgresModule } from "../../infrastructure/postgres/postgres.module";
 import { AuthModule } from "../auth/auth.module";
 import { UsersModule } from "../users/users.module";
+import { AuditLogModule } from "../audit/audit-log.module";
 
 import { CalendarController } from "./calendar.controller";
 import { CalendarService } from "./calendar.service";
@@ -11,7 +12,7 @@ import { GoogleCalendarClient } from "./google-calendar.client";
 import { KaistAcademicCalendarSource } from "./kaist-academic-calendar.source";
 
 @Module({
-  imports: [PostgresModule, AuthModule, UsersModule],
+  imports: [PostgresModule, AuthModule, UsersModule, AuditLogModule],
   controllers: [CalendarController],
   providers: [
     CalendarService,

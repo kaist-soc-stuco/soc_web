@@ -39,8 +39,8 @@ function getQuestionTypeLabel(type: QuestionType, lang: string) {
   const labels: Record<QuestionType, { ko: string; en: string }> = {
     short_text: { ko: "단답형", en: "Short text" },
     long_text: { ko: "서술형", en: "Long text" },
-    single_choice: { ko: "단일 선택", en: "Single choice" },
-    multiple_choice: { ko: "복수 선택", en: "Multiple choice" },
+    single_choice: { ko: "객관식", en: "Multiple choice" },
+    multiple_choice: { ko: "체크박스", en: "Checkboxes" },
     dropdown: { ko: "드롭다운", en: "Dropdown" },
     rating: { ko: "등급", en: "Rating" },
     grid_single: { ko: "객관식 그리드", en: "Multiple choice grid" },

@@ -1,4 +1,7 @@
-import { normalizeRoadmapCourseCode } from "@soc/contracts";
+import {
+  getRoadmapLegacyCourseCode,
+  normalizeRoadmapCourseCode,
+} from "@soc/contracts";
 
 export type RoadmapLanguage = "ko" | "en";
 
@@ -72,7 +75,10 @@ const course = (
   const normalizedCode = normalizeRoadmapCourseCode(code);
   return {
     code: normalizedCode,
-    legacyCode: normalizedCode === code ? undefined : code,
+    legacyCode:
+      normalizedCode === code
+        ? getRoadmapLegacyCourseCode(normalizedCode) ?? undefined
+        : code,
     name: { ko, en },
     semesters,
     credits,

@@ -1,5 +1,10 @@
 import { createApiClient } from "@soc/api-client";
-import { PERMISSION_REGISTRY, type BoardCreateRequest, type BoardSummary } from "@soc/contracts";
+import {
+  PERMISSION_REGISTRY,
+  type BoardCreateRequest,
+  type BoardSummary,
+  type BoardWriteAccessScope,
+} from "@soc/contracts";
 import {
   closestCenter,
   DndContext,
@@ -36,12 +41,18 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
-const permissionOptions = [
-  { bit: 0, label: "제한 없음" },
-  ...PERMISSION_REGISTRY
-    .filter((permission) => permission.code === "WRITE_OFFICIAL" || permission.code === "WRITE_LAB")
-    .map((permission) => ({ bit: permission.bit, label: permission.labelKo })),
+const WRITE_ACCESS_OPTIONS: Array<{ value: BoardWriteAccessScope; label: string }> = [
+  { value: "ANYONE", label: "제한 없음(누구나)" },
+  { value: "AUTHENTICATED", label: "로그인 사용자" },
+  { value: "PRIMARY_MAJOR", label: "전산학부 주전공생" },
+  { value: "FEE_PAYER", label: "과비 납부자" },
+  { value: "PERMISSION", label: "권한 선택" },
 ];
+
+const permissionOptions = PERMISSION_REGISTRY.map((permission) => ({
+  bit: permission.bit,
+  label: permission.labelKo,
+}));
 
 type BoardFormValues = Omit<BoardCreateRequest, "descriptionKo" | "descriptionEn"> & { isActive: boolean };
 
@@ -55,6 +66,7 @@ const createEmptyForm = (sortOrder = 0): BoardFormValues => ({
   nameEn: "",
   nameKo: "",
   sortOrder,
+  writeAccessScope: "ANYONE",
   writePermissionBit: 0,
 });
 
@@ -120,6 +132,7 @@ function BoardManagementPageContent() {
       nameEn: board.nameEn ?? "",
       nameKo: board.nameKo,
       sortOrder: board.sortOrder,
+      writeAccessScope: board.writeAccessScope ?? (board.writePermissionBit > 0 ? "PERMISSION" : "AUTHENTICATED"),
       writePermissionBit: board.writePermissionBit,
     });
     setFormOpen(true);
@@ -275,7 +288,50 @@ function BoardManagementPageContent() {
 
         <section className="space-y-4 border-t border-slate-100 pt-6">
           <h3 className="text-sm font-semibold text-slate-900">작성 권한</h3>
-          <div className="max-w-sm"><PermissionSelect label="작성 권한" value={form.writePermissionBit} onChange={(value) => setForm((current) => ({ ...current, writePermissionBit: value }))} /></div>
+          <fieldset className="space-y-2">
+            <legend className="sr-only">게시판 작성 권한</legend>
+            {WRITE_ACCESS_OPTIONS.map((option) => {
+              const selected = form.writeAccessScope === option.value;
+              return (
+                <label
+                  key={option.value}
+                  className={cn(
+                    "flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm font-medium transition-colors",
+                    selected
+                      ? "border-brand-primary/40 bg-emerald-50/50 text-slate-900"
+                      : "border-slate-200 text-slate-700 hover:bg-slate-50",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="board-write-access-scope"
+                    value={option.value}
+                    checked={selected}
+                    onChange={() => setForm((current) => ({
+                      ...current,
+                      writeAccessScope: option.value,
+                      writePermissionBit:
+                        option.value === "PERMISSION"
+                          ? current.writePermissionBit || permissionOptions[0]?.bit || 0
+                          : 0,
+                    }))}
+                    className="size-4 accent-emerald-700"
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+          {form.writeAccessScope === "PERMISSION" ? (
+            <AdminFormField label="필요 권한">
+              <AdminSelectDropdown
+                ariaLabel="게시판 작성에 필요한 권한"
+                value={String(form.writePermissionBit)}
+                onChange={(value) => setForm((current) => ({ ...current, writePermissionBit: Number(value) }))}
+                options={permissionOptions.map((option) => ({ value: String(option.bit), label: option.label }))}
+              />
+            </AdminFormField>
+          ) : null}
         </section>
 
         <section className="space-y-4 border-t border-slate-100 pt-6">
@@ -307,10 +363,6 @@ function BoardDragPreview({ board, width }: { board: BoardSummary; width: number
     <div className="truncate px-4 text-sm text-slate-700">{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</div>
     <div className="px-4">{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</div>
   </div>;
-}
-
-function PermissionSelect({ label, onChange, value }: { label: string; onChange: (value: number) => void; value: number }) {
-  return <AdminFormField label={label}><AdminSelectDropdown ariaLabel={label} value={String(value)} onChange={(nextValue) => onChange(Number(nextValue))} options={permissionOptions.map((option) => ({ value: String(option.bit), label: option.label }))} /></AdminFormField>;
 }
 
 function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {

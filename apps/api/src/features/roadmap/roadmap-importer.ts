@@ -1,5 +1,8 @@
 import * as XLSX from "xlsx";
-import { normalizeRoadmapCourseCode } from "@soc/contracts";
+import {
+  getRoadmapLegacyCourseCode,
+  normalizeRoadmapCourseCode,
+} from "@soc/contracts";
 
 export interface RoadmapImportRow {
   capacity: number | null;
@@ -180,7 +183,7 @@ export function parseRoadmapWorkbook(
       accepted.push({
         capacity: parseInteger(readField(row, FIELD_ALIASES.capacity)),
         courseCode: canonicalCourseCode,
-        legacyCourseCode: oldCode || null,
+        legacyCourseCode: oldCode || getRoadmapLegacyCourseCode(canonicalCourseCode),
         credits: normalizeCredits(readField(row, FIELD_ALIASES.credits)),
         currentCode: currentCode || canonicalCourseCode,
         delivery: normalizeNullableText(readField(row, FIELD_ALIASES.delivery)),

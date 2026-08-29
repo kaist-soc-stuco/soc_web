@@ -5,6 +5,7 @@ import type {
   ArticleDraftSaveRequest,
   SurveyRecord,
 } from "@soc/contracts";
+import { normalizeBoardCode } from "@soc/contracts";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -20,7 +21,7 @@ import {
   isoToEventDateInput,
 } from "./event-date-utils";
 
-const PUBLIC_WRITE_BOARD_CODES = new Set(["건의사항"]);
+const PUBLIC_WRITE_BOARD_CODES = new Set(["suggestions"]);
 
 const parseHomeOrder = (value: string): number | null => {
   const parsed = Number(value);
@@ -43,11 +44,11 @@ const getDraftFingerprint = (
 };
 
 export function useBoardEditPageController(forcedCategory?: string) {
-  const { category: routeCategory = "공지", articleId } = useParams<{
+  const { category: routeCategory = "notice", articleId } = useParams<{
     category: string;
     articleId: string;
   }>();
-  const category = forcedCategory ?? routeCategory;
+  const category = normalizeBoardCode(forcedCategory ?? routeCategory);
   const navigate = useNavigate();
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
@@ -123,7 +124,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
             : String(res.homeOrder),
         );
         setIsSecret(res.isSecret);
-        setAllowComment(category === "건의사항" ? true : res.allowComment);
+        setAllowComment(category === "suggestions" ? true : res.allowComment);
         setIsKoreanOnly(
           !res.titleEn?.trim() ||
             !res.contentEn?.trim() ||
@@ -218,7 +219,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     homeOrder: category === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
     isSecret: allowSecret ? isSecret : false,
     isAnonymous: canConfigurePostSettings ? isAnonymous : false,
-    allowComment: category === "건의사항" ? true : allowComment,
+    allowComment: category === "suggestions" ? true : allowComment,
     isKoreanOnly,
     assets: assets.map((asset, index) => ({
       assetId: asset.assetId,
@@ -512,7 +513,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
         homeVisible: category === "_EVENT" ? homeVisible : undefined,
         homeOrder: category === "_EVENT" ? parseHomeOrder(homeOrder) : undefined,
         isSecret: allowSecret ? isSecret : false,
-        allowComment: category === "건의사항" ? true : allowComment,
+        allowComment: category === "suggestions" ? true : allowComment,
         assets: assets.map((asset, index) => ({
           assetId: asset.assetId,
           usageType: asset.usageType,

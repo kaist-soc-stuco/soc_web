@@ -12,9 +12,10 @@ import { AuthService } from "./auth.service";
 import { InitialAdminRepository } from "./initial-admin.repository";
 import { InitialAdminService } from "./initial-admin.service";
 import { AuthGuard, OptionalAuthGuard, PermissionBitsGuard } from "./guards";
+import { AuditLogModule } from "../audit/audit-log.module";
 
 @Module({
-  imports: [PostgresModule, RedisModule, UsersModule],
+  imports: [PostgresModule, RedisModule, UsersModule, AuditLogModule],
   controllers: [AuthController],
   providers: [
     AuthGuard,

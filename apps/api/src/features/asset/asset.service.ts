@@ -20,6 +20,7 @@ import { ArticleRepository } from "../board/repositories/article.repository";
 import type { CurrentUserContext } from "../board/board-access";
 import { getReadableArticleScopes } from "../board/article-access";
 import { AuditLogService } from "../audit/audit-log.service";
+import type { AuditMetadata } from "../audit/audit-context";
 import type {
   AssetDirectUploadPrepareResponse,
   AssetUploadResponse,
@@ -90,6 +91,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
   async uploadFile(input: {
     file: UploadedAssetFile;
     userId: string;
+    audit?: AuditMetadata;
   }): Promise<{
     assetId: string;
     originalFilename: string;
@@ -111,6 +113,20 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       uploadedBy: input.userId,
     });
 
+    await this.auditLogService?.record({
+      action: "asset.upload",
+      actorUserId: input.audit?.actorUserId ?? input.userId,
+      ipAddress: input.audit?.ipAddress ?? null,
+      payload: {
+        extension: fileExtension(input.file.originalname),
+        mimeType: input.file.mimetype,
+        operation: "multipart",
+        sizeBytes: input.file.size,
+      },
+      targetId: asset.assetId,
+      targetType: "asset",
+    });
+
     return {
       assetId: asset.assetId,
       originalFilename: input.file.originalname,
@@ -125,6 +141,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     mimeType: string;
     sizeBytes: number;
     userId: string;
+    audit?: AuditMetadata;
   }): Promise<AssetDirectUploadPrepareResponse> {
     if (
       this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
@@ -139,12 +156,26 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       sizeBytes: input.sizeBytes,
     });
 
-    await this.assetRepository.createAsset({
+    const asset = await this.assetRepository.createAsset({
       storageKey: preparation.storageKey,
       originalFilename: input.originalFilename,
       mimeType: input.mimeType,
       sizeBytes: input.sizeBytes,
       uploadedBy: input.userId,
+    });
+
+    await this.auditLogService?.record({
+      action: "asset.upload.prepare",
+      actorUserId: input.audit?.actorUserId ?? input.userId,
+      ipAddress: input.audit?.ipAddress ?? null,
+      payload: {
+        extension: fileExtension(input.originalFilename),
+        mimeType: input.mimeType,
+        operation: "direct",
+        sizeBytes: input.sizeBytes,
+      },
+      targetId: asset.assetId,
+      targetType: "asset",
     });
 
     return preparation;
@@ -153,6 +184,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
   async completeDirectUpload(input: {
     storageKey: string;
     userId: string;
+    audit?: AuditMetadata;
   }): Promise<AssetUploadResponse> {
     if (
       this.configService.get<string>("ASSET_STORAGE_PROVIDER") !== "s3" ||
@@ -186,16 +218,29 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException("asset_upload_mime_mismatch");
     }
 
-    return {
+    const result = {
       assetId: asset.assetId,
       originalFilename: asset.originalFilename,
       mimeType: asset.mimeType,
       sizeBytes: asset.sizeBytes,
       storageKey: toAssetReference(asset.assetId),
     };
+    await this.auditLogService?.record({
+      action: "asset.upload.complete",
+      actorUserId: input.audit?.actorUserId ?? input.userId,
+      ipAddress: input.audit?.ipAddress ?? null,
+      payload: {
+        mimeType: result.mimeType,
+        operation: "direct",
+        sizeBytes: result.sizeBytes,
+      },
+      targetId: result.assetId,
+      targetType: "asset",
+    });
+    return result;
   }
 
-  async migrateLocalAssets(limit: number): Promise<{
+  async migrateLocalAssets(limit: number, audit?: AuditMetadata): Promise<{
     scanned: number;
     migrated: number;
     failed: number;
@@ -233,12 +278,21 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    return { scanned: candidates.length, migrated, failed };
+    const result = { scanned: candidates.length, migrated, failed };
+    await this.auditLogService?.record({
+      action: "asset.migrate",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { ...result, source: "local" },
+      targetType: "asset",
+    });
+    return result;
   }
 
   async getFile(
     assetId: string,
     currentUser: CurrentUserContext,
+    audit?: AuditMetadata,
   ): Promise<{
     buffer: Buffer;
     inline: boolean;
@@ -309,6 +363,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       await this.auditLogService?.record({
         action: "survey.answer_file.download",
         actorUserId: currentUser.user.id,
+        ipAddress: audit?.ipAddress ?? null,
         targetId: asset.assetId,
         targetType: "survey_answer_file",
         payload: {
@@ -368,7 +423,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async cleanupUnlinkedAssets(): Promise<{
+  async cleanupUnlinkedAssets(audit?: AuditMetadata): Promise<{
     scanned: number;
     deleted: number;
     failed: number;
@@ -399,12 +454,20 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     const deleted =
       await this.assetRepository.deleteAssetsByIds(deletableAssetIds);
 
-    return {
+    const result = {
       scanned: candidates.length,
       deleted,
       failed,
       olderThanHours,
     };
+    await this.auditLogService?.record({
+      action: "asset.cleanup",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { ...result, source: audit ? "admin" : "scheduler" },
+      targetType: "asset",
+    });
+    return result;
   }
 
   private async runScheduledCleanup() {
@@ -430,4 +493,9 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       this.cleanupRunning = false;
     }
   }
+}
+
+function fileExtension(filename: string): string | null {
+  const match = filename.trim().match(/\.([a-z0-9]{1,12})$/i);
+  return match?.[1]?.toLowerCase() ?? null;
 }

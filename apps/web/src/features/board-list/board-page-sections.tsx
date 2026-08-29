@@ -61,7 +61,7 @@ export function BoardCategoryNavigation({
             return (
               <PageTabLink
                 key={board.code}
-                to={board.code === "FAQ" ? "/board/faq" : `/board/${board.code}`}
+                to={board.code === "faq" ? "/board/faq" : `/board/${board.code}`}
                 active={isActive}
               >
                 {getBoardLabelFromMetadata(board, board.code, lang)}
@@ -182,7 +182,7 @@ export function BoardArticleTable({
   const renderArticleRow = (post: ArticleListItem, pinned = false) => {
     const isNew =
       isoToMs(post.postedAt) >= nowMs() - 4 * 24 * 60 * 60 * 1000;
-    const postCategory = post.boardCode || category || "공지";
+    const postCategory = post.boardCode || category || "notice";
     const postBoard = boardByCode.get(postCategory);
 
     return (

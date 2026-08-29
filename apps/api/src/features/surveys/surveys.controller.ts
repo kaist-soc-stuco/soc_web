@@ -22,6 +22,7 @@ import { CreateSurveyDto } from "./dto/create-survey.dto";
 import { UpdateSurveyDto } from "./dto/update-survey.dto";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
+import { AuditLogService } from "../audit/audit-log.service";
 
 interface AuthedRequest extends Request {
   user: { id: string; permission: number };
@@ -43,6 +44,7 @@ export class SurveysController {
   constructor(
     private readonly surveysService: SurveysService,
     private readonly surveySheetsService: GoogleSurveySheetsService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Get()
@@ -83,14 +85,15 @@ export class SurveysController {
   update(
     @Param("id", ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(UpdateSurveySchema)) dto: UpdateSurveyDto,
+    @Req() req: AuthedRequest,
   ) {
-    return this.surveysService.update(id, dto);
+    return this.surveysService.update(id, dto, req.user.id);
   }
 
   @Delete(":id")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
-  delete(@Param("id", ParseUUIDPipe) id: string) {
-    return this.surveysService.delete(id);
+  delete(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
+    return this.surveysService.delete(id, req.user.id);
   }
 
   @Post(":id/duplicate")
@@ -104,14 +107,27 @@ export class SurveysController {
 
   @Post(":id/spreadsheet")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
-  connectSpreadsheet(@Param("id", ParseUUIDPipe) id: string) {
-    return this.surveySheetsService.connect(id);
+  connectSpreadsheet(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.surveySheetsService.connect(id, req.user.id);
   }
 
   @Post(":id/spreadsheet/sync")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
-  async syncSpreadsheet(@Param("id", ParseUUIDPipe) id: string) {
+  async syncSpreadsheet(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
     await this.surveySheetsService.refresh(id, true);
+    await this.auditLogService.record({
+      action: "survey.spreadsheet.sync",
+      actorUserId: req.user.id,
+      targetId: id,
+      targetType: "survey",
+      payload: { surveyId: id },
+    });
     return this.surveysService.findById(id);
   }
 }

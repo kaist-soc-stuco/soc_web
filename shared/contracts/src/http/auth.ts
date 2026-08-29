@@ -41,6 +41,8 @@ export interface LoginSessionResponse {
   userName?: string;
   nameKo?: string;
   nameEn?: string | null;
+  primaryMajor?: string | null;
+  feeStatus?: "PAID" | "PARTIAL" | "UNPAID" | null;
 }
 
 export interface CurrentUserResponse {

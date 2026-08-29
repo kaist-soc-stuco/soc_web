@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { ArticleEngagementKind, ArticleListItem } from "@soc/contracts";
-import { hasPermission, isoToMs } from "@soc/shared";
+import { normalizeBoardCode, type ArticleEngagementKind, type ArticleListItem } from "@soc/contracts";
+import { isoToMs } from "@soc/shared";
 
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -12,7 +12,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
   getBoardDescriptionFromMetadata,
   getBoardTitleFromMetadata,
-  getBoardWritePermissionBitFromMetadata,
+  canWriteBoardFromMetadata,
 } from "@/lib/board-metadata";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
@@ -33,7 +33,8 @@ function comparePinnedArticles(a: ArticleListItem, b: ArticleListItem) {
 }
 
 export function useBoardPageController() {
-  const { category } = useParams<{ category?: string }>();
+  const { category: routeCategory } = useParams<{ category?: string }>();
+  const category = routeCategory ? normalizeBoardCode(routeCategory) : undefined;
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
@@ -135,17 +136,21 @@ export function useBoardPageController() {
 
     return boards
       .filter((board) => {
-        const requiredPermission = getBoardWritePermissionBitFromMetadata(
-          board,
-          board.code,
-        );
-        return (
-          requiredPermission === 0 ||
-          hasPermission(userPermission, requiredPermission)
-        );
+        return canWriteBoardFromMetadata(board, board.code, {
+          permission: userPermission,
+          primaryMajor: session?.primaryMajor,
+          feeStatus: session?.feeStatus,
+        });
       })
       .map((board) => board.code);
-  }, [boardCatalogSource, boards, canUseWriteFeatures, userPermission]);
+  }, [
+    boardCatalogSource,
+    boards,
+    canUseWriteFeatures,
+    session?.feeStatus,
+    session?.primaryMajor,
+    userPermission,
+  ]);
   const canWrite = category
     ? writableBoardCodes.includes(category)
     : writableBoardCodes.length > 0;
@@ -171,7 +176,7 @@ export function useBoardPageController() {
       return;
     }
 
-    const postCategory = post.boardCode || category || "공지";
+    const postCategory = post.boardCode || category || "notice";
     const isLike = kind === "LIKE";
     const previous = isLike
       ? {
