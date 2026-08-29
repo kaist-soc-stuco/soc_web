@@ -196,6 +196,8 @@ export function SurveyResponseListPage() {
     }
   };
 
+  const canRetrySheetConnection = survey?.spreadsheetSyncStatus === "ERROR";
+
   const handleSheetSync = async () => {
     if (!surveyId || sheetBusy) return;
     setSheetBusy(true);
@@ -268,11 +270,13 @@ export function SurveyResponseListPage() {
                 <Download className="size-4" />
                 <span>내보내기</span>
               </Button>
-              <Button variant="outline" onClick={handleSheet} disabled={sheetBusy}>
-                <Sheet className="size-4" />
-                <span>{survey?.spreadsheetUrl ? "Google Sheets 열기" : "Google Sheets 연결"}</span>
-                {survey?.spreadsheetUrl ? <ExternalLink className="size-3.5" /> : null}
-              </Button>
+              {survey?.spreadsheetUrl || canRetrySheetConnection ? (
+                <Button variant="outline" onClick={handleSheet} disabled={sheetBusy}>
+                  <Sheet className="size-4" />
+                  <span>{survey?.spreadsheetUrl ? "Google Sheets 열기" : "Google Sheets 재시도"}</span>
+                  {survey?.spreadsheetUrl ? <ExternalLink className="size-3.5" /> : null}
+                </Button>
+              ) : null}
               {survey?.spreadsheetUrl ? (
                 <IconButton
                   aria-label="Google Sheets 지금 동기화"

@@ -104,6 +104,9 @@ const ContactsPage = lazy(() =>
 const SiteContentPage = lazy(() =>
   import('@/pages/admin/site-content-page').then((module) => ({ default: module.SiteContentPage })),
 );
+const RoadmapManagementPage = lazy(() =>
+  import('@/pages/admin/roadmap-management-page').then((module) => ({ default: module.RoadmapManagementPage })),
+);
 const CalendarManagementPage = lazy(() =>
   import('@/pages/admin/calendar-management-page').then((module) => ({ default: module.CalendarManagementPage })),
 );
@@ -277,6 +280,7 @@ export function App() {
             <Route path="votes/new" element={<VoteEditorPage />} />
             <Route path="votes/:id" element={<VoteEditorPage />} />
             <Route path="content" element={<SiteContentPage />} />
+            <Route path="roadmap" element={<RoadmapManagementPage />} />
             <Route path="calendar" element={<CalendarManagementPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="emails" element={<BulkEmailPage />} />

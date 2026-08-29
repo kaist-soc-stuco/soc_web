@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
@@ -28,6 +29,7 @@ import type { ComputedSurveyState, SurveyDetailResponse } from "@soc/contracts";
 import { UsersService } from "../users/users.service";
 import { getSurveyEligibilityFailures } from "./survey-eligibility";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
+import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 
 interface SurveyCaller {
   id?: string;
@@ -51,6 +53,8 @@ type EligibilityContext = {
 
 @Injectable()
 export class SurveysService {
+  private readonly logger = new Logger(SurveysService.name);
+
   constructor(
     private readonly surveysRepo: SurveysRepository,
     private readonly sectionsRepo: SurveySectionsRepository,
@@ -58,6 +62,7 @@ export class SurveysService {
     private readonly responsesRepo: SurveyResponsesRepository,
     private readonly mutationPolicy: SurveyMutationPolicy,
     @Optional() private readonly usersService?: UsersService,
+    @Optional() private readonly surveySheetsService?: GoogleSurveySheetsService,
   ) {}
 
   private computeState(survey: {
@@ -320,7 +325,8 @@ export class SurveysService {
   }
 
   async update(id: string, dto: UpdateSurveyDto): Promise<SurveyRecordWithState> {
-    return this.mutationPolicy.withSurveyLock(id, async (tx) => {
+    let publishedForTheFirstTime = false;
+    const updated = await this.mutationPolicy.withSurveyLock(id, async (tx) => {
       const current = await this.surveysRepo.findById(id, tx);
       if (!current) throw new NotFoundException("survey_not_found");
 
@@ -361,6 +367,7 @@ export class SurveysService {
 
       const survey = await this.surveysRepo.update(id, dto, tx);
       if (!survey) throw new NotFoundException("survey_not_found");
+      publishedForTheFirstTime = !current.isPublished && survey.isPublished;
       const computedState = this.computeState(survey);
       return {
         ...survey,
@@ -369,6 +376,43 @@ export class SurveysService {
         derivedVersionCount: current.derivedVersionCount,
       };
     });
+
+    if (!publishedForTheFirstTime || !this.surveySheetsService) return updated;
+
+    try {
+      // The database publication is committed before the external Google API
+      // call. A Sheets outage must not turn a successful survey publication
+      // into a failed mutation; the connection status is persisted by the
+      // Sheets service and can be retried from the response page.
+      const connected = await this.surveySheetsService.connect(id);
+      if (connected) {
+        return {
+          ...updated,
+          spreadsheetId: connected.spreadsheetId,
+          spreadsheetUrl: connected.spreadsheetUrl,
+          spreadsheetSyncStatus: connected.spreadsheetSyncStatus,
+          spreadsheetLastSyncedAt: connected.spreadsheetLastSyncedAt,
+        };
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Survey response sheet creation failed after publication (${id}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      const failedConnection = await this.surveysRepo.findById(id);
+      if (failedConnection) {
+        return {
+          ...updated,
+          spreadsheetId: failedConnection.spreadsheetId,
+          spreadsheetUrl: failedConnection.spreadsheetUrl,
+          spreadsheetSyncStatus: failedConnection.spreadsheetSyncStatus,
+          spreadsheetLastSyncedAt: failedConnection.spreadsheetLastSyncedAt,
+        };
+      }
+    }
+
+    return updated;
   }
 
   async delete(id: string): Promise<void> {

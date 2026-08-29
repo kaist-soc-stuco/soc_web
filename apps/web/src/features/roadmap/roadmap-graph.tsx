@@ -14,24 +14,34 @@ import {
 import { Maximize2, Minimize2, Search, X } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  normalizeRoadmapCourseCode,
+  type RoadmapCourseRecord,
+  type RoadmapCourseRelationRecord,
+  type RoadmapOfferingRecord,
+} from "@soc/contracts";
+import { createApiClient } from "@soc/api-client";
+import { useQuery } from "@tanstack/react-query";
+
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { IconButton } from "@/components/ui/icon-button";
 import { TextInput } from "@/components/ui/text-input";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { cn } from "@/lib/utils";
 import {
   CATEGORY_LABELS,
-  ROADMAP_COURSE_BY_CODE,
   ROADMAP_COURSES,
   ROADMAP_LANES,
   ROADMAP_RELATIONS,
   ROADMAP_TRACKS,
   type RoadmapCourse,
+  type RoadmapLane,
   type RoadmapLanguage,
 } from "./roadmap-data";
 import {
   ROADMAP_OFFERINGS,
-  ROADMAP_OFFERINGS_BY_COURSE,
-  ROADMAP_TERM_LABELS,
+  getRoadmapTermLabel,
+  groupRoadmapOfferings,
   type RoadmapOffering,
   type RoadmapOfferingTerm,
 } from "./roadmap-offerings";
@@ -50,8 +60,8 @@ const LANE_GAP = 22;
 interface CourseNodeData extends Record<string, unknown> {
   course: RoadmapCourse;
   duplicate: boolean;
+  displayCode: string;
   lang: RoadmapLanguage;
-  offeringCount: number;
 }
 
 interface LaneNodeData extends Record<string, unknown> {
@@ -72,15 +82,19 @@ interface LayoutResult {
 
 function buildLayout(
   lang: RoadmapLanguage,
+  courses: readonly RoadmapCourse[],
+  lanes: readonly RoadmapLane[],
   visibleCourseCodes: ReadonlySet<string> | null,
-  offeringCounts: ReadonlyMap<string, number>,
+  displayCodeByCourse: ReadonlyMap<string, string>,
+  positionByCourse?: ReadonlyMap<string, { x: number; y: number }>,
 ): LayoutResult {
   const canonicalNodeByCode = new Map<string, string>();
   const instancesByCode = new Map<string, string[]>();
   const nodes: GraphNode[] = [];
+  const courseByCode = new Map(courses.map((item) => [item.code, item]));
   let offsetY = 0;
 
-  ROADMAP_LANES.forEach((lane) => {
+  lanes.forEach((lane) => {
     const courseCodes = lane.courses.filter(
       (code) => !visibleCourseCodes || visibleCourseCodes.has(code),
     );
@@ -108,7 +122,7 @@ function buildLayout(
     });
 
     courseCodes.forEach((code, index) => {
-      const item = ROADMAP_COURSE_BY_CODE.get(code);
+      const item = courseByCode.get(code);
       if (!item) return;
 
       const instanceId = `${lane.id}:${code}`;
@@ -120,19 +134,23 @@ function buildLayout(
         id: instanceId,
         type: "course",
         position: {
-          x: LANE_LABEL_WIDTH + (index % COURSES_PER_ROW) * (COURSE_WIDTH + COURSE_GAP_X),
-          y: offsetY + 48 + Math.floor(index / COURSES_PER_ROW) * (COURSE_HEIGHT + COURSE_GAP_Y),
+          x:
+            positionByCourse?.get(code)?.x ??
+            LANE_LABEL_WIDTH + (index % COURSES_PER_ROW) * (COURSE_WIDTH + COURSE_GAP_X),
+          y:
+            positionByCourse?.get(code)?.y ??
+            offsetY + 48 + Math.floor(index / COURSES_PER_ROW) * (COURSE_HEIGHT + COURSE_GAP_Y),
         },
         data: {
           course: item,
           duplicate: false,
+          displayCode: displayCodeByCourse.get(item.code) ?? item.code,
           lang,
-          offeringCount: offeringCounts.get(item.code) ?? 0,
         },
         draggable: false,
         selectable: true,
         focusable: true,
-        ariaLabel: `${item.code} ${item.name[lang]}`,
+        ariaLabel: [displayCodeByCourse.get(item.code) ?? item.code, item.name[lang]].join(" "),
         zIndex: 1,
         style: { height: COURSE_HEIGHT, width: COURSE_WIDTH },
       });
@@ -169,7 +187,7 @@ interface RoadmapInteractionContextValue {
 const RoadmapInteractionContext = createContext<RoadmapInteractionContextValue | null>(null);
 
 const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
-  const { course, duplicate, lang, offeringCount } = data;
+  const { course, displayCode, duplicate, lang } = data;
   const interaction = useContext(RoadmapInteractionContext);
   const relation =
     course.code === interaction?.activeCourseCode
@@ -194,7 +212,7 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
       onMouseEnter={() => interaction?.setHoveredCourseCode(course.code)}
       onMouseLeave={() => interaction?.setHoveredCourseCode(null)}
       className={cn(
-        "roadmap-course-card select-none group relative h-full w-full rounded-lg border bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[opacity,border-color,box-shadow] duration-150",
+        "roadmap-course-card select-none group relative h-full w-full rounded-lg border bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[opacity,border-color,box-shadow,transform] duration-300",
         selected
           ? "border-kaist-darkgreen shadow-[0_0_0_2px_rgba(0,92,74,0.13)]"
           : relation === "previous"
@@ -211,7 +229,7 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
       <Handle className="!h-px !w-px !border-0 !bg-transparent !opacity-0" position={Position.Right} type="source" />
 
       <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-semibold tabular-nums text-slate-500">{course.code}</span>
+        <span className="text-xs font-semibold tabular-nums text-slate-500">{displayCode}</span>
         <span className="flex min-h-2.5 items-center gap-1" aria-hidden="true">
           {course.tracks.map((trackId) => {
             const track = ROADMAP_TRACKS.find((item) => item.id === trackId);
@@ -228,11 +246,6 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
         <span>{course.semesters}</span>
         <span className="tabular-nums">{course.credits}</span>
       </div>
-      {offeringCount > 0 ? (
-        <span className="absolute bottom-2.5 left-3 rounded bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-emerald-700">
-          {lang === "ko" ? `개설 ${offeringCount}` : `${offeringCount} offered`}
-        </span>
-      ) : null}
       {course.ai ? (
         <span className="absolute bottom-2.5 right-3 rounded bg-sky-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-bold text-sky-700">
           AI
@@ -249,10 +262,16 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
 
 const nodeTypes = { course: CourseCard, lane: LaneCard };
 
-function getCourseSearchText(course: RoadmapCourse) {
-  const offerings = ROADMAP_OFFERINGS_BY_COURSE.get(course.code) ?? [];
+function getCourseSearchText(
+  course: RoadmapCourse,
+  offeringsByCourse: ReadonlyMap<string, RoadmapOffering[]>,
+  displayCode?: string,
+) {
+  const offerings = offeringsByCourse.get(course.code) ?? [];
   return [
     course.code,
+    course.legacyCode ?? "",
+    displayCode ?? "",
     course.name.ko,
     course.name.en,
     ...offerings.flatMap((offering) => [
@@ -261,6 +280,50 @@ function getCourseSearchText(course: RoadmapCourse) {
       offering.instructor ?? "",
     ]),
   ].join(" ");
+}
+
+function toRoadmapOffering(record: RoadmapOfferingRecord): RoadmapOffering {
+  return {
+    capacity: record.capacity,
+    courseCode: normalizeRoadmapCourseCode(record.courseCode),
+    credits: record.credits,
+    currentCode: record.currentCode,
+    delivery: record.delivery,
+    enrolled: record.enrolled,
+    inEnglish: record.inEnglish,
+    instructor: record.instructor,
+    nameKo: record.nameKo,
+    room: record.room,
+    section: record.section,
+    term: record.term,
+    time: record.time,
+  };
+}
+
+function toRoadmapCourse(record: RoadmapCourseRecord): RoadmapCourse {
+  return {
+    ai: record.ai,
+    category: record.category,
+    code: normalizeRoadmapCourseCode(record.courseCode),
+    credits: record.credits,
+    legacyCode: record.legacyCourseCode ?? undefined,
+    name: { en: record.nameEn || record.nameKo, ko: record.nameKo },
+    semesters: record.semesters,
+    tracks: record.trackIds,
+  };
+}
+
+function toRoadmapRelation(record: RoadmapCourseRelationRecord) {
+  return {
+    source: normalizeRoadmapCourseCode(record.prerequisiteCourseCode),
+    target: normalizeRoadmapCourseCode(record.postrequisiteCourseCode),
+  };
+}
+
+function roadmapTermSortValue(term: string): number {
+  const match = term.match(/^(20\d{2})-(spring|fall)$/i);
+  if (!match) return 0;
+  return Number(match[1]) * 10 + (match[2].toLocaleLowerCase() === "fall" ? 2 : 1);
 }
 
 interface RoadmapGraphProps {
@@ -274,6 +337,16 @@ export function RoadmapGraph({
   onSelectedCourseChange,
   selectedCourseCode,
 }: RoadmapGraphProps) {
+  const apiClient = useMemo(
+    () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
+    [],
+  );
+  const { data: importedOfferingsResponse } = useQuery({
+    queryKey: ["roadmap", "offerings"],
+    queryFn: () => apiClient.getRoadmapOfferings(),
+    retry: false,
+    staleTime: 60_000,
+  });
   const [hoveredCourseCode, setHoveredCourseCode] = useState<string | null>(null);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(() => new Set());
   const [searchText, setSearchText] = useState("");
@@ -284,29 +357,140 @@ export function RoadmapGraph({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const activeCourseCode = hoveredCourseCode ?? selectedCourseCode;
 
-  const termOfferings = useMemo(
-    () =>
-      selectedTerm === "all"
-        ? ROADMAP_OFFERINGS
-        : ROADMAP_OFFERINGS.filter((offering) => offering.term === selectedTerm),
-    [selectedTerm],
+  const remoteCourses = useMemo(
+    () => (importedOfferingsResponse?.courses ?? []).filter((course) => course.isVisible).map(toRoadmapCourse),
+    [importedOfferingsResponse?.courses],
   );
-  const offeringCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const offering of termOfferings) {
-      counts.set(offering.courseCode, (counts.get(offering.courseCode) ?? 0) + 1);
+  const hasRemoteCatalog = remoteCourses.length > 0;
+  const roadmapRelations = useMemo(
+    () =>
+      importedOfferingsResponse?.relations
+        ? importedOfferingsResponse.relations.map(toRoadmapRelation)
+        : ROADMAP_RELATIONS,
+    [importedOfferingsResponse?.relations],
+  );
+
+  const effectiveOfferings = useMemo(() => {
+    const importedOfferings =
+      importedOfferingsResponse?.items.map(toRoadmapOffering) ?? [];
+    if (importedOfferings.length === 0) return ROADMAP_OFFERINGS;
+
+    const importedTerms = new Set(importedOfferings.map((offering) => offering.term));
+    return [
+      ...ROADMAP_OFFERINGS.filter((offering) => !importedTerms.has(offering.term)),
+      ...importedOfferings,
+    ];
+  }, [importedOfferingsResponse]);
+  const offeringsByCourse = useMemo(
+    () => groupRoadmapOfferings(effectiveOfferings),
+    [effectiveOfferings],
+  );
+  const termOptions = useMemo(
+    () =>
+      [...new Set(effectiveOfferings.map((offering) => offering.term))]
+        .sort((left, right) => roadmapTermSortValue(right) - roadmapTermSortValue(left))
+        .map((term) => ({ value: term, label: getRoadmapTermLabel(term, lang) })),
+    [effectiveOfferings, lang],
+  );
+  const importedCourseCodes = useMemo(
+    () =>
+      [...offeringsByCourse.keys()].filter(
+        (courseCode) =>
+          !(hasRemoteCatalog ? remoteCourses : ROADMAP_COURSES).some(
+            (course) => course.code === courseCode,
+          ),
+      ),
+    [hasRemoteCatalog, offeringsByCourse, remoteCourses],
+  );
+  const roadmapCourses = useMemo<RoadmapCourse[]>(
+    () => (hasRemoteCatalog ? remoteCourses : [
+      ...ROADMAP_COURSES,
+      ...importedCourseCodes.map((courseCode) => {
+        const offering = offeringsByCourse.get(courseCode)?.[0];
+        const semesters = [
+          ...new Set(
+            (offeringsByCourse.get(courseCode) ?? []).map((item) =>
+              item.term.endsWith("-spring") ? "S" : item.term.endsWith("-fall") ? "F" : item.term,
+            ),
+          ),
+        ].join("/");
+        return {
+          category: "major-elective" as const,
+          code: courseCode,
+          credits: offering?.credits ?? "—",
+          name: { en: offering?.nameKo ?? courseCode, ko: offering?.nameKo ?? courseCode },
+          semesters: semesters || "—",
+          tracks: [],
+        };
+      }),
+    ]),
+    [hasRemoteCatalog, importedCourseCodes, offeringsByCourse, remoteCourses],
+  );
+  const positionByCourse = useMemo(
+    () =>
+      new Map(
+        (importedOfferingsResponse?.courses ?? [])
+          .filter((course) => course.positionX !== 0 || course.positionY !== 0)
+          .map((course) => [
+            normalizeRoadmapCourseCode(course.courseCode),
+            { x: course.positionX, y: course.positionY },
+          ]),
+      ),
+    [importedOfferingsResponse?.courses],
+  );
+  const roadmapCourseByCode = useMemo(
+    () => new Map(roadmapCourses.map((course) => [course.code, course])),
+    [roadmapCourses],
+  );
+  const roadmapLanes = useMemo(() => {
+    const assignedCodes = new Set(ROADMAP_LANES.flatMap((lane) => lane.courses));
+    const unassignedCourseCodes = roadmapCourses
+      .map((course) => course.code)
+      .filter((code) => !assignedCodes.has(code));
+    if (unassignedCourseCodes.length === 0) return ROADMAP_LANES;
+    return [
+      ...ROADMAP_LANES,
+      {
+        id: "imported",
+        label: { en: "Imported offerings", ko: "Import 개설 과목" },
+        courses: unassignedCourseCodes,
+      },
+    ];
+  }, [roadmapCourses]);
+  const displayCodeByCourse = useMemo(() => {
+    const displayCodes = new Map<string, string>();
+    for (const course of roadmapCourses) {
+      const offerings = offeringsByCourse.get(course.code) ?? [];
+      const selectedOffering =
+        offerings.find((offering) => offering.term === selectedTerm) ?? offerings[0];
+      const section = selectedOffering?.section;
+      // The course master is the source of truth for the card code. An
+      // offering can contain a historical code (for example CS.40700 in
+      // spring 2026), but the roadmap must consistently show the current
+      // code. Keep section information as the only offering-specific suffix.
+      displayCodes.set(course.code, `${course.code}${section ? ` (${section})` : ""}`);
     }
-    return counts;
-  }, [termOfferings]);
+    return displayCodes;
+  }, [offeringsByCourse, roadmapCourses, selectedTerm]);
+  const termOfferings = useMemo(
+    () => effectiveOfferings.filter((offering) => offering.term === selectedTerm),
+    [effectiveOfferings, selectedTerm],
+  );
   const offeredCourseCodes = useMemo(
     () => new Set(termOfferings.map((offering) => offering.courseCode)),
     [termOfferings],
   );
   const visibleCourseCodes = offeredOnly ? offeredCourseCodes : null;
   const layout = useMemo(
-    () => buildLayout(lang, visibleCourseCodes, offeringCounts),
-    [lang, offeringCounts, visibleCourseCodes],
+    () => buildLayout(lang, roadmapCourses, roadmapLanes, visibleCourseCodes, displayCodeByCourse, positionByCourse),
+    [displayCodeByCourse, lang, positionByCourse, roadmapCourses, roadmapLanes, visibleCourseCodes],
   );
+
+  useEffect(() => {
+    if (termOptions.some((option) => option.value === selectedTerm)) return;
+    const nextTerm = termOptions[0]?.value;
+    if (nextTerm) setSelectedTerm(nextTerm);
+  }, [selectedTerm, termOptions]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -340,23 +524,23 @@ export function RoadmapGraph({
     () =>
       new Set(
         activeCourseCode
-          ? ROADMAP_RELATIONS.filter((item) => item.target === activeCourseCode).map(
+          ? roadmapRelations.filter((item) => item.target === activeCourseCode).map(
               (item) => item.source,
             )
           : [],
       ),
-    [activeCourseCode],
+    [activeCourseCode, roadmapRelations],
   );
   const nextCodes = useMemo(
     () =>
       new Set(
         activeCourseCode
-          ? ROADMAP_RELATIONS.filter((item) => item.source === activeCourseCode).map(
+          ? roadmapRelations.filter((item) => item.source === activeCourseCode).map(
               (item) => item.target,
             )
           : [],
       ),
-    [activeCourseCode],
+    [activeCourseCode, roadmapRelations],
   );
 
   const nodes = useMemo<GraphNode[]>(
@@ -389,7 +573,7 @@ export function RoadmapGraph({
 
   const edges = useMemo<Edge[]>(
     () =>
-      ROADMAP_RELATIONS.flatMap((relation) => {
+      roadmapRelations.flatMap((relation) => {
         const source = layout.canonicalNodeByCode.get(relation.source);
         const target = layout.canonicalNodeByCode.get(relation.target);
         if (!source || !target) return [];
@@ -425,16 +609,18 @@ export function RoadmapGraph({
           },
         ];
       }),
-    [activeCourseCode, lang, layout.canonicalNodeByCode],
+    [activeCourseCode, lang, layout.canonicalNodeByCode, roadmapRelations],
   );
 
   const searchMatches = useMemo(() => {
     const query = searchText.trim().toLocaleLowerCase();
     if (!query) return [];
-    return ROADMAP_COURSES.filter((item) =>
-      getCourseSearchText(item).toLocaleLowerCase().includes(query),
+    return roadmapCourses.filter((item) =>
+      getCourseSearchText(item, offeringsByCourse, displayCodeByCourse.get(item.code))
+        .toLocaleLowerCase()
+        .includes(query),
     ).slice(0, 6);
-  }, [searchText]);
+  }, [displayCodeByCourse, offeringsByCourse, roadmapCourses, searchText]);
 
   const focusCourse = useCallback(
     (code: string) => {
@@ -444,7 +630,7 @@ export function RoadmapGraph({
       if (nodeId && flow) {
         void flow.fitView({
           nodes: [{ id: nodeId }],
-          duration: 240,
+          duration: 380,
           padding: 0.85,
           maxZoom: 1.25,
         });
@@ -474,11 +660,13 @@ export function RoadmapGraph({
     });
   };
 
-  const mobileCourses = ROADMAP_COURSES.filter((item) => {
+  const mobileCourses = roadmapCourses.filter((item) => {
     const query = searchText.trim().toLocaleLowerCase();
     const matchesQuery =
       !query ||
-      getCourseSearchText(item).toLocaleLowerCase().includes(query);
+      getCourseSearchText(item, offeringsByCourse, displayCodeByCourse.get(item.code))
+        .toLocaleLowerCase()
+        .includes(query);
     const matchesTrack =
       selectedTrackIds.size === 0 || item.tracks.some((trackId) => selectedTrackIds.has(trackId));
     const matchesAvailability = !offeredOnly || offeredCourseCodes.has(item.code);
@@ -499,6 +687,7 @@ export function RoadmapGraph({
           lang={lang}
           offeredOnly={offeredOnly}
           selectedTerm={selectedTerm}
+          termOptions={termOptions}
           onOfferedOnlyChange={setOfferedOnly}
           onTermChange={setSelectedTerm}
         />
@@ -529,7 +718,11 @@ export function RoadmapGraph({
           <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 pb-5">
             <CourseDetails
               courseCode={selectedCourseCode}
+              courseByCode={roadmapCourseByCode}
+              displayCodeByCourse={displayCodeByCourse}
               lang={lang}
+              relations={roadmapRelations}
+              offeringsByCourse={offeringsByCourse}
               selectedTerm={selectedTerm}
               onClose={() => onSelectedCourseChange(null)}
               onCourseClick={onSelectedCourseChange}
@@ -545,7 +738,9 @@ export function RoadmapGraph({
               onClick={() => onSelectedCourseChange(item.code)}
               className="flex min-h-16 w-full items-center gap-3 py-3 text-left"
             >
-              <span className="w-14 shrink-0 text-xs font-semibold text-slate-500">{item.code}</span>
+              <span className="w-14 shrink-0 text-xs font-semibold text-slate-500">
+                {displayCodeByCourse.get(item.code) ?? item.code}
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-slate-900">{item.name[lang]}</span>
                 <span className="mt-1 block text-xs font-medium text-slate-400">
@@ -593,7 +788,7 @@ export function RoadmapGraph({
             {searchMatches.length > 0 ? (
               <div className="absolute left-0 right-0 top-[calc(100%+0.375rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
                 {searchMatches.map((item) => {
-                  const offering = ROADMAP_OFFERINGS_BY_COURSE.get(item.code)?.[0];
+                  const offering = offeringsByCourse.get(item.code)?.[0];
                   return (
                     <button
                       key={item.code}
@@ -601,7 +796,9 @@ export function RoadmapGraph({
                       onClick={() => focusCourse(item.code)}
                       className="flex min-h-12 w-full items-center gap-3 border-b border-slate-100 px-3 text-left last:border-b-0 hover:bg-slate-50"
                     >
-                      <span className="w-14 shrink-0 text-xs font-semibold text-slate-500">{item.code}</span>
+                      <span className="w-14 shrink-0 text-xs font-semibold text-slate-500">
+                        {displayCodeByCourse.get(item.code) ?? item.code}
+                      </span>
                       <span className="min-w-0 truncate text-sm font-medium text-slate-900">
                         <span className="block truncate">{item.name[lang]}</span>
                         {offering ? (
@@ -622,6 +819,7 @@ export function RoadmapGraph({
               lang={lang}
               offeredOnly={offeredOnly}
               selectedTerm={selectedTerm}
+              termOptions={termOptions}
               onOfferedOnlyChange={setOfferedOnly}
               onTermChange={setSelectedTerm}
             />
@@ -643,6 +841,7 @@ export function RoadmapGraph({
           </button>
           <RoadmapInteractionContext.Provider value={interactionValue}>
             <ReactFlow<GraphNode, Edge>
+              proOptions={{ hideAttribution: true }}
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
@@ -687,7 +886,11 @@ export function RoadmapGraph({
             </div>
             <CourseDetails
               courseCode={selectedCourseCode}
+              courseByCode={roadmapCourseByCode}
+              displayCodeByCourse={displayCodeByCourse}
               lang={lang}
+              relations={roadmapRelations}
+              offeringsByCourse={offeringsByCourse}
               selectedTerm={selectedTerm}
               onClose={() => onSelectedCourseChange(null)}
               onCourseClick={focusCourse}
@@ -743,27 +946,23 @@ function RoadmapOfferingControls({
   lang,
   offeredOnly,
   selectedTerm,
+  termOptions,
   onOfferedOnlyChange,
   onTermChange,
 }: {
   lang: RoadmapLanguage;
   offeredOnly: boolean;
   selectedTerm: RoadmapOfferingTerm;
+  termOptions: { value: RoadmapOfferingTerm; label: string }[];
   onOfferedOnlyChange: (value: boolean) => void;
   onTermChange: (value: RoadmapOfferingTerm) => void;
 }) {
-  const options: { value: RoadmapOfferingTerm; label: string }[] = ([
-    "all",
-    "2026-spring",
-    "2026-fall",
-  ] as RoadmapOfferingTerm[]).map((value) => ({ value, label: ROADMAP_TERM_LABELS[value][lang] }));
-
   return (
     <div className="flex flex-wrap items-center gap-2">
       <SelectDropdown
         ariaLabel={lang === "ko" ? "개설 학기" : "Offering semester"}
         value={selectedTerm}
-        options={options}
+        options={termOptions}
         onChange={(value) => onTermChange(value as RoadmapOfferingTerm)}
         className="w-36 shrink-0"
         buttonClassName="h-9 !min-h-9 text-xs"
@@ -783,22 +982,33 @@ function RoadmapOfferingControls({
 
 interface CourseDetailsProps {
   courseCode: string | null;
+  courseByCode: ReadonlyMap<string, RoadmapCourse>;
+  displayCodeByCourse: ReadonlyMap<string, string>;
   lang: RoadmapLanguage;
   onClose: () => void;
   onCourseClick: (code: string) => void;
+  offeringsByCourse: ReadonlyMap<string, RoadmapOffering[]>;
+  relations: ReadonlyArray<{ source: string; target: string }>;
   selectedTerm: RoadmapOfferingTerm;
 }
 
-function CourseDetails({ courseCode, lang, onClose, onCourseClick, selectedTerm }: CourseDetailsProps) {
+function CourseDetails({
+  courseCode,
+  courseByCode,
+  displayCodeByCourse,
+  lang,
+  onClose,
+  onCourseClick,
+  offeringsByCourse,
+  relations,
+  selectedTerm,
+}: CourseDetailsProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "offerings">("overview");
-  const item = courseCode ? ROADMAP_COURSE_BY_CODE.get(courseCode) : undefined;
-  const allOfferings = item ? ROADMAP_OFFERINGS_BY_COURSE.get(item.code) ?? [] : [];
-  const offerings =
-    selectedTerm === "all"
-      ? allOfferings
-      : allOfferings.filter((offering) => offering.term === selectedTerm);
+  const item = courseCode ? courseByCode.get(courseCode) : undefined;
+  const allOfferings = item ? offeringsByCourse.get(item.code) ?? [] : [];
+  const offerings = allOfferings.filter((offering) => offering.term === selectedTerm);
   const previous = item
-    ? ROADMAP_RELATIONS.filter((relation) => relation.target === item.code).map(
+    ? relations.filter((relation) => relation.target === item.code).map(
         (relation) => relation.source,
       )
     : [];
@@ -807,7 +1017,7 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick, selectedTerm 
     setActiveTab("overview");
   }, [courseCode]);
   const next = item
-    ? ROADMAP_RELATIONS.filter((relation) => relation.source === item.code).map(
+    ? relations.filter((relation) => relation.source === item.code).map(
         (relation) => relation.target,
       )
     : [];
@@ -831,7 +1041,9 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick, selectedTerm 
     <section className="pt-5" aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <span className="text-xs font-semibold text-kaist-darkgreen">{item.code}</span>
+          <span className="text-xs font-semibold text-kaist-darkgreen">
+            {displayCodeByCourse.get(item.code) ?? item.code}
+          </span>
           <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">{item.name[lang]}</h2>
         </div>
         <IconButton aria-label={lang === "ko" ? "과목 상세 닫기" : "Close details"} onClick={onClose}>
@@ -862,7 +1074,7 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick, selectedTerm 
             activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
           )}
         >
-          {lang === "ko" ? `개설 분반 (${offerings.length})` : `Offerings (${offerings.length})`}
+          {lang === "ko" ? "개설 분반" : "Offerings"}
         </button>
       </div>
 
@@ -907,6 +1119,8 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick, selectedTerm 
           <RelationList
             title={lang === "ko" ? "먼저 들으면 좋은 과목" : "Recommended before"}
             codes={previous}
+            courseByCode={courseByCode}
+            displayCodeByCourse={displayCodeByCourse}
             lang={lang}
             tone="previous"
             onCourseClick={onCourseClick}
@@ -914,6 +1128,8 @@ function CourseDetails({ courseCode, lang, onClose, onCourseClick, selectedTerm 
           <RelationList
             title={lang === "ko" ? "다음에 이어지는 과목" : "Recommended next"}
             codes={next}
+            courseByCode={courseByCode}
+            displayCodeByCourse={displayCodeByCourse}
             lang={lang}
             tone="next"
             onCourseClick={onCourseClick}
@@ -958,10 +1174,11 @@ function OfferingList({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-emerald-700">
-                    {ROADMAP_TERM_LABELS[offering.term][lang]}
+                    {getRoadmapTermLabel(offering.term, lang)}
                   </span>
                   <span className="text-xs font-semibold tabular-nums text-slate-500">
                     {offering.currentCode}
+                    {offering.section ? ` (${offering.section})` : ""}
                   </span>
                   {offering.inEnglish ? (
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-slate-600">
@@ -973,15 +1190,6 @@ function OfferingList({
                   {offering.nameKo}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full border border-slate-200 px-2 py-1 text-[length:var(--ui-text-micro-size)] font-semibold text-slate-600">
-                {offering.section
-                  ? lang === "ko"
-                    ? `${offering.section}분반`
-                    : `Section ${offering.section}`
-                  : lang === "ko"
-                    ? "분반 미정"
-                    : "Section —"}
-              </span>
             </div>
 
             <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[length:var(--ui-text-micro-size)]">
@@ -1044,12 +1252,16 @@ function OfferingDetailField({
 
 function RelationList({
   codes,
+  courseByCode,
+  displayCodeByCourse,
   lang,
   onCourseClick,
   title,
   tone,
 }: {
   codes: string[];
+  courseByCode: ReadonlyMap<string, RoadmapCourse>;
+  displayCodeByCourse: ReadonlyMap<string, string>;
   lang: RoadmapLanguage;
   onCourseClick: (code: string) => void;
   title: string;
@@ -1062,7 +1274,7 @@ function RelationList({
       <h3 className="text-xs font-semibold text-slate-500">{title}</h3>
       <div className="mt-2 space-y-1">
         {codes.map((code) => {
-          const item = ROADMAP_COURSE_BY_CODE.get(code);
+          const item = courseByCode.get(code);
           return item ? (
             <button
               key={code}
@@ -1071,7 +1283,9 @@ function RelationList({
               className="flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-slate-100"
             >
               <span className={cn("h-5 w-0.5 rounded-full", tone === "previous" ? "bg-amber-500" : "bg-sky-500")} />
-              <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">{code}</span>
+              <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">
+                {displayCodeByCourse.get(code) ?? code}
+              </span>
               <span className="truncate text-xs font-medium text-slate-800">{item.name[lang]}</span>
             </button>
           ) : null;

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   ContactRound,
   LayoutList,
+  Map,
   MessageCircleQuestion,
   EyeOff,
   Mail,
@@ -44,6 +45,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
     icon: MessageCircleQuestion,
   },
   { label: "게시글/댓글 관리", to: "/admin/moderation", bits: [Permissions.MODERATE_CONTENT], icon: EyeOff },
+  { label: "로드맵 관리", to: "/admin/roadmap", bits: [Permissions.MANAGE_SITE_CONTENT], icon: Map },
 ];
 
 const ADMIN_ACCESS_PERMISSIONS = ADMIN_MENU.flatMap((item) => item.bits);

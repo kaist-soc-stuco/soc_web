@@ -24,6 +24,7 @@ import { AuditLogHttpModule } from "./features/audit/audit-log-http.module";
 import { SiteContentModule } from "./features/site-content/site-content.module";
 import { NotificationsModule } from "./features/notifications/notifications.module";
 import { VotesModule } from "./features/votes/votes.module";
+import { RoadmapModule } from "./features/roadmap/roadmap.module";
 
 const devOnlyModules =
   process.env.NODE_ENV === "production" ? [] : [AuthDevModule, MockModule];
@@ -56,6 +57,7 @@ const devOnlyModules =
     SiteContentModule,
     NotificationsModule,
     VotesModule,
+    RoadmapModule,
     RoleGroupsModule,
     HealthModule,
     ...devOnlyModules,

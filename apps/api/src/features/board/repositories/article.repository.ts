@@ -247,6 +247,7 @@ export class ArticleRepository {
         thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
+        eventLocation: articles.eventLocation,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
         ...connectedSurveyFields,
@@ -301,6 +302,7 @@ export class ArticleRepository {
         snippetEn: includeContentPreview ? row.contentEn : undefined,
         eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
         eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
+        eventLocation: row.eventLocation ?? undefined,
         eventDescriptionKo: row.eventDescriptionKo ?? undefined,
         eventDescriptionEn: row.eventDescriptionEn ?? undefined,
         surveyId: row.surveyId ?? undefined,
@@ -417,6 +419,7 @@ export class ArticleRepository {
         thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
+        eventLocation: articles.eventLocation,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
         ...connectedSurveyFields,
@@ -478,6 +481,7 @@ export class ArticleRepository {
         eventEndDate: row.eventEndDate
           ? msToIso(row.eventEndDate.valueOf())
           : undefined,
+        eventLocation: row.eventLocation ?? undefined,
         eventDescriptionKo: row.eventDescriptionKo ?? undefined,
         eventDescriptionEn: row.eventDescriptionEn ?? undefined,
         surveyId: row.surveyId ?? undefined,
@@ -546,6 +550,7 @@ export class ArticleRepository {
         thumbnailStorageKey: articleThumbnailStorageKey,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
+        eventLocation: articles.eventLocation,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
         ...connectedSurveyFields,
@@ -593,6 +598,7 @@ export class ArticleRepository {
       thumbnailStorageKey: row.thumbnailStorageKey ?? undefined,
       eventStartDate: row.eventStartDate ? msToIso(row.eventStartDate.valueOf()) : undefined,
       eventEndDate: row.eventEndDate ? msToIso(row.eventEndDate.valueOf()) : undefined,
+      eventLocation: row.eventLocation ?? undefined,
       eventDescriptionKo: row.eventDescriptionKo ?? undefined,
       eventDescriptionEn: row.eventDescriptionEn ?? undefined,
       surveyId: row.surveyId ?? undefined,
@@ -637,6 +643,7 @@ export class ArticleRepository {
         )`,
         eventStartDate: articles.eventStartDate,
         eventEndDate: articles.eventEndDate,
+        eventLocation: articles.eventLocation,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
       })
@@ -771,6 +778,7 @@ export class ArticleRepository {
       viewerHasScrapped: engagementSummary.viewerHasScrapped,
       eventStartDate: row[0].eventStartDate ? msToIso(row[0].eventStartDate.valueOf()) : undefined,
       eventEndDate: row[0].eventEndDate ? msToIso(row[0].eventEndDate.valueOf()) : undefined,
+      eventLocation: row[0].eventLocation ?? undefined,
       eventDescriptionKo: row[0].eventDescriptionKo ?? undefined,
       eventDescriptionEn: row[0].eventDescriptionEn ?? undefined,
       survey: surveyRow[0]
@@ -879,6 +887,7 @@ export class ArticleRepository {
           updatedAt: now,
           eventStartDate: input.payload.eventStartDate ? isoToDate(input.payload.eventStartDate) : null,
           eventEndDate: input.payload.eventEndDate ? isoToDate(input.payload.eventEndDate) : null,
+          eventLocation: input.payload.eventLocation ?? null,
           eventDescriptionKo: input.payload.eventDescriptionKo ?? null,
           eventDescriptionEn: input.payload.eventDescriptionEn ?? null,
         })
@@ -1014,6 +1023,7 @@ export class ArticleRepository {
       updatedAt: Date;
       eventStartDate?: Date | null;
       eventEndDate?: Date | null;
+      eventLocation?: string | null;
       eventDescriptionKo?: string | null;
       eventDescriptionEn?: string | null;
     } = {
@@ -1074,6 +1084,10 @@ export class ArticleRepository {
 
     if (payload.eventEndDate !== undefined) {
       updateSet.eventEndDate = payload.eventEndDate ? isoToDate(payload.eventEndDate) : null;
+    }
+
+    if (payload.eventLocation !== undefined) {
+      updateSet.eventLocation = payload.eventLocation ?? null;
     }
 
     if (payload.eventDescriptionKo !== undefined) {

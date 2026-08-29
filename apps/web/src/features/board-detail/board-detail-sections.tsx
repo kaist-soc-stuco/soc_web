@@ -204,7 +204,11 @@ export function BoardDetailArticleCard({
       />
 
       {article.survey && (
-        <section className="mt-6 rounded-xl border border-brand-primary-border bg-brand-primary-light/55 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.025)]">
+        <Link
+          to={`/survey/${article.survey.surveyId}`}
+          aria-label={lang === "ko" ? `${surveyTitle} 설문조사 참여하기` : `Take the ${surveyTitle} survey`}
+          className="group mt-6 block rounded-xl border border-brand-primary-border bg-brand-primary-light/55 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.025)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-brand-primary/45 hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white text-brand-primary shadow-sm">
@@ -222,9 +226,8 @@ export function BoardDetailArticleCard({
                 )}
               </div>
             </div>
-            <Link
-              to={`/survey/${article.survey.surveyId}`}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#053b23]"
+            <span
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition-colors group-hover:bg-[#053b23]"
             >
               <span>{lang === "ko" ? "설문조사 참여하기" : "Take Survey"}</span>
               <svg
@@ -240,9 +243,9 @@ export function BoardDetailArticleCard({
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-            </Link>
+            </span>
           </div>
-        </section>
+        </Link>
       )}
 
       <div className="mt-8 flex items-center justify-start gap-2 border-t border-slate-100 pt-4">

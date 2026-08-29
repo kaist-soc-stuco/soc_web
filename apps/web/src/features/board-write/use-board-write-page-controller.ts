@@ -85,6 +85,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const [uploading, setUploading] = useState(false);
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
   const [eventDescriptionKo, setEventDescriptionKo] = useState("");
   const [eventDescriptionEn, setEventDescriptionEn] = useState("");
   const [isAllDay, setIsAllDay] = useState(false);
@@ -328,7 +329,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
       eventDescriptionKo.trim() ||
       eventDescriptionEn.trim() ||
       eventStartDate ||
-      eventEndDate,
+      eventEndDate ||
+      eventLocation.trim(),
   );
 
   const applyDraftToForm = (draft: ArticleDraftRecord) => {
@@ -367,6 +369,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         ? isoToEventDateInput(draft.eventEndDate, draftIsAllDay)
         : "",
     );
+    setEventLocation(draft.eventLocation || "");
     setEventDescriptionKo(draft.eventDescriptionKo || "");
     setEventDescriptionEn(draft.eventDescriptionEn || "");
     setSelectedSurveyId(draft.linkedSurveyId || "");
@@ -446,6 +449,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       isEventAlwaysOpen,
       eventStartDate,
       eventEndDate,
+      eventLocation,
       eventDescriptionKo,
       eventDescriptionEn,
       updatedAt: nowMs(),
@@ -479,6 +483,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
         selectedCategory === "_EVENT" && eventEndDate
           ? eventDateInputToIso(eventEndDate, isAllDay, true)
           : null,
+      eventLocation:
+        selectedCategory === "_EVENT" ? eventLocation.trim() || null : null,
       eventDescriptionKo:
         selectedCategory === "_EVENT" ? eventDescriptionKo || null : null,
       eventDescriptionEn:
@@ -554,6 +560,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
             ? isoToEventDateInput(draft.eventEndDate, draftIsAllDay)
             : "",
         );
+        setEventLocation(draft.eventLocation || "");
         setEventDescriptionKo(draft.eventDescriptionKo || "");
         setEventDescriptionEn(draft.eventDescriptionEn || "");
         setSelectedSurveyId(draft.linkedSurveyId || "");
@@ -607,6 +614,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
             : parsed.eventEndDate
           : "",
       );
+      setEventLocation(parsed.eventLocation || "");
       setEventDescriptionKo(
         parsed.eventDescriptionKo || parsed.eventDescription || "",
       );
@@ -641,6 +649,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setAssets([]);
     setEventStartDate("");
     setEventEndDate("");
+    setEventLocation("");
     setEventDescriptionKo("");
     setEventDescriptionEn("");
     setIsEventAlwaysOpen(false);
@@ -702,6 +711,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       !isEventAlwaysOpen &&
       !eventStartDate &&
       !eventEndDate &&
+      !eventLocation &&
       !eventDescriptionKo &&
       !eventDescriptionEn
     ) {
@@ -725,6 +735,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     isEventAlwaysOpen,
     eventStartDate,
     eventEndDate,
+    eventLocation,
     eventDescriptionKo,
     eventDescriptionEn,
     assets,
@@ -757,6 +768,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     isEventAlwaysOpen,
     eventStartDate,
     eventEndDate,
+    eventLocation,
     eventDescriptionKo,
     eventDescriptionEn,
     assets,
@@ -854,6 +866,10 @@ export function useBoardWritePageController(forcedCategory?: string) {
               ? null
               : eventDateInputToIso(eventEndDate, isAllDay, true)
             : undefined,
+        eventLocation:
+          selectedCategory === "_EVENT"
+            ? eventLocation.trim() || undefined
+            : undefined,
         eventDescriptionKo:
           selectedCategory === "_EVENT" ? eventDescriptionKo.trim() : undefined,
         eventDescriptionEn:
@@ -948,6 +964,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
+    eventLocation,
     eventStartDate,
     fileInputRef,
     handleCategoryChange,
@@ -978,6 +995,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     setEventDescriptionKo,
     setEventDescriptionEn,
     setEventEndDate,
+    setEventLocation,
     setEventStartDate,
     setAllowComment,
     setIsAnonymous,

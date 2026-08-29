@@ -9,3 +9,4 @@ export * from "./schema/site-content.schema";
 export * from "./schema/calendar.schema";
 export * from "./schema/notification.schema";
 export * from "./schema/vote.schema";
+export * from "./schema/roadmap.schema";

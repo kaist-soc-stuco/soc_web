@@ -82,7 +82,7 @@ export class GoogleSheetsClient {
     key?: string;
   }): Promise<GoogleSpreadsheetReference> {
     const targetFolderId = this.getTargetFolderId();
-    if (targetFolderId) await this.assertFolderWritable(targetFolderId);
+    await this.assertFolderWritable(targetFolderId);
 
     const configuredSpreadsheetId = options.configuredSpreadsheetId?.trim() || undefined;
     const spreadsheetId =
@@ -124,8 +124,6 @@ export class GoogleSheetsClient {
 
   async ensureSpreadsheetInTargetFolder(spreadsheetId: string): Promise<void> {
     const folderId = this.getTargetFolderId();
-    if (!folderId) return;
-
     await this.assertFolderWritable(folderId);
     const current = await this.request<{ parents?: string[] }>(
       "GET",
@@ -363,12 +361,10 @@ export class GoogleSheetsClient {
     return value;
   }
 
-  private getTargetFolderId(): string | undefined {
-    return (
-      this.config.get<string>("GOOGLE_OPERATIONS_FOLDER_ID")?.trim() ||
-      this.config.get<string>("GOOGLE_SURVEY_RESULTS_FOLDER_ID")?.trim() ||
-      undefined
-    );
+  private getTargetFolderId(): string {
+    const folderId = this.config.get<string>("GOOGLE_OPERATIONS_FOLDER_ID")?.trim();
+    if (!folderId) throw new Error("google_operations_folder_not_configured");
+    return folderId;
   }
 
   private async assertFolderWritable(folderId: string): Promise<void> {

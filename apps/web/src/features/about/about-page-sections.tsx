@@ -1,12 +1,14 @@
 import { OPERATIONAL_SURVEY_IDS, operationalSurveyPath } from "@soc/contracts";
 import { nowDate } from "@soc/shared";
 import { useEffect, useRef, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, Calendar, ChevronDown, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { usePublicContentBlocksByType } from "@/features/site-content/site-content";
+import { useLocalizedSiteContent, usePublicContentBlocksByType } from "@/features/site-content/site-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { PledgesSection } from "./pledges-section";
+import { usePublicContactDepartments } from "./use-public-contact-departments";
 import type { AboutSectionId } from "./use-about-page-controller";
 
 const SECTIONS: Array<{
@@ -19,6 +21,51 @@ const SECTIONS: Array<{
   { id: "people", labelKo: "조직도", labelEn: "Organization chart" },
   { id: "partnership", labelKo: "후원 및 제휴", labelEn: "Partnerships" },
 ];
+
+const DEFAULT_DEPARTMENTS = [
+  {
+    id: "presidium",
+    nameKo: "회장단",
+    nameEn: "Presidium",
+    descriptionKo: "학생회 주요 방향을 설정하고 학부생의 의견을 바탕으로 의사 결정합니다.",
+    descriptionEn: "Set the council's direction and make decisions grounded in undergraduate feedback.",
+  },
+  {
+    id: "secretariat",
+    nameKo: "비서실",
+    nameEn: "Secretariat",
+    descriptionKo: "회의와 행정을 지원하고 공지·기록을 체계적으로 관리합니다.",
+    descriptionEn: "Support meetings and administration while keeping notices and records organized.",
+  },
+  {
+    id: "communications",
+    nameKo: "대외소통부",
+    nameEn: "External Communications",
+    descriptionKo: "학부와 외부 커뮤니케이션을 담당하고 행사와 학생회 소식을 알립니다.",
+    descriptionEn: "Lead communications with the department and external partners and share council news.",
+  },
+  {
+    id: "planning",
+    nameKo: "기획부",
+    nameEn: "Planning Division",
+    descriptionKo: "축제·간식 행사와 학부생을 위한 프로그램을 기획하고 운영합니다.",
+    descriptionEn: "Plan and run festivals, snack events, and programs for School of Computing students.",
+  },
+  {
+    id: "it-administration",
+    nameKo: "전산관리부",
+    nameEn: "IT Administration",
+    descriptionKo: "포털 개발 및 인프라 운영, 시스템 관리를 담당합니다.",
+    descriptionEn: "Develop and operate the portal, infrastructure, and council systems.",
+  },
+] as const;
+
+type ScopeItem = {
+  description: string;
+  href: string;
+  icon: LucideIcon;
+  title: string;
+};
 
 export function AboutLandingHero({ lang }: { lang: string }) {
   const currentYear = nowDate().getFullYear();
@@ -47,11 +94,11 @@ export function AboutLandingHero({ lang }: { lang: string }) {
               : "SoC Student Council representing KAIST School of Computing undergraduates"}
           </p>
           <div className="about-hero-links">
-            <Link className="select-none" to="/events">
+            <Link className="about-hero-cta about-hero-cta-primary select-none" to="/events">
               {lang === "ko" ? "행사·일정" : "Events & calendar"}
               <ArrowRight aria-hidden="true" />
             </Link>
-            <Link className="select-none" to="/board/건의사항">
+            <Link className="about-hero-cta about-hero-cta-secondary select-none" to="/board/건의사항">
               {lang === "ko" ? "건의사항" : "Suggestions"}
               <ArrowRight aria-hidden="true" />
             </Link>
@@ -161,40 +208,54 @@ function SectionHeading({ children }: { children: ReactNode }) {
 }
 
 function WorkSection({ lang }: { lang: string }) {
-  const scopes = lang === "ko"
+  const introTitle = useLocalizedSiteContent("about.intro.title");
+  const introBody = useLocalizedSiteContent("about.intro.body");
+  const scopes: ScopeItem[] = lang === "ko"
     ? [
-        { title: "학생 의견", description: "접수된 의견과 학생회의 답변을 게시판에 공개", href: "/board/건의사항" },
-        { title: "학술·진로", description: "선배·연구·진로 교류 프로그램 운영", href: "/board/HoC" },
-        { title: "행사·설문", description: "행사 신청, 설문 참여와 주요 일정 안내", href: "/events" },
+        { title: "학생 의견", description: "접수된 의견과 학생회의 답변을 게시판에 공개", href: "/board/건의사항", icon: MessageCircle },
+        { title: "학술·진로", description: "선배·연구·진로 교류 프로그램 운영", href: "/board/HoC", icon: BookOpen },
+        { title: "행사·설문", description: "행사 신청, 설문 참여와 주요 일정 안내", href: "/events", icon: Calendar },
       ]
     : [
-        { title: "Student feedback", description: "Publish submitted feedback and the council's official responses", href: "/board/건의사항" },
-        { title: "Academics & careers", description: "Connect students through academic and career programs", href: "/board/HoC" },
-        { title: "Events & surveys", description: "Manage registrations, surveys, and important dates", href: "/events" },
+        { title: "Student feedback", description: "Publish submitted feedback and the council's official responses", href: "/board/건의사항", icon: MessageCircle },
+        { title: "Academics & careers", description: "Connect students through academic and career programs", href: "/board/HoC", icon: BookOpen },
+        { title: "Events & surveys", description: "Manage registrations, surveys, and important dates", href: "/events", icon: Calendar },
       ];
 
   return (
     <section id="work" className="about-anchor-section about-landing-section about-landing-section-muted">
       <div className="about-landing-container">
+        <div className="about-intro-summary" data-about-reveal>
+          <span className="about-eyebrow">{lang === "ko" ? "학생회 소개" : "ABOUT SOC"}</span>
+          <h2>{introTitle}</h2>
+          <p>{introBody}</p>
+        </div>
         <div data-about-reveal>
           <SectionHeading>{lang === "ko" ? "주요 사업" : "What we do"}</SectionHeading>
         </div>
-        <ol className="about-scope-list about-reveal-delay-1" data-about-reveal>
-          {scopes.map((scope, index) => (
-            <li key={scope.title}>
-              <Link className="select-none" to={scope.href}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
+        <div className="about-scope-grid about-reveal-delay-1" data-about-reveal>
+          {scopes.map((scope, index) => {
+            const ScopeIcon = scope.icon;
+            return (
+              <Link key={scope.title} className="about-scope-card select-none" to={scope.href}>
+                <div className="about-scope-card-top">
+                  <span className="about-scope-icon"><ScopeIcon aria-hidden="true" /></span>
+                  <span className="about-scope-index">{String(index + 1).padStart(2, "0")}</span>
+                </div>
                 <span className="about-scope-copy">
                   <strong>{scope.title}</strong>
                   <small>{scope.description}</small>
                 </span>
-                <ArrowRight aria-hidden="true" />
+                <span className="about-scope-card-link">
+                  {lang === "ko" ? "자세히 보기" : "Explore"}
+                  <ArrowRight aria-hidden="true" />
+                </span>
               </Link>
-            </li>
-          ))}
-        </ol>
+            );
+          })}
+        </div>
 
-        <div className="about-work-pledges" data-about-reveal>
+        <div className="about-work-pledges about-reveal-delay-2" data-about-reveal>
           <h3>{lang === "ko" ? "공약 이행 현황" : "Pledge progress"}</h3>
           <PledgesSection lang={lang} />
         </div>
@@ -205,6 +266,8 @@ function WorkSection({ lang }: { lang: string }) {
 
 function PeopleSection({ lang }: { lang: string }) {
   const organizationChart = usePublicContentBlocksByType("ORGANIZATION_CHART")[0];
+  const { departments } = usePublicContactDepartments();
+  const departmentItems = departments.length > 0 ? departments : DEFAULT_DEPARTMENTS;
   const organizationImage = organizationChart
     ? lang === "en"
       ? organizationChart.imageUrlEn || organizationChart.imageUrl
@@ -215,29 +278,54 @@ function PeopleSection({ lang }: { lang: string }) {
       <div className="about-landing-container">
         <div data-about-reveal>
           <SectionHeading>{lang === "ko" ? "조직도" : "Organization chart"}</SectionHeading>
+          <p className="about-section-lead">
+            {lang === "ko" ? "전산학부 집행위원회는 부서별 역할을 바탕으로 학부생을 지원합니다." : "The SoC Student Council supports students through focused departments."}
+          </p>
         </div>
 
-        <div className="about-people-org about-reveal-delay-1" data-about-reveal>
-          {organizationImage && organizationChart ? (
-            <a
-              className="about-org-image-link select-none"
-              href={resolveAssetUrl(organizationImage)}
-              target="_blank"
-              rel="noreferrer"
-            >
+        <div className="about-department-grid about-reveal-delay-1" data-about-reveal>
+          {departmentItems.map((department, index) => {
+            const defaultDepartment = DEFAULT_DEPARTMENTS.find(
+              (item) => item.nameKo === department.nameKo,
+            );
+            const name = lang === "ko"
+              ? department.nameKo
+              : department.nameEn || defaultDepartment?.nameEn || department.nameKo;
+            const description = lang === "ko"
+              ? department.descriptionKo || defaultDepartment?.descriptionKo || "이 부서의 주요 역할을 소개합니다."
+              : department.descriptionEn || defaultDepartment?.descriptionEn || department.descriptionKo || "Learn about this department's main responsibilities.";
+            return (
+              <article key={department.id} className="about-department-card">
+                <div className="about-department-card-top">
+                  <span className="about-department-icon"><Building2 aria-hidden="true" /></span>
+                  <span className="about-department-index">{String(index + 1).padStart(2, "0")}</span>
+                </div>
+                <h3>{name}</h3>
+                <p className="about-department-description">{description}</p>
+              </article>
+            );
+          })}
+        </div>
+
+        {organizationImage && organizationChart ? (
+          <details className="about-org-chart about-reveal-delay-2" data-about-reveal>
+            <summary className="about-org-chart-summary select-none">
+              <span>
+                <small>{lang === "ko" ? "참고 자료" : "REFERENCE"}</small>
+                <strong>{lang === "ko" ? "전체 조직 구조" : "Full organization structure"}</strong>
+              </span>
+              <ChevronDown aria-hidden="true" />
+            </summary>
+            <div className="about-org-chart-content">
               <img
                 src={resolveAssetUrl(organizationImage)}
-                alt={lang === "ko" ? organizationChart.titleKo : organizationChart.titleEn || organizationChart.titleKo}
+                alt={lang === "ko" ? "전산학부 집행위원회 전체 조직도" : "Full SoC Student Council organization chart"}
                 loading="lazy"
                 decoding="async"
               />
-            </a>
-          ) : (
-            <p className="about-empty-state">
-              {lang === "ko" ? "등록된 조직도가 없습니다." : "No organization chart has been published."}
-            </p>
-          )}
-        </div>
+            </div>
+          </details>
+        ) : null}
       </div>
     </section>
   );
@@ -269,9 +357,9 @@ function PartnershipSection({ lang }: { lang: string }) {
             </Link>
           </div>
           <ol className="about-partnership-areas about-reveal-delay-1" data-about-reveal>
-            {areas.map((area, index) => (
+            {areas.map((area) => (
               <li key={area}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
+                <span className="about-partnership-area-icon"><ArrowRight aria-hidden="true" /></span>
                 <strong>{area}</strong>
               </li>
             ))}

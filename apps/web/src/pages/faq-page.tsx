@@ -196,11 +196,15 @@ export function FaqPage() {
                 />
               ) : (
                 <div className="min-h-48 border-t-2 border-t-brand-primary">
-                  {faqSections.map((section) => (
-                    <section key={section.key} aria-labelledby={`faq-section-${section.key}`}>
+                  {faqSections.map((section, index) => (
+                    <section
+                      key={section.key}
+                      aria-labelledby={`faq-section-${section.key}`}
+                      className={index > 0 ? "mt-4 border-t border-slate-100 pt-4" : undefined}
+                    >
                       <h3
                         id={`faq-section-${section.key}`}
-                        className="border-b border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs font-semibold tracking-tight text-slate-500 sm:px-6"
+                        className="border-b border-emerald-100 border-l-4 border-l-brand-primary bg-emerald-50/70 px-4 py-3 text-sm font-semibold tracking-tight text-slate-800 sm:px-6"
                       >
                         {lang === "ko" ? section.titleKo : section.titleEn}
                       </h3>

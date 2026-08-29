@@ -43,6 +43,7 @@ export interface UnifiedItem {
   pinOrder?: number | null;
   isAlwaysOpen?: boolean;
   imageUrl?: string | null;
+  location?: string | null;
   articleBoardCode?: string;
   likeCount?: number;
   scrapCount?: number;
@@ -274,6 +275,8 @@ export const buildUnifiedItems = (
     isPinned: false,
     pinOrder: null,
     isAlwaysOpen: survey.isAlwaysOpen,
+    imageUrl: survey.descriptionImageUrlKo ?? survey.descriptionImageUrlEn ?? null,
+    location: null,
   }));
 
   const mappedEvents: UnifiedItem[] = events.map((event) => {
@@ -318,6 +321,7 @@ export const buildUnifiedItems = (
       pinOrder: event.pinOrder ?? null,
       isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
       imageUrl: event.imageUrl ?? null,
+      location: event.eventLocation ?? null,
       articleBoardCode: event.boardCode ?? "_EVENT",
       likeCount: event.likeCount,
       scrapCount: event.scrapCount,
@@ -419,6 +423,7 @@ export const buildCalendarEvents = (
           computedState: item.computedState,
           articleId: item.id,
           surveyId: item.surveyId,
+          location: item.location,
         });
       }
       return;
@@ -438,6 +443,7 @@ export const buildCalendarEvents = (
         articleId: item.kind === "EVENT" ? item.id : null,
         surveyId: item.surveyId,
         startAt: isoToDate(item.opensAt),
+        location: item.location,
       });
     }
 
@@ -456,6 +462,7 @@ export const buildCalendarEvents = (
         surveyId: item.surveyId,
         startAt: isoToDate(item.closesAt),
         endAt: isoToDate(item.closesAt),
+        location: item.location,
       });
     }
   });

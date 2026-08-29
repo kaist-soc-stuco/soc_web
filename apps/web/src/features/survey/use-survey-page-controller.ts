@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { SurveyDetailResponse, SurveyQuestionRecord } from "@soc/contracts";
 import { msToIso, nowMs } from "@soc/shared";
@@ -148,6 +148,25 @@ export function useSurveyPageController(surveyId: string | undefined) {
   const draftStorageKey = surveyId
     ? getSurveyResponseDraftKey(surveyId, session?.userId)
     : null;
+
+  const resetResponseDraft = useCallback(() => {
+    const clearedAnswers: Record<string, AnswerValue> = {};
+    for (const question of allSurveyQuestions) {
+      clearedAnswers[question.id] = emptyAnswerValue(question.questionType);
+    }
+    setAnswers(clearedAnswers);
+    setQuestionErrors({});
+    setSubmitError(null);
+    setDraftRestored(false);
+
+    if (typeof window !== "undefined" && draftStorageKey) {
+      try {
+        window.localStorage.removeItem(draftStorageKey);
+      } catch {
+        // Draft cleanup is best effort and must not block answering.
+      }
+    }
+  }, [allSurveyQuestions, draftStorageKey]);
 
   useEffect(() => {
     if (
@@ -361,6 +380,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
     session,
     sessionLoading,
     responseSubmittedAt,
+    resetResponseDraft,
     questionErrors,
     submitError,
     submitted,

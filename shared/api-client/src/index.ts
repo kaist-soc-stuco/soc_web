@@ -9,6 +9,7 @@ import {
 } from "./core.js";
 import { createMiscApi } from "./misc.js";
 import { createNotificationsApi } from "./notifications.js";
+import { createRoadmapApi } from "./roadmap.js";
 import { createSurveyApi } from "./survey.js";
 import { createSiteContentApi } from "./site-content.js";
 import { createVoteApi } from "./vote.js";
@@ -28,6 +29,7 @@ export const createApiClient = (options: ApiClientOptions) => {
     ...createSiteContentApi(context),
     ...createMiscApi(context),
     ...createNotificationsApi(context),
+    ...createRoadmapApi(context),
     ...createVoteApi(context),
   };
 };

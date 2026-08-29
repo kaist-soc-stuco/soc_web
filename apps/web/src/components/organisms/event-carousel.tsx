@@ -1,6 +1,6 @@
 import { createApiClient } from "@soc/api-client";
 import { isoToMs, localDate, msToDate, nowMs } from "@soc/shared";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -31,6 +31,12 @@ interface EventCardRecord {
   homeOrder: number | null;
   startAt: string | null;
   endAt: string | null;
+  location: string | null;
+  eventState: "before_open" | "open" | "closed";
+  surveyId: string | null;
+  linkedSurveyState: "before_open" | "open" | "closed" | null;
+  linkedSurveyMaxResponses: number | null;
+  linkedSurveyResponseCount: number;
 }
 
 interface EventCardItem {
@@ -41,6 +47,12 @@ interface EventCardItem {
   description?: string;
   startAt: string | null;
   endAt: string | null;
+  location: string | null;
+  eventState: "before_open" | "open" | "closed";
+  surveyId: string | null;
+  linkedSurveyState: "before_open" | "open" | "closed" | null;
+  linkedSurveyMaxResponses: number | null;
+  linkedSurveyResponseCount: number;
 }
 
 type EventSortRecord = Pick<EventCardRecord, "isPinned" | "pinOrder" | "homeOrder" | "startAt" | "endAt">;
@@ -112,6 +124,12 @@ function formatEventDateRange(startAt: string | null, endAt: string | null) {
   return `${start} – ${end}`;
 }
 
+function normalizeEventState(value: string | null | undefined): EventCardRecord["linkedSurveyState"] {
+  return value === "before_open" || value === "open" || value === "closed"
+    ? value
+    : null;
+}
+
 function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
   return {
     id: record.id,
@@ -123,6 +141,12 @@ function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
       : record.descriptionEn || record.titleEn || record.descriptionKo || record.titleKo,
     startAt: record.startAt,
     endAt: record.endAt,
+    location: record.location,
+    eventState: record.eventState,
+    surveyId: record.surveyId,
+    linkedSurveyState: record.linkedSurveyState,
+    linkedSurveyMaxResponses: record.linkedSurveyMaxResponses,
+    linkedSurveyResponseCount: record.linkedSurveyResponseCount,
   };
 }
 
@@ -197,14 +221,40 @@ function EventDayBadge({ event }: { event: EventCardItem }) {
   return label ? <span className="home-editorial-dday">{label}</span> : null;
 }
 
+function getEventApplicationLabel(event: EventCardItem, lang: string) {
+  if (!event.surveyId || !event.linkedSurveyState) return null;
+
+  const isFull = Boolean(
+    event.linkedSurveyMaxResponses &&
+      event.linkedSurveyMaxResponses > 0 &&
+      event.linkedSurveyResponseCount >= event.linkedSurveyMaxResponses,
+  );
+  if (isFull || event.linkedSurveyState === "closed") {
+    return lang === "ko" ? "신청 마감" : "Applications closed";
+  }
+  if (event.linkedSurveyState === "open") {
+    return event.eventState === "before_open"
+      ? lang === "ko" ? "사전 신청" : "Pre-registration"
+      : lang === "ko" ? "신청중" : "Applications open";
+  }
+  return lang === "ko" ? "신청 예정" : "Registration opens soon";
+}
+
+function EventApplicationBadge({ event, lang }: { event: EventCardItem; lang: string }) {
+  const label = getEventApplicationLabel(event, lang);
+  return label ? <span className="home-editorial-event-application">{label}</span> : null;
+}
+
 function EventCard({
   event,
   enter,
   enterIndex,
+  lang,
 }: {
   event: EventCardItem;
   enter: boolean;
   enterIndex: number;
+  lang: string;
 }) {
   const dateRange = formatEventDateRange(event.startAt, event.endAt);
   const style = {
@@ -221,14 +271,21 @@ function EventCard({
     >
       <div className="home-portal-event-media">
         <EventImage event={event} />
+        <div className="pointer-events-none absolute left-4 top-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap gap-1.5">
+          <EventDayBadge event={event} />
+          <EventApplicationBadge event={event} lang={lang} />
+        </div>
       </div>
       <div className="home-portal-event-body">
-        <div className="flex w-full items-center justify-between gap-3">
-          {dateRange ? <time className="home-portal-event-date">{dateRange}</time> : <span />}
-          <EventDayBadge event={event} />
-        </div>
+        {dateRange ? <time className="home-portal-event-date">{dateRange}</time> : null}
         <h3 className="line-clamp-2">{event.title}</h3>
         {event.description ? <p className="line-clamp-2">{event.description}</p> : null}
+        {event.location ? (
+          <div className="home-portal-event-location mt-auto flex min-w-0 items-center gap-1.5">
+            <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
+            <span className="truncate">{event.location}</span>
+          </div>
+        ) : null}
       </div>
     </Link>
   );
@@ -287,23 +344,32 @@ export function EventCarousel() {
           const state = getEventArticleState(item, referenceTime);
           return state === "open" || (state === "before_open" && startsWithinNextMonth(item.eventStartDate ?? null, referenceTime));
         })
-        .map((item) => ({
-          id: item.articleId,
-          titleKo: item.titleKo,
-          titleEn: item.titleEn,
-          descriptionKo: item.eventDescriptionKo ?? item.titleKo,
-          descriptionEn: item.eventDescriptionEn || item.titleEn || item.eventDescriptionKo || item.titleKo,
-          imageUrl: item.thumbnailStorageKey
-            ? resolveAssetUrl(item.thumbnailStorageKey)
-            : null,
-          palette: resolvePalette(item.articleId),
-          isPinned: item.isPinned,
-          pinOrder: item.pinOrder ?? null,
-          homeVisible: item.homeVisible !== false,
-          homeOrder: item.homeOrder ?? null,
-          startAt: item.eventStartDate ?? null,
-          endAt: item.eventEndDate ?? null,
-        }))
+        .map((item) => {
+          const eventState = getEventArticleState(item, referenceTime);
+          return {
+            id: item.articleId,
+            titleKo: item.titleKo,
+            titleEn: item.titleEn,
+            descriptionKo: item.eventDescriptionKo ?? item.titleKo,
+            descriptionEn: item.eventDescriptionEn || item.titleEn || item.eventDescriptionKo || item.titleKo,
+            imageUrl: item.thumbnailStorageKey
+              ? resolveAssetUrl(item.thumbnailStorageKey)
+              : null,
+            palette: resolvePalette(item.articleId),
+            isPinned: item.isPinned,
+            pinOrder: item.pinOrder ?? null,
+            homeVisible: item.homeVisible !== false,
+            homeOrder: item.homeOrder ?? null,
+            startAt: item.eventStartDate ?? null,
+            endAt: item.eventEndDate ?? null,
+            location: item.eventLocation ?? null,
+            eventState,
+            surveyId: item.surveyId ?? item.survey?.surveyId ?? null,
+            linkedSurveyState: normalizeEventState(item.survey?.computedState),
+            linkedSurveyMaxResponses: item.survey?.maxResponses ?? null,
+            linkedSurveyResponseCount: item.survey?.responseCount ?? 0,
+          };
+        })
         .sort((a, b) => compareEventCards(a, b, referenceTime));
       setEvents(nextEvents);
       setLoading(false);
@@ -481,6 +547,7 @@ export function EventCarousel() {
                           enter={hasEnteredViewport}
                           enterIndex={eventIndex}
                           event={event}
+                          lang={lang}
                         />
                       ))}
                     </div>

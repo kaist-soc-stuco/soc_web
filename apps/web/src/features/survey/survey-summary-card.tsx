@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { SurveyDetailResponse } from "@soc/contracts";
 import {
   Calendar,
@@ -8,7 +7,6 @@ import {
 } from "lucide-react";
 
 import {
-  formatSurveyDateTime,
   getAudienceLabel,
   getLocalizedText,
   getResponsePolicyLabel,
@@ -18,12 +16,11 @@ import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveAssetUrl } from "@/lib/asset-url";
 
 interface SurveySummaryCardProps {
-  children?: ReactNode;
   lang: string;
   survey: SurveyDetailResponse;
 }
 
-export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardProps) {
+export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
   const description = getLocalizedText(
     lang,
     survey.descriptionKo,
@@ -35,7 +32,7 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
   const hasInlineDescriptionImage = /<img\b/i.test(description);
 
   return (
-    <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in duration-300 sm:p-8">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in duration-300 sm:p-8">
       <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
         {getLocalizedText(lang, survey.titleKo, survey.titleEn)}
       </h1>
@@ -74,10 +71,6 @@ export function SurveySummaryCard({ children, lang, survey }: SurveySummaryCardP
           </span>
         )}
       </div>
-
-      {children ? (
-        <div className="mt-6 border-t border-slate-100 pt-6">{children}</div>
-      ) : null}
     </section>
   );
 }

@@ -110,3 +110,21 @@ test("marks a failed response sync as an error", async () => {
   await assert.rejects(service.refresh("survey-1", true), /sync failed/);
   assert.equal(getSurvey().spreadsheetSyncStatus, "ERROR");
 });
+
+test("marks a failed sheet connection as an error", async () => {
+  const { service, getSurvey } = createService(
+    {
+      id: "survey-1",
+      titleKo: "진로 설문",
+      spreadsheetId: null,
+    },
+    {
+      getOrCreateSpreadsheet: async () => {
+        throw new Error("oauth unavailable");
+      },
+    },
+  );
+
+  await assert.rejects(service.connect("survey-1"), /oauth unavailable/);
+  assert.equal(getSurvey().spreadsheetSyncStatus, "ERROR");
+});

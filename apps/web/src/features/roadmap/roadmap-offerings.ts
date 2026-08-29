@@ -1,6 +1,11 @@
 import type { LocalizedText } from "./roadmap-data";
+import { normalizeRoadmapCourseCode } from "@soc/contracts";
 
-export type RoadmapOfferingTerm = "all" | "2026-spring" | "2026-fall";
+/**
+ * Terms are intentionally open-ended because the admin Import page can add a
+ * future semester without requiring a frontend release first.
+ */
+export type RoadmapOfferingTerm = string;
 
 export interface RoadmapOffering {
   capacity: number | null;
@@ -14,15 +19,46 @@ export interface RoadmapOffering {
   nameKo: string;
   room: string | null;
   section: string | null;
-  term: Exclude<RoadmapOfferingTerm, "all">;
+  term: RoadmapOfferingTerm;
   time: string | null;
 }
 
-export const ROADMAP_TERM_LABELS: Record<RoadmapOfferingTerm, LocalizedText> = {
-  all: { ko: "전체 학기", en: "All semesters" },
+export const ROADMAP_TERM_LABELS: Record<string, LocalizedText> = {
   "2026-spring": { ko: "2026 봄학기", en: "Spring 2026" },
   "2026-fall": { ko: "2026 가을학기", en: "Fall 2026" },
 };
+
+export function getRoadmapTermLabel(term: string, lang: "ko" | "en"): string {
+  const knownLabel = ROADMAP_TERM_LABELS[term];
+  if (knownLabel) return knownLabel[lang];
+
+  const match = term.match(/^(20\d{2})-(spring|fall)$/i);
+  if (match) {
+    const [, year, season] = match;
+    const isSpring = season.toLocaleLowerCase() === "spring";
+    if (lang === "ko") return year + (isSpring ? " 봄학기" : " 가을학기");
+    return (isSpring ? "Spring " : "Fall ") + year;
+  }
+
+  return term;
+}
+
+export function normalizeRoadmapDisplayCode(value: string): string {
+  return value.trim().replace(/\./g, "");
+}
+
+export function groupRoadmapOfferings(
+  offerings: readonly RoadmapOffering[],
+): Map<string, RoadmapOffering[]> {
+  const grouped = new Map<string, RoadmapOffering[]>();
+  for (const offering of offerings) {
+    const courseCode = normalizeRoadmapCourseCode(offering.courseCode);
+    const current = grouped.get(courseCode) ?? [];
+    current.push({ ...offering, courseCode });
+    grouped.set(courseCode, current);
+  }
+  return grouped;
+}
 
 export const ROADMAP_OFFERINGS: RoadmapOffering[] = [
   {
@@ -1424,8 +1460,8 @@ export const ROADMAP_OFFERINGS: RoadmapOffering[] = [
 
 export const ROADMAP_OFFERINGS_BY_COURSE = new Map<string, RoadmapOffering[]>();
 for (const offering of ROADMAP_OFFERINGS) {
-  const current = ROADMAP_OFFERINGS_BY_COURSE.get(offering.courseCode) ?? [];
-  current.push(offering);
-  ROADMAP_OFFERINGS_BY_COURSE.set(offering.courseCode, current);
+  const courseCode = normalizeRoadmapCourseCode(offering.courseCode);
+  const current = ROADMAP_OFFERINGS_BY_COURSE.get(courseCode) ?? [];
+  current.push({ ...offering, courseCode });
+  ROADMAP_OFFERINGS_BY_COURSE.set(courseCode, current);
 }
-

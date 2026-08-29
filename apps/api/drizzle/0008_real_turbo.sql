@@ -1,0 +1,1 @@
+ALTER TABLE "article" ADD COLUMN "event_location" varchar(255);

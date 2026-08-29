@@ -85,3 +85,16 @@ test("getOrCreateSpreadsheet validates the destination folder before creating a 
     false,
   );
 });
+
+test("does not create a spreadsheet when the shared operations folder is not configured", async () => {
+  const client = new GoogleSheetsClient({ get: () => undefined });
+
+  await assert.rejects(
+    client.getOrCreateSpreadsheet({
+      title: "KAIST SOC 과비 납부",
+      sheetTitle: "과비 납부",
+      purpose: "student-fees",
+    }),
+    /google_operations_folder_not_configured/,
+  );
+});

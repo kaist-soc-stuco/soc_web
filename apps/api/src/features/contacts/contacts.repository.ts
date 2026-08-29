@@ -57,6 +57,9 @@ export class ContactsRepository {
       id: row.id,
       nameKo: row.nameKo,
       nameEn: row.nameEn,
+      descriptionKo: row.descriptionKo,
+      descriptionEn: row.descriptionEn,
+      inquiryEmail: row.inquiryEmail || null,
       sortOrder: row.sortOrder,
       isActive: row.isActive,
       createdAt: msToIso(row.createdAt.valueOf()),
@@ -90,6 +93,9 @@ export class ContactsRepository {
       .values({
         nameKo: dto.nameKo,
         nameEn: dto.nameEn ?? "",
+        descriptionKo: dto.descriptionKo ?? "",
+        descriptionEn: dto.descriptionEn ?? "",
+        inquiryEmail: dto.inquiryEmail ?? "",
         sortOrder: dto.sortOrder ?? Number(sortOrderRow?.maxSortOrder ?? -1) + 1,
         isActive: dto.isActive ?? true,
         updatedAt: nowDate(),
@@ -106,11 +112,17 @@ export class ContactsRepository {
     if (!current) return null;
     const nameKo = dto.nameKo ?? current.nameKo;
     const nameEn = dto.nameEn ?? current.nameEn;
+    const descriptionKo = dto.descriptionKo ?? current.descriptionKo;
+    const descriptionEn = dto.descriptionEn ?? current.descriptionEn;
+    const inquiryEmail = dto.inquiryEmail ?? current.inquiryEmail ?? "";
     const set: Partial<typeof executiveContactDepartments.$inferInsert> = {
       updatedAt: nowDate(),
     };
     if (dto.nameKo !== undefined) set.nameKo = nameKo;
     if (dto.nameEn !== undefined) set.nameEn = nameEn;
+    if (dto.descriptionKo !== undefined) set.descriptionKo = descriptionKo;
+    if (dto.descriptionEn !== undefined) set.descriptionEn = descriptionEn;
+    if (dto.inquiryEmail !== undefined) set.inquiryEmail = inquiryEmail;
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
     if (dto.isActive !== undefined) set.isActive = dto.isActive;
 

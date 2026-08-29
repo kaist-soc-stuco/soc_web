@@ -365,21 +365,21 @@ interface SurveyEligibility {
 - 학번, 이메일, 주전공, 학적과 과비 상태를 표시한다.
 - 비로그인 응답은 사용자 상세 링크를 제공하지 않는다.
 
-### 11.9 Google Sheets 연결
+### 11.9 Google Sheets 연동
 
 - 설문 결과 연동은 `kaist.helloworld@gmail.com` 사용자 OAuth를 사용한다. 캘린더 동기화용 서비스 계정과 분리한다.
-- OAuth 범위는 `drive.file`만 요청한다. 이 범위로 앱이 만든 Sheets 파일을 생성·수정할 수 있으며 Gmail 읽기·쓰기·발송 권한은 요청하지 않는다.
-- 앱이 사용자 내 드라이브에 `KAIST SOC 설문 결과` 폴더를 한 번 생성해 재사용한다. 운영자가 이 폴더를 다른 폴더 아래로 이동해도 앱이 만든 파일에 대한 접근은 유지된다.
+- OAuth 범위는 앱이 만든 Sheets를 생성·수정하는 `drive.file`과, 운영자가 지정한 기존 부모 폴더의 메타데이터만 확인하는 `drive.metadata.readonly`를 요청한다. Gmail 읽기·쓰기·발송 권한은 요청하지 않는다.
+- 과비 납부·집행위 연락망·설문 응답 시트는 모두 `GOOGLE_OPERATIONS_FOLDER_ID`로 지정한 하나의 운영 폴더 아래에 둔다. 폴더 ID가 없거나 접근할 수 없으면 루트 Drive에 잘못 생성하지 않고 명시적으로 실패한다.
 - OAuth client와 refresh token은 각각 별도 비밀 파일로 관리하고 저장소에 커밋하지 않는다.
 
 ```env
 GOOGLE_OAUTH_CLIENT_KEY_FILE=/run/secrets/google-oauth-client.json
 GOOGLE_OAUTH_TOKEN_FILE=/run/secrets/google-oauth-token.json
-GOOGLE_SURVEY_RESULTS_FOLDER_NAME=KAIST SOC 설문 결과
+GOOGLE_OPERATIONS_FOLDER_ID=<공통 운영 폴더 ID>
 ```
 
-- 관리자가 설문에서 `Google Sheets 연결`을 한 번 실행하면 앱 전용 결과 폴더에 스프레드시트를 생성한다.
-- 파일 이름은 `[설문 제목] 응답 · {surveyId}` 형식으로 하여 동명 설문 충돌을 막는다.
+- 설문이 초안에서 최초 게시 상태로 전환될 때 `[설문 제목] 응답 · {surveyId}` 형식의 스프레드시트를 자동 생성하고 `응답` 시트를 초기화한다.
+- 게시 시 Google 연동에 실패해도 설문 게시 자체는 성공시키고 연결 상태를 `ERROR`로 기록한다. 응답 화면에서는 실패한 경우에만 재시도 액션을 제공한다.
 - 설문에는 `spreadsheetId`, `spreadsheetUrl`, 연결 시각과 마지막 동기화 상태를 저장한다.
 - 첫 행에는 제출 시각, 응답 ID, 응답자 기본 정보와 문항 제목을 기록한다.
 - 제출 완료 응답만 반영하고 임시 응답은 반영하지 않는다.

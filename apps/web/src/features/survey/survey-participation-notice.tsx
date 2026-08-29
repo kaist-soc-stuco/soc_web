@@ -61,7 +61,7 @@ export function SurveyParticipationNotice({
         "flex flex-col gap-4 rounded-2xl border text-left",
         compact
           ? "mt-4 border-slate-200 bg-slate-50/80 p-4"
-          : "mx-auto my-10 w-full border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.04)]",
+          : "w-full border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.04)]",
       )}
     >
       <div className={cn("flex gap-3", !compact && "flex-col items-center text-center")}>

@@ -247,6 +247,7 @@ const ArticleAssetsSchema = z
   assets: ArticleAssetsSchema.optional(),
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
+  eventLocation: z.string().trim().max(255).nullable().optional(),
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
 });
@@ -267,6 +268,7 @@ export const ArticleUpdateSchema = z.object({
   assets: ArticleAssetsSchema.optional(),
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
+  eventLocation: z.string().trim().max(255).nullable().optional(),
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
 });
@@ -302,6 +304,7 @@ export const ArticleDraftSaveSchema = z.object({
   assets: ArticleAssetsSchema.optional(),
   eventStartDate: z.string().nullable().optional(),
   eventEndDate: z.string().nullable().optional(),
+  eventLocation: z.string().trim().max(255).nullable().optional(),
   eventDescriptionKo: z.string().nullable().optional(),
   eventDescriptionEn: z.string().nullable().optional(),
   linkedSurveyId: z.string().uuid().nullable().optional(),
@@ -442,6 +445,7 @@ export const QuestionConfigSchema = z.object({
   maxFiles: z.number().int().positive().max(10).optional(),
   maxSizeBytes: z.number().int().positive().max(20_000_000).optional(),
   allowedMimeTypes: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
+  validationErrorMessage: z.string().trim().max(255).optional(),
   // Google Forms-style section branching. Values are option IDs; targets are
   // section IDs or the terminal `SUBMIT` marker.
   goToSectionByValue: z
@@ -658,6 +662,9 @@ export const BulkImportContactsSchema = z.object({
 export const CreateContactDepartmentSchema = z.object({
   nameKo: RequiredContactTextSchema,
   nameEn: z.string().trim().max(100).default(""),
+  descriptionKo: z.string().trim().max(500).default(""),
+  descriptionEn: z.string().trim().max(500).default(""),
+  inquiryEmail: z.string().trim().email().or(z.literal("")).default(""),
   sortOrder: z.number().int().min(0).optional(),
   isActive: z.boolean().default(true),
 });
@@ -717,3 +724,65 @@ export const CreateBulkEmailTemplateSchema = z.object({
 });
 
 export const UpdateBulkEmailTemplateSchema = CreateBulkEmailTemplateSchema.partial();
+
+// ─── Roadmap ────────────────────────────────────────────────────────────────
+
+export const RoadmapCourseCategorySchema = z.enum([
+  "basic-required",
+  "basic-elective",
+  "major-required",
+  "major-elective",
+]);
+
+const RoadmapCourseFieldsSchema = z.object({
+  courseCode: z.string().trim().min(2).max(64),
+  legacyCourseCode: z.string().trim().max(64).nullable().optional(),
+  nameKo: z.string().trim().min(1).max(255),
+  nameEn: z.string().trim().max(255).default(""),
+  category: RoadmapCourseCategorySchema.default("major-elective"),
+  credits: z.string().trim().max(40).default(""),
+  semesters: z.string().trim().max(20).default("S/F"),
+  trackIds: z.array(z.string().trim().min(1).max(50)).max(30).default([]),
+  ai: z.boolean().default(false),
+  positionX: z.number().finite().default(0),
+  positionY: z.number().finite().default(0),
+  isVisible: z.boolean().default(true),
+  prerequisiteCourseCodes: z.array(z.string().trim().min(2).max(64)).max(100).default([]),
+});
+
+export const CreateRoadmapCourseSchema = RoadmapCourseFieldsSchema.strict();
+export const UpdateRoadmapCourseSchema = RoadmapCourseFieldsSchema.partial().strict();
+
+const RoadmapOfferingFieldsSchema = z.object({
+  term: z.string().trim().min(4).max(32),
+  courseCode: z.string().trim().min(2).max(64),
+  currentCode: z.string().trim().min(2).max(64),
+  nameKo: z.string().trim().min(1).max(255),
+  section: z.string().trim().max(30).nullable().optional(),
+  instructor: z.string().trim().max(255).nullable().optional(),
+  credits: z.string().trim().max(40).nullable().optional(),
+  time: z.string().trim().max(1_000).nullable().optional(),
+  room: z.string().trim().max(1_000).nullable().optional(),
+  capacity: z.number().int().nonnegative().nullable().optional(),
+  enrolled: z.number().int().nonnegative().nullable().optional(),
+  delivery: z.string().trim().max(80).nullable().optional(),
+  inEnglish: z.boolean().default(false),
+});
+
+export const CreateRoadmapOfferingSchema = RoadmapOfferingFieldsSchema.strict();
+export const UpdateRoadmapOfferingSchema = RoadmapOfferingFieldsSchema.partial().strict();
+
+export const RoadmapImportDecisionSchema = z.object({
+  action: z.enum(["ADD_TO_ROADMAP", "SKIP"]),
+  category: RoadmapCourseCategorySchema.optional(),
+  trackIds: z.array(z.string().trim().min(1).max(50)).max(30).optional(),
+  nameEn: z.string().trim().max(255).optional(),
+  semesters: z.string().trim().max(20).optional(),
+  credits: z.string().trim().max(40).optional(),
+  positionX: z.number().finite().optional(),
+  positionY: z.number().finite().optional(),
+}).strict();
+
+export const RoadmapImportCommitSchema = z.object({
+  decisions: z.record(z.string().trim().min(1).max(64), RoadmapImportDecisionSchema),
+}).strict();

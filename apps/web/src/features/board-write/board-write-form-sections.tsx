@@ -1,4 +1,5 @@
 import type { ReactNode, RefObject } from "react";
+import { useState } from "react";
 import type { SurveyRecord } from "@soc/contracts";
 import {
   ArrowLeft,
@@ -256,6 +257,7 @@ interface EventFieldsProps {
   eventDescriptionKo: string;
   eventDescriptionEn: string;
   eventEndDate: string;
+  eventLocation: string;
   eventStartDate: string;
   isAllDay: boolean;
   isEventAlwaysOpen: boolean;
@@ -264,6 +266,7 @@ interface EventFieldsProps {
   onEventDescriptionKoChange: (value: string) => void;
   onEventDescriptionEnChange: (value: string) => void;
   onEventEndDateChange: (value: string) => void;
+  onEventLocationChange: (value: string) => void;
   onEventStartDateChange: (value: string) => void;
   onAllDayChange: (checked: boolean) => void;
   onEventAlwaysOpenChange: (checked: boolean) => void;
@@ -277,6 +280,7 @@ export function BoardWriteEventFields({
   eventDescriptionKo,
   eventDescriptionEn,
   eventEndDate,
+  eventLocation,
   eventStartDate,
   isAllDay,
   isEventAlwaysOpen,
@@ -287,12 +291,15 @@ export function BoardWriteEventFields({
   onEventDescriptionKoChange,
   onEventDescriptionEnChange,
   onEventEndDateChange,
+  onEventLocationChange,
   onEventStartDateChange,
   onThumbnailRemove,
   onThumbnailSelect,
   thumbnail,
   uploading,
 }: EventFieldsProps) {
+  const [descriptionLanguage, setDescriptionLanguage] = useState<"ko" | "en">("ko");
+  const activeDescriptionLanguage = isKoreanOnly ? "ko" : descriptionLanguage;
   const eventStartInputValue = isAllDay
     ? switchEventDateInputMode(eventStartDate, true)
     : switchEventDateInputMode(eventStartDate, false);
@@ -348,8 +355,9 @@ export function BoardWriteEventFields({
           </span>
         </label>
       </div>
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <UiFormField
+          className="min-w-0"
           htmlFor="event-start-date"
           label={lang === "ko" ? "시작" : "Start"}
         >
@@ -357,12 +365,13 @@ export function BoardWriteEventFields({
             id="event-start-date"
             type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
-            className="w-full"
+            className="w-full min-w-0 text-[length:var(--ui-text-body-sm-size)]"
             value={eventStartInputValue}
             onChange={(event) => onEventStartDateChange(event.target.value)}
           />
         </UiFormField>
         <UiFormField
+          className="min-w-0"
           htmlFor="event-end-date"
           label={lang === "ko" ? "종료" : "End"}
         >
@@ -370,7 +379,7 @@ export function BoardWriteEventFields({
             id="event-end-date"
             type={isAllDay ? "date" : "datetime-local"}
             disabled={isEventAlwaysOpen}
-            className="w-full"
+            className="w-full min-w-0 text-[length:var(--ui-text-body-sm-size)]"
             value={eventEndInputValue}
             onChange={(event) => onEventEndDateChange(event.target.value)}
           />
@@ -385,12 +394,9 @@ export function BoardWriteEventFields({
       >
         <ImageUploadField
           alt={lang === "ko" ? "대표 썸네일 미리보기" : "Representative thumbnail preview"}
+          compact
           disabled={uploading}
-          emptyText={
-            lang === "ko"
-              ? "대표 이미지를 선택하세요"
-              : "Choose a representative image"
-          }
+          fileName={thumbnail?.originalFilename}
           imageUrl={thumbnail ? resolveAssetUrl(thumbnail.storageKey) : undefined}
           onRemove={onThumbnailRemove}
           onSelect={onThumbnailSelect}
@@ -406,52 +412,71 @@ export function BoardWriteEventFields({
           }
         />
       </UiFormField>
-      <UiFormField
-        label={
-          lang === "ko"
-            ? "카드 요약 설명 (피드 노출용)"
-            : "Card summary (shown in feeds)"
-        }
-      >
-        <div className="grid grid-cols-1 gap-3">
-          <label className="flex min-w-0 items-center gap-2">
-            <span className="w-7 shrink-0 text-[length:var(--ui-text-micro-size)] font-bold uppercase tracking-[0.12em] text-slate-400">
-              KO
-            </span>
-            <UiInput
-              type="text"
-              aria-label={lang === "ko" ? "국문 카드 설명" : "Korean card description"}
-              placeholder={
-                lang === "ko"
-                  ? "피드에 표시될 짧은 국문 행사 정보입니다"
-                  : "Short Korean description for card display"
-              }
-              className="min-w-0 w-full flex-1"
-              value={eventDescriptionKo}
-              onChange={(event) => onEventDescriptionKoChange(event.target.value)}
-            />
+      <div className="min-w-0">
+        <UiInput
+          id="event-location"
+          type="text"
+          maxLength={255}
+          aria-label={lang === "ko" ? "행사 장소" : "Event location"}
+          placeholder={lang === "ko" ? "행사 장소를 입력하세요" : "Enter event location"}
+          className="w-full"
+          value={eventLocation}
+          onChange={(event) => onEventLocationChange(event.target.value)}
+        />
+      </div>
+      <div className="grid gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <label
+            htmlFor="event-description"
+            className="min-w-0 text-xs font-normal leading-4 text-[#344054]"
+          >
+            {lang === "ko" ? "카드 요약 설명 (피드 노출용)" : "Card summary (shown in feeds)"}
           </label>
-          {!isKoreanOnly ? (
-            <label className="flex min-w-0 items-center gap-2">
-              <span className="w-7 shrink-0 text-[length:var(--ui-text-micro-size)] font-bold uppercase tracking-[0.12em] text-slate-400">
-                EN
-              </span>
-              <UiInput
-                type="text"
-                aria-label={lang === "ko" ? "영문 카드 설명" : "English card description"}
-                placeholder={
-                  lang === "ko"
-                    ? "피드에 표시될 짧은 영문 행사 정보입니다"
-                    : "Short English description for card display"
-                }
-                className="min-w-0 w-full flex-1"
-                value={eventDescriptionEn}
-                onChange={(event) => onEventDescriptionEnChange(event.target.value)}
-              />
-            </label>
-          ) : null}
+          <div
+            aria-label={lang === "ko" ? "설명 언어" : "Description language"}
+            className="inline-flex shrink-0 rounded-md border border-slate-200 bg-slate-50 p-0.5"
+            role="tablist"
+          >
+            {(["ko", "en"] as const).map((language) => {
+              const isActive = activeDescriptionLanguage === language;
+              const isDisabled = language === "en" && isKoreanOnly;
+              return (
+                <button
+                  key={language}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-disabled={isDisabled}
+                  disabled={isDisabled}
+                  onClick={() => setDescriptionLanguage(language)}
+                  className={`select-none rounded px-2 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold uppercase leading-4 transition-colors ${
+                    isActive
+                      ? "bg-white text-brand-primary shadow-sm"
+                      : "text-slate-400 hover:text-slate-700"
+                  } disabled:cursor-not-allowed disabled:opacity-45`}
+                >
+                  {language.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </UiFormField>
+        <UiInput
+          id="event-description"
+          type="text"
+          aria-label={lang === "ko" ? "카드 요약 설명" : "Card summary"}
+          placeholder="설명을 입력하세요"
+          className="w-full"
+          value={activeDescriptionLanguage === "ko" ? eventDescriptionKo : eventDescriptionEn}
+          onChange={(event) => {
+            if (activeDescriptionLanguage === "ko") {
+              onEventDescriptionKoChange(event.target.value);
+            } else {
+              onEventDescriptionEnChange(event.target.value);
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -580,9 +605,6 @@ export function BoardWriteSettings({
       >
         {canConfigurePostSettings && (
           <div className="w-full space-y-1.5">
-            <p className="text-xs font-semibold text-slate-700">
-              {lang === "ko" ? "행사/설문조사 연동" : "Event/survey link"}
-            </p>
             <SelectDropdown
               id="settings-survey-select"
               aria-label={lang === "ko" ? "연결된 설문조사" : "Linked survey"}
@@ -616,7 +638,7 @@ export function BoardWriteSettings({
               {lang === "ko" ? "공개 및 게시 옵션" : "Visibility and publishing options"}
             </p>
           ) : null}
-          <div className={stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
+          <div className={isEvent ? "grid grid-cols-2 gap-x-4 gap-y-3" : stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
             {canConfigurePostSettings && (
               <label className="flex items-center gap-2.5 cursor-pointer group">
                 <div

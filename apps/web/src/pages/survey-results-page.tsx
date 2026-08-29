@@ -13,7 +13,7 @@ export function SurveyResultsPage() {
   return (
     <PageShell>
       <Header />
-      <main className="flex-1 px-4 py-10 lg:px-0">
+      <main className="flex-1 bg-[#f3f5f4] px-4 py-10 lg:px-0" aria-busy={loading}>
         <div className="mx-auto max-w-[52rem]">
           <div className="mb-4">
             <Button variant="ghost"
@@ -22,7 +22,7 @@ export function SurveyResultsPage() {
               className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent text-xs font-semibold text-slate-400 transition-colors hover:text-kaist-darkgreen"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              {lang === "ko" ? "이전 페이지로" : "Go back"}
+              {lang === "ko" ? "목록으로" : "Back to list"}
             </Button>
           </div>
           <SurveyResultsContent
