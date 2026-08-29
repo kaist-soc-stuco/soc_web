@@ -36,7 +36,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createPortal } from "react-dom";
-import { Download, GripVertical, Mail, Pencil, Phone, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { GripVertical, Mail, Pencil, Phone, Plus, Trash2, Upload } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -57,7 +57,6 @@ import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./Executiv
 
 const CONTACT_LIST_PAGE_SIZE = 500;
 const CONTACT_ROW_GRID = "grid min-w-[1120px] grid-cols-[52px_280px_120px_120px_220px_minmax(0,1fr)]";
-const GOOGLE_SHEETS_HOME_URL = "https://docs.google.com/spreadsheets/";
 
 export function ExecutiveDirectoryPage() {
   return <AuthGuard requirePermission={Permissions.MANAGE_CONTACTS}><ContactsPageContent /></AuthGuard>;
@@ -103,7 +102,6 @@ function ContactsPageContent() {
   const [memberModalOpen, setMemberModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactRecord | null>(null);
   const [memberSaving, setMemberSaving] = useState(false);
-  const [sheetSyncing, setSheetSyncing] = useState(false);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [departmentModalOpen, setDepartmentModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<ContactDepartmentRecord | null>(null);
@@ -140,9 +138,18 @@ function ContactsPageContent() {
     }
   }, [apiClient]);
 
+  const loadSpreadsheet = useCallback(async () => {
+    try {
+      const spreadsheet = await apiClient.getContactsSpreadsheet();
+      setSpreadsheetUrl(spreadsheet.spreadsheetUrl);
+    } catch {
+      setSpreadsheetUrl(null);
+    }
+  }, [apiClient]);
+
   useEffect(() => {
-    void Promise.all([loadContacts(), loadDepartments()]);
-  }, [loadContacts, loadDepartments]);
+    void Promise.all([loadContacts(), loadDepartments(), loadSpreadsheet()]);
+  }, [loadContacts, loadDepartments, loadSpreadsheet]);
 
   const activityYearOptions = useMemo(
     () => Array.from(new Set(contacts.map((contact) => contact.cohort).filter((year): year is number => year !== null)))
@@ -182,36 +189,6 @@ function ContactsPageContent() {
     (searchQuery: string): Promise<AdminUserRecord[]> => apiClient.searchContactPortalMembers(searchQuery, 20),
     [apiClient],
   );
-
-  const exportContacts = async () => {
-    try {
-      const spreadsheet = await apiClient.downloadContactsXlsx({
-        q: query,
-        cohort: activityYearFilter ? Number(activityYearFilter) : undefined,
-        department: departmentFilter || undefined,
-      });
-      downloadBlob(spreadsheet, "executive_contacts.xlsx");
-    } catch {
-      setError("연락망을 내보내지 못했습니다.");
-    }
-  };
-
-  const syncContactsSpreadsheet = async () => {
-    try {
-      setSheetSyncing(true);
-      const result = await apiClient.syncContactsSpreadsheet();
-      setSpreadsheetUrl(result.spreadsheetUrl);
-      toast({
-        type: "success",
-        message: `Google Sheets에 ${result.syncedCount}명을 동기화했습니다.`,
-        action: { label: "시트 열기", onClick: () => window.open(result.spreadsheetUrl, "_blank", "noopener,noreferrer") },
-      });
-    } catch {
-      toast({ type: "error", message: "Google Sheets 동기화에 실패했습니다. OAuth 설정을 확인해 주세요." });
-    } finally {
-      setSheetSyncing(false);
-    }
-  };
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveContactId(String(active.id));
@@ -408,25 +385,24 @@ function ContactsPageContent() {
     }
   };
 
+  const pageSpreadsheetLink = spreadsheetUrl ? (
+    <a
+      href={spreadsheetUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline"
+    >
+      Google Sheets에서 보기 ↗
+    </a>
+  ) : null;
+
   const headerActions = activeTab === "members" ? (
     <>
-      <a
-        href={spreadsheetUrl ?? GOOGLE_SHEETS_HOME_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline"
-      >
-        Google Sheets로 이동
-      </a>
-      <Button type="button" variant="outline" onClick={() => void syncContactsSpreadsheet()} disabled={sheetSyncing}>
-        <RefreshCw aria-hidden="true" className={sheetSyncing ? "animate-spin" : undefined} />
-        {sheetSyncing ? "동기화 중..." : "Google Sheets 동기화"}
-      </Button>
-      <Button type="button" variant="outline" onClick={() => void exportContacts()}><Download aria-hidden="true" />내보내기</Button>
+      {pageSpreadsheetLink}
       <Button type="button" variant="outline" onClick={() => bulkFileInputRef.current?.click()}><Upload aria-hidden="true" />불러오기</Button>
       <Button type="button" onClick={openNewMemberModal}><Plus aria-hidden="true" />부원 추가</Button>
     </>
-  ) : <Button type="button" onClick={openNewDepartmentModal}><Plus aria-hidden="true" />부서 추가</Button>;
+  ) : <>{pageSpreadsheetLink}<Button type="button" onClick={openNewDepartmentModal}><Plus aria-hidden="true" />부서 추가</Button></>;
 
   return (
     <AdminPageShell>

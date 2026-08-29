@@ -254,7 +254,11 @@ function formatScheduleText(event: CalendarEvent, lang: Language) {
   const startText = formatDetailDate(startDate, lang);
   const endText = formatDetailDate(endDate, lang);
 
-  if (event.sourceType === "KAIST_ACADEMIC") {
+  if (event.isAlways) {
+    return lang === "ko" ? "상시" : "Always";
+  }
+
+  if (event.isAllDay || event.sourceType === "KAIST_ACADEMIC") {
     return sameDay
       ? `${startText} ${lang === "ko" ? "종일" : "All day"}`
       : `${startText} ～ ${endText} ${lang === "ko" ? "종일" : "All day"}`;

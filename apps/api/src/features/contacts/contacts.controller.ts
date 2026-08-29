@@ -143,6 +143,15 @@ export class ContactsController {
     return this.googleContactSheetsService.sync();
   }
 
+  @Get("spreadsheet")
+  @RequirePermissions(Permissions.MANAGE_CONTACTS)
+  async getContactSpreadsheet(): Promise<{
+    spreadsheetId: string;
+    spreadsheetUrl: string;
+  }> {
+    return this.googleContactSheetsService.getReference();
+  }
+
   @Post("departments")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async createContactDepartment(

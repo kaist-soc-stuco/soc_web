@@ -72,6 +72,8 @@ export interface CalendarEvent {
   surveyId?: string | null;
   startAt?: Date;
   endAt?: Date;
+  isAllDay?: boolean;
+  isAlways?: boolean;
   location?: string | null;
 }
 
@@ -515,6 +517,8 @@ export const buildCalendarEventsFromPublicItems = (
       computedState,
       startAt,
       endAt,
+      isAllDay: item.isAllDay,
+      isAlways: item.isAlways,
       location: item.location,
     };
   });

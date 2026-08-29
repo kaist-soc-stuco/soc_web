@@ -44,7 +44,7 @@ export function useAboutPageController() {
     const hashSection = location.hash.replace(/^#/, "");
     const resolvedHash = resolveAboutSectionId(hashSection);
     if (resolvedHash) return resolvedHash;
-    return resolveAboutSectionId(legacyTab);
+    return resolveAboutSectionId(legacyTab) ?? "intro";
   }, [legacyTab, location.hash]);
 
   const [activeSection, setActiveSection] = useState<AboutSectionId>(requestedSection ?? "intro");
@@ -67,7 +67,11 @@ export function useAboutPageController() {
   useEffect(() => {
     if (!requestedSection) return;
 
-    if (legacyTab) navigate(`/about#${requestedSection}`, { replace: true });
+    if (legacyTab) {
+      navigate(`/about#${requestedSection}`, { replace: true });
+    } else if (!resolveAboutSectionId(location.hash.replace(/^#/, ""))) {
+      replaceSectionHash(requestedSection);
+    }
 
     let cancelled = false;
     let userInterrupted = false;

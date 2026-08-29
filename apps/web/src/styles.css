@@ -2523,6 +2523,10 @@
     white-space: pre-wrap;
   }
 
+  .about-pledge-item[open] > p {
+    animation: about-pledge-content-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   .about-partnership-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
@@ -2747,6 +2751,18 @@
     opacity: 1;
     clip-path: inset(0);
     transform: scale(1);
+  }
+}
+
+@keyframes about-pledge-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-0.35rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

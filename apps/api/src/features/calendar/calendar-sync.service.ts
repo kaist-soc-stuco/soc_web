@@ -462,7 +462,7 @@ export class CalendarSyncService {
   }
 
   private toGoogleResource(row: CalendarEventRow): GoogleCalendarEventResource {
-    const isAllDay = row.sourceType === KAIST_SOURCE;
+    const isAllDay = row.isAllDay || row.sourceType === KAIST_SOURCE;
     const resource: GoogleCalendarEventResource = isAllDay
       ? {
           summary: row.titleKo,

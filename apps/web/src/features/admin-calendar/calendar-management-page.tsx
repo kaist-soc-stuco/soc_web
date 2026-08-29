@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import type {
   CalendarEventCategory,
@@ -56,7 +56,7 @@ import { formatNumericDateRange } from "@/lib/date-display";
 import { Permissions } from "@/lib/permissions";
 
 const QUERY_KEY = ["admin", "calendar-events"] as const;
-type SourceFilter = "all" | "MANUAL" | "KAIST_ACADEMIC";
+type SourceFilter = "all" | "ARTICLE" | "MANUAL" | "KAIST_ACADEMIC";
 type CategoryFilter = "all" | CalendarEventCategory;
 type VisibilityFilter = "all" | "visible" | "hidden";
 type CategoryDraft = CalendarEventCategory;
@@ -68,14 +68,17 @@ interface EventDraft {
   descriptionEn: string;
   startAt: string;
   endAt: string;
+  isAllDay: boolean;
+  isAlways: boolean;
   location: string;
   category: CategoryDraft;
   visibility: "visible" | "hidden";
 }
 
 const emptyDraft = (): EventDraft => {
-  const start = msToIso(nowMs());
-  const end = msToIso(nowMs() + 60 * 60 * 1000);
+  const startMs = nowMs();
+  const start = msToIso(startMs);
+  const end = msToIso(startMs + 60 * 60 * 1000);
   return {
     titleKo: "",
     titleEn: "",
@@ -83,19 +86,41 @@ const emptyDraft = (): EventDraft => {
     descriptionEn: "",
     startAt: isoToHtmlDatetimeLocal(start),
     endAt: isoToHtmlDatetimeLocal(end),
+    isAllDay: false,
+    isAlways: false,
     location: "",
     category: "EVENT",
     visibility: "visible",
   };
 };
 
+function toCalendarDateInput(value: string, isAllDay: boolean) {
+  const datetimeLocal = isoToHtmlDatetimeLocal(value);
+  return isAllDay ? datetimeLocal.slice(0, 10) : datetimeLocal;
+}
+
+function switchCalendarDateInput(value: string, isAllDay: boolean, endOfDay = false) {
+  if (!value) return "";
+  const datePart = value.slice(0, 10);
+  return isAllDay ? datePart : `${datePart}T${endOfDay ? "23:59" : "00:00"}`;
+}
+
+function calendarInputToIso(value: string, isAllDay: boolean, endOfDay = false) {
+  const datetimeLocal = isAllDay
+    ? `${value.slice(0, 10)}T${endOfDay ? "23:59" : "00:00"}`
+    : value;
+  return htmlDatetimeLocalToIso(datetimeLocal);
+}
+
 const draftFromEvent = (event: CalendarEventRecord): EventDraft => ({
   titleKo: event.titleKo,
   titleEn: event.titleEn ?? "",
   descriptionKo: event.descriptionKo ?? "",
   descriptionEn: event.descriptionEn ?? "",
-  startAt: isoToHtmlDatetimeLocal(event.startAt),
-  endAt: isoToHtmlDatetimeLocal(event.endAt),
+  startAt: toCalendarDateInput(event.startAt, event.isAllDay),
+  endAt: toCalendarDateInput(event.endAt, event.isAllDay),
+  isAllDay: event.isAllDay,
+  isAlways: event.isAlways,
   location: event.location ?? "",
   category: event.categoryOverride ?? event.category,
   visibility: event.isHiddenByAdmin ? "hidden" : "visible",
@@ -108,8 +133,9 @@ const categoryLabel: Record<CalendarEventCategory, string> = {
 };
 
 function formatPeriod(event: CalendarEventRecord) {
+  if (event.isAlways) return "상시";
   return formatNumericDateRange(event.startAt, event.endAt, {
-    includeTime: event.sourceType === "MANUAL",
+    includeTime: event.sourceType !== "KAIST_ACADEMIC" && !event.isAllDay,
   });
 }
 
@@ -243,6 +269,7 @@ function CalendarManagementContent() {
 
   const saveEvent = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
+    if (editingEvent?.sourceType === "ARTICLE") return;
     setSaving(true);
     try {
       let saved: CalendarEventRecord;
@@ -252,8 +279,10 @@ function CalendarManagementContent() {
           titleEn: draft.titleEn.trim() || undefined,
           descriptionKo: draft.descriptionKo.trim() || undefined,
           descriptionEn: draft.descriptionEn.trim() || undefined,
-          startAt: htmlDatetimeLocalToIso(draft.startAt),
-          endAt: htmlDatetimeLocalToIso(draft.endAt),
+          startAt: calendarInputToIso(draft.startAt, draft.isAllDay),
+          endAt: calendarInputToIso(draft.endAt, draft.isAllDay, true),
+          isAllDay: draft.isAllDay,
+          isAlways: draft.isAlways,
           location: draft.location.trim() || undefined,
         };
         saved = await apiClient.createManualCalendarEvent(payload);
@@ -263,8 +292,10 @@ function CalendarManagementContent() {
           titleEn: draft.titleEn.trim() || undefined,
           descriptionKo: draft.descriptionKo.trim() || undefined,
           descriptionEn: draft.descriptionEn.trim() || undefined,
-          startAt: htmlDatetimeLocalToIso(draft.startAt),
-          endAt: htmlDatetimeLocalToIso(draft.endAt),
+          startAt: calendarInputToIso(draft.startAt, draft.isAllDay),
+          endAt: calendarInputToIso(draft.endAt, draft.isAllDay, true),
+          isAllDay: draft.isAllDay,
+          isAlways: draft.isAlways,
           location: draft.location.trim() || undefined,
         });
       } else {
@@ -389,6 +420,7 @@ function CalendarManagementContent() {
                   onChange={(value) => { setSourceFilter(value); setPage(1); }}
                   options={[
                     { value: "all", label: "전체" },
+                    { value: "ARTICLE", label: "행사 게시글" },
                     { value: "MANUAL", label: "학생회 일정" },
                     { value: "KAIST_ACADEMIC", label: "KAIST 학사일정" },
                   ]}
@@ -431,6 +463,7 @@ function CalendarManagementContent() {
                       { value: "all", label: "전체 분류" },
                       { value: "EVENT", label: "행사" },
                       { value: "ACADEMIC", label: "학사일정" },
+                      { value: "HOLIDAY", label: "공휴일" },
                     ]}
                     className="w-32"
                   />
@@ -480,7 +513,7 @@ function CalendarManagementContent() {
               <AdminTableHeader>
                 <tr>
                   <AdminTableHead>제목</AdminTableHead>
-                  <AdminTableHead>분류</AdminTableHead>
+                  <AdminTableHead>표시 분류</AdminTableHead>
                   <AdminTableHead>출처</AdminTableHead>
                   <AdminSortableHead active ascending={sortDirection === "asc"} onClick={() => setSortDirection((value) => value === "asc" ? "desc" : "asc")}>기간</AdminSortableHead>
                 </tr>
@@ -506,7 +539,7 @@ function CalendarManagementContent() {
                       ) : null}
                     </AdminTableCell>
                     <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{categoryLabel[event.category]}</span></AdminTableCell>
-                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{event.sourceType === "KAIST_ACADEMIC" ? "KAIST 학사일정" : "학생회 일정"}</span></AdminTableCell>
+                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{event.sourceType === "ARTICLE" ? "행사 게시글" : event.sourceType === "KAIST_ACADEMIC" ? "KAIST 학사일정" : "학생회 일정"}</span></AdminTableCell>
                     <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{formatPeriod(event)}</span></AdminTableCell>
                   </tr>
                 ))}
@@ -519,8 +552,12 @@ function CalendarManagementContent() {
       <AdminDrawer
         open={drawerOpen}
         onClose={() => !saving && setDrawerOpen(false)}
-        title={editingEvent ? "일정 설정" : "일정 추가"}
-        footer={(
+        title={editingEvent?.sourceType === "ARTICLE" ? "행사 게시글 일정" : editingEvent ? "일정 설정" : "일정 추가"}
+        footer={editingEvent?.sourceType === "ARTICLE" ? (
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setDrawerOpen(false)}>닫기</Button>
+          </div>
+        ) : (
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDrawerOpen(false)} disabled={saving}>취소</Button>
             <Button type="submit" form="calendar-management-form" disabled={saving}>
@@ -530,64 +567,117 @@ function CalendarManagementContent() {
           </div>
         )}
       >
-        <form id="calendar-management-form" className="space-y-5" onSubmit={(event) => void saveEvent(event)}>
-          {editingEvent?.isReadOnly ? (
+        {editingEvent?.sourceType === "ARTICLE" ? (
+          <div className="space-y-5">
             <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
               <CalendarDays className="mt-0.5 size-4 shrink-0 text-[#344054]" aria-hidden="true" />
-              <p className="text-sm font-normal leading-5 text-[#344054]">KAIST 학사일정의 제목과 기간은 자동 동기화됩니다. 이 화면에서는 분류와 공개 여부만 변경할 수 있습니다.</p>
+              <p className="text-sm font-normal leading-5 text-[#344054]">행사 게시글에 입력된 일정이 자동으로 표시됩니다. 제목과 기간은 행사 게시글에서 수정해 주세요.</p>
             </div>
-          ) : null}
-          <AdminFormField label="제목">
-            <UiInput required value={draft.titleKo} disabled={editingEvent?.isReadOnly} onChange={(event) => setDraft((current) => ({ ...current, titleKo: event.currentTarget.value }))} />
-          </AdminFormField>
-          {!editingEvent?.isReadOnly ? (
-            <>
-              <AdminFormField label="영문 제목">
-                <UiInput value={draft.titleEn} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.currentTarget.value }))} />
-              </AdminFormField>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <AdminFormField label="시작">
-                  <UiInput required type="datetime-local" value={draft.startAt} onChange={(event) => setDraft((current) => ({ ...current, startAt: event.currentTarget.value }))} />
-                </AdminFormField>
-                <AdminFormField label="종료">
-                  <UiInput required type="datetime-local" value={draft.endAt} onChange={(event) => setDraft((current) => ({ ...current, endAt: event.currentTarget.value }))} />
-                </AdminFormField>
-              </div>
-              <AdminFormField label="장소">
-                <UiInput value={draft.location} onChange={(event) => setDraft((current) => ({ ...current, location: event.currentTarget.value }))} />
-              </AdminFormField>
-              <AdminFormField label="설명">
-                <UiTextarea rows={4} value={draft.descriptionKo} onChange={(event) => setDraft((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} />
-              </AdminFormField>
-            </>
-          ) : (
-            <AdminFormField label="기간">
-              <UiInput value={editingEvent ? formatPeriod(editingEvent) : ""} disabled />
+            <AdminFormField label="제목">
+              <UiInput value={editingEvent.titleKo} disabled />
             </AdminFormField>
-          )}
-          <AdminFormField label="분류">
-            <AdminSelectDropdown
-              ariaLabel="일정 분류"
-              value={draft.category}
-              onChange={(value) => setDraft((current) => ({ ...current, category: value as CategoryDraft }))}
-              options={[
-                { value: "EVENT", label: "행사" },
-                { value: "ACADEMIC", label: "학사일정" },
-              ]}
-            />
-          </AdminFormField>
-          <AdminFormField label="공개 상태">
-            <SegmentedControl
-              ariaLabel="일정 공개 상태"
-              value={draft.visibility}
-              onChange={(value) => setDraft((current) => ({ ...current, visibility: value }))}
-              options={[
-                { value: "visible", label: "노출" },
-                { value: "hidden", label: "숨김" },
-              ]}
-            />
-          </AdminFormField>
-        </form>
+            <AdminFormField label="기간">
+              <UiInput value={formatPeriod(editingEvent)} disabled />
+            </AdminFormField>
+            <AdminFormField label="표시 분류">
+              <UiInput value="행사" disabled />
+            </AdminFormField>
+            {editingEvent.articleId ? (
+              <Button asChild variant="outline" className="w-full">
+                <Link to={`/events/${editingEvent.articleId}`}>행사 게시글 열기</Link>
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <form id="calendar-management-form" className="space-y-5" onSubmit={(event) => void saveEvent(event)}>
+            {editingEvent?.isReadOnly ? (
+              <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <CalendarDays className="mt-0.5 size-4 shrink-0 text-[#344054]" aria-hidden="true" />
+                <p className="text-sm font-normal leading-5 text-[#344054]">KAIST 학사일정의 제목과 기간은 자동 동기화됩니다. 이 화면에서는 표시 분류와 공개 여부만 변경할 수 있습니다. 공휴일은 날짜 기준으로 자동 분류됩니다.</p>
+              </div>
+            ) : null}
+            <AdminFormField label="제목">
+              <UiInput required value={draft.titleKo} disabled={editingEvent?.isReadOnly} onChange={(event) => setDraft((current) => ({ ...current, titleKo: event.currentTarget.value }))} />
+            </AdminFormField>
+            {!editingEvent?.isReadOnly ? (
+              <>
+                <AdminFormField label="영문 제목">
+                  <UiInput value={draft.titleEn} onChange={(event) => setDraft((current) => ({ ...current, titleEn: event.currentTarget.value }))} />
+                </AdminFormField>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[#344054]">
+                    <UiInput
+                      type="checkbox"
+                      checked={draft.isAllDay}
+                      onChange={(event) => {
+                        const isAllDay = event.currentTarget.checked;
+                        setDraft((current) => ({
+                          ...current,
+                          isAllDay,
+                          startAt: switchCalendarDateInput(current.startAt, isAllDay),
+                          endAt: switchCalendarDateInput(current.endAt, isAllDay, true),
+                        }));
+                      }}
+                      className="size-4 accent-[#007a4d]"
+                    />
+                    종일
+                  </label>
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[#344054]">
+                    <UiInput
+                      type="checkbox"
+                      checked={draft.isAlways}
+                      onChange={(event) => setDraft((current) => ({ ...current, isAlways: event.currentTarget.checked }))}
+                      className="size-4 accent-[#007a4d]"
+                    />
+                    상시
+                  </label>
+                  {draft.isAlways ? <span className="text-xs font-normal text-slate-500">기간 대신 상시 일정으로 표시합니다.</span> : null}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <AdminFormField label="시작">
+                    <UiInput required type={draft.isAllDay ? "date" : "datetime-local"} disabled={draft.isAlways} value={draft.startAt} onChange={(event) => setDraft((current) => ({ ...current, startAt: event.currentTarget.value }))} />
+                  </AdminFormField>
+                  <AdminFormField label="종료">
+                    <UiInput required type={draft.isAllDay ? "date" : "datetime-local"} disabled={draft.isAlways} value={draft.endAt} onChange={(event) => setDraft((current) => ({ ...current, endAt: event.currentTarget.value }))} />
+                  </AdminFormField>
+                </div>
+                <AdminFormField label="장소">
+                  <UiInput value={draft.location} onChange={(event) => setDraft((current) => ({ ...current, location: event.currentTarget.value }))} />
+                </AdminFormField>
+                <AdminFormField label="설명">
+                  <UiTextarea rows={4} value={draft.descriptionKo} onChange={(event) => setDraft((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} />
+                </AdminFormField>
+              </>
+            ) : (
+              <AdminFormField label="기간">
+                <UiInput value={editingEvent ? formatPeriod(editingEvent) : ""} disabled />
+              </AdminFormField>
+            )}
+            <AdminFormField label="표시 분류" hint="행사·학사일정·공휴일은 원본 출처와 별개로 캘린더에서 보이는 분류입니다.">
+              <AdminSelectDropdown
+                ariaLabel="표시 분류"
+                value={draft.category}
+                onChange={(value) => setDraft((current) => ({ ...current, category: value as CategoryDraft }))}
+                options={[
+                  { value: "EVENT", label: "행사" },
+                  { value: "ACADEMIC", label: "학사일정" },
+                  { value: "HOLIDAY", label: "공휴일" },
+                ]}
+              />
+            </AdminFormField>
+            <AdminFormField label="공개 상태">
+              <SegmentedControl
+                ariaLabel="일정 공개 상태"
+                value={draft.visibility}
+                onChange={(value) => setDraft((current) => ({ ...current, visibility: value }))}
+                options={[
+                  { value: "visible", label: "노출" },
+                  { value: "hidden", label: "숨김" },
+                ]}
+              />
+            </AdminFormField>
+          </form>
+        )}
       </AdminDrawer>
     </AdminPageShell>
   );

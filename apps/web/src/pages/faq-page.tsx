@@ -154,6 +154,7 @@ export function FaqPage() {
       <Header />
       <PageMain>
         <PageHeader
+          className="mb-0"
           title="FAQ"
           titleId="faq-page-title"
         />
@@ -195,16 +196,16 @@ export function FaqPage() {
                   minHeightClassName="min-h-48"
                 />
               ) : (
-                <div className="min-h-48 border-t-2 border-t-brand-primary">
+                <div className="min-h-48">
                   {faqSections.map((section, index) => (
                     <section
                       key={section.key}
                       aria-labelledby={`faq-section-${section.key}`}
-                      className={index > 0 ? "mt-4 border-t border-slate-100 pt-4" : undefined}
+                      className={index > 0 ? "border-t border-slate-100" : undefined}
                     >
                       <h3
                         id={`faq-section-${section.key}`}
-                        className="border-b border-emerald-100 border-l-4 border-l-brand-primary bg-emerald-50/70 px-4 py-3 text-sm font-semibold tracking-tight text-slate-800 sm:px-6"
+                        className="border-b border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm font-semibold tracking-tight text-slate-800 sm:px-6"
                       >
                         {lang === "ko" ? section.titleKo : section.titleEn}
                       </h3>

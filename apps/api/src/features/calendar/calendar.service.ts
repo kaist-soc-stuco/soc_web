@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { and, eq, gte, ilike, inArray, lte, or } from "drizzle-orm";
+import { and, eq, gte, ilike, inArray, isNotNull, lte, or } from "drizzle-orm";
 import type {
   CalendarEventCreateRequest,
   CalendarEventCategory,
@@ -112,7 +112,86 @@ export class CalendarService {
   }
 
   async listManagedEvents(): Promise<CalendarEventListResponse> {
-    return this.listManualEvents();
+    const [manualEvents, articleEvents] = await Promise.all([
+      this.listManualEvents(),
+      this.listManagedArticleEvents(),
+    ]);
+
+    return {
+      items: [...manualEvents.items, ...articleEvents].sort(
+        (a, b) => a.startAt.localeCompare(b.startAt) || a.titleKo.localeCompare(b.titleKo, "ko"),
+      ),
+    };
+  }
+
+  /**
+   * 행사 게시글은 `article`에 일정 정보가 저장되고 `calendar_event`에는
+   * 미러링되지 않습니다. 관리 화면에서는 두 저장소를 한 목록으로 보여주되,
+   * 게시글 일정은 행사 게시글에서 관리할 수 있도록 읽기 전용 항목으로
+   * 표시합니다.
+   */
+  private async listManagedArticleEvents(): Promise<CalendarEventRecord[]> {
+    const rows = await this.db
+      .select({
+        articleId: articles.articleId,
+        authorUserId: articles.authorUserId,
+        titleKo: articles.titleKo,
+        titleEn: articles.titleEn,
+        eventDescriptionKo: articles.eventDescriptionKo,
+        eventDescriptionEn: articles.eventDescriptionEn,
+        eventStartDate: articles.eventStartDate,
+        eventEndDate: articles.eventEndDate,
+        eventLocation: articles.eventLocation,
+        status: articles.status,
+        createdAt: articles.postedAt,
+        updatedAt: articles.updatedAt,
+      })
+      .from(articles)
+      .innerJoin(boards, eq(articles.boardId, boards.boardId))
+      .where(
+        and(
+          eq(boards.code, "_EVENT"),
+          eq(boards.isActive, true),
+          inArray(articles.status, ["PUBLISHED", "HIDDEN"]),
+          isNotNull(articles.eventStartDate),
+          isNotNull(articles.eventEndDate),
+        ),
+      )
+      .orderBy(articles.eventStartDate, articles.articleId);
+
+    return rows.flatMap((row) => {
+      if (!row.eventStartDate || !row.eventEndDate) return [];
+
+      return [{
+        calendarEventId: `article-${row.articleId}`,
+        articleId: String(row.articleId),
+        titleKo: row.titleKo,
+        titleEn: row.titleEn,
+        descriptionKo: row.eventDescriptionKo,
+        descriptionEn: row.eventDescriptionEn,
+        startAt: msToIso(row.eventStartDate.valueOf()),
+        endAt: msToIso(row.eventEndDate.valueOf()),
+        location: row.eventLocation,
+        sourceUid: null,
+        sourceType: "ARTICLE" as const,
+        sourceYear: null,
+        isReadOnly: true,
+        isActive: true,
+        isHiddenByAdmin: row.status === "HIDDEN",
+        isAllDay: false,
+        isAlways: false,
+        category: "EVENT" as const,
+        categoryOverride: null,
+        createdByUserId: row.authorUserId,
+        googleCalendarId: null,
+        googleEventId: null,
+        googleSyncStatus: "NOT_CONFIGURED" as const,
+        googleSyncedAt: null,
+        googleSyncError: null,
+        createdAt: msToIso(row.createdAt.valueOf()),
+        updatedAt: msToIso(row.updatedAt.valueOf()),
+      }];
+    });
   }
 
   async createManualEvent(
@@ -128,6 +207,8 @@ export class CalendarService {
         descriptionEn: input.descriptionEn ?? null,
         startAt: this.parseDate(input.startAt),
         endAt: this.parseDate(input.endAt),
+        isAllDay: input.isAllDay ?? false,
+        isAlways: input.isAlways ?? false,
         location: input.location ?? null,
         sourceUid: input.sourceUid ?? null,
         sourceType: "MANUAL",
@@ -162,6 +243,8 @@ export class CalendarService {
         ...(input.descriptionEn !== undefined ? { descriptionEn: input.descriptionEn ?? null } : {}),
         ...(input.startAt !== undefined ? { startAt } : {}),
         ...(input.endAt !== undefined ? { endAt } : {}),
+        ...(input.isAllDay !== undefined ? { isAllDay: input.isAllDay } : {}),
+        ...(input.isAlways !== undefined ? { isAlways: input.isAlways } : {}),
         ...(input.location !== undefined ? { location: input.location ?? null } : {}),
         ...(input.sourceUid !== undefined ? { sourceUid: input.sourceUid ?? null } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
@@ -368,7 +451,7 @@ export class CalendarService {
         "BEGIN:VEVENT",
         `UID:${escapeIcsText(row.sourceUid ?? `soc-${row.calendarEventId}@soc.kaist.ac.kr`)}`,
         `DTSTAMP:${formatIcsDate(nowDate())}`,
-        ...(row.sourceType === "KAIST_ACADEMIC"
+        ...(row.isAllDay || row.sourceType === "KAIST_ACADEMIC"
           ? [
               `DTSTART;VALUE=DATE:${formatIcsDateOnly(row.startAt)}`,
               `DTEND;VALUE=DATE:${formatIcsDateOnly(addSeoulDays(row.endAt, 1))}`,
@@ -643,6 +726,8 @@ export class CalendarService {
       dateType: "open" as const,
       startAt: msToIso(row.startAt.valueOf()),
       endAt: msToIso(row.endAt.valueOf()),
+      isAllDay: row.isAllDay,
+      isAlways: row.isAlways,
       location: row.location,
     }));
   }
@@ -673,6 +758,8 @@ export class CalendarService {
       descriptionEn: row.descriptionEn,
       startAt: msToIso(row.startAt.valueOf()),
       endAt: msToIso(row.endAt.valueOf()),
+      isAllDay: row.isAllDay,
+      isAlways: row.isAlways,
       location: row.location,
       sourceUid: row.sourceUid,
       sourceType: row.sourceType === "KAIST_ACADEMIC" ? "KAIST_ACADEMIC" : "MANUAL",

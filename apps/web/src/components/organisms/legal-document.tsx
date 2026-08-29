@@ -651,7 +651,7 @@ function localized(value: LegalText, lang: Language): string {
 
 function LegalSectionView({ lang, section }: { lang: Language; section: LegalSection }) {
   return (
-    <section id={section.id} className="scroll-mt-24 select-text px-5 py-7 md:px-8">
+    <section id={section.id} className="scroll-mt-24 break-words select-text px-5 py-7 md:px-8">
       <div className="min-w-0">
         <h2 className="text-lg font-semibold tracking-tight text-app-text-strong">
           {lang === "ko"
@@ -711,10 +711,13 @@ export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
     <PageShell>
       <Header />
       <PageMain>
-        <PageHeader title={localized(document.title, lang)} />
+        <PageHeader
+          title={localized(document.title, lang)}
+          containerClassName="max-w-[var(--ui-legal-max-width)]"
+        />
 
         <PageContainer className="max-w-[var(--ui-legal-max-width)] pb-12">
-          <article className="overflow-hidden rounded-[var(--ui-card-radius)] border border-slate-200 bg-white shadow-card">
+          <article className="break-words overflow-hidden rounded-[var(--ui-card-radius)] border border-slate-200 bg-white shadow-card">
             <header className="border-b border-slate-200 px-5 py-6 md:px-8">
               <p className="text-sm leading-6 text-app-text-strong">
                 <span className="font-semibold">[{localized(document.versionLabel, lang)}]</span>

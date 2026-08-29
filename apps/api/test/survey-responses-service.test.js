@@ -40,6 +40,7 @@ function createService({
   surveyRecord = survey(),
 } = {}) {
   const insertSubmissionCalls = [];
+  const sheetQueueCalls = [];
   const updateSubmissionCalls = [];
 
   const responsesRepo = {
@@ -103,9 +104,13 @@ function createService({
     responsesRepo,
     { findById: async () => surveyRecord },
     { getStudentFeeStatus: async () => feeStatus },
+    undefined,
+    undefined,
+    undefined,
+    { enqueueRefresh: async (surveyId) => sheetQueueCalls.push(surveyId) },
   );
 
-  return { insertSubmissionCalls, service, updateSubmissionCalls };
+  return { insertSubmissionCalls, service, sheetQueueCalls, updateSubmissionCalls };
 }
 
 async function expectHttpError(promise, ExceptionClass, message) {
@@ -207,8 +212,8 @@ test("rejects submissions once capacity is full", async () => {
   assert.equal(insertSubmissionCalls.length, 1);
 });
 
-test("stores valid submissions with the authenticated user id", async () => {
-  const { insertSubmissionCalls, service } = createService({
+test("stores valid submissions and queues Sheets without calling Google inline", async () => {
+  const { insertSubmissionCalls, service, sheetQueueCalls } = createService({
     surveyRecord: survey({ feePayersOnly: true, maxResponses: 10 }),
   });
 
@@ -222,6 +227,7 @@ test("stores valid submissions with the authenticated user id", async () => {
   });
   assert.equal(result.id, "response-1");
   assert.equal(result.answers.length, 1);
+  assert.deepEqual(sheetQueueCalls, ["survey-1"]);
 });
 
 test("rejects response edits when the survey does not allow editing", async () => {
@@ -237,8 +243,8 @@ test("rejects response edits when the survey does not allow editing", async () =
   assert.equal(updateSubmissionCalls.length, 0);
 });
 
-test("updates the caller's existing response when editing is allowed", async () => {
-  const { service, updateSubmissionCalls } = createService({
+test("updates the caller's existing response and queues Sheets", async () => {
+  const { service, sheetQueueCalls, updateSubmissionCalls } = createService({
     existingResponse: { id: "existing-response" },
     surveyRecord: survey({ allowResponseEdit: true }),
   });
@@ -254,4 +260,5 @@ test("updates the caller's existing response when editing is allowed", async () 
   });
   assert.equal(result.id, "existing-response");
   assert.equal(result.answers.length, 1);
+  assert.deepEqual(sheetQueueCalls, ["survey-1"]);
 });

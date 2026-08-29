@@ -221,6 +221,7 @@ test("note-only fee updates remain visible in the existing audit trail", async (
     updatedAt: "2026-07-15T00:00:00.000Z",
   };
   let auditEntry;
+  const queuedResources = [];
   const service = new UsersService(
     {
       updateStudentFeeStatus: async () => record,
@@ -229,6 +230,10 @@ test("note-only fee updates remain visible in the existing audit trail", async (
       record: async (entry) => {
         auditEntry = entry;
       },
+    },
+    undefined,
+    {
+      enqueue: async (resourceType) => queuedResources.push(resourceType),
     },
   );
 
@@ -245,4 +250,5 @@ test("note-only fee updates remain visible in the existing audit trail", async (
     input: { note: "updated note" },
     record,
   });
+  assert.deepEqual(queuedResources, ["STUDENT_FEES"]);
 });

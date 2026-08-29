@@ -974,7 +974,7 @@ function RoadmapOfferingControls({
           onChange={(event) => onOfferedOnlyChange(event.currentTarget.checked)}
           className="size-3.5 accent-emerald-700"
         />
-        <span>{lang === "ko" ? "개설 과목만 보기" : "Show offered only"}</span>
+        <span>{lang === "ko" ? "이번 학기 개설 과목만 보기" : "Show courses offered this semester"}</span>
       </label>
     </div>
   );

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
   bootChannelTalk,
@@ -14,16 +15,39 @@ export function ChannelTalkProvider({ children }: PropsWithChildren) {
   const location = useLocation();
   const isAdminRoute = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
   const hasBootedRef = useRef(false);
+  const previousIdentityRef = useRef<string | null>(null);
+  const { data: session, isPending: isSessionPending } = useCurrentSession();
+  const channelTalkIdentity =
+    session?.authenticated && session.userId ? session.userId : "anonymous";
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
   const { data } = useQuery({
-    queryKey: ["channel-talk", "config"],
+    queryKey: ["channel-talk", "config", channelTalkIdentity],
     queryFn: () => apiClient.getChannelTalkConfig(),
+    enabled: !isSessionPending,
     retry: false,
-    staleTime: 5 * 60 * 1000,
+    // Authentication changes must always revalidate the server-generated
+    // memberId/memberHash instead of reusing an earlier identity's config.
+    staleTime: 0,
   });
+
+  useEffect(() => {
+    if (isSessionPending) return;
+
+    const previousIdentity = previousIdentityRef.current;
+    previousIdentityRef.current = channelTalkIdentity;
+
+    if (
+      previousIdentity !== null &&
+      previousIdentity !== channelTalkIdentity &&
+      hasBootedRef.current
+    ) {
+      shutdownChannelTalk();
+      hasBootedRef.current = false;
+    }
+  }, [channelTalkIdentity, isSessionPending]);
 
   useEffect(() => {
     if (isAdminRoute) {
