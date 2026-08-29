@@ -47,6 +47,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 const RECIPIENT_TYPES: ReadonlyArray<{
   value: SendBulkEmailRequest["recipientType"];
@@ -124,7 +125,6 @@ const RECIPIENT_FILTER_GROUPS: ReadonlyArray<{
     options: [
       { kind: "recipientType", value: "PAID_STUDENTS", label: "납부" },
       { kind: "recipientType", value: "UNPAID_STUDENTS", label: "미납부" },
-      { kind: "recipientType", value: "ALL", label: "전체 학생" },
     ],
   },
   {
@@ -603,6 +603,35 @@ function BulkEmailPageContent() {
     }
   };
 
+  const handleInlineImageUpload = async (file: File): Promise<string | null> => {
+    if (!file.type.startsWith("image/")) {
+      setOperationError("본문 이미지는 이미지 파일만 첨부할 수 있습니다.");
+      return null;
+    }
+    try {
+      setUploading(true);
+      setOperationError(null);
+      const asset = await apiClient.uploadAsset(file);
+      setAttachments((previous) =>
+        [
+          ...previous,
+          {
+            assetId: asset.assetId,
+            filename: asset.originalFilename,
+            mimeType: asset.mimeType,
+            sizeBytes: asset.sizeBytes,
+          },
+        ].slice(0, 10),
+      );
+      return resolveAssetUrl(asset.storageKey);
+    } catch {
+      setOperationError("본문 이미지를 업로드하지 못했습니다.");
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const dismissReview = () => {
     if (sending || testSending) return;
     setReviewOpen(false);
@@ -756,6 +785,7 @@ function BulkEmailPageContent() {
                   content={content}
                   fileInputRef={fileInputRef}
                   lang="ko"
+                  onImageUpload={handleInlineImageUpload}
                   onChange={(value) => {
                     setContent(value);
                     setContentType("html");

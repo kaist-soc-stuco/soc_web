@@ -380,7 +380,7 @@ export function Header({ variant = "default" }: HeaderProps) {
     <header
       className={
         variant === "home"
-          ? "site-header-home absolute left-0 top-0 z-50 w-full"
+          ? "site-header-home sticky top-0 z-50 w-full"
           : "sticky top-0 z-50 shrink-0 border-b border-[var(--ui-menu-divider)] bg-white"
       }
       onMouseLeave={() => setHoveredIndex(null)}

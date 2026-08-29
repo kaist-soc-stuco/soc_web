@@ -12,6 +12,7 @@ import {
   boards,
   comments,
   contentBlocks,
+  executiveContactDepartments,
   executiveContacts,
   permissions,
   roleGroupPermissions,
@@ -1083,13 +1084,28 @@ async function seedAboutPageContent(seedAuthorId: string) {
     },
   ]);
 
+  await db
+    .insert(executiveContactDepartments)
+    .values([
+      { nameKo: "회장단", nameEn: "Presidium", sortOrder: 0, isActive: true },
+      { nameKo: "기획국", nameEn: "Planning Bureau", sortOrder: 1, isActive: true },
+      { nameKo: "복지국", nameEn: "Welfare Bureau", sortOrder: 2, isActive: true },
+      { nameKo: "홍보국", nameEn: "Communications Bureau", sortOrder: 3, isActive: true },
+    ])
+    .onConflictDoUpdate({
+      target: executiveContactDepartments.nameKo,
+      set: { nameEn: sql`excluded.name_en`, isActive: true, updatedAt: new Date() },
+    });
+
   await db.insert(executiveContacts).values([
     {
       nameKo: "김성찬",
       nameEn: "Seongchan Kim",
+      departmentKo: "회장단",
+      departmentEn: "Presidium",
       roleKo: "회장",
       roleEn: "President",
-      gender: null,
+      studentNumber: "20261234",
       cohort: 26,
       email: "president@cs.kaist.ac.kr",
       phoneNumber: null,
@@ -1099,9 +1115,11 @@ async function seedAboutPageContent(seedAuthorId: string) {
     {
       nameKo: "이서윤",
       nameEn: "Seoyoon Lee",
+      departmentKo: "기획국",
+      departmentEn: "Planning Bureau",
       roleKo: "기획국장",
       roleEn: "Planning Director",
-      gender: null,
+      studentNumber: "20251234",
       cohort: 25,
       email: "planning@cs.kaist.ac.kr",
       phoneNumber: null,
@@ -1111,9 +1129,11 @@ async function seedAboutPageContent(seedAuthorId: string) {
     {
       nameKo: "박도현",
       nameEn: "Dohyun Park",
+      departmentKo: "복지국",
+      departmentEn: "Welfare Bureau",
       roleKo: "복지국장",
       roleEn: "Welfare Director",
-      gender: null,
+      studentNumber: "20251235",
       cohort: 25,
       email: "welfare@cs.kaist.ac.kr",
       phoneNumber: null,
@@ -1123,9 +1143,11 @@ async function seedAboutPageContent(seedAuthorId: string) {
     {
       nameKo: "최민아",
       nameEn: "Mina Choi",
+      departmentKo: "홍보국",
+      departmentEn: "Communications Bureau",
       roleKo: "홍보국장",
       roleEn: "Communications Director",
-      gender: null,
+      studentNumber: "20261235",
       cohort: 26,
       email: "pr@cs.kaist.ac.kr",
       phoneNumber: null,

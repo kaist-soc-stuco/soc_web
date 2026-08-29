@@ -620,9 +620,8 @@ const ContactFieldsSchema = z.object({
   departmentEn: z.string().trim().max(100).nullable().optional(),
   roleKo: RequiredContactTextSchema,
   roleEn: RequiredContactTextSchema,
-  avatarStorageKey: z.string().regex(/^asset:\d+$/).nullable().optional(),
-  gender: z.string().trim().max(20).nullable().optional(),
-  cohort: z.number().int().positive().max(100).nullable().optional(),
+  studentNumber: z.string().trim().max(30).nullable().optional(),
+  cohort: z.number().int().positive().max(3000).nullable().optional(),
   email: z.string().email().or(z.literal("")).nullable().optional(),
   phoneNumber: z.string().max(50).nullable().optional(),
   privacyConsented: z.boolean(),
@@ -655,6 +654,15 @@ export const BulkImportContactsSchema = z.object({
   items: z.array(CreateContactSchema).min(1).max(500),
   replaceExisting: z.boolean().default(false),
 });
+
+export const CreateContactDepartmentSchema = z.object({
+  nameKo: RequiredContactTextSchema,
+  nameEn: z.string().trim().max(100).default(""),
+  sortOrder: z.number().int().min(0).optional(),
+  isActive: z.boolean().default(true),
+});
+
+export const UpdateContactDepartmentSchema = CreateContactDepartmentSchema.partial();
 
 // ─── Bulk Email ──────────────────────────────────────────────────────────────
 

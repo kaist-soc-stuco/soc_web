@@ -61,7 +61,7 @@ export function BoardCategoryNavigation({
             return (
               <PageTabLink
                 key={board.code}
-                to={board.code === "FAQ" ? "/about/faq" : `/board/${board.code}`}
+                to={board.code === "FAQ" ? "/board/faq" : `/board/${board.code}`}
                 active={isActive}
               >
                 {getBoardLabelFromMetadata(board, board.code, lang)}

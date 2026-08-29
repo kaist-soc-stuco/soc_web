@@ -43,9 +43,11 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
     handleCreateReply,
     handleDeleteArticle,
     handleHideArticle,
+    handleRestoreArticle,
     handleDeleteComment,
     handleUpdateComment,
     handleHideComment,
+    handleRestoreComment,
     handleSetCommentEngagement,
     handleSetArticleEngagement,
     handleShareArticle,
@@ -166,6 +168,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             lang={lang}
             onDeleteArticle={() => void handleDeleteArticle()}
             onHideArticle={() => { setHideReason(""); setHideDialogOpen(true); }}
+            onRestoreArticle={() => void handleRestoreArticle()}
             onShare={() => void handleShareArticle()}
             onToggle={(kind, active) =>
               void handleSetArticleEngagement(kind, active)
@@ -207,6 +210,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
             onCreateReply={handleCreateReply}
             onDeleteComment={handleDeleteComment}
             onHideComment={handleHideComment}
+            onRestoreComment={handleRestoreComment}
             onCommentPageChange={setCommentPage}
             onUpdateComment={handleUpdateComment}
             onSetCommentEngagement={handleSetCommentEngagement}

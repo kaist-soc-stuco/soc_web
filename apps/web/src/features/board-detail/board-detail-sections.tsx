@@ -44,6 +44,7 @@ interface ArticleCardProps {
   lang: string;
   onDeleteArticle: () => void;
   onHideArticle: () => void;
+  onRestoreArticle: () => void;
   onShare: () => void;
   onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   posterAsset?: ArticleAssetItem;
@@ -67,6 +68,7 @@ export function BoardDetailArticleCard({
   lang,
   onDeleteArticle,
   onHideArticle,
+  onRestoreArticle,
   onShare,
   onToggle,
   posterAsset,
@@ -155,11 +157,17 @@ export function BoardDetailArticleCard({
                         </DropdownMenu.Item>
                       </>
                     ) : null}
-                    {canModerate && article.status === "PUBLISHED" ? (
+                    {canModerate ? (
                       <>
                         <DropdownMenu.Item asChild>
-                          <AdminActionMenuItem icon={<EyeOff />} tone="danger" onClick={onHideArticle}>
-                            {lang === "ko" ? "게시글 숨기기" : "Hide post"}
+                          <AdminActionMenuItem
+                            icon={article.status === "HIDDEN" ? <Eye /> : <EyeOff />}
+                            tone={article.status === "HIDDEN" ? "default" : "danger"}
+                            onClick={article.status === "HIDDEN" ? onRestoreArticle : onHideArticle}
+                          >
+                            {article.status === "HIDDEN"
+                              ? lang === "ko" ? "게시글 숨김 해제" : "Unhide post"
+                              : lang === "ko" ? "게시글 숨기기" : "Hide post"}
                           </AdminActionMenuItem>
                         </DropdownMenu.Item>
                       </>

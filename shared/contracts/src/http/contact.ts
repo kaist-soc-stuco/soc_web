@@ -1,8 +1,10 @@
 import type { z } from "zod";
 import type {
   BulkImportContactsSchema,
+  CreateContactDepartmentSchema,
   CreateContactSchema,
   ReorderContactsSchema,
+  UpdateContactDepartmentSchema,
   UpdateContactSchema,
 } from "../schemas.js";
 
@@ -14,8 +16,7 @@ export interface ContactRecord {
   departmentEn: string | null;
   roleKo: string;
   roleEn: string;
-  avatarStorageKey: string | null;
-  gender: string | null;
+  studentNumber: string | null;
   cohort: number | null;
   email: string | null;
   phoneNumber: string | null;
@@ -44,12 +45,40 @@ export interface ContactListResponse {
 
 export interface ContactListOptions {
   q?: string;
-  gender?: string;
   cohort?: number;
   department?: string;
   privacyConsented?: boolean;
   page?: number;
   pageSize?: number;
+}
+
+export interface ContactDepartmentRecord {
+  id: string;
+  nameKo: string;
+  nameEn: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateContactDepartmentRequest = z.infer<
+  typeof CreateContactDepartmentSchema
+>;
+
+export type UpdateContactDepartmentRequest = z.infer<
+  typeof UpdateContactDepartmentSchema
+>;
+
+export interface ContactDepartmentListResponse {
+  items: ContactDepartmentRecord[];
+}
+
+export interface ContactSpreadsheetSyncResponse {
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  syncedCount: number;
+  syncedAt: string;
 }
 
 export interface BulkImportContactsResponse {

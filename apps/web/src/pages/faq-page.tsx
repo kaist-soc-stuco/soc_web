@@ -110,7 +110,7 @@ export function FaqPage() {
                   minHeightClassName="min-h-48"
                 />
               ) : (
-                <div className="min-h-48 divide-y divide-slate-100">
+          <div className="min-h-48 divide-y divide-slate-100 border-t-2 border-t-brand-primary">
                   {filteredItems.map((item) => {
                     const isOpen = openItems.has(item.articleId);
                     const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;

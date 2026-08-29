@@ -10,7 +10,7 @@ export function HomePage() {
   const { lang } = useLanguage();
 
   return (
-    <div className="home-page-shell flex min-h-screen flex-col overflow-x-hidden bg-white">
+    <div className="home-page-shell flex min-h-screen flex-col overflow-x-clip bg-white">
       <Header variant="home" />
       <main className="channel-talk-safe-area flex-1">
         <Hero />

@@ -171,10 +171,11 @@
 }
 
 @layer components {
-  .site-header-home {
-    border-bottom: 1px solid rgb(255 255 255 / 0.14);
-    background: linear-gradient(to bottom, rgb(4 18 13 / 0.42), transparent);
-  }
+.site-header-home {
+  margin-bottom: calc(-1 * var(--ui-header-height));
+  border-bottom: 1px solid rgb(255 255 255 / 0.14);
+  background: linear-gradient(to bottom, rgb(4 18 13 / 0.42), transparent);
+}
 
   .site-header-home::after {
     display: none;

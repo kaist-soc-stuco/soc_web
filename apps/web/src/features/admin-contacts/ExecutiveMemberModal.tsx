@@ -1,22 +1,24 @@
-import { useEffect, useRef, useState } from "react";
-import type { ContactRecord } from "@soc/contracts";
-import { Image } from "lucide-react";
+import { useEffect, useState } from "react";
+import type {
+  AdminUserRecord,
+  ContactDepartmentRecord,
+  ContactRecord,
+} from "@soc/contracts";
 
 import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
-import { resolveAssetUrl } from "@/lib/asset-url";
 
 export interface ExecutiveMemberFormValues {
   nameKo: string;
   nameEn: string;
+  studentNumber: string;
   departmentKo: string;
   departmentEn: string;
   roleKo: string;
   roleEn: string;
-  avatarStorageKey: string | null;
-  gender: string;
   cohort: number | null;
   email: string;
   phoneNumber: string;
@@ -24,25 +26,30 @@ export interface ExecutiveMemberFormValues {
 
 interface ExecutiveMemberModalProps {
   contact: ContactRecord | null;
+  departments: ContactDepartmentRecord[];
   onClose: () => void;
   onDelete?: () => void | Promise<void>;
-  onUploadAvatar?: (file: File) => Promise<string>;
   onSave: (values: ExecutiveMemberFormValues) => Promise<void>;
+  onSearchPortalMembers: (query: string) => Promise<AdminUserRecord[]>;
   open: boolean;
   saving?: boolean;
+}
+
+function formatActivityYear(value: number | null | undefined): number | null {
+  if (!value) return null;
+  return value < 100 ? 2000 + value : value;
 }
 
 function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormValues {
   return {
     nameKo: contact?.nameKo ?? "",
     nameEn: contact?.nameEn ?? "",
+    studentNumber: contact?.studentNumber ?? "",
     departmentKo: contact?.departmentKo ?? "",
     departmentEn: contact?.departmentEn ?? "",
     roleKo: contact?.roleKo ?? "",
     roleEn: contact?.roleEn ?? "",
-    avatarStorageKey: contact?.avatarStorageKey ?? null,
-    gender: contact?.gender ?? "",
-    cohort: contact?.cohort ?? null,
+    cohort: formatActivityYear(contact?.cohort),
     email: contact?.email ?? "",
     phoneNumber: contact?.phoneNumber ?? "",
   };
@@ -50,25 +57,63 @@ function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormVal
 
 export function ExecutiveMemberModal({
   contact,
+  departments,
   onClose,
   onDelete,
-  onUploadAvatar,
   onSave,
+  onSearchPortalMembers,
   open,
   saving = false,
 }: ExecutiveMemberModalProps) {
   const [formData, setFormData] = useState<ExecutiveMemberFormValues>(() => getInitialValues(contact));
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [portalQuery, setPortalQuery] = useState("");
+  const [portalMembers, setPortalMembers] = useState<AdminUserRecord[]>([]);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
   const formId = "executive-member-form";
 
   useEffect(() => {
-    if (open) {
-      setFormData(getInitialValues(contact));
-      setAvatarError(null);
-    }
+    if (!open) return;
+    setFormData(getInitialValues(contact));
+    setPortalQuery("");
+    setPortalMembers([]);
+    setPortalError(null);
   }, [contact, open]);
+
+  useEffect(() => {
+    const query = portalQuery.trim();
+    if (!open || query.length < 2) {
+      setPortalMembers([]);
+      setPortalLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setPortalLoading(true);
+      void onSearchPortalMembers(query)
+        .then((members) => {
+          if (!cancelled) {
+            setPortalMembers(members);
+            setPortalError(null);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPortalMembers([]);
+            setPortalError("포털 회원을 검색하지 못했습니다.");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setPortalLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [onSearchPortalMembers, open, portalQuery]);
 
   const updateField = <K extends keyof ExecutiveMemberFormValues>(
     field: K,
@@ -77,18 +122,41 @@ export function ExecutiveMemberModal({
     setFormData((current) => ({ ...current, [field]: value }));
   };
 
-  const handleAvatarChange = async (file: File | undefined) => {
-    if (!file || !onUploadAvatar) return;
-    setAvatarError(null);
-    setAvatarUploading(true);
-    try {
-      updateField("avatarStorageKey", await onUploadAvatar(file));
-    } catch {
-      setAvatarError("프로필 이미지를 업로드하지 못했습니다.");
-    } finally {
-      setAvatarUploading(false);
-    }
+  const selectPortalMember = (member: AdminUserRecord) => {
+    const department = departments.find(
+      (item) => item.nameKo === member.departmentKo || (item.nameEn && item.nameEn === member.departmentEn),
+    );
+    setFormData((current) => ({
+      ...current,
+      nameKo: member.nameKo,
+      nameEn: member.nameEn ?? "",
+      studentNumber: member.stdNo ?? "",
+      departmentKo: department?.nameKo ?? "",
+      departmentEn: department?.nameEn ?? "",
+      email: member.email,
+      phoneNumber: member.phoneNumber ?? "",
+    }));
+    setPortalQuery(`${member.nameKo}${member.stdNo ? ` · ${member.stdNo}` : ""}`);
+    setPortalMembers([]);
+    setPortalError(
+      member.departmentKo && !department
+        ? "회원의 소속이 등록된 부서 목록에 없습니다. 부서를 먼저 등록한 뒤 선택해 주세요."
+        : null,
+    );
   };
+
+  const departmentOptions = [
+    { value: "", label: "부서 선택" },
+    ...departments
+      .filter((department) => department.isActive)
+      .map((department) => ({
+        value: department.nameKo,
+        label: department.nameEn ? `${department.nameKo} · ${department.nameEn}` : department.nameKo,
+      })),
+    ...(formData.departmentKo && !departments.some((department) => department.nameKo === formData.departmentKo)
+      ? [{ value: formData.departmentKo, label: `${formData.departmentKo} (현재 값)` }]
+      : []),
+  ];
 
   return (
     <AdminDrawer
@@ -102,15 +170,15 @@ export function ExecutiveMemberModal({
               type="button"
               variant="outline"
               onClick={() => void onDelete()}
-              disabled={saving || avatarUploading}
-              className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+              disabled={saving}
+              className="rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
             >
               삭제
             </Button>
           ) : <span />}
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving || avatarUploading}>취소</Button>
-            <Button type="submit" form={formId} disabled={saving || avatarUploading}>{saving ? "저장 중..." : "저장"}</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>취소</Button>
+            <Button type="submit" form={formId} disabled={saving}>{saving ? "저장 중..." : "저장"}</Button>
           </div>
         </div>
       }
@@ -123,65 +191,74 @@ export function ExecutiveMemberModal({
         }}
         className="scrollbar-hidden max-h-[70vh] space-y-5 overflow-y-auto"
       >
+        <AdminFormField label="포털 가입 회원 검색" hint="이름, 학번, 이메일로 검색한 뒤 회원을 선택하세요.">
+          <div className="relative">
+            <UiInput
+              value={portalQuery}
+              onChange={(event) => setPortalQuery(event.currentTarget.value)}
+              placeholder="포털 가입 회원 검색"
+              autoComplete="off"
+              className="box-border w-full focus-visible:border-brand-primary focus-visible:ring-2 focus-visible:ring-brand-primary/20"
+            />
+            {portalLoading ? <p className="mt-1 text-xs text-slate-500">검색 중...</p> : null}
+            {portalMembers.length > 0 ? (
+              <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-elevated">
+                {portalMembers.map((member) => (
+                  <button
+                    key={member.userId}
+                    type="button"
+                    onClick={() => selectPortalMember(member)}
+                    className="flex w-full items-start justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50"
+                  >
+                    <span className="min-w-0 truncate font-medium text-slate-800">
+                      {member.nameKo} {member.nameEn ? `(${member.nameEn})` : ""}
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-500">{member.stdNo ?? member.email}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {portalError ? <span className="text-xs font-normal leading-4 text-rose-600">{portalError}</span> : null}
+        </AdminFormField>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <AdminFormField label="이름 (한글) *">
-            <UiInput required value={formData.nameKo} onChange={(event) => updateField("nameKo", event.currentTarget.value)} placeholder="예: 김성찬" />
+            <UiInput required value={formData.nameKo} onChange={(event) => updateField("nameKo", event.currentTarget.value)} placeholder="예: 김성찬" className="box-border w-full" />
           </AdminFormField>
           <AdminFormField label="이름 (영문) *">
-            <UiInput required value={formData.nameEn} onChange={(event) => updateField("nameEn", event.currentTarget.value)} placeholder="예: Seongchan Kim" />
+            <UiInput required value={formData.nameEn} onChange={(event) => updateField("nameEn", event.currentTarget.value)} placeholder="예: Seongchan Kim" className="box-border w-full" />
           </AdminFormField>
-          <AdminFormField label="부서 (한글)">
-            <UiInput value={formData.departmentKo} onChange={(event) => updateField("departmentKo", event.currentTarget.value)} placeholder="예: 회장단" />
+          <AdminFormField label="학번">
+            <UiInput value={formData.studentNumber} readOnly placeholder="포털 회원 선택 시 자동 입력" className="box-border w-full bg-slate-50" />
           </AdminFormField>
-          <AdminFormField label="부서 (영문)">
-            <UiInput value={formData.departmentEn} onChange={(event) => updateField("departmentEn", event.currentTarget.value)} placeholder="예: Presidium" />
+          <AdminFormField label="활동 연도">
+            <UiInput type="number" min="1900" max="3000" value={formData.cohort ?? ""} onChange={(event) => updateField("cohort", event.currentTarget.value ? Number(event.currentTarget.value) : null)} placeholder="예: 2026" className="box-border w-full" />
+          </AdminFormField>
+          <AdminFormField label="부서">
+            <AdminSelectDropdown
+              value={formData.departmentKo}
+              onChange={(value) => {
+                const department = departments.find((item) => item.nameKo === value);
+                updateField("departmentKo", department?.nameKo ?? value);
+                updateField("departmentEn", department?.nameEn ?? "");
+              }}
+              ariaLabel="부서 선택"
+              options={departmentOptions}
+              className="w-full"
+            />
+          </AdminFormField>
+          <AdminFormField label="이메일">
+            <UiInput type="email" value={formData.email} onChange={(event) => updateField("email", event.currentTarget.value)} placeholder="name@kaist.ac.kr" className="box-border w-full" />
           </AdminFormField>
           <AdminFormField label="직책 (한글) *">
-            <UiInput required value={formData.roleKo} onChange={(event) => updateField("roleKo", event.currentTarget.value)} placeholder="예: 회장" />
+            <UiInput required value={formData.roleKo} onChange={(event) => updateField("roleKo", event.currentTarget.value)} placeholder="예: 회장" className="box-border w-full" />
           </AdminFormField>
           <AdminFormField label="직책 (영문) *">
-            <UiInput required value={formData.roleEn} onChange={(event) => updateField("roleEn", event.currentTarget.value)} placeholder="예: President" />
+            <UiInput required value={formData.roleEn} onChange={(event) => updateField("roleEn", event.currentTarget.value)} placeholder="예: President" className="box-border w-full" />
           </AdminFormField>
-        </div>
-
-        <div className="flex items-center gap-3 border-t border-slate-100 pt-5">
-          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-slate-400">
-            {formData.avatarStorageKey ? (
-              <img src={resolveAssetUrl(formData.avatarStorageKey)} alt="" className="size-full object-cover" />
-            ) : <Image aria-hidden="true" className="size-5" />}
-          </div>
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => avatarInputRef.current?.click()} disabled={!onUploadAvatar || avatarUploading}>
-                {avatarUploading ? "업로드 중..." : "프로필 이미지 선택"}
-              </Button>
-              <UiInput
-                ref={avatarInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={(event) => {
-                  void handleAvatarChange(event.currentTarget.files?.[0]);
-                  event.currentTarget.value = "";
-                }}
-              />
-            </div>
-            {avatarError ? <p className="text-xs font-medium text-rose-600">{avatarError}</p> : null}
-          </div>
-        </div>
-
-        <div className="grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
-          <AdminFormField label="이메일">
-            <UiInput type="email" value={formData.email} onChange={(event) => updateField("email", event.currentTarget.value)} placeholder="name@kaist.ac.kr" />
-          </AdminFormField>
-          <AdminFormField label="전화번호">
-            <UiInput value={formData.phoneNumber} onChange={(event) => updateField("phoneNumber", event.currentTarget.value)} placeholder="010-0000-0000" />
-          </AdminFormField>
-          <AdminFormField label="성별">
-            <UiInput value={formData.gender} onChange={(event) => updateField("gender", event.currentTarget.value)} placeholder="예: 여성" />
-          </AdminFormField>
-          <AdminFormField label="기수">
-            <UiInput type="number" min="1" value={formData.cohort ?? ""} onChange={(event) => updateField("cohort", event.currentTarget.value ? Number(event.currentTarget.value) : null)} placeholder="예: 26" />
+          <AdminFormField label="전화번호" className="sm:col-span-2">
+            <UiInput value={formData.phoneNumber} onChange={(event) => updateField("phoneNumber", event.currentTarget.value)} placeholder="010-0000-0000" className="box-border w-full" />
           </AdminFormField>
         </div>
 

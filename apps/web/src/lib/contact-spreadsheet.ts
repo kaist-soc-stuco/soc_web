@@ -7,7 +7,7 @@ export interface ParsedContactSpreadsheetRow {
   departmentEn: string;
   roleKo: string;
   roleEn: string;
-  gender: string;
+  studentNumber: string;
   cohort?: number;
   email: string;
   phoneNumber: string;
@@ -27,8 +27,8 @@ const HEADER_ALIASES: Record<keyof ParsedContactSpreadsheetRow, string[]> = {
   departmentEn: ["departmenten", "영문부서", "부서(영문)"],
   roleKo: ["roleko", "직책", "역할", "직책(한글)", "역할(한글)"],
   roleEn: ["roleen", "영문직책", "직책(영문)", "역할(영문)"],
-  gender: ["gender", "성별"],
-  cohort: ["cohort", "기수"],
+  studentNumber: ["studentnumber", "학번", "학생번호"],
+  cohort: ["cohort", "활동연도", "활동 연도", "기수"],
   email: ["email", "이메일", "메일"],
   phoneNumber: ["phonenumber", "phone", "전화번호", "연락처", "휴대전화"],
   privacyConsented: ["privacyconsented", "개인정보동의", "동의여부"],
@@ -106,7 +106,7 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
       departmentEn: value("departmentEn"),
       roleKo: value("roleKo"),
       roleEn: value("roleEn"),
-      gender: value("gender"),
+      studentNumber: value("studentNumber"),
       cohort: cohortText ? Number(cohortText) : undefined,
       email: value("email"),
       phoneNumber: value("phoneNumber"),
@@ -130,7 +130,7 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
       return;
     }
     if (row.cohort !== undefined && (!Number.isInteger(row.cohort) || row.cohort < 1)) {
-      errors.push(`${lineNumber}행: 기수는 1 이상의 정수여야 합니다.`);
+      errors.push(`${lineNumber}행: 활동 연도는 1 이상의 정수여야 합니다.`);
       return;
     }
 
@@ -141,6 +141,6 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
 }
 
 export const CONTACT_XLSX_TEMPLATE_ROWS = [
-  ["이름", "영문명", "부서", "영문부서", "직책", "영문직책", "성별", "기수", "이메일", "전화번호", "개인정보동의", "표시순서"],
-  ["홍길동", "Gildong Hong", "회장단", "Presidium", "회장", "President", "남", 26, "hong@example.com", "010-0000-0000", "동의", 10],
+  ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
+  ["홍길동", "Gildong Hong", "20261234", "회장단", "Presidium", "회장", "President", 2026, "hong@example.com", "010-0000-0000", "동의", 10],
 ] as const;

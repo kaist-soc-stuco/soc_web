@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ContactListOptions, ContactListResponse } from "@soc/contracts";
 import { AuditLogService } from "../audit/audit-log.service";
 import { ContactsRepository } from "./contacts.repository";
+import { UsersService } from "../users/users.service";
 import type {
   BulkImportContactsRequest,
   BulkImportContactsResponse,
@@ -9,6 +10,10 @@ import type {
   CreateContactRequest,
   ReorderContactsRequest,
   UpdateContactRequest,
+  ContactDepartmentListResponse,
+  ContactDepartmentRecord,
+  CreateContactDepartmentRequest,
+  UpdateContactDepartmentRequest,
 } from "@soc/contracts";
 
 @Injectable()
@@ -16,6 +21,7 @@ export class ContactsService {
   constructor(
     private readonly contactsRepo: ContactsRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly usersService: UsersService,
   ) {}
 
   async findAll(): Promise<ContactRecord[]> {
@@ -29,6 +35,47 @@ export class ContactsService {
   ): Promise<ContactListResponse> {
     await this.purgeRevoked(actorUserId);
     return this.contactsRepo.findManaged(input);
+  }
+
+  async findDepartments(includeInactive = false): Promise<ContactDepartmentListResponse> {
+    return this.contactsRepo.findDepartments(includeInactive);
+  }
+
+  async createDepartment(dto: CreateContactDepartmentRequest): Promise<ContactDepartmentRecord> {
+    try {
+      return await this.contactsRepo.insertDepartment(dto);
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new ConflictException("contact_department_exists");
+      throw error;
+    }
+  }
+
+  async updateDepartment(
+    id: string,
+    dto: UpdateContactDepartmentRequest,
+  ): Promise<ContactDepartmentRecord> {
+    try {
+      const department = await this.contactsRepo.updateDepartment(id, dto);
+      if (!department) throw new NotFoundException("contact_department_not_found");
+      return department;
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new ConflictException("contact_department_exists");
+      throw error;
+    }
+  }
+
+  async deleteDepartment(id: string): Promise<void> {
+    const department = await this.contactsRepo.findDepartmentById(id);
+    if (!department) throw new NotFoundException("contact_department_not_found");
+    const linked = await this.contactsRepo.findManaged({ department: department.nameKo, page: 1, pageSize: 1 });
+    if (linked.total && linked.total > 0) {
+      throw new ConflictException("contact_department_in_use");
+    }
+    await this.contactsRepo.deleteDepartment(id);
+  }
+
+  async searchPortalMembers(query?: string, limit = 20) {
+    return this.usersService.searchUsers({ query, limit });
   }
 
   async exportManaged(
@@ -91,4 +138,13 @@ export class ContactsService {
       targetType: "executive_contact",
     });
   }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: string }).code === "23505",
+  );
 }
