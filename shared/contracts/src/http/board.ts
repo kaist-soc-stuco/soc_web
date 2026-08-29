@@ -86,6 +86,7 @@ export interface ArticleListItem {
   snippetKo?: string | null;
   snippetEn?: string | null;
   eventStartDate?: string | null;
+  eventLocation?: string | null;
   eventEndDate?: string | null;
   eventDescriptionKo?: string | null;
   eventDescriptionEn?: string | null;
@@ -156,6 +157,7 @@ export interface ArticleDetailResponse {
   survey?: SurveySummary | null;
   prevArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
   nextArticle?: { articleId: string; titleKo: string; titleEn?: string; postedAt: string; author: ArticleAuthorSummary; isAnonymous: boolean } | null;
+  eventLocation?: string | null;
   eventStartDate?: string | null;
   eventEndDate?: string | null;
   eventDescriptionKo?: string | null;
@@ -244,6 +246,7 @@ export interface ArticleDraftRecord {
   assets?: ArticleAssetRequest[];
   eventStartDate?: string | null;
   eventEndDate?: string | null;
+  eventLocation?: string | null;
   eventDescriptionKo?: string | null;
   eventDescriptionEn?: string | null;
   linkedSurveyId?: string | null;

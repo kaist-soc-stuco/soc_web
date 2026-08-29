@@ -298,7 +298,7 @@ function ShortcutHelpModal({
       open={open}
       onClose={onClose}
       title={isKorean ? "에디터 도움말" : "Editor help"}
-      className="max-w-xl"
+      className="max-w-5xl"
       bodyClassName="space-y-6"
     >
       <section className="space-y-3">
@@ -306,7 +306,7 @@ function ShortcutHelpModal({
           <h3 className="text-sm font-semibold text-slate-800">{isKorean ? "키보드 단축키" : "Keyboard shortcuts"}</h3>
           <p className="text-[length:var(--ui-text-caption-size)] text-slate-400">Windows/Linux: Ctrl · macOS: ⌘</p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {shortcuts.map(({ keys, label }) => (
             <div key={`${keys}-${label}`} className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
               <span className="text-sm text-slate-700">{label}</span>
@@ -318,7 +318,7 @@ function ShortcutHelpModal({
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-800">{isKorean ? "지원 서식" : "Supported formatting"}</h3>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {supportedFormats.map(({ detail, label }) => (
             <div key={label} className="rounded-lg border border-slate-100 px-3 py-2.5">
               <p className="text-sm font-medium text-slate-700">{label}</p>
@@ -333,7 +333,7 @@ function ShortcutHelpModal({
           <h3 className="text-sm font-semibold text-slate-800">{isKorean ? "빠른 입력 문법" : "Quick input syntax"}</h3>
           <p className="mt-1 text-xs text-slate-400">{isKorean ? "문장 맨 앞에서 입력한 뒤 Space 또는 Enter를 누르면 서식이 적용됩니다." : "Type at the start of a line, then press Space or Enter to apply formatting."}</p>
         </div>
-        <div className="space-y-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {inputRules.map(({ label, trigger }) => (
             <div key={trigger} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg bg-slate-50/70 px-3 py-2.5">
               <span className="text-sm text-slate-700">{label}</span>

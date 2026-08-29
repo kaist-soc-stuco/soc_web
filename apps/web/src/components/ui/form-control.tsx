@@ -31,20 +31,62 @@ export const UiInput = React.forwardRef<
 
 UiInput.displayName = "UiInput";
 
-export const UiTextarea = React.forwardRef<
-  HTMLTextAreaElement,
-  React.TextareaHTMLAttributes<HTMLTextAreaElement>
->(({ className, ...props }, ref) => (
-  <textarea
-    ref={ref}
-    data-slot="textarea"
-    className={cn(
-      "interaction-control select-text min-h-24 !rounded-[var(--ui-control-radius)] border border-slate-200 bg-white px-3 py-2.5 text-[length:var(--ui-control-font-size)] [font-weight:var(--ui-control-font-weight)] leading-relaxed text-[#172033] outline-none placeholder:font-normal placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70",
-      className,
-    )}
-    {...props}
-  />
-));
+type UiTextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  autoResize?: boolean;
+};
+
+export const UiTextarea = React.forwardRef<HTMLTextAreaElement, UiTextareaProps>(
+  ({ className, autoResize = true, defaultValue, onInput, value, ...props }, ref) => {
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+    const resize = React.useCallback(() => {
+      const element = textareaRef.current;
+      if (!autoResize || !element) return;
+      element.style.height = "auto";
+      element.style.height = `${element.scrollHeight}px`;
+    }, [autoResize]);
+
+    React.useLayoutEffect(() => {
+      resize();
+    }, [defaultValue, resize, value]);
+
+    const assignRef = React.useCallback(
+      (element: HTMLTextAreaElement | null) => {
+        textareaRef.current = element;
+        if (typeof ref === "function") {
+          ref(element);
+        } else if (ref) {
+          ref.current = element;
+        }
+      },
+      [ref],
+    );
+
+    const handleInput = React.useCallback(
+      (event: React.InputEvent<HTMLTextAreaElement>) => {
+        resize();
+        onInput?.(event);
+      },
+      [onInput, resize],
+    );
+
+    return (
+      <textarea
+        ref={assignRef}
+        data-slot="textarea"
+        value={value}
+        defaultValue={defaultValue}
+        onInput={autoResize ? handleInput : onInput}
+        className={cn(
+          "interaction-control select-text min-h-24 !rounded-[var(--ui-control-radius)] border border-slate-200 bg-white px-3 py-2.5 text-[length:var(--ui-control-font-size)] [font-weight:var(--ui-control-font-weight)] leading-relaxed text-[#172033] outline-none placeholder:font-normal placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70",
+          autoResize ? "resize-none overflow-hidden" : "resize-y overflow-y-auto",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
+);
 
 UiTextarea.displayName = "UiTextarea";
 

@@ -38,7 +38,7 @@ export function BeforeOpenView({
   lang: string;
 }) {
   return (
-    <div className="bg-white rounded-3xl border border-kaist-grey/15 p-12 shadow-md text-center flex flex-col items-center max-w-md mx-auto my-12 animate-in fade-in zoom-in-95 duration-300">
+    <div className="flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in zoom-in-95 duration-300 sm:p-10">
       <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 mb-6 border border-amber-100">
         <Clock className="w-8 h-8" />
       </div>
@@ -74,7 +74,7 @@ export function ClosedView({
       className={`${
         embedded
           ? "flex flex-col items-center text-center"
-          : "mx-auto my-12 flex max-w-md flex-col items-center rounded-3xl border border-kaist-grey/15 bg-white p-12 text-center shadow-md"
+          : "flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.04)] sm:p-10"
       } animate-in fade-in zoom-in-95 duration-300`}
     >
       <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 mb-6 border border-red-100">
@@ -133,7 +133,7 @@ export function SuccessView({
       className={`${
         embedded
           ? "flex w-full flex-col items-center text-center"
-          : "mx-auto my-10 flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.05)] sm:p-10"
+          : "flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.05)] sm:p-10"
       } animate-in fade-in zoom-in-95 duration-300`}
     >
       <div className="w-14 h-14 rounded-2xl bg-kaist-lightgreen/20 flex items-center justify-center text-kaist-darkgreen mb-5 border border-kaist-lightgreen/30">
@@ -190,7 +190,7 @@ export function AlreadySubmittedView({
       className={`${
         embedded
           ? "flex w-full flex-col items-center text-center"
-          : "mx-auto my-10 flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.05)] sm:p-10"
+          : "flex w-full flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-[0_6px_20px_rgba(15,23,42,0.05)] sm:p-10"
       } animate-in fade-in zoom-in-95 duration-300`}
     >
       <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 mb-5 border border-blue-100">

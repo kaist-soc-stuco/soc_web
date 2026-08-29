@@ -26,6 +26,7 @@ export interface BoardTemplateSnapshot {
   isEventAlwaysOpen: boolean;
   eventStartDate: string;
   eventEndDate: string;
+  eventLocation: string;
   eventDescriptionKo: string;
   eventDescriptionEn: string;
   selectedSurveyId: string;

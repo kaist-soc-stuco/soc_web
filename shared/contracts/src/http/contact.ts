@@ -56,6 +56,9 @@ export interface ContactDepartmentRecord {
   id: string;
   nameKo: string;
   nameEn: string;
+  descriptionKo: string;
+  descriptionEn: string;
+  inquiryEmail: string | null;
   sortOrder: number;
   isActive: boolean;
   createdAt: string;

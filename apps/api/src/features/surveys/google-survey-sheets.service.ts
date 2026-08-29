@@ -26,24 +26,46 @@ export class GoogleSurveySheetsService {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
 
-    if (!survey.spreadsheetId) {
-      const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
-        title: `${survey.titleKo} 응답 · ${survey.id}`,
-        sheetTitle: SHEET_TITLE,
-        purpose: "survey-results",
-        key: survey.id,
-      });
-      await this.surveysRepo.updateSpreadsheetConnection(surveyId, {
-        spreadsheetId: spreadsheet.spreadsheetId,
-        spreadsheetUrl: spreadsheet.spreadsheetUrl,
-        spreadsheetSyncStatus: "CONNECTED",
-      });
-    } else {
-      await this.sheets.ensureSpreadsheetInTargetFolder(survey.spreadsheetId);
+    try {
+      if (!survey.spreadsheetId) {
+        const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
+          title: `${survey.titleKo} 응답 · ${survey.id}`,
+          sheetTitle: SHEET_TITLE,
+          purpose: "survey-results",
+          key: survey.id,
+        });
+        await this.surveysRepo.updateSpreadsheetConnection(surveyId, {
+          spreadsheetId: spreadsheet.spreadsheetId,
+          spreadsheetUrl: spreadsheet.spreadsheetUrl,
+          spreadsheetSyncStatus: "CONNECTED",
+        });
+      } else {
+        await this.sheets.ensureSpreadsheetInTargetFolder(survey.spreadsheetId);
+      }
+    } catch (error) {
+      await this.markConnectionError(surveyId, error);
+      throw error;
     }
 
     await this.refresh(surveyId, true);
     return this.surveysRepo.findById(surveyId);
+  }
+
+  private async markConnectionError(surveyId: string, error: unknown): Promise<void> {
+    try {
+      await this.surveysRepo.updateSpreadsheetSyncState(surveyId, "ERROR");
+    } catch (stateError) {
+      this.logger.warn(
+        `Unable to persist survey sheet error state (${surveyId}): ${
+          stateError instanceof Error ? stateError.message : String(stateError)
+        }`,
+      );
+    }
+    this.logger.warn(
+      `Survey sheet connection failed (${surveyId}): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 
   async refresh(surveyId: string, throwOnError = false): Promise<void> {

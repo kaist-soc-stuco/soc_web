@@ -77,6 +77,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
   const [eventDescriptionKo, setEventDescriptionKo] = useState("");
   const [eventDescriptionEn, setEventDescriptionEn] = useState("");
   const [isAllDay, setIsAllDay] = useState(false);
@@ -149,6 +150,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
             ? isoToEventDateInput(res.eventEndDate, eventIsAllDay)
             : "",
         );
+        setEventLocation(res.eventLocation || "");
         setEventDescriptionKo(res.eventDescriptionKo || "");
         setEventDescriptionEn(res.eventDescriptionEn || "");
         setSelectedSurveyId(res.survey?.surveyId ?? "");
@@ -231,6 +233,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
       category === "_EVENT" && eventEndDate
         ? eventDateInputToIso(eventEndDate, isAllDay, true)
         : null,
+    eventLocation:
+      category === "_EVENT" ? eventLocation.trim() || null : null,
     eventDescriptionKo:
       category === "_EVENT" ? eventDescriptionKo || null : null,
     eventDescriptionEn:
@@ -295,6 +299,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     assets,
     eventStartDate,
     eventEndDate,
+    eventLocation,
     eventDescriptionKo,
     eventDescriptionEn,
     selectedSurveyId,
@@ -326,6 +331,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     assets,
     eventStartDate,
     eventEndDate,
+    eventLocation,
     eventDescriptionKo,
     eventDescriptionEn,
     selectedSurveyId,
@@ -524,6 +530,8 @@ export function useBoardEditPageController(forcedCategory?: string) {
               ? null
               : eventDateInputToIso(eventEndDate, isAllDay, true)
             : undefined,
+        eventLocation:
+          category === "_EVENT" ? eventLocation.trim() || undefined : undefined,
         eventDescriptionKo:
           category === "_EVENT" ? eventDescriptionKo.trim() : undefined,
         eventDescriptionEn:
@@ -630,6 +638,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
+    eventLocation,
     eventStartDate,
     fileInputRef,
     handleSubmit,
@@ -656,6 +665,7 @@ export function useBoardEditPageController(forcedCategory?: string) {
     setEventDescriptionKo,
     setEventDescriptionEn,
     setEventEndDate,
+    setEventLocation,
     setEventStartDate,
     setIsAnonymous,
     setIsAllDay,

@@ -46,6 +46,11 @@ export class ContactsController {
     return { items };
   }
 
+  @Get("departments")
+  async getContactDepartments(): Promise<ContactDepartmentListResponse> {
+    return this.contactsService.findDepartments(false);
+  }
+
   @Get("manage/export.xlsx")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

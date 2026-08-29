@@ -822,6 +822,7 @@ function BulkEmailPageContent() {
                   {editorModeTabs}
                 </div>
                 <UiTextarea
+                  autoResize={false}
                   aria-label="HTML 본문"
                   value={content}
                   onChange={(event) => {

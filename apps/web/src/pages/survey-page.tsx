@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Header } from "@/components/organisms/header";
 import { SurveyResponseForm } from "@/features/survey/survey-response-form";
@@ -12,6 +13,7 @@ import {
 import { SurveySummaryCard } from "@/features/survey/survey-summary-card";
 import { useSurveyPageController } from "@/features/survey/use-survey-page-controller";
 import { PageShell } from "@/components/ui/page-layout";
+import { useToast } from "@/components/ui/toast";
 
 export function SurveyPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +26,7 @@ export function SurveyPage() {
     lang,
     loadError,
     questionErrors,
+    resetResponseDraft,
     session,
     sessionLoading,
     submitError,
@@ -33,24 +36,36 @@ export function SurveyPage() {
     survey,
     visibleSectionIds,
   } = useSurveyPageController(id);
+  const { toast } = useToast();
+  const draftToastShownRef = useRef(false);
 
   const isPreview = Boolean(survey?.isPreview || (survey && !survey.isPublished));
   // A temporary consent session is authenticated for eligibility checks, but
   // it still cannot access persistent account features.
   const sessionAuthenticated = Boolean(session?.authenticated);
-  const shouldEmbedTerminalState = Boolean(
-    survey &&
-      !sessionLoading &&
-      (submitted ||
-        (!isPreview &&
-          (survey.computedState === "closed" ||
-            (sessionAuthenticated &&
-              survey.hasSubmitted &&
-              !survey.allowMultipleResponses &&
-              !survey.allowResponseEdit)))),
-  );
 
-  const renderBody = (embedded = false) => {
+  useEffect(() => {
+    if (!draftRestored) {
+      draftToastShownRef.current = false;
+      return;
+    }
+    if (draftToastShownRef.current || isPreview) return;
+
+    draftToastShownRef.current = true;
+    toast({
+      type: "info",
+      duration: 8000,
+      message:
+        lang === "ko"
+          ? "이전에 입력한 응답을 불러왔습니다."
+          : "Your saved response has been restored.",
+      action: {
+        label: lang === "ko" ? "새로 쓰기" : "Start over",
+        onClick: resetResponseDraft,
+      },
+    });
+  }, [draftRestored, isPreview, lang, resetResponseDraft, toast]);
+  const renderBody = () => {
     if (loadError) {
       return (
         <div className="bg-white border border-kaist-grey/15 rounded-3xl p-12 text-center text-red-500 font-bold shadow-xl">
@@ -58,17 +73,10 @@ export function SurveyPage() {
         </div>
       );
     }
-    if (!survey || sessionLoading) {
-      return (
-        <div className="bg-white border border-kaist-grey/15 rounded-3xl p-12 text-center text-kaist-grey/60 font-medium shadow-xl">
-          {lang === "ko" ? "불러오는 중..." : "Loading..."}
-        </div>
-      );
-    }
+    if (!survey || sessionLoading) return null;
     if (submitted) {
       return (
         <SuccessView
-          embedded={embedded}
           lang={lang}
           resultVisibility={survey.resultVisibility}
           surveyId={id!}
@@ -112,7 +120,6 @@ export function SurveyPage() {
     ) {
       return (
         <AlreadySubmittedView
-          embedded={embedded}
           lang={lang}
           resultVisibility={survey.resultVisibility}
           surveyId={id!}
@@ -140,7 +147,6 @@ export function SurveyPage() {
         submitting={submitting}
         survey={survey}
         visibleSectionIds={visibleSectionIds}
-        draftRestored={draftRestored}
       />
     );
   };
@@ -148,24 +154,10 @@ export function SurveyPage() {
   return (
     <PageShell>
       <Header />
-      <main className="flex-1 bg-[#f3f5f4] px-4 py-10 lg:px-0">
-        <div className="mx-auto max-w-[52rem]">
-          {survey && shouldEmbedTerminalState ? (
-            <SurveySummaryCard lang={lang} survey={survey}>
-              {submitted ? (
-                renderBody(true)
-              ) : survey.computedState === "closed" ? (
-                <ClosedView embedded lang={lang} />
-              ) : (
-                renderBody(true)
-              )}
-            </SurveySummaryCard>
-          ) : (
-            <>
-              {survey && <SurveySummaryCard lang={lang} survey={survey} />}
-              {renderBody()}
-            </>
-          )}
+      <main className="flex-1 bg-[#f3f5f4] px-4 py-10 lg:px-0" aria-busy={(!survey || sessionLoading) && !loadError}>
+        <div className="mx-auto max-w-[52rem] space-y-5">
+          {survey && <SurveySummaryCard lang={lang} survey={survey} />}
+          {renderBody()}
         </div>
       </main>
     </PageShell>

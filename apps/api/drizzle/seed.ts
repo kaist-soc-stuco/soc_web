@@ -26,12 +26,22 @@ import {
   voteOptions,
   voteVoters,
   votes,
+  roadmapCourseRelations,
+  roadmapCourses,
+  roadmapOfferings,
+  roadmapTerms,
 } from "../src/infrastructure/postgres/postgres.schema";
 import {
   INITIAL_ADMIN_ROLE_GROUP_NAME,
+  normalizeRoadmapCourseCode,
   OPERATIONAL_SURVEY_IDS,
   PERMISSION_REGISTRY,
 } from "@soc/contracts";
+import {
+  ROADMAP_REFERENCE_COURSES,
+  ROADMAP_REFERENCE_OFFERINGS,
+  ROADMAP_REFERENCE_RELATIONS,
+} from "./roadmap-reference";
 
 const readRequiredEnv = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -204,11 +214,14 @@ const LEGACY_DEMO_FAQ_TITLES = [
   "건의사항 답변은 어떻게 확인하나요?",
   "개인정보 수정은 어디에서 하나요?",
 ] as const;
+const RETIRED_REFERENCE_FAQ_TITLES = [
+  "학생회 활동인증서는 어디에 요청하나요?",
+] as const;
 const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
   {
     titleKo: "KAIST 계정으로 어떻게 로그인하나요?",
     titleEn: "How do I sign in with my KAIST account?",
-    contentKo: "헤더의 로그인 버튼을 누르고 KAIST 통합인증을 완료해 주세요.\n\n• 처음 로그인하면 개인정보 저장 동의가 필요할 수 있습니다.\n• 로그인에 계속 실패하면 오류 문구와 발생 시각을 함께 적어 채널톡으로 문의해 주세요.",
+    contentKo: "[로그인] 버튼을 누르고 KAIST 통합인증을 완료해 주세요.\n\n• 처음 로그인하면 개인정보 저장 동의가 필요할 수 있습니다.\n• 로그인에 계속 실패하면 오류 문구와 발생 시각을 함께 적어 채널톡으로 문의해 주세요.",
     contentEn: "Select Sign in in the header and complete KAIST SSO.\n\n• You may be asked to consent to storing your account information on your first sign-in.\n• If the issue continues, contact us through Channel Talk with the error message and time.",
   },
   {
@@ -220,67 +233,67 @@ const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
   {
     titleKo: "제 과비 납부 여부는 어디서 확인하나요?",
     titleEn: "Where can I check my student-fee status?",
-    contentKo: "로그인 후 마이페이지에서 과비 납부 상태를 확인할 수 있습니다.\n\n• 입금 내역과 표시 상태가 다르면 입금자명·입금일만 준비해 채널톡으로 문의해 주세요.\n• 전체 계좌번호 등 불필요한 금융정보는 보내지 마세요.",
+    contentKo: "로그인 후 [마이페이지]에서 과비 납부 상태를 확인할 수 있습니다.\n\n• 입금 내역과 표시 상태가 다르면 입금자명·입금일만 준비해 채널톡으로 문의해 주세요.\n• 전체 계좌번호 등 불필요한 금융정보는 보내지 마세요.",
     contentEn: "After signing in, check your fee status on My Page.\n\n• If it differs from your bank record, contact us through Channel Talk with only the sender name and payment date.\n• Do not send a full bank account number or other unnecessary financial information.",
   },
   {
     titleKo: "과비를 환급받을 수 있나요?",
     titleEn: "Can I request a student-fee refund?",
-    contentKo: "과비 환급은 원칙적으로 어렵습니다.\n\n• 중복 입금·오입금처럼 확인이 필요한 경우 입금일·금액·입금자명을 준비해 채널톡으로 문의해 주세요.\n• 환급 여부는 개별 확인 후 안내합니다.",
-    contentEn: "Student-fee payments are generally non-refundable.\n\n• For duplicate or mistaken transfers, contact us through Channel Talk with the payment date, amount, and sender name.\n• Refund eligibility is reviewed case by case.",
+    contentKo: "과비 환급은 원칙적으로 어렵습니다.\n\n• 중복 입금·오입금처럼 확인이 필요한 경우 입금일·금액·입금자명만 준비해 상담원 연결을 요청해 주세요.\n• 환급 가능 여부는 개별 확인 후 안내하며, 전체 계좌번호 등 불필요한 금융정보는 보내지 마세요.",
+    contentEn: "Student-fee payments are generally non-refundable.\n\n• For duplicate or mistaken transfers, request a staff handoff with only the payment date, amount, and sender name.\n• Refund eligibility is reviewed case by case; do not send a full bank account number or other unnecessary financial information.",
   },
   {
     titleKo: "행사·일정은 어디서 확인하나요?",
     titleEn: "Where can I find events and schedules?",
-    contentKo: "행사 메뉴에서 행사 목록을, 일정 메뉴에서 학사·학생회 일정을 확인할 수 있습니다.\n\n• 상단 메뉴의 행사·일정에서 원하는 화면을 선택하세요.\n• 신청이 필요한 행사는 행사 상세의 연결 설문에서 신청합니다.",
+    contentKo: "[행사]에서 행사 목록을, [일정]에서 학사·학생회 일정을 확인할 수 있습니다.\n\n• 상단의 [행사·일정] 메뉴에서 원하는 화면을 선택해 주세요.\n• 신청이 필요한 행사는 행사 상세 페이지의 연결 설문에서 신청해 주세요.",
     contentEn: "Use Events to browse event notices and Calendar to check academic and council schedules.\n\n• Choose the relevant view from the Events menu in the header.\n• Apply through the linked survey on an event's detail page when registration is required.",
   },
   {
     titleKo: "행사는 어떻게 신청하나요?",
     titleEn: "How do I apply for an event?",
-    contentKo: "행사 상세 페이지를 열고 연결된 신청 설문을 제출해 주세요.\n\n• 신청 기간과 대상 조건을 먼저 확인하세요.\n• 신청 기간이 끝났거나 설문이 보이지 않으면 행사명을 적어 채널톡으로 문의해 주세요.",
+    contentKo: "행사 상세 페이지를 열고 연결된 신청 설문을 제출해 주세요.\n\n• 신청 기간과 대상 조건을 먼저 확인해 주세요.\n• 신청 기간이 끝났거나 설문이 보이지 않으면 행사명을 적어 채널톡으로 문의해 주세요.",
     contentEn: "Open the event detail page and submit its linked application survey.\n\n• Check the application period and eligibility first.\n• If registration is closed or the survey is missing, contact us through Channel Talk with the event name.",
   },
   {
     titleKo: "행사 신청을 수정하거나 취소하려면 어떻게 하나요?",
     titleEn: "How do I edit or cancel an event application?",
-    contentKo: "설문에 수정 또는 취소 기능이 안내되어 있으면 해당 방법으로 처리해 주세요.\n\n• 기능이 보이지 않으면 행사명과 신청 정보만 적어 채널톡으로 문의하세요.\n• 취소·환불 조건은 행사별 공지를 확인해 주세요.",
-    contentEn: "Use the edit or cancellation method described in the application survey when available.\n\n• If no option is shown, contact us through Channel Talk with the event name and application details.\n• Check the event notice for cancellation and refund terms.",
+    contentKo: "응답 수정이 허용된 설문은 참여 기간 안에 기존 응답을 수정할 수 있습니다.\n\n• 현재 사용자가 응답을 직접 취소하거나 삭제하는 기능은 제공하지 않습니다.\n• 취소가 필요하면 행사명과 신청 정보만 적어 상담원 연결을 요청하고, 취소·환불 조건은 행사별 공지를 확인해 주세요.",
+    contentEn: "If a survey allows response editing, you can update your existing response during the participation period.\n\n• There is currently no self-service option to cancel or delete a response.\n• To request cancellation, ask for a staff handoff with only the event name and application details, and check the event notice for cancellation or refund terms.",
   },
   {
     titleKo: "학생회에 사업이나 정책을 건의하려면 어떻게 하나요?",
     titleEn: "How can I suggest a project or policy to the council?",
-    contentKo: "로그인 후 건의사항 게시판에서 글을 작성해 주세요.\n\n• 공개가 부담스러운 내용은 비밀글로 작성할 수 있습니다.\n• 공식 답변이 등록되면 알림에서 확인할 수 있습니다.",
+    contentKo: "로그인 후 [건의사항] 게시판에서 글을 작성해 주세요.\n\n• 공개가 부담스러운 내용은 비밀글로 작성할 수 있습니다.\n• 공식 답변이 등록되면 [알림]에서 확인할 수 있습니다.",
     contentEn: "After signing in, submit your suggestion on the Suggestions board.\n\n• Mark it as secret if it should not be public.\n• You will receive a notification when an official response is posted.",
   },
   {
     titleKo: "비밀 건의사항과 공식 답변은 누가 볼 수 있나요?",
     titleEn: "Who can see secret suggestions and official responses?",
-    contentKo: "비밀 건의사항은 작성자와 답변 권한이 있는 운영진만 확인할 수 있습니다.\n\n• 다른 이용자에게는 제목과 본문이 공개되지 않습니다.\n• 공식 답변은 해당 건의사항의 작성자와 공식 답변 권한이 있는 운영진에게만 표시됩니다.",
-    contentEn: "Secret suggestions are visible only to the author and council members with official-response access.\n\n• Other users cannot see the title or body.\n• An official response is shown only to the author and authorized council members.",
+    contentKo: "비밀 건의사항은 작성자와 해당 게시판의 공식 답변 또는 게시글 관리 권한이 있는 운영진만 확인할 수 있습니다.\n\n• 다른 이용자에게는 제목과 본문이 공개되지 않습니다.\n• 공식 답변도 해당 비밀글에 접근할 수 있는 이용자에게만 표시됩니다.",
+    contentEn: "Secret suggestions are visible only to the author and council members with official-response or content-moderation access for the board.\n\n• Other users cannot see the title or body.\n• Official responses are visible only to users who can access that secret post.",
   },
   {
     titleKo: "행사나 동아리 홍보글 게시를 요청하려면 어떻게 하나요?",
     titleEn: "How do I request an event or club promotion post?",
-    contentKo: "설문·투표 메뉴의 신청형 설문에서 ‘학부 내 행사·동아리 홍보글 게시 요청’을 제출해 주세요.\n\n• 게시할 문구·포스터·희망 게시일을 함께 보내 주세요.\n• 검토 후 게시 여부와 일정을 안내합니다.",
-    contentEn: "In Surveys & Voting, open the application survey titled ‘SoC Event or Club Promotion Post Request.’\n\n• Include the copy, poster, and preferred publication date.\n• The council will review the request and reply with the publication decision and schedule.",
+    contentKo: "[설문·투표] 메뉴의 [신청형 설문]에서 ‘학부 내 행사·동아리 홍보글 게시 요청’을 제출해 주세요.\n\n• 게시할 문구·포스터·희망 게시일을 함께 보내 주세요.\n• 제출한 요청은 담당자가 확인하며, 제출만으로 게시 여부나 일정이 확정되지는 않습니다.",
+    contentEn: "In Surveys & Voting, open the application survey titled ‘SoC Event or Club Promotion Post Request.’\n\n• Include the copy, poster, and preferred publication date.\n• A council member will review the request; submission alone does not confirm publication or its schedule.",
   },
   {
     titleKo: "학번별 단체 카카오톡방에 참여하려면 어떻게 하나요?",
     titleEn: "How do I join my cohort KakaoTalk chat?",
-    contentKo: "학부 생활 → 학번톡 참여 신청을 누르거나 설문·투표 → 신청형 설문에서 ‘전산학부 학번톡 초대 요청’을 제출해 주세요.\n\n• 초대를 받을 카카오톡 ID·전화번호와 입학 연도를 정확히 입력하세요.\n• 대상 확인을 위해 전산학부 주전공 및 학적 정보를 확인할 수 있습니다.",
+    contentKo: "[학부 생활] > [학번톡 참여 신청]을 누르거나 [설문·투표] > [신청형 설문]에서 ‘전산학부 학번톡 초대 요청’을 제출해 주세요.\n\n• 초대를 받을 카카오톡 ID·전화번호와 입학 연도를 정확히 입력해 주세요.\n• 대상 확인을 위해 전산학부 주전공 및 학적 정보를 확인할 수 있습니다.",
     contentEn: "Select Campus Life → Join Cohort Chat, or submit ‘SoC Cohort Chat Invitation Request’ under application surveys.\n\n• Enter the KakaoTalk ID or phone number and admission year accurately.\n• Your School of Computing primary-major and enrollment information may be checked for eligibility.",
   },
   {
     titleKo: "졸업 요건과 교과목 이수 순서는 어디서 확인하나요?",
     titleEn: "Where can I check graduation requirements and course planning?",
-    contentKo: "입학 연도에 적용되는 최신 학사요람과 전산학부 공식 안내를 우선 확인해 주세요.\n\n• 전산학부 로드맵은 과목 탐색을 돕는 참고 자료입니다.\n• 개인별 졸업 사정이나 선수조건은 학사요람과 담당 부서의 안내를 기준으로 확인하세요.",
+    contentKo: "입학 연도에 적용되는 최신 학사요람과 전산학부 공식 안내를 우선 확인해 주세요.\n\n• [전산학부 로드맵]은 과목 탐색을 돕는 참고 자료입니다.\n• 개인별 졸업 사정이나 선수조건은 학사요람과 담당 부서의 안내를 기준으로 확인해 주세요.",
     contentEn: "Start with the latest academic handbook and official School of Computing guidance for your admission year.\n\n• The SoC Roadmap is a planning aid for exploring courses.\n• Use the handbook and the responsible office's guidance for your individual degree audit and prerequisites.",
   },
   {
     titleKo: "연구실, 교수진, 시설 정보는 어디서 확인하나요?",
     titleEn: "Where can I find information about labs, faculty, and facilities?",
-    contentKo: "연구실·교수진·학부 소식은 전산학부 공식 홈페이지(cs.kaist.ac.kr)에서 확인해 주세요.\n\n• 시설 이용 정보나 로그인 전용 자료는 공식 홈페이지 로그인이 필요할 수 있습니다.\n• 원하는 정보를 찾기 어렵다면 해당 홈페이지의 문의 창구를 이용하세요.",
+    contentKo: "연구실·교수진·학부 소식은 전산학부 공식 홈페이지(cs.kaist.ac.kr)에서 확인해 주세요.\n\n• 시설 이용 정보나 로그인 전용 자료는 공식 홈페이지 로그인이 필요할 수 있습니다.\n• 원하는 정보를 찾기 어렵다면 해당 홈페이지의 문의 창구를 이용해 주세요.",
     contentEn: "Visit the official School of Computing website (cs.kaist.ac.kr) for labs, faculty, and school news.\n\n• Facility information or restricted materials may require signing in there.\n• Use the official website's contact channel if you cannot find what you need.",
   },
   {
@@ -290,34 +303,28 @@ const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
     contentEn: "Recruitment timing varies by semester.\n\n• Open recruitment is announced on the Notice board and official council channels.\n• If no current notice is available, please wait for the next announcement.",
   },
   {
-    titleKo: "학생회 활동인증서는 어디에 요청하나요?",
-    titleEn: "Where do I request a student activity certificate?",
-    contentKo: "학생회 활동인증서는 총학생회 담당 창구의 확인 후 발급됩니다.\n\n• 본 사이트에서 자동 발급되지 않습니다.\n• 활동 기간과 조직명을 준비해 총학생회 담당자에게 문의해 주세요.",
-    contentEn: "Student activity certificates are issued after confirmation by the KAIST Undergraduate Student Council.\n\n• They are not issued automatically on this site.\n• Contact the council with your activity period and organization name.",
-  },
-  {
     titleKo: "기업 후원이나 제휴를 제안하려면 어떻게 하나요?",
     titleEn: "How can a company propose sponsorship or a partnership?",
-    contentKo: "학생회 소개 → 후원 및 제휴 또는 설문·투표 메뉴의 ‘기업 후원 및 제휴 문의’를 이용해 주세요.\n\n• 기업·기관명, 회신 이메일, 제안 유형과 내용을 입력하세요.\n• 담당자가 내용을 검토한 후 회신합니다.",
-    contentEn: "Use About → Sponsorship & Partnerships or submit ‘Corporate Sponsorship and Partnership Inquiry’ under Surveys & Voting.\n\n• Include your organization, reply email, proposal type, and details.\n• A council member will review the request and reply.",
+    contentKo: "[학생회 소개] > [후원 및 제휴] 또는 [설문·투표] > [신청형 설문]의 ‘기업 후원 및 제휴 문의’를 이용해 주세요.\n\n• 기업·기관명, 회신 이메일, 제안 유형과 내용을 입력해 주세요.\n• 담당자가 내용을 확인하며, 제출만으로 제휴 성사나 회신 일정이 확정되지는 않습니다.",
+    contentEn: "Use About → Sponsorship & Partnerships or submit ‘Corporate Sponsorship and Partnership Inquiry’ under Surveys & Voting.\n\n• Include your organization, reply email, proposal type, and details.\n• A council member will review the request; submission alone does not confirm a partnership or response schedule.",
   },
   {
     titleKo: "전산학부 학생회칙은 어디서 확인하나요?",
     titleEn: "Where can I read the SoC Student Council bylaws?",
-    contentKo: "현행 공개본은 카이스트 백과사전의 전산학부 학생회칙에서 확인할 수 있습니다.\n\n• 특정 조항의 적용이나 최신 개정 여부가 궁금하면 담당자에게 문의해 주세요.\n• 학생회가 법률 해석을 대신하지는 않습니다.",
-    contentEn: "Read the current public version on the KAIST Wiki page for the SoC Student Council bylaws.\n\n• Ask a council member when you need confirmation about a provision or a recent amendment.\n• The council does not provide legal interpretation.",
+    contentKo: "현행 공개본은 카이스트 백과사전의 전산학부 학생회칙에서 확인할 수 있습니다.\nhttps://student.kaist.ac.kr/wiki/학부총학생회:전산학부_학생회칙\n\n• 특정 조항의 적용이나 최신 개정 여부는 학생회 담당자에게 확인해 주세요.",
+    contentEn: "Read the current public version on the KAIST Wiki page for the SoC Student Council bylaws.\nhttps://student.kaist.ac.kr/wiki/학부총학생회:전산학부_학생회칙\n\n• Ask a council member to confirm how a provision applies or whether a newer amendment exists.",
   },
   {
     titleKo: "설문이나 투표에 참여할 수 없다고 표시되는 이유는 무엇인가요?",
     titleEn: "Why am I not eligible for a survey or vote?",
-    contentKo: "설문·투표마다 참여 조건이 다릅니다.\n\n• 로그인 여부, 전산학부 소속, 학적 상태, 과비 납부 여부, 참여 기간을 확인하세요.\n• 참여 화면에 표시된 미충족 조건을 먼저 확인하세요.\n• 프로필 정보가 실제와 다르면 마이페이지 확인 후 채널톡으로 문의해 주세요.",
+    contentKo: "설문·투표마다 참여 조건이 다릅니다.\n\n• 로그인 여부, 전산학부 소속, 학적 상태, 과비 납부 여부, 참여 기간을 확인해 주세요.\n• 참여 화면에 표시된 미충족 조건을 먼저 확인해 주세요.\n• 프로필 정보가 실제와 다르면 [마이페이지]를 확인한 후 채널톡으로 문의해 주세요.",
     contentEn: "Each survey or vote has its own participation requirements.\n\n• Check sign-in status, SoC affiliation, enrollment, student-fee status, and the participation period.\n• Start with the unmet condition shown on the participation page.\n• If your profile is incorrect, review My Page and contact us through Channel Talk.",
   },
   {
     titleKo: "댓글이나 공식 답변 알림은 어디서 확인하나요?",
     titleEn: "Where can I find comment and official-response notifications?",
-    contentKo: "로그인 후 헤더의 알림 아이콘에서 내 글의 새 댓글·답글과 공식 답변을 확인할 수 있습니다.\n\n• 읽은 알림을 포함한 전체 내역은 알림 목록에서 확인하세요.\n• 알림을 찾을 수 없으면 해당 계정으로 로그인했는지 확인해 주세요.",
-    contentEn: "After signing in, use the notification icon in the header to see new comments, replies, and official responses.\n\n• Open the notification list to review the full history, including read items.\n• If an alert is missing, make sure you are signed in with the account that owns the post.",
+    contentKo: "로그인 후 헤더의 [알림]에서 읽지 않은 새 댓글·답글과 공식 답변을 확인할 수 있습니다.\n\n• 알림을 누르면 읽음 처리되어 목록에서 사라집니다.\n• 현재 읽은 알림을 다시 확인하는 별도 전체 내역 화면은 제공하지 않습니다.",
+    contentEn: "After signing in, use the notification icon in the header to see unread comments, replies, and official responses.\n\n• Opening a notification marks it as read and removes it from the list.\n• There is currently no separate page for reviewing read notification history.",
   },
   {
     titleKo: "사이트 오류는 어떻게 신고하나요?",
@@ -328,7 +335,7 @@ const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
   {
     titleKo: "프로필 정보가 잘못 표시되면 어떻게 하나요?",
     titleEn: "What should I do if my profile information is incorrect?",
-    contentKo: "로그인 후 마이페이지에서 표시된 학적·전공 정보를 확인해 주세요.\n\n• 직접 수정할 수 있는 항목은 마이페이지에서 변경합니다.\n• KAIST 원본 정보와 다르면 잘못된 항목만 적어 채널톡으로 문의해 주세요.\n• 비밀번호나 주민등록번호는 보내지 마세요.",
+    contentKo: "로그인 후 [마이페이지]에서 표시된 학적·전공 정보를 확인해 주세요.\n\n• 직접 수정할 수 있는 항목은 [마이페이지]에서 변경해 주세요.\n• KAIST 원본 정보와 다르면 잘못된 항목만 적어 채널톡으로 문의해 주세요.\n• 비밀번호나 주민등록번호는 보내지 마세요.",
     contentEn: "After signing in, review the enrollment and major information shown on My Page.\n\n• Update fields that are editable there.\n• If the information differs from the KAIST source, contact us through Channel Talk and identify only the incorrect field.\n• Never send a national ID number or password.",
   },
   {
@@ -344,6 +351,103 @@ const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
     contentEn: "Posting availability depends on the board's writing permissions and your sign-in status.\n\n• If the write button is not shown, you cannot create a post on that board.\n• Commenting depends on the board's comment setting and sign-in status.\n• Check each board's guidance for the exact conditions.",
   },
 ];
+
+/**
+ * 기존 reference FAQ가 아직 이전 문구인 경우에만 새 문구로 갱신한다.
+ * 관리자가 이미 편집한 FAQ는 seed 재실행으로 덮어쓰지 않는다.
+ */
+const LEGACY_REFERENCE_FAQ_CONTENT = new Map<string, string>([
+  [
+    "KAIST 계정으로 어떻게 로그인하나요?",
+    "헤더의 로그인 버튼을 누르고 KAIST 통합인증을 완료해 주세요.\n\n• 처음 로그인하면 개인정보 저장 동의가 필요할 수 있습니다.\n• 로그인에 계속 실패하면 오류 문구와 발생 시각을 함께 적어 채널톡으로 문의해 주세요.",
+  ],
+  [
+    "제 과비 납부 여부는 어디서 확인하나요?",
+    "로그인 후 마이페이지에서 과비 납부 상태를 확인할 수 있습니다.\n\n• 입금 내역과 표시 상태가 다르면 입금자명·입금일만 준비해 채널톡으로 문의해 주세요.\n• 전체 계좌번호 등 불필요한 금융정보는 보내지 마세요.",
+  ],
+  [
+    "행사·일정은 어디서 확인하나요?",
+    "행사 메뉴에서 행사 목록을, 일정 메뉴에서 학사·학생회 일정을 확인할 수 있습니다.\n\n• 상단 메뉴의 행사·일정에서 원하는 화면을 선택하세요.\n• 신청이 필요한 행사는 행사 상세의 연결 설문에서 신청합니다.",
+  ],
+  [
+    "행사는 어떻게 신청하나요?",
+    "행사 상세 페이지를 열고 연결된 신청 설문을 제출해 주세요.\n\n• 신청 기간과 대상 조건을 먼저 확인하세요.\n• 신청 기간이 끝났거나 설문이 보이지 않으면 행사명을 적어 채널톡으로 문의해 주세요.",
+  ],
+  [
+    "행사 신청을 수정하거나 취소하려면 어떻게 하나요?",
+    "설문에 수정 또는 취소 기능이 안내되어 있으면 해당 방법으로 처리해 주세요.\n\n• 기능이 보이지 않으면 행사명과 신청 정보만 적어 채널톡으로 문의하세요.\n• 취소·환불 조건은 행사별 공지를 확인해 주세요.",
+  ],
+  [
+    "학생회에 사업이나 정책을 건의하려면 어떻게 하나요?",
+    "로그인 후 건의사항 게시판에서 글을 작성해 주세요.\n\n• 공개가 부담스러운 내용은 비밀글로 작성할 수 있습니다.\n• 공식 답변이 등록되면 알림에서 확인할 수 있습니다.",
+  ],
+  [
+    "행사나 동아리 홍보글 게시를 요청하려면 어떻게 하나요?",
+    "설문·투표 메뉴의 신청형 설문에서 ‘학부 내 행사·동아리 홍보글 게시 요청’을 제출해 주세요.\n\n• 게시할 문구·포스터·희망 게시일을 함께 보내 주세요.\n• 검토 후 게시 여부와 일정을 안내합니다.",
+  ],
+  [
+    "학번별 단체 카카오톡방에 참여하려면 어떻게 하나요?",
+    "학부 생활 → 학번톡 참여 신청을 누르거나 설문·투표 → 신청형 설문에서 ‘전산학부 학번톡 초대 요청’을 제출해 주세요.\n\n• 초대를 받을 카카오톡 ID·전화번호와 입학 연도를 정확히 입력하세요.\n• 대상 확인을 위해 전산학부 주전공 및 학적 정보를 확인할 수 있습니다.",
+  ],
+  [
+    "졸업 요건과 교과목 이수 순서는 어디서 확인하나요?",
+    "입학 연도에 적용되는 최신 학사요람과 전산학부 공식 안내를 우선 확인해 주세요.\n\n• 전산학부 로드맵은 과목 탐색을 돕는 참고 자료입니다.\n• 개인별 졸업 사정이나 선수조건은 학사요람과 담당 부서의 안내를 기준으로 확인하세요.",
+  ],
+  [
+    "연구실, 교수진, 시설 정보는 어디서 확인하나요?",
+    "연구실·교수진·학부 소식은 전산학부 공식 홈페이지(cs.kaist.ac.kr)에서 확인해 주세요.\n\n• 시설 이용 정보나 로그인 전용 자료는 공식 홈페이지 로그인이 필요할 수 있습니다.\n• 원하는 정보를 찾기 어렵다면 해당 홈페이지의 문의 창구를 이용하세요.",
+  ],
+  [
+    "기업 후원이나 제휴를 제안하려면 어떻게 하나요?",
+    "학생회 소개 → 후원 및 제휴 또는 설문·투표 메뉴의 ‘기업 후원 및 제휴 문의’를 이용해 주세요.\n\n• 기업·기관명, 회신 이메일, 제안 유형과 내용을 입력하세요.\n• 담당자가 내용을 검토한 후 회신합니다.",
+  ],
+  [
+    "설문이나 투표에 참여할 수 없다고 표시되는 이유는 무엇인가요?",
+    "설문·투표마다 참여 조건이 다릅니다.\n\n• 로그인 여부, 전산학부 소속, 학적 상태, 과비 납부 여부, 참여 기간을 확인하세요.\n• 참여 화면에 표시된 미충족 조건을 먼저 확인하세요.\n• 프로필 정보가 실제와 다르면 마이페이지 확인 후 채널톡으로 문의해 주세요.",
+  ],
+  [
+    "댓글이나 공식 답변 알림은 어디서 확인하나요?",
+    "로그인 후 헤더의 알림 아이콘에서 내 글의 새 댓글·답글과 공식 답변을 확인할 수 있습니다.\n\n• 읽은 알림을 포함한 전체 내역은 알림 목록에서 확인하세요.\n• 알림을 찾을 수 없으면 해당 계정으로 로그인했는지 확인해 주세요.",
+  ],
+  [
+    "프로필 정보가 잘못 표시되면 어떻게 하나요?",
+    "로그인 후 마이페이지에서 표시된 학적·전공 정보를 확인해 주세요.\n\n• 직접 수정할 수 있는 항목은 마이페이지에서 변경합니다.\n• KAIST 원본 정보와 다르면 잘못된 항목만 적어 채널톡으로 문의해 주세요.\n• 비밀번호나 주민등록번호는 보내지 마세요.",
+  ],
+]);
+
+// Reference answers shipped immediately before the current copy. Keeping the
+// exact previous text lets a repeated seed upgrade untouched reference rows
+// without overwriting an answer that an administrator has edited.
+const PREVIOUS_REFERENCE_FAQ_CONTENT = new Map<string, string>([
+  [
+    "과비를 환급받을 수 있나요?",
+    "과비 환급 가능 여부는 납부 공지와 개별 사유에 따라 확인이 필요합니다.\n\n• 중복 입금·오입금처럼 확인이 필요한 경우 입금일·금액·입금자명만 준비해 상담원 연결을 요청해 주세요.\n• 전체 계좌번호 등 불필요한 금융정보는 보내지 마세요.",
+  ],
+  [
+    "행사 신청을 수정하거나 취소하려면 어떻게 하나요?",
+    "설문에 수정 또는 취소 기능이 안내되어 있으면 해당 방법으로 처리해 주세요.\n\n• 기능이 보이지 않으면 행사명과 신청 정보만 적어 채널톡으로 문의해 주세요.\n• 취소·환불 조건은 행사별 공지를 확인해 주세요.",
+  ],
+  [
+    "비밀 건의사항과 공식 답변은 누가 볼 수 있나요?",
+    "비밀 건의사항은 작성자와 답변 권한이 있는 운영진만 확인할 수 있습니다.\n\n• 다른 이용자에게는 제목과 본문이 공개되지 않습니다.\n• 공식 답변은 해당 건의사항의 작성자와 공식 답변 권한이 있는 운영진에게만 표시됩니다.",
+  ],
+  [
+    "행사나 동아리 홍보글 게시를 요청하려면 어떻게 하나요?",
+    "[설문·투표] 메뉴의 [신청형 설문]에서 ‘학부 내 행사·동아리 홍보글 게시 요청’을 제출해 주세요.\n\n• 게시할 문구·포스터·희망 게시일을 함께 보내 주세요.\n• 검토 후 게시 여부와 일정을 안내합니다.",
+  ],
+  [
+    "기업 후원이나 제휴를 제안하려면 어떻게 하나요?",
+    "[학생회 소개] > [후원 및 제휴] 또는 [설문·투표] > [신청형 설문]의 ‘기업 후원 및 제휴 문의’를 이용해 주세요.\n\n• 기업·기관명, 회신 이메일, 제안 유형과 내용을 입력해 주세요.\n• 담당자가 내용을 검토한 후 회신합니다.",
+  ],
+  [
+    "전산학부 학생회칙은 어디서 확인하나요?",
+    "현행 공개본은 카이스트 백과사전의 전산학부 학생회칙에서 확인할 수 있습니다.\n\n• 특정 조항의 적용이나 최신 개정 여부가 궁금하면 담당자에게 문의해 주세요.\n• 학생회가 법률 해석을 대신하지는 않습니다.",
+  ],
+  [
+    "댓글이나 공식 답변 알림은 어디서 확인하나요?",
+    "로그인 후 헤더의 [알림]에서 내 글의 새 댓글·답글과 공식 답변을 확인할 수 있습니다.\n\n• 읽은 알림을 포함한 전체 내역은 [알림 목록]에서 확인해 주세요.\n• 알림을 찾을 수 없으면 해당 계정으로 로그인했는지 확인해 주세요.",
+  ],
+]);
 
 const FAQ_DISPLAY_ORDER = new Map<string, number>([
   ["KAIST 계정으로 어떻게 로그인하나요?", 0],
@@ -366,9 +470,8 @@ const FAQ_DISPLAY_ORDER = new Map<string, number>([
   ["졸업 요건과 교과목 이수 순서는 어디서 확인하나요?", 17],
   ["연구실, 교수진, 시설 정보는 어디서 확인하나요?", 18],
   ["집행위원회 모집은 언제 하나요?", 19],
-  ["학생회 활동인증서는 어디에 요청하나요?", 20],
-  ["기업 후원이나 제휴를 제안하려면 어떻게 하나요?", 21],
-  ["전산학부 학생회칙은 어디서 확인하나요?", 22],
+  ["기업 후원이나 제휴를 제안하려면 어떻게 하나요?", 20],
+  ["전산학부 학생회칙은 어디서 확인하나요?", 21],
 ]);
 async function seedPermissions() {
   await db
@@ -1294,6 +1397,26 @@ async function seedReferenceFaqs() {
     throw new Error("Failed to upsert the reference FAQ author");
   }
 
+  const retiredReferenceFaqs = await db
+    .select({ articleId: articles.articleId })
+    .from(articles)
+    .where(
+      and(
+        eq(articles.boardId, faqBoard.boardId),
+        eq(articles.authorUserId, referenceAuthor.userId),
+        inArray(articles.titleKo, [...RETIRED_REFERENCE_FAQ_TITLES]),
+      ),
+    );
+  if (retiredReferenceFaqs.length > 0) {
+    await db.delete(articles).where(
+      inArray(
+        articles.articleId,
+        retiredReferenceFaqs.map((item) => item.articleId),
+      ),
+    );
+    console.log(`Removed ${retiredReferenceFaqs.length} retired reference FAQ article(s)`);
+  }
+
   const legacyFaqs = await db
     .select({ articleId: articles.articleId, titleKo: articles.titleKo })
     .from(articles)
@@ -1317,6 +1440,7 @@ async function seedReferenceFaqs() {
     .select({
       articleId: articles.articleId,
       authorUserId: articles.authorUserId,
+      contentKo: articles.contentKo,
       homeOrder: articles.homeOrder,
       status: articles.status,
       titleKo: articles.titleKo,
@@ -1340,15 +1464,16 @@ async function seedReferenceFaqs() {
       (FAQ_DISPLAY_ORDER.get(right.titleKo) ?? Number.MAX_SAFE_INTEGER),
   );
 
-  const legacyReferenceFaqs = existingFaqs.filter(
-    (item) =>
-      item.authorUserId === referenceAuthor.userId &&
-      (item.homeOrder === null ||
-        (item.homeOrder >= LEGACY_REFERENCE_FAQ_HOME_ORDER_BASE &&
-          item.homeOrder < REFERENCE_FAQ_HOME_ORDER_BASE)),
+  const referenceFaqsToNormalize = existingFaqs.filter((item) =>
+    item.authorUserId === referenceAuthor.userId &&
+    (item.homeOrder === null ||
+      (item.homeOrder >= LEGACY_REFERENCE_FAQ_HOME_ORDER_BASE &&
+        item.homeOrder < REFERENCE_FAQ_HOME_ORDER_BASE) ||
+      LEGACY_REFERENCE_FAQ_CONTENT.get(item.titleKo) === item.contentKo ||
+      PREVIOUS_REFERENCE_FAQ_CONTENT.get(item.titleKo) === item.contentKo),
   );
   const legacyReferenceByTitle = new Map(
-    legacyReferenceFaqs.map((item) => [item.titleKo, item]),
+    referenceFaqsToNormalize.map((item) => [item.titleKo, item]),
   );
   for (const [index, item] of orderedReferenceFaqs.entries()) {
     const existing = legacyReferenceByTitle.get(item.titleKo);
@@ -1403,7 +1528,7 @@ async function seedReferenceFaqs() {
   }
 
   console.log(
-    `Reference FAQs ready (${missingFaqs.length} inserted, ${REFERENCE_FAQ_SEEDS.length - missingFaqs.length} already present, ${legacyReferenceFaqs.length} normalized)`,
+    `Reference FAQs ready (${missingFaqs.length} inserted, ${REFERENCE_FAQ_SEEDS.length - missingFaqs.length} already present, ${referenceFaqsToNormalize.length} normalized)`,
   );
 }
 
@@ -1480,17 +1605,64 @@ async function seedAboutPageContent(seedAuthorId: string) {
   ]);
 
   await db
-      .insert(executiveContactDepartments)
+    .insert(executiveContactDepartments)
     .values([
-      { nameKo: "회장단", nameEn: "Presidium", sortOrder: 0, isActive: true },
-      { nameKo: "비서실", nameEn: "Secretariat", sortOrder: 1, isActive: true },
-      { nameKo: "대외소통부", nameEn: "External Communications", sortOrder: 2, isActive: true },
-      { nameKo: "기획부", nameEn: "Planning Division", sortOrder: 3, isActive: true },
-      { nameKo: "전산관리부", nameEn: "IT Administration", sortOrder: 4, isActive: true },
+      {
+        nameKo: "회장단",
+        nameEn: "Presidium",
+        descriptionKo: "학생회 주요 방향을 설정하고 학부생의 의견을 바탕으로 의사 결정합니다.",
+        descriptionEn: "Set the council's direction and make decisions grounded in undergraduate feedback.",
+        inquiryEmail: "kaist.helloworld@gmail.com",
+        sortOrder: 0,
+        isActive: true,
+      },
+      {
+        nameKo: "비서실",
+        nameEn: "Secretariat",
+        descriptionKo: "회의와 행정을 지원하고 공지·기록을 체계적으로 관리합니다.",
+        descriptionEn: "Support meetings and administration while keeping notices and records organized.",
+        inquiryEmail: "kaist.helloworld@gmail.com",
+        sortOrder: 1,
+        isActive: true,
+      },
+      {
+        nameKo: "대외소통부",
+        nameEn: "External Communications",
+        descriptionKo: "학부와 외부 커뮤니케이션을 담당하고 행사와 학생회 소식을 알립니다.",
+        descriptionEn: "Lead communications with the department and external partners and share council news.",
+        inquiryEmail: "kaist.helloworld@gmail.com",
+        sortOrder: 2,
+        isActive: true,
+      },
+      {
+        nameKo: "기획부",
+        nameEn: "Planning Division",
+        descriptionKo: "축제·간식 행사와 학부생을 위한 프로그램을 기획하고 운영합니다.",
+        descriptionEn: "Plan and run festivals, snack events, and programs for School of Computing students.",
+        inquiryEmail: "kaist.helloworld@gmail.com",
+        sortOrder: 3,
+        isActive: true,
+      },
+      {
+        nameKo: "전산관리부",
+        nameEn: "IT Administration",
+        descriptionKo: "포털 개발 및 인프라 운영, 시스템 관리를 담당합니다.",
+        descriptionEn: "Develop and operate the portal, infrastructure, and council systems.",
+        inquiryEmail: "kaist.helloworld@gmail.com",
+        sortOrder: 4,
+        isActive: true,
+      },
     ])
     .onConflictDoUpdate({
       target: executiveContactDepartments.nameKo,
-      set: { nameEn: sql`excluded.name_en`, isActive: true, updatedAt: new Date() },
+      set: {
+        nameEn: sql`excluded.name_en`,
+        descriptionKo: sql`excluded.description_ko`,
+        descriptionEn: sql`excluded.description_en`,
+        inquiryEmail: sql`excluded.inquiry_email`,
+        isActive: true,
+        updatedAt: new Date(),
+      },
     });
 
   await db.insert(executiveContacts).values([
@@ -1869,6 +2041,142 @@ async function seedVotes(creatorId: string) {
   });
 
   console.log(`Seeded vote with ${items.length} items and one eligible voter`);
+}
+
+async function seedReferenceRoadmap() {
+  const existingReferenceCourses = await db
+    .select({
+      courseId: roadmapCourses.courseId,
+      courseCode: roadmapCourses.courseCode,
+      legacyCourseCode: roadmapCourses.legacyCourseCode,
+    })
+    .from(roadmapCourses)
+    .where(eq(roadmapCourses.source, "REFERENCE"));
+  const referenceCourseCodes = new Set(
+    ROADMAP_REFERENCE_COURSES.map((course) => course.courseCode),
+  );
+
+  // Keep repeated reference seeding idempotent when a current code is
+  // corrected later. This also migrates reference rows created from a
+  // legacy three-digit code before the canonical map was added.
+  for (const course of ROADMAP_REFERENCE_COURSES) {
+    const stale = existingReferenceCourses.find(
+      (existing) =>
+        !referenceCourseCodes.has(existing.courseCode) &&
+        (existing.legacyCourseCode === course.legacyCourseCode ||
+          existing.courseCode === course.legacyCourseCode ||
+          normalizeRoadmapCourseCode(existing.courseCode) === course.courseCode),
+    );
+    if (!stale) continue;
+    const targetExists = existingReferenceCourses.some(
+      (existing) => existing.courseCode === course.courseCode,
+    );
+    if (targetExists) continue;
+    await db
+      .update(roadmapCourses)
+      .set({
+        ai: course.ai,
+        category: course.category,
+        courseCode: course.courseCode,
+        credits: course.credits,
+        legacyCourseCode: course.legacyCourseCode,
+        nameEn: course.nameEn,
+        nameKo: course.nameKo,
+        semesters: course.semesters,
+        trackIds: course.trackIds,
+        updatedAt: new Date(),
+      })
+      .where(eq(roadmapCourses.courseId, stale.courseId));
+  }
+
+  for (const course of ROADMAP_REFERENCE_COURSES) {
+    await db
+      .insert(roadmapCourses)
+      .values({
+        ai: course.ai,
+        category: course.category,
+        courseCode: course.courseCode,
+        credits: course.credits,
+        legacyCourseCode: course.legacyCourseCode,
+        nameEn: course.nameEn,
+        nameKo: course.nameKo,
+        positionX: 0,
+        positionY: 0,
+        semesters: course.semesters,
+        source: "REFERENCE",
+        trackIds: course.trackIds,
+        isVisible: true,
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing({ target: roadmapCourses.courseCode });
+  }
+
+  const referenceOfferings = await db
+    .select({ offeringId: roadmapOfferings.offeringId, courseCode: roadmapOfferings.courseCode })
+    .from(roadmapOfferings)
+    .where(eq(roadmapOfferings.sourceFileName, "reference-2026-spring.xlsx"));
+  const referenceFallOfferings = await db
+    .select({ offeringId: roadmapOfferings.offeringId, courseCode: roadmapOfferings.courseCode })
+    .from(roadmapOfferings)
+    .where(eq(roadmapOfferings.sourceFileName, "reference-2026-fall.xlsx"));
+  for (const offering of [...referenceOfferings, ...referenceFallOfferings]) {
+    const courseCode = normalizeRoadmapCourseCode(offering.courseCode);
+    if (courseCode === offering.courseCode) continue;
+    await db
+      .update(roadmapOfferings)
+      .set({ courseCode })
+      .where(eq(roadmapOfferings.offeringId, offering.offeringId));
+  }
+
+  const courseRows = await db
+    .select({ courseId: roadmapCourses.courseId, courseCode: roadmapCourses.courseCode })
+    .from(roadmapCourses);
+  const courseIdByCode = new Map(courseRows.map((row) => [row.courseCode, row.courseId]));
+  for (const relation of ROADMAP_REFERENCE_RELATIONS) {
+    const prerequisiteCourseId = courseIdByCode.get(relation.prerequisiteCourseCode);
+    const postrequisiteCourseId = courseIdByCode.get(relation.postrequisiteCourseCode);
+    if (!prerequisiteCourseId || !postrequisiteCourseId) continue;
+    await db
+      .insert(roadmapCourseRelations)
+      .values({ prerequisiteCourseId, postrequisiteCourseId })
+      .onConflictDoNothing();
+  }
+
+  const now = new Date();
+  for (const term of ["2026-spring", "2026-fall"] as const) {
+    await db
+      .insert(roadmapTerms)
+      .values({
+        importedAt: now,
+        sourceFileName: `reference-${term}.xlsx`,
+        term,
+        updatedAt: now,
+      })
+      .onConflictDoNothing({ target: roadmapTerms.term });
+
+    const existingOfferings = await db
+      .select({ sourceFileName: roadmapOfferings.sourceFileName })
+      .from(roadmapOfferings)
+      .where(eq(roadmapOfferings.term, term));
+    const hasNonReferenceOffering = existingOfferings.some(
+      (offering) => offering.sourceFileName !== `reference-${term}.xlsx`,
+    );
+    if (hasNonReferenceOffering) continue;
+    if (existingOfferings.length > 0) {
+      await db.delete(roadmapOfferings).where(eq(roadmapOfferings.term, term));
+    }
+
+    await db.insert(roadmapOfferings).values(
+      ROADMAP_REFERENCE_OFFERINGS.filter((offering) => offering.term === term).map((offering) => ({
+        ...offering,
+        importedAt: now,
+        importedBy: null,
+        sourceData: { source: "reference-seed" },
+        sourceFileName: `reference-${term}.xlsx`,
+      })),
+    );
+  }
+  console.log(`Seeded roadmap catalog (${ROADMAP_REFERENCE_COURSES.length} courses)`);
 }
 
 async function seedMockData() {
@@ -2765,6 +3073,7 @@ async function main() {
       await seedMockData();
     }
     await seedReferenceFaqs();
+    await seedReferenceRoadmap();
     console.log("Seed finished");
   } catch (err) {
     console.error("Seed failed:", err);

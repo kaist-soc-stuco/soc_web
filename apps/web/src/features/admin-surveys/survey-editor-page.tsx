@@ -47,7 +47,7 @@ import {
   SectionEditorModal,
   type SectionFormState,
 } from "@/components/organisms/section-editor-modal";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Copy, Eye, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { UiInput } from "@/components/ui/form-control";
@@ -179,6 +179,7 @@ const emptyQuestion = (): QuestionFormState => ({
   questionType: "short_text",
   options: [],
   answerRegex: "",
+  answerValidationEnabled: false,
   isRequired: true,
   config: null,
 });
@@ -195,18 +196,12 @@ type QuestionRowContentProps = {
   question: SurveyQuestionRecord;
   isOngoing: boolean;
   dragHandle: ReactNode;
-  onEdit: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
 };
 
 function QuestionRowContent({
   question,
   isOngoing,
   dragHandle,
-  onEdit,
-  onDuplicate,
-  onDelete,
 }: QuestionRowContentProps) {
   return (
     <>
@@ -229,34 +224,6 @@ function QuestionRowContent({
           )}
         </div>
       </div>
-      <div className="ml-2 flex shrink-0 gap-1">
-        <IconButton
-          size="sm"
-          aria-label={`${question.titleKo} ${isOngoing ? "보기" : "편집"}`}
-          onClick={onEdit}
-        >
-          {isOngoing ? <Eye className="size-4" /> : <Pencil className="size-4" />}
-        </IconButton>
-        {!isOngoing && (
-          <IconButton
-            size="sm"
-            aria-label={`${question.titleKo} 복제`}
-            onClick={onDuplicate}
-          >
-            <Copy className="size-4" />
-          </IconButton>
-        )}
-        {!isOngoing && (
-          <IconButton
-            size="sm"
-            aria-label={`${question.titleKo} 삭제`}
-            onClick={onDelete}
-            className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
-          >
-            <Trash2 className="size-4" />
-          </IconButton>
-        )}
-      </div>
     </>
   );
 }
@@ -265,8 +232,6 @@ type SortableQuestionRowProps = {
   question: SurveyQuestionRecord;
   isOngoing: boolean;
   onEdit: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
   isEditing?: boolean;
   editor?: ReactNode;
 };
@@ -275,8 +240,6 @@ function SortableQuestionRow({
   question,
   isOngoing,
   onEdit,
-  onDuplicate,
-  onDelete,
   isEditing = false,
   editor,
 }: SortableQuestionRowProps) {
@@ -336,22 +299,21 @@ function SortableQuestionRow({
               }
             }
       }
-      className={`${QUESTION_ROW_CLASS} transition-[background-color,border-color,box-shadow] duration-100 ${
+      className={
         isEditing
-          ? "w-full cursor-default border-brand-primary/35 p-0"
-            : isDragging
-            ? "relative z-0 select-none opacity-0"
-            : "cursor-pointer select-none hover:border-slate-300 hover:bg-slate-50/60"
-      }`}
+          ? "w-full cursor-default border-0 bg-transparent p-0 shadow-none"
+          : `${QUESTION_ROW_CLASS} transition-[background-color,border-color,box-shadow] duration-100 ${
+              isDragging
+                ? "relative z-0 select-none opacity-0"
+                : "cursor-pointer select-none hover:border-slate-300 hover:bg-slate-50/60"
+            }`
+      }
     >
       {isEditing && editor ? editor : (
         <QuestionRowContent
           question={question}
           isOngoing={isOngoing}
           dragHandle={dragHandle}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
         />
       )}
     </div>
@@ -361,11 +323,8 @@ function SortableQuestionRow({
 function QuestionDragOverlayRow({
   question,
   isOngoing,
-  onEdit,
-  onDuplicate,
-  onDelete,
   width,
-}: Pick<SortableQuestionRowProps, "question" | "isOngoing" | "onEdit" | "onDuplicate" | "onDelete"> & { width: number | null }) {
+}: Pick<SortableQuestionRowProps, "question" | "isOngoing"> & { width: number | null }) {
   return (
     <div
       style={{ width: width ?? undefined }}
@@ -379,9 +338,6 @@ function QuestionDragOverlayRow({
             <GripVertical className="size-4" />
           </span>
         }
-        onEdit={onEdit}
-        onDuplicate={onDuplicate}
-        onDelete={onDelete}
       />
     </div>
   );
@@ -854,6 +810,9 @@ export function SurveyEditorPage() {
           imageUrlEn: opt.imageUrlEn ?? null,
         })),
         answerRegex: q.answerRegex ?? "",
+        answerValidationEnabled: Boolean(
+          q.answerRegex?.trim() || q.config?.validationErrorMessage?.trim(),
+        ),
         isRequired: q.isRequired ?? true,
         config: q.config,
       },
@@ -864,6 +823,10 @@ export function SurveyEditorPage() {
     if (!loadedSurveyId || !editingQuestion) return;
     setError(null);
     const { sectionId, questionId } = editingQuestion;
+    const questionConfig = qForm.config ? { ...qForm.config } : undefined;
+    if (!qForm.answerValidationEnabled && questionConfig) {
+      delete questionConfig.validationErrorMessage;
+    }
     const body = {
       titleKo: qForm.titleKo.trim(),
       titleEn: qForm.titleEn.trim() || undefined,
@@ -871,8 +834,10 @@ export function SurveyEditorPage() {
       descriptionEn: qForm.descriptionEn.trim() || undefined,
       questionType: qForm.questionType,
       options: qForm.options.length > 0 ? qForm.options : undefined,
-      config: qForm.config ?? undefined,
-      answerRegex: qForm.answerRegex.trim() || undefined,
+      config: questionConfig && Object.keys(questionConfig).length > 0 ? questionConfig : undefined,
+      answerRegex: qForm.answerValidationEnabled
+        ? qForm.answerRegex.trim() || undefined
+        : undefined,
       isRequired: qForm.isRequired,
     };
 
@@ -884,7 +849,15 @@ export function SurveyEditorPage() {
       }
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
-      setEditingQuestion(null);
+      setEditingQuestion((current) => {
+        if (
+          current?.sectionId === sectionId &&
+          current.questionId === questionId
+        ) {
+          return null;
+        }
+        return current;
+      });
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "문항 저장 실패"));
@@ -1237,7 +1210,8 @@ export function SurveyEditorPage() {
 
                           {/* 섹션 질문 목록 */}
                           <div className="space-y-2 p-4">
-                            {section.questions.length === 0 && (
+                            {section.questions.length === 0 &&
+                              !(editingQuestion?.sectionId === section.id && !editingQuestion.questionId) && (
                               <p className="text-kaist-grey/40 text-sm text-center py-6 font-bold">
                                 등록된 질문이 없습니다.
                               </p>
@@ -1264,14 +1238,15 @@ export function SurveyEditorPage() {
                                           isOngoing={isOngoing}
                                           currentSectionId={section.id}
                                           branchTargets={branchTargetsForEditing}
+                                          isNewQuestion={false}
+                                          onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
+                                          onDelete={() => void handleDeleteQuestion(section.id, question.id)}
                                           onSave={handleSaveQuestion}
                                           onCancel={() => setEditingQuestion(null)}
                                         />
                                       ) : undefined
                                     }
                                     onEdit={() => openEditQuestion(section.id, question)}
-                                    onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
-                                    onDelete={() => void handleDeleteQuestion(section.id, question.id)}
                                   />
                                 );
                               })}
@@ -1283,6 +1258,7 @@ export function SurveyEditorPage() {
                                 isOngoing={isOngoing}
                                 currentSectionId={section.id}
                                 branchTargets={branchTargetsForEditing}
+                                isNewQuestion
                                 onSave={handleSaveQuestion}
                                 onCancel={() => setEditingQuestion(null)}
                               />
@@ -1312,9 +1288,6 @@ export function SurveyEditorPage() {
                                 question={activeQuestion}
                                 isOngoing={isOngoing}
                                 width={activeDragWidth}
-                                onEdit={() => undefined}
-                                onDuplicate={() => undefined}
-                                onDelete={() => undefined}
                               />
                             ) : null}
                           </DragOverlay>,

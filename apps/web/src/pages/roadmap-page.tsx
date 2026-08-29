@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import { Header } from "@/components/organisms/header";
+import { normalizeRoadmapCourseCode } from "@soc/contracts";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
 import { RoadmapGraph } from "@/features/roadmap/roadmap-graph";
 import {
@@ -15,10 +16,10 @@ export function RoadmapPage() {
   const { lang } = useLanguage();
   const title = useLocalizedSiteContent("about.roadmap.title");
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedCourseParam = searchParams.get("course")?.toUpperCase() ?? null;
+  const selectedCourseParam = searchParams.get("course") ?? null;
   const selectedCourseCode =
-    selectedCourseParam && ROADMAP_COURSE_BY_CODE.has(selectedCourseParam)
-      ? selectedCourseParam
+    selectedCourseParam && ROADMAP_COURSE_BY_CODE.has(normalizeRoadmapCourseCode(selectedCourseParam))
+      ? normalizeRoadmapCourseCode(selectedCourseParam)
       : null;
 
   const updateSelectedCourse = (courseCode: string | null) => {

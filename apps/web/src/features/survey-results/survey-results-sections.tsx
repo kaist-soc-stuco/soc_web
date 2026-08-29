@@ -321,11 +321,7 @@ export function SurveyResultsContent({
   loading: boolean;
 }) {
   if (loading) {
-    return (
-      <ResultShell className="p-10 text-center text-sm font-bold text-slate-400">
-        {lang === "ko" ? "결과를 불러오는 중..." : "Loading results..."}
-      </ResultShell>
-    );
+    return null;
   }
 
   if (error === "forbidden") {

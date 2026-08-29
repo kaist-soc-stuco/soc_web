@@ -14,6 +14,7 @@ export * from "./http/site-content.js";
 export * from "./http/asset.js";
 export * from "./http/notifications.js";
 export * from "./http/vote.js";
+export * from "./http/roadmap.js";
 export * from "./errors/app-error.js";
 export * from "./permissions-registry.js";
 export * from "./operational-surveys.js";

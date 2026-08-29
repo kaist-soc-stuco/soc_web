@@ -32,6 +32,7 @@ export interface ApiClientContext {
   emailsBaseUrl: string;
   normalizedBaseUrl: string;
   notificationsBaseUrl: string;
+  roadmapBaseUrl: string;
   requestJson: <T>(
     url: string,
     init: RequestInit,
@@ -409,6 +410,7 @@ export const createApiClientContext = ({
     emailsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "admin/emails"),
     normalizedBaseUrl,
     notificationsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "notifications"),
+    roadmapBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "roadmap"),
     putObject,
     requestJson,
     requestBlob,

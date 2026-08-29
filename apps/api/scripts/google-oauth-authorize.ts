@@ -35,6 +35,10 @@ const PORT = Number.parseInt(process.env.GOOGLE_OAUTH_CALLBACK_PORT ?? "53682", 
 const REDIRECT_URI = `http://127.0.0.1:${PORT}/oauth/callback`;
 const SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
+  // The app uses a pre-existing operations folder configured by ID. This
+  // metadata-only scope lets Drive validate that folder without granting
+  // access to file contents outside the app-created Sheets.
+  "https://www.googleapis.com/auth/drive.metadata.readonly",
 ];
 
 const base64Url = (value: Buffer): string =>

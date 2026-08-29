@@ -25,7 +25,6 @@ interface SurveyResponseFormProps {
   submitting: boolean;
   survey: SurveyDetailResponse;
   visibleSectionIds: Set<string>;
-  draftRestored: boolean;
 }
 
 export function SurveyResponseForm({
@@ -41,7 +40,6 @@ export function SurveyResponseForm({
   submitting,
   survey,
   visibleSectionIds,
-  draftRestored,
 }: SurveyResponseFormProps) {
   const visibleSections = useMemo(
     () => survey.sections.filter((section) => visibleSectionIds.has(section.id)),
@@ -95,16 +93,6 @@ export function SurveyResponseForm({
               ? "이전에 제출한 응답을 수정하는 중입니다. 설문이 열려 있는 동안 다시 저장할 수 있습니다."
               : "You are editing your previous response. Changes can be saved before the survey closes."}
           </div>
-        )}
-        {draftRestored && (
-          <p
-            role="status"
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-normal text-slate-500"
-          >
-            {lang === "ko"
-              ? "이전에 입력한 응답을 불러왔습니다."
-              : "Your saved response has been restored."}
-          </p>
         )}
         {activeSection ? (
           <section key={activeSection.id} className="flex flex-col gap-4">
@@ -218,29 +206,27 @@ export function SurveyResponseForm({
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-slate-100 pt-4">
-          <div className="flex items-center gap-3">
-            {visibleSections.length > 1 && (
-              <span className="text-xs font-normal text-slate-500">
-                {activeSectionIndex + 1} / {visibleSections.length}
-              </span>
-            )}
-            {hasPreviousSection && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePrevious}
-                className="rounded-xl px-5 py-3 text-sm font-medium"
-              >
-                {lang === "ko" ? "이전" : "Back"}
-              </Button>
-            )}
-          </div>
+        <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+          {visibleSections.length > 1 && (
+            <span className="mr-auto text-xs font-normal text-slate-500">
+              {activeSectionIndex + 1} / {visibleSections.length}
+            </span>
+          )}
+          {hasPreviousSection && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePrevious}
+              className="rounded-xl px-5 py-3 text-sm font-medium"
+            >
+              {lang === "ko" ? "이전" : "Back"}
+            </Button>
+          )}
           <Button
             variant="default"
             type="submit"
             disabled={submitting || (isPreview && !hasNextSection)}
-            className="inline-flex w-full items-center justify-center rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm !font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition-all hover:bg-kaist-darkgreen/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="inline-flex w-auto items-center justify-center rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm !font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition-all hover:bg-kaist-darkgreen/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
               <>

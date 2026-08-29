@@ -63,6 +63,7 @@ export const articles = pgTable("article", {
   hiddenReason: varchar("hidden_reason", { length: 500 }),
   eventStartDate: timestamp("event_start_date", { withTimezone: true }),
   eventEndDate: timestamp("event_end_date", { withTimezone: true }),
+  eventLocation: varchar("event_location", { length: 255 }),
   eventDescriptionKo: text("event_description_ko"),
   eventDescriptionEn: text("event_description_en"),
 }, (table) => [

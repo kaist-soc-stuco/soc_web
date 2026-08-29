@@ -1,3 +1,5 @@
+import { normalizeRoadmapCourseCode } from "@soc/contracts";
+
 export type RoadmapLanguage = "ko" | "en";
 
 export interface LocalizedText {
@@ -15,6 +17,7 @@ export interface RoadmapCourse {
   ai?: boolean;
   category: CourseCategory;
   code: string;
+  legacyCode?: string;
   credits: string;
   name: LocalizedText;
   semesters: string;
@@ -65,7 +68,19 @@ const course = (
   category: CourseCategory,
   tracks: string[] = [],
   ai = false,
-): RoadmapCourse => ({ code, name: { ko, en }, semesters, credits, category, tracks, ai });
+): RoadmapCourse => {
+  const normalizedCode = normalizeRoadmapCourseCode(code);
+  return {
+    code: normalizedCode,
+    legacyCode: normalizedCode === code ? undefined : code,
+    name: { ko, en },
+    semesters,
+    credits,
+    category,
+    tracks,
+    ai,
+  };
+};
 
 export const ROADMAP_COURSES: RoadmapCourse[] = [
   course("CS101", "프로그래밍 기초", "Programming Basics", "S/F", "2:3:2(0)", "basic-required"),
@@ -153,7 +168,10 @@ export const ROADMAP_LANES: RoadmapLane[] = [
   { id: "ai", trackId: "ai", label: { ko: "인공지능·정보서비스", en: "AI & Information Services" }, courses: ["CS10003", "CS270", "CS371", "CS372", "CS376", "CS377", "CS470", "CS474", "CS484", "CS411", "CS471", "CS479", "CS423", "CS30708", "CS40710", "CS40711"] },
   { id: "interactive", trackId: "interactive", label: { ko: "인터랙티브 컴퓨팅", en: "Interactive Computing" }, courses: ["CS380", "CS486", "CS482", "CS442", "CS374", "CS473"] },
   { id: "special", label: { ko: "프로젝트·특강", en: "Projects & Special Topics" }, courses: ["CS408", "CS492", "CS494", "CS496"] },
-];
+].map((lane) => ({
+  ...lane,
+  courses: lane.courses.map(normalizeRoadmapCourseCode),
+}));
 
 export const ROADMAP_RELATIONS: RoadmapRelation[] = [
   { source: "CS101", target: "CS109" },
@@ -187,7 +205,10 @@ export const ROADMAP_RELATIONS: RoadmapRelation[] = [
   { source: "CS300", target: "CS423" },
   { source: "CS320", target: "CS423" },
   { source: "CS376", target: "CS423" },
-];
+].map((relation) => ({
+  source: normalizeRoadmapCourseCode(relation.source),
+  target: normalizeRoadmapCourseCode(relation.target),
+}));
 
 export const CATEGORY_LABELS: Record<CourseCategory, LocalizedText> = {
   "basic-required": { ko: "기초필수", en: "Basic required" },

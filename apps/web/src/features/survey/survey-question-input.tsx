@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import { createApiClient } from "@soc/api-client";
 import type {
   QuestionOption,
   QuestionType,
   SurveyQuestionRecord,
 } from "@soc/contracts";
-import { Check, FileText, Star, X } from "lucide-react";
+import { Check, FileText, Loader2, Plus, Star, UploadCloud, X } from "lucide-react";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -46,6 +46,8 @@ export function SurveyQuestionInput({
   );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
   const base =
     "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20";
   const controlClass = base;
@@ -84,6 +86,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiTextarea
+            autoResize={false}
             className={`${controlClass} min-h-[100px] resize-y`}
             value={value as string}
             onChange={(e) => onChange(e.target.value)}
@@ -390,34 +393,110 @@ export function SurveyQuestionInput({
       const removeFile = (assetId: string) => {
         onChange({ kind: "file", files: currentFiles.filter((file) => file.assetId !== assetId) });
       };
+      const openFilePicker = () => {
+        if (disabled || uploading) return;
+        fileInputRef.current?.click();
+      };
+      const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        setIsDragActive(false);
+        if (disabled || uploading) return;
+        void handleFileChange(event.dataTransfer.files);
+      };
       return (
-        <div className="space-y-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-4">
-          <UiInput
-            type="file"
-            accept={accept}
-            multiple={maxFiles > 1}
-            disabled={disabled || uploading}
-            aria-invalid={Boolean(error)}
-            onChange={(event) => {
-              void handleFileChange(event.target.files ?? undefined);
-              event.currentTarget.value = "";
+        <div className="space-y-3">
+          <div
+            role="button"
+            tabIndex={disabled || uploading ? -1 : 0}
+            aria-disabled={disabled || uploading}
+            aria-invalid={Boolean(error || uploadError)}
+            onClick={openFilePicker}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openFilePicker();
+              }
             }}
-            className="block w-full text-sm font-semibold text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-kaist-darkgreen file:px-3 file:py-2 file:text-xs file:font-bold file:text-white hover:file:bg-kaist-darkgreen/90"
-          />
+            onDragEnter={(event) => {
+              event.preventDefault();
+              if (!disabled && !uploading) setIsDragActive(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (!disabled && !uploading) setIsDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setIsDragActive(false);
+              }
+            }}
+            onDrop={handleDrop}
+            className={`flex min-h-28 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 py-6 text-center outline-none transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/20 ${
+              isDragActive
+                ? "border-kaist-darkgreen bg-emerald-50/70"
+                : "border-slate-300 bg-slate-50/70 hover:border-kaist-darkgreen/50 hover:bg-slate-50"
+            } ${disabled || uploading ? "cursor-not-allowed opacity-60" : ""}`}
+          >
+            <UiInput
+              ref={fileInputRef}
+              type="file"
+              accept={accept}
+              multiple={maxFiles > 1}
+              disabled={disabled || uploading}
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(event) => {
+                void handleFileChange(event.currentTarget.files ?? undefined);
+                event.currentTarget.value = "";
+              }}
+              className="sr-only"
+            />
+            {uploading ? (
+              <Loader2 aria-hidden="true" className="mb-2 size-7 animate-spin text-kaist-darkgreen" />
+            ) : (
+              <UploadCloud aria-hidden="true" className="mb-2 size-7 text-kaist-darkgreen/70" />
+            )}
+            <p className="text-sm font-medium text-slate-700">
+              {uploading
+                ? "파일을 업로드하는 중입니다."
+                : currentFiles.length > 0
+                  ? "파일을 추가하려면 클릭하거나 끌어다 놓으세요."
+                  : "파일을 선택하거나 여기로 끌어다 놓으세요."}
+            </p>
+            <p className="mt-1 text-xs font-normal text-slate-400">
+              최대 {(maxSizeBytes / 1_000_000).toFixed(0)}MB
+            </p>
+          </div>
+
           {currentFiles.length > 0 ? (
-            <div className="space-y-1.5" aria-label="업로드된 파일 목록">
+            <div className="space-y-2" aria-label="업로드된 파일 목록">
               {currentFiles.map((file) => (
-                <div key={file.assetId} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-normal text-slate-700">
-                  <FileText aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+                <div key={file.assetId} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                    <FileText aria-hidden="true" className="size-4" />
+                  </span>
                   <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
                   {typeof file.sizeBytes === "number" ? <span className="shrink-0 text-xs text-slate-400">{(file.sizeBytes / 1_000_000).toFixed(1)}MB</span> : null}
-                  <button type="button" className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => removeFile(file.assetId)} disabled={disabled || uploading} aria-label={`${file.fileName} 삭제`}>
+                  <button type="button" className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => removeFile(file.assetId)} disabled={disabled || uploading} aria-label={`${file.fileName} 삭제`}>
                     <X aria-hidden="true" className="size-3.5" />
                   </button>
                 </div>
               ))}
             </div>
           ) : null}
+
+          {maxFiles > 1 && currentFiles.length > 0 && currentFiles.length < maxFiles ? (
+            <button
+              type="button"
+              onClick={openFilePicker}
+              disabled={disabled || uploading}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-kaist-darkgreen transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus aria-hidden="true" className="size-3.5" />
+              파일 추가
+            </button>
+          ) : null}
+
           {uploadError ? <p className="text-xs font-normal text-rose-600" role="alert">{uploadError}</p> : null}
           {renderError}
         </div>

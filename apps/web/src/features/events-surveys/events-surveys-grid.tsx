@@ -2,7 +2,7 @@ import type {
   ArticleEngagementKind,
 } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
-import { CalendarDays, Clock } from "lucide-react";
+import { CalendarDays, ClipboardList, Clock, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
@@ -12,6 +12,7 @@ import {
   isClosedItem,
   type UnifiedItem,
 } from "@/lib/events-surveys";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 interface EventsSurveysGridProps {
   isAuthenticated: boolean;
@@ -164,69 +165,66 @@ export function EventsSurveysGrid({
         const closed = isClosedItem(item);
         const href = getItemHref(item);
         const isSurvey = item.kind !== "EVENT";
-        const eyebrow = [
+        const badges = [
           getStatusText(item, lang),
           getApplicationText(item, lang),
           getAudienceText(item, lang),
         ]
           .filter(Boolean)
-          .join(" · ");
+          .filter((label, index, labels) => labels.indexOf(label) === index);
         const canEngage = item.kind === "EVENT" && onEngagementToggle;
         const submitting =
           engagementSubmitting === `${item.id}:SCRAP` ? "SCRAP" : null;
+        const mediaUrl = item.imageUrl ? resolveAssetUrl(item.imageUrl) : null;
 
         return (
           <div
             key={item.id}
-            className={`interaction-card select-none group flex w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${isSurvey ? "h-[14.5rem] min-h-[14.5rem] max-h-[14.5rem]" : "h-full"} ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
+            className={`interaction-card select-none group flex h-full min-h-[24rem] w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
           >
-            {item.kind === "EVENT" ? (
+            <div className="relative aspect-video shrink-0 overflow-hidden border-b border-slate-100 bg-slate-50">
               <Link
                 aria-label={title}
                 to={href}
-                className="relative block aspect-video overflow-hidden border-b border-slate-100 bg-slate-50"
+                className="absolute inset-0 block"
               >
-                {item.imageUrl ? (
+                {mediaUrl ? (
                   <img
-                    src={item.imageUrl}
+                    src={mediaUrl}
                     alt=""
                     aria-hidden="true"
                     className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <CalendarDays
-                      aria-hidden="true"
-                      className="h-8 w-8 text-slate-400"
-                    />
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50">
+                    {isSurvey ? (
+                      <ClipboardList
+                        aria-hidden="true"
+                        className="h-8 w-8 text-emerald-600/60"
+                      />
+                    ) : (
+                      <CalendarDays
+                        aria-hidden="true"
+                        className="h-8 w-8 text-slate-400"
+                      />
+                    )}
                   </div>
                 )}
               </Link>
-            ) : null}
-
-            <div className={`flex min-h-0 flex-1 flex-col ${isSurvey ? "p-5" : "p-4"}`}>
-              <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-                <Link
-                  aria-label={title}
-                  to={href}
-                  className="min-w-0 flex-1"
-                >
-                  {eyebrow ? (
-                    <p className="truncate text-xs font-medium leading-5 text-slate-500">
-                      {eyebrow}
-                    </p>
-                  ) : null}
-                  <h3 className={`${isSurvey ? "mt-2.5" : "mt-1"} line-clamp-2 text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong`}>
-                    {title}
-                  </h3>
-                  {desc ? (
-                    <p className={`${isSurvey ? "mt-2.5 min-h-[3.375rem] line-clamp-3" : "mt-1.5 line-clamp-2"} text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body`}>
-                      {desc}
-                    </p>
-                  ) : null}
-                </Link>
-
-                {canEngage ? (
+              {badges.length > 0 ? (
+                <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap gap-1.5">
+                  {badges.map((badge) => (
+                    <span
+                      key={badge}
+                      className="rounded-full border border-white/30 bg-slate-950/35 px-2.5 py-1 text-[length:var(--ui-text-caption-size)] font-medium leading-none text-white shadow-sm backdrop-blur-md"
+                    >
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {canEngage ? (
+                <div className="absolute right-3 top-3 z-20 rounded-lg border border-white/40 bg-white/75 p-0.5 shadow-sm backdrop-blur-md">
                   <ArticleEngagementActions
                     allowLike={false}
                     compact
@@ -242,17 +240,42 @@ export function EventsSurveysGrid({
                       onEngagementToggle(item, kind, active)
                     }
                   />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col p-5">
+              <Link
+                aria-label={title}
+                to={href}
+                className="min-w-0 flex-1"
+              >
+                <h3 className="line-clamp-2 text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong">
+                  {title}
+                </h3>
+                {desc ? (
+                  <p className="mt-2.5 min-h-[3.375rem] line-clamp-3 text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body">
+                    {desc}
+                  </p>
+                ) : null}
+              </Link>
+
+              <div className="mt-auto space-y-1.5 pt-5">
+                <Link
+                  aria-label={`${title} ${getCardPeriodText(item, lang)}`}
+                  to={href}
+                  className="flex min-w-0 items-center gap-1.5 text-xs font-normal text-slate-700"
+                >
+                  <Clock className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                  <span className="truncate">{getCardPeriodText(item, lang)}</span>
+                </Link>
+                {item.location ? (
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs font-normal text-slate-600">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                    <span className="truncate">{item.location}</span>
+                  </div>
                 ) : null}
               </div>
-
-              <Link
-                aria-label={`${title} ${getCardPeriodText(item, lang)}`}
-                to={href}
-                className={`mt-auto flex items-center gap-1.5 text-xs font-normal text-slate-700 ${isSurvey ? "pt-5" : "pt-4"}`}
-              >
-                <Clock className="h-3.5 w-3.5 shrink-0 text-slate-600" />
-                <span className="truncate">{getCardPeriodText(item, lang)}</span>
-              </Link>
             </div>
           </div>
         );

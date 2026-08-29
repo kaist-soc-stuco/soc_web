@@ -43,6 +43,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     eventDescriptionKo,
     eventDescriptionEn,
     eventEndDate,
+    eventLocation,
     eventStartDate,
     fileInputRef,
     handleCategoryChange,
@@ -72,6 +73,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setEventDescriptionKo,
     setEventDescriptionEn,
     setEventEndDate,
+    setEventLocation,
     setEventStartDate,
     setIsAnonymous,
     setIsAllDay,
@@ -110,6 +112,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     isEventAlwaysOpen,
     eventStartDate,
     eventEndDate,
+    eventLocation,
     eventDescriptionKo,
     eventDescriptionEn,
     selectedSurveyId,
@@ -135,6 +138,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     setEventEndDate(
       switchEventEndDateInputMode(template.eventEndDate, Boolean(template.isAllDay)),
     );
+    setEventLocation(template.eventLocation || "");
     setEventDescriptionKo(template.eventDescriptionKo);
     setEventDescriptionEn(template.eventDescriptionEn);
     setSelectedSurveyId(template.selectedSurveyId);
@@ -152,6 +156,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       eventDescriptionKo={eventDescriptionKo}
       eventDescriptionEn={eventDescriptionEn}
       eventEndDate={eventEndDate}
+      eventLocation={eventLocation}
       eventStartDate={eventStartDate}
       isAllDay={isAllDay}
       isEventAlwaysOpen={isEventAlwaysOpen}
@@ -167,6 +172,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
       onEventDescriptionKoChange={setEventDescriptionKo}
       onEventDescriptionEnChange={setEventDescriptionEn}
       onEventEndDateChange={setEventEndDate}
+      onEventLocationChange={setEventLocation}
       onEventStartDateChange={setEventStartDate}
       onThumbnailRemove={() =>
         setAssets((current) =>
@@ -313,7 +319,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
           ) : null}
 
           {isEvent ? (
-            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
               {editorCard(false)}
               <DataViewCard className="min-w-0">
                 {eventFields}

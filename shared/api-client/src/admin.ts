@@ -406,6 +406,13 @@ export const createAdminApi = ({
     );
   },
 
+  getContactDepartments: async (): Promise<ContactDepartmentListResponse> => {
+    return requestJson<ContactDepartmentListResponse>(
+      `${contactsBaseUrl}/departments`,
+      { method: "GET" },
+    );
+  },
+
   createContact: async (
     body: CreateContactRequest,
   ): Promise<ContactRecord> => {
