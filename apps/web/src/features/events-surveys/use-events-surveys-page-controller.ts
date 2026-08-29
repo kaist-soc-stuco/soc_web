@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, KoreanHolidayRecord } from "@soc/contracts";
-import { isoToDate, localDate, nowDate } from "@soc/shared";
+import { isoToDate, isoToMs, localDate, nowDate } from "@soc/shared";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useToast } from "@/components/ui/toast";
@@ -24,6 +24,14 @@ function parseSelectedCalendarDate(value: string | null) {
   if (!value) return null;
   const parsed = isoToDate(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseDateBoundary(value: string, endOfDay: boolean) {
+  if (!value) return null;
+  const time = Date.parse(
+    `${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}+09:00`,
+  );
+  return Number.isFinite(time) ? time : null;
 }
 
 export function useEventsSurveysPageController({
@@ -58,6 +66,8 @@ export function useEventsSurveysPageController({
   );
   const [calendarQuery, setCalendarQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
   const [engagementOverrides, setEngagementOverrides] = useState<
     Record<string, Partial<UnifiedItem>>
@@ -201,16 +211,32 @@ export function useEventsSurveysPageController({
     return filterItemsByTab(unifiedItems, currentTab);
   }, [unifiedItems, currentTab]);
 
+  const dateFilteredItems = useMemo(() => {
+    if (!dateFrom && !dateTo) return filteredItems;
+    const from = parseDateBoundary(dateFrom, false) ?? Number.MIN_SAFE_INTEGER;
+    const to = parseDateBoundary(dateTo, true) ?? Number.MAX_SAFE_INTEGER;
+    if (from > to) return [];
+
+    return filteredItems.filter((item) => {
+      const start = item.opensAt ? isoToMs(item.opensAt) : null;
+      const end = item.closesAt ? isoToMs(item.closesAt) : start;
+      if (start === null || end === null || !Number.isFinite(start) || !Number.isFinite(end)) {
+        return false;
+      }
+      return end >= from && start <= to;
+    });
+  }, [dateFrom, dateTo, filteredItems]);
+
   const searchedItems = useMemo(() => {
     const query = itemQuery.trim().toLocaleLowerCase();
-    if (!query) return filteredItems;
+    if (!query) return dateFilteredItems;
 
-    return filteredItems.filter((item) =>
+    return dateFilteredItems.filter((item) =>
       [item.titleKo, item.titleEn, item.descriptionKo, item.descriptionEn]
         .filter(Boolean)
         .some((value) => value!.toLocaleLowerCase().includes(query)),
     );
-  }, [filteredItems, itemQuery]);
+  }, [dateFilteredItems, itemQuery]);
 
   const visibleItems = useMemo(() => {
     return sortVisibleItems(searchedItems, "latest", stateFilter);
@@ -342,10 +368,14 @@ export function useEventsSurveysPageController({
         : listQuery.isPending,
     selectedDate,
     calendarQuery,
+    dateFrom,
+    dateTo,
     engagementSubmitting,
     handleSetEngagement,
     setCurrentDate: handleCurrentDateChange,
     setCalendarQuery,
+    setDateFrom,
+    setDateTo,
     itemQuery,
     setItemQuery,
     setSelectedDate,

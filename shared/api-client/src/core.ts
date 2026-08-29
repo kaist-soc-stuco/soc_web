@@ -8,7 +8,7 @@ export interface ListQueryOptions {
   page?: number;
   period?: "all" | "today" | "7days" | "30days";
   q?: string;
-  searchBy?: "title" | "author" | "title_content";
+  searchBy?: "title" | "content" | "author" | "title_content";
   sortBy?: "latest" | "views";
   sortDirection?: "asc" | "desc";
 }

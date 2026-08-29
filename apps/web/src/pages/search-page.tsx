@@ -22,7 +22,9 @@ export function SearchPage() {
     lang,
     loading,
     query,
+    searchBy,
     setInputValue,
+    setSearchBy,
     setFilter,
     surveys,
     totalCount,
@@ -38,7 +40,9 @@ export function SearchPage() {
           inputValue={inputValue}
           lang={lang}
           onInputValueChange={setInputValue}
+          onSearchByChange={setSearchBy}
           onSubmit={handleSubmit}
+          searchBy={searchBy}
         />
         <SearchFilterTabs
           activeFilter={filter}

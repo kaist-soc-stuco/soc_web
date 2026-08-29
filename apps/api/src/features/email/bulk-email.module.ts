@@ -13,6 +13,6 @@ import { AssetModule } from "../asset/asset.module";
   imports: [AuthModule, UsersModule, PostgresModule, AssetModule],
   controllers: [BulkEmailController],
   providers: [BulkEmailRepository, BulkEmailTemplateRepository, BulkEmailService, EmailDeliveryService],
-  exports: [BulkEmailService, BulkEmailRepository],
+  exports: [BulkEmailService, BulkEmailRepository, EmailDeliveryService],
 })
 export class BulkEmailModule {}

@@ -11,14 +11,26 @@ import type {
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
-import { ABOUT_ITEMS, includesQuery, type SearchFilter } from "./search-utils";
+import {
+  ABOUT_ITEMS,
+  includesQuery,
+  type SearchFilter,
+  type SearchScope,
+} from "./search-utils";
 
 export function useSearchPageController() {
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
+  const searchByParam: SearchScope =
+    searchParams.get("searchBy") === "title"
+      ? "title"
+      : searchParams.get("searchBy") === "content"
+        ? "content"
+        : "title_content";
   const [inputValue, setInputValue] = useState(query);
+  const [searchBy, setSearchBy] = useState<SearchScope>(searchByParam);
   const [filter, setFilter] = useState<SearchFilter>("all");
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<PublicCalendarEventItem[]>([]);
@@ -35,7 +47,8 @@ export function useSearchPageController() {
   useEffect(() => {
     setInputValue(query);
     setFilter("all");
-  }, [query]);
+    setSearchBy(searchByParam);
+  }, [query, searchByParam]);
 
   useEffect(() => {
     if (!query) {
@@ -52,7 +65,7 @@ export function useSearchPageController() {
     setError(null);
 
     Promise.all([
-      apiClient.searchArticles(query, 60),
+      apiClient.searchArticles(query, 60, searchBy),
       apiClient.getPublicSurveys(),
       apiClient.getBoards().catch(() => ({ items: [] as BoardSummary[] })),
       apiClient.searchPublicCalendarEvents(query, 40),
@@ -100,7 +113,7 @@ export function useSearchPageController() {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, lang, query]);
+  }, [apiClient, lang, query, searchBy]);
 
   const boardById = useMemo(
     () => new Map(boards.map((board) => [board.boardId, board])),
@@ -143,7 +156,11 @@ export function useSearchPageController() {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextQuery = inputValue.trim();
-    navigate(nextQuery ? `/search?q=${encodeURIComponent(nextQuery)}` : "/search");
+    navigate(
+      nextQuery
+        ? `/search?q=${encodeURIComponent(nextQuery)}&searchBy=${searchBy}`
+        : "/search",
+    );
   };
 
   return {
@@ -159,7 +176,9 @@ export function useSearchPageController() {
     lang,
     loading,
     query,
+    searchBy,
     setInputValue,
+    setSearchBy,
     setFilter,
     surveys,
     totalCount,

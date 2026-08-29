@@ -179,6 +179,8 @@ export class ArticleRepository {
       ? or(
           ilike(articles.titleKo, `%${normalizedQuery}%`),
           ilike(articles.titleEn, `%${normalizedQuery}%`),
+          ilike(articles.contentKo, `%${normalizedQuery}%`),
+          ilike(articles.contentEn, `%${normalizedQuery}%`),
         )
       : undefined;
 
@@ -302,7 +304,7 @@ export class ArticleRepository {
       limit: number;
       page: number;
       query?: string;
-      searchBy: "title" | "author" | "title_content";
+      searchBy: "title" | "content" | "author" | "title_content";
       sortBy: "latest" | "views";
       sortDirection: "asc" | "desc";
       includeContentPreview?: boolean;
@@ -322,6 +324,11 @@ export class ArticleRepository {
             ilike(users.nameKo, `%${normalizedQuery}%`),
             ilike(users.nameEn, `%${normalizedQuery}%`),
           )
+        : params.searchBy === "content"
+          ? or(
+              ilike(articles.contentKo, `%${normalizedQuery}%`),
+              ilike(articles.contentEn, `%${normalizedQuery}%`),
+            )
         : params.searchBy === "title_content"
           ? or(
               ilike(articles.titleKo, `%${normalizedQuery}%`),

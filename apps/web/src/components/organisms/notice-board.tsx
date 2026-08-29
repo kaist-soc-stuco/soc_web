@@ -7,7 +7,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatNumericDate } from "@/lib/date-display";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { useLanguage } from "@/hooks/use-language";
 
 interface NoticeItemProps {
@@ -136,6 +136,7 @@ export function NoticeBoard() {
   const [activeTab, setActiveTab] = useState(0);
   const [notices, setNotices] = useState<Record<string, NoticeItemProps[]>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [lastLoadedNotices, setLastLoadedNotices] = useState<NoticeItemProps[]>([]);
 
   const tabs = [
@@ -179,6 +180,7 @@ export function NoticeBoard() {
     let active = true;
     const fetchNotices = async () => {
       setLoading(true);
+      setLoadError(false);
       try {
         const res = await apiClient.getArticles(activeCategory, { limit: 20 });
         // Filter out items with blank/empty titles
@@ -217,11 +219,13 @@ export function NoticeBoard() {
             commentCount: item.commentCount,
         }));
         if (active) {
+          setLoadError(false);
           setNotices((prev) => ({ ...prev, [activeNoticeKey]: items }));
           setLastLoadedNotices(items);
         }
       } catch (err) {
         console.error(err);
+        if (active) setLoadError(true);
       } finally {
         if (active) {
           setLoading(false);
@@ -275,6 +279,16 @@ export function NoticeBoard() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pb-1 pt-1">
           {showInitialSkeleton ? (
             <NoticeBoardSkeleton />
+          ) : loadError ? (
+            <ErrorState
+              className="min-h-0 flex-1 rounded-none border-0 bg-transparent p-4"
+              message={
+                lang === "ko"
+                  ? "게시글을 불러오지 못했습니다."
+                  : "Posts could not be loaded."
+              }
+              minHeightClassName="min-h-0"
+            />
           ) : renderedNotices.length > 0 ? (
             <div
               className={`grid min-h-0 flex-1 transition-opacity duration-150 ${

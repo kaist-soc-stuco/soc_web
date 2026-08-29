@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   clearStoredAuthState,
+  consumeAuthReturnPath,
   writeStoredAuthState,
 } from "@/lib/auth-storage";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -91,6 +92,10 @@ export function LoginCallbackPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const navigateAfterLogin = () => {
+    const returnTo = consumeAuthReturnPath();
+    navigate(returnTo ?? "/", { replace: true });
+  };
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
@@ -168,7 +173,7 @@ export function LoginCallbackPage() {
         .then(async () => {
           clearStoredAuthState();
           await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-          navigate("/", { replace: true });
+          navigateAfterLogin();
         })
         .catch(() => {
           consumedResultTokenRef.current.delete(resultToken);
@@ -183,7 +188,7 @@ export function LoginCallbackPage() {
     if (loginStatus === "success") {
       void queryClient
         .invalidateQueries({ queryKey: ["auth", "session"] })
-        .finally(() => navigate("/", { replace: true }));
+        .finally(navigateAfterLogin);
       return;
     }
 
@@ -235,7 +240,7 @@ export function LoginCallbackPage() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
-      navigate("/", { replace: true });
+      navigateAfterLogin();
     } catch {
       setConsentErrorMessage(resolveLoginFailureMessage("pending_login_not_found_or_expired", lang));
     } finally {

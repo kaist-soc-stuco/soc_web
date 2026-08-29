@@ -133,8 +133,10 @@ API replica를 둘 때는 별도 worker 또는 distributed lock을 도입하기 
 
 ```bash
 curl -X POST "$API_BASE_URL/v1/assets/cleanup-orphans" \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
+  -b "$COOKIE_JAR"
 ```
+
+`COOKIE_JAR`에는 관리자 인증 세션 쿠키가 들어 있어야 한다.
 
 응답 예시:
 

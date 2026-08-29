@@ -13,7 +13,7 @@ import { stripRichText } from "@/components/ui/rich-text-content";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
 import { formatShortDate } from "@/lib/date-display";
 
-import type { AboutSearchItem, SearchFilter } from "./search-utils";
+import type { AboutSearchItem, SearchFilter, SearchScope } from "./search-utils";
 
 function formatDate(value: string, lang: string) {
   return formatShortDate(value, lang);
@@ -35,12 +35,16 @@ export function SearchForm({
   inputValue,
   lang,
   onInputValueChange,
+  onSearchByChange,
   onSubmit,
+  searchBy,
 }: {
   inputValue: string;
   lang: string;
   onInputValueChange: (value: string) => void;
+  onSearchByChange: (value: SearchScope) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  searchBy: SearchScope;
 }) {
   return (
     <form
@@ -56,6 +60,16 @@ export function SearchForm({
           onClear={() => onInputValueChange("")}
           placeholder={lang === "ko" ? "검색어를 입력하세요" : "Enter a search term"}
         />
+        <select
+          aria-label={lang === "ko" ? "검색 범위" : "Search scope"}
+          className="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-sm font-normal text-[#172033] outline-none focus:border-brand-primary"
+          value={searchBy}
+          onChange={(event) => onSearchByChange(event.currentTarget.value as SearchScope)}
+        >
+          <option value="title">{lang === "ko" ? "제목" : "Title"}</option>
+          <option value="content">{lang === "ko" ? "내용" : "Content"}</option>
+          <option value="title_content">{lang === "ko" ? "제목 + 내용" : "Title + content"}</option>
+        </select>
         <PageActionButton type="submit" tone="primary" className="px-5">
           {lang === "ko" ? "검색" : "Search"}
         </PageActionButton>

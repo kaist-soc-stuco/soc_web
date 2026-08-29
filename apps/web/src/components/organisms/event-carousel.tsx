@@ -9,6 +9,7 @@ import { getEventArticleState } from "@/lib/events-surveys";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { ErrorState } from "@/components/ui/data-state";
 
 interface EventCardRecord {
   id: string;
@@ -301,6 +302,7 @@ export function EventCarousel() {
   const [currentPage, setCurrentPage] = useState(0);
   const [events, setEvents] = useState<EventCardRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragStartXRef = useRef<number | null>(null);
@@ -350,12 +352,14 @@ export function EventCarousel() {
           }))
           .sort((a, b) => compareEventCards(a, b, referenceTime));
         if (active) {
+          setLoadError(false);
           setEvents(eventCards);
           setLoading(false);
         }
       } catch (err) {
         console.error(err);
         if (active) {
+          setLoadError(true);
           setEvents([]);
           setLoading(false);
         }
@@ -537,6 +541,25 @@ export function EventCarousel() {
 
   if (loading && events.length === 0) {
     return <EventCarouselSkeleton lang={lang} />;
+  }
+
+  if (loadError) {
+    return (
+      <section
+        aria-label={lang === "ko" ? "주요 행사" : "Featured events"}
+        className="min-w-0 max-w-full bg-transparent"
+      >
+        <ErrorState
+          className="home-event-card border-dashed bg-white"
+          message={
+            lang === "ko"
+              ? "주요 행사를 불러오지 못했습니다."
+              : "Featured events could not be loaded."
+          }
+        />
+        <div className="mt-5 flex h-1.5 items-center justify-center" />
+      </section>
+    );
   }
 
   if (events.length === 0) {

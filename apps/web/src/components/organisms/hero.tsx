@@ -1,21 +1,35 @@
-import { ArrowUpRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
-  resolveContentBlockText,
   useLocalizedSiteContent,
   usePublicContentBlocksByType,
 } from "@/features/site-content/site-content";
-import { useLanguage } from "@/hooks/use-language";
 import { resolveAssetUrl } from "@/lib/asset-url";
 
 export function Hero() {
   const [imageLoaded, setImageLoaded] = useState(false);
-  const { lang } = useLanguage();
+  const [heroIndex, setHeroIndex] = useState(0);
   const fallbackTitle = useLocalizedSiteContent("home.hero.title");
-  const hero = usePublicContentBlocksByType("HERO")[0];
-  const quickLinks = usePublicContentBlocksByType("QUICK_LINK");
+  const heroes = usePublicContentBlocksByType("HERO");
+  const hero = heroes[heroIndex] ?? heroes[0];
   const imageUrl = hero?.imageUrl ? resolveAssetUrl(hero.imageUrl) : "/hero_background_1.jpg";
+
+  useEffect(() => {
+    if (heroIndex < heroes.length) return;
+    setHeroIndex(0);
+  }, [heroIndex, heroes.length]);
+
+  useEffect(() => {
+    if (heroes.length <= 1) return;
+    const intervalId = window.setInterval(() => {
+      setHeroIndex((current) => (current + 1) % heroes.length);
+    }, 6000);
+    return () => window.clearInterval(intervalId);
+  }, [heroes.length]);
+
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [imageUrl]);
 
   return (
     <section className="hero-image-placeholder relative h-full w-full overflow-hidden">
@@ -47,19 +61,6 @@ export function Hero() {
           </h1>
         </div>
       </div>
-      {quickLinks.length > 0 ? (
-        <nav aria-label={lang === "en" ? "Quick links" : "빠른 링크"} className="absolute bottom-7 left-10 right-10 z-10 flex flex-wrap gap-2 lg:left-14 lg:right-14">
-          {quickLinks.map((block) => {
-            const text = resolveContentBlockText(block, lang);
-            return block.linkUrl ? (
-              <a key={block.contentBlockId} href={block.linkUrl} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm transition-all hover:bg-white/20">
-                {text.title}
-                <ArrowUpRight aria-hidden="true" className="size-3" />
-              </a>
-            ) : null;
-          })}
-        </nav>
-      ) : null}
     </section>
   );
 }

@@ -42,10 +42,11 @@ interface ArticleQueryParams {
   limit?: number;
   q?: string;
   period?: "all" | "today" | "7days" | "30days";
-  searchBy?: "title" | "author" | "title_content";
+  searchBy?: "title" | "content" | "author" | "title_content";
   sortBy?: "latest" | "views";
   sortDirection?: "asc" | "desc";
   includeContentPreview?: boolean;
+  includeNonAggregateBoards?: boolean;
 }
 
 interface AuthenticatedUser {
@@ -158,7 +159,11 @@ export class ArticleService {
     const readableBoards = (await this.boardRepository.listBoards())
       // Keep legacy boards addressable through their direct routes, but keep
       // the public aggregate feed aligned with the current IA.
-      .filter((board) => !PUBLIC_NON_AGGREGATE_BOARD_CODES.has(board.code));
+      .filter(
+        (board) =>
+          params.includeNonAggregateBoards ||
+          !PUBLIC_NON_AGGREGATE_BOARD_CODES.has(board.code),
+      );
 
     const page = params.page && params.page > 0 ? params.page : 1;
     const rawLimit = params.limit && params.limit > 0 ? params.limit : 20;
@@ -579,16 +584,18 @@ export class ArticleService {
     query: string | undefined,
     limit: number,
     currentUser: CurrentUserContext,
+    searchBy: "title" | "content" | "title_content" = "title_content",
   ): Promise<ArticleListItem[]> {
     const result = await this.getAllArticles(
       {
         limit,
         page: 1,
         q: query,
-        searchBy: "title_content",
+        searchBy,
         sortBy: "latest",
         sortDirection: "desc",
         includeContentPreview: true,
+        includeNonAggregateBoards: true,
       },
       currentUser,
     );

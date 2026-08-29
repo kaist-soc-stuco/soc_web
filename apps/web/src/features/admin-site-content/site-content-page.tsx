@@ -43,7 +43,7 @@ const CONTENT_BLOCK_QUERY_KEY = ["admin", "content-blocks"] as const;
 
 const categoryMeta: Record<ContentCategory, { createLabel: string; createType: ContentBlockType; label: string; singleton: boolean; types: ContentBlockType[] }> = {
   NOTICE: { createLabel: "등록", createType: "TOP_BANNER", label: "띠배너", singleton: false, types: ["TOP_BANNER"] },
-  HERO: { createLabel: "등록", createType: "HERO", label: "홈 히어로", singleton: true, types: ["HERO"] },
+  HERO: { createLabel: "등록", createType: "HERO", label: "홈 히어로", singleton: false, types: ["HERO"] },
   QUICK_LINK: { createLabel: "등록", createType: "QUICK_LINK", label: "퀵링크", singleton: false, types: ["QUICK_LINK"] },
   LOGO: { createLabel: "등록", createType: "LOGO", label: "로고", singleton: true, types: ["LOGO"] },
   ORGANIZATION: { createLabel: "등록", createType: "ORGANIZATION_CHART", label: "조직도", singleton: true, types: ["ORGANIZATION_CHART"] },
