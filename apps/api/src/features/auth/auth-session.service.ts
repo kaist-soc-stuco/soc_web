@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { nowIso, isExpired, secondsUntil, expiresAtMs, nowDate } from "@soc/shared";
 
@@ -28,7 +28,7 @@ import { InitialAdminService } from "./initial-admin.service";
 import {
   AUTH_ACCESS_TOKEN_TTL_SECONDS,
   AUTH_REFRESH_TOKEN_TTL_SECONDS,
-  AUTH_TEMPORARY_REFRESH_TTL_SECONDS,
+  AUTH_TEMPORARY_ACCESS_TOKEN_TTL_SECONDS,
 } from "./auth.tokens";
 
 /**
@@ -66,12 +66,18 @@ export class AuthSessionService {
           }
         : {
             mode: "temporary",
-            pendingLoginId: record.pendingLoginId ?? "",
-            sub: record.pendingLoginId ?? "",
+            academicStatus: record.temporaryAcademicStatus,
+            department: record.temporaryDepartment,
+            primaryMajor: record.temporaryPrimaryMajor,
+            studentNumberHash: record.temporaryStudentNumberHash,
+            sub: record.temporarySubjectHash ?? "",
           };
 
     return jwt.sign(claims, this.getJwtSecret(), {
-      expiresIn: AUTH_ACCESS_TOKEN_TTL_SECONDS,
+      expiresIn:
+        record.mode === "temporary"
+          ? Math.max(secondsUntil(record.expiresAt), 1)
+          : AUTH_ACCESS_TOKEN_TTL_SECONDS,
     });
   }
 
@@ -80,8 +86,7 @@ export class AuthSessionService {
     record: AuthSessionRecord,
     refreshJti: string,
   ): string {
-    const subject =
-      record.mode === "persisted" ? record.userId : record.pendingLoginId;
+    const subject = record.userId;
     const claims: RefreshTokenClaims = {
       jti: refreshJti,
       mode: record.mode,
@@ -166,23 +171,50 @@ export class AuthSessionService {
     }
 
     if (mode === "temporary") {
-      const pendingLoginId =
-        typeof decoded.pendingLoginId === "string"
-          ? decoded.pendingLoginId
-          : undefined;
+      const subject = typeof decoded.sub === "string" ? decoded.sub : undefined;
 
-      if (!pendingLoginId) {
+      if (!subject) {
         throw new UnauthorizedException("invalid_access_token");
       }
 
       return {
+        academicStatus:
+          typeof decoded.academicStatus === "string"
+            ? decoded.academicStatus
+            : undefined,
+        department:
+          typeof decoded.department === "string" ? decoded.department : undefined,
         mode: "temporary",
-        pendingLoginId,
-        sub: pendingLoginId,
+        primaryMajor:
+          typeof decoded.primaryMajor === "string"
+            ? decoded.primaryMajor
+            : undefined,
+        studentNumberHash:
+          typeof decoded.studentNumberHash === "string"
+            ? decoded.studentNumberHash
+            : undefined,
+        sub: subject,
       };
     }
 
     throw new UnauthorizedException("invalid_access_token");
+  }
+
+  /**
+   * 임시 access token만 통과시키는 검증 도우미입니다.
+   * persisted token을 이 경로에서 일반 사용자처럼 취급하지 않도록
+   * 호출부에서 모드를 명시적으로 제한합니다.
+   */
+  validateTemporaryAccessToken(
+    accessToken: string | undefined,
+  ): TemporaryAccessTokenClaims {
+    const claims = this.validateAccessToken(accessToken);
+
+    if (claims.mode !== "temporary") {
+      throw new UnauthorizedException("temporary_access_token_required");
+    }
+
+    return claims;
   }
 
   /** 세션 존재 여부, 만료, revoke 상태를 공통 검증합니다. */
@@ -228,36 +260,47 @@ export class AuthSessionService {
   }
 
   /**
-   * 비동의 임시 로그인용 access/refresh(또는 session key) 세트를 발급합니다.
+   * 비동의 임시 로그인용 access token만 발급합니다.
+   *
+   * 임시 세션은 개인정보 동의 전 상태이므로 PostgreSQL 사용자나 Redis
+   * 세션 레코드를 만들지 않습니다. 토큰에는 설문 자격 확인에 필요한
+   * 최소 정보만 넣고, 만료되면 다시 SSO 동의 화면을 거쳐야 합니다.
    */
   async issueTemporarySession(
-    pendingLoginId: string,
     pendingUser: PendingSsoUser,
   ): Promise<{
     accessToken: string;
-    refreshToken?: string;
     session: AuthSessionRecord;
   }> {
     const sessionId = randomUUID();
-    const refreshJti = randomUUID();
+    const secret = this.getJwtSecret();
+    const temporarySubjectHash = createHmac("sha256", secret)
+      .update(`temporary-subject:${pendingUser.ssoSubject}`)
+      .digest("hex");
+    const temporaryStudentNumberHash = pendingUser.stdNo
+      ? createHmac("sha256", secret)
+          .update(`student-number:${pendingUser.stdNo}`)
+          .digest("hex")
+      : undefined;
 
     const session: AuthSessionRecord = {
       expiresAt: Math.min(
         pendingUser.expiresAt,
-        expiresAtMs(AUTH_TEMPORARY_REFRESH_TTL_SECONDS),
+        expiresAtMs(AUTH_TEMPORARY_ACCESS_TOKEN_TTL_SECONDS),
       ),
       mode: "temporary",
-      pendingLoginId,
-      refreshJti,
       revoked: false,
       sessionId,
+      temporaryAcademicStatus: pendingUser.academicStatus,
+      temporaryDepartment:
+        pendingUser.departmentKo?.trim() || pendingUser.departmentEn?.trim(),
+      temporaryPrimaryMajor: pendingUser.primaryMajor?.trim(),
+      temporaryStudentNumberHash,
+      temporarySubjectHash,
     };
-
-    await this.authSessionRepository.save(session);
 
     return {
       accessToken: this.issueAccessToken(session),
-      refreshToken: this.issueRefreshToken(session, refreshJti),
       session,
     };
   }
@@ -267,11 +310,16 @@ export class AuthSessionService {
    */
   async rotateRefreshToken(refreshToken: string): Promise<{
     accessToken: string;
-    refreshToken?: string;
+    refreshToken: string;
     sessionId: string;
-    storageMode: "temporary" | "persisted";
+    storageMode: "persisted";
   }> {
     const claims = this.verifyRefreshToken(refreshToken);
+
+    if (claims.mode === "temporary") {
+      throw new UnauthorizedException("temporary_refresh_not_supported");
+    }
+
     const session = await this.authSessionRepository.findBySessionId(
       claims.sid,
     );
@@ -301,13 +349,8 @@ export class AuthSessionService {
     const rotatedJti = randomUUID();
     const rotatedSession: AuthSessionRecord = {
       ...session,
-      // Active users receive a fresh sliding refresh window on rotation;
-      // inactive sessions still expire when the current refresh window ends.
-      expiresAt: expiresAtMs(
-        session.mode === "persisted"
-          ? AUTH_REFRESH_TOKEN_TTL_SECONDS
-          : AUTH_TEMPORARY_REFRESH_TTL_SECONDS,
-      ),
+      // Active users receive a fresh sliding refresh window on rotation.
+      expiresAt: expiresAtMs(AUTH_REFRESH_TOKEN_TTL_SECONDS),
       refreshJti: rotatedJti,
     };
 
@@ -317,7 +360,7 @@ export class AuthSessionService {
       accessToken: this.issueAccessToken(rotatedSession),
       refreshToken: this.issueRefreshToken(rotatedSession, rotatedJti),
       sessionId: rotatedSession.sessionId,
-      storageMode: rotatedSession.mode,
+      storageMode: "persisted",
     };
   }
 
@@ -381,16 +424,11 @@ export class AuthSessionService {
       };
     }
 
-    const issued = await this.issueTemporarySession(
-      input.pendingLoginToken,
-      pendingUser,
-    );
+    const issued = await this.issueTemporarySession(pendingUser);
     await this.pendingLoginRepository.delete(input.pendingLoginToken);
 
     return {
       accessToken: issued.accessToken,
-      refreshToken: issued.refreshToken,
-      sessionId: issued.session.sessionId,
       storageMode: "temporary",
     };
   }
@@ -398,7 +436,25 @@ export class AuthSessionService {
   /**
    * 현재 로그인 세션 상태를 조회합니다.
    */
-  async getSession(sessionId?: string): Promise<AuthSessionSummary> {
+  async getSession(
+    sessionId?: string,
+    accessToken?: string,
+  ): Promise<AuthSessionSummary> {
+    if (accessToken) {
+      try {
+        this.validateTemporaryAccessToken(accessToken);
+        return {
+          authenticated: true,
+          canUsePersistentFeatures: false,
+          requiresConsent: true,
+          storageMode: "temporary",
+        };
+      } catch {
+        // A missing/expired temporary token falls through to the persisted
+        // cookie session lookup below.
+      }
+    }
+
     if (!sessionId) {
       return {
         authenticated: false,
@@ -539,10 +595,10 @@ export class AuthSessionService {
    * refresh 요청을 처리합니다.
    */
   async refreshSession(input: RefreshSessionRequest): Promise<{
-    accessToken?: string;
-    refreshToken?: string;
+    accessToken: string;
+    refreshToken: string;
     sessionId: string;
-    storageMode: "temporary" | "persisted";
+    storageMode: "persisted";
   }> {
     if (!input.refreshToken) {
       throw new BadRequestException("refreshToken_is_required");

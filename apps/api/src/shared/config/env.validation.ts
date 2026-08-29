@@ -125,6 +125,9 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     SSO_CLIENT_SECRET: asString(config.SSO_CLIENT_SECRET, 'SSO_CLIENT_SECRET'),
     CHANNELTALK_PLUGIN_KEY: asOptionalString(config.CHANNELTALK_PLUGIN_KEY),
     CHANNELTALK_SECRET_KEY: asOptionalString(config.CHANNELTALK_SECRET_KEY),
+    CHANNELTALK_MEMBER_HASH_SECRET: asOptionalString(
+      config.CHANNELTALK_MEMBER_HASH_SECRET,
+    ),
     CALENDAR_EXTERNAL_ICS_URLS: asOptionalString(config.CALENDAR_EXTERNAL_ICS_URLS),
     GOOGLE_CALENDAR_ID: asOptionalString(config.GOOGLE_CALENDAR_ID),
     GOOGLE_KAIST_CALENDAR_ID: asOptionalString(config.GOOGLE_KAIST_CALENDAR_ID),
@@ -135,6 +138,7 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       config.GOOGLE_OAUTH_CLIENT_KEY_FILE,
     ),
     GOOGLE_OAUTH_TOKEN_FILE: asOptionalString(config.GOOGLE_OAUTH_TOKEN_FILE),
+    GOOGLE_OPERATIONS_FOLDER_ID: asOptionalString(config.GOOGLE_OPERATIONS_FOLDER_ID),
     GOOGLE_CONTACTS_SPREADSHEET_ID: asOptionalString(config.GOOGLE_CONTACTS_SPREADSHEET_ID),
     GOOGLE_SURVEY_RESULTS_FOLDER_ID: asOptionalString(
       config.GOOGLE_SURVEY_RESULTS_FOLDER_ID,

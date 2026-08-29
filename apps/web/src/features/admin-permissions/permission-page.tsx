@@ -36,7 +36,7 @@ const CANDIDATE_PAGE_SIZE = 20;
 const permissionDomains = [
   { id: "publishing", label: "게시·응답", codes: ["WRITE_OFFICIAL", "WRITE_LAB", "WRITE_REPLY", "MODERATE_CONTENT", "MANAGE_BOARDS"] },
   { id: "operations", label: "운영", codes: ["MANAGE_SURVEY", "MANAGE_VOTE", "MANAGE_FINANCE", "MANAGE_SITE_CONTENT", "MANAGE_CALENDAR", "MANAGE_CONTACTS", "SEND_BULK_EMAIL"] },
-  { id: "system", label: "시스템", codes: ["MANAGE_USERS", "VIEW_AUDIT_LOG", "MANAGE_ROLES", "SUPER_ADMIN"] },
+  { id: "system", label: "시스템", codes: ["MANAGE_USERS", "VIEW_AUDIT_LOG", "MANAGE_ROLES"] },
 ] as const;
 
 const permissionLabels: Record<string, string> = {
@@ -55,7 +55,6 @@ const permissionLabels: Record<string, string> = {
   SEND_BULK_EMAIL: "이메일 일괄 발송",
   VIEW_AUDIT_LOG: "운영 로그 조회",
   MANAGE_ROLES: "권한·역할 관리",
-  SUPER_ADMIN: "최고 관리자",
 };
 
 const emptyRoleDraft = (): RoleDraft => ({ description: "", nameKo: "", permissionIds: [] });
@@ -349,7 +348,7 @@ export function PermissionPage() {
                   : <div className="grid gap-1" role="listbox" aria-label="역할 목록">{filteredRoles.map((role) => {
                       const selected = role.roleGroupId === selectedRoleId;
                       return <Button key={role.roleGroupId} type="button" variant="ghost" role="option" aria-selected={selected} onClick={() => void selectRole(role)} className={cn("relative h-auto min-h-14 w-full rounded-lg px-3 py-2 text-left", selected ? "bg-slate-100 text-[#172033]" : "text-[#344054] hover:bg-slate-50 hover:text-[#172033]")}>
-                        <span className="min-w-0 flex-1"><span className="block truncate text-sm !font-semibold text-[#172033]">{role.nameKo}</span><span className="block truncate text-xs font-normal text-[#344054]">{role.description || "설명 없음"}</span></span><span className="shrink-0 text-xs font-normal text-[#344054]">{role.userCount}명</span>
+                        <span className="min-w-0 flex-1"><span className="flex min-w-0 items-center justify-between gap-2"><span className="min-w-0 truncate text-sm !font-semibold text-[#172033]">{role.nameKo}</span><span className="shrink-0 text-xs font-normal text-[#344054]">{role.userCount}명</span></span><span className="block truncate text-xs font-normal text-[#344054]">{role.description || "설명 없음"}</span></span>
                       </Button>;
                     })}</div>}
               </div>

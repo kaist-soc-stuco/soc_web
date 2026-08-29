@@ -38,7 +38,7 @@ export function VoteListPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {votes.map((vote) => (
-                <Link key={vote.id} to={`/votes/${vote.id}`} className="group rounded-xl border border-slate-200 bg-white p-6 transition-colors hover:border-slate-300">
+                <Link key={vote.id} to={`/votes/${vote.id}`} className="select-none group rounded-xl border border-slate-200 bg-white p-6 transition-colors hover:border-slate-300">
                   <div className="flex items-center justify-between gap-3">
                     <VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} />
                     <span className="text-xs font-normal text-[#344054]">{dateTime(vote.startsAt, lang === "ko" ? "ko-KR" : "en-US")} – {dateTime(vote.endsAt, lang === "ko" ? "ko-KR" : "en-US")}</span>

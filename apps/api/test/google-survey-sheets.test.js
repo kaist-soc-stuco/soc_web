@@ -5,9 +5,7 @@ const {
   GoogleSurveySheetsService,
 } = require("../dist/apps/api/src/features/surveys/google-survey-sheets.service.js");
 
-const FOLDER_ID = "folder-1";
-
-function createService(initialSurvey, config = {}) {
+function createService(initialSurvey, sheets = {}) {
   let survey = { ...initialSurvey };
   const calls = [];
   const repository = {
@@ -19,8 +17,24 @@ function createService(initialSurvey, config = {}) {
       survey = { ...survey, spreadsheetSyncStatus: status };
     },
   };
+  const sharedSheets = {
+    getOrCreateSpreadsheet: async (options) => {
+      calls.push({ kind: "getOrCreateSpreadsheet", options });
+      return {
+        spreadsheetId: "sheet-1",
+        spreadsheetUrl: "https://docs.google.com/spreadsheets/d/sheet-1/edit",
+      };
+    },
+    ensureSpreadsheetInTargetFolder: async (spreadsheetId) => {
+      calls.push({ kind: "ensureSpreadsheetInTargetFolder", spreadsheetId });
+    },
+    syncSheet: async (definition) => {
+      calls.push({ kind: "syncSheet", definition });
+    },
+    ...sheets,
+  };
   const service = new GoogleSurveySheetsService(
-    { get: (key) => config[key] },
+    sharedSheets,
     repository,
     { findBySurveyId: async () => [] },
     { findBySectionId: async () => [] },
@@ -29,29 +43,10 @@ function createService(initialSurvey, config = {}) {
       findAnswersBySurveyId: async () => [],
     },
   );
-  service.request = async (method, url, body) => {
-    calls.push({ method, url, body });
-    if (url.includes(`/drive/v3/files/${FOLDER_ID}?`)) {
-      return {
-        mimeType: "application/vnd.google-apps.folder",
-        capabilities: { canAddChildren: true },
-      };
-    }
-    if (method === "GET" && url.startsWith("https://www.googleapis.com/drive/v3/files?")) {
-      return { files: [{ id: FOLDER_ID }] };
-    }
-    if (method === "POST" && url === "https://sheets.googleapis.com/v4/spreadsheets") {
-      return { spreadsheetId: "sheet-1", spreadsheetUrl: "https://sheets.test/sheet-1" };
-    }
-    if (method === "GET" && url.includes("/drive/v3/files/sheet-1?")) {
-      return { parents: ["root"] };
-    }
-    return {};
-  };
   return { service, calls, getSurvey: () => survey };
 }
 
-test("creates a survey sheet in the OAuth app results folder", async () => {
+test("creates and syncs a survey response sheet through the shared Sheets client", async () => {
   const { service, calls, getSurvey } = createService({
     id: "survey-1",
     titleKo: "진로 설문",
@@ -60,98 +55,58 @@ test("creates a survey sheet in the OAuth app results folder", async () => {
 
   await service.connect("survey-1");
 
-  const folderLookup = calls.find(
-    (call) => call.method === "GET" && call.url.startsWith("https://www.googleapis.com/drive/v3/files?"),
-  );
-  assert.match(decodeURIComponent(folderLookup.url), /socPurpose/);
-  const createCall = calls.find(
-    (call) => call.method === "POST" && call.url === "https://sheets.googleapis.com/v4/spreadsheets",
-  );
-  assert.equal(createCall.body.properties.title, "진로 설문 응답 · survey-1");
-  const moveCall = calls.find(
-    (call) => call.method === "PATCH" && call.url.includes("/drive/v3/files/sheet-1?"),
-  );
-  assert.match(moveCall.url, /addParents=folder-1/);
+  const createCall = calls.find((call) => call.kind === "getOrCreateSpreadsheet");
+  assert.deepEqual(createCall.options, {
+    title: "진로 설문 응답 · survey-1",
+    sheetTitle: "응답",
+    purpose: "survey-results",
+    key: "survey-1",
+  });
+  const syncCall = calls.find((call) => call.kind === "syncSheet");
+  assert.deepEqual(syncCall.definition.headers, [
+    "응답 ID",
+    "제출 시각",
+    "이름",
+    "이메일",
+    "소속",
+    "학번",
+  ]);
+  assert.deepEqual(syncCall.definition.dateTimeColumns, [1]);
+  assert.deepEqual(syncCall.definition.columnWidths, [230, 155, 105, 240, 150, 100]);
   assert.equal(getSurvey().spreadsheetId, "sheet-1");
   assert.equal(getSurvey().spreadsheetSyncStatus, "CONNECTED");
 });
 
-test("creates the results folder once when the OAuth app has none", async () => {
+test("moves an existing survey spreadsheet into the shared target folder before syncing", async () => {
   const { service, calls } = createService({
     id: "survey-1",
     titleKo: "진로 설문",
-    spreadsheetId: null,
+    spreadsheetId: "existing-sheet",
   });
-  const originalRequest = service.request;
-  service.request = async (method, url, body) => {
-    if (method === "GET" && url.startsWith("https://www.googleapis.com/drive/v3/files?")) {
-      calls.push({ method, url, body });
-      return { files: [] };
-    }
-    if (method === "POST" && url === "https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink") {
-      calls.push({ method, url, body });
-      return { id: FOLDER_ID };
-    }
-    return originalRequest(method, url, body);
-  };
 
   await service.connect("survey-1");
 
-  const folderCreate = calls.find(
-    (call) => call.method === "POST" && call.url === "https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink",
+  assert.equal(
+    calls.some((call) => call.kind === "getOrCreateSpreadsheet"),
+    false,
   );
-  assert.deepEqual(folderCreate.body, {
-    name: "KAIST SOC 설문 결과",
-    mimeType: "application/vnd.google-apps.folder",
-    appProperties: { socPurpose: "survey-results" },
-  });
+  assert.deepEqual(
+    calls.find((call) => call.kind === "ensureSpreadsheetInTargetFolder"),
+    { kind: "ensureSpreadsheetInTargetFolder", spreadsheetId: "existing-sheet" },
+  );
+  assert.equal(calls.some((call) => call.kind === "syncSheet"), true);
 });
 
-test("rejects an explicitly configured folder that is not writable", async () => {
-  const { service, calls } = createService(
+test("marks a failed response sync as an error", async () => {
+  const { service, getSurvey } = createService(
     {
       id: "survey-1",
       titleKo: "진로 설문",
-      spreadsheetId: null,
+      spreadsheetId: "existing-sheet",
     },
-    { GOOGLE_SURVEY_RESULTS_FOLDER_ID: FOLDER_ID },
+    { syncSheet: async () => { throw new Error("sync failed"); } },
   );
-  service.request = async (method, url, body) => {
-    calls.push({ method, url, body });
-    if (url.includes(`/drive/v3/files/${FOLDER_ID}?`)) {
-      return {
-        mimeType: "application/vnd.google-apps.folder",
-        capabilities: { canAddChildren: false },
-      };
-    }
-    return {};
-  };
 
-  await assert.rejects(
-    service.connect("survey-1"),
-    /google_survey_results_folder_not_writable/,
-  );
-  assert.equal(
-    calls.some((call) => call.url === "https://sheets.googleapis.com/v4/spreadsheets"),
-    false,
-  );
-});
-
-test("reuses an existing spreadsheet instead of creating a duplicate", async () => {
-  const { service, calls } = createService({
-    id: "survey-1",
-    titleKo: "진로 설문",
-    spreadsheetId: "sheet-1",
-  });
-
-  await service.connect("survey-1");
-
-  assert.equal(
-    calls.some((call) => call.url === "https://sheets.googleapis.com/v4/spreadsheets"),
-    false,
-  );
-  assert.equal(
-    calls.some((call) => call.url.startsWith("https://www.googleapis.com/drive/v3/files?")),
-    false,
-  );
+  await assert.rejects(service.refresh("survey-1", true), /sync failed/);
+  assert.equal(getSurvey().spreadsheetSyncStatus, "ERROR");
 });

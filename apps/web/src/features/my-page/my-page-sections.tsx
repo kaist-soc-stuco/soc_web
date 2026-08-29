@@ -296,7 +296,7 @@ export function MyPageProfilePanel({
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-8 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:grid-cols-2 sm:p-5 select-none">
+      <div className="grid grid-cols-1 gap-x-8 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:grid-cols-2 sm:p-5 select-text">
         {profileRows.map(([label, value]) => (
           <div
             key={label}

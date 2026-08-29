@@ -18,14 +18,22 @@ import { ZodValidationPipe } from "../../shared/pipes/zod-validation.pipe";
 
 import { SurveyResponsesService } from "./survey-responses.service";
 import { SubmitResponseDto } from "./dto/submit-response.dto";
+import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 
 interface MaybeAuthedRequest extends Request {
   user?: { id: string; permission: number };
+  temporaryUser?: TemporaryAccessTokenClaims;
 }
 
 interface AuthedRequest extends Request {
   user: { id: string; permission: number };
 }
+
+const getSurveyCaller = (request: MaybeAuthedRequest) =>
+  request.user ??
+  (request.temporaryUser
+    ? { permission: 0, temporaryClaims: request.temporaryUser }
+    : undefined);
 
 @Controller("surveys/:surveyId/responses")
 export class SurveyResponsesController {
@@ -38,7 +46,7 @@ export class SurveyResponsesController {
     @Body(new ZodValidationPipe(SubmitResponseSchema)) dto: SubmitResponseDto,
     @Req() req: MaybeAuthedRequest,
   ) {
-    return this.responsesService.submit(surveyId, dto, req.user);
+    return this.responsesService.submit(surveyId, dto, getSurveyCaller(req));
   }
 
   @Get()
@@ -53,7 +61,7 @@ export class SurveyResponsesController {
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
     @Req() req: MaybeAuthedRequest,
   ) {
-    return this.responsesService.findMine(surveyId, req.user);
+    return this.responsesService.findMine(surveyId, getSurveyCaller(req));
   }
 
   @Patch("mine")
@@ -63,7 +71,7 @@ export class SurveyResponsesController {
     @Body(new ZodValidationPipe(SubmitResponseSchema)) dto: SubmitResponseDto,
     @Req() req: MaybeAuthedRequest,
   ) {
-    return this.responsesService.updateMine(surveyId, dto, req.user);
+    return this.responsesService.updateMine(surveyId, dto, getSurveyCaller(req));
   }
 
   @Get("with-answers")

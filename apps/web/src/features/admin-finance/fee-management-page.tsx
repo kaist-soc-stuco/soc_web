@@ -13,7 +13,7 @@ import type {
   StudentFeeStatsResponse,
 } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
-import { ChevronDown, CreditCard, Download, FileUp } from "lucide-react";
+import { ChevronDown, CreditCard, Download, FileSpreadsheet, FileUp } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -43,6 +43,7 @@ import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
 import { PopoverPanel } from "@/components/ui/popover-panel";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { downloadBlob } from "@/lib/download-blob";
@@ -56,6 +57,7 @@ type StudentFeeRow = StudentFeeListResponse["students"][number];
 
 const DEFAULT_FEE_AMOUNT = 45_000;
 const DEFAULT_COVERAGE_SEMESTERS = 6;
+const GOOGLE_SHEETS_HOME_URL = "https://docs.google.com/spreadsheets/";
 
 const toDateInput = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const periodRange = (preset: Exclude<PeriodPreset, "custom">) => {
@@ -110,6 +112,7 @@ const buildSemesterOptions = () => {
 export function FeeManagementPage() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
+  const { toast } = useToast();
   const [feeData, setFeeData] = useState<StudentFeeListResponse | null>(null);
   const [studentCache, setStudentCache] = useState<Record<string, StudentFeeRow>>({});
   const [loading, setLoading] = useState(true);
@@ -142,6 +145,8 @@ export function FeeManagementPage() {
   const [paymentNote, setPaymentNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [spreadsheetInfoOpen, setSpreadsheetInfoOpen] = useState(false);
+  const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [openFilterDropdown, setOpenFilterDropdown] = useState<"semester" | "major" | null>(null);
   const [spreadsheetInputKey, setSpreadsheetInputKey] = useState(0);
   const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
@@ -404,6 +409,35 @@ export function FeeManagementPage() {
     }
   };
 
+  const handleSyncSpreadsheet = async () => {
+    try {
+      setOperationError(null);
+      setSheetSyncing(true);
+      const result = await apiClient.syncStudentFeeSpreadsheet({
+        status: statusFilter === "ALL" ? undefined : statusFilter,
+        query,
+        referenceSemester,
+        majorCategory,
+        sortBy,
+        sortDirection,
+        userIds: selectedUserIds.size > 0 ? Array.from(selectedUserIds) : undefined,
+      });
+      setSpreadsheetUrl(result.spreadsheetUrl);
+      toast({
+        type: "success",
+        message: `과비 납부 시트에 ${result.syncedCount}명을 동기화했습니다.`,
+        action: {
+          label: "시트 열기",
+          onClick: () => window.open(result.spreadsheetUrl, "_blank", "noopener,noreferrer"),
+        },
+      });
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : "Google Sheets 동기화에 실패했습니다.");
+    } finally {
+      setSheetSyncing(false);
+    }
+  };
+
   const handleSpreadsheetUpload = async (file: File | undefined) => {
     if (!file) return;
     try {
@@ -517,14 +551,16 @@ export function FeeManagementPage() {
                 <AdminSelectDropdown
                   ariaLabel="전공 구분"
                   value={majorCategory ?? "ALL"}
-                  options={[{ value: "ALL", label: "전공 전체" }, { value: "PRIMARY", label: "주전공 보유" }]}
+                  options={[{ value: "ALL", label: "전공 전체" }, { value: "PRIMARY", label: "전산학부" }]}
                   onChange={(value) => updateFilter(setMajorCategory, value === "ALL" ? undefined : value as StudentFeeListOptions["majorCategory"])}
                   className="w-32 shrink-0"
                   open={openFilterDropdown === "major"}
                   onOpenChange={(open) => setOpenFilterDropdown(open ? "major" : null)}
                 />
-                <PageSearchField ariaLabel="학생 검색" className="w-full min-w-[220px] sm:w-64" onChange={(value) => updateFilter(setQuery, value)} onClear={() => updateFilter(setQuery, "")} placeholder="이름·학번·전공·이메일 검색" value={query} />
-                <Button type="button" variant="outline" onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" /> 내보내기{selectedUserIds.size > 0 ? ` (${selectedUserIds.size})` : ""}</Button>
+                 <PageSearchField ariaLabel="학생 검색" className="w-full min-w-[220px] sm:w-64" onChange={(value) => updateFilter(setQuery, value)} onClear={() => updateFilter(setQuery, "")} placeholder="이름·학번·전공·이메일 검색" value={query} />
+                 <a href={spreadsheetUrl ?? GOOGLE_SHEETS_HOME_URL} target="_blank" rel="noreferrer" className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline">Google Sheets로 이동</a>
+                 <Button type="button" variant="outline" disabled={sheetSyncing} onClick={() => void handleSyncSpreadsheet()}><FileSpreadsheet aria-hidden="true" className="size-4" /> {sheetSyncing ? "시트 생성 중" : "시트 동기화"}</Button>
+                 <Button type="button" variant="outline" onClick={() => void handleExport()}><Download aria-hidden="true" className="size-4" /> 내보내기{selectedUserIds.size > 0 ? ` (${selectedUserIds.size})` : ""}</Button>
                 <Button type="button" variant="outline" onClick={() => setSpreadsheetInfoOpen(true)}><FileUp aria-hidden="true" className="size-4" /> 불러오기</Button>
               </div>
             </div>
@@ -551,7 +587,7 @@ export function FeeManagementPage() {
                           </AdminTableHead>
                         ) : (
                           <>
-                            <AdminSortableHead active={sortBy === "name"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("name")}>이름(영문명)</AdminSortableHead><AdminSortableHead active={sortBy === "studentId"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("studentId")}>학번</AdminSortableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>전공</AdminTableHead><AdminSortableHead active={sortBy === "status"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("status")}>상태</AdminSortableHead><AdminSortableHead className="text-right" active={sortBy === "paidAt"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("paidAt")}>수납액</AdminSortableHead>
+                            <AdminSortableHead active={sortBy === "name"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("name")}>이름(영문명)</AdminSortableHead><AdminSortableHead active={sortBy === "studentId"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("studentId")}>학번</AdminSortableHead><AdminTableHead>이메일</AdminTableHead><AdminTableHead>주전공</AdminTableHead><AdminSortableHead active={sortBy === "status"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("status")}>상태</AdminSortableHead><AdminSortableHead className="text-right" active={sortBy === "paidAt"} ascending={sortDirection === "asc"} onClick={() => handleSortChange("paidAt")}>수납액</AdminSortableHead>
                           </>
                         )}
                       </tr>

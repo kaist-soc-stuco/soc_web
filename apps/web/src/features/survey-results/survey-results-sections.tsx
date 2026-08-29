@@ -6,6 +6,7 @@ import type {
   SurveyChoiceAnalyticsItem,
   SurveyGridAnalytics,
   SurveyQuestionAnalyticsItem,
+  SurveyAnalyticsSection,
 } from "@soc/contracts";
 import {
   AlertCircle,
@@ -217,16 +218,16 @@ function PrivateRawAnswerResult({
 }) {
   if (question.totalAnswers === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-medium text-slate-400">
+      <div className="border-t border-slate-100 px-1 pt-3 text-sm font-normal text-slate-400">
         {lang === "ko" ? "제출된 응답이 없습니다." : "No responses submitted."}
       </div>
     );
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+    <div className="flex items-start gap-3 border-t border-slate-100 px-1 pt-3 text-sm text-slate-600">
       <Lock className="mt-0.5 h-4 w-4 shrink-0 text-kaist-darkgreen" />
-      <p className="font-medium leading-relaxed">
+      <p className="font-normal leading-relaxed">
         {lang === "ko"
           ? "개인정보 보호를 위해 이 문항의 개별 응답은 공개 결과에 표시하지 않습니다."
           : "Individual answers to this question are hidden from public results for privacy."}
@@ -235,12 +236,43 @@ function PrivateRawAnswerResult({
   );
 }
 
+function ResultSectionHeader({
+  lang,
+  section,
+}: {
+  lang: string;
+  section: SurveyAnalyticsSection;
+}) {
+  const title = getLocalizedTitle(lang, section.titleKo, section.titleEn);
+  const description = getLocalizedTitle(
+    lang,
+    section.descriptionKo ?? "",
+    section.descriptionEn,
+  );
+
+  if (!title && !description) return null;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.035)]">
+      {title ? (
+        <div className="bg-[#5545e8] px-5 py-3.5 text-white">
+          <h2 className="text-base font-normal leading-6">{title}</h2>
+        </div>
+      ) : null}
+      {description ? (
+        <RichTextContent
+          content={description}
+          className="px-5 py-4 text-[length:var(--ui-text-section-size)] font-normal leading-relaxed text-slate-600"
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function QuestionResultCard({
-  idx,
   lang,
   question,
 }: {
-  idx: number;
   lang: string;
   question: SurveyQuestionAnalyticsItem;
 }) {
@@ -260,10 +292,7 @@ function QuestionResultCard({
                 : `${question.totalAnswers} answers`}
             </span>
           </div>
-          <h2 className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-slate-950">
-            <span className="inline-flex h-6 shrink-0 items-center leading-6 text-kaist-darkgreen">
-              {idx + 1}.
-            </span>
+          <h2 className="min-w-0 text-[length:var(--ui-text-section-size)] font-normal leading-6 text-slate-950">
             <span className="min-h-6 break-words leading-6">{title}</span>
           </h2>
         </div>
@@ -336,6 +365,17 @@ export function SurveyResultsContent({
     );
   }
 
+  const resultSections: SurveyAnalyticsSection[] = analytics.sections?.length
+    ? analytics.sections
+    : [{
+        sectionId: "__all__",
+        titleKo: "",
+        titleEn: null,
+        descriptionKo: null,
+        descriptionEn: null,
+        questions: analytics.questions,
+      }];
+
   return (
     <div className="space-y-5">
       <ResultShell className="p-6 sm:p-8">
@@ -397,13 +437,17 @@ export function SurveyResultsContent({
         </div>
       </ResultShell>
 
-      {analytics.questions.map((question, idx) => (
-        <QuestionResultCard
-          key={question.questionId}
-          idx={idx}
-          lang={lang}
-          question={question}
-        />
+      {resultSections.map((section) => (
+        <section key={section.sectionId} className="space-y-4">
+          <ResultSectionHeader lang={lang} section={section} />
+          {section.questions.map((question) => (
+            <QuestionResultCard
+              key={question.questionId}
+              lang={lang}
+              question={question}
+            />
+          ))}
+        </section>
       ))}
     </div>
   );

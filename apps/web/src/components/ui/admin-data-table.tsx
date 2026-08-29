@@ -8,13 +8,25 @@ import { cn } from "@/lib/utils";
 export function AdminDataTable({
   children,
   className,
+  isDragging = false,
   minWidth = "47.5rem",
+  viewportClassName,
   ...props
-}: ComponentProps<"table"> & { minWidth?: CSSProperties["minWidth"] }) {
+}: ComponentProps<"table"> & {
+  isDragging?: boolean;
+  minWidth?: CSSProperties["minWidth"];
+  viewportClassName?: string;
+}) {
   const resolvedMinWidth = typeof minWidth === "number" ? `${minWidth / 16}rem` : minWidth;
 
   return (
-    <AdminTableViewport className="w-full">
+    <AdminTableViewport
+      className={cn(
+        "w-full",
+        isDragging && "admin-table-viewport--dragging",
+        viewportClassName,
+      )}
+    >
       <table
         className={cn("admin-data-table w-full table-fixed text-left", className)}
         style={{ minWidth: resolvedMinWidth }}
@@ -46,7 +58,7 @@ export function AdminTableCell({
   return (
     <td
       className={cn(
-        "admin-table-text px-4 py-3.5 [word-break:keep-all]",
+        "admin-table-text select-text px-4 py-3.5 [word-break:keep-all]",
         truncate && "overflow-hidden text-ellipsis whitespace-nowrap",
         className,
       )}

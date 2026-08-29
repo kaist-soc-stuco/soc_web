@@ -39,6 +39,7 @@ import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { Permissions } from "@/lib/permissions";
@@ -81,6 +82,7 @@ function FaqManagementPageContent() {
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ArticleListItem | null>(null);
+  const [activeFaqId, setActiveFaqId] = useState<string | null>(null);
   const [form, setForm] = useState<FaqForm>(emptyForm);
 
   const loadItems = useCallback(async () => {
@@ -172,6 +174,7 @@ function FaqManagementPageContent() {
   };
 
   const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    setActiveFaqId(null);
     if (!over || active.id === over.id || saving) return;
     const oldIndex = items.findIndex((item) => item.articleId === String(active.id));
     const newIndex = items.findIndex((item) => item.articleId === String(over.id));
@@ -207,8 +210,15 @@ function FaqManagementPageContent() {
         />
         <AdminTableCard>
           {loading && items.length === 0 ? null : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}>
-              <AdminDataTable minWidth={760}>
+            <DndContext
+              autoScroll={false}
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={({ active }) => setActiveFaqId(String(active.id))}
+              onDragCancel={() => setActiveFaqId(null)}
+              onDragEnd={(event) => void handleDragEnd(event)}
+            >
+              <AdminDataTable minWidth={760} isDragging={Boolean(activeFaqId)}>
                 <colgroup>
                   <col style={{ width: 52 }} />
                   <col style={{ width: 280 }} />
@@ -306,8 +316,8 @@ function SortableFaqRow({
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
       </AdminTableCell>
-      <AdminTableCell truncate><span className="admin-table-text-emphasis">{item.titleKo}</span></AdminTableCell>
-      <AdminTableCell truncate><span className="admin-table-text">{item.snippetKo || ""}</span></AdminTableCell>
+      <AdminTableCell><span className="admin-table-text-emphasis line-clamp-2 whitespace-normal">{item.titleKo}</span></AdminTableCell>
+      <AdminTableCell><span className="admin-table-text line-clamp-2 whitespace-normal">{stripRichText(item.snippetKo)}</span></AdminTableCell>
       <AdminTableCell>
         <div className="flex items-center gap-1 opacity-70 transition-opacity group-hover:opacity-100">
           <Button type="button" variant="ghost" size="icon" aria-label="FAQ 편집" onClick={() => onEdit(item)} disabled={disabled}><Pencil aria-hidden="true" /></Button>

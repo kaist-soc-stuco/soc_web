@@ -215,9 +215,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
             originalFilename: asset.originalFilename,
             sizeBytes: asset.sizeBytes,
             storageKey: asset.storageKey,
-            usageType: asset.mimeType.startsWith("image/")
-              ? "IMAGE"
-              : "ATTACHMENT",
+            usageType: "ATTACHMENT",
           } satisfies AttachedAsset;
         }),
       );

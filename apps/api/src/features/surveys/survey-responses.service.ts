@@ -23,6 +23,13 @@ import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import { isoToMs, nowMs } from "@soc/shared";
 import { getSurveyEligibilityFailure } from "./survey-eligibility";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
+import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
+
+interface SurveyCaller {
+  id?: string;
+  permission: number;
+  temporaryClaims?: TemporaryAccessTokenClaims;
+}
 
 @Injectable()
 export class SurveyResponsesService {
@@ -93,7 +100,7 @@ export class SurveyResponsesService {
   async submit(
     surveyId: string,
     dto: SubmitResponseDto,
-    caller?: { id: string; permission: number },
+    caller?: SurveyCaller,
   ): Promise<ResponseDetailResponse> {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
@@ -110,7 +117,19 @@ export class SurveyResponsesService {
       throw new ForbiddenException("login_required");
     }
 
-    if (caller) {
+    if (caller?.temporaryClaims) {
+      const eligibilityFailure = getSurveyEligibilityFailure({
+        user: {
+          academicStatus: caller.temporaryClaims.academicStatus ?? null,
+          departmentKo: caller.temporaryClaims.department ?? null,
+          departmentEn: null,
+          primaryMajor: caller.temporaryClaims.primaryMajor ?? null,
+        },
+        eligibleSocAffiliations: survey.eligibleSocAffiliations ?? [],
+        academicEligibility: survey.academicEligibility ?? "ANY",
+      });
+      if (eligibilityFailure) throw new ForbiddenException(eligibilityFailure);
+    } else if (caller?.id) {
       if (typeof this.usersService.findById === "function") {
         const user = await this.usersService.findById(caller.id);
         if (!user) throw new ForbiddenException("login_required");
@@ -124,6 +143,9 @@ export class SurveyResponsesService {
     }
 
     if (survey.feePayersOnly && caller) {
+      if (!caller.id) {
+        throw new ForbiddenException("fee_payer_only");
+      }
       const feeStatus = await this.usersService.getStudentFeeStatus(caller.id);
       if (!feeStatus || feeStatus.status !== "PAID") {
         throw new ForbiddenException("fee_payer_only");
@@ -133,7 +155,11 @@ export class SurveyResponsesService {
     const questions = this.sectionsRepo && this.questionsRepo
       ? await this.loadQuestions(surveyId)
       : [];
-    if (caller) {
+    if (caller?.temporaryClaims) {
+      if (questions.some((question) => question.questionType === "file_upload")) {
+        throw new ForbiddenException("login_required_for_file_upload");
+      }
+    } else if (caller?.id) {
       await this.validateUploadedAssets(dto.answers, caller.id, questions);
     } else if (questions.some((question) => question.questionType === "file_upload")) {
       throw new ForbiddenException("login_required_for_file_upload");
@@ -173,9 +199,9 @@ export class SurveyResponsesService {
 
   async findMine(
     surveyId: string,
-    caller?: { id: string; permission: number },
+    caller?: SurveyCaller,
   ): Promise<ResponseDetailResponse> {
-    if (!caller) throw new ForbiddenException("login_required");
+    if (!caller?.id) throw new ForbiddenException("login_required");
 
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey || !survey.isPublished) {
@@ -192,9 +218,9 @@ export class SurveyResponsesService {
   async updateMine(
     surveyId: string,
     dto: SubmitResponseDto,
-    caller?: { id: string; permission: number },
+    caller?: SurveyCaller,
   ): Promise<ResponseDetailResponse> {
-    if (!caller) throw new ForbiddenException("login_required");
+    if (!caller?.id) throw new ForbiddenException("login_required");
 
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");

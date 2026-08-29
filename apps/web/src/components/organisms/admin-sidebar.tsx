@@ -43,7 +43,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
     bits: [Permissions.MANAGE_SITE_CONTENT],
     icon: MessageCircleQuestion,
   },
-  { label: "게시글 관리", to: "/admin/moderation", bits: [Permissions.MODERATE_CONTENT], icon: EyeOff },
+  { label: "게시글/댓글 관리", to: "/admin/moderation", bits: [Permissions.MODERATE_CONTENT], icon: EyeOff },
 ];
 
 const ADMIN_ACCESS_PERMISSIONS = ADMIN_MENU.flatMap((item) => item.bits);
@@ -68,7 +68,7 @@ export function AdminSidebar() {
 
   return (
     <>
-      <nav className="flex min-w-0 gap-1.5 overflow-x-auto border-b border-[#e5eaf0] bg-white px-4 py-2.5 md:hidden">
+      <nav className="select-none flex min-w-0 gap-1.5 overflow-x-auto border-b border-[#e5eaf0] bg-white px-4 py-2.5 md:hidden">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.startsWith(item.to);
@@ -89,7 +89,7 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <aside className="hidden min-h-full w-60 shrink-0 flex-col border-r border-[#e5eaf0] bg-white px-3 py-6 text-app-text-strong md:flex">
+      <aside className="select-none sticky top-16 hidden h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] w-60 shrink-0 self-start flex-col overflow-y-auto border-r border-[#e5eaf0] bg-white px-3 py-6 text-app-text-strong md:flex">
         <div className="px-3 text-base font-semibold tracking-tight text-slate-900">관리자 메뉴</div>
 
         <nav className="mt-5 flex flex-col gap-0.5">

@@ -25,24 +25,27 @@ function createService(config = {}) {
       ],
     }),
   };
+  const sheets = {
+    getOrCreateSpreadsheet: async (options) => {
+      calls.push({ kind: "getOrCreateSpreadsheet", options });
+      return {
+        spreadsheetId: config.GOOGLE_CONTACTS_SPREADSHEET_ID || "contact-sheet-1",
+        spreadsheetUrl: "https://docs.google.com/spreadsheets/d/contact-sheet-1/edit",
+      };
+    },
+    syncSheet: async (definition) => {
+      calls.push({ kind: "syncSheet", definition });
+    },
+  };
   const service = new GoogleContactSheetsService(
     { get: (key) => config[key] },
+    sheets,
     repository,
   );
-  service.request = async (method, url, body) => {
-    calls.push({ method, url, body });
-    if (method === "GET" && url.startsWith("https://www.googleapis.com/drive/v3/files?")) {
-      return { files: [] };
-    }
-    if (method === "POST" && url === "https://sheets.googleapis.com/v4/spreadsheets") {
-      return { spreadsheetId: "contact-sheet-1" };
-    }
-    return {};
-  };
   return { calls, service };
 }
 
-test("creates and syncs an executive contact sheet through the OAuth service", async () => {
+test("creates and formats an executive contact sheet through the shared Sheets client", async () => {
   const { calls, service } = createService();
 
   const result = await service.sync();
@@ -53,30 +56,48 @@ test("creates and syncs an executive contact sheet through the OAuth service", a
     syncedCount: 1,
     syncedAt: result.syncedAt,
   });
-  assert.equal(
-    calls.some(
-      (call) => call.method === "POST" && call.url === "https://sheets.googleapis.com/v4/spreadsheets",
-    ),
-    true,
-  );
-  const updateCall = calls.find((call) => call.method === "PUT");
-  assert.ok(updateCall);
-  assert.deepEqual(updateCall.body.values, [
-    ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호"],
-    ["홍길동", "Gildong Hong", "20261234", "회장단", "Presidium", "회장", "President", 2026, "hong@example.com", "010-0000-0000"],
+  const createCall = calls.find((call) => call.kind === "getOrCreateSpreadsheet");
+  assert.deepEqual(createCall.options, {
+    configuredSpreadsheetId: undefined,
+    title: "KAIST SOC 집행위 연락망",
+    sheetTitle: "연락망",
+    purpose: "executive-contacts",
+  });
+  const syncCall = calls.find((call) => call.kind === "syncSheet");
+  assert.deepEqual(syncCall.definition.headers, [
+    "이름",
+    "영문명",
+    "학번",
+    "부서",
+    "영문부서",
+    "직책",
+    "영문직책",
+    "활동 연도",
+    "이메일",
+    "전화번호",
   ]);
-  const tagCall = calls.find((call) => call.method === "PATCH");
-  assert.deepEqual(tagCall.body, { appProperties: { socPurpose: "executive-contacts" } });
+  assert.deepEqual(syncCall.definition.rows, [[
+    "홍길동",
+    "Gildong Hong",
+    "20261234",
+    "회장단",
+    "Presidium",
+    "회장",
+    "President",
+    2026,
+    "hong@example.com",
+    "010-0000-0000",
+  ]]);
+  assert.deepEqual(syncCall.definition.columnWidths, [120, 160, 100, 140, 160, 140, 160, 100, 230, 140]);
+  assert.equal(syncCall.definition.protectionDescription, "KAIST SOC · 집행부원 연락망 (읽기 전용)");
 });
 
-test("reuses the configured contact spreadsheet without creating another file", async () => {
+test("passes the configured contact spreadsheet through without creating a duplicate", async () => {
   const { calls, service } = createService({ GOOGLE_CONTACTS_SPREADSHEET_ID: "configured-sheet" });
 
   const result = await service.sync();
 
   assert.equal(result.spreadsheetId, "configured-sheet");
-  assert.equal(
-    calls.some((call) => call.method === "POST" && call.url === "https://sheets.googleapis.com/v4/spreadsheets"),
-    false,
-  );
+  const createCall = calls.find((call) => call.kind === "getOrCreateSpreadsheet");
+  assert.equal(createCall.options.configuredSpreadsheetId, "configured-sheet");
 });

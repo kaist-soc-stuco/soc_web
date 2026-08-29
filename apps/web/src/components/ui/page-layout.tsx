@@ -188,9 +188,9 @@ export function PageTabs({
 }
 
 const pageTabClassName =
-  "interaction-link !h-[var(--ui-page-tab-height)] !min-h-[var(--ui-page-tab-height)] !font-normal";
+  "interaction-link select-none !h-[var(--ui-page-tab-height)] !min-h-[var(--ui-page-tab-height)] !font-normal";
 const pageActionClassName =
-  "interaction-button inline-flex h-[var(--ui-control-height)] shrink-0 items-center justify-center gap-1.5 rounded-[var(--ui-control-radius)] border px-3.5 text-[length:var(--ui-control-font-size)] font-semibold tracking-tight";
+  "interaction-button select-none inline-flex h-[var(--ui-control-height)] shrink-0 items-center justify-center gap-1.5 rounded-[var(--ui-control-radius)] border px-3.5 text-[length:var(--ui-control-font-size)] font-semibold tracking-tight";
 
 function pageActionToneClassName(tone: "neutral" | "primary") {
   return tone === "primary"
@@ -245,7 +245,7 @@ export function PageActionButton({
 }) {
   return (
     <Button
-      variant="ghost"
+      variant={tone === "primary" ? "default" : "ghost"}
       className={cn(pageActionClassName, pageActionToneClassName(tone), className)}
       {...props}
     />

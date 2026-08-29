@@ -41,7 +41,7 @@ export function ArticleEngagementActions({
   if (!allowLike && !allowScrap) return null;
 
   return (
-    <div className="flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+    <div className="select-none flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
       {allowLike ? (
         <EngagementActionButton
           active={likeActive}

@@ -27,13 +27,20 @@ import type { UpdateSurveyDto } from "./dto/update-survey.dto";
 import type { ComputedSurveyState, SurveyDetailResponse } from "@soc/contracts";
 import { UsersService } from "../users/users.service";
 import { getSurveyEligibilityFailures } from "./survey-eligibility";
+import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 
 interface SurveyCaller {
-  id: string;
+  id?: string;
   permission: number;
+  temporaryClaims?: TemporaryAccessTokenClaims;
 }
 
-type EligibilityUser = Awaited<ReturnType<UsersService["findById"]>>;
+type EligibilityUser = {
+  primaryMajor?: string | null;
+  departmentKo?: string | null;
+  departmentEn?: string | null;
+  academicStatus?: string | null;
+} | null;
 type EligibilityFeeStatus = Awaited<
   ReturnType<UsersService["getStudentFeeStatus"]>
 >;
@@ -116,6 +123,20 @@ export class SurveysService {
     caller?: SurveyCaller,
   ): Promise<EligibilityContext | null> {
     if (!caller || !this.usersService) return null;
+
+    if (caller.temporaryClaims) {
+      return {
+        user: {
+          academicStatus: caller.temporaryClaims.academicStatus ?? null,
+          departmentKo: caller.temporaryClaims.department ?? null,
+          departmentEn: null,
+          primaryMajor: caller.temporaryClaims.primaryMajor ?? null,
+        },
+        feeStatus: null,
+      };
+    }
+
+    if (!caller.id) return null;
 
     const user = await this.usersService.findById(caller.id);
     if (!user) return { user: null, feeStatus: null };
@@ -481,7 +502,7 @@ export class SurveysService {
 
   async getAnalytics(
     surveyId: string,
-    caller?: { id: string; permission: number },
+    caller?: SurveyCaller,
   ) {
     const survey = await this.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
@@ -502,10 +523,10 @@ export class SurveysService {
     const sections = await this.sectionsRepo.findBySurveyId(surveyId);
     const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);
 
-    const questionsAnalytics = await Promise.all(
+    const analyticsSections = await Promise.all(
       sections.map(async (section) => {
         const questions = await this.questionsRepo.findBySectionId(section.id);
-        return Promise.all(
+        const analyticsQuestions = await Promise.all(
           questions.map(async (q) => {
             const questionAnswers = answers.filter((a) => a.questionId === q.id);
             const totalAnswers = questionAnswers.length;
@@ -633,6 +654,14 @@ export class SurveysService {
             };
           }),
         );
+        return {
+          sectionId: section.id,
+          titleKo: section.titleKo,
+          titleEn: section.titleEn,
+          descriptionKo: section.descriptionKo,
+          descriptionEn: section.descriptionEn,
+          questions: analyticsQuestions,
+        };
       }),
     );
 
@@ -652,7 +681,8 @@ export class SurveysService {
       titleKo: survey.titleKo,
       titleEn: survey.titleEn,
       totalResponses,
-      questions: questionsAnalytics.flat(2),
+      questions: analyticsSections.flatMap((section) => section.questions),
+      sections: analyticsSections,
     };
   }
 }

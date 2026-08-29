@@ -151,7 +151,7 @@ export function EventsSurveysDayDetails({
               Boolean(event.calendarEventId) &&
               openMenuId === event.calendarEventId;
             const cardClassName =
-              `group relative block w-full shrink-0 rounded-lg border border-slate-200 bg-white p-3.5 transition hover:border-slate-300 ${showAdminMenu ? "z-20" : "z-0"}`;
+              `group relative block w-full shrink-0 select-none rounded-lg border border-slate-200 bg-white p-3.5 transition hover:border-slate-300 ${showAdminMenu ? "z-20" : "z-0"}`;
             const cardContent = (
               <>
                 <div className="flex items-start gap-2.5">

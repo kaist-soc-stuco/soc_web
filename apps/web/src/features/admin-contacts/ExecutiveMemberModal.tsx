@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import type {
   AdminUserRecord,
   ContactDepartmentRecord,
@@ -8,6 +9,7 @@ import type {
 import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminDrawer } from "@/components/ui/admin-drawer";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
 
@@ -55,6 +57,12 @@ function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormVal
   };
 }
 
+function formatPortalMemberSummary(member: AdminUserRecord) {
+  const identity = member.stdNo ? `${member.nameKo} (${member.stdNo})` : member.nameKo;
+  const department = member.departmentKo || member.departmentEn || "소속 미등록";
+  return `${identity} | ${member.email} | ${department}`;
+}
+
 export function ExecutiveMemberModal({
   contact,
   departments,
@@ -68,6 +76,7 @@ export function ExecutiveMemberModal({
   const [formData, setFormData] = useState<ExecutiveMemberFormValues>(() => getInitialValues(contact));
   const [portalQuery, setPortalQuery] = useState("");
   const [portalMembers, setPortalMembers] = useState<AdminUserRecord[]>([]);
+  const [selectedPortalMember, setSelectedPortalMember] = useState<AdminUserRecord | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
   const formId = "executive-member-form";
@@ -77,30 +86,38 @@ export function ExecutiveMemberModal({
     setFormData(getInitialValues(contact));
     setPortalQuery("");
     setPortalMembers([]);
+    setSelectedPortalMember(null);
     setPortalError(null);
   }, [contact, open]);
 
   useEffect(() => {
     const query = portalQuery.trim();
     if (!open || query.length < 2) {
-      setPortalMembers([]);
+      setPortalMembers((current) => (current.length === 0 ? current : []));
       setPortalLoading(false);
+      setPortalError(null);
       return;
     }
 
     let cancelled = false;
+    setPortalLoading(true);
+    setPortalError(null);
+    setPortalMembers((current) => (current.length === 0 ? current : []));
     const timer = window.setTimeout(() => {
-      setPortalLoading(true);
       void onSearchPortalMembers(query)
         .then((members) => {
           if (!cancelled) {
-            setPortalMembers(members);
+            setPortalMembers((current) => {
+              const isSameResult = current.length === members.length
+                && current.every((member, index) => member.userId === members[index]?.userId);
+              return isSameResult ? current : members;
+            });
             setPortalError(null);
           }
         })
         .catch(() => {
           if (!cancelled) {
-            setPortalMembers([]);
+            setPortalMembers((current) => (current.length === 0 ? current : []));
             setPortalError("포털 회원을 검색하지 못했습니다.");
           }
         })
@@ -136,13 +153,21 @@ export function ExecutiveMemberModal({
       email: member.email,
       phoneNumber: member.phoneNumber ?? "",
     }));
-    setPortalQuery(`${member.nameKo}${member.stdNo ? ` · ${member.stdNo}` : ""}`);
+    setSelectedPortalMember(member);
+    setPortalQuery("");
     setPortalMembers([]);
     setPortalError(
       member.departmentKo && !department
         ? "회원의 소속이 등록된 부서 목록에 없습니다. 부서를 먼저 등록한 뒤 선택해 주세요."
         : null,
     );
+  };
+
+  const clearPortalMember = () => {
+    setSelectedPortalMember(null);
+    setPortalQuery("");
+    setPortalMembers([]);
+    setPortalError(null);
   };
 
   const departmentOptions = [
@@ -189,36 +214,54 @@ export function ExecutiveMemberModal({
           event.preventDefault();
           void onSave(formData);
         }}
-        className="scrollbar-hidden max-h-[70vh] space-y-5 overflow-y-auto"
+        className="space-y-5 pb-1"
       >
         <AdminFormField label="포털 가입 회원 검색" hint="이름, 학번, 이메일로 검색한 뒤 회원을 선택하세요.">
-          <div className="relative">
-            <UiInput
-              value={portalQuery}
-              onChange={(event) => setPortalQuery(event.currentTarget.value)}
-              placeholder="포털 가입 회원 검색"
-              autoComplete="off"
-              className="box-border w-full focus-visible:border-brand-primary focus-visible:ring-2 focus-visible:ring-brand-primary/20"
-            />
-            {portalLoading ? <p className="mt-1 text-xs text-slate-500">검색 중...</p> : null}
-            {portalMembers.length > 0 ? (
-              <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-elevated">
-                {portalMembers.map((member) => (
-                  <button
-                    key={member.userId}
-                    type="button"
-                    onClick={() => selectPortalMember(member)}
-                    className="flex w-full items-start justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50"
-                  >
-                    <span className="min-w-0 truncate font-medium text-slate-800">
-                      {member.nameKo} {member.nameEn ? `(${member.nameEn})` : ""}
-                    </span>
-                    <span className="shrink-0 text-xs text-slate-500">{member.stdNo ?? member.email}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          {selectedPortalMember ? (
+            <div className="flex min-h-10 w-full items-center rounded-lg border border-emerald-200 bg-emerald-50/45 px-2 py-1.5">
+              <Badge tone="success" className="h-auto min-h-7 w-full min-w-0 max-w-full justify-between gap-1.5 rounded-md px-2 py-1 text-xs font-medium leading-4">
+                <span className="min-w-0 truncate">{formatPortalMemberSummary(selectedPortalMember)}</span>
+                <button
+                  type="button"
+                  aria-label="연결된 포털 회원 해제"
+                  onClick={clearPortalMember}
+                  className="inline-flex size-5 shrink-0 items-center justify-center rounded text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-900"
+                >
+                  <X aria-hidden="true" className="size-3.5" />
+                </button>
+              </Badge>
+            </div>
+          ) : (
+            <div className="relative">
+              <UiInput
+                value={portalQuery}
+                onChange={(event) => setPortalQuery(event.currentTarget.value)}
+                placeholder="포털 가입 회원 검색"
+                autoComplete="off"
+                aria-busy={portalLoading}
+                className="box-border w-full focus-visible:border-brand-primary focus-visible:ring-2 focus-visible:ring-brand-primary/20"
+              />
+              {portalQuery.trim().length >= 2 && !portalError ? (
+                <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-elevated" role="listbox" aria-label="포털 회원 검색 결과">
+                  {portalMembers.length > 0 ? portalMembers.map((member) => (
+                    <button
+                      key={member.userId}
+                      type="button"
+                      role="option"
+                      onClick={() => selectPortalMember(member)}
+                      className="flex w-full min-w-0 items-center rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50"
+                    >
+                      <span className="min-w-0 truncate font-medium text-slate-800" title={formatPortalMemberSummary(member)}>
+                        {formatPortalMemberSummary(member)}
+                      </span>
+                    </button>
+                  )) : (
+                    <p className="px-3 py-2 text-xs text-slate-500">검색 결과가 없습니다.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
           {portalError ? <span className="text-xs font-normal leading-4 text-rose-600">{portalError}</span> : null}
         </AdminFormField>
 
@@ -230,7 +273,7 @@ export function ExecutiveMemberModal({
             <UiInput required value={formData.nameEn} onChange={(event) => updateField("nameEn", event.currentTarget.value)} placeholder="예: Seongchan Kim" className="box-border w-full" />
           </AdminFormField>
           <AdminFormField label="학번">
-            <UiInput value={formData.studentNumber} readOnly placeholder="포털 회원 선택 시 자동 입력" className="box-border w-full bg-slate-50" />
+            <UiInput value={formData.studentNumber} onChange={(event) => updateField("studentNumber", event.currentTarget.value)} placeholder="포털 회원 선택 시 자동 입력" className="box-border w-full" />
           </AdminFormField>
           <AdminFormField label="활동 연도">
             <UiInput type="number" min="1900" max="3000" value={formData.cohort ?? ""} onChange={(event) => updateField("cohort", event.currentTarget.value ? Number(event.currentTarget.value) : null)} placeholder="예: 2026" className="box-border w-full" />

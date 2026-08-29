@@ -47,6 +47,7 @@ import type {
   StudentFeeStatsResponse,
   StudentFeeStatsOptions,
   StudentFeeStatusRecord,
+  StudentFeeSpreadsheetSyncResponse,
   UpdateContactRequest,
   UpdateContactDepartmentRequest,
   UpdateRoleGroupRequest,
@@ -582,6 +583,26 @@ export const createAdminApi = ({
     return requestBlob(
       `${usersBaseUrl}/fee-status/export.xlsx${query ? `?${query}` : ""}`,
       { method: "GET" },
+      { retryOnUnauthorized: true },
+    );
+  },
+
+  syncStudentFeeSpreadsheet: async (
+    options?: StudentFeeListOptions,
+  ): Promise<StudentFeeSpreadsheetSyncResponse> => {
+    const params = new URLSearchParams();
+    if (options?.status) params.set("status", options.status);
+    if (options?.sortBy) params.set("sortBy", options.sortBy);
+    if (options?.sortDirection) params.set("sortDirection", options.sortDirection);
+    if (options?.query?.trim()) params.set("q", options.query.trim());
+    if (options?.referenceSemester) params.set("referenceSemester", options.referenceSemester);
+    if (options?.paymentYear !== undefined) params.set("paymentYear", String(options.paymentYear));
+    if (options?.majorCategory) params.set("majorCategory", options.majorCategory);
+    if (options?.userIds?.length) params.set("userIds", options.userIds.join(","));
+    const query = params.toString();
+    return requestJson<StudentFeeSpreadsheetSyncResponse>(
+      `${usersBaseUrl}/fee-status/spreadsheet/sync${query ? `?${query}` : ""}`,
+      { method: "POST" },
       { retryOnUnauthorized: true },
     );
   },

@@ -7,9 +7,10 @@ const {
   ROADMAP_RELATIONS,
   ROADMAP_TRACKS,
 } = require("../dist/test-src/features/roadmap/roadmap-data.js");
+const { ROADMAP_OFFERINGS } = require("../dist/test-src/features/roadmap/roadmap-offerings.js");
 
-test("keeps the 2025-04-22 roadmap snapshot complete and internally consistent", () => {
-  assert.equal(ROADMAP_COURSES.length, 55);
+test("keeps the roadmap course graph complete and internally consistent", () => {
+  assert.equal(ROADMAP_COURSES.length, 65);
   assert.equal(ROADMAP_TRACKS.length, 9);
   assert.equal(ROADMAP_RELATIONS.length, 31);
 
@@ -40,4 +41,11 @@ test("keeps the 2025-04-22 roadmap snapshot complete and internally consistent",
     assert.ok(courseCodes.has(relation.target), `unknown relation target: ${relation.target}`);
     assert.notEqual(relation.source, relation.target, "a course cannot point to itself");
   }
+});
+
+test("keeps 2026 term offerings limited to eligible undergraduate courses", () => {
+  assert.equal(ROADMAP_OFFERINGS.filter((offering) => offering.term === "2026-spring").length, 49);
+  assert.equal(ROADMAP_OFFERINGS.filter((offering) => offering.term === "2026-fall").length, 44);
+  assert.ok(ROADMAP_OFFERINGS.some((offering) => offering.courseCode === "CS492"));
+  assert.ok(ROADMAP_OFFERINGS.every((offering) => !/졸업연구|개별연구|논문연구/.test(offering.nameKo)));
 });

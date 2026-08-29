@@ -2,15 +2,14 @@
  * 프런트 인증 보조 상태 저장소입니다.
  *
  * 쿠키 기반 인증으로 전환되어 access/refresh/session 토큰은 브라우저 쿠키로 관리합니다.
- * temporary 모드에서는 access/refresh/session을 sessionStorage에만 저장해 현재 탭 세션 범위에서만 사용합니다.
+ * temporary 모드에서는 짧은 수명의 access token만 sessionStorage에 저장해
+ * 현재 탭 세션 범위에서만 사용합니다. refresh token과 세션 레코드는 없습니다.
  */
 
 export interface StoredAuthState {
   pendingLoginToken?: string;
   temporarySession?: {
     accessToken?: string;
-    refreshToken?: string;
-    sessionId?: string;
   };
 }
 

@@ -89,6 +89,13 @@ export interface StudentFeeListOptions {
   userIds?: string[];
 }
 
+export interface StudentFeeSpreadsheetSyncResponse {
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  syncedCount: number;
+  syncedAt: string;
+}
+
 export interface StudentFeeListResponse {
   students: Array<{
     userId: string;

@@ -70,6 +70,7 @@ const course = (
 export const ROADMAP_COURSES: RoadmapCourse[] = [
   course("CS101", "프로그래밍 기초", "Programming Basics", "S/F", "2:3:2(0)", "basic-required"),
   course("CS109", "프로그래밍 실습", "Programming Practice", "S/F", "2:3:3(0)", "basic-elective"),
+  course("CS10003", "인공지능 기초", "AI Fundamentals", "S/F", "3:0:3(0)", "basic-elective", ["ai"]),
   course("MAS110", "데이터과학을 위한 선형대수학", "Linear Algebra for Data Science", "S/F", "3:1:3(0)", "basic-required"),
   course("MAS109", "선형대수학개론", "Introduction to Linear Algebra", "S/F", "3:1:3(0)", "basic-elective"),
   course("CS204", "이산구조", "Discrete Mathematics", "S/F", "3:0:3(0)", "major-required", ["theory", "visual"]),
@@ -92,11 +93,13 @@ export const ROADMAP_COURSES: RoadmapCourse[] = [
   course("CS422", "계산이론", "Theory of Computation", "S/F", "3:0:3(0)", "major-elective", ["systems"]),
   course("CS443", "분산 알고리즘 및 시스템", "Distributed Algorithms and Systems", "F", "3:0:3(0)", "major-elective", ["systems", "theory"]),
   course("CS376", "기계학습", "Machine Learning", "S/F", "3:0:3(0)", "major-elective", ["visual", "ai"], true),
+  course("CS377", "강화학습 개론", "Introduction to Reinforcement Learning", "S/F", "3:0:3(0)", "major-elective", ["ai"]),
   course("CS482", "대화형 컴퓨터그래픽스", "Interactive Computer Graphics", "S/F", "3:2:3(0)", "major-elective", ["visual", "interactive"]),
   course("CS485", "컴퓨터비전을 위한 기계학습", "Machine Learning for Computer Vision", "F", "3:0:3(0)", "major-elective", ["visual"]),
   course("CS380", "컴퓨터그래픽스 개론", "Introduction to Computer Graphics", "S", "3:3:4(0)", "major-elective", ["visual", "interactive"]),
   course("CS484", "컴퓨터비전개론", "Introduction to Computer Vision", "F", "3:0:3(0)", "major-elective", ["visual", "ai"], true),
   course("CS402", "전산논리학 개론", "Introduction to Logic in Computer Science", "S/F", "3:0:3(0)", "major-elective", ["theory"]),
+  course("CS424", "프로그램 논증", "Program Verification", "S/F", "3:0:3(0)", "major-elective", ["theory"]),
   course("CS202", "문제해결기법", "Problem Solving", "S/F", "2:3:3(0)", "major-elective", ["theory"]),
   course("CS322", "형식언어 및 오토마타", "Formal Languages and Automata", "F", "3:0:3(0)", "major-elective", ["theory"]),
   course("CS431", "동시성 프로그래밍", "Concurrent Programming", "S/F", "3:0:3(0)", "major-elective", ["theory"]),
@@ -124,6 +127,13 @@ export const ROADMAP_COURSES: RoadmapCourse[] = [
   course("CS471", "그래프 기계학습 및 마이닝", "Graph Machine Learning and Mining", "S", "3:0:3(0)", "major-elective", ["ai"]),
   course("CS423", "확률적 프로그래밍", "Probabilistic Programming", "S", "3:0:3(0)", "major-elective", ["ai"], true),
   course("CS486", "웨어러블 사용자 인터페이스", "Wearable User Interfaces", "S", "3:0:3(0)", "major-elective", ["interactive"]),
+  course("CS30708", "생성모델 개론", "Introduction to Generative Models", "S/F", "3:0:3(0)", "major-elective", ["ai"]),
+  course("CS40710", "돌봄 및 사회적 약자를 위한 AI 및 컴퓨팅", "AI and Computing for Care and Underserved Communities", "S/F", "3:0:3(0)", "major-elective", ["ai", "social"]),
+  course("CS40711", "경영을 위한 인공지능 기초", "AI Fundamentals for Business", "S/F", "3:0:3(0)", "major-elective", ["ai", "social"]),
+  course("CS408", "전산학 프로젝트", "Computer Science Project", "S/F", "1:6:3(0)", "major-elective", ["software"]),
+  course("CS492", "전산학특강", "Special Topics in Computer Science", "S/F", "3:0:3(0)", "major-elective"),
+  course("CS494", "전산학특강 II", "Special Topics in Computer Science II", "S/F", "2:0:2(0)", "major-elective", ["theory"]),
+  course("CS496", "세미나", "Seminar", "S/F", "1:0:1(0)", "major-elective"),
 ];
 
 export const ROADMAP_COURSE_BY_CODE = new Map(
@@ -131,17 +141,18 @@ export const ROADMAP_COURSE_BY_CODE = new Map(
 );
 
 export const ROADMAP_LANES: RoadmapLane[] = [
-  { id: "foundation", label: { ko: "기초 과목", en: "Foundation" }, courses: ["CS101", "CS109", "MAS110", "MAS109"] },
+  { id: "foundation", label: { ko: "기초 과목", en: "Foundation" }, courses: ["CS101", "CS109", "CS10003", "MAS110", "MAS109"] },
   { id: "core", label: { ko: "전공 핵심", en: "Major Core" }, courses: ["CS204", "CS206", "CS300", "CS311", "CS320", "CS330", "CS230", "CS341"] },
   { id: "data", trackId: "data", label: { ko: "데이터 과학", en: "Data Science" }, courses: ["CS361", "CS360"] },
   { id: "software", trackId: "software", label: { ko: "소프트웨어 디자인", en: "Software Design" }, courses: ["CS350", "CS453", "CS454", "CS457"] },
   { id: "systems", trackId: "systems", label: { ko: "시스템·네트워크", en: "Systems & Networks" }, courses: ["CS211", "CS310", "CS422", "CS443"] },
   { id: "visual", trackId: "visual", label: { ko: "비주얼 컴퓨팅", en: "Visual Computing" }, courses: ["CS376", "CS482", "CS485", "CS380", "CS484"] },
-  { id: "theory", trackId: "theory", label: { ko: "전산이론", en: "Theory" }, courses: ["CS402", "CS202", "CS322", "CS431", "CS458", "CS481", "CS459", "CS220", "CS370", "CS443", "CS477", "CS479", "CS475"] },
+  { id: "theory", trackId: "theory", label: { ko: "전산이론", en: "Theory" }, courses: ["CS402", "CS424", "CS202", "CS322", "CS431", "CS458", "CS481", "CS459", "CS220", "CS370", "CS443", "CS477", "CS479", "CS475", "CS494"] },
   { id: "secure", trackId: "secure", label: { ko: "시큐어 컴퓨팅", en: "Secure Computing" }, courses: ["CS420", "CS447", "CS348"] },
   { id: "social", trackId: "social", label: { ko: "소셜 컴퓨팅", en: "Social Computing" }, courses: ["CS360", "CS442", "CS374", "CS473", "CS372", "CS470", "CS489"] },
-  { id: "ai", trackId: "ai", label: { ko: "인공지능·정보서비스", en: "AI & Information Services" }, courses: ["CS270", "CS371", "CS372", "CS376", "CS470", "CS474", "CS484", "CS411", "CS471", "CS479", "CS423"] },
+  { id: "ai", trackId: "ai", label: { ko: "인공지능·정보서비스", en: "AI & Information Services" }, courses: ["CS10003", "CS270", "CS371", "CS372", "CS376", "CS377", "CS470", "CS474", "CS484", "CS411", "CS471", "CS479", "CS423", "CS30708", "CS40710", "CS40711"] },
   { id: "interactive", trackId: "interactive", label: { ko: "인터랙티브 컴퓨팅", en: "Interactive Computing" }, courses: ["CS380", "CS486", "CS482", "CS442", "CS374", "CS473"] },
+  { id: "special", label: { ko: "프로젝트·특강", en: "Projects & Special Topics" }, courses: ["CS408", "CS492", "CS494", "CS496"] },
 ];
 
 export const ROADMAP_RELATIONS: RoadmapRelation[] = [

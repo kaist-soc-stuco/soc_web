@@ -5,6 +5,7 @@ import type {
   BoardSummary,
   PublicCalendarEventItem,
   SurveyRecord,
+  VoteRecord,
 } from "@soc/contracts";
 import { ArrowRight, Loader2 } from "lucide-react";
 
@@ -84,19 +85,23 @@ export function SearchFilterTabs({
   activeFilter,
   boardCount,
   eventCount,
+  faqCount,
   lang,
   onFilterChange,
   surveyCount,
   totalCount,
+  voteCount,
   visible,
 }: {
   activeFilter: SearchFilter;
   boardCount: number;
   eventCount: number;
+  faqCount: number;
   lang: string;
   onFilterChange: (filter: SearchFilter) => void;
   surveyCount: number;
   totalCount: number;
+  voteCount: number;
   visible: boolean;
 }) {
   if (!visible) return null;
@@ -104,12 +109,14 @@ export function SearchFilterTabs({
   const tabs: Array<{ count: number; filter: SearchFilter; label: string }> = [
     { count: totalCount, filter: "all", label: lang === "ko" ? "전체" : "All" },
     { count: boardCount, filter: "board", label: lang === "ko" ? "게시판" : "Board" },
+    { count: faqCount, filter: "faq", label: "FAQ" },
     { count: eventCount, filter: "event", label: lang === "ko" ? "행사" : "Events" },
     {
       count: surveyCount,
       filter: "survey",
       label: lang === "ko" ? "설문" : "Surveys",
     },
+    { count: voteCount, filter: "vote", label: lang === "ko" ? "투표" : "Votes" },
   ];
 
   return (
@@ -170,12 +177,14 @@ export function SearchResults({
   calendarEvents,
   error,
   eventArticles,
+  faqArticles,
   filter,
   lang,
   loading,
   query,
   surveys,
   totalCount,
+  votes,
 }: {
   aboutResults: AboutSearchItem[];
   boardById: Map<number, BoardSummary>;
@@ -183,12 +192,14 @@ export function SearchResults({
   calendarEvents: PublicCalendarEventItem[];
   error: string | null;
   eventArticles: ArticleListItem[];
+  faqArticles: ArticleListItem[];
   filter: SearchFilter;
   lang: string;
   loading: boolean;
   query: string;
   surveys: SurveyRecord[];
   totalCount: number;
+  votes: VoteRecord[];
 }) {
   if (loading) {
     return (
@@ -217,6 +228,9 @@ export function SearchResults({
       {filter === "board" || showAll ? (
         <ArticleResults articles={boardArticles} boardById={boardById} lang={lang} query={query} />
       ) : null}
+      {filter === "faq" || showAll ? (
+        <FaqResults articles={faqArticles} lang={lang} query={query} />
+      ) : null}
       {filter === "event" || showAll ? (
         <>
           <EventResults articles={eventArticles} lang={lang} query={query} />
@@ -225,6 +239,9 @@ export function SearchResults({
       ) : null}
       {filter === "survey" || showAll ? (
         <SurveyResults lang={lang} query={query} surveys={surveys} />
+      ) : null}
+      {filter === "vote" || showAll ? (
+        <VoteResults lang={lang} query={query} votes={votes} />
       ) : null}
       {showAll ? <AboutResults items={aboutResults} lang={lang} query={query} /> : null}
     </div>
@@ -402,6 +419,81 @@ function SurveyResults({
               <HighlightedText value={title} query={query} />
             </p>
             {snippet ? <Snippet value={snippet} query={query} /> : null}
+          </SearchLink>
+        );
+      })}
+    </SectionShell>
+  );
+}
+
+function FaqResults({
+  articles,
+  lang,
+  query,
+}: {
+  articles: ArticleListItem[];
+  lang: string;
+  query: string;
+}) {
+  return (
+    <SectionShell count={articles.length} title="FAQ">
+      {articles.map((article) => {
+        const title = lang === "ko" ? article.titleKo : article.titleEn || article.titleKo;
+        const snippet = getSnippet(
+          lang === "ko" ? article.snippetKo : article.snippetEn || article.snippetKo,
+          query,
+        );
+
+        return (
+          <SearchLink key={article.articleId} to={`/board/faq/${article.articleId}`}>
+            <p className="truncate text-sm font-medium text-slate-900">
+              <HighlightedText value={title} query={query} />
+            </p>
+            {snippet ? <Snippet value={snippet} query={query} /> : null}
+            <p className="mt-1 flex items-center gap-2 text-xs font-normal text-slate-400">
+              <span>FAQ</span>
+              <span>·</span>
+              <span>{formatDate(article.postedAt, lang)}</span>
+            </p>
+          </SearchLink>
+        );
+      })}
+    </SectionShell>
+  );
+}
+
+function VoteResults({
+  lang,
+  query,
+  votes,
+}: {
+  lang: string;
+  query: string;
+  votes: VoteRecord[];
+}) {
+  return (
+    <SectionShell count={votes.length} title={lang === "ko" ? "투표" : "Votes"}>
+      {votes.map((vote) => {
+        const title = lang === "ko" ? vote.titleKo : vote.titleEn || vote.titleKo;
+        const description = lang === "ko" ? vote.descriptionKo : vote.descriptionEn || vote.descriptionKo;
+        const period = `${formatDate(vote.startsAt, lang)} ～ ${formatDate(vote.endsAt, lang)}`;
+        const status = vote.status === "PUBLISHED"
+          ? lang === "ko" ? "진행 중" : "Open"
+          : vote.status === "CLOSED" || vote.status === "TALLIED"
+            ? lang === "ko" ? "마감" : "Closed"
+            : lang === "ko" ? "시작 예정" : "Upcoming";
+
+        return (
+          <SearchLink key={vote.id} to={`/votes/${vote.id}`}>
+            <p className="truncate text-sm font-medium text-slate-900">
+              <HighlightedText value={title} query={query} />
+            </p>
+            {description ? <Snippet value={description} query={query} /> : null}
+            <p className="mt-1 flex items-center gap-2 text-xs font-normal text-slate-400">
+              <span>{status}</span>
+              <span>·</span>
+              <span>{period}</span>
+            </p>
           </SearchLink>
         );
       })}

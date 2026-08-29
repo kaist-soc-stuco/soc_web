@@ -47,11 +47,11 @@ export function AboutLandingHero({ lang }: { lang: string }) {
               : "SoC Student Council representing KAIST School of Computing undergraduates"}
           </p>
           <div className="about-hero-links">
-            <Link to="/events">
+            <Link className="select-none" to="/events">
               {lang === "ko" ? "행사·일정" : "Events & calendar"}
               <ArrowRight aria-hidden="true" />
             </Link>
-            <Link to="/board/건의사항">
+            <Link className="select-none" to="/board/건의사항">
               {lang === "ko" ? "건의사항" : "Suggestions"}
               <ArrowRight aria-hidden="true" />
             </Link>
@@ -91,7 +91,7 @@ export function AboutSectionNavigation({
               key={section.id}
               href={`#${section.id}`}
               aria-current={active ? "location" : undefined}
-              className={active ? "is-active" : undefined}
+              className={active ? "is-active select-none" : "select-none"}
               onClick={(event) => {
                 event.preventDefault();
                 onNavigate(section.id);
@@ -182,7 +182,7 @@ function WorkSection({ lang }: { lang: string }) {
         <ol className="about-scope-list about-reveal-delay-1" data-about-reveal>
           {scopes.map((scope, index) => (
             <li key={scope.title}>
-              <Link to={scope.href}>
+              <Link className="select-none" to={scope.href}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <span className="about-scope-copy">
                   <strong>{scope.title}</strong>
@@ -220,7 +220,7 @@ function PeopleSection({ lang }: { lang: string }) {
         <div className="about-people-org about-reveal-delay-1" data-about-reveal>
           {organizationImage && organizationChart ? (
             <a
-              className="about-org-image-link"
+              className="about-org-image-link select-none"
               href={resolveAssetUrl(organizationImage)}
               target="_blank"
               rel="noreferrer"
@@ -263,7 +263,7 @@ function PartnershipSection({ lang }: { lang: string }) {
                 ? "전산학부 학생과 연결되는 행사, 세션과 공동 프로그램 제안을 받습니다. 담당자 연락처와 제안 내용을 남겨 주세요."
                 : "We welcome proposals for events, sessions, and joint programs that connect with School of Computing students."}
             </p>
-            <Link className="about-partnership-link" to={inquiryHref}>
+            <Link className="about-partnership-link select-none" to={inquiryHref}>
               {lang === "ko" ? "후원·제휴 문의하기" : "Submit an inquiry"}
               <ArrowRight aria-hidden="true" />
             </Link>

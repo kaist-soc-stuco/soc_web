@@ -57,6 +57,7 @@ import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./Executiv
 
 const CONTACT_LIST_PAGE_SIZE = 500;
 const CONTACT_ROW_GRID = "grid min-w-[1120px] grid-cols-[52px_280px_120px_120px_220px_minmax(0,1fr)]";
+const GOOGLE_SHEETS_HOME_URL = "https://docs.google.com/spreadsheets/";
 
 export function ExecutiveDirectoryPage() {
   return <AuthGuard requirePermission={Permissions.MANAGE_CONTACTS}><ContactsPageContent /></AuthGuard>;
@@ -103,6 +104,7 @@ function ContactsPageContent() {
   const [editingContact, setEditingContact] = useState<ContactRecord | null>(null);
   const [memberSaving, setMemberSaving] = useState(false);
   const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [departmentModalOpen, setDepartmentModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<ContactDepartmentRecord | null>(null);
   const [departmentForm, setDepartmentForm] = useState({ nameKo: "", nameEn: "" });
@@ -192,6 +194,7 @@ function ContactsPageContent() {
     try {
       setSheetSyncing(true);
       const result = await apiClient.syncContactsSpreadsheet();
+      setSpreadsheetUrl(result.spreadsheetUrl);
       toast({
         type: "success",
         message: `Google Sheets에 ${result.syncedCount}명을 동기화했습니다.`,
@@ -389,6 +392,14 @@ function ContactsPageContent() {
 
   const headerActions = activeTab === "members" ? (
     <>
+      <a
+        href={spreadsheetUrl ?? GOOGLE_SHEETS_HOME_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="px-1 text-xs font-medium text-brand-primary underline-offset-4 hover:underline"
+      >
+        Google Sheets로 이동
+      </a>
       <Button type="button" variant="outline" onClick={() => void syncContactsSpreadsheet()} disabled={sheetSyncing}>
         <RefreshCw aria-hidden="true" className={sheetSyncing ? "animate-spin" : undefined} />
         {sheetSyncing ? "동기화 중..." : "Google Sheets 동기화"}
@@ -458,8 +469,8 @@ function ContactsPageContent() {
                 <AdminSelectDropdown value={departmentFilter} onChange={setDepartmentFilter} ariaLabel="부서 필터" className="w-36 shrink-0" options={[{ value: "", label: "부서 전체" }, ...departments.filter((department) => department.isActive).map((department) => ({ value: department.nameKo, label: department.nameKo })), ...legacyDepartmentOptions.map((department) => ({ value: department, label: department }))]} />
                 <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·학번·직책·메일·전화번호 검색" value={query} />
               </div></div>
-              <div className="min-w-0 overflow-x-auto">
-                {loading && contacts.length === 0 ? null : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport><div className="min-w-[1120px]"><div role="row" className={`${CONTACT_ROW_GRID} border-t-2 border-t-brand-primary bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center px-5">이름 (한글/영문)</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">활동 연도</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
+              <div className="min-w-0">
+                {loading && contacts.length === 0 ? null : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-table-viewport--dragging" : undefined}><div className="min-w-[1120px]"><div role="row" className={`${CONTACT_ROW_GRID} border-t-2 border-t-brand-primary bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center px-5">이름 (한글/영문)</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">활동 연도</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
               </div>
               {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
             </AdminTableCard>
@@ -521,7 +532,7 @@ function SortableContactRow({ contact, disabled, onEdit }: { contact: ContactRec
 }
 
 function ContactDragPreview({ contact, width }: { contact: ContactRecord; width: number | null }) {
-  return <div style={{ width: width ?? undefined }} className={`${CONTACT_ROW_GRID} relative z-50 min-h-20 cursor-grabbing rounded-lg border border-brand-primary/45 bg-white shadow-lg`}>
+  return <div style={{ width: width ?? undefined }} className={`${CONTACT_ROW_GRID} relative z-50 select-none min-h-20 cursor-grabbing rounded-lg border border-brand-primary/45 bg-white shadow-lg`}>
     <div className="flex items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
     <div className="min-w-0 px-5 py-3"><p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p><p className="truncate text-xs text-slate-500">{contact.nameEn}</p></div>
     <div className="min-w-0 truncate px-5 py-3 text-sm text-slate-700">{contact.studentNumber || "—"}</div>

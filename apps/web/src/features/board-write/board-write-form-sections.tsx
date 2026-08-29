@@ -210,6 +210,8 @@ interface EditorFieldsProps {
   titleKo: string;
   fileInputRef?: RefObject<HTMLInputElement | null>;
   uploading?: boolean;
+  onSave?: () => void | Promise<void>;
+  onSubmit?: () => void | Promise<void>;
 }
 
 export function BoardWriteEditorFields({
@@ -226,6 +228,8 @@ export function BoardWriteEditorFields({
   titleKo,
   fileInputRef,
   uploading,
+  onSave,
+  onSubmit,
 }: EditorFieldsProps) {
   return (
     <BilingualRichTextEditor
@@ -242,6 +246,8 @@ export function BoardWriteEditorFields({
       titleEn={titleEn}
       titleKo={titleKo}
       uploading={uploading}
+      onSave={onSave}
+      onSubmit={onSubmit}
     />
   );
 }
@@ -463,9 +469,7 @@ export function BoardWriteAttachmentList({
   onRemoveAsset,
   uploading,
 }: AttachmentListProps) {
-  const attachmentAssets = assets.filter(
-    (asset) => asset.usageType !== "THUMBNAIL",
-  );
+  const attachmentAssets = assets.filter((asset) => asset.usageType === "ATTACHMENT");
 
   if (attachmentAssets.length === 0 && !uploading) {
     return null;

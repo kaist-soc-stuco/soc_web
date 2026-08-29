@@ -17,6 +17,7 @@
     "src/lib/korean-holidays.ts",
     "src/lib/my-page-localization.ts",
     "src/features/roadmap/roadmap-data.ts",
+    "src/features/roadmap/roadmap-offerings.ts",
     "src/lib/site-content-value.ts",
     "src/lib/survey-display.ts",
     "src/lib/survey-results-display.ts"

@@ -20,7 +20,10 @@ export function Hero() {
   const title = heroText?.title || fallbackTitle;
 
   return (
-    <section className="hero-image-placeholder home-public-hero relative w-full overflow-hidden">
+    <section
+      data-home-hero
+      className="hero-image-placeholder home-public-hero relative w-full overflow-hidden"
+    >
       <img
         key={imageUrl}
         src={imageUrl}

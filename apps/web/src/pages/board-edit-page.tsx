@@ -42,6 +42,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     eventEndDate,
     eventStartDate,
     fileInputRef,
+    handleSaveDraft,
     handleSubmit,
     handleUploadThumbnail,
     handleUploadFiles,
@@ -232,6 +233,8 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
           titleKo={titleKo}
           fileInputRef={fileInputRef}
           uploading={uploading}
+          onSave={handleSaveDraft}
+          onSubmit={handleSubmit}
         />
       </div>
 

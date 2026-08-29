@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import { nowMs } from "@soc/shared";
 import { Maximize2, Minus, Move, Plus } from "lucide-react";
 
@@ -122,6 +122,12 @@ export function ImageCropModal({
     });
   };
 
+  const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const step = event.deltaY < 0 ? 0.1 : -0.1;
+    setZoom((value) => clamp(Math.round((value + step) * 100) / 100, 1, 3));
+  };
+
   const handleCrop = async () => {
     if (
       !file ||
@@ -183,7 +189,7 @@ export function ImageCropModal({
       <div className="space-y-3">
         <div
           ref={stageRef}
-          className="relative mx-auto flex h-[min(52vh,28rem)] w-full max-w-[720px] touch-none select-none items-center justify-center overflow-hidden rounded-xl bg-slate-950"
+          className="relative mx-auto flex h-[min(52vh,28rem)] w-full max-w-[720px] touch-none select-none items-center justify-center overflow-hidden overscroll-contain rounded-xl bg-slate-950"
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture(event.pointerId);
             dragRef.current = { point: { x: event.clientX, y: event.clientY }, offset };
@@ -191,6 +197,7 @@ export function ImageCropModal({
           onPointerMove={handlePointerMove}
           onPointerUp={() => { dragRef.current = null; }}
           onPointerCancel={() => { dragRef.current = null; }}
+          onWheel={handleWheel}
         >
           {sourceUrl ? (
             <img

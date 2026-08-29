@@ -6,8 +6,6 @@ import { AdminLayout } from '@/components/organisms/admin-layout';
 import { AuthGuard } from '@/components/guards/auth-guard';
 import { useCurrentSession } from '@/hooks/use-current-session';
 import { resolveApiBaseUrl } from '@/lib/api-base-url';
-import { getTemporaryAuthRequest } from '@/lib/auth-session';
-import { readStoredAuthState, writeStoredAuthState } from '@/lib/auth-storage';
 import { PublicOperationalContent } from '@/features/site-content/public-operational-content';
 import { ChannelTalkProvider } from '@/features/channel-talk/channel-talk-provider';
 import { BoardPage } from '@/pages/board-page';
@@ -145,7 +143,7 @@ function SessionKeepAlive() {
   const lastRefreshAtRef = useRef(0);
 
   useEffect(() => {
-    if (!session?.authenticated) return;
+    if (!session?.authenticated || session.storageMode === 'temporary') return;
 
     let cancelled = false;
     const refreshIfNeeded = async () => {
@@ -156,13 +154,8 @@ function SessionKeepAlive() {
 
       lastRefreshAtRef.current = now;
       try {
-        const result = await apiClient.refreshSession(getTemporaryAuthRequest());
-        if (cancelled || !result.temporarySession) return;
-
-        writeStoredAuthState({
-          ...(readStoredAuthState() ?? {}),
-          temporarySession: result.temporarySession,
-        });
+        if (cancelled) return;
+        await apiClient.refreshSession();
       } catch {
         // Normal API requests still own the expired-session redirect path.
         // Do not interrupt navigation because a background refresh was late.
@@ -187,9 +180,25 @@ function SessionKeepAlive() {
   return null;
 }
 
+function PreventImageGhostDrag() {
+  useEffect(() => {
+    const preventImageDrag = (event: DragEvent) => {
+      if (event.target instanceof HTMLImageElement) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('dragstart', preventImageDrag);
+    return () => document.removeEventListener('dragstart', preventImageDrag);
+  }, []);
+
+  return null;
+}
+
 export function App() {
   return (
     <BrowserRouter>
+      <PreventImageGhostDrag />
       <SessionKeepAlive />
       <ChannelTalkProvider>
         <PublicOperationalContent />
@@ -208,6 +217,7 @@ export function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/board/faq" element={<FaqPage />} />
+          <Route path="/board/faq/:articleId" element={<BoardDetailPage forcedCategory="FAQ" publicBasePath="/board/faq" />} />
           <Route path="/about/faq" element={<Navigate to="/board/faq" replace />} />
           <Route path="/about/pledges" element={<Navigate to="/about#work" replace />} />
           <Route path="/search" element={<SearchPage />} />

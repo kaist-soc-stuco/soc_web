@@ -173,6 +173,69 @@ const readBlob = async (response: Response): Promise<Blob> => {
   return response.blob();
 };
 
+/**
+ * Temporary consent sessions deliberately do not use cookies or refresh
+ * tokens. The short-lived access token is kept in the current browser tab and
+ * attached to API requests as a bearer credential so survey eligibility can be
+ * checked without creating a persisted user account.
+ */
+const readTemporaryAccessToken = (): string | undefined => {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const raw = window.sessionStorage.getItem("soc.auth.state");
+    if (!raw) return undefined;
+
+    const parsed = JSON.parse(raw) as {
+      temporarySession?: { accessToken?: unknown };
+    };
+    return typeof parsed.temporarySession?.accessToken === "string"
+      ? parsed.temporarySession.accessToken
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const shouldAttachTemporaryAuth = (url: string): boolean => {
+  try {
+    const parsed = new URL(
+      url,
+      typeof window === "undefined" ? "http://localhost" : window.location.origin,
+    );
+
+    return (
+      /\/v1\/surveys(?:\/|$)/.test(parsed.pathname) ||
+      /\/v1\/auth\/(?:session|me)$/.test(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+};
+
+const withCredentialsAndTemporaryAuth = (
+  url: string,
+  init: RequestInit,
+): RequestInit => {
+  const accessToken = shouldAttachTemporaryAuth(url)
+    ? readTemporaryAccessToken()
+    : undefined;
+  if (!accessToken) {
+    return { credentials: "include", ...init };
+  }
+
+  const headers = new Headers(init.headers);
+  if (!headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  return {
+    credentials: "include",
+    ...init,
+    headers,
+  };
+};
+
 export const createApiClientContext = ({
   baseUrl,
   fetcher = fetch,
@@ -182,6 +245,11 @@ export const createApiClientContext = ({
   let refreshInFlight: Promise<void> | null = null;
 
   const sendRefreshRequest = async (): Promise<void> => {
+    if (readTemporaryAccessToken()) {
+      redirectToLogin();
+      throw new ApiClientHttpError(401, "temporary_session_expired");
+    }
+
     if (!refreshInFlight) {
       refreshInFlight = (async () => {
         const response = await fetcher(`${authBaseUrl}/refresh`, {
@@ -217,18 +285,18 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<T> => {
-    const response = await fetcher(url, {
-      credentials: "include",
-      ...init,
-    });
+    const response = await fetcher(
+      url,
+      withCredentialsAndTemporaryAuth(url, init),
+    );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
       await sendRefreshRequest();
 
-      const retriedResponse = await fetcher(url, {
-        credentials: "include",
-        ...init,
-      });
+      const retriedResponse = await fetcher(
+        url,
+        withCredentialsAndTemporaryAuth(url, init),
+      );
 
       return readJson<T>(retriedResponse);
     }
@@ -241,18 +309,18 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<void> => {
-    const response = await fetcher(url, {
-      credentials: "include",
-      ...init,
-    });
+    const response = await fetcher(
+      url,
+      withCredentialsAndTemporaryAuth(url, init),
+    );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
       await sendRefreshRequest();
 
-      const retriedResponse = await fetcher(url, {
-        credentials: "include",
-        ...init,
-      });
+      const retriedResponse = await fetcher(
+        url,
+        withCredentialsAndTemporaryAuth(url, init),
+      );
 
       if (!retriedResponse.ok) {
         throw new ApiClientHttpError(retriedResponse.status);
@@ -271,18 +339,18 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<string> => {
-    const response = await fetcher(url, {
-      credentials: "include",
-      ...init,
-    });
+    const response = await fetcher(
+      url,
+      withCredentialsAndTemporaryAuth(url, init),
+    );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
       await sendRefreshRequest();
 
-      const retriedResponse = await fetcher(url, {
-        credentials: "include",
-        ...init,
-      });
+      const retriedResponse = await fetcher(
+        url,
+        withCredentialsAndTemporaryAuth(url, init),
+      );
 
       return readText(retriedResponse);
     }
@@ -295,18 +363,18 @@ export const createApiClientContext = ({
     init: RequestInit,
     options?: { retryOnUnauthorized?: boolean },
   ): Promise<Blob> => {
-    const response = await fetcher(url, {
-      credentials: "include",
-      ...init,
-    });
+    const response = await fetcher(
+      url,
+      withCredentialsAndTemporaryAuth(url, init),
+    );
 
     if (response.status === 401 && options?.retryOnUnauthorized) {
       await sendRefreshRequest();
 
-      const retriedResponse = await fetcher(url, {
-        credentials: "include",
-        ...init,
-      });
+      const retriedResponse = await fetcher(
+        url,
+        withCredentialsAndTemporaryAuth(url, init),
+      );
 
       return readBlob(retriedResponse);
     }
@@ -319,11 +387,14 @@ export const createApiClientContext = ({
     body: BodyInit,
     headers?: HeadersInit,
   ): Promise<void> => {
-    const response = await fetcher(url, {
-      body,
-      headers,
-      method: "PUT",
-    });
+    const response = await fetcher(
+      url,
+      withCredentialsAndTemporaryAuth(url, {
+        body,
+        headers,
+        method: "PUT",
+      }),
+    );
     if (!response.ok) {
       throw new ApiClientHttpError(response.status);
     }

@@ -8,7 +8,7 @@ export type AboutSearchItem = {
   keywords: string[];
 };
 
-export type SearchFilter = "all" | "board" | "event" | "survey";
+export type SearchFilter = "all" | "board" | "faq" | "event" | "survey" | "vote";
 
 export const ABOUT_ITEMS: AboutSearchItem[] = [
   {

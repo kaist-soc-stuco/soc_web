@@ -66,8 +66,6 @@ export type ConsentDecisionRequest = z.infer<typeof ConsentDecisionSchema>;
 
 export interface TemporarySessionPayload {
   accessToken?: string;
-  refreshToken?: string;
-  sessionId?: string;
 }
 
 export interface ConsentDecisionResponse {
@@ -77,8 +75,7 @@ export interface ConsentDecisionResponse {
 }
 
 export interface RefreshResponse {
-  storageMode: AuthStorageMode;
-  temporarySession?: TemporarySessionPayload;
+  storageMode: "persisted";
 }
 
 export interface LogoutResponse {

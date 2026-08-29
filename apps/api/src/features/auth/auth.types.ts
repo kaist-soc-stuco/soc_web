@@ -48,10 +48,23 @@ export interface BaseAccessTokenClaims {
 
 /**
  * 개인정보 저장에 동의하지 않은 임시 로그인용 access token 클레임입니다.
+ *
+ * 이 토큰에는 이름·이메일·KAIST UID·연락처 같은 원문 개인정보를 넣지
+ * 않습니다. 설문 자격 판별에 필요한 최소 속성과 학번의 HMAC 해시만
+ * 담고, 만료 후에는 서버에 보존되는 사용자 계정이 없습니다.
  */
 export interface TemporaryAccessTokenClaims extends BaseAccessTokenClaims {
   mode: "temporary";
-  pendingLoginId: string;
+  /** SSO subject의 HMAC 해시를 기반으로 한 임시 주체 식별자입니다. */
+  sub: string;
+  /** 원문 학번이 아닌 서버 비밀키 기반 HMAC 해시입니다. */
+  studentNumberHash?: string;
+  /** 설문 자격 판별에 필요한 학과 정보입니다. */
+  department?: string;
+  /** 주전공 조건 판별에 필요한 최소 정보입니다. */
+  primaryMajor?: string;
+  /** 재학/휴학 조건 판별에 필요한 최소 정보입니다. */
+  academicStatus?: string;
 }
 
 /**
@@ -85,10 +98,14 @@ export interface RefreshTokenClaims {
 export interface AuthSessionRecord {
   expiresAt: number;
   mode: StorageMode;
-  pendingLoginId?: string;
   refreshJti?: string;
   revoked: boolean;
   sessionId: string;
+  temporaryAcademicStatus?: string;
+  temporaryDepartment?: string;
+  temporaryPrimaryMajor?: string;
+  temporaryStudentNumberHash?: string;
+  temporarySubjectHash?: string;
   userId?: string;
 }
 

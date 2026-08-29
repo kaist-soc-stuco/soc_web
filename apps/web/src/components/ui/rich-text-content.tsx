@@ -138,6 +138,10 @@ function sanitizeForDisplay(value: string) {
       if (element.tagName === "A" && element.getAttribute("target") === "_blank") {
         element.setAttribute("rel", "noopener noreferrer");
       }
+
+      if (element.tagName === "IMG") {
+        element.setAttribute("draggable", "false");
+      }
     });
 
   return root.innerHTML;
@@ -163,7 +167,7 @@ export function RichTextContent({ content, className = "" }: RichTextContentProp
 
   return (
     <div
-      className={`rich-content [overflow-wrap:anywhere] ${className}`}
+      className={`rich-content select-text [overflow-wrap:anywhere] ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

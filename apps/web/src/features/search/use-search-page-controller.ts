@@ -6,6 +6,7 @@ import type {
   BoardSummary,
   PublicCalendarEventItem,
   SurveyRecord,
+  VoteRecord,
 } from "@soc/contracts";
 
 import { useLanguage } from "@/hooks/use-language";
@@ -26,6 +27,8 @@ export function useSearchPageController() {
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<PublicCalendarEventItem[]>([]);
   const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
+  const [faqArticles, setFaqArticles] = useState<ArticleListItem[]>([]);
+  const [votes, setVotes] = useState<VoteRecord[]>([]);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,8 @@ export function useSearchPageController() {
       setArticles([]);
       setCalendarEvents([]);
       setSurveys([]);
+      setFaqArticles([]);
+      setVotes([]);
       setError(null);
       setLoading(false);
       return;
@@ -63,10 +68,37 @@ export function useSearchPageController() {
         searchBy,
       }),
       apiClient.getPublicSurveys(),
+      apiClient
+        .getArticles("FAQ", {
+          page: 1,
+          limit: 60,
+          q: query,
+          searchBy,
+        })
+        .then((response) => response.items)
+        .catch(() => [] as ArticleListItem[]),
+      apiClient
+        .listPublicVotes()
+        .then((items) =>
+          items.filter((vote) =>
+            includesQuery(
+              searchBy === "title"
+                ? [vote.titleKo, vote.titleEn]
+                : [
+                    vote.titleKo,
+                    vote.titleEn,
+                    vote.descriptionKo,
+                    vote.descriptionEn,
+                  ],
+              query,
+            ),
+          ),
+        )
+        .catch(() => [] as VoteRecord[]),
       apiClient.getBoards().catch(() => ({ items: [] as BoardSummary[] })),
       apiClient.searchPublicCalendarEvents(query, 40),
     ])
-      .then(([articleItems, eventResponse, surveyItems, boardResponse, calendarResponse]) => {
+      .then(([articleItems, eventResponse, surveyItems, faqItems, voteItems, boardResponse, calendarResponse]) => {
         if (cancelled) return;
         setArticles([
           ...articleItems,
@@ -91,6 +123,8 @@ export function useSearchPageController() {
             ),
           ),
         );
+        setFaqArticles(faqItems);
+        setVotes(voteItems);
         setBoards(boardResponse.items);
       })
       .catch(() => {
@@ -98,6 +132,8 @@ export function useSearchPageController() {
           setArticles([]);
           setCalendarEvents([]);
           setSurveys([]);
+          setFaqArticles([]);
+          setVotes([]);
           setError(
             lang === "ko"
               ? "검색 결과를 불러오지 못했습니다."
@@ -147,8 +183,10 @@ export function useSearchPageController() {
 
   const totalCount =
     boardArticles.length +
+    faqArticles.length +
     eventArticles.length +
     surveys.length +
+    votes.length +
     calendarEvents.length +
     aboutResults.length;
 
@@ -164,6 +202,7 @@ export function useSearchPageController() {
     boardArticles,
     calendarEvents,
     eventArticles,
+    faqArticles,
     error,
     filter,
     handleSubmit,
@@ -176,6 +215,7 @@ export function useSearchPageController() {
     searchBy,
     setSearchBy,
     surveys,
+    votes,
     totalCount,
   };
 }

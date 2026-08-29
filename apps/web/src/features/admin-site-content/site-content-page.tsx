@@ -453,7 +453,7 @@ function SortableContentBlockItem({ block, disabled, onSelect, selected, sortabl
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: block.contentBlockId, disabled: disabled || !sortable });
   const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
   const displayStatus = statusMeta[effectiveStatus(block)];
-  return <div ref={setNodeRef} style={style} className={cn("group flex items-stretch rounded-lg", selected ? "bg-emerald-50" : "hover:bg-slate-50", isDragging && "z-10 opacity-40")}>
+  return <div ref={setNodeRef} style={style} className={cn("group select-none flex items-stretch rounded-lg", selected ? "bg-emerald-50" : "hover:bg-slate-50", isDragging && "z-10 opacity-40")}>
     {sortable ? <button type="button" {...attributes} {...listeners} disabled={disabled} className="flex w-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-l-lg text-slate-400 hover:text-[#344054] disabled:cursor-default disabled:opacity-30 active:cursor-grabbing" aria-label={`${block.titleKo} 노출 순서 변경`} title={disabled ? "변경 사항을 적용한 뒤 순서를 바꿀 수 있습니다." : "드래그하여 노출 순서 변경"}><GripVertical aria-hidden="true" className="size-4" /></button> : null}
     <button type="button" onClick={onSelect} className={cn("min-w-0 flex-1 px-3 py-3 text-left", sortable ? "rounded-r-lg" : "rounded-lg")}>
       <span className="flex items-center justify-between gap-3"><span className="min-w-0 truncate text-sm font-normal text-[#172033]">{block.titleKo}</span><AdminStatusBadge tone={displayStatus.tone}>{displayStatus.label}</AdminStatusBadge></span>

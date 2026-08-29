@@ -20,7 +20,7 @@ export function AdminStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex h-6 max-w-full items-center whitespace-nowrap rounded-md border px-2 text-xs font-normal",
+        "select-none inline-flex h-6 max-w-full items-center whitespace-nowrap rounded-md border px-2 text-xs font-normal",
         toneClassNames[tone],
         className,
       )}

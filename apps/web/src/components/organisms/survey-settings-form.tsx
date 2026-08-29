@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, Controller } from "react-hook-form";
 import { createApiClient } from "@soc/api-client";
-import { Check } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import type { ArticleListItem } from "@soc/contracts";
 import { RichTextEditor } from "./rich-text-editor";
-import { AdminFormField, AdminSearchField } from "@/components/ui/admin-page";
+import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -67,6 +67,226 @@ const escapeHtmlAttribute = (value: string) =>
 const appendInlineImage = (content: string, src: string) =>
   `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
 
+function SettingCheckbox({
+  checked,
+  disabled = false,
+  hint,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  hint?: string;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      className={`flex min-w-0 items-start gap-2.5 rounded-lg px-2 py-2 transition-colors ${
+        disabled
+          ? "cursor-not-allowed opacity-50"
+          : "cursor-pointer hover:bg-slate-50"
+      }`}
+    >
+      <UiInput
+        type="checkbox"
+        className="mt-0.5 size-4 shrink-0 rounded border-slate-300 accent-brand-primary"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium leading-5 text-[#172033]">
+          {label}
+        </span>
+        {hint ? (
+          <span className="mt-0.5 block text-xs font-normal leading-4 text-slate-400">
+            {hint}
+          </span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+function ArticleCombobox({
+  articles,
+  connectedArticleId,
+  onFetchArticles,
+  onSelectArticle,
+  selectedArticleTitle,
+}: {
+  articles: ArticleListItem[];
+  connectedArticleId: string;
+  onFetchArticles: (query?: string) => Promise<void>;
+  onSelectArticle: (articleId: string, title: string) => void;
+  selectedArticleTitle: string | null;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selectedLabel = connectedArticleId
+    ? `#${connectedArticleId} · ${selectedArticleTitle || "연결된 게시글"}`
+    : "";
+
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+        setQuery("");
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setIsOpen(false);
+      setQuery("");
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
+  const open = () => {
+    setIsOpen(true);
+    if (articles.length === 0) void onFetchArticles("");
+  };
+
+  const queueSearch = (nextQuery: string) => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      void onFetchArticles(nextQuery);
+    }, 250);
+  };
+
+  const selectArticle = (articleId: string, title: string) => {
+    onSelectArticle(articleId, title);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400"
+        />
+        <UiInput
+          type="search"
+          role="combobox"
+          aria-label="연결 게시글"
+          aria-expanded={isOpen}
+          aria-autocomplete="list"
+          placeholder="게시글 제목 또는 번호 검색"
+          value={isOpen ? query : selectedLabel}
+          onFocus={() => {
+            if (!isOpen) setQuery("");
+            open();
+          }}
+          onChange={(event) => {
+            const nextQuery = event.target.value;
+            setQuery(nextQuery);
+            if (!isOpen) setIsOpen(true);
+            if (nextQuery.trim()) queueSearch(nextQuery);
+          }}
+          className="h-[var(--ui-control-height)] w-full border-[var(--ui-border-subtle)] pl-9 pr-20 text-[length:var(--ui-control-font-size)] font-normal"
+        />
+        <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+          {connectedArticleId ? (
+            <button
+              type="button"
+              aria-label="연결 게시글 선택 해제"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectArticle("", "")}
+              className="inline-flex size-8 items-center justify-center rounded-md border-0 bg-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="size-4" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            aria-label={isOpen ? "연결 게시글 목록 닫기" : "연결 게시글 목록 열기"}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              if (isOpen) {
+                setIsOpen(false);
+                setQuery("");
+              } else {
+                open();
+              }
+            }}
+            className="inline-flex size-8 items-center justify-center rounded-md border-0 bg-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <ChevronDown className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      {isOpen ? (
+        <div
+          role="listbox"
+          className="absolute inset-x-0 top-full z-30 mt-2 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-[0_8px_24px_rgb(15_23_42_/_0.10)]"
+        >
+          <button
+            type="button"
+            role="option"
+            aria-selected={!connectedArticleId}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => selectArticle("", "")}
+            className={`flex h-9 w-full items-center rounded-md px-2.5 text-left text-sm font-normal hover:bg-slate-50 ${
+              connectedArticleId ? "text-slate-600" : "bg-brand-primary-light font-medium text-brand-primary"
+            }`}
+          >
+            <span className="truncate">연결 게시글 없음</span>
+            {!connectedArticleId ? <Check className="ml-auto size-3.5 shrink-0" /> : null}
+          </button>
+          {articles.length > 0 ? (
+            articles.map((article) => {
+              const articleId = String(article.articleId);
+              const title = article.titleKo;
+              const selected = articleId === connectedArticleId;
+              return (
+                <button
+                  key={articleId}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => selectArticle(articleId, title)}
+                  className={`flex h-9 w-full items-center rounded-md px-2.5 text-left text-sm font-normal hover:bg-slate-50 ${
+                    selected ? "bg-brand-primary-light font-medium text-brand-primary" : "text-[#172033]"
+                  }`}
+                >
+                  <span className="truncate">#{articleId} · {title}</span>
+                  {selected ? <Check className="ml-auto size-3.5 shrink-0" /> : null}
+                </button>
+              );
+            })
+          ) : (
+            <p className="px-2.5 py-2 text-sm font-normal text-slate-400">
+              불러온 게시글이 없습니다.
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SurveySettingsForm({
   mode = "all",
   isOngoing = false,
@@ -77,7 +297,6 @@ export function SurveySettingsForm({
   onSubmit,
 }: SurveySettingsFormProps) {
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
-  const articleSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const {
     register,
@@ -103,24 +322,6 @@ export function SurveySettingsForm({
   const connectedArticleId = watch("connectedArticleId") ?? "";
   const openAt = watch("openAt") ?? "";
   const closeAt = watch("closeAt") ?? "";
-
-  const articleOptions = useMemo(() => {
-    const options = articleSearchResults.map((article) => ({
-      value: String(article.articleId),
-      label: `#${article.articleId} · ${article.titleKo}`,
-    }));
-    if (
-      connectedArticleId &&
-      selectedArticleTitle &&
-      !options.some((option) => option.value === connectedArticleId)
-    ) {
-      options.unshift({
-        value: connectedArticleId,
-        label: `#${connectedArticleId} · ${selectedArticleTitle}`,
-      });
-    }
-    return [{ value: "", label: "연결 게시글 없음" }, ...options];
-  }, [articleSearchResults, connectedArticleId, selectedArticleTitle]);
 
   useEffect(() => {
     if (isKoreanOnly && activeTab === "en") {
@@ -158,10 +359,14 @@ export function SurveySettingsForm({
   };
 
   const toggleSocAffiliation = (value: "PRIMARY") => {
+    const isAdding = !eligibleSocAffiliations.includes(value);
     const next = eligibleSocAffiliations.includes(value)
       ? eligibleSocAffiliations.filter((item) => item !== value)
       : [...eligibleSocAffiliations, value];
     setValue("eligibleSocAffiliations", next, { shouldDirty: true, shouldValidate: true });
+    if (isAdding) {
+      setValue("allowAnonymous", false, { shouldDirty: true, shouldValidate: true });
+    }
   };
 
   const handleDescriptionImageUpload = async (file: File) => {
@@ -317,367 +522,220 @@ export function SurveySettingsForm({
             </div>
           </div>
 
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <AdminFormField label="유형 *">
-                <Controller
-                  name="kind"
-                  control={control}
-                  render={({ field }) => (
-                    <AdminSelectDropdown
-                      value={field.value}
-                      options={SURVEY_KINDS}
-                      onChange={field.onChange}
-                      disabled={isOngoing}
-                    />
-                  )}
-                />
-              </AdminFormField>
+          <div className="space-y-6">
+            <section className="space-y-3" aria-labelledby="survey-basic-settings">
+              <div>
+                <h3 id="survey-basic-settings" className="text-sm font-semibold text-[#172033]">기본 설정</h3>
+                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">설문 유형과 결과 공개 범위를 정합니다.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <AdminFormField label="유형 *">
+                  <Controller
+                    name="kind"
+                    control={control}
+                    render={({ field }) => (
+                      <AdminSelectDropdown
+                        value={field.value}
+                        options={SURVEY_KINDS}
+                        onChange={field.onChange}
+                        disabled={isOngoing}
+                      />
+                    )}
+                  />
+                </AdminFormField>
+                <AdminFormField label="결과 공개 범위 *">
+                  <Controller
+                    name="resultVisibility"
+                    control={control}
+                    render={({ field }) => (
+                      <AdminSelectDropdown
+                        value={field.value}
+                        options={SURVEY_VISIBILITIES}
+                        onChange={field.onChange}
+                        disabled={isOngoing}
+                      />
+                    )}
+                  />
+                </AdminFormField>
+              </div>
+            </section>
 
-              <AdminFormField label="결과 공개 범위 *">
-                <Controller
-                  name="resultVisibility"
-                  control={control}
-                  render={({ field }) => (
-                    <AdminSelectDropdown
-                      value={field.value}
-                      options={SURVEY_VISIBILITIES}
-                      onChange={field.onChange}
-                      disabled={isOngoing}
-                    />
-                  )}
-                />
-              </AdminFormField>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label
-                className={`flex items-center gap-3 group ${
-                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
-                    isAlwaysOpen
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-sm shadow-kaist-darkgreen/10"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {isAlwaysOpen && (
-                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
+            <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-schedule-settings">
+              <div>
+                <h3 id="survey-schedule-settings" className="text-sm font-semibold text-[#172033]">일정 및 기간</h3>
+                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">응답을 받을 기간과 최대 응답 수를 설정합니다.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                <SettingCheckbox
                   checked={isAlwaysOpen}
                   disabled={isOngoing}
-                  onChange={(e) =>
-                    !isOngoing && setValue("isAlwaysOpen", e.target.checked)
-                  }
+                  label="상시 진행"
+                  onChange={(checked) => setValue("isAlwaysOpen", checked, { shouldDirty: true })}
                 />
-                <span className="text-sm font-normal text-[#172033]">
-                  상시 진행
-                </span>
-              </label>
-
-              <label
-                className={`flex items-center gap-3 group ${
-                  isOngoing || isAlwaysOpen
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer"
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
-                    isAllDay
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-sm shadow-kaist-darkgreen/10"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {isAllDay && (
-                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
+                <SettingCheckbox
                   checked={isAllDay}
                   disabled={isOngoing || isAlwaysOpen}
-                  onChange={(e) =>
-                    !isOngoing && !isAlwaysOpen && handleAllDayChange(e.target.checked)
-                  }
+                  label="종일"
+                  onChange={handleAllDayChange}
                 />
-                <span className="text-sm font-normal text-[#172033]">종일</span>
-              </label>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <AdminFormField label={isAllDay ? "시작 날짜 *" : "시작 시각 (Asia/Seoul) *"}>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <AdminFormField label={isAllDay ? "시작 날짜 *" : "시작 시각 (Asia/Seoul) *"}>
+                  <UiInput
+                    type={isAllDay ? "date" : "datetime-local"}
+                    className={inputCls}
+                    disabled={isOngoing || isAlwaysOpen}
+                    {...register("openAt")}
+                    value={isAllDay ? toDateOnly(openAt) : toDateTime(openAt, "09:00")}
+                  />
+                  {errors.openAt ? <p className="mt-1 text-xs font-normal text-red-500">{errors.openAt.message as string}</p> : null}
+                </AdminFormField>
+                <AdminFormField label={isAllDay ? "종료 날짜 (선택)" : "종료 시각 (선택)"}>
+                  <UiInput
+                    type={isAllDay ? "date" : "datetime-local"}
+                    className={inputCls}
+                    disabled={isOngoing || isAlwaysOpen}
+                    {...register("closeAt")}
+                    value={isAllDay ? toDateOnly(closeAt) : toDateTime(closeAt, "18:00")}
+                  />
+                  {errors.closeAt ? <p className="mt-1 text-xs font-normal text-red-500">{errors.closeAt.message as string}</p> : null}
+                </AdminFormField>
+              </div>
+              <AdminFormField label="최대 응답 수 (선택)">
                 <UiInput
-                  type={isAllDay ? "date" : "datetime-local"}
-                  className={inputCls}
-                  disabled={isOngoing || isAlwaysOpen}
-                  {...register("openAt")}
-                  value={isAllDay ? toDateOnly(openAt) : toDateTime(openAt, "09:00")}
-                />
-                {errors.openAt && (
-                  <p className="mt-1 text-xs font-normal text-red-500">
-                    {errors.openAt.message as string}
-                  </p>
-                )}
-              </AdminFormField>
-
-              <AdminFormField label={isAllDay ? "종료 날짜 (선택)" : "종료 시각 (선택)"}>
-                <UiInput
-                  type={isAllDay ? "date" : "datetime-local"}
-                  className={inputCls}
-                  disabled={isOngoing || isAlwaysOpen}
-                  {...register("closeAt")}
-                  value={isAllDay ? toDateOnly(closeAt) : toDateTime(closeAt, "18:00")}
-                />
-                {errors.closeAt && (
-                  <p className="mt-1 text-xs font-normal text-red-500">
-                    {errors.closeAt.message as string}
-                  </p>
-                )}
-              </AdminFormField>
-            </div>
-
-            <AdminFormField label="최대 응답 수 (선택)">
-              <UiInput
-                type="number"
-                className={`${inputCls} w-1/2 min-w-[160px]`}
-                placeholder="제한 없음"
-                disabled={isOngoing}
-                {...register("maxResponseCount")}
-              />
-              {errors.maxResponseCount && (
-                <p className="mt-1 text-xs font-normal text-red-500">
-                  {errors.maxResponseCount.message as string}
-                </p>
-              )}
-            </AdminFormField>
-
-            <div className="pt-2 border-t border-kaist-grey/10" />
-
-            <div className="grid grid-cols-1 gap-3 py-1 sm:grid-cols-2">
-              <label
-                className={`flex items-center gap-3 group ${
-                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                    feePayersOnly
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {feePayersOnly && (
-                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
-                  checked={feePayersOnly}
+                  type="number"
+                  className={`${inputCls} w-1/2 min-w-[160px]`}
+                  placeholder="제한 없음"
                   disabled={isOngoing}
-                  onChange={(e) =>
-                    !isOngoing && setValue("feePayersOnly", e.target.checked)
-                  }
+                  {...register("maxResponseCount")}
                 />
-                <span className="text-sm font-normal text-[#172033]">
-                  과비 납부자만 응답 가능
-                </span>
-              </label>
+                {errors.maxResponseCount ? <p className="mt-1 text-xs font-normal text-red-500">{errors.maxResponseCount.message as string}</p> : null}
+              </AdminFormField>
+            </section>
 
-              <label
-                className={`flex items-center gap-3 group ${
-                  isOngoing || feePayersOnly || eligibleSocAffiliations.length > 0 || academicEligibility !== "ANY"
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer"
-                }`}
-              >
-                <UiInput
-                  type="checkbox"
-                  className="size-4 rounded border-slate-300 accent-brand-primary"
+            <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-audience-settings">
+              <div>
+                <h3 id="survey-audience-settings" className="text-sm font-semibold text-[#172033]">참여 대상 및 접근</h3>
+                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">익명 응답과 로그인 사용자 제한은 동시에 적용되지 않습니다.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                <SettingCheckbox
                   checked={allowAnonymous}
-                  disabled={isOngoing || feePayersOnly || eligibleSocAffiliations.length > 0 || academicEligibility !== "ANY"}
-                  onChange={(event) => setValue("allowAnonymous", event.target.checked, { shouldDirty: true })}
-                />
-                <span className="text-sm font-normal text-[#172033]">로그인 없이 응답 허용</span>
-              </label>
-
-              <label className="flex items-center gap-3 group cursor-pointer">
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                    showOnCalendar
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {showOnCalendar && (
-                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
-                  checked={showOnCalendar}
-                  onChange={(e) => setValue("showOnCalendar", e.target.checked)}
-                />
-                <span className="text-sm font-normal text-[#172033]">
-                  캘린더에 표시
-                </span>
-              </label>
-
-              <label
-                className={`flex items-start gap-3 group ${
-                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                }`}
-              >
-                <div
-                  className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
-                    allowMultipleResponses
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {allowMultipleResponses && (
-                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
-                  checked={allowMultipleResponses}
                   disabled={isOngoing}
-                  onChange={(e) => {
+                  label="로그인 없이 응답 허용"
+                  hint="소속·학적·과비 조건을 자동으로 해제합니다."
+                  onChange={(checked) => {
                     if (isOngoing) return;
-                    const checked = e.target.checked;
-                    setValue("allowMultipleResponses", checked);
-                    if (checked) setValue("allowResponseEdit", false);
+                    setValue("allowAnonymous", checked, { shouldDirty: true, shouldValidate: true });
+                    if (checked) {
+                      setValue("feePayersOnly", false, { shouldDirty: true, shouldValidate: true });
+                      setValue("eligibleSocAffiliations", [], { shouldDirty: true, shouldValidate: true });
+                      setValue("academicEligibility", "ANY", { shouldDirty: true, shouldValidate: true });
+                    }
                   }}
                 />
-                <span className="text-sm font-normal text-[#172033]">
-                  복수 응답 허용
-                </span>
-              </label>
-
-              <label
-                className={`flex items-start gap-3 group ${
-                  isOngoing || allowMultipleResponses
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer"
-                }`}
-              >
-                <div
-                  className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
-                    allowResponseEdit
-                      ? "bg-kaist-darkgreen border-kaist-darkgreen shadow-md shadow-kaist-darkgreen/15"
-                      : "border-kaist-grey/30 group-hover:border-kaist-darkgreen"
-                  }`}
-                >
-                  {allowResponseEdit && (
-                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
-                  )}
-                </div>
-                <UiInput
-                  type="checkbox"
-                  className="hidden"
-                  checked={allowResponseEdit}
-                  disabled={isOngoing || allowMultipleResponses}
-                  onChange={(e) =>
-                    !isOngoing &&
-                    !allowMultipleResponses &&
-                    setValue("allowResponseEdit", e.target.checked)
-                  }
+                <SettingCheckbox
+                  checked={feePayersOnly}
+                  disabled={isOngoing}
+                  label="과비 납부자만 응답 가능"
+                  hint={allowAnonymous ? "선택하면 로그인 응답으로 전환됩니다." : undefined}
+                  onChange={(checked) => {
+                    if (isOngoing) return;
+                    setValue("feePayersOnly", checked, { shouldDirty: true, shouldValidate: true });
+                    if (checked) setValue("allowAnonymous", false, { shouldDirty: true, shouldValidate: true });
+                  }}
                 />
-                <span className="text-sm font-normal text-[#172033]">
-                  응답 제출 후 수정 허용
-                </span>
-              </label>
-            </div>
-
-            <div className="space-y-4 rounded-lg border border-slate-200 p-4">
-              <div>
-                <p className="text-sm font-normal text-[#172033]">전산학부 소속 조건</p>
               </div>
-              <div className="flex flex-wrap gap-x-5 gap-y-3">
-                {([
-                  ["PRIMARY", "주전공"],
-                ] as const).map(([value, label]) => (
-                  <label key={value} className={`flex items-center gap-2 ${isOngoing || allowAnonymous ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+              <div className="grid grid-cols-1 gap-4 rounded-lg bg-slate-50/70 p-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-[#344054]">전산학부 소속 조건</p>
+                  <label className={`flex items-center gap-2 ${isOngoing ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                     <UiInput
                       type="checkbox"
                       className="size-4 rounded border-slate-300 accent-brand-primary"
-                      checked={eligibleSocAffiliations.includes(value)}
-                      disabled={isOngoing || allowAnonymous}
-                      onChange={() => toggleSocAffiliation(value)}
+                      checked={eligibleSocAffiliations.includes("PRIMARY")}
+                      disabled={isOngoing}
+                      onChange={() => toggleSocAffiliation("PRIMARY")}
                     />
-                    <span className="text-sm font-normal text-[#344054]">{label}</span>
+                    <span className="text-sm font-normal text-[#344054]">주전공</span>
                   </label>
-                ))}
+                </div>
+                <AdminFormField label="학적 조건">
+                  <Controller
+                    name="academicEligibility"
+                    control={control}
+                    render={({ field }) => (
+                      <AdminSelectDropdown
+                        value={field.value}
+                        options={[
+                          { value: "ANY", label: "제한 없음" },
+                          { value: "ENROLLED_ONLY", label: "재학생만" },
+                          { value: "ENROLLED_OR_LEAVE", label: "재학생·휴학생" },
+                        ]}
+                        onChange={(value) => {
+                          field.onChange(value);
+                          if (value !== "ANY") setValue("allowAnonymous", false, { shouldDirty: true, shouldValidate: true });
+                        }}
+                        disabled={isOngoing}
+                      />
+                    )}
+                  />
+                </AdminFormField>
               </div>
-              <AdminFormField label="학적 조건">
-                <Controller
-                  name="academicEligibility"
-                  control={control}
-                  render={({ field }) => (
-                    <AdminSelectDropdown
-                      value={field.value}
-                      options={[
-                        { value: "ANY", label: "제한 없음" },
-                        { value: "ENROLLED_ONLY", label: "재학생만" },
-                        { value: "ENROLLED_OR_LEAVE", label: "재학생·휴학생" },
-                      ]}
-                      onChange={field.onChange}
-                      disabled={isOngoing || allowAnonymous}
-                    />
-                  )}
+            </section>
+
+            <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-response-settings">
+              <div>
+                <h3 id="survey-response-settings" className="text-sm font-semibold text-[#172033]">응답 규칙</h3>
+                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">복수 응답과 제출 후 수정 중 하나만 선택할 수 있습니다.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                <SettingCheckbox
+                  checked={allowMultipleResponses}
+                  disabled={isOngoing}
+                  label="복수 응답 허용"
+                  onChange={(checked) => {
+                    if (isOngoing) return;
+                    setValue("allowMultipleResponses", checked, { shouldDirty: true, shouldValidate: true });
+                    if (checked) setValue("allowResponseEdit", false, { shouldDirty: true, shouldValidate: true });
+                  }}
+                />
+                <SettingCheckbox
+                  checked={allowResponseEdit}
+                  disabled={isOngoing}
+                  label="응답 제출 후 수정 허용"
+                  onChange={(checked) => {
+                    if (isOngoing) return;
+                    setValue("allowResponseEdit", checked, { shouldDirty: true, shouldValidate: true });
+                    if (checked) setValue("allowMultipleResponses", false, { shouldDirty: true, shouldValidate: true });
+                  }}
+                />
+              </div>
+            </section>
+
+            <section className="space-y-3 border-t border-slate-100 pt-5" aria-labelledby="survey-display-settings">
+              <div>
+                <h3 id="survey-display-settings" className="text-sm font-semibold text-[#172033]">노출 및 연결</h3>
+                <p className="mt-1 text-xs font-normal leading-4 text-slate-400">홈 캘린더 노출 여부와 연결할 게시글을 관리합니다.</p>
+              </div>
+              <SettingCheckbox
+                checked={showOnCalendar}
+                label="캘린더에 표시"
+                onChange={(checked) => setValue("showOnCalendar", checked, { shouldDirty: true })}
+              />
+              <AdminFormField label="연결 게시글 (선택)">
+                <ArticleCombobox
+                  articles={articleSearchResults}
+                  connectedArticleId={connectedArticleId}
+                  onFetchArticles={onFetchArticles}
+                  onSelectArticle={(articleId, title) => {
+                    const article = articleSearchResults.find((item) => String(item.articleId) === articleId);
+                    onSelectArticle(articleId, article?.titleKo ?? title);
+                  }}
+                  selectedArticleTitle={selectedArticleTitle}
                 />
               </AdminFormField>
-            </div>
-
-            <div className="pt-2 border-t border-kaist-grey/10" />
-
-            <AdminFormField label="연결 게시글 (선택)">
-              <AdminSearchField
-                aria-label="연결 게시글 검색"
-                className="mb-2"
-                placeholder="게시글 제목 또는 번호 검색"
-                onValueChange={(query) => {
-                  if (articleSearchTimer.current) clearTimeout(articleSearchTimer.current);
-                  articleSearchTimer.current = setTimeout(() => {
-                    void onFetchArticles(query);
-                  }, 250);
-                }}
-              />
-              <AdminSelectDropdown
-                ariaLabel="연결 게시글"
-                value={connectedArticleId}
-                options={articleOptions}
-                onChange={(articleId) => {
-                  const option = articleOptions.find((item) => item.value === articleId);
-                  const article = articleSearchResults.find(
-                    (item) => String(item.articleId) === articleId,
-                  );
-                  onSelectArticle(
-                    articleId,
-                    article?.titleKo ??
-                      (articleId === connectedArticleId
-                        ? selectedArticleTitle ?? ""
-                        : option?.label ?? ""),
-                  );
-                }}
-                onOpenChange={(open) => {
-                  if (open && articleSearchResults.length === 0) void onFetchArticles("");
-                }}
-                emptyLabel="불러온 게시글이 없습니다."
-                className="w-full"
-              />
-            </AdminFormField>
+            </section>
           </div>
         </div> : null}
       </div>

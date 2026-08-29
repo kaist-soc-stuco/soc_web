@@ -14,27 +14,48 @@ export function Logo({ inverse = false }: { inverse?: boolean }) {
   return (
     <Link
       to="/"
-      className="flex items-center gap-4 transition-opacity hover:opacity-90"
+      className="select-none flex items-center gap-4 transition-opacity hover:opacity-90"
     >
       <img
         src="/kaist_logo.png"
         alt="KAIST Logo"
-        className={cn("h-6 w-auto", inverse && "brightness-0 invert")}
+        className={cn(
+          "h-6 w-auto transition-[filter] duration-300 ease-out",
+          inverse && "brightness-0 invert",
+        )}
       />
-      <div className={cn("h-6 w-px", inverse ? "bg-white/30" : "bg-slate-300")} />
+      <div
+        className={cn(
+          "h-6 w-px transition-colors duration-300 ease-out",
+          inverse ? "bg-white/30" : "bg-slate-300",
+        )}
+      />
       {customLogoUrl ? (
         <img
           src={customLogoUrl}
           alt={customLogo?.titleKo || "SoC Student Council"}
           onError={() => setImageFailed(true)}
-          className={cn("h-6 w-auto max-w-[9rem] object-contain", inverse && "brightness-0 invert")}
+          className={cn(
+            "h-6 w-auto max-w-[9rem] object-contain transition-[filter] duration-300 ease-out",
+            inverse && "brightness-0 invert",
+          )}
         />
       ) : (
         <span className="flex flex-col leading-none" aria-label="SoC Student Council">
-          <span className={cn("text-xl font-bold tracking-[-0.04em]", inverse ? "text-white" : "text-kaist-darkgreen")}>
+          <span
+            className={cn(
+              "text-xl font-bold tracking-[-0.04em] transition-colors duration-300 ease-out",
+              inverse ? "text-white" : "text-kaist-darkgreen",
+            )}
+          >
             SoC
           </span>
-          <span className={cn("mt-0.5 whitespace-nowrap text-[length:var(--ui-text-logo-mark-size)] font-bold uppercase tracking-[0.18em]", inverse ? "text-white/70" : "text-kaist-grey")}>
+          <span
+            className={cn(
+              "mt-0.5 whitespace-nowrap text-[length:var(--ui-text-logo-mark-size)] font-bold uppercase tracking-[0.18em] transition-colors duration-300 ease-out",
+              inverse ? "text-white/70" : "text-kaist-grey",
+            )}
+          >
             Student Council
           </span>
         </span>

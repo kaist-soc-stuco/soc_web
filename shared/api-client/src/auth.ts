@@ -21,11 +21,6 @@ export interface MockLoginResponse {
   userId: string;
 }
 
-export interface TemporaryAuthRequest {
-  refreshToken?: string;
-  sessionId?: string;
-}
-
 export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) => ({
   getLoginStartPayload: async (): Promise<LoginStartResponse> => {
     return requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, {
@@ -93,11 +88,9 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
     );
   },
 
-  refreshSession: async (
-    temporaryAuth?: TemporaryAuthRequest,
-  ): Promise<RefreshResponse> => {
+  refreshSession: async (): Promise<RefreshResponse> => {
     return requestJson<RefreshResponse>(`${authBaseUrl}/refresh`, {
-      body: JSON.stringify(temporaryAuth ?? {}),
+      body: JSON.stringify({}),
       headers: {
         "Content-Type": "application/json",
       },
