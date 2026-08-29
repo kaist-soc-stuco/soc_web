@@ -148,6 +148,11 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     DOORAY_SMTP_USER: asOptionalString(config.DOORAY_SMTP_USER),
     DOORAY_SMTP_PASSWORD: asOptionalString(config.DOORAY_SMTP_PASSWORD),
     DOORAY_SMTP_SECURE: asOptionalBoolean(config.DOORAY_SMTP_SECURE, 'DOORAY_SMTP_SECURE', false),
+    MAIL_HOST: asOptionalString(config.MAIL_HOST),
+    MAIL_PORT: asOptionalPositiveInt(config.MAIL_PORT, 'MAIL_PORT', 587),
+    MAIL_USER: asOptionalString(config.MAIL_USER),
+    MAIL_PASS: asOptionalString(config.MAIL_PASS),
+    MAIL_SECURE: asOptionalBoolean(config.MAIL_SECURE, 'MAIL_SECURE', false),
     EMAIL_FROM: asOptionalString(config.EMAIL_FROM),
     EMAIL_DRY_RUN: asOptionalBoolean(
       config.EMAIL_DRY_RUN,

@@ -12,7 +12,7 @@ export function Footer() {
             전산학부 집행위원회
           </Link>
           <p className="text-slate-400">KAIST SOC</p>
-          <p className="text-xs text-slate-400">© KAIST SOC. All rights reserved.</p>
+          <p className="text-xs text-slate-400">Copyright © KAIST SOC. All rights reserved.</p>
         </div>
 
         <div className="flex flex-col gap-4 md:items-end">

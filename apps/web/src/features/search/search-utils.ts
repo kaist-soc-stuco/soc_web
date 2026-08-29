@@ -9,6 +9,7 @@ export type AboutSearchItem = {
 };
 
 export type SearchFilter = "all" | "board" | "event" | "survey";
+export type SearchScope = "title" | "content" | "title_content";
 
 export const ABOUT_ITEMS: AboutSearchItem[] = [
   {

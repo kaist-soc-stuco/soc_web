@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createApiClient } from "@soc/api-client";
+import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, ArticleListItem } from "@soc/contracts";
-import { hasPermission, isoToMs } from "@soc/shared";
+import { hasPermission } from "@soc/shared";
 
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
@@ -15,8 +15,6 @@ import {
   getBoardWritePermissionBitFromMetadata,
 } from "@/lib/board-metadata";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
-
-export type BoardSearchCriteria = "title" | "author" | "title_content";
 
 function comparePinnedArticles(a: ArticleListItem, b: ArticleListItem) {
   if (a.isPinned !== b.isPinned) {
@@ -39,13 +37,13 @@ export function useBoardPageController() {
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [isArticleLoading, setIsArticleLoading] = useState(true);
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
+  const [isBoardNotFound, setIsBoardNotFound] = useState(false);
+  const [hasArticleLoadError, setHasArticleLoadError] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [searchCriteria, setSearchCriteria] =
-    useState<BoardSearchCriteria>("title_content");
   const [postsPerPage, setPostsPerPage] = useState(20);
   const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
 
@@ -70,15 +68,21 @@ export function useBoardPageController() {
   useEffect(() => {
     let cancelled = false;
     setIsArticleLoading(true);
+    setIsBoardNotFound(false);
+    setHasArticleLoadError(false);
 
     const queryParam = searchQuery;
     const fetchPromise = category
-      ? apiClient.getArticles(category, { page: 1, limit: 100, q: queryParam })
+      ? apiClient.getArticles(category, {
+          page: currentPage,
+          limit: postsPerPage,
+          q: queryParam,
+        })
       : apiClient.getAllArticles({
           limit: postsPerPage,
           page: currentPage,
           q: searchQuery,
-          searchBy: searchCriteria,
+          searchBy: "title_content",
           sortBy: "latest",
           sortDirection: "desc",
         });
@@ -86,7 +90,8 @@ export function useBoardPageController() {
     fetchPromise
       .then((data) => {
         if (cancelled) return;
-        let items = [...data.items];
+        const items = [...data.items];
+        setHasArticleLoadError(false);
 
         if (!category) {
           items.sort((a, b) => comparePinnedArticles(a, b));
@@ -95,28 +100,18 @@ export function useBoardPageController() {
           return;
         }
 
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          items = items.filter((item) => {
-            const title = `${item.titleKo} ${item.titleEn ?? ""}`.toLowerCase();
-            return title.includes(query);
-          });
-        }
-
-        items.sort((a, b) => {
-          const pinnedOrder = comparePinnedArticles(a, b);
-          if (pinnedOrder !== 0) return pinnedOrder;
-          return isoToMs(b.postedAt) - isoToMs(a.postedAt);
-        });
-
-        const total = items.length;
-        const startIndex = (currentPage - 1) * postsPerPage;
-        setArticles(items.slice(startIndex, startIndex + postsPerPage));
-        setTotalCount(total);
+        setArticles(items);
+        setTotalCount(data.total);
       })
       .catch((error) => {
-        console.error("Failed to load board articles:", error);
+        const isNotFound =
+          error instanceof ApiClientHttpError && error.status === 404;
+        if (!isNotFound) {
+          console.error("Failed to load board articles:", error);
+        }
         if (!cancelled) {
+          setIsBoardNotFound(Boolean(category && isNotFound));
+          setHasArticleLoadError(!isNotFound);
           setArticles([]);
           setTotalCount(0);
         }
@@ -136,14 +131,12 @@ export function useBoardPageController() {
     category,
     currentPage,
     searchQuery,
-    searchCriteria,
     postsPerPage,
   ]);
 
   useEffect(() => {
     setCurrentPage(1);
     setSearchQuery("");
-    setSearchCriteria("title_content");
   }, [category]);
 
   const canUseWriteFeatures = hasPersistedProfile(session ?? null);
@@ -286,14 +279,14 @@ export function useBoardPageController() {
     handleSetEngagement,
     engagementSubmitting,
     isArticleLoading,
+    isBoardNotFound,
+    hasArticleLoadError,
     showInitialSkeleton: isArticleLoading && !hasCompletedInitialLoad,
     lang,
     postsPerPage,
-    searchCriteria,
     searchQuery,
     setCurrentPage,
     setPostsPerPage,
-    setSearchCriteria,
     setSearchQuery,
     totalCount,
     totalPages,

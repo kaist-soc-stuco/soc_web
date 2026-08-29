@@ -60,10 +60,12 @@ export const createBoardApi = ({
   searchArticles: async (
     query?: string,
     limit = 20,
+    searchBy: "title" | "content" | "title_content" = "title_content",
   ): Promise<ArticleListItem[]> => {
     const params = new URLSearchParams();
     if (query?.trim()) params.set("q", query.trim());
     params.set("limit", String(limit));
+    params.set("searchBy", searchBy);
     return requestJson<ArticleListItem[]>(
       `${normalizedBaseUrl}/articles/search?${params.toString()}`,
       { method: "GET" },

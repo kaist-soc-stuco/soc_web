@@ -12,7 +12,7 @@ import {
   type BoardMetadata,
 } from "@/lib/board-metadata";
 
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import {
   PageActionLink,
   PageContainer,
@@ -140,6 +140,7 @@ interface BoardArticleTableProps {
   boardByCode: Map<string, BoardMetadata>;
   category?: string;
   currentPage: number;
+  hasLoadError: boolean;
   isLoading: boolean;
   showInitialSkeleton: boolean;
   lang: string;
@@ -166,6 +167,7 @@ export function BoardArticleTable({
   boardByCode,
   category,
   currentPage,
+  hasLoadError,
   isLoading,
   showInitialSkeleton,
   lang,
@@ -299,7 +301,17 @@ export function BoardArticleTable({
               isLoading && articles.length > 0 ? "opacity-70" : "opacity-100"
             }`}
           >
-            {articles.length > 0
+            {hasLoadError && !isLoading ? (
+              <ErrorState
+                className="min-h-48 rounded-none border-0 bg-transparent"
+                message={
+                  lang === "ko"
+                    ? "게시글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+                    : "Posts could not be loaded. Please try again later."
+                }
+                minHeightClassName="min-h-48"
+              />
+            ) : articles.length > 0
               ? articles.map((post) => renderArticleRow(post, post.isPinned))
               : articles.length === 0 && !isLoading ? (
                 <EmptyState

@@ -50,10 +50,11 @@ export class ArticleSearchController {
   async searchArticles(
     @Query("q") q?: string,
     @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
+    @Query("searchBy") searchBy?: "title" | "content" | "title_content",
     @Cookies(AUTH_ACCESS_COOKIE_NAME) accessToken?: string,
   ): Promise<ArticleListItem[]> {
     const currentUser =
       await this.authSessionService.getOptionalCurrentUser(accessToken);
-    return this.articleService.searchArticles(q, limit ?? 20, currentUser);
+    return this.articleService.searchArticles(q, limit ?? 20, currentUser, searchBy);
   }
 }
