@@ -294,12 +294,12 @@ export function Header({ variant = "default" }: HeaderProps) {
             ],
           },
           {
-            label: "학생회 소개",
+            label: "집행위원회 소개",
             href: "/about",
             activePaths: ["/about"],
             megaItems: [
-              { label: "소개", href: "/about#intro" },
-              { label: "주요 사업", href: "/about#work" },
+              { label: "집행위원회 소개", href: "/about#intro" },
+              { label: "공약 이행 상황판", href: "/about#work" },
               { label: "조직도", href: "/about#people" },
               { label: "후원 및 제휴", href: "/about#partnership" },
             ],
