@@ -563,6 +563,18 @@ export const UpdateUserPostingSuspensionSchema = z.object({
   }
 });
 
+export const UserRestrictionCreateSchema = z.object({
+  duration: z.enum(["1_DAY", "3_DAYS", "7_DAYS", "30_DAYS", "PERMANENT"]),
+  reasonCode: z.enum([
+    "ABUSE",
+    "SPAM",
+    "HARASSMENT",
+    "GUIDELINE_VIOLATION",
+    "OTHER",
+  ]),
+  reasonDetail: z.string().trim().max(1_000).optional(),
+});
+
 // ─── Finance ─────────────────────────────────────────────────────────────────
 
 export const UpdateStudentFeeStatusSchema = z
