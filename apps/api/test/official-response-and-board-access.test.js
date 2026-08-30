@@ -3,112 +3,40 @@ const test = require("node:test");
 const { ForbiddenException } = require("@nestjs/common");
 const { Permissions } = require("@soc/contracts");
 
-const {
-  canUseOfficialIdentity,
-  canWriteOfficialResponse,
-  canWriteToBoard,
-} = require("../dist/apps/api/src/features/board/board-access.js");
+const { canWriteBoard } = require("../dist/apps/api/src/features/board/board-write-access.js");
 const { CommentService } = require("../dist/apps/api/src/features/board/comment.service.js");
 
-test("board write access is controlled by role mappings and atomic post permission", () => {
-  const mappedBoard = {
-    writeAccessType: "ROLE_GROUP",
-    writePermissionBit: 0,
-    writeRoleGroupIds: [7],
-  };
-
+test("board write access follows the current board scope", async () => {
   assert.equal(
-    canWriteToBoard(mappedBoard, {
-      id: "member",
-      permission: Permissions.POST_CREATE,
-      roleGroupIds: [7],
-    }),
-    true,
-  );
-  assert.equal(
-    canWriteToBoard(mappedBoard, {
-      id: "member",
-      permission: Permissions.POST_CREATE,
-      roleGroupIds: [8],
-    }),
-    false,
-  );
-  assert.equal(
-    canWriteToBoard(mappedBoard, {
-      id: "member",
-      permission: 0,
-      roleGroupIds: [7],
-    }),
-    false,
-  );
-  assert.equal(
-    canWriteToBoard(
-      { writeAccessType: "AUTHENTICATED", writePermissionBit: 0 },
-      { id: "member", permission: Permissions.POST_CREATE },
+    await canWriteBoard(
+      { writeAccessScope: "AUTHENTICATED", writePermissionBit: 0 },
+      { id: "member", permission: 0 },
     ),
     true,
   );
-});
-
-test("official identity and official response access use separate atomic permissions", () => {
-  const board = {
-    writeAccessType: "AUTHENTICATED",
-    writePermissionBit: 0,
-    allowOfficialReply: true,
-  };
-
   assert.equal(
-    canUseOfficialIdentity(board, {
-      id: "official-writer",
-      permission: Permissions.POST_OFFICIAL,
-    }),
+    await canWriteBoard(
+      { writeAccessScope: "PERMISSION", writePermissionBit: Permissions.MANAGE_BOARDS },
+      { id: "manager", permission: Permissions.MANAGE_BOARDS },
+    ),
     true,
   );
   assert.equal(
-    canUseOfficialIdentity(board, {
-      id: "regular-writer",
-      permission: Permissions.POST_CREATE,
-    }),
-    false,
-  );
-  assert.equal(
-    canWriteOfficialResponse(board, {
-      id: "reply-writer",
-      permission:
-        Permissions.MANAGE_SUGGESTION_REPLY | Permissions.POST_OFFICIAL,
-    }),
-    true,
-  );
-  assert.equal(
-    canWriteOfficialResponse(board, {
-      id: "reply-writer",
-      permission: Permissions.MANAGE_SUGGESTION_REPLY,
-    }),
-    false,
-  );
-  assert.equal(
-    canWriteOfficialResponse(
-      { ...board, allowOfficialReply: false },
-      {
-        id: "reply-writer",
-        permission:
-          Permissions.MANAGE_SUGGESTION_REPLY | Permissions.POST_OFFICIAL,
-      },
+    await canWriteBoard(
+      { writeAccessScope: "PERMISSION", writePermissionBit: Permissions.MANAGE_BOARDS },
+      { id: "member", permission: 0 },
     ),
     false,
   );
 });
 
-test("comments-disabled boards accept only marked official responses", async () => {
+test("the suggestions board accepts official replies with the current reply permission", async () => {
   const created = [];
   const board = {
     boardId: 1,
-    code: "feedback",
+    code: "suggestions",
     isActive: true,
     allowComment: false,
-    allowOfficialReply: true,
-    writeAccessType: "AUTHENTICATED",
-    writePermissionBit: 0,
   };
   const article = {
     allowComment: false,
@@ -129,19 +57,15 @@ test("comments-disabled boards accept only marked official responses", async () 
       findNotificationTargets: async () => null,
     },
     { notifyCommentCreated: async () => undefined },
+    { record: async () => undefined },
   );
-  const user = {
-    id: "reply-writer",
-    permission:
-      Permissions.MANAGE_SUGGESTION_REPLY | Permissions.POST_OFFICIAL,
-  };
 
   await assert.rejects(
     service.createComment(
-      "feedback",
+      "suggestions",
       "1",
-      { content: "일반 댓글", isOfficial: false },
-      user,
+      { content: "일반 댓글" },
+      { id: "member", permission: 0 },
     ),
     (error) =>
       error instanceof ForbiddenException &&
@@ -149,10 +73,10 @@ test("comments-disabled boards accept only marked official responses", async () 
   );
 
   await service.createComment(
-    "feedback",
+    "suggestions",
     "1",
-    { content: "공식 답변", isOfficial: true },
-    user,
+    { content: "공식 답변" },
+    { id: "reply-writer", permission: Permissions.WRITE_REPLY },
   );
   assert.equal(created[0].isOfficial, true);
 });

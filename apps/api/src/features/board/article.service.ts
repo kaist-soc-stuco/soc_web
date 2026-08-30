@@ -28,9 +28,9 @@ import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import {
   assertArticleScopeAssignable,
+  type CurrentUserContext,
   getReadableArticleScopes,
 } from "./article-access";
-import type { CurrentUserContext } from "./board-access";
 import { ARTICLE_STATUS } from "./board.constants";
 import { sanitizeArticleHtml } from "./article-html-sanitizer";
 import { canWriteBoard } from "./board-write-access";
