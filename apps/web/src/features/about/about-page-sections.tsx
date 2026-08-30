@@ -16,8 +16,8 @@ const SECTIONS: Array<{
   labelKo: string;
   labelEn: string;
 }> = [
-  { id: "intro", labelKo: "소개", labelEn: "About" },
-  { id: "work", labelKo: "주요 사업", labelEn: "What we do" },
+  { id: "intro", labelKo: "집행위원회 소개", labelEn: "About" },
+  { id: "work", labelKo: "공약 이행 상황판", labelEn: "Pledge progress" },
   { id: "people", labelKo: "조직도", labelEn: "Organization chart" },
   { id: "partnership", labelKo: "후원 및 제휴", labelEn: "Partnerships" },
 ];
@@ -129,7 +129,7 @@ export function AboutSectionNavigation({
   onNavigate: (sectionId: AboutSectionId) => void;
 }) {
   return (
-    <nav className="about-section-nav" aria-label={lang === "ko" ? "학생회 소개 목차" : "About page sections"}>
+    <nav className="about-section-nav" aria-label={lang === "ko" ? "집행위원회 소개 목차" : "About page sections"}>
       <div className="about-landing-container about-section-nav-inner">
         {SECTIONS.map((section) => {
           const active = activeSection === section.id;

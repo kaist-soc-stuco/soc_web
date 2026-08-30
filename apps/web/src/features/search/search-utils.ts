@@ -22,12 +22,12 @@ export const ABOUT_ITEMS: AboutSearchItem[] = [
   },
   {
     id: "work",
-    titleKo: "주요 사업",
-    titleEn: "What SoC Student Council does",
+    titleKo: "공약 이행 상황판",
+    titleEn: "Pledge progress",
     descriptionKo: "학생 의견, 복지, 학술·진로, 행사·설문과 공약 이행 현황을 확인합니다.",
     descriptionEn: "Explore SoC Student Council programs and pledge progress.",
     href: "/about#work",
-    keywords: ["주요 사업", "하는 일", "활동", "공약", "복지", "행사", "what we do", "pledges"],
+    keywords: ["공약 이행 상황판", "주요 사업", "하는 일", "활동", "공약", "복지", "행사", "what we do", "pledges"],
   },
   {
     id: "people",
