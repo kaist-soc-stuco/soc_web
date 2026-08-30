@@ -3,7 +3,6 @@ import type { ResponseStatus } from "./survey.js";
 import type { z } from "zod";
 import type {
   UpdateUserActiveStatusSchema,
-  UserRestrictionCreateSchema,
 } from "../schemas.js";
 
 export interface MyPageListMeta {
@@ -100,31 +99,4 @@ export interface MyScrapListResponse extends MyPageListMeta {
 
 export type UpdateUserActiveStatusRequest = z.infer<
   typeof UpdateUserActiveStatusSchema
->;
-
-export type UserRestrictionCreateRequest = z.infer<
-  typeof UserRestrictionCreateSchema
->;
-
-export type UserRestrictionDuration = UserRestrictionCreateRequest["duration"];
-export type UserRestrictionReasonCode = UserRestrictionCreateRequest["reasonCode"];
-
-export interface UserRestrictionResponse {
-  restrictionId: string;
-  userId: string;
-  duration: UserRestrictionDuration;
-  reasonCode: UserRestrictionReasonCode;
-  reasonDetail: string | null;
-  expiresAt: string | null;
-  createdByUserId: string;
-  createdAt: string;
-}
-
-/**
- * Anonymous-author moderation deliberately does not echo either account id
- * back to the browser.
- */
-export type UserRestrictionAppliedResponse = Pick<
-  UserRestrictionResponse,
-  "restrictionId" | "duration" | "reasonCode" | "reasonDetail" | "expiresAt" | "createdAt"
 >;
