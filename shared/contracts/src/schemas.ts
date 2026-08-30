@@ -144,7 +144,7 @@ export const SsoCallbackBodySchema = z.object({
       .trim()
       .min(1)
       .max(20)
-      .regex(/^[\\p{L}\\p{N}_-]+$/u, "invalid_board_code"),
+      .regex(/^[\p{L}\p{N}_-]+$/u, "invalid_board_code"),
     nameKo: z.string().trim().min(1).max(20),
     nameEn: z.string().trim().max(100).optional(),
     descriptionKo: z.string().trim().max(255).optional(),

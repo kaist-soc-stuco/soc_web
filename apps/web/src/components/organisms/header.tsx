@@ -223,7 +223,6 @@ export function Header({ variant = "default" }: HeaderProps) {
     try {
       await apiClient.loginWithMockSession();
       clearStoredAuthState();
-      await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
       window.location.assign("/");
     } catch (error) {
       console.error(error);
