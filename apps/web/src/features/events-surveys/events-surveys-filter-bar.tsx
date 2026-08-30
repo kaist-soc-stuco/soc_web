@@ -18,7 +18,11 @@ const stateFilters: Array<{
 interface EventsSurveysFilterBarProps {
   lang: string;
   onQueryChange: (value: string) => void;
+  onDateFromChange: (value: string) => void;
+  onDateToChange: (value: string) => void;
   onStateFilterChange: (filter: EventsSurveysStateFilter) => void;
+  dateFrom: string;
+  dateTo: string;
   query: string;
   stateCounts: Record<EventsSurveysStateFilter, number>;
   stateFilter: EventsSurveysStateFilter;
@@ -27,7 +31,11 @@ interface EventsSurveysFilterBarProps {
 export function EventsSurveysFilterBar({
   lang,
   onQueryChange,
+  onDateFromChange,
+  onDateToChange,
   onStateFilterChange,
+  dateFrom,
+  dateTo,
   query,
   stateCounts,
   stateFilter,
@@ -55,6 +63,26 @@ export function EventsSurveysFilterBar({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
+        <label className="flex items-center gap-2 text-xs font-normal text-slate-500">
+          <span>{lang === "ko" ? "시작" : "From"}</span>
+          <input
+            aria-label={lang === "ko" ? "검색 시작일" : "Search start date"}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700"
+            type="date"
+            value={dateFrom}
+            onChange={(event) => onDateFromChange(event.currentTarget.value)}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-xs font-normal text-slate-500">
+          <span>{lang === "ko" ? "종료" : "To"}</span>
+          <input
+            aria-label={lang === "ko" ? "검색 종료일" : "Search end date"}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700"
+            type="date"
+            value={dateTo}
+            onChange={(event) => onDateToChange(event.currentTarget.value)}
+          />
+        </label>
         <PageSearchField
           ariaLabel={lang === "ko" ? "행사·설문 검색" : "Search events and surveys"}
           className="order-last w-full sm:w-64 lg:w-72"

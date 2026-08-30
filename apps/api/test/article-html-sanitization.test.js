@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { BadRequestException } = require("@nestjs/common");
+const { Permissions } = require("@soc/contracts");
 
 const {
   ArticleService,
@@ -9,6 +10,7 @@ const {
 const board = {
   boardId: 1,
   isActive: true,
+  writeAccessType: "AUTHENTICATED",
   managePermissionBit: 0,
   writePermissionBit: 0,
 };
@@ -35,6 +37,7 @@ const createServiceHarness = () => {
     },
     findPermissionInfo: async () => ({
       authorUserId: "user-1",
+      isSecret: false,
       status: "PUBLISHED",
     }),
     updateArticle: async (boardId, articleId, payload) => {
@@ -71,7 +74,7 @@ test("create sanitizes both localized article bodies before persistence", async 
   await service.createArticle(
     "공지",
     createPayload(maliciousKo, maliciousEn),
-    { id: "user-1", permission: 0 },
+    { id: "user-1", permission: Permissions.POST_CREATE },
   );
 
   assert.equal(calls.create.length, 1);
@@ -107,7 +110,7 @@ test("update sanitizes only supplied article bodies and preserves safe editor fo
         safeFormatting +
         '<iframe srcdoc="<script>alert(1)</script>"></iframe><a href="//evil.example">protocol relative</a>',
     },
-    { id: "user-1", permission: 0 },
+    { id: "user-1", permission: Permissions.POST_CREATE },
   );
 
   assert.equal(calls.update.length, 1);
