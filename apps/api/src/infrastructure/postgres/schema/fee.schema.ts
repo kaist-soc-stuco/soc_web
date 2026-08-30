@@ -54,17 +54,3 @@ export const studentFeePayments = pgTable("student_fee_payment", {
   index("student_fee_payment_user_paid_idx").on(table.userId, table.paidAt),
   index("student_fee_payment_semester_idx").on(table.effectiveStartSemester),
 ]);
-
-/**
- * OAuth secret 파일로 생성한 과비 관리용 Google Spreadsheet의 위치만 저장합니다.
- * Google credential/token은 DB에 복제하지 않습니다.
- */
-export const studentFeeGoogleSheetsIntegration = pgTable("student_fee_google_sheets_integration", {
-  integrationKey: varchar("integration_key", { length: 40 }).primaryKey(),
-  spreadsheetId: varchar("spreadsheet_id", { length: 255 }).notNull(),
-  spreadsheetUrl: varchar("spreadsheet_url", { length: 2000 }).notNull(),
-  createdBy: uuid("created_by").references(() => users.userId),
-  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
