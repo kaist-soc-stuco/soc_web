@@ -31,6 +31,8 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     calendarQuery,
     currentPage,
     currentDate,
+    dateFrom,
+    dateTo,
     engagementSubmitting,
     error,
     holidays,
@@ -40,6 +42,8 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     setCurrentDate,
     setCalendarQuery,
     setCurrentPage,
+    setDateFrom,
+    setDateTo,
     itemQuery,
     setItemQuery,
     setSelectedDate,
@@ -90,7 +94,11 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
             <EventsSurveysFilterBar
               lang={lang}
               onQueryChange={setItemQuery}
+              onDateFromChange={setDateFrom}
+              onDateToChange={setDateTo}
               onStateFilterChange={setStateFilter}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
               query={itemQuery}
               stateCounts={stateCounts}
               stateFilter={stateFilter}

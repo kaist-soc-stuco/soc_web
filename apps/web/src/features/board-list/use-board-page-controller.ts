@@ -60,6 +60,9 @@ export function useBoardPageController() {
     source: boardCatalogSource,
   } = useBoardCatalog(apiClient);
   const currentBoard = category ? boardByCode.get(category) : undefined;
+  const isBoardNotFound = Boolean(
+    category && boardCatalogSource === "server" && !currentBoard,
+  );
 
   const totalPages = Math.ceil(totalCount / postsPerPage);
 
@@ -273,6 +276,7 @@ export function useBoardPageController() {
     handlePageChange,
     handleSetEngagement,
     engagementSubmitting,
+    isBoardNotFound,
     isArticleLoading,
     showInitialSkeleton: isArticleLoading && !hasCompletedInitialLoad,
     lang,

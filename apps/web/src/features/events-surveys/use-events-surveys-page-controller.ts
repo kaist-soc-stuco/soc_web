@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import type { ArticleEngagementKind, KoreanHolidayRecord } from "@soc/contracts";
-import { isoToDate, localDate, nowDate } from "@soc/shared";
+import { isoToDate, isoToMs, localDate, nowDate } from "@soc/shared";
 
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useToast } from "@/components/ui/toast";
@@ -60,6 +60,8 @@ export function useEventsSurveysPageController({
   );
   const [calendarQuery, setCalendarQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
   const [engagementOverrides, setEngagementOverrides] = useState<
@@ -215,16 +217,32 @@ export function useEventsSurveysPageController({
     );
   }, [filteredItems, itemQuery]);
 
+  const dateFilteredItems = useMemo(() => {
+    if (!dateFrom && !dateTo) return searchedItems;
+
+    const from = dateFrom ? isoToMs(`${dateFrom}T00:00:00+09:00`) : -Infinity;
+    const to = dateTo ? isoToMs(`${dateTo}T23:59:59.999+09:00`) : Infinity;
+    if (from > to) return [];
+
+    return searchedItems.filter((item) => {
+      const itemStart = item.opensAt ? isoToMs(item.opensAt) : null;
+      const itemEnd = item.closesAt ? isoToMs(item.closesAt) : itemStart;
+      if (itemStart === null || Number.isNaN(itemStart)) return false;
+      if (itemEnd !== null && Number.isNaN(itemEnd)) return false;
+      return (itemEnd ?? itemStart) >= from && itemStart <= to;
+    });
+  }, [dateFrom, dateTo, searchedItems]);
+
   const sortedItems = useMemo(() => {
-    return sortVisibleItems(searchedItems, "latest", stateFilter);
-  }, [searchedItems, stateFilter]);
+    return sortVisibleItems(dateFilteredItems, "latest", stateFilter);
+  }, [dateFilteredItems, stateFilter]);
 
   const totalItems = sortedItems.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / PUBLIC_ITEMS_PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [currentTab, itemQuery, stateFilter]);
+  }, [currentTab, dateFrom, dateTo, itemQuery, stateFilter]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -237,12 +255,12 @@ export function useEventsSurveysPageController({
 
   const stateCounts = useMemo(
     () => ({
-      all: searchedItems.length,
-      before_open: searchedItems.filter((item) => item.computedState === "before_open").length,
-      open: searchedItems.filter((item) => item.computedState === "open").length,
-      closed: searchedItems.filter((item) => item.computedState === "closed").length,
+      all: dateFilteredItems.length,
+      before_open: dateFilteredItems.filter((item) => item.computedState === "before_open").length,
+      open: dateFilteredItems.filter((item) => item.computedState === "open").length,
+      closed: dateFilteredItems.filter((item) => item.computedState === "closed").length,
     }),
-    [searchedItems],
+    [dateFilteredItems],
   );
 
   const handleSetEngagement = async (
@@ -342,6 +360,8 @@ export function useEventsSurveysPageController({
   return {
     calendarEvents,
     currentDate,
+    dateFrom,
+    dateTo,
     error:
       currentTab === "calendar"
         ? calendarEventsQuery.isError
@@ -369,6 +389,8 @@ export function useEventsSurveysPageController({
     setCurrentDate: handleCurrentDateChange,
     setCalendarQuery,
     setCurrentPage,
+    setDateFrom,
+    setDateTo,
     itemQuery,
     setItemQuery,
     setSelectedDate,
