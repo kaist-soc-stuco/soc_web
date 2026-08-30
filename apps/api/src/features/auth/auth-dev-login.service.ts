@@ -20,7 +20,7 @@ export class AuthDevLoginService {
     storageMode: "persisted";
     userId: string;
   }> {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.ENABLE_MOCK_AUTH !== "true") {
       throw new ForbiddenException("mock_login_disabled_in_production");
     }
 
