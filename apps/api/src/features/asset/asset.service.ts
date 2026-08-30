@@ -17,7 +17,7 @@ import { AssetStorageProvider } from "./asset.storage";
 import { toAssetReference } from "./asset-reference";
 import { BoardRepository } from "../board/repositories/board.repository";
 import { ArticleRepository } from "../board/repositories/article.repository";
-import type { CurrentUserContext } from "../board/board-access";
+import type { CurrentUserContext } from "../board/article-access";
 import { getReadableArticleScopes } from "../board/article-access";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";

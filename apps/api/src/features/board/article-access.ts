@@ -2,7 +2,13 @@ import { ForbiddenException } from "@nestjs/common";
 import { Permissions } from "@soc/contracts";
 import type { VisibilityScope } from "@soc/contracts";
 
-import type { CurrentUserContext } from "./board-access";
+export interface CurrentUserContext {
+  authenticated: boolean;
+  user?: {
+    id: string;
+    permission: number;
+  };
+}
 
 const STAFF_ARTICLE_PERMISSIONS = [
   Permissions.WRITE_OFFICIAL,
