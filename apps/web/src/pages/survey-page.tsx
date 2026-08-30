@@ -154,7 +154,7 @@ export function SurveyPage() {
   return (
     <PageShell>
       <Header />
-      <main className="flex-1 bg-[#f3f5f4] px-4 py-10 lg:px-0" aria-busy={(!survey || sessionLoading) && !loadError}>
+      <main className="channel-talk-safe-area flex-1 bg-[#f3f5f4] px-4 py-10 lg:px-0" aria-busy={(!survey || sessionLoading) && !loadError}>
         <div className="mx-auto max-w-[52rem] space-y-5">
           {survey && <SurveySummaryCard lang={lang} survey={survey} />}
           {renderBody()}

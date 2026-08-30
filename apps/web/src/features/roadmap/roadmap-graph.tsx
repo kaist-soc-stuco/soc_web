@@ -671,7 +671,7 @@ export function RoadmapGraph({
           onOfferedOnlyChange={setOfferedOnly}
           onTermChange={setSelectedTerm}
         />
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-3 flex flex-wrap gap-2">
           {ROADMAP_TRACKS.map((track) => {
             const selected = selectedTrackIds.has(track.id);
             return (

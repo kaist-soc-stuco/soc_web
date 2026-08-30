@@ -37,7 +37,7 @@ export function RoadmapPage() {
           title={title}
           titleId="roadmap-page-title"
           className="mb-0"
-          containerClassName="max-w-[100rem]"
+          containerClassName="max-w-[100rem] flex-col items-start gap-2 sm:flex-row sm:items-end sm:gap-4"
           actions={
             <a
               href={ROADMAP_SOURCE.url}

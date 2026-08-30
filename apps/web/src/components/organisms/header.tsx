@@ -8,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   ChevronDown,
-  Globe,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -589,7 +588,6 @@ export function Header({ variant = "default" }: HeaderProps) {
             }`}
             title={lang === "ko" ? "Switch to English" : "한국어로 변경"}
           >
-            <Globe aria-hidden="true" />
             <span>{lang === "ko" ? "KO" : "EN"}</span>
           </Button>
 
@@ -843,7 +841,6 @@ export function Header({ variant = "default" }: HeaderProps) {
               onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-medium text-slate-700"
             >
-              <Globe aria-hidden="true" className="h-4 w-4 text-kaist-greygreen" />
               {lang === "ko" ? "English" : "한국어"}
             </Button>
 
