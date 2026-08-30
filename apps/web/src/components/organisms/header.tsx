@@ -62,7 +62,6 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [loginStarting, setLoginStarting] = useState(false);
-  const [mockLoginStarting, setMockLoginStarting] = useState(false);
   const { lang, setLanguage } = useLanguage();
 
   const [homeHeaderScrolled, setHomeHeaderScrolled] = useState(false);
@@ -213,20 +212,6 @@ export function Header({ variant = "default" }: HeaderProps) {
     } catch (error) {
       console.error(error);
       setLoginStarting(false);
-    }
-  };
-
-  const handleMockLogin = async () => {
-    if (!import.meta.env.DEV || mockLoginStarting) return;
-
-    setMockLoginStarting(true);
-    try {
-      await apiClient.loginWithMockSession();
-      clearStoredAuthState();
-      window.location.assign("/");
-    } catch (error) {
-      console.error(error);
-      setMockLoginStarting(false);
     }
   };
 
@@ -775,20 +760,6 @@ export function Header({ variant = "default" }: HeaderProps) {
                     ? "로그인"
                     : "Login"}
               </Button>
-              {import.meta.env.DEV ? (
-                <Button variant="ghost"
-                  type="button"
-                  onClick={() => void handleMockLogin()}
-                  disabled={mockLoginStarting}
-                  className="hidden rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-70 lg:inline-flex"
-                >
-                  {mockLoginStarting
-                    ? "Mock..."
-                    : lang === "ko"
-                      ? "Mock 로그인"
-                      : "Mock Login"}
-                </Button>
-              ) : null}
             </>
           )}
 
@@ -925,16 +896,6 @@ export function Header({ variant = "default" }: HeaderProps) {
                       ? "로그인"
                       : "Login"}
                 </Button>
-                {import.meta.env.DEV && (
-                  <Button variant="ghost"
-                    type="button"
-                    onClick={() => void handleMockLogin()}
-                    disabled={mockLoginStarting}
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[length:var(--ui-text-caption-size)] font-medium text-emerald-700 disabled:opacity-60"
-                  >
-                    {mockLoginStarting ? "Mock..." : "Mock"}
-                  </Button>
-                )}
               </div>
             )}
           </div>
