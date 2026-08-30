@@ -1,5 +1,6 @@
 import { Header } from "@/components/organisms/header";
 import { PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
+import { NotFoundPage } from "@/pages/not-found-page";
 import {
   BoardArticleTable,
   BoardCategoryNavigation,
@@ -16,7 +17,9 @@ export function BoardPage() {
     canWrite,
     category,
     currentPage,
+    hasArticleLoadError,
     handlePageChange,
+    isBoardNotFound,
     isArticleLoading,
     lang,
     postsPerPage,
@@ -29,6 +32,10 @@ export function BoardPage() {
     totalPages,
     writeState,
   } = useBoardPageController();
+
+  if (isBoardNotFound) {
+    return <NotFoundPage />;
+  }
 
   return (
     <PageShell>
@@ -59,6 +66,7 @@ export function BoardPage() {
           boardByCode={boardByCode}
           category={category}
           currentPage={currentPage}
+          hasLoadError={hasArticleLoadError}
           isLoading={isArticleLoading}
           showInitialSkeleton={showInitialSkeleton}
           lang={lang}
