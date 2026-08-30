@@ -17,7 +17,6 @@ export function BoardPage() {
     canWrite,
     category,
     currentPage,
-    hasArticleLoadError,
     handlePageChange,
     isBoardNotFound,
     isArticleLoading,
@@ -66,7 +65,6 @@ export function BoardPage() {
           boardByCode={boardByCode}
           category={category}
           currentPage={currentPage}
-          hasLoadError={hasArticleLoadError}
           isLoading={isArticleLoading}
           showInitialSkeleton={showInitialSkeleton}
           lang={lang}
