@@ -26,8 +26,12 @@ function resolveAboutSectionId(value: string | null | undefined): AboutSectionId
 function replaceSectionHash(sectionId: AboutSectionId) {
   const url = new URL(window.location.href);
   url.searchParams.delete("tab");
-  url.hash = sectionId;
+  url.hash = sectionId === "work" ? "pledges" : sectionId;
   window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function getSectionTargetId(sectionId: AboutSectionId) {
+  return sectionId === "work" ? "pledges" : sectionId;
 }
 
 function prefersReducedMotion() {
@@ -53,7 +57,7 @@ export function useAboutPageController() {
   );
 
   const scrollToSection = useCallback((sectionId: AboutSectionId, behavior: ScrollBehavior = "smooth") => {
-    const target = document.getElementById(sectionId);
+    const target = document.getElementById(getSectionTargetId(sectionId));
     if (!target) return;
     // Native smooth-scroll duration grows with travel distance. Keep the
     // scroll spy quiet until long jumps have settled so it cannot replace the
@@ -77,7 +81,7 @@ export function useAboutPageController() {
     let userInterrupted = false;
     let animationFrame = 0;
     const correctionDeadline = performance.now() + 2200;
-    const target = document.getElementById(requestedSection);
+    const target = document.getElementById(getSectionTargetId(requestedSection));
     const content = document.querySelector<HTMLElement>("[data-about-content]");
     if (!target) return;
 

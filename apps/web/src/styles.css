@@ -2194,6 +2194,11 @@
   .about-work-pledges {
     margin-top: clamp(5rem, 8vw, 7rem);
     padding-top: clamp(1rem, 2vw, 2rem);
+    scroll-margin-top: calc(var(--ui-header-height) + 3.75rem);
+  }
+
+  .has-public-top-banner .about-work-pledges {
+    scroll-margin-top: calc(var(--ui-header-height) + 6.5rem);
   }
 
   .about-work-pledges h3 {
