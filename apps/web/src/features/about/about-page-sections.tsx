@@ -136,7 +136,7 @@ export function AboutSectionNavigation({
           return (
             <a
               key={section.id}
-              href={`#${section.id}`}
+              href={`#${section.id === "work" ? "pledges" : section.id}`}
               aria-current={active ? "location" : undefined}
               className={active ? "is-active select-none" : "select-none"}
               onClick={(event) => {
@@ -255,8 +255,8 @@ function WorkSection({ lang }: { lang: string }) {
           })}
         </div>
 
-        <div className="about-work-pledges about-reveal-delay-2" data-about-reveal>
-          <h3>{lang === "ko" ? "공약 이행 현황" : "Pledge progress"}</h3>
+        <div id="pledges" className="about-work-pledges about-reveal-delay-2" data-about-reveal>
+          <h3>{lang === "ko" ? "공약 이행 상황판" : "Pledge progress"}</h3>
           <PledgesSection lang={lang} />
         </div>
       </div>
