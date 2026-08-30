@@ -429,9 +429,13 @@ export function EventsSurveysCalendarGrid({
                                 width: `calc(${labelSegment.dayCount * 100}% - 1rem)`,
                               } satisfies CSSProperties}
                             >
-                              <span className="block min-w-0 max-w-full truncate whitespace-nowrap">
+                              <span className="hidden min-w-0 max-w-full truncate whitespace-nowrap md:block">
                                 {titleText}
                               </span>
+                              <span
+                                aria-hidden="true"
+                                className={`mx-auto block h-1.5 w-6 rounded-full md:hidden ${eventStyle.bullet}`}
+                              />
                             </span>
                           ) : (
                             <span className="block h-4 w-full" aria-hidden="true" />

@@ -87,7 +87,7 @@ export function PageHeader({
           ) : null}
           <h1
             id={titleId}
-            className="truncate text-[length:var(--ui-text-page-title-size)] font-bold leading-9 tracking-[-0.025em] text-app-text-strong"
+            className="break-words text-[length:var(--ui-text-page-title-size)] font-bold leading-9 tracking-[-0.025em] text-app-text-strong"
           >
             {title}
           </h1>
