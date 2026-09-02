@@ -45,11 +45,14 @@ export class GoogleSurveySheetsService implements OnModuleInit {
 
     try {
       if (!survey.spreadsheetId) {
+        const surveyTitle = survey.titleKo.trim() || "설문";
         const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
-          title: `${survey.titleKo} 응답 · ${survey.id}`,
+          title: `${surveyTitle}(응답)`,
+          duplicateTitle: `${surveyTitle} (응답)`,
           sheetTitle: SHEET_TITLE,
           purpose: "survey-results",
           key: survey.id,
+          ensureUniqueTitle: true,
         });
         await this.surveysRepo.updateSpreadsheetConnection(surveyId, {
           spreadsheetId: spreadsheet.spreadsheetId,

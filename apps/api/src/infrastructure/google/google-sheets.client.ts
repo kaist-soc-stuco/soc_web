@@ -76,6 +76,8 @@ export class GoogleSheetsClient {
 
   async getOrCreateSpreadsheet(options: {
     configuredSpreadsheetId?: string | null;
+    duplicateTitle?: string;
+    ensureUniqueTitle?: boolean;
     title: string;
     sheetTitle: string;
     purpose: string;
@@ -96,11 +98,19 @@ export class GoogleSheetsClient {
       };
     }
 
+    const spreadsheetTitle = options.ensureUniqueTitle
+      ? await this.findAvailableSpreadsheetTitle(
+          options.title,
+          targetFolderId,
+          options.duplicateTitle,
+        )
+      : options.title;
+
     const created = await this.request<GoogleSpreadsheetCreateResponse>(
       "POST",
       "https://sheets.googleapis.com/v4/spreadsheets",
       {
-        properties: { title: options.title },
+        properties: { title: spreadsheetTitle },
         sheets: [
           {
             properties: {
@@ -209,6 +219,49 @@ export class GoogleSheetsClient {
       `https://www.googleapis.com/drive/v3/files?${query.toString()}`,
     );
     return found.files?.[0]?.id ?? null;
+  }
+
+  private async findAvailableSpreadsheetTitle(
+    baseTitle: string,
+    folderId: string,
+    duplicateTitle = baseTitle,
+  ): Promise<string> {
+    const titleSearches = [...new Set([baseTitle, duplicateTitle])].map(
+      (title) => `name contains '${escapeDriveQueryValue(title)}'`,
+    );
+    const predicates = [
+      `mimeType = '${GOOGLE_SHEETS_MIME}'`,
+      "trashed = false",
+      `'${escapeDriveQueryValue(folderId)}' in parents`,
+      titleSearches.length === 1 ? titleSearches[0] : `(${titleSearches.join(" or ")})`,
+    ];
+    const query = new URLSearchParams({
+      q: predicates.join(" and "),
+      spaces: "drive",
+      fields: "files(name)",
+      pageSize: "1000",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+    const found = await this.request<{ files?: Array<{ name?: string }> }>(
+      "GET",
+      `https://www.googleapis.com/drive/v3/files?${query.toString()}`,
+    );
+    const existingTitles = new Set(
+      (found.files ?? [])
+        .map((file) => file.name)
+        .filter((name): name is string => Boolean(name)),
+    );
+    if (!existingTitles.has(baseTitle)) return baseTitle;
+
+    let suffix = 1;
+    while (
+      existingTitles.has(`${duplicateTitle} (${suffix})`) ||
+      existingTitles.has(`${baseTitle} (${suffix})`)
+    ) {
+      suffix += 1;
+    }
+    return `${duplicateTitle} (${suffix})`;
   }
 
   private async setSpreadsheetProperties(

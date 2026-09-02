@@ -27,7 +27,7 @@ docker compose --env-file .env.production -f infra/docker/compose.prod.yml run -
   -e SEED_MODE=reference api pnpm db:seed
 ```
 
-reference seed는 권한·게시판·상시 신청형 설문과 `최고 관리자` 시스템 역할만 생성하며 개발 사용자나 샘플 콘텐츠를 만들지 않습니다. `.env.production`의 `INITIAL__ADMIN_STDNOS`에 쉼표로 구분한 8자리 학번을 설정하면 해당 사용자가 SSO로 영구 계정을 만들거나 다시 로그인할 때 `최고 관리자` 역할이 부여됩니다. 목록에서 학번을 제거해도 이미 부여된 역할은 자동 회수하지 않으므로 관리자 화면에서 명시적으로 회수합니다.
+reference seed는 권한·게시판·상시 신청형 설문·FAQ·로드맵과 학생회 소개의 기준 콘텐츠(공약 이행 상황판·조직도), `최고 관리자` 시스템 역할을 생성하며 개발 사용자나 데모 콘텐츠는 만들지 않습니다. `.env.production`의 `INITIAL__ADMIN_STDNOS`에 쉼표로 구분한 8자리 학번을 설정하면 해당 사용자가 SSO로 영구 계정을 만들거나 다시 로그인할 때 `최고 관리자` 역할이 부여됩니다. 목록에서 학번을 제거해도 이미 부여된 역할은 자동 회수하지 않으므로 관리자 화면에서 명시적으로 회수합니다.
 
 로컬 compose 기준:
 

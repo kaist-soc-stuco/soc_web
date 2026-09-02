@@ -11,7 +11,7 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { Maximize2, Minimize2, Search, X } from "lucide-react";
+import { Clock3, MapPin, Maximize2, Minimize2, Search, X } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -859,7 +859,7 @@ export function RoadmapGraph({
       <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start" aria-live="polite">
         {selectedCourseCode ? (
           <div key="course-details" className="roadmap-side-panel__view">
-            <div className="mb-4 border-b border-slate-200 pb-3">
+            <div className="mb-4 flex h-10 items-center border-b border-slate-200">
               <h2 className="text-sm font-semibold text-slate-900">
                 {lang === "ko" ? "과목 상세 정보" : "Course details"}
               </h2>
@@ -1054,7 +1054,7 @@ function CourseDetails({
             activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
           )}
         >
-          {lang === "ko" ? "개설 분반" : "Offerings"}
+          {lang === "ko" ? `개설 분반 (${offerings.length})` : `Offerings (${offerings.length})`}
         </button>
       </div>
 
@@ -1144,88 +1144,45 @@ function OfferingList({
             : offering.enrolled !== null
               ? String(offering.enrolled)
               : null;
+        const sectionInfo = offering.section
+          ? `${offering.currentCode} (${offering.section})`
+          : offering.currentCode;
+        const courseMeta = [sectionInfo, offering.instructor]
+          .filter((value): value is string => Boolean(value))
+          .join(" · ");
 
         return (
           <article
             key={`${offering.term}-${offering.currentCode}-${offering.nameKo}-${offering.section ?? "none"}`}
             className="rounded-lg border border-slate-200 bg-white p-3"
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-emerald-700">
-                    {getRoadmapTermLabel(offering.term, lang)}
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums text-slate-500">
-                    {offering.currentCode}
-                    {offering.section ? ` (${offering.section})` : ""}
-                  </span>
-                  {offering.inEnglish ? (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[length:var(--ui-text-micro-size)] font-semibold text-slate-600">
-                      {lang === "ko" ? "영어" : "English"}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1.5 break-keep text-xs font-semibold leading-5 text-slate-900">
-                  {offering.nameKo}
+            <div className="space-y-1.5 text-[length:var(--ui-text-micro-size)]">
+              <div className="flex min-w-0 items-baseline justify-between gap-3">
+                <p className="min-w-0 flex-1 break-keep font-semibold text-slate-800">
+                  {courseMeta}
                 </p>
+                {enrollment ? (
+                  <p className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-slate-700">
+                    {enrollment}
+                  </p>
+                ) : null}
               </div>
+              {offering.time ? (
+                <p className="flex items-start gap-1.5 break-keep leading-5 text-slate-600">
+                  <Clock3 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                  <span className="whitespace-pre-line">{offering.time}</span>
+                </p>
+              ) : null}
+              {offering.room ? (
+                <p className="flex items-start gap-1.5 break-keep leading-5 text-slate-600">
+                  <MapPin aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                  <span className="whitespace-pre-line">{offering.room}</span>
+                </p>
+              ) : null}
             </div>
-
-            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[length:var(--ui-text-micro-size)]">
-              <OfferingDetailField
-                label={lang === "ko" ? "담당교수" : "Instructor"}
-                value={offering.instructor}
-              />
-              <OfferingDetailField
-                label={lang === "ko" ? "강의 방식" : "Format"}
-                value={offering.delivery}
-              />
-              <OfferingDetailField
-                label={lang === "ko" ? "강·실·학" : "L·Lab·Cr"}
-                value={offering.credits}
-              />
-              <OfferingDetailField
-                label={lang === "ko" ? "수강 / 정원" : "Enrolled / capacity"}
-                value={enrollment}
-              />
-              <OfferingDetailField
-                className="col-span-2"
-                label={lang === "ko" ? "강의시간" : "Schedule"}
-                value={offering.time}
-                preserveWhitespace
-              />
-              <OfferingDetailField
-                className="col-span-2"
-                label={lang === "ko" ? "강의실" : "Room"}
-                value={offering.room}
-                preserveWhitespace
-              />
-            </dl>
           </article>
         );
       })}
-    </div>
-  );
-}
-
-function OfferingDetailField({
-  className,
-  label,
-  preserveWhitespace = false,
-  value,
-}: {
-  className?: string;
-  label: string;
-  preserveWhitespace?: boolean;
-  value: string | null;
-}) {
-  if (!value) return null;
-
-  return (
-    <div className={className}>
-      <dt className="font-medium text-slate-400">{label}</dt>
-      <dd className={cn("mt-0.5 break-keep font-medium text-slate-700", preserveWhitespace && "whitespace-pre-line")}>{value}</dd>
     </div>
   );
 }

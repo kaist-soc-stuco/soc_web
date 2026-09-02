@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
-import { Copy, ImagePlus, Trash2 } from "lucide-react";
+import { createApiClient } from "@soc/api-client";
 import type { QuestionType, SurveyQuestionConfig } from "@soc/contracts";
+import { Copy, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MutableRefObject, type ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { IconButton } from "@/components/ui/icon-button";
-import { SurveyImageField } from "@/components/ui/survey-image-field";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { resolveAssetUrl } from "@/lib/asset-url";
 
 const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: "short_text", label: "단답형" },
@@ -114,38 +117,74 @@ function CompactImagePicker({
   label,
   value,
   onChange,
+  onRemove,
   disabled,
 }: {
   label: string;
   value?: string | null;
   onChange: (value: string | null) => void;
+  onRemove?: () => void;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("이미지 파일만 등록할 수 있습니다.");
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+    try {
+      const asset = await client.uploadAsset(file);
+      onChange(asset.storageKey);
+    } catch {
+      setError("이미지를 업로드하지 못했습니다.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative flex shrink-0 items-center gap-1">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(event) => void handleFileSelection(event)}
+      />
       <IconButton
         type="button"
         size="sm"
         aria-label={`${label} ${value ? "변경" : "추가"}`}
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
+        aria-busy={uploading}
+        disabled={disabled || uploading}
+        onClick={() => fileInputRef.current?.click()}
         className={value ? "border-brand-primary/25 bg-emerald-50 text-brand-primary" : ""}
       >
-        <ImagePlus className="size-4" />
+        {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
       </IconButton>
-      {open ? (
-        <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-elevated">
-          <SurveyImageField
-            label={label}
-            value={value}
-            onChange={onChange}
-            disabled={disabled}
-          />
-        </div>
+      {value && onRemove ? (
+        <IconButton
+          type="button"
+          size="sm"
+          aria-label={`${label} 삭제`}
+          disabled={disabled || uploading}
+          onClick={onRemove}
+          className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+        >
+          <Trash2 className="size-4" />
+        </IconButton>
       ) : null}
+      {error ? <span role="alert" className="absolute right-0 top-full z-10 mt-1 w-48 rounded-md bg-rose-50 px-2 py-1 text-[length:var(--ui-text-micro-size)] font-normal leading-4 text-rose-600 shadow-sm">{error}</span> : null}
     </div>
   );
 }
@@ -193,6 +232,7 @@ export function QuestionInlineEditor({
   const gridConfig = form.config ?? { rows: [], columns: [] };
   const branchMap = form.config?.goToSectionByValue ?? {};
   const questionImage = form.config?.imageUrlKo ?? form.config?.imageUrlEn ?? null;
+  const hasBranchingControls = supportsBranching && branchTargets.length > 0;
 
   const updateQuestionImage = (value: string | null) => {
     set("config", {
@@ -443,7 +483,7 @@ export function QuestionInlineEditor({
     "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-normal text-slate-900 outline-none transition-[border-color,box-shadow] placeholder:text-slate-400 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-l-4 border-brand-primary/45 bg-white p-4 pb-2 pt-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5 md:pb-2 md:pt-4"
+      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 pb-4 pt-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5 md:pb-4 md:pt-4"
     >
       {dragHandle ? (
         <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="문항 순서 이동">
@@ -454,7 +494,7 @@ export function QuestionInlineEditor({
         <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
         <div className="group relative min-w-0">
           <UiInput
-            autoFocus={isNewQuestion}
+            autoFocus
             aria-label="국문 질문"
             className={`${titleInputCls} min-w-0`}
             placeholder="질문"
@@ -498,11 +538,37 @@ export function QuestionInlineEditor({
         />
       </div>
 
+      {questionImage ? (
+        <div className="mt-3 flex min-w-0 items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+          <div className="min-w-0 flex-1 overflow-hidden rounded-md bg-white">
+            <img
+              src={resolveAssetUrl(questionImage)}
+              alt="문항 이미지 미리보기"
+              className="mx-auto block max-h-40 max-w-full object-contain"
+            />
+          </div>
+          {!isOngoing ? (
+            <IconButton
+              type="button"
+              size="sm"
+              aria-label="문항 이미지 삭제"
+              onClick={() => updateQuestionImage(null)}
+              className="shrink-0 text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+            >
+              <Trash2 className="size-4" />
+            </IconButton>
+          ) : null}
+        </div>
+      ) : null}
+
       {needsOptions ? (
         <div className="mt-4 pt-1">
           <div className="scrollbar-hidden max-h-64 space-y-2 overflow-y-auto pr-1">
             {form.options.map((option, index) => (
-              <div key={`${option.value}-${index}`} className="group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 px-1 py-1">
+              <div
+                key={`${option.value}-${index}`}
+                className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto_auto] items-center gap-2 px-1 py-1 ${hasBranchingControls ? "sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto]" : ""}`}
+              >
                 <span className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`} aria-hidden="true" />
                 <UiInput
                   ref={index === form.options.length - 1 ? lastOptionLabelRef : undefined}
@@ -524,7 +590,7 @@ export function QuestionInlineEditor({
                 {supportsBranching && branchTargets.length > 0 ? (
                   <AdminSelectDropdown
                     ariaLabel={`${option.labelKo || option.value || "선택지"} 다음 섹션`}
-                    className="col-span-full w-full shrink-0 sm:col-span-1 sm:w-40"
+                    className="col-span-full row-start-2 w-full shrink-0 sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:w-40"
                     value={branchMap[option.value] ?? ""}
                     disabled={isOngoing || !option.value.trim()}
                     onChange={(target) => updateBranchTarget(option.value, target)}
@@ -537,12 +603,15 @@ export function QuestionInlineEditor({
                     ]}
                   />
                 ) : null}
-                <CompactImagePicker
-                  label="선택지 이미지"
-                  value={option.imageUrlKo ?? option.imageUrlEn ?? null}
-                  onChange={(value) => updateOptionImage(index, value)}
-                  disabled={isOngoing}
-                />
+                <div className={`col-start-4 row-start-1 ${hasBranchingControls ? "sm:col-start-5" : ""}`}>
+                  <CompactImagePicker
+                    label="선택지 이미지"
+                    value={option.imageUrlKo ?? option.imageUrlEn ?? null}
+                    onChange={(value) => updateOptionImage(index, value)}
+                    onRemove={() => updateOptionImage(index, null)}
+                    disabled={isOngoing}
+                  />
+                </div>
                 {!isOngoing ? (
                   form.options.length > 1 ? (
                     <IconButton
@@ -550,7 +619,7 @@ export function QuestionInlineEditor({
                       aria-label={`${option.labelKo || option.value || "선택지"} 삭제`}
                       size="sm"
                       onClick={() => removeOption(index)}
-                      className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                      className={`col-start-5 row-start-1 text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600 ${hasBranchingControls ? "sm:col-start-6" : ""}`}
                     >
                       <Trash2 className="size-4" />
                     </IconButton>

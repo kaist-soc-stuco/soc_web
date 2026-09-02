@@ -362,6 +362,73 @@ const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
   },
 ];
 
+type ReferencePledgeSeed = {
+  titleKo: string;
+  titleEn: string;
+  bodyKo: string;
+  bodyEn: string;
+  pledgeStatus: "COMPLETED" | "IN_PROGRESS" | "PLANNED";
+};
+
+const REFERENCE_PLEDGE_SEEDS: readonly ReferencePledgeSeed[] = [
+  {
+    titleKo: "전산학부 학생회 웹사이트 개발",
+    titleEn: "Development of the SoC Student Council website",
+    bodyKo: "현재 학생회 웹사이트의 ver 1.0이 이렇게 배포 되었습니다! 앞으로 추가적인 기능 개발과 지속적인 유지 보수를 할 예정이니, 혹시 사이트를 이용하면서 불편하신점이나, 버그가 있다면 편하게 아래 채널톡 등을 통해 연락해 주시기 바랍니다.",
+    bodyEn: "Version 1.0 of the Student Council website is now live! We plan to continue developing features and maintaining the site. If you experience any inconvenience or find a bug, please contact us through Channel Talk or one of the channels below.",
+    pledgeStatus: "COMPLETED",
+  },
+  {
+    titleKo: "사업 전문화를 위한 집행위원회 구조 개편",
+    titleEn: "Restructuring the executive committee for specialized operations",
+    bodyKo: "사업의 전문화와 원활한 업무 분배를 위해 기존의 부서 + 팀체계에서 온전한 부서 체계로 개편하였으며, 외부 기업 및 타학교 교류 업무를 위한 대외소통부, 웹사이트 개발 등의 업무를 위한 전산관리부를 새롭게 신설하였습니다. 자세한 조직도는 웹사이트 학생회 소개에서 보실 수 있습니다.",
+    bodyEn: "To specialize our work and distribute responsibilities smoothly, we reorganized the former department-and-team structure into a full department structure. We newly established the External Communications Division for exchanges with companies and other schools, and the IT Administration Division for website development and related work. See the Student Council Introduction page for the detailed organization chart.",
+    pledgeStatus: "COMPLETED",
+  },
+  {
+    titleKo: "과목별 건강톡방 개설",
+    titleEn: "Opening course-specific chat rooms",
+    bodyKo: "2026년 상반기, 담당 교수님께 허락을 받은 9개 과목의 건강톡방을 개설하여 한 학기 동안 운영하였습니다.",
+    bodyEn: "In the first half of 2026, we opened chat rooms for nine courses with the permission of the instructors and operated them throughout the semester.",
+    pledgeStatus: "COMPLETED",
+  },
+  {
+    titleKo: "타 학교, 타 학과와의 교류 행사 추진",
+    titleEn: "Pursuing exchange events with other schools and departments",
+    bodyKo: "타 학교의 전산학부(컴퓨터공학부)와 교류 할 수 있는 행사 기획을 준비 중입니다.",
+    bodyEn: "We are preparing an event to exchange ideas and experiences with the School of Computing or Computer Engineering departments at other schools.",
+    pledgeStatus: "IN_PROGRESS",
+  },
+  {
+    titleKo: "진로 탐색 기회 확장",
+    titleEn: "Expanding career exploration opportunities",
+    bodyKo: "진로콘서트를 토크콘서트로 개편하며 더 다양한 분야의 연사 분들을 모셔 강연을 진행하였습니다. 이번 학기 중 진행할 기업체 탐방도 더 다양한 기업들을 탐방 할 수 있도록 노력 중입니다.",
+    bodyEn: "We redesigned the Career Concert as a talk concert and invited speakers from a wider range of fields. We are also working to visit a more diverse range of companies during this semester's company tour.",
+    pledgeStatus: "IN_PROGRESS",
+  },
+  {
+    titleKo: "스승의 날 행사 개최",
+    titleEn: "Holding a Teachers' Day event",
+    bodyKo: "기존에 사라졌던 사업인 '스승의 날 행사'를 다시 진행하였습니다. 전산학부 교수님들께 감사한 마음을 글로 전달할 수 있는 소중한 기회가 되었습니다.",
+    bodyEn: "We brought back the previously discontinued Teachers' Day event. It was a valuable opportunity to express our gratitude to the School of Computing faculty in writing.",
+    pledgeStatus: "COMPLETED",
+  },
+  {
+    titleKo: "전산학부 OTL 수강 후기 이벤트 진행",
+    titleEn: "Running an SoC OTL course-review event",
+    bodyKo: "전산학부의 전공 수강 계획에 도움이 되는 양질의 OTL 수강 후기를 제공해 드리기 위해 OTL 수강후기 이벤트를 봄학기 종강 이후 진행하였습니다. 가을 학기에도 동일한 행사를 진행 예정입니다.",
+    bodyEn: "To provide high-quality OTL course reviews that help students plan their major courses, we ran an OTL course-review event after the spring semester ended. We plan to hold the same event in the fall semester as well.",
+    pledgeStatus: "COMPLETED",
+  },
+  {
+    titleKo: "공약이행상황판 제작",
+    titleEn: "Creating the pledge progress board",
+    bodyKo: "전산학부 학생회장단의 공약이행상황을 학우분들과 공유하고자 이번 웹사이트에 공약이행상황판을 만들게 되었습니다.",
+    bodyEn: "We created this pledge progress board on the website to share the SoC Student Council leadership's pledge progress with students.",
+    pledgeStatus: "COMPLETED",
+  },
+];
+
 /**
  * 기존 reference FAQ가 아직 이전 문구인 경우에만 새 문구로 갱신한다.
  * 관리자가 이미 편집한 FAQ는 seed 재실행으로 덮어쓰지 않는다.
@@ -1738,6 +1805,138 @@ async function seedAboutPageContent(seedAuthorId: string) {
   console.log("Seeded pledge progress and executive contacts");
 }
 
+async function seedReferenceAboutPageContent() {
+  const [referenceAuthor] = await db
+    .select({ userId: users.userId })
+    .from(users)
+    .where(eq(users.kaistUid, "reference-faq"))
+    .limit(1);
+  if (!referenceAuthor) {
+    throw new Error("Reference content author is missing while seeding about content");
+  }
+
+  const [legacyDemoAuthor] = await db
+    .select({ userId: users.userId })
+    .from(users)
+    .where(eq(users.kaistUid, "seed-council-author"))
+    .limit(1);
+  if (legacyDemoAuthor) {
+    await db
+      .delete(contentBlocks)
+      .where(
+        and(
+          eq(contentBlocks.createdBy, legacyDemoAuthor.userId),
+          inArray(contentBlocks.type, ["QUICK_LINK", "ORGANIZATION_CHART", "PLEDGE"]),
+        ),
+      );
+  }
+
+  const publishedAt = new Date("2026-03-02T09:00:00+09:00");
+  const existingPledges = await db
+    .select({
+      contentBlockId: contentBlocks.contentBlockId,
+      titleKo: contentBlocks.titleKo,
+    })
+    .from(contentBlocks)
+    .where(
+      and(
+        eq(contentBlocks.type, "PLEDGE"),
+        eq(contentBlocks.createdBy, referenceAuthor.userId),
+      ),
+    );
+  const existingPledgesByTitle = new Map(
+    existingPledges.map((item) => [item.titleKo, item.contentBlockId]),
+  );
+
+  for (const [sortOrder, seed] of REFERENCE_PLEDGE_SEEDS.entries()) {
+    const values = {
+      bodyEn: seed.bodyEn,
+      bodyKo: seed.bodyKo,
+      imageUrl: null,
+      imageUrlEn: null,
+      linkUrl: null,
+      pledgeStatus: seed.pledgeStatus,
+      publishedAt,
+      publishedBy: referenceAuthor.userId,
+      sortOrder,
+      status: "PUBLISHED" as const,
+      titleEn: seed.titleEn,
+      titleKo: seed.titleKo,
+      type: "PLEDGE" as const,
+      updatedAt: new Date(),
+      updatedBy: referenceAuthor.userId,
+    };
+    const contentBlockId = existingPledgesByTitle.get(seed.titleKo);
+    if (contentBlockId) {
+      await db
+        .update(contentBlocks)
+        .set(values)
+        .where(eq(contentBlocks.contentBlockId, contentBlockId));
+    } else {
+      await db.insert(contentBlocks).values({
+        ...values,
+        createdBy: referenceAuthor.userId,
+      });
+    }
+  }
+
+  const referencePledgeTitles = new Set(REFERENCE_PLEDGE_SEEDS.map((item) => item.titleKo));
+  for (const existing of existingPledges) {
+    if (referencePledgeTitles.has(existing.titleKo)) continue;
+    await db
+      .delete(contentBlocks)
+      .where(eq(contentBlocks.contentBlockId, existing.contentBlockId));
+  }
+
+  const existingOrganizationCharts = await db
+    .select({ contentBlockId: contentBlocks.contentBlockId })
+    .from(contentBlocks)
+    .where(
+      and(
+        eq(contentBlocks.type, "ORGANIZATION_CHART"),
+        eq(contentBlocks.createdBy, referenceAuthor.userId),
+      ),
+    );
+  const organizationValues = {
+    bodyEn: null,
+    bodyKo: null,
+    imageUrl: "/organization-chart.png",
+    imageUrlEn: null,
+    linkUrl: null,
+    pledgeStatus: null,
+    publishedAt,
+    publishedBy: referenceAuthor.userId,
+    sortOrder: 0,
+    status: "PUBLISHED" as const,
+    titleEn: "SoC Student Council Organization Chart",
+    titleKo: "전산학부 집행위원회 조직도",
+    type: "ORGANIZATION_CHART" as const,
+    updatedAt: new Date(),
+    updatedBy: referenceAuthor.userId,
+  };
+  const [existingOrganizationChart, ...duplicateOrganizationCharts] = existingOrganizationCharts;
+  if (existingOrganizationChart) {
+    await db
+      .update(contentBlocks)
+      .set(organizationValues)
+      .where(eq(contentBlocks.contentBlockId, existingOrganizationChart.contentBlockId));
+    for (const duplicate of duplicateOrganizationCharts) {
+      await db
+        .delete(contentBlocks)
+        .where(eq(contentBlocks.contentBlockId, duplicate.contentBlockId));
+    }
+  } else {
+    await db.insert(contentBlocks).values({
+      ...organizationValues,
+      createdBy: referenceAuthor.userId,
+    });
+  }
+
+  console.log(
+    `Reference about content ready (${REFERENCE_PLEDGE_SEEDS.length} pledges and organization chart)`,
+  );
+}
+
 async function attachAssetsToArticle(
   articleId: number,
   uploadedBy: string,
@@ -3099,6 +3298,9 @@ async function main() {
       await seedMockData();
     }
     await seedReferenceFaqs();
+    if (seedMode === "reference") {
+      await seedReferenceAboutPageContent();
+    }
     await seedReferenceRoadmap();
     console.log("Seed finished");
   } catch (err) {

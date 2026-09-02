@@ -86,6 +86,52 @@ test("getOrCreateSpreadsheet validates the destination folder before creating a 
   );
 });
 
+test("chooses the next available title when creating a survey response spreadsheet", async () => {
+  const calls = [];
+  const client = new GoogleSheetsClient({
+    get: (key) => key === "GOOGLE_OPERATIONS_FOLDER_ID" ? "folder-1" : undefined,
+  });
+  client.request = async (method, url, body) => {
+    calls.push({ method, url, body });
+    const queryText = new URL(url).searchParams.get("q") ?? "";
+    if (url.includes("/files/folder-1?")) {
+      return {
+        mimeType: "application/vnd.google-apps.folder",
+        trashed: false,
+        capabilities: { canAddChildren: true },
+      };
+    }
+    if (queryText.includes("appProperties has")) return { files: [] };
+    if (queryText.includes("name contains")) {
+      return {
+        files: [
+          { name: "전산인의 밤 참가 신청(응답)" },
+          { name: "전산인의 밤 참가 신청 (응답) (1)" },
+        ],
+      };
+    }
+    if (method === "POST" && url === "https://sheets.googleapis.com/v4/spreadsheets") {
+      return {
+        spreadsheetId: "new-sheet",
+        spreadsheetUrl: "https://docs.google.com/spreadsheets/d/new-sheet/edit",
+      };
+    }
+    return {};
+  };
+
+  await client.getOrCreateSpreadsheet({
+    title: "전산인의 밤 참가 신청(응답)",
+    duplicateTitle: "전산인의 밤 참가 신청 (응답)",
+    ensureUniqueTitle: true,
+    sheetTitle: "응답",
+    purpose: "survey-results",
+    key: "survey-1",
+  });
+
+  const createCall = calls.find((call) => call.method === "POST" && call.url === "https://sheets.googleapis.com/v4/spreadsheets");
+  assert.equal(createCall.body.properties.title, "전산인의 밤 참가 신청 (응답) (2)");
+});
+
 test("does not create a spreadsheet when the shared operations folder is not configured", async () => {
   const client = new GoogleSheetsClient({ get: () => undefined });
 
