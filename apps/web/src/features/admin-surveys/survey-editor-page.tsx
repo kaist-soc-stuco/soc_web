@@ -47,7 +47,7 @@ import {
   SectionEditorModal,
   type SectionFormState,
 } from "@/components/organisms/section-editor-modal";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, Pencil, Plus, Save, Sheet, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { UiInput } from "@/components/ui/form-control";
@@ -86,21 +86,6 @@ const isAllDayRange = (openAt: string | null, closeAt: string | null) => {
   );
 };
 
-const QUESTION_TYPES = [
-  { value: "short_text", label: "단답형" },
-  { value: "long_text", label: "장문형" },
-  { value: "single_choice", label: "객관식" },
-  { value: "multiple_choice", label: "체크박스" },
-  { value: "dropdown", label: "드롭다운" },
-  { value: "rating", label: "등급" },
-  { value: "grid_single", label: "객관식 그리드" },
-  { value: "grid_multiple", label: "체크박스 그리드" },
-  { value: "file_upload", label: "파일 업로드" },
-  { value: "date", label: "날짜" },
-  { value: "time", label: "시간" },
-  { value: "datetime", label: "날짜+시간" },
-];
-
 const SurveySettingsSchema = z.object({
   titleKo: z.string().max(255),
   titleEn: z.string().max(255).optional(),
@@ -112,7 +97,7 @@ const SurveySettingsSchema = z.object({
   resultVisibility: z.enum(["PRIVATE", "PUBLIC"]),
   feePayersOnly: z.boolean().optional(),
   eligibleSocAffiliations: z.array(z.enum(["PRIMARY"])),
-  academicEligibility: z.enum(["ANY", "ENROLLED_ONLY", "ENROLLED_OR_LEAVE"]),
+  academicEligibility: z.enum(["ANY", "ENROLLED_ONLY"]),
   allowAnonymous: z.boolean().optional(),
   isKoreanOnly: z.boolean().optional(),
   allowMultipleResponses: z.boolean().optional(),
@@ -180,7 +165,7 @@ const getErrorMessage = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
 
 const QUESTION_ROW_CLASS =
-  "group relative flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 pb-2 pt-4 text-sm";
+  "group relative rounded-lg border border-slate-200 bg-white px-4 pb-5 pt-4 text-sm";
 
 function QuestionDragHandleIcon() {
   return (
@@ -207,27 +192,115 @@ type QuestionRowContentProps = {
   question: SurveyQuestionRecord;
 };
 
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  short_text: "단답형",
+  long_text: "장문형",
+  single_choice: "객관식 질문",
+  multiple_choice: "체크박스",
+  dropdown: "드롭다운",
+  rating: "등급",
+  grid_single: "객관식 그리드",
+  grid_multiple: "체크박스 그리드",
+  file_upload: "파일 업로드",
+  date: "날짜",
+  time: "시간",
+  datetime: "날짜+시간",
+};
+
+function QuestionOptionPreview({
+  questionType,
+  options,
+}: {
+  questionType: SurveyQuestionRecord["questionType"];
+  options: NonNullable<SurveyQuestionRecord["options"]>;
+}) {
+  const fallbackOptions = options.length > 0
+    ? options
+    : [{ value: "option_1", labelKo: "옵션 1", labelEn: "Option 1" }];
+  const isDropdown = questionType === "dropdown";
+  const isMultiple = questionType === "multiple_choice";
+
+  return (
+    <div className="mt-3 grid max-w-2xl gap-2 text-xs text-slate-700">
+      {fallbackOptions.slice(0, 8).map((option, index) => (
+        <div key={`${option.value}-${index}`} className="flex min-w-0 items-center gap-2">
+          {isDropdown ? (
+            <span className="w-4 shrink-0 text-center tabular-nums text-slate-500">
+              {index + 1}
+            </span>
+          ) : (
+            <span
+              aria-hidden="true"
+              className={`size-4 shrink-0 border border-slate-300 bg-white ${isMultiple ? "rounded" : "rounded-full"}`}
+            />
+          )}
+          <span className="min-w-0 truncate">
+            {option.labelKo?.trim() || `옵션 ${index + 1}`}
+          </span>
+        </div>
+      ))}
+      {fallbackOptions.length > 8 ? (
+        <span className="text-xs text-slate-400">외 {fallbackOptions.length - 8}개</span>
+      ) : null}
+    </div>
+  );
+}
+
+function QuestionPreview({ question }: { question: SurveyQuestionRecord }) {
+  switch (question.questionType) {
+    case "short_text":
+      return (
+        <div className="mt-3 max-w-md space-y-2 text-xs text-slate-500">
+          <span className="block text-slate-600">설명</span>
+          <div className="w-3/4 border-b border-dotted border-slate-400 pb-1">
+            단답형 텍스트
+          </div>
+        </div>
+      );
+    case "long_text":
+      return (
+        <div className="mt-3 max-w-2xl border-b border-dotted border-slate-400 pb-1 text-xs text-slate-500">
+          장문형 텍스트
+        </div>
+      );
+    case "single_choice":
+    case "multiple_choice":
+    case "dropdown":
+      return (
+        <QuestionOptionPreview
+          questionType={question.questionType}
+          options={question.options ?? []}
+        />
+      );
+    default:
+      return (
+        <div className="mt-3 text-xs text-slate-400">
+          {QUESTION_TYPE_LABELS[question.questionType] ?? "문항"}
+        </div>
+      );
+  }
+}
+
 function QuestionRowContent({
   question,
 }: QuestionRowContentProps) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-sm font-semibold text-slate-900">
-          {question.titleKo}
+    <div className="min-w-0">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <span className="min-w-0 truncate text-sm font-semibold text-slate-900">
+          {question.titleKo || "질문"}
         </span>
-        {question.titleEn && (
-          <span className="hidden truncate text-xs font-semibold text-kaist-grey/60 md:inline">
-            ({question.titleEn})
+        {question.isRequired ? (
+          <span
+            aria-label="필수 응답"
+            className="shrink-0 text-sm font-semibold text-red-500"
+            title="필수 응답"
+          >
+            *
           </span>
-        )}
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-medium text-slate-600">
-          {QUESTION_TYPES.find((type) => type.value === question.questionType)?.label}
-        </span>
-        {question.isRequired && (
-          <span className="shrink-0 text-[length:var(--ui-text-micro-size)] font-bold text-red-500">*</span>
-        )}
+        ) : null}
       </div>
+      <QuestionPreview question={question} />
     </div>
   );
 }
@@ -408,6 +481,8 @@ export function SurveyEditorPage() {
   const [tab, setTab] = useState<"settings" | "content" | "delivery">("settings");
 
   const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
+  const [sheetBusy, setSheetBusy] = useState(false);
   const [draftRestoredAt, setDraftRestoredAt] = useState<string | null>(null);
   const [draftBannerVisible, setDraftBannerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -470,7 +545,9 @@ export function SurveyEditorPage() {
             : detail.eligibleSocAffiliations ?? [];
           const academicEligibility = allowAnonymous
             ? "ANY"
-            : detail.academicEligibility ?? "ANY";
+            : detail.academicEligibility === "ANY"
+              ? "ANY"
+              : "ENROLLED_ONLY";
           form.reset({
             titleKo: detail.titleKo,
             titleEn: detail.titleEn ?? "",
@@ -510,6 +587,7 @@ export function SurveyEditorPage() {
           });
           setSections(detail.sections);
           setLoadedSurveyId(surveyId);
+          setSpreadsheetUrl(detail.spreadsheetUrl ?? null);
           setLoadedLifecycleStatus(detail.lifecycleStatus);
           if (detail.lifecycleStatus === "DRAFT") {
             setDraftRestoredAt(detail.updatedAt);
@@ -606,6 +684,7 @@ export function SurveyEditorPage() {
         });
         const detail = await client.getSurveyDetail(created.id);
         setLoadedSurveyId(created.id);
+        setSpreadsheetUrl(detail.spreadsheetUrl ?? null);
         setLoadedLifecycleStatus(detail.lifecycleStatus);
         setSections(detail.sections.length ? detail.sections : [{ ...section, questions: [] }]);
         setDraftRestoredAt(detail.updatedAt);
@@ -675,6 +754,7 @@ export function SurveyEditorPage() {
       const body = buildSurveyBody(values, { publish: options?.publish });
       const updated = await client.updateSurvey(id, body);
       form.setValue("isPublished", updated.isPublished ?? Boolean(options?.publish));
+      setSpreadsheetUrl(updated.spreadsheetUrl ?? null);
       setLoadedLifecycleStatus(updated.lifecycleStatus);
       setSaveState("saved");
     } catch (err: unknown) {
@@ -683,6 +763,30 @@ export function SurveyEditorPage() {
       setError(getErrorMessage(err, "저장 중 오류가 발생했습니다."));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSheet = async () => {
+    if (!loadedSurveyId || sheetBusy) return;
+    if (spreadsheetUrl) {
+      window.open(spreadsheetUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setSheetBusy(true);
+    try {
+      const updated = await client.connectSurveySpreadsheet(loadedSurveyId);
+      setSpreadsheetUrl(updated.spreadsheetUrl ?? null);
+      if (updated.spreadsheetUrl) {
+        window.open(updated.spreadsheetUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      toast({
+        type: "error",
+        message: "Google Sheets를 연결하지 못했습니다. Google 계정 연결과 OAuth 권한을 확인해주세요.",
+      });
+    } finally {
+      setSheetBusy(false);
     }
   };
 
@@ -701,6 +805,7 @@ export function SurveyEditorPage() {
     setDraftBannerVisible(false);
     setDraftRestoredAt(null);
     setLoadedSurveyId(null);
+    setSpreadsheetUrl(null);
     setLoadedLifecycleStatus(null);
     setSections([]);
     setError(null);
@@ -1145,6 +1250,17 @@ export function SurveyEditorPage() {
                               : "초안"
                             : "입력 중"}
                 </span>
+                {loadedSurveyId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={sheetBusy}
+                    className="gap-1.5"
+                    onClick={() => void handleSheet()}
+                  >
+                    <Sheet className="size-4" /> Google Sheets에서 보기 ↗
+                  </Button>
+                ) : null}
                 {loadedSurveyId ? (
                   <Button
                     type="button"

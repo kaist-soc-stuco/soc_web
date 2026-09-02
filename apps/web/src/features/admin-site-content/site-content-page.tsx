@@ -1,5 +1,5 @@
 import { createApiClient } from "@soc/api-client";
-import type { ContentBlockListResponse, ContentBlockRecord, ContentBlockStatus, ContentBlockType, CreateContentBlockRequest, UpdateContentBlockRequest } from "@soc/contracts";
+import type { AdminSiteContentListResponse, ContentBlockListResponse, ContentBlockRecord, ContentBlockStatus, ContentBlockType, CreateContentBlockRequest, SiteContentKey, UpdateContentBlockRequest } from "@soc/contracts";
 import { isoToDate } from "@soc/shared";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -18,12 +18,13 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SITE_CONTENT_DEFINITIONS, SITE_CONTENT_QUERY_KEY } from "@/features/site-content/site-content";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { Permissions } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
-type ContentCategory = "NOTICE" | "HERO" | "QUICK_LINK" | "LOGO" | "ORGANIZATION" | "PLEDGE";
+type ContentCategory = "NOTICE" | "HERO" | "QUICK_LINK" | "LOGO" | "ORGANIZATION" | "PLEDGE" | "COPY";
 
 interface BlockDraft {
   bodyEn: string;
@@ -47,6 +48,7 @@ const categoryMeta: Record<ContentCategory, { createLabel: string; createType: C
   LOGO: { createLabel: "등록", createType: "LOGO", label: "로고", singleton: true, types: ["LOGO"] },
   ORGANIZATION: { createLabel: "등록", createType: "ORGANIZATION_CHART", label: "조직도", singleton: true, types: ["ORGANIZATION_CHART"] },
   PLEDGE: { createLabel: "공약 추가", createType: "PLEDGE", label: "공약", singleton: false, types: ["PLEDGE"] },
+  COPY: { createLabel: "", createType: "TOP_BANNER", label: "페이지 문구", singleton: true, types: [] },
 };
 
 type ImageContentBlockType = "HERO" | "LOGO" | "ORGANIZATION_CHART";
@@ -331,7 +333,7 @@ function SiteContentPageContent() {
     }
   };
 
-  const canCreateCategory = !categoryMeta[category].singleton || filteredBlocks.length === 0;
+  const canCreateCategory = category !== "COPY" && (!categoryMeta[category].singleton || filteredBlocks.length === 0);
 
   return <AdminPageShell>
     {ConfirmDialog}
@@ -351,7 +353,7 @@ function SiteContentPageContent() {
         options={Object.entries(categoryMeta).map(([value, meta]) => ({ value, label: meta.label }))}
       />
 
-      <div className="grid min-h-[680px] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+      {category === "COPY" ? <SiteCopyEditor apiClient={apiClient} /> : <div className="grid min-h-[680px] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <AdminCard className="self-start xl:sticky xl:top-6">
           <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
           <div className="scrollbar-hidden max-h-[680px] overflow-y-auto p-2">
@@ -395,7 +397,7 @@ function SiteContentPageContent() {
             <AdminToolbarGroup><Button type="button" variant="outline" onClick={() => setDraft(draftFromBlock(selectedBlock))} disabled={!isDirty || saving}>되돌리기</Button><Button type="button" onClick={() => void applyBlock()} disabled={saving || imageUploading || (!isDirty && selectedBlock.status === "PUBLISHED") || !draft.titleKo.trim() || (isImageOnlyType(draft.type) && !draft.imageUrl.trim())}>{saving ? "적용 중" : "변경 적용"}</Button></AdminToolbarGroup>
           </AdminStickyActionBar>
         </div> : <AdminCard className="grid min-h-[420px] place-items-center p-8 text-center"><div><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-9 text-slate-300" /><p className="text-sm font-medium text-slate-700">관리할 콘텐츠를 선택하거나 새로 만드세요.</p></div></AdminCard>}
-      </div>
+      </div>}
     </AdminPageMain>
 
     <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={categoryMeta[category].createLabel} className="max-w-xl" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{saving ? "등록 중" : "등록"}</Button></>}>
@@ -411,6 +413,140 @@ function SiteContentPageContent() {
     </Modal>
     {cropRequest ? <ImageCropModal aspectRatio={getImageSpec(cropRequest.type)!.width / getImageSpec(cropRequest.type)!.height} file={cropRequest.file} outputHeight={getImageSpec(cropRequest.type)!.height} outputWidth={getImageSpec(cropRequest.type)!.width} onCancel={() => setCropRequest(null)} onComplete={applyCroppedImage} /> : null}
   </AdminPageShell>;
+}
+
+const COPY_GROUPS = [
+  { id: "about", label: "소개 페이지", description: "소개 화면에 표시되는 제목, 설명, 카드, 조직도·제휴 문구를 관리합니다." },
+  { id: "home", label: "홈 화면", description: "홈 히어로와 버튼에 표시되는 기본 문구를 관리합니다." },
+  { id: "footer", label: "푸터", description: "사이트 하단에 표시되는 문구를 관리합니다." },
+] as const;
+
+type SiteCopyDraft = {
+  valueEn: string;
+  valueKo: string;
+};
+
+function SiteCopyEditor({ apiClient }: { apiClient: ReturnType<typeof createApiClient> }) {
+  const queryClient = useQueryClient();
+  const [drafts, setDrafts] = useState<Partial<Record<SiteContentKey, SiteCopyDraft>>>({});
+  const [savingKey, setSavingKey] = useState<SiteContentKey | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const siteContentQuery = useQuery({
+    queryKey: SITE_CONTENT_QUERY_KEY,
+    queryFn: () => apiClient.getAdminSiteContent(),
+  });
+
+  const getDraft = (definition: (typeof SITE_CONTENT_DEFINITIONS)[number]): SiteCopyDraft => {
+    const existing = drafts[definition.key];
+    if (existing) return existing;
+    const persisted = siteContentQuery.data?.items.find((item) => item.key === definition.key);
+    return {
+      valueEn: persisted?.valueEn ?? definition.valueEn,
+      valueKo: persisted?.valueKo ?? definition.valueKo,
+    };
+  };
+
+  const isDirty = (definition: (typeof SITE_CONTENT_DEFINITIONS)[number], draft: SiteCopyDraft) => {
+    const persisted = siteContentQuery.data?.items.find((item) => item.key === definition.key);
+    return draft.valueKo !== (persisted?.valueKo ?? definition.valueKo)
+      || draft.valueEn !== (persisted?.valueEn ?? definition.valueEn);
+  };
+
+  const updateDraft = (key: SiteContentKey, field: keyof SiteCopyDraft, value: string) => {
+    setCopyError(null);
+    setCopyMessage(null);
+    setDrafts((current) => {
+      const definition = SITE_CONTENT_DEFINITIONS.find((item) => item.key === key);
+      if (!definition) return current;
+      const previous = current[key] ?? getDraft(definition);
+      return { ...current, [key]: { ...previous, [field]: value } };
+    });
+  };
+
+  const saveCopy = async (definition: (typeof SITE_CONTENT_DEFINITIONS)[number]) => {
+    const draft = getDraft(definition);
+    const valueKo = draft.valueKo.trim();
+    const valueEn = draft.valueEn.trim();
+    if (!valueKo || !valueEn) {
+      setCopyError(`${definition.labelKo}의 국문·영문 문구를 모두 입력해 주세요.`);
+      return;
+    }
+    setSavingKey(definition.key);
+    setCopyError(null);
+    setCopyMessage(null);
+    try {
+      const saved = await apiClient.upsertSiteContent(definition.key, { valueKo, valueEn });
+      setDrafts((current) => ({ ...current, [definition.key]: { valueKo: saved.valueKo, valueEn: saved.valueEn } }));
+      queryClient.setQueryData<AdminSiteContentListResponse>(SITE_CONTENT_QUERY_KEY, (current) => {
+        const items = current?.items ?? [];
+        const next = items.some((item) => item.key === saved.key)
+          ? items.map((item) => item.key === saved.key ? saved : item)
+          : [...items, saved];
+        return { items: next };
+      });
+      await queryClient.invalidateQueries({ queryKey: SITE_CONTENT_QUERY_KEY });
+      setCopyMessage(`${definition.labelKo}을(를) 저장했습니다.`);
+    } catch {
+      setCopyError("페이지 문구를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  return <div className="space-y-4">
+    <AdminCard>
+      <AdminCardHeader>
+        <div>
+          <AdminSectionTitle>페이지 문구</AdminSectionTitle>
+          <AdminMetaText>국문과 영문을 각각 수정한 뒤 항목별로 저장합니다.</AdminMetaText>
+        </div>
+      </AdminCardHeader>
+      {copyError ? <div role="alert" className="mx-5 mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{copyError}</div> : null}
+      {copyMessage ? <div role="status" className="mx-5 mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{copyMessage}</div> : null}
+      {siteContentQuery.isLoading && !siteContentQuery.data ? <div className="px-5 py-12 text-sm text-slate-500">페이지 문구를 불러오는 중입니다.</div> : <div className="grid gap-4 p-5">
+        {COPY_GROUPS.map((group) => {
+          const definitions = SITE_CONTENT_DEFINITIONS.filter((definition) => definition.group === group.id);
+          return <section key={group.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-[#172033]">{group.label}</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{group.description}</p>
+            </div>
+            <div className="grid gap-4">
+              {definitions.map((definition) => {
+                const draft = getDraft(definition);
+                const dirty = isDirty(definition, draft);
+                const inputId = `site-copy-${definition.key.replace(/\./g, "-")}`;
+                return <div key={definition.key} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-medium text-[#172033]">{definition.labelKo}</h4>
+                      <p className="mt-1 text-xs font-normal text-slate-400">{definition.key}</p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void saveCopy(definition)} disabled={savingKey !== null || !dirty}>
+                      {savingKey === definition.key ? "저장 중" : "저장"}
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <AdminFormField label="한국어" htmlFor={`${inputId}-ko`}>
+                      {definition.multiline
+                        ? <UiTextarea id={`${inputId}-ko`} value={draft.valueKo} onChange={(event) => updateDraft(definition.key, "valueKo", event.currentTarget.value)} />
+                        : <UiInput id={`${inputId}-ko`} value={draft.valueKo} onChange={(event) => updateDraft(definition.key, "valueKo", event.currentTarget.value)} />}
+                    </AdminFormField>
+                    <AdminFormField label="영문" htmlFor={`${inputId}-en`}>
+                      {definition.multiline
+                        ? <UiTextarea id={`${inputId}-en`} value={draft.valueEn} onChange={(event) => updateDraft(definition.key, "valueEn", event.currentTarget.value)} />
+                        : <UiInput id={`${inputId}-en`} value={draft.valueEn} onChange={(event) => updateDraft(definition.key, "valueEn", event.currentTarget.value)} />}
+                    </AdminFormField>
+                  </div>
+                </div>;
+              })}
+            </div>
+          </section>;
+        })}
+      </div>}
+    </AdminCard>
+  </div>;
 }
 
 function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onSelect, previewBorderless = false, secondaryLabel, secondaryValue, spec, uploading, value }: {

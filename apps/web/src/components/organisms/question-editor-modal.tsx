@@ -5,13 +5,24 @@ import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type D
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  AlignLeft,
+  CalendarDays,
   Check,
+  ChevronDown,
+  Circle,
+  Clock3,
   Copy,
+  Grid3X3,
   GripVertical,
   ImagePlus,
   Loader2,
+  Minus,
   MoreVertical,
+  SquareCheck,
+  Star,
+  Table2,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import {
@@ -21,6 +32,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ComponentType,
   type CSSProperties,
   type MutableRefObject,
   type ReactNode,
@@ -35,19 +47,33 @@ import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
 
-const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
-  { value: "short_text", label: "단답형" },
-  { value: "long_text", label: "장문형" },
-  { value: "single_choice", label: "객관식" },
-  { value: "multiple_choice", label: "체크박스" },
-  { value: "dropdown", label: "드롭다운" },
-  { value: "rating", label: "등급" },
-  { value: "grid_single", label: "객관식 그리드" },
-  { value: "grid_multiple", label: "체크박스 그리드" },
-  { value: "file_upload", label: "파일 업로드" },
-  { value: "date", label: "날짜" },
-  { value: "time", label: "시간" },
-  { value: "datetime", label: "날짜+시간" },
+type QuestionTypeIcon = ComponentType<{
+  className?: string;
+  "aria-hidden"?: boolean;
+}>;
+
+const QUESTION_TYPES: Array<{
+  value: QuestionType;
+  label: string;
+  icon: QuestionTypeIcon;
+  separatorBefore?: boolean;
+}> = [
+  { value: "short_text", label: "단답형", icon: Minus },
+  { value: "long_text", label: "장문형", icon: AlignLeft },
+  {
+    value: "single_choice",
+    label: "객관식 질문",
+    icon: Circle,
+    separatorBefore: true,
+  },
+  { value: "multiple_choice", label: "체크박스", icon: SquareCheck },
+  { value: "dropdown", label: "드롭다운", icon: ChevronDown },
+  { value: "file_upload", label: "파일 업로드", icon: Upload, separatorBefore: true },
+  { value: "rating", label: "등급", icon: Star, separatorBefore: true },
+  { value: "grid_single", label: "객관식 그리드", icon: Table2 },
+  { value: "grid_multiple", label: "체크박스 그리드", icon: Grid3X3 },
+  { value: "date", label: "날짜", icon: CalendarDays, separatorBefore: true },
+  { value: "time", label: "시간", icon: Clock3 },
 ];
 
 type ValidationType = NonNullable<SurveyQuestionConfig["validationType"]>;
@@ -371,7 +397,7 @@ function SortableOptionRow({
         <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-2">
           <UiInput
             ref={index === optionCount - 1 ? (element) => { lastOptionLabelRef.current = element; } : undefined}
-            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
             placeholder={`옵션 ${index + 1}`}
             aria-label={`${index + 1}번 국문 옵션`}
             value={option.labelKo}
@@ -379,7 +405,7 @@ function SortableOptionRow({
             onChange={(event) => onUpdateOption(index, "labelKo", event.target.value)}
           />
           <UiInput
-            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
             placeholder={`Option ${index + 1}`}
             aria-label={`${index + 1}번 영문 옵션`}
             value={option.labelEn}
@@ -388,13 +414,15 @@ function SortableOptionRow({
           />
         </div>
         {!optionImage ? (
-          <CompactImagePicker
-            label="선택지 이미지"
-            value={null}
-            onChange={(value) => onUpdateOptionImage(index, value)}
-            disabled={isOngoing}
-            onError={onError}
-          />
+          <div className="pointer-events-none shrink-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+              <CompactImagePicker
+                label="선택지 이미지"
+                value={null}
+                onChange={(value) => onUpdateOptionImage(index, value)}
+                disabled={isOngoing}
+                onError={onError}
+              />
+          </div>
         ) : null}
         {!isOngoing && optionCount > 1 ? (
           <IconButton
@@ -404,15 +432,13 @@ function SortableOptionRow({
             onClick={() => onRemoveOption(index)}
             className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
           >
-            <Trash2 className="size-4" />
+            <X className="size-4" />
           </IconButton>
         ) : null}
-      </div>
-      {hasBranchingControls ? (
-        <div className="mt-1 pl-[4.5rem] md:pl-[4.5rem]">
+        {hasBranchingControls ? (
           <AdminSelectDropdown
             ariaLabel={`${option.labelKo || option.value || "선택지"} 다음 섹션`}
-            className="w-full md:w-52"
+            className="w-44 max-w-full shrink-0"
             value={branchMap[option.value] ?? ""}
             disabled={isOngoing || !option.value.trim()}
             onChange={(target) => onUpdateBranchTarget(option.value, target)}
@@ -423,9 +449,10 @@ function SortableOptionRow({
                 .map((target) => ({ value: target.id, label: target.titleKo })),
               { value: "SUBMIT", label: "설문지 제출" },
             ]}
+            buttonClassName="!h-9 !text-xs"
           />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <ImagePreview
         label="선택지 이미지"
         value={optionImage}
@@ -923,25 +950,24 @@ export function QuestionInlineEditor({
       if (!trigger || !menu) return;
 
       const viewportPadding = 8;
-      const gap = 8;
-      const maxMenuHeight = 360;
       const triggerRect = trigger.getBoundingClientRect();
-      const menuWidth = Math.min(320, Math.max(0, window.innerWidth - viewportPadding * 2));
-      const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
-      const spaceAbove = triggerRect.top - viewportPadding;
-      const naturalHeight = Math.min(menu.scrollHeight, maxMenuHeight);
-      const opensUp = spaceBelow < naturalHeight + gap && spaceAbove > spaceBelow;
-      const availableHeight = Math.max(
+      const naturalHeight = menu.scrollHeight;
+      const naturalWidth = menu.scrollWidth;
+      const availableWidth = Math.max(
         1,
-        (opensUp ? spaceAbove : spaceBelow) - gap,
+        window.innerWidth - viewportPadding * 2,
       );
-      const positionedHeight = Math.min(menu.scrollHeight, maxMenuHeight, availableHeight);
-      const top = opensUp
-        ? Math.max(viewportPadding, triggerRect.top - positionedHeight - gap)
-        : Math.min(
-            triggerRect.bottom + gap,
-            Math.max(viewportPadding, window.innerHeight - positionedHeight - viewportPadding),
-          );
+      const menuWidth = Math.min(naturalWidth, availableWidth);
+      const preferredTop =
+        triggerRect.top + triggerRect.height / 2 - naturalHeight * 0.35;
+      const maxTop = Math.max(
+        viewportPadding,
+        window.innerHeight - naturalHeight - viewportPadding,
+      );
+      const top = Math.min(
+        Math.max(viewportPadding, preferredTop),
+        maxTop,
+      );
       const left = Math.min(
         Math.max(viewportPadding, triggerRect.right - menuWidth),
         Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
@@ -949,7 +975,6 @@ export function QuestionInlineEditor({
 
       setMoreMenuStyle({
         left,
-        maxHeight: positionedHeight,
         top,
         visibility: "visible",
         width: menuWidth,
@@ -968,10 +993,10 @@ export function QuestionInlineEditor({
   }, [moreMenuOpen]);
 
   const titleInputCls =
-    "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-sm font-normal text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
+    "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-sm font-normal text-slate-900 outline-none placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 pb-7 pt-7 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5 md:pb-8 md:pt-7"
+      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 pb-8 pt-7 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5 md:pb-9 md:pt-7"
     >
       {dragHandle ? (
         <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="문항 순서 이동">
@@ -980,7 +1005,7 @@ export function QuestionInlineEditor({
       ) : null}
       <div className="min-w-0 flex-1">
         <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-        <div className="group relative min-w-0">
+        <div className="question-editor-field group relative min-w-0">
           <UiInput
             autoFocus
             aria-label="국문 질문"
@@ -992,10 +1017,10 @@ export function QuestionInlineEditor({
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-0 left-1/2 h-0.5 w-0 -translate-x-1/2 bg-brand-primary transition-[width] duration-200 ease-out group-focus-within:w-full"
-          />
-        </div>
-        <div className="group relative min-w-0">
+             className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
+           />
+         </div>
+         <div className="question-editor-field group relative min-w-0">
           <UiInput
             aria-label="영문 질문"
             className={`${titleInputCls} min-w-0`}
@@ -1006,7 +1031,7 @@ export function QuestionInlineEditor({
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-0 left-1/2 h-0.5 w-0 -translate-x-1/2 bg-brand-primary transition-[width] duration-200 ease-out group-focus-within:w-full"
+             className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
           />
         </div>
         <CompactImagePicker
@@ -1024,6 +1049,8 @@ export function QuestionInlineEditor({
           disabled={isOngoing}
           className="w-full md:w-48"
           buttonClassName="!h-10 !text-sm"
+          disableMenuScroll
+          menuClassName="!max-h-none !overflow-visible"
         />
       </div>
 
@@ -1061,8 +1088,8 @@ export function QuestionInlineEditor({
       ) : null}
 
       {needsOptions ? (
-        <div className="mt-4 pb-2 pt-1">
-          <div className="scrollbar-hidden max-h-80 space-y-1 overflow-y-auto pr-1">
+          <div className="mt-4 pb-4 pt-1">
+           <div className="scrollbar-hidden max-h-80 space-y-1 overflow-y-auto pr-1">
             <DndContext
               sensors={optionSensors}
               collisionDetection={closestCenter}
@@ -1110,7 +1137,7 @@ export function QuestionInlineEditor({
                   placeholder="옵션 추가"
                   disabled={isOngoing}
                   onFocus={addOption}
-                  className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none transition-colors placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                   className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                 />
               </div>
             ) : null}
@@ -1137,7 +1164,7 @@ export function QuestionInlineEditor({
                         </span>
                         <UiInput
                           ref={index === items.length - 1 ? (element) => { lastGridLabelRef.current[kind] = element; } : undefined}
-                          className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                           placeholder={`${isRow ? "행" : "열"}${index + 1}`}
                           aria-label={`${isRow ? "행" : "열"} ${index + 1} 국문 라벨`}
                           value={option.labelKo}
@@ -1145,7 +1172,7 @@ export function QuestionInlineEditor({
                           onChange={(event) => updateGridOption(kind, index, "labelKo", event.target.value)}
                         />
                         <UiInput
-                          className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none transition-colors hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                           placeholder={`${isRow ? "row" : "col"}${index + 1}`}
                           aria-label={`${isRow ? "행" : "열"} ${index + 1} 영문 라벨`}
                           value={option.labelEn ?? ""}
@@ -1160,7 +1187,7 @@ export function QuestionInlineEditor({
                             onClick={() => removeGridOption(kind, index)}
                             className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
                           >
-                            <Trash2 className="size-4" />
+                            <X className="size-4" />
                           </IconButton>
                         ) : null}
                       </div>
@@ -1176,7 +1203,7 @@ export function QuestionInlineEditor({
                           aria-label={isRow ? "행 추가" : "열 추가"}
                           placeholder={isRow ? "행 추가" : "열 추가"}
                           onFocus={() => addGridOption(kind)}
-                          className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none transition-colors placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                         />
                       </div>
                     ) : null}
@@ -1208,8 +1235,9 @@ export function QuestionInlineEditor({
       ) : null}
 
       <div className="mt-5 border-t border-slate-100 pt-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {!isNewQuestion && !isOngoing && (onDuplicate || onDelete) ? (
+            <div className="flex items-center gap-1">
             {!isNewQuestion && !isOngoing && onDuplicate ? (
               <IconButton type="button" size="sm" aria-label="문항 복제" onClick={onDuplicate}>
                 <Copy className="size-4" />
@@ -1220,9 +1248,12 @@ export function QuestionInlineEditor({
                 <Trash2 className="size-4" />
               </IconButton>
             ) : null}
-          </div>
-          <div ref={moreMenuRef} className="relative ml-auto flex items-center gap-3">
+            </div>
+          ) : null}
+          {!isNewQuestion && !isOngoing && (onDuplicate || onDelete) ? (
             <span aria-hidden="true" className="h-6 border-l border-slate-200" />
+          ) : null}
+          <div ref={moreMenuRef} className="relative flex items-center gap-3">
             <QuestionSwitch
               checked={form.isRequired}
               disabled={isOngoing}
@@ -1405,7 +1436,7 @@ function QuestionMoreMenu({
       style={menuStyle}
       role="menu"
       aria-label="문항 옵션"
-      className="fixed z-[100] max-h-[22.5rem] min-w-64 overflow-x-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+      className="fixed z-[100] w-max max-w-[calc(100vw-1rem)] overflow-visible rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
     >
       <MoreMenuItem
         label="설명"
@@ -1497,14 +1528,14 @@ function MoreMenuItem({
       aria-checked={checked}
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex min-h-9 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       {checked ? (
         <Check aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
       ) : (
         <span aria-hidden="true" className="size-4 shrink-0" />
       )}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 whitespace-nowrap">{label}</span>
     </button>
   );
 }

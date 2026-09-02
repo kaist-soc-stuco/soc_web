@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
-import type { CSSProperties } from "react";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { useLanguage } from "@/hooks/use-language";
 export interface DropdownOption {
   value: string;
   label: string;
+  icon?: ComponentType<{ className?: string }>;
+  separatorBefore?: boolean;
 }
 
 export interface SelectDropdownProps {
@@ -28,6 +30,7 @@ export interface SelectDropdownProps {
   menuClassName?: string;
   onOpenChange?: (open: boolean) => void;
   optionClassName?: string;
+  disableMenuScroll?: boolean;
 }
 
 const DROPDOWN_VIEWPORT_PADDING = 8;
@@ -55,6 +58,7 @@ export function SelectDropdown({
   menuClassName,
   onOpenChange,
   optionClassName,
+  disableMenuScroll = false,
 }: SelectDropdownProps) {
   const { lang } = useLanguage();
   const instanceId = useId();
@@ -109,14 +113,18 @@ export function SelectDropdown({
       const triggerRect = trigger.getBoundingClientRect();
       const spaceBelow = window.innerHeight - triggerRect.bottom - DROPDOWN_VIEWPORT_PADDING;
       const spaceAbove = triggerRect.top - DROPDOWN_VIEWPORT_PADDING;
-      const naturalHeight = Math.min(menu.scrollHeight, DROPDOWN_MAX_HEIGHT);
+      const naturalHeight = menu.scrollHeight;
       const opensUp = spaceBelow < naturalHeight + DROPDOWN_GAP && spaceAbove > spaceBelow;
       const availableHeight = Math.max(
         120,
         (opensUp ? spaceAbove : spaceBelow) - DROPDOWN_GAP,
       );
-      const maxMenuHeight = Math.min(DROPDOWN_MAX_HEIGHT, availableHeight);
-      const positionedHeight = Math.min(menu.scrollHeight, maxMenuHeight);
+      const maxMenuHeight = disableMenuScroll
+        ? undefined
+        : Math.min(DROPDOWN_MAX_HEIGHT, availableHeight);
+      const positionedHeight = disableMenuScroll
+        ? naturalHeight
+        : Math.min(menu.scrollHeight, maxMenuHeight ?? DROPDOWN_MAX_HEIGHT);
       const optionNode = menu.querySelector<HTMLElement>('[role="option"]');
       const font = optionNode ? window.getComputedStyle(optionNode).font : window.getComputedStyle(menu).font;
       const canvas = document.createElement("canvas");
@@ -139,15 +147,32 @@ export function SelectDropdown({
         Math.max(DROPDOWN_VIEWPORT_PADDING, window.innerWidth - menuWidth - DROPDOWN_VIEWPORT_PADDING),
       );
 
-      setMenuStyle({
-        left,
-        maxHeight: maxMenuHeight,
-        top: opensUp
+      const top = disableMenuScroll
+        ? (() => {
+            // Keep the trigger around the lower third of a tall menu, so the
+            // list naturally expands farther below than above it.
+            const preferredTop =
+              triggerRect.top + triggerRect.height / 2 - positionedHeight * 0.35;
+            const maxTop = Math.max(
+              DROPDOWN_VIEWPORT_PADDING,
+              window.innerHeight - positionedHeight - DROPDOWN_VIEWPORT_PADDING,
+            );
+            return Math.min(
+              Math.max(DROPDOWN_VIEWPORT_PADDING, preferredTop),
+              maxTop,
+            );
+          })()
+        : opensUp
           ? Math.max(
               DROPDOWN_VIEWPORT_PADDING,
               triggerRect.top - positionedHeight - DROPDOWN_GAP,
             )
-          : triggerRect.bottom + DROPDOWN_GAP,
+          : triggerRect.bottom + DROPDOWN_GAP;
+
+      setMenuStyle({
+        left,
+        ...(maxMenuHeight === undefined ? {} : { maxHeight: maxMenuHeight }),
+        top,
         visibility: "visible",
         width: menuWidth,
       });
@@ -196,6 +221,7 @@ export function SelectDropdown({
   }, [isOpen]);
 
   const selectedOption = options.find((o) => o.value === value);
+  const SelectedIcon = selectedOption?.icon;
   const menuId = id ? `${id}-menu` : undefined;
 
   return (
@@ -226,10 +252,13 @@ export function SelectDropdown({
             : "bg-white text-gray-700"
         } ${buttonClassName || ""}`}
       >
-        <span className={selectedOption ? "text-kaist-black" : "text-kaist-grey/50"}>
-          {selectedOption
-            ? selectedOption.label
-            : placeholder || (lang === "ko" ? "선택하세요" : "Select")}
+        <span className={`flex min-w-0 items-center gap-2 ${selectedOption ? "text-kaist-black" : "text-kaist-grey/50"}`}>
+          {SelectedIcon ? <SelectedIcon aria-hidden="true" className="size-4 shrink-0 text-slate-500" /> : null}
+          <span className="min-w-0 truncate">
+            {selectedOption
+              ? selectedOption.label
+              : placeholder || (lang === "ko" ? "선택하세요" : "Select")}
+          </span>
         </span>
         <ChevronDown
           className={`w-4 h-4 text-kaist-grey/60 transition-transform duration-200 ${
@@ -245,7 +274,7 @@ export function SelectDropdown({
               id={menuId}
               role="listbox"
               style={menuStyle}
-              className={`ui-select-dropdown-menu fixed z-[100] max-h-60 overflow-x-hidden overflow-y-auto rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white p-1 shadow-[0_2px_8px_rgb(15_23_42_/_0.08)] ${menuClassName || ""}`}
+              className={`ui-select-dropdown-menu fixed z-[100] max-h-60 overflow-x-hidden overflow-y-auto rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white p-1 shadow-[0_2px_8px_rgb(15_23_42_/_0.08)] ${disableMenuScroll ? "!max-h-none !overflow-visible" : ""} ${menuClassName || ""}`}
             >
               {options.length === 0 ? (
                 <div className="px-2.5 py-2 text-sm font-normal text-kaist-grey/50">
@@ -253,28 +282,38 @@ export function SelectDropdown({
                     (lang === "ko" ? "선택지가 없습니다." : "No options.")}
                 </div>
               ) : (
-                options.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    role="option"
-                    aria-selected={option.value === value}
-                    onClick={() => {
-                      onChange(option.value);
-                      setOpen(false);
-                    }}
-                    className={`interaction-menu-item h-[var(--ui-menu-row-height)] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-[length:var(--ui-text-body-size)] ${
-                      option.value === value
-                        ? "bg-brand-primary-light text-brand-primary font-medium"
-                        : "text-kaist-black font-normal"
-                    } ${optionClassName || ""}`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                    {option.value === value && <Check className="w-3.5 h-3.5 text-kaist-darkgreen" />}
-                  </Button>
-                ))
+                options.map((option) => {
+                  const OptionIcon = option.icon;
+                  return (
+                    <Fragment key={option.value}>
+                      {option.separatorBefore ? (
+                        <div role="separator" className="my-1 border-t border-slate-100" />
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        role="option"
+                        aria-selected={option.value === value}
+                        onClick={() => {
+                          onChange(option.value);
+                          setOpen(false);
+                        }}
+                        className={`interaction-menu-item h-[var(--ui-menu-row-height)] w-full min-w-0 justify-between overflow-hidden rounded-md px-2.5 py-0 text-left text-[length:var(--ui-text-body-size)] ${
+                          option.value === value
+                            ? "bg-brand-primary-light text-brand-primary font-medium"
+                            : "text-kaist-black font-normal"
+                        } ${optionClassName || ""}`}
+                      >
+                        <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                          {OptionIcon ? <OptionIcon aria-hidden="true" className="size-4 shrink-0 text-slate-500" /> : null}
+                          <span className="min-w-0 flex-1 truncate whitespace-nowrap">{option.label}</span>
+                        </span>
+                        {option.value === value && <Check className="size-3.5 shrink-0 text-kaist-darkgreen" />}
+                      </Button>
+                    </Fragment>
+                  );
+                })
               )}
             </div>,
             document.body,
