@@ -457,6 +457,35 @@ export const QuestionConfigSchema = z.object({
   maxSizeBytes: z.number().int().positive().max(20_000_000).optional(),
   allowedMimeTypes: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
   validationErrorMessage: z.string().trim().max(255).optional(),
+  validationType: z
+    .enum(["number", "text", "length", "regex", "checkbox_count"])
+    .optional(),
+  validationTextType: z.enum(["length", "regex"]).optional(),
+  validationOperator: z
+    .enum([
+      "min",
+      "max",
+      "equal",
+      "greater",
+      "greater_or_equal",
+      "less",
+      "less_or_equal",
+      "not_equal",
+      "between",
+      "not_between",
+      "is_number",
+      "integer",
+      "min_length",
+      "max_length",
+    ])
+    .optional(),
+  validationValue: z.number().int().min(0).optional(),
+  validationValueMax: z.number().int().min(0).optional(),
+  branchingEnabled: z.boolean().optional(),
+  shuffleOptions: z.boolean().optional(),
+  dateIncludeTime: z.boolean().optional(),
+  dateIncludeYear: z.boolean().optional(),
+  timeAnswerType: z.enum(["time", "duration"]).optional(),
   // Google Forms-style section branching. Values are option IDs; targets are
   // section IDs or the terminal `SUBMIT` marker.
   goToSectionByValue: z

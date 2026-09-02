@@ -193,6 +193,68 @@ test("validates date and time answer formats", () => {
   );
 });
 
+test("validates configured text and checkbox response rules", () => {
+  const short = question({
+    id: "short",
+    config: {
+      validationType: "length",
+      validationOperator: "min",
+      validationValue: 3,
+      validationErrorMessage: "세 글자 이상 입력해주세요.",
+    },
+  });
+  assert.doesNotThrow(() =>
+    validateSurveyAnswers([short], [{ questionId: "short", content: { text: "abc" } }]),
+  );
+  expectHttpError(
+    () => validateSurveyAnswers([short], [{ questionId: "short", content: { text: "ab" } }]),
+    BadRequestException,
+    "세 글자 이상 입력해주세요.",
+  );
+
+  const checkbox = question({
+    id: "checkbox",
+    questionType: "multiple_choice",
+    options: [
+      { value: "a", labelKo: "A" },
+      { value: "b", labelKo: "B" },
+    ],
+    config: {
+      validationType: "checkbox_count",
+      validationOperator: "max",
+      validationValue: 1,
+    },
+  });
+  expectHttpError(
+    () => validateSurveyAnswers([checkbox], [{ questionId: "checkbox", content: { values: ["a", "b"] } }]),
+    BadRequestException,
+    "answer_validation_mismatch",
+  );
+});
+
+test("honors date and time answer settings", () => {
+  assert.doesNotThrow(() =>
+    validateSurveyAnswers(
+      [
+        question({ id: "date", questionType: "date", config: { dateIncludeTime: true } }),
+        question({ id: "time", questionType: "time", config: { timeAnswerType: "duration" } }),
+      ],
+      [
+        { questionId: "date", content: { date: "2026-05-30T12:30" } },
+        { questionId: "time", content: { time: "1:30" } },
+      ],
+    ),
+  );
+  expectHttpError(
+    () => validateSurveyAnswers(
+      [question({ questionType: "date", config: { dateIncludeYear: false } })],
+      [{ questionId: "question-1", content: { date: "02-30" } }],
+    ),
+    BadRequestException,
+    "answer_content_invalid",
+  );
+});
+
 test("accepts a valid uploaded asset reference", () => {
   assert.doesNotThrow(() =>
     validateSurveyAnswers(

@@ -62,6 +62,16 @@ export function SurveyQuestionInput({
   };
   const getOptionImage = (opt: QuestionOption) =>
     lang === "ko" ? opt.imageUrlKo : opt.imageUrlEn || opt.imageUrlKo;
+  const displayedOptions = useMemo(() => {
+    const options = question.options ?? [];
+    if (!question.config?.shuffleOptions || options.length < 2) return options;
+    const shuffled = [...options];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
+  }, [question.config?.shuffleOptions, question.options]);
 
   switch (question.questionType as QuestionType) {
     case "short_text":
@@ -115,7 +125,7 @@ export function SurveyQuestionInput({
                   value: "",
                   label: lang === "ko" ? "선택하세요" : "Select an option",
                 },
-                ...(question.options ?? []).map((opt) => ({
+                ...displayedOptions.map((opt) => ({
                   value: opt.value,
                   label: getOptionLabel(opt),
                 })),
@@ -132,7 +142,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <div className="flex flex-col gap-2.5">
-          {question.options?.map((opt) => {
+          {displayedOptions.map((opt) => {
             const isSelected = value === opt.value;
             return (
               <label
@@ -144,14 +154,14 @@ export function SurveyQuestionInput({
                 }`}
               >
                 <div
-                  className={`grid size-5 shrink-0 place-items-center rounded-full border-2 ${
+                  className={`relative box-border size-5 shrink-0 rounded-full border-2 ${
                     isSelected
                       ? "border-kaist-darkgreen bg-white"
                       : "border-kaist-grey/30"
                   }`}
                 >
                   {isSelected && (
-                    <div className="size-2.5 rounded-full bg-kaist-darkgreen" />
+                    <div className="absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-kaist-darkgreen" />
                   )}
                 </div>
                 <UiInput
@@ -181,7 +191,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <div className="flex flex-col gap-2.5">
-          {question.options?.map((opt) => {
+          {displayedOptions.map((opt) => {
             const selected = (value as string[]).includes(opt.value);
             return (
               <label
@@ -503,13 +513,24 @@ export function SurveyQuestionInput({
       );
     }
 
-    case "date":
+    case "date": {
+      const includeTime = question.config?.dateIncludeTime ?? false;
+      const includeYear = question.config?.dateIncludeYear ?? true;
+      const rawValue = value as string;
+      const inputValue = includeTime
+        ? normalizeDatetimeLocalValue(rawValue)
+        : !includeYear && /^\d{4}-\d{2}-\d{2}$/.test(rawValue)
+          ? rawValue.slice(5)
+          : rawValue;
       return (
         <div>
           <UiInput
             className={controlClass}
-            type="date"
-            value={value as string}
+            type={includeTime ? "datetime-local" : includeYear ? "date" : "text"}
+            inputMode={!includeYear && !includeTime ? "numeric" : undefined}
+            pattern={!includeYear && !includeTime ? "\\d{2}-\\d{2}" : undefined}
+            placeholder={!includeYear && !includeTime ? "MM-DD" : undefined}
+            value={inputValue}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={Boolean(error)}
             disabled={disabled}
@@ -517,13 +538,18 @@ export function SurveyQuestionInput({
           {renderError}
         </div>
       );
+    }
 
-    case "time":
+    case "time": {
+      const isDuration = question.config?.timeAnswerType === "duration";
       return (
         <div>
           <UiInput
             className={controlClass}
-            type="time"
+            type={isDuration ? "text" : "time"}
+            inputMode={isDuration ? "numeric" : undefined}
+            pattern={isDuration ? "\\d{1,3}:[0-5]\\d(?::[0-5]\\d)?" : undefined}
+            placeholder={isDuration ? "예: 1:30" : undefined}
             value={value as string}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={Boolean(error)}
@@ -532,6 +558,7 @@ export function SurveyQuestionInput({
           {renderError}
         </div>
       );
+    }
 
     case "datetime":
       return (
