@@ -34,7 +34,7 @@ const record = {
 };
 
 test("site content contracts accept only finite keys and complete bilingual copy", () => {
-  assert.equal(SITE_CONTENT_KEYS.length, 10);
+  assert.equal(SITE_CONTENT_KEYS.length, 37);
   assert.equal(SiteContentKeySchema.parse("about.intro.body"), "about.intro.body");
   assert.equal(SiteContentKeySchema.safeParse("arbitrary.json.key").success, false);
 

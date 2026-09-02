@@ -102,6 +102,27 @@
   height: 0;
 }
 
+/* Survey question fields animate their focus bar in, but dismiss it at once
+   when focus leaves so switching between cards never leaves a trailing bar. */
+.question-editor-field__focus-bar {
+  width: 0;
+  transition: width 200ms ease-out;
+}
+
+.question-editor-field:focus-within .question-editor-field__focus-bar {
+  width: 100%;
+}
+
+.question-editor-field:not(:focus-within) .question-editor-field__focus-bar {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .question-editor-field__focus-bar {
+    transition: none;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

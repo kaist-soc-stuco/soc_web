@@ -1,0 +1,27 @@
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.hero.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.hero.cta.events';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.hero.cta.suggestions';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.intro';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.work';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.organization';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.partnership';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.intro.eyebrow';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.1.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.1.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.2.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.2.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.3.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.3.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.cta';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.pledges.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.reference.eyebrow';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.reference.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.cta';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.area.1';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.area.2';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.area.3';

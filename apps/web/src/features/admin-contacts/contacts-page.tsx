@@ -110,7 +110,6 @@ function ContactsPageContent() {
     nameEn: "",
     descriptionKo: "",
     descriptionEn: "",
-    inquiryEmail: "",
   });
   const [departmentSaving, setDepartmentSaving] = useState(false);
 
@@ -316,7 +315,7 @@ function ContactsPageContent() {
 
   const openNewDepartmentModal = () => {
     setEditingDepartment(null);
-    setDepartmentForm({ nameKo: "", nameEn: "", descriptionKo: "", descriptionEn: "", inquiryEmail: "" });
+    setDepartmentForm({ nameKo: "", nameEn: "", descriptionKo: "", descriptionEn: "" });
     setDepartmentModalOpen(true);
   };
   const openEditDepartmentModal = (department: ContactDepartmentRecord) => {
@@ -326,7 +325,6 @@ function ContactsPageContent() {
       nameEn: department.nameEn,
       descriptionKo: department.descriptionKo,
       descriptionEn: department.descriptionEn,
-      inquiryEmail: department.inquiryEmail ?? "",
     });
     setDepartmentModalOpen(true);
   };
@@ -345,7 +343,6 @@ function ContactsPageContent() {
           nameEn: departmentForm.nameEn.trim(),
           descriptionKo: departmentForm.descriptionKo.trim(),
           descriptionEn: departmentForm.descriptionEn.trim(),
-          inquiryEmail: departmentForm.inquiryEmail.trim(),
         });
       } else {
         const payload: CreateContactDepartmentRequest = {
@@ -353,7 +350,7 @@ function ContactsPageContent() {
           nameEn: departmentForm.nameEn.trim(),
           descriptionKo: departmentForm.descriptionKo.trim(),
           descriptionEn: departmentForm.descriptionEn.trim(),
-          inquiryEmail: departmentForm.inquiryEmail.trim(),
+          inquiryEmail: "",
           isActive: true,
         };
         await apiClient.createContactDepartment(payload);
@@ -474,7 +471,7 @@ function ContactsPageContent() {
           </>
         ) : (
           <AdminTableCard className="overflow-hidden">
-            {departmentsLoading && departments.length === 0 ? <div className="px-5 py-16 text-center text-sm text-slate-400">부서 정보를 불러오는 중입니다...</div> : departments.length === 0 ? <AdminEmptyState message="등록된 부서가 없습니다." /> : <div className="divide-y divide-slate-100">{departments.map((department) => <div key={department.id} className="flex min-h-16 items-center justify-between gap-4 px-5 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{department.nameKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{department.nameEn || "영문 부서명 미입력"}</p><p className="mt-1 truncate text-xs text-slate-500">{department.descriptionKo || "소개 문구 미입력"}{department.inquiryEmail ? ` · ${department.inquiryEmail}` : ""}</p></div><div className="flex shrink-0 items-center gap-2"><span className={`rounded-full px-2 py-1 text-xs font-medium ${department.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{department.isActive ? "사용 중" : "비활성"}</span><Button type="button" variant="outline" size="icon" aria-label={`${department.nameKo} 수정`} onClick={() => openEditDepartmentModal(department)}><Pencil aria-hidden="true" className="size-4" /></Button><Button type="button" variant="outline" size="icon" aria-label={`${department.nameKo} 삭제`} onClick={() => void handleDepartmentDelete(department)}><Trash2 aria-hidden="true" className="size-4 text-rose-600" /></Button></div></div>)}</div>}
+            {departmentsLoading && departments.length === 0 ? <div className="px-5 py-16 text-center text-sm text-slate-400">부서 정보를 불러오는 중입니다...</div> : departments.length === 0 ? <AdminEmptyState message="등록된 부서가 없습니다." /> : <div className="divide-y divide-slate-100">{departments.map((department) => <div key={department.id} className="flex min-h-16 items-center justify-between gap-4 px-5 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{department.nameKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{department.nameEn || "영문 부서명 미입력"}</p><p className="mt-1 truncate text-xs text-slate-500">{department.descriptionKo || "소개 문구 미입력"}</p></div><div className="flex shrink-0 items-center gap-2"><span className={`rounded-full px-2 py-1 text-xs font-medium ${department.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{department.isActive ? "사용 중" : "비활성"}</span><Button type="button" variant="outline" size="icon" aria-label={`${department.nameKo} 수정`} onClick={() => openEditDepartmentModal(department)}><Pencil aria-hidden="true" className="size-4" /></Button><Button type="button" variant="outline" size="icon" aria-label={`${department.nameKo} 삭제`} onClick={() => void handleDepartmentDelete(department)}><Trash2 aria-hidden="true" className="size-4 text-rose-600" /></Button></div></div>)}</div>}
           </AdminTableCard>
         )}
 
@@ -490,7 +487,6 @@ function ContactsPageContent() {
               <AdminFormField label="부서 (영문)"><UiInput value={departmentForm.nameEn} onChange={(event) => setDepartmentForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} placeholder="예: Presidium" className="box-border w-full" /></AdminFormField>
               <AdminFormField label="역할 소개 (한글)" className="sm:col-span-2"><UiTextarea value={departmentForm.descriptionKo} onChange={(event) => setDepartmentForm((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} placeholder="예: 포털 개발 및 인프라 운영, 시스템 관리" className="min-h-24 w-full" /></AdminFormField>
               <AdminFormField label="역할 소개 (영문)" className="sm:col-span-2"><UiTextarea value={departmentForm.descriptionEn} onChange={(event) => setDepartmentForm((current) => ({ ...current, descriptionEn: event.currentTarget.value }))} placeholder="Describe this department's main responsibilities." className="min-h-24 w-full" /></AdminFormField>
-              <AdminFormField label="공식 문의 이메일" className="sm:col-span-2"><UiInput type="email" value={departmentForm.inquiryEmail} onChange={(event) => setDepartmentForm((current) => ({ ...current, inquiryEmail: event.currentTarget.value }))} placeholder="kaist.helloworld@gmail.com" className="box-border w-full" /></AdminFormField>
             </div>
         </Modal>
       </main>

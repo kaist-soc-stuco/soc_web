@@ -32,7 +32,7 @@ export interface SurveySettingsFormValues {
   resultVisibility: "PRIVATE" | "PUBLIC";
   feePayersOnly?: boolean;
   eligibleSocAffiliations: Array<"PRIMARY">;
-  academicEligibility: "ANY" | "ENROLLED_ONLY" | "ENROLLED_OR_LEAVE";
+  academicEligibility: "ANY" | "ENROLLED_ONLY";
   allowAnonymous?: boolean;
   isKoreanOnly?: boolean;
   allowMultipleResponses?: boolean;
@@ -317,7 +317,6 @@ export function SurveySettingsForm({
   const isKoreanOnly = Boolean(watch("isKoreanOnly"));
   const allowMultipleResponses = Boolean(watch("allowMultipleResponses"));
   const allowResponseEdit = Boolean(watch("allowResponseEdit"));
-  const isPublished = Boolean(watch("isPublished"));
   const showOnCalendar = Boolean(watch("showOnCalendar"));
   const isAlwaysOpen = Boolean(watch("isAlwaysOpen"));
   const isAllDay = Boolean(watch("isAllDay"));
@@ -507,23 +506,6 @@ export function SurveySettingsForm({
 
         {/* 우측 메타데이터 영역 */}
         {mode !== "basic" ? <div className={`${mode === "all" ? "lg:col-span-1" : ""} h-full space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}>
-            <div className="flex items-center justify-between border-b border-kaist-grey/10 pb-4">
-              <span className="text-sm font-normal text-[#172033]">
-                메타데이터 설정
-              </span>
-              <div className="flex items-center gap-2">
-              {isPublished ? (
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-normal text-emerald-700 border border-emerald-200">
-                  게시됨
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-full bg-slate-50 px-3 py-1 text-xs font-normal text-[#344054] border border-slate-200">
-                  임시저장
-                </span>
-              )}
-            </div>
-          </div>
-
           <div className="space-y-6">
             <section className="space-y-3" aria-labelledby="survey-basic-settings">
               <div>
@@ -661,7 +643,6 @@ export function SurveySettingsForm({
                         options={[
                           { value: "ANY", label: "제한 없음" },
                           { value: "ENROLLED_ONLY", label: "재학생만" },
-                          { value: "ENROLLED_OR_LEAVE", label: "재학생·휴학생" },
                         ]}
                         onChange={(value) => {
                           field.onChange(value);
