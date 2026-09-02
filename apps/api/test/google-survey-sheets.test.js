@@ -57,10 +57,12 @@ test("creates and syncs a survey response sheet through the shared Sheets client
 
   const createCall = calls.find((call) => call.kind === "getOrCreateSpreadsheet");
   assert.deepEqual(createCall.options, {
-    title: "진로 설문 응답 · survey-1",
+    title: "진로 설문(응답)",
+    duplicateTitle: "진로 설문 (응답)",
     sheetTitle: "응답",
     purpose: "survey-results",
     key: "survey-1",
+    ensureUniqueTitle: true,
   });
   const syncCall = calls.find((call) => call.kind === "syncSheet");
   assert.deepEqual(syncCall.definition.headers, [

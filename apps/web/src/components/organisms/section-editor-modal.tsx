@@ -144,7 +144,8 @@ export function SectionEditorModal({
                 placeholder="국문 섹션 제목"
               />
             </AdminFormField>
-            <AdminFormField label="섹션 설명">
+            <div className="grid min-w-0 gap-1.5">
+              <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
               <RichTextEditor
                 compact
                 disabled={isOngoing}
@@ -153,7 +154,7 @@ export function SectionEditorModal({
                 onChange={(value) => update("descriptionKo", value)}
                 lang="ko"
               />
-            </AdminFormField>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -166,7 +167,8 @@ export function SectionEditorModal({
                 placeholder="영문 섹션 제목"
               />
             </AdminFormField>
-            <AdminFormField label="섹션 설명">
+            <div className="grid min-w-0 gap-1.5">
+              <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
               <RichTextEditor
                 compact
                 disabled={isOngoing || isKoreanOnly}
@@ -175,7 +177,7 @@ export function SectionEditorModal({
                 onChange={(value) => update("descriptionEn", value)}
                 lang="ko"
               />
-            </AdminFormField>
+            </div>
           </div>
         )}
 

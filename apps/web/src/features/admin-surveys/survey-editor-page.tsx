@@ -280,20 +280,6 @@ function SortableQuestionRow({
       role={isEditing ? undefined : "button"}
       tabIndex={isEditing ? undefined : 0}
       aria-label={isEditing ? undefined : `${question.titleKo} 문항 편집`}
-      onPointerDown={
-        isEditing
-          ? undefined
-          : (event) => {
-              if (event.button !== 0 || isInteractiveQuestionRowTarget(event.target, event.currentTarget)) {
-                return;
-              }
-              // Switch the editor before the browser moves focus away from the
-              // current input. This keeps the clicked row under the pointer
-              // instead of collapsing the current card first.
-              event.preventDefault();
-              onEdit();
-            }
-      }
       onClick={
         isEditing
           ? undefined

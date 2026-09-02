@@ -2,6 +2,7 @@ import { Header } from "@/components/organisms/header";
 import { Footer } from "@/components/organisms/footer";
 import { useLanguage, type Language } from "@/hooks/use-language";
 import { PageContainer, PageHeader, PageMain, PageShell } from "@/components/ui/page-layout";
+import { useLayoutEffect } from "react";
 
 type LegalText = Readonly<{
   ko: string;
@@ -706,6 +707,10 @@ function LegalSectionView({ lang, section }: { lang: Language; section: LegalSec
 export function LegalDocumentPage({ kind }: { kind: "terms" | "privacy" }) {
   const { lang } = useLanguage();
   const document = documents[kind];
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [kind]);
 
   return (
     <PageShell>

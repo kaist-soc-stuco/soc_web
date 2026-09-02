@@ -144,14 +144,14 @@ export function SurveyQuestionInput({
                 }`}
               >
                 <div
-                  className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                  className={`grid size-5 shrink-0 place-items-center rounded-full border-2 ${
                     isSelected
                       ? "border-kaist-darkgreen bg-white"
                       : "border-kaist-grey/30"
                   }`}
                 >
                   {isSelected && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-kaist-darkgreen" />
+                    <div className="size-2.5 rounded-full bg-kaist-darkgreen" />
                   )}
                 </div>
                 <UiInput
