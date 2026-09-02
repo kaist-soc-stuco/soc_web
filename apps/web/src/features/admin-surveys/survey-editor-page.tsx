@@ -164,6 +164,8 @@ const SurveySettingsSchema = z.object({
 const emptyQuestion = (): QuestionFormState => ({
   titleKo: "",
   titleEn: "",
+  descriptionKo: "",
+  descriptionEn: "",
   questionType: "short_text",
   options: [],
   answerRegex: "",
@@ -808,6 +810,8 @@ export function SurveyEditorPage() {
       initial: {
         titleKo: q.titleKo,
         titleEn: q.titleEn ?? "",
+        descriptionKo: q.descriptionKo ?? "",
+        descriptionEn: q.descriptionEn ?? "",
         questionType: q.questionType,
         options: (q.options ?? []).map((opt) => ({
           value: opt.value,
@@ -818,7 +822,9 @@ export function SurveyEditorPage() {
         })),
         answerRegex: q.answerRegex ?? "",
         answerValidationEnabled: Boolean(
-          q.answerRegex?.trim() || q.config?.validationErrorMessage?.trim(),
+          q.answerRegex?.trim() ||
+            q.config?.validationErrorMessage?.trim() ||
+            q.config?.validationType,
         ),
         isRequired: q.isRequired ?? true,
         config: q.config,
@@ -834,12 +840,17 @@ export function SurveyEditorPage() {
     const questionConfig = qForm.config ? { ...qForm.config } : undefined;
     if (!qForm.answerValidationEnabled && questionConfig) {
       delete questionConfig.validationErrorMessage;
+      delete questionConfig.validationType;
+      delete questionConfig.validationTextType;
+      delete questionConfig.validationOperator;
+      delete questionConfig.validationValue;
+      delete questionConfig.validationValueMax;
     }
     const body = {
       titleKo: qForm.titleKo.trim() || "질문",
       titleEn: qForm.titleEn.trim() || (isKoreanOnly ? undefined : "Question"),
-      descriptionKo: "",
-      descriptionEn: "",
+      descriptionKo: qForm.descriptionKo.trim(),
+      descriptionEn: qForm.descriptionEn.trim(),
       questionType: qForm.questionType,
       options: qForm.options.length > 0 ? qForm.options : undefined,
       config: questionConfig && Object.keys(questionConfig).length > 0 ? questionConfig : undefined,
@@ -872,8 +883,8 @@ export function SurveyEditorPage() {
       await client.createQuestion(loadedSurveyId, sectionId, {
         titleKo: `${question.titleKo} (복사본)`,
         titleEn: question.titleEn ? `${question.titleEn} (Copy)` : undefined,
-        descriptionKo: "",
-        descriptionEn: "",
+        descriptionKo: question.descriptionKo ?? "",
+        descriptionEn: question.descriptionEn ?? "",
         questionType: question.questionType,
         options: question.options?.map((option) => ({ ...option })) ?? undefined,
         config: question.config

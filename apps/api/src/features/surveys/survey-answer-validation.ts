@@ -4,7 +4,11 @@ import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const YEARLESS_DATE_PATTERN = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const DATETIME_LOCAL_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?:\:[0-5]\d)?$/;
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?:[:][0-5]\d)?$/;
+const DURATION_PATTERN = /^\d{1,3}:[0-5]\d(?:[:][0-5]\d)?$/;
 
 function isValidDateOnly(value: string): boolean {
   if (!DATE_PATTERN.test(value)) return false;
@@ -13,6 +17,93 @@ function isValidDateOnly(value: string): boolean {
   const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
   return day >= 1 && day <= daysInMonth;
+}
+
+function isValidYearlessDate(value: string): boolean {
+  if (!YEARLESS_DATE_PATTERN.test(value)) return false;
+  const [, monthText, dayText] = value.match(YEARLESS_DATE_PATTERN) ?? [];
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const daysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return day >= 1 && day <= daysInMonth;
+}
+
+function isValidDatetimeLocal(value: string): boolean {
+  return DATETIME_LOCAL_PATTERN.test(value) && Number.isFinite(Date.parse(value));
+}
+
+type ValidationOperator =
+  | "min"
+  | "max"
+  | "equal"
+  | "greater"
+  | "greater_or_equal"
+  | "less"
+  | "less_or_equal"
+  | "not_equal"
+  | "between"
+  | "not_between"
+  | "is_number"
+  | "integer"
+  | "min_length"
+  | "max_length";
+
+function passesNumericValidation(
+  value: number,
+  operator: ValidationOperator | undefined,
+  threshold: number | undefined,
+  thresholdMax?: number,
+): boolean {
+  switch (operator ?? "min") {
+    case "is_number":
+      return Number.isFinite(value);
+    case "integer":
+      return Number.isInteger(value);
+    case "greater":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value > threshold!;
+    case "greater_or_equal":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value >= threshold!;
+    case "less":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value < threshold!;
+    case "less_or_equal":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value <= threshold!;
+    case "not_equal":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value !== threshold!;
+    case "between":
+      return (
+        Number.isFinite(value) &&
+        Number.isFinite(threshold) &&
+        Number.isFinite(thresholdMax) &&
+        value >= threshold! &&
+        value <= thresholdMax!
+      );
+    case "not_between":
+      return (
+        Number.isFinite(value) &&
+        Number.isFinite(threshold) &&
+        Number.isFinite(thresholdMax) &&
+        (value < threshold! || value > thresholdMax!)
+      );
+    case "min_length":
+    case "min":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value >= threshold!;
+    case "max_length":
+    case "max":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value <= threshold!;
+    case "equal":
+      return Number.isFinite(value) && Number.isFinite(threshold) && value === threshold!;
+    default:
+      return false;
+  }
+}
+
+function validationError(
+  question: SurveyQuestionRecord,
+  fallback = "answer_validation_mismatch",
+): BadRequestException {
+  return new BadRequestException(
+    question.config?.validationErrorMessage?.trim() || fallback,
+  );
 }
 
 function hasDuplicateValues(values: readonly string[]): boolean {
@@ -90,14 +181,43 @@ function validateAnswerContent(
       if (typeof content.text !== "string") {
         throw new BadRequestException("answer_content_invalid");
       }
-      if (question.answerRegex) {
+      const configuredValidationType = question.config?.validationType ??
+        (question.answerRegex ? "regex" : undefined);
+      const validationType = configuredValidationType === "text"
+        ? question.config?.validationTextType ?? "length"
+        : configuredValidationType;
+      const validationOperator =
+        validationType === "length" && question.config?.validationOperator === "min"
+          ? "min_length"
+          : validationType === "length" && question.config?.validationOperator === "max"
+            ? "max_length"
+            : question.config?.validationOperator;
+      if (validationType === "regex" && question.answerRegex) {
         try {
           if (!new RegExp(question.answerRegex).test(content.text)) {
-            throw new BadRequestException("answer_regex_mismatch");
+            throw validationError(question, "answer_regex_mismatch");
           }
         } catch (error) {
           if (error instanceof BadRequestException) throw error;
           throw new BadRequestException("answer_regex_invalid");
+        }
+      }
+      if (validationType === "length" && !passesNumericValidation(
+        content.text.length,
+        validationOperator,
+        question.config?.validationValue,
+      )) {
+        throw validationError(question);
+      }
+      if (validationType === "number") {
+        const numericValue = Number(content.text.trim());
+        if (!passesNumericValidation(
+          numericValue,
+          validationOperator,
+          question.config?.validationValue,
+          question.config?.validationValueMax,
+        )) {
+          throw validationError(question);
         }
       }
       break;
@@ -116,6 +236,16 @@ function validateAnswerContent(
         hasDuplicateValues(content.values as string[])
       ) {
         throw new BadRequestException("answer_option_invalid");
+      }
+      if (
+        question.config?.validationType === "checkbox_count" &&
+        !passesNumericValidation(
+          (content.values as string[]).length,
+          question.config.validationOperator,
+          question.config.validationValue,
+        )
+      ) {
+        throw validationError(question);
       }
       break;
     }
@@ -179,13 +309,27 @@ function validateAnswerContent(
       break;
     }
     case "date": {
-      if (typeof content.date !== "string" || !isValidDateOnly(content.date)) {
+      const dateValue = content.date;
+      const isValid =
+        typeof dateValue === "string" &&
+        (question.config?.dateIncludeTime
+          ? isValidDatetimeLocal(dateValue)
+          : question.config?.dateIncludeYear === false
+            ? isValidYearlessDate(dateValue)
+            : isValidDateOnly(dateValue));
+      if (!isValid) {
         throw new BadRequestException("answer_content_invalid");
       }
       break;
     }
     case "time": {
-      if (typeof content.time !== "string" || !TIME_PATTERN.test(content.time)) {
+      const timeValue = content.time;
+      const isValid =
+        typeof timeValue === "string" &&
+        (question.config?.timeAnswerType === "duration"
+          ? DURATION_PATTERN.test(timeValue)
+          : TIME_PATTERN.test(timeValue));
+      if (!isValid) {
         throw new BadRequestException("answer_content_invalid");
       }
       break;
