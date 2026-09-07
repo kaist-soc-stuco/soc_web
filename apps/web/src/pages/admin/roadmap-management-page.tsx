@@ -100,12 +100,8 @@ interface CourseForm {
 
 interface OfferingForm {
   term: string;
-  courseCode: string;
-  currentCode: string;
-  nameKo: string;
   section: string;
   instructor: string;
-  credits: string;
   time: string;
   room: string;
   capacity: string;
@@ -426,13 +422,18 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
   };
 
   const saveOffering = async () => {
-    if (!offeringDraft || !offeringDraft.term || !offeringDraft.currentCode || !offeringDraft.nameKo) {
-      toast({ type: "error", message: "학기·현재 코드·과목명을 입력해 주세요." });
+    const master = {
+      courseCode: course?.courseCode ?? form.courseCode.trim(),
+      nameKo: course?.nameKo ?? form.nameKo.trim(),
+      credits: course?.credits ?? form.credits.trim(),
+    };
+    if (!offeringDraft || !offeringDraft.term || !master.courseCode || !master.nameKo) {
+      toast({ type: "error", message: "기본 정보(마스터)를 먼저 저장해 주세요." });
       return;
     }
     setSaving(true);
     try {
-      const payload = offeringToRequest(offeringDraft);
+      const payload = offeringToRequest(offeringDraft, master);
       if (selectedOfferingId) await apiClient.updateRoadmapOffering(selectedOfferingId, payload);
       else await apiClient.createRoadmapOffering(payload);
       toast({ type: "success", message: "개설 정보를 저장했습니다." });
@@ -468,7 +469,7 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
         <button type="button" role="tab" aria-selected={tab === "master"} onClick={() => setTab("master")} className={cn("flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "master" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>기본 정보 (마스터)</button>
         <button type="button" role="tab" aria-selected={tab === "offerings"} onClick={() => setTab("offerings")} className={cn("flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>학기별 개설 ({offerings.length})</button>
       </div>
-      {tab === "master" ? <MasterCourseForm form={form} onChange={setForm} courseCodeEditable={isNew} /> : <OfferingEditor defaultTerm={selectedTerm} draft={offeringDraft} onDraftChange={setOfferingDraft} onNew={(term) => { setSelectedOfferingId(null); setOfferingDraft(blankOffering(course?.courseCode ?? form.courseCode, term)); }} offerings={offerings} onSelect={(offering) => { setSelectedOfferingId(offering.offeringId); setOfferingDraft(offeringToForm(offering)); }} onSave={() => void saveOffering()} onDelete={() => void removeOffering()} saving={saving} />}
+      {tab === "master" ? <MasterCourseForm form={form} onChange={setForm} courseCodeEditable={isNew} /> : <OfferingEditor defaultTerm={selectedTerm} draft={offeringDraft} onDraftChange={setOfferingDraft} onNew={(term) => { setSelectedOfferingId(null); setOfferingDraft(blankOffering(term)); }} offerings={offerings} onSelect={(offering) => { setSelectedOfferingId(offering.offeringId); setOfferingDraft(offeringToForm(offering)); }} onSave={() => void saveOffering()} onDelete={() => void removeOffering()} saving={saving} />}
     </Modal>
   );
 }
@@ -548,12 +549,12 @@ function OfferingEditor({
             onChange={setOfferingTerm}
             className="w-36"
           />
-          <Button type="button" size="sm" variant="outline" onClick={() => onNew(offeringTerm)}>
+          <Button type="button" size="sm" variant="outline" onClick={() => onNew(offeringTerm || offeringTerms[0] || defaultTerm)}>
             <Plus aria-hidden="true" /> 분반 추가
           </Button>
         </div>
       </div>
-      <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+      <div className="scrollbar-hidden max-h-72 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-200">
         {visibleOfferings.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-slate-500">등록된 개설 정보가 없습니다.</p>
         ) : (
@@ -583,15 +584,21 @@ function OfferingEditor({
       {draft ? (
         <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
           <div className="grid gap-4 sm:grid-cols-3">
-            <AdminFormField label="학기 *"><UiInput value={draft.term} onChange={(event) => set("term", event.currentTarget.value)} placeholder="2026-fall" /></AdminFormField>
-            <AdminFormField label="신 코드 *"><UiInput value={draft.currentCode} onChange={(event) => set("currentCode", event.currentTarget.value)} /></AdminFormField>
+            <AdminFormField label="학기 *">
+              <AdminSelectDropdown
+                ariaLabel="수동 개설 학기"
+                value={draft.term}
+                options={[...new Set([draft.term, ...offeringTerms])]
+                  .filter(Boolean)
+                  .map((term) => ({ value: term, label: formatTerm(term) }))}
+                onChange={(value) => set("term", value)}
+              />
+            </AdminFormField>
             <AdminFormField label="분반"><UiInput value={draft.section} onChange={(event) => set("section", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="과목명 *" className="sm:col-span-2"><UiInput value={draft.nameKo} onChange={(event) => set("nameKo", event.currentTarget.value)} /></AdminFormField>
             <AdminFormField label="담당교수"><UiInput value={draft.instructor} onChange={(event) => set("instructor", event.currentTarget.value)} /></AdminFormField>
             <AdminFormField label="강의시간"><UiTextarea className="min-h-20" value={draft.time} onChange={(event) => set("time", event.currentTarget.value)} /></AdminFormField>
             <AdminFormField label="강의실"><UiTextarea className="min-h-20" value={draft.room} onChange={(event) => set("room", event.currentTarget.value)} /></AdminFormField>
             <AdminFormField label="강의 방식"><UiInput value={draft.delivery} onChange={(event) => set("delivery", event.currentTarget.value)} /></AdminFormField>
-            <AdminFormField label="강·실·학"><UiInput value={draft.credits} onChange={(event) => set("credits", event.currentTarget.value)} /></AdminFormField>
             <AdminFormField label="정원"><UiInput type="number" value={draft.capacity} onChange={(event) => set("capacity", event.currentTarget.value)} /></AdminFormField>
             <AdminFormField label="수강인원"><UiInput type="number" value={draft.enrolled} onChange={(event) => set("enrolled", event.currentTarget.value)} /></AdminFormField>
           </div>
@@ -622,9 +629,9 @@ function Stat({ label, value }: { label: string; value: string }) { return <div 
 
 function courseToForm(course: RoadmapCourseRecord): CourseForm { return { courseCode: course.courseCode, legacyCourseCode: course.legacyCourseCode ?? "", nameKo: course.nameKo, nameEn: course.nameEn, category: course.category, credits: course.credits, semesters: course.semesters, trackIds: course.trackIds, ai: course.ai, isVisible: course.isVisible, prerequisiteCourseCodes: course.prerequisiteCourseCodes.join(", ") }; }
 function splitCodes(value: string): string[] { return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))]; }
-function blankOffering(courseCode: string, term: string): OfferingForm { return { term, courseCode, currentCode: "", nameKo: "", section: "", instructor: "", credits: "", time: "", room: "", capacity: "", enrolled: "", delivery: "", inEnglish: false }; }
-function offeringToForm(offering: RoadmapOfferingRecord): OfferingForm & { offeringId?: string } { return { offeringId: offering.offeringId, term: offering.term, courseCode: offering.courseCode, currentCode: offering.currentCode, nameKo: offering.nameKo, section: offering.section ?? "", instructor: offering.instructor ?? "", credits: offering.credits ?? "", time: offering.time ?? "", room: offering.room ?? "", capacity: offering.capacity === null ? "" : String(offering.capacity), enrolled: offering.enrolled === null ? "" : String(offering.enrolled), delivery: offering.delivery ?? "", inEnglish: offering.inEnglish }; }
-function offeringToRequest(form: OfferingForm): CreateRoadmapOfferingRequest { return { term: form.term.trim(), courseCode: form.courseCode.trim(), currentCode: form.currentCode.trim(), nameKo: form.nameKo.trim(), section: form.section.trim() || null, instructor: form.instructor.trim() || null, credits: form.credits.trim() || null, time: form.time.trim() || null, room: form.room.trim() || null, capacity: form.capacity.trim() ? Number(form.capacity) : null, enrolled: form.enrolled.trim() ? Number(form.enrolled) : null, delivery: form.delivery.trim() || null, inEnglish: form.inEnglish }; }
+function blankOffering(term: string): OfferingForm { return { term, section: "", instructor: "", time: "", room: "", capacity: "", enrolled: "", delivery: "", inEnglish: false }; }
+function offeringToForm(offering: RoadmapOfferingRecord): OfferingForm & { offeringId?: string } { return { offeringId: offering.offeringId, term: offering.term, section: offering.section ?? "", instructor: offering.instructor ?? "", time: offering.time ?? "", room: offering.room ?? "", capacity: offering.capacity === null ? "" : String(offering.capacity), enrolled: offering.enrolled === null ? "" : String(offering.enrolled), delivery: offering.delivery ?? "", inEnglish: offering.inEnglish }; }
+function offeringToRequest(form: OfferingForm, master: { courseCode: string; nameKo: string; credits: string }): CreateRoadmapOfferingRequest { return { term: form.term.trim(), courseCode: master.courseCode.trim(), currentCode: master.courseCode.trim(), nameKo: master.nameKo.trim(), section: form.section.trim() || null, instructor: form.instructor.trim() || null, credits: master.credits.trim() || null, time: form.time.trim() || null, room: form.room.trim() || null, capacity: form.capacity.trim() ? Number(form.capacity) : null, enrolled: form.enrolled.trim() ? Number(form.enrolled) : null, delivery: form.delivery.trim() || null, inEnglish: form.inEnglish }; }
 function makeCourseFromOffering(offering: RoadmapOfferingRecord): RoadmapCourseRecord { return { courseId: `offering-${offering.courseCode}`, courseCode: offering.courseCode, legacyCourseCode: null, nameKo: offering.nameKo, nameEn: "", category: "major-elective", credits: offering.credits ?? "", semesters: offering.term.endsWith("-spring") ? "S" : "F", trackIds: [], ai: false, isVisible: true, source: "IMPORT", prerequisiteCourseCodes: [], postrequisiteCourseCodes: [], createdAt: offering.importedAt, updatedAt: offering.importedAt }; }
 function formatEnrollment(enrolled: number | null, capacity: number | null): string {
   if (enrolled === null && capacity === null) return "";

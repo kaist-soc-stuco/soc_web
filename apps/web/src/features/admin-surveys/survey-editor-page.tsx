@@ -159,6 +159,29 @@ const emptyQuestion = (): QuestionFormState => ({
   config: null,
 });
 
+const questionToFormState = (question: SurveyQuestionRecord): QuestionFormState => ({
+  titleKo: question.titleKo,
+  titleEn: question.titleEn ?? "",
+  descriptionKo: question.descriptionKo ?? "",
+  descriptionEn: question.descriptionEn ?? "",
+  questionType: question.questionType,
+  options: (question.options ?? []).map((option) => ({
+    value: option.value,
+    labelKo: option.labelKo,
+    labelEn: option.labelEn ?? "",
+    imageUrlKo: option.imageUrlKo ?? null,
+    imageUrlEn: option.imageUrlEn ?? null,
+  })),
+  answerRegex: question.answerRegex ?? "",
+  answerValidationEnabled: Boolean(
+    question.answerRegex?.trim() ||
+      question.config?.validationErrorMessage?.trim() ||
+      question.config?.validationType,
+  ),
+  isRequired: question.isRequired ?? true,
+  config: question.config,
+});
+
 const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
 
 const getErrorMessage = (err: unknown, fallback: string) =>
@@ -286,7 +309,7 @@ function QuestionRowContent({
 }: QuestionRowContentProps) {
   return (
     <div className="min-w-0">
-      <div className="flex min-w-0 items-start justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-1">
         <span className="min-w-0 truncate text-sm font-semibold text-slate-900">
           {question.titleKo || "질문"}
         </span>
@@ -912,28 +935,7 @@ export function SurveyEditorPage() {
     setEditingQuestion({
       sectionId,
       questionId: q.id,
-      initial: {
-        titleKo: q.titleKo,
-        titleEn: q.titleEn ?? "",
-        descriptionKo: q.descriptionKo ?? "",
-        descriptionEn: q.descriptionEn ?? "",
-        questionType: q.questionType,
-        options: (q.options ?? []).map((opt) => ({
-          value: opt.value,
-          labelKo: opt.labelKo,
-          labelEn: opt.labelEn ?? "",
-          imageUrlKo: opt.imageUrlKo ?? null,
-          imageUrlEn: opt.imageUrlEn ?? null,
-        })),
-        answerRegex: q.answerRegex ?? "",
-        answerValidationEnabled: Boolean(
-          q.answerRegex?.trim() ||
-            q.config?.validationErrorMessage?.trim() ||
-            q.config?.validationType,
-        ),
-        isRequired: q.isRequired ?? true,
-        config: q.config,
-      },
+      initial: questionToFormState(q),
     });
   };
 
@@ -963,6 +965,12 @@ export function SurveyEditorPage() {
         ? qForm.answerRegex.trim() || undefined
         : undefined,
       isRequired: qForm.isRequired,
+      ...(questionId
+        ? {}
+        : {
+            sortOrder:
+              sections.find((section) => section.id === sectionId)?.questions.length ?? 0,
+          }),
     };
 
     try {
@@ -984,10 +992,13 @@ export function SurveyEditorPage() {
     if (!loadedSurveyId) return;
     setError(null);
 
+    const sourceSection = sections.find((section) => section.id === sectionId);
+    const sourceIndex = sourceSection?.questions.findIndex((item) => item.id === question.id) ?? -1;
+
     try {
-      await client.createQuestion(loadedSurveyId, sectionId, {
-        titleKo: `${question.titleKo} (복사본)`,
-        titleEn: question.titleEn ? `${question.titleEn} (Copy)` : undefined,
+      const duplicated = await client.createQuestion(loadedSurveyId, sectionId, {
+        titleKo: question.titleKo,
+        titleEn: question.titleEn ?? undefined,
         descriptionKo: question.descriptionKo ?? "",
         descriptionEn: question.descriptionEn ?? "",
         questionType: question.questionType,
@@ -1004,9 +1015,31 @@ export function SurveyEditorPage() {
           : undefined,
         answerRegex: question.answerRegex ?? undefined,
         isRequired: question.isRequired,
+        sortOrder: Math.max(0, question.sortOrder + 1),
       });
       const updated = await client.getSurveyDetail(loadedSurveyId);
-      setSections(updated.sections);
+      const duplicatedSection = updated.sections.find((section) => section.id === sectionId);
+      if (!duplicatedSection) throw new Error("복제할 섹션을 찾을 수 없습니다.");
+
+      const questions = duplicatedSection.questions.filter((item) => item.id !== duplicated.id);
+      const insertIndex = sourceIndex >= 0
+        ? Math.min(sourceIndex + 1, questions.length)
+        : questions.length;
+      questions.splice(insertIndex, 0, duplicated);
+      const reordered = await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {
+        items: questions.map((item, sortOrder) => ({ id: item.id, sortOrder })),
+      });
+      const orderedQuestions = [...reordered].sort(
+        (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
+      );
+      setSections(updated.sections.map((section) =>
+        section.id === sectionId ? { ...section, questions: orderedQuestions } : section,
+      ));
+      setEditingQuestion({
+        sectionId,
+        questionId: duplicated.id,
+        initial: questionToFormState(duplicated),
+      });
       toast({ type: "success", message: "문항이 복제되었습니다." });
     } catch (err: unknown) {
       console.error(err);
@@ -1311,7 +1344,7 @@ export function SurveyEditorPage() {
             onChange={(value) => void handleTabChange(value)}
             options={[
               { value: "settings", label: "기본 정보" },
-              { value: "content", label: `문항 구성${sections.length ? ` · ${sections.reduce((count, section) => count + section.questions.length, 0)}` : ""}` },
+              { value: "content", label: `문항 구성${sections.length ? ` (${sections.reduce((count, section) => count + section.questions.length, 0)})` : ""}` },
               { value: "delivery", label: "설정" },
             ]}
           />
@@ -1416,8 +1449,9 @@ export function SurveyEditorPage() {
                                     isEditing={isEditing}
                                     editor={
                                       isEditing
-                                        ? (dragHandle) => (
+                                          ? (dragHandle) => (
                                             <QuestionInlineEditor
+                                              key={question.id}
                                               initial={editingQuestion.initial}
                                               isKoreanOnly={isKoreanOnly}
                                               isOngoing={isOngoing}
@@ -1441,6 +1475,7 @@ export function SurveyEditorPage() {
                             </SortableContext>
                             {editingQuestion?.sectionId === section.id && !editingQuestion.questionId ? (
                               <QuestionInlineEditor
+                                key={`${section.id}-new`}
                                 initial={editingQuestion.initial}
                                 isKoreanOnly={isKoreanOnly}
                                 isOngoing={isOngoing}

@@ -74,7 +74,13 @@ const QUESTION_TYPES: Array<{
   { value: "grid_multiple", label: "체크박스 그리드", icon: Grid3X3 },
   { value: "date", label: "날짜", icon: CalendarDays, separatorBefore: true },
   { value: "time", label: "시간", icon: Clock3 },
+  { value: "datetime", label: "날짜+시간", icon: CalendarDays },
 ];
+
+const normalizeQuestionType = (value: unknown): QuestionType =>
+  QUESTION_TYPES.some((option) => option.value === value)
+    ? (value as QuestionType)
+    : "short_text";
 
 type ValidationType = NonNullable<SurveyQuestionConfig["validationType"]>;
 type ValidationOperator = NonNullable<SurveyQuestionConfig["validationOperator"]>;
@@ -211,12 +217,14 @@ function CompactImagePicker({
   onChange,
   disabled,
   onError,
+  hideWhenValue = false,
 }: {
   label: string;
   value?: string | null;
   onChange: (value: string | null) => void;
   disabled?: boolean;
   onError?: (message: string) => void;
+  hideWhenValue?: boolean;
 }) {
   const client = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -242,7 +250,7 @@ function CompactImagePicker({
     }
   };
 
-  if (value) return null;
+  if (value && hideWhenValue) return null;
 
   return (
     <div className="relative flex shrink-0 items-center gap-1">
@@ -413,17 +421,20 @@ function SortableOptionRow({
             onChange={(event) => onUpdateOption(index, "labelEn", event.target.value)}
           />
         </div>
-        {!optionImage ? (
-          <div className="pointer-events-none shrink-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+          {!optionImage ? (
+            <div className="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
               <CompactImagePicker
                 label="선택지 이미지"
                 value={null}
                 onChange={(value) => onUpdateOptionImage(index, value)}
                 disabled={isOngoing}
                 onError={onError}
+                hideWhenValue
               />
-          </div>
-        ) : null}
+            </div>
+          ) : null}
+        </div>
         {!isOngoing && optionCount > 1 ? (
           <IconButton
             type="button"
@@ -481,6 +492,7 @@ export function QuestionInlineEditor({
   const { toast } = useToast();
   const [form, setForm] = useState<QuestionFormState>(() => ({
     ...initial,
+    questionType: normalizeQuestionType(initial.questionType),
     config: isGridQuestionType(initial.questionType)
       ? normalizeGridConfig(initial.config)
       : initial.config,
@@ -950,28 +962,31 @@ export function QuestionInlineEditor({
       if (!trigger || !menu) return;
 
       const viewportPadding = 8;
+      const gap = 8;
       const triggerRect = trigger.getBoundingClientRect();
       const naturalHeight = menu.scrollHeight;
-      const naturalWidth = menu.scrollWidth;
+      const naturalWidth = Math.max(menu.scrollWidth, 240);
       const availableWidth = Math.max(
         1,
         window.innerWidth - viewportPadding * 2,
       );
       const menuWidth = Math.min(naturalWidth, availableWidth);
-      const preferredTop =
-        triggerRect.top + triggerRect.height / 2 - naturalHeight * 0.35;
-      const maxTop = Math.max(
-        viewportPadding,
-        window.innerHeight - naturalHeight - viewportPadding,
-      );
-      const top = Math.min(
-        Math.max(viewportPadding, preferredTop),
-        maxTop,
-      );
-      const left = Math.min(
-        Math.max(viewportPadding, triggerRect.right - menuWidth),
-        Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
-      );
+      const rightEdge = window.innerWidth - viewportPadding;
+      const preferredLeft = triggerRect.right + gap;
+      const left = preferredLeft + menuWidth <= rightEdge
+        ? preferredLeft
+        : Math.min(
+            Math.max(viewportPadding, triggerRect.right - menuWidth),
+            Math.max(viewportPadding, rightEdge - menuWidth),
+          );
+      const bottomEdge = window.innerHeight - viewportPadding;
+      const preferredTop = triggerRect.bottom + gap;
+      const top = preferredTop + naturalHeight <= bottomEdge
+        ? preferredTop
+        : Math.max(
+            viewportPadding,
+            triggerRect.top - naturalHeight - gap,
+          );
 
       setMoreMenuStyle({
         left,
@@ -1056,23 +1071,35 @@ export function QuestionInlineEditor({
 
       {showDescription ? (
         <div className="mt-2 grid min-w-0 gap-3 md:grid-cols-2">
-          <UiInput
-            aria-label="국문 설명"
-            className={`${titleInputCls} min-w-0`}
-            placeholder="설명"
-            value={form.descriptionKo}
-            disabled={isOngoing}
-            onChange={(event) => set("descriptionKo", event.target.value)}
-          />
-          {!isKoreanOnly ? (
+          <div className="question-editor-field group relative min-w-0">
             <UiInput
-              aria-label="영문 설명"
+              aria-label="국문 설명"
               className={`${titleInputCls} min-w-0`}
-              placeholder="Description"
-              value={form.descriptionEn}
+              placeholder="설명"
+              value={form.descriptionKo}
               disabled={isOngoing}
-              onChange={(event) => set("descriptionEn", event.target.value)}
+              onChange={(event) => set("descriptionKo", event.target.value)}
             />
+            <span
+              aria-hidden="true"
+              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
+            />
+          </div>
+          {!isKoreanOnly ? (
+            <div className="question-editor-field group relative min-w-0">
+              <UiInput
+                aria-label="영문 설명"
+                className={`${titleInputCls} min-w-0`}
+                placeholder="Description"
+                value={form.descriptionEn}
+                disabled={isOngoing}
+                onChange={(event) => set("descriptionEn", event.target.value)}
+              />
+              <span
+                aria-hidden="true"
+                className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
+              />
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -1436,7 +1463,7 @@ function QuestionMoreMenu({
       style={menuStyle}
       role="menu"
       aria-label="문항 옵션"
-      className="fixed z-[100] w-max max-w-[calc(100vw-1rem)] overflow-visible rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+      className="fixed z-[100] min-w-60 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
     >
       <MoreMenuItem
         label="설명"
