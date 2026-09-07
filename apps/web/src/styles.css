@@ -2233,6 +2233,10 @@
     scrollbar-width: none;
   }
 
+  .about-section-nav-mobile {
+    display: none;
+  }
+
   .about-section-nav-inner::-webkit-scrollbar {
     display: none;
   }
@@ -2944,13 +2948,17 @@
       justify-content: center;
     }
 
-    .about-section-nav a:first-child {
-      margin-left: -0.875rem;
+    .about-section-nav-inner {
+      display: none;
     }
 
-    .about-section-nav a::after {
-      right: 0.875rem;
-      left: 0.875rem;
+    .about-section-nav-mobile {
+      display: block;
+      padding-block: 0.5rem;
+    }
+
+    .about-section-nav-mobile select {
+      min-height: 2.75rem;
     }
 
     .about-landing-section {

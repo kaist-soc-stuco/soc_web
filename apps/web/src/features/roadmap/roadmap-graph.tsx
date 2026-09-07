@@ -681,7 +681,7 @@ export function RoadmapGraph({
                 aria-pressed={selected}
                 onClick={() => toggleTrack(track.id)}
                 className={cn(
-                  "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold",
+                  "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold",
                   selected
                     ? "border-slate-400 bg-slate-100 text-slate-950"
                     : "border-slate-200 bg-white text-slate-600",
@@ -722,7 +722,7 @@ export function RoadmapGraph({
                 {displayCodeByCourse.get(item.code) ?? item.code}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-slate-900">{item.name[lang]}</span>
+                <span className="block line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-900">{item.name[lang]}</span>
                 <span className="mt-1 block text-xs font-medium text-slate-400">
                   {CATEGORY_LABELS[item.category][lang]} · {item.semesters}
                 </span>
@@ -945,9 +945,9 @@ function RoadmapOfferingControls({
         options={termOptions}
         onChange={(value) => onTermChange(value as RoadmapOfferingTerm)}
         className="w-36 shrink-0"
-        buttonClassName="h-9 !min-h-9 text-xs"
+        buttonClassName="h-11 !min-h-11 text-xs"
       />
-      <label className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
+      <label className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900">
         <input
           type="checkbox"
           checked={offeredOnly}
@@ -1038,7 +1038,7 @@ function CourseDetails({
           aria-selected={activeTab === "overview"}
           onClick={() => setActiveTab("overview")}
           className={cn(
-            "min-h-8 rounded-md px-2 text-xs font-semibold transition-colors",
+            "min-h-11 rounded-md px-2 text-xs font-semibold transition-colors",
             activeTab === "overview" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
           )}
         >
@@ -1050,7 +1050,7 @@ function CourseDetails({
           aria-selected={activeTab === "offerings"}
           onClick={() => setActiveTab("offerings")}
           className={cn(
-            "min-h-8 rounded-md px-2 text-xs font-semibold transition-colors",
+            "min-h-11 rounded-md px-2 text-xs font-semibold transition-colors",
             activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
           )}
         >
@@ -1158,7 +1158,7 @@ function OfferingList({
           >
             <div className="space-y-1.5 text-[length:var(--ui-text-micro-size)]">
               <div className="flex min-w-0 items-baseline justify-between gap-3">
-                <p className="min-w-0 flex-1 break-keep font-semibold text-slate-800">
+                <p className="min-w-0 flex-1 break-words font-semibold text-slate-800">
                   {courseMeta}
                 </p>
                 {enrollment ? (
@@ -1217,13 +1217,13 @@ function RelationList({
               key={code}
               type="button"
               onClick={() => onCourseClick(code)}
-              className="flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-slate-100"
+              className="flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-slate-100"
             >
               <span className={cn("h-5 w-0.5 rounded-full", tone === "previous" ? "bg-amber-500" : "bg-sky-500")} />
               <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">
                 {displayCodeByCourse.get(code) ?? code}
               </span>
-              <span className="truncate text-xs font-medium text-slate-800">{item.name[lang]}</span>
+              <span className="min-w-0 flex-1 break-words text-xs font-medium text-slate-800">{item.name[lang]}</span>
             </button>
           ) : null;
         })}

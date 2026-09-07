@@ -268,7 +268,7 @@ export function LoginCallbackPage() {
           <Button variant="ghost"
             type="button"
             onClick={() => window.location.assign("/login")}
-            className="mt-5 rounded-lg bg-kaist-darkgreen px-4 py-2 text-xs font-semibold text-white"
+            className="mt-5 min-h-11 rounded-lg bg-kaist-darkgreen px-4 py-2 text-xs font-semibold text-white"
           >
             {lang === "ko" ? "다시 로그인" : "Try again"}
           </Button>
