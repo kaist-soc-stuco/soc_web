@@ -401,7 +401,7 @@ function useTiptapEditor({
     editorProps: {
       attributes: {
         class: cn(
-          `${editorMinHeight} text-[length:var(--ui-text-section-size)] leading-normal text-slate-800`,
+          `${editorMinHeight} text-[length:var(--ui-text-body-size)] leading-normal text-slate-800`,
           contentClassName,
         ),
         spellcheck: spellCheck ? "true" : "false",
@@ -613,6 +613,7 @@ function MoreFormattingMenu({
         align="start"
         sideOffset={6}
         collisionPadding={12}
+        data-rich-text-overlay="true"
         className="z-[200] min-w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
       >
       {[
@@ -751,7 +752,7 @@ function RichTextToolbar({
         }))}
         className="w-[96px]"
         buttonClassName="h-8 rounded-md border-slate-200 px-2.5 text-xs font-medium text-slate-700"
-        menuClassName="rounded-lg"
+        menuClassName="rounded-lg rich-text-editor-menu"
         optionClassName="text-xs"
       />
 
@@ -895,6 +896,7 @@ function RichTextToolbar({
               align="start"
               sideOffset={6}
               collisionPadding={12}
+              data-rich-text-overlay="true"
               className="z-[200] min-w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_32px_rgb(15_23_42_/_0.14)]"
             >
               {variableMenuOptions.map((option) => (
