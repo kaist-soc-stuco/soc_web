@@ -370,7 +370,7 @@ function CalendarManagementContent() {
 
   return (
     <AdminPageShell>
-      <AdminPageMain>
+      <AdminPageMain className="admin-calendar-management">
         <AdminPageHeader
           title="일정 관리"
           actions={(
@@ -503,7 +503,7 @@ function CalendarManagementContent() {
           {!eventsQuery.data && eventsQuery.isPending ? null : eventsQuery.isError ? (
             <div className="px-5 py-16 text-center text-sm font-normal text-rose-600">일정을 불러오지 못했습니다.</div>
           ) : (
-            <AdminDataTable minWidth={760}>
+            <AdminDataTable minWidth={760} mobileMode="cards">
               <colgroup>
                 <col />
                 <col style={{ width: 120 }} />
@@ -538,9 +538,9 @@ function CalendarManagementContent() {
                         <p className="mt-1 truncate text-xs font-normal text-rose-600">Google 동기화 확인 필요</p>
                       ) : null}
                     </AdminTableCell>
-                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{categoryLabel[event.category]}</span></AdminTableCell>
-                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{event.sourceType === "ARTICLE" ? "행사 게시글" : event.sourceType === "KAIST_ACADEMIC" ? "KAIST 학사일정" : "학생회 일정"}</span></AdminTableCell>
-                    <AdminTableCell><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{formatPeriod(event)}</span></AdminTableCell>
+                    <AdminTableCell data-mobile-label="분류"><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{categoryLabel[event.category]}</span></AdminTableCell>
+                    <AdminTableCell data-mobile-label="출처"><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{event.sourceType === "ARTICLE" ? "행사 게시글" : event.sourceType === "KAIST_ACADEMIC" ? "KAIST 학사일정" : "학생회 일정"}</span></AdminTableCell>
+                    <AdminTableCell data-mobile-label="기간"><span className="text-[length:var(--ui-text-body-size)] font-normal text-[var(--ui-text-body)]">{formatPeriod(event)}</span></AdminTableCell>
                   </tr>
                 ))}
               </AdminTableBody>

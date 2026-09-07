@@ -5,17 +5,18 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, GripVertical, ImageUp, LayoutTemplate, Link2, Megaphone, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, GripVertical, ImageUp, LayoutTemplate, Link2, Megaphone, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminCard, AdminCardHeader, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle, AdminStickyActionBar, AdminToolbarGroup } from "@/components/ui/admin-page";
+import { AdminCard, AdminCardHeader, AdminEditorGuidance, AdminFormField, AdminMetaText, AdminPageHeader, AdminPageMain, AdminPageShell, AdminSectionTitle, AdminStickyActionBar, AdminToolbarGroup } from "@/components/ui/admin-page";
 import { AdminStatusBadge } from "@/components/ui/admin-status-badge";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { ImageCropModal } from "@/components/ui/image-crop-modal";
+import { IconButton } from "@/components/ui/icon-button";
 import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { SITE_CONTENT_DEFINITIONS, SITE_CONTENT_QUERY_KEY } from "@/features/site-content/site-content";
@@ -232,14 +233,7 @@ function SiteContentPageContent() {
     });
   };
 
-  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
-    if (!over || active.id === over.id || isDirty || saving || orderSaving) return;
-    const categoryBlocks = blocks.filter((block) => categoryMeta[category].types.includes(block.type));
-    const oldIndex = categoryBlocks.findIndex((block) => block.contentBlockId === active.id);
-    const newIndex = categoryBlocks.findIndex((block) => block.contentBlockId === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const previous = blocks;
-    const reorderedCategory = arrayMove(categoryBlocks, oldIndex, newIndex).map((block, sortOrder) => ({ ...block, sortOrder }));
+  const persistBlockOrder = async (reorderedCategory: ContentBlockRecord[], previous: ContentBlockRecord[]) => {
     const reorderedById = new Map(reorderedCategory.map((block) => [block.contentBlockId, block]));
     const reordered = blocks.map((block) => reorderedById.get(block.contentBlockId) ?? block);
     setOrderedBlocks(reordered);
@@ -256,6 +250,28 @@ function SiteContentPageContent() {
     } finally {
       setOrderSaving(false);
     }
+  };
+
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id || isDirty || saving || orderSaving) return;
+    const categoryBlocks = blocks.filter((block) => categoryMeta[category].types.includes(block.type));
+    const oldIndex = categoryBlocks.findIndex((block) => block.contentBlockId === active.id);
+    const newIndex = categoryBlocks.findIndex((block) => block.contentBlockId === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    await persistBlockOrder(
+      arrayMove(categoryBlocks, oldIndex, newIndex).map((block, sortOrder) => ({ ...block, sortOrder })),
+      blocks,
+    );
+  };
+
+  const moveBlock = async (index: number, direction: -1 | 1) => {
+    if (isDirty || saving || orderSaving) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= filteredBlocks.length) return;
+    await persistBlockOrder(
+      arrayMove(filteredBlocks, index, targetIndex).map((block, sortOrder) => ({ ...block, sortOrder })),
+      blocks,
+    );
   };
 
   const selectBlock = async (block: ContentBlockRecord) => {
@@ -337,11 +353,15 @@ function SiteContentPageContent() {
 
   return <AdminPageShell>
     {ConfirmDialog}
-    <AdminPageMain className="max-w-[var(--ui-admin-page-max-width)]">
+    <AdminPageMain className="admin-site-content max-w-[var(--ui-admin-page-max-width)]">
       <AdminPageHeader
         title="사이트 설정"
         actions={canCreateCategory ? <Button type="button" onClick={() => { setCreateDraft(draftForCategory(category)); setCreateOpen(true); }}><Plus aria-hidden="true" /> {categoryMeta[category].createLabel}</Button> : undefined}
       />
+
+      <AdminEditorGuidance>
+        <p>복잡한 콘텐츠 편집과 정렬은 데스크톱에서 계속하는 것을 권장합니다. 모바일에서 입력 중이라면 저장하기 전 페이지를 이동하지 마세요.</p>
+      </AdminEditorGuidance>
 
       {error ? <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
 
@@ -349,22 +369,22 @@ function SiteContentPageContent() {
         ariaLabel="사이트 설정 영역"
         value={category}
         onChange={(value) => void changeCategory(value as ContentCategory)}
-        className="clean-segmented-control w-fit"
+        className="clean-segmented-control w-fit max-w-full overflow-x-auto"
         options={Object.entries(categoryMeta).map(([value, meta]) => ({ value, label: meta.label }))}
       />
 
       {category === "COPY" ? <SiteCopyEditor apiClient={apiClient} /> : <div className="grid min-h-[680px] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <AdminCard className="self-start xl:sticky xl:top-6">
+        <AdminCard className="admin-site-content__list self-start xl:sticky xl:top-6">
           <AdminCardHeader><div><AdminSectionTitle>{categoryMeta[category].label}</AdminSectionTitle><AdminMetaText>{filteredBlocks.length}개 표시</AdminMetaText></div></AdminCardHeader>
-          <div className="scrollbar-hidden max-h-[680px] overflow-y-auto p-2">
+          <div className="scrollbar-hidden max-h-none overflow-y-visible p-2 sm:max-h-[680px] sm:overflow-y-auto">
             {blocksQuery.isLoading && !blocksQuery.data ? null
               : filteredBlocks.length === 0 ? <div className="px-4 py-16 text-center"><LayoutTemplate aria-hidden="true" className="mx-auto mb-3 size-8 text-slate-300" /><p className="text-sm font-medium text-slate-600">조건에 맞는 콘텐츠가 없습니다.</p></div>
-              : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block) => <SortableContentBlockItem key={block.contentBlockId} block={block} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
+              : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void handleDragEnd(event)}><SortableContext items={filteredBlocks.map((block) => block.contentBlockId)} strategy={verticalListSortingStrategy}><div className="grid gap-1">{filteredBlocks.map((block, index) => <SortableContentBlockItem key={block.contentBlockId} block={block} index={index} itemCount={filteredBlocks.length} selected={block.contentBlockId === selectedId} disabled={isDirty || saving || orderSaving} sortable={!categoryMeta[category].singleton} onMove={(direction) => void moveBlock(index, direction)} onSelect={() => void selectBlock(block)} />)}</div></SortableContext></DndContext>}
             {orderSaving ? <p className="px-3 pb-3 pt-2 text-xs font-normal text-[#344054]">노출 순서를 저장하는 중입니다.</p> : null}
           </div>
         </AdminCard>
 
-        {selectedBlock ? <div className="min-w-0 space-y-4">
+        {selectedBlock ? <div className="admin-site-content__editor min-w-0 space-y-4">
           <AdminCard>
             <AdminCardHeader className="min-h-[72px] px-5 py-4">
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><AdminSectionTitle className="truncate">{selectedBlock.titleKo}</AdminSectionTitle><AdminStatusBadge tone={statusMeta[selectedBlock.status].tone}>{statusMeta[selectedBlock.status].label}</AdminStatusBadge></div></div>
@@ -372,7 +392,7 @@ function SiteContentPageContent() {
                 <Button type="button" variant="ghost" size="sm" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteBlock()} disabled={saving}><Trash2 aria-hidden="true" /> 삭제</Button>
               </AdminToolbarGroup>
             </AdminCardHeader>
-            <div className="grid gap-5 p-5">
+            <div className="grid gap-5 p-4 sm:p-5">
               {!isImageOnlyType(draft.type) ? <div className="grid gap-4 lg:grid-cols-2">
                 <AdminFormField label="한국어 제목"><UiInput value={draft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, titleKo: value })); }} /></AdminFormField>
                 <AdminFormField label="영문 제목"><UiInput value={draft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField>
@@ -389,10 +409,10 @@ function SiteContentPageContent() {
 
           <AdminCard>
             <AdminCardHeader><div><AdminSectionTitle>미리보기</AdminSectionTitle><AdminMetaText>한국어 공개 화면 기준</AdminMetaText></div>{draft.linkUrl ? <a href={draft.linkUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-brand-primary hover:underline">링크 열기 <ExternalLink aria-hidden="true" className="size-3.5" /></a> : null}</AdminCardHeader>
-            <div className="p-5"><ContentBlockPreview draft={draft} /></div>
+            <div className="p-4 sm:p-5"><ContentBlockPreview draft={draft} /></div>
           </AdminCard>
 
-          <AdminStickyActionBar>
+          <AdminStickyActionBar className="admin-site-content__action-bar">
             <div><p className="text-sm font-medium text-slate-800">{isDirty ? "저장하지 않은 변경 사항이 있습니다." : `마지막 수정 ${formatDateTime(selectedBlock.updatedAt)}`}</p></div>
             <AdminToolbarGroup><Button type="button" variant="outline" onClick={() => setDraft(draftFromBlock(selectedBlock))} disabled={!isDirty || saving}>되돌리기</Button><Button type="button" onClick={() => void applyBlock()} disabled={saving || imageUploading || (!isDirty && selectedBlock.status === "PUBLISHED") || !draft.titleKo.trim() || (isImageOnlyType(draft.type) && !draft.imageUrl.trim())}>{saving ? "적용 중" : "변경 적용"}</Button></AdminToolbarGroup>
           </AdminStickyActionBar>
@@ -400,7 +420,7 @@ function SiteContentPageContent() {
       </div>}
     </AdminPageMain>
 
-    <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={categoryMeta[category].createLabel} className="max-w-xl" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{saving ? "등록 중" : "등록"}</Button></>}>
+    <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={categoryMeta[category].createLabel} mobileFullscreen className="max-w-xl" bodyClassName="space-y-4 px-4 py-5 sm:px-5" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createBlock()} disabled={saving || imageUploading || !createDraft.titleKo.trim() || (isImageOnlyType(createDraft.type) && !createDraft.imageUrl.trim())}>{saving ? "등록 중" : "등록"}</Button></>}>
       <div className="grid gap-4">
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="한국어 제목"><UiInput value={createDraft.titleKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleKo: value })); }} placeholder="공개 화면에 표시할 제목" /></AdminFormField> : null}
         {!isImageOnlyType(createDraft.type) ? <AdminFormField label="영문 제목"><UiInput value={createDraft.titleEn} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, titleEn: value })); }} /></AdminFormField> : null}
@@ -566,7 +586,7 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
       {label ? <p className="text-sm font-medium text-slate-700">{label}</p> : null}
       {slotValue ? <div className={cn("overflow-hidden rounded-lg", previewBorderless ? "bg-white" : "border border-[#e5e9ec] bg-slate-50")}><img src={resolveAssetUrl(slotValue)} alt="" className={cn("block h-36 w-full object-contain", previewBorderless && "h-auto max-h-[420px]")} /></div> : null}
       <div className="flex flex-wrap gap-2">
-        <label className={cn("inline-flex h-[var(--ui-control-height)] cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-[length:var(--ui-control-font-size)] font-normal text-[#172033] transition-colors hover:bg-slate-50", uploading && "pointer-events-none opacity-60")}>
+        <label className={cn("inline-flex min-h-[var(--ui-control-height-mobile)] cursor-pointer items-center justify-center gap-2 rounded-[var(--ui-control-radius)] border border-[var(--ui-border-subtle)] bg-white px-3 text-[length:var(--ui-control-font-size)] font-normal text-[#172033] transition-colors hover:bg-slate-50", uploading && "pointer-events-none opacity-60")}>
           <ImageUp aria-hidden="true" className="size-4" />
           {uploading ? "업로드 중" : slotValue ? "이미지 교체" : "이미지 선택"}
           <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) select(file); }} />
@@ -585,15 +605,23 @@ function ContentImageInput({ onRemove, onSecondaryRemove, onSecondarySelect, onS
   </AdminFormField>;
 }
 
-function SortableContentBlockItem({ block, disabled, onSelect, selected, sortable }: { block: ContentBlockRecord; disabled: boolean; onSelect: () => void; selected: boolean; sortable: boolean }) {
+function SortableContentBlockItem({ block, disabled, index, itemCount, onMove, onSelect, selected, sortable }: { block: ContentBlockRecord; disabled: boolean; index: number; itemCount: number; onMove: (direction: -1 | 1) => void; onSelect: () => void; selected: boolean; sortable: boolean }) {
   const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: block.contentBlockId, disabled: disabled || !sortable });
   const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
   const displayStatus = statusMeta[effectiveStatus(block)];
   return <div ref={setNodeRef} style={style} className={cn("group flex min-w-0 w-full select-none items-stretch overflow-hidden rounded-lg", selected ? "bg-emerald-50" : "hover:bg-slate-50", isDragging && "z-10 opacity-40")}>
     {sortable ? <button type="button" {...attributes} {...listeners} disabled={disabled} className="flex w-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-l-lg text-slate-400 hover:text-[#344054] disabled:cursor-default disabled:opacity-30 active:cursor-grabbing" aria-label={`${block.titleKo} 노출 순서 변경`} title={disabled ? "변경 사항을 적용한 뒤 순서를 바꿀 수 있습니다." : "드래그하여 노출 순서 변경"}><GripVertical aria-hidden="true" className="size-4" /></button> : null}
-    <button type="button" onClick={onSelect} className={cn("min-w-0 flex-1 overflow-hidden px-3 py-3 text-left", sortable ? "rounded-r-lg" : "rounded-lg")}>
+    <button type="button" onClick={onSelect} className={cn("min-w-0 flex-1 overflow-hidden px-3 py-3 text-left", sortable ? "rounded-none" : "rounded-lg")}>
       <span className="flex min-w-0 items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate text-sm font-normal text-[#172033]">{block.titleKo}</span><AdminStatusBadge className="shrink-0" tone={displayStatus.tone}>{displayStatus.label}</AdminStatusBadge></span>
     </button>
+    {sortable ? <div className="content-order-actions flex shrink-0 items-center gap-0.5 rounded-r-lg pr-1">
+      <IconButton type="button" size="sm" aria-label={`${block.titleKo} 위로 이동`} disabled={disabled || index === 0} onClick={() => onMove(-1)}>
+        <ChevronUp aria-hidden="true" className="size-4" />
+      </IconButton>
+      <IconButton type="button" size="sm" aria-label={`${block.titleKo} 아래로 이동`} disabled={disabled || index === itemCount - 1} onClick={() => onMove(1)}>
+        <ChevronDown aria-hidden="true" className="size-4" />
+      </IconButton>
+    </div> : null}
   </div>;
 }
 
