@@ -367,6 +367,7 @@ function SortableOptionRow({
   } = useSortable({ id, disabled: isOngoing });
   const optionImage = option.imageUrlKo ?? option.imageUrlEn ?? null;
   const isCircular = questionType === "single_choice" || questionType === "dropdown";
+  const isDropdown = questionType === "dropdown";
 
   return (
     <div
@@ -376,7 +377,7 @@ function SortableOptionRow({
         transition,
         zIndex: isDragging ? 20 : undefined,
       }}
-      className={`group relative min-w-0 rounded-lg px-0 py-1.5 transition-colors hover:bg-slate-50/70 ${
+      className={`group relative -mx-4 min-w-0 rounded-lg px-4 py-1.5 transition-colors hover:bg-slate-50/70 ${
         isDragging ? "bg-emerald-50 shadow-md" : ""
       }`}
     >
@@ -386,7 +387,7 @@ function SortableOptionRow({
           type="button"
           aria-label={`${option.labelKo || option.value || "선택지"} 순서 이동`}
           aria-grabbed={isDragging ? "true" : undefined}
-          className="absolute -left-4 top-1/2 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-300 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 active:cursor-grabbing"
+          className="absolute left-0 top-1/2 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-300 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
@@ -394,12 +395,18 @@ function SortableOptionRow({
         </button>
       ) : null}
       <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white ${
-            isCircular ? "rounded-full" : "rounded"
-          }`}
-          aria-hidden="true"
-        />
+        {isDropdown ? (
+          <span className="flex size-5 shrink-0 items-center justify-center text-xs font-medium tabular-nums text-slate-500" aria-hidden="true">
+            {index + 1}
+          </span>
+        ) : (
+          <span
+            className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white ${
+              isCircular ? "rounded-full" : "rounded"
+            }`}
+            aria-hidden="true"
+          />
+        )}
         <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-2">
           <UiInput
             ref={index === optionCount - 1 ? (element) => { lastOptionLabelRef.current = element; } : undefined}
@@ -810,6 +817,16 @@ export function QuestionInlineEditor({
     }
   };
 
+  const toggleDescription = () => {
+    if (showDescription) {
+      setShowDescription(false);
+      set("descriptionKo", "");
+      set("descriptionEn", "");
+      return;
+    }
+    setShowDescription(true);
+  };
+
   const handleSave = () => {
     const usedOptionValues = new Set<string>();
     const normalizedOptions = form.options.map((option, index) => {
@@ -1150,12 +1167,18 @@ export function QuestionInlineEditor({
                 ))}
               </SortableContext>
             </DndContext>
-            {!isOngoing ? (
-              <div className="flex min-w-0 items-center gap-2 px-0 py-1">
-                <span
-                  className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 text-[length:var(--ui-text-micro-size)] text-slate-300 ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`}
-                  aria-hidden="true"
-                />
+             {!isOngoing ? (
+               <div className="flex min-w-0 items-center gap-2 px-0 py-1">
+                 {form.questionType === "dropdown" ? (
+                   <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-400" aria-hidden="true">
+                     {form.options.length + 1}
+                   </span>
+                 ) : (
+                   <span
+                     className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 text-[length:var(--ui-text-micro-size)] text-slate-300 ${form.questionType === "single_choice" ? "rounded-full" : "rounded"}`}
+                     aria-hidden="true"
+                   />
+                 )}
                 <UiInput
                   type="text"
                   readOnly
@@ -1306,7 +1329,7 @@ export function QuestionInlineEditor({
                   menuStyle={moreMenuStyle}
                   disabled={isOngoing}
                   descriptionEnabled={showDescription}
-                  onDescriptionToggle={() => setShowDescription((visible) => !visible)}
+                  onDescriptionToggle={toggleDescription}
                   validationEnabled={form.answerValidationEnabled}
                   onValidationToggle={toggleAnswerValidation}
                   canValidate={supportsValidation}

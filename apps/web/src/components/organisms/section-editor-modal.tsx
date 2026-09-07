@@ -89,7 +89,7 @@ export function SectionEditorModal({
       open
       onClose={onCancel}
       title="섹션 편집"
-      className="max-w-2xl"
+      className="max-w-4xl"
       bodyClassName="space-y-6 px-6 py-6 md:px-8"
       footer={
         <>
