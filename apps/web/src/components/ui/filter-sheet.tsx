@@ -8,12 +8,19 @@ import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
 
 interface FilterSheetProps {
   children: ReactNode;
+  closeLabel?: string;
   onClose: () => void;
   open: boolean;
   title: string;
 }
 
-export function FilterSheet({ children, onClose, open, title }: FilterSheetProps) {
+export function FilterSheet({
+  children,
+  closeLabel = "필터 닫기",
+  onClose,
+  open,
+  title,
+}: FilterSheetProps) {
   const surfaceRef = useRef<HTMLElement>(null);
   const titleId = useId();
   const handleOverlayKeyDown = useOverlayBehavior({
@@ -26,10 +33,10 @@ export function FilterSheet({ children, onClose, open, title }: FilterSheetProps
 
   return createPortal(
     <div className="fixed inset-0 z-[120]">
-      <Button
-        type="button"
-        variant="ghost"
-        aria-label="필터 닫기"
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label={closeLabel}
         tabIndex={-1}
         className="absolute inset-0 h-full w-full rounded-none bg-slate-950/35 p-0 hover:bg-slate-950/35"
         onClick={onClose}
@@ -47,7 +54,7 @@ export function FilterSheet({ children, onClose, open, title }: FilterSheetProps
           <h2 id={titleId} className="min-w-0 break-words text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-app-text-strong">
             {title}
           </h2>
-          <IconButton tone="navigation" aria-label="필터 닫기" onClick={onClose}>
+          <IconButton tone="navigation" aria-label={closeLabel} onClick={onClose}>
             <X aria-hidden="true" />
           </IconButton>
         </div>

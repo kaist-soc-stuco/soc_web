@@ -180,6 +180,21 @@ export function FaqPage() {
                     <div key={index} className="h-14 bg-slate-50/70" />
                   ))}
                 </div>
+              ) : faqQuery.isError ? (
+                <div className="flex min-h-48 flex-col items-center justify-center gap-3 px-5 py-8 text-center" role="alert">
+                  <p className="text-sm font-normal text-red-600">
+                    {lang === "ko"
+                      ? "FAQ를 불러오지 못했습니다."
+                      : "Failed to load FAQ."}
+                  </p>
+                  <UiButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => void faqQuery.refetch()}
+                  >
+                    {lang === "ko" ? "다시 시도" : "Retry"}
+                  </UiButton>
+                </div>
               ) : filteredItems.length === 0 ? (
                 <EmptyState
                   className="min-h-48 rounded-none border-0 bg-transparent"

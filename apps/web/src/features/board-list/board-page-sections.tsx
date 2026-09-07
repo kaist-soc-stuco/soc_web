@@ -2,9 +2,10 @@ import type { ReactNode } from "react";
 import type { ArticleListItem } from "@soc/contracts";
 import { isoToDate, isoToMs, nowMs } from "@soc/shared";
 import { Paperclip } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { PageSizeSelect, Pagination } from "@/components/ui/pagination";
+import { MobileSectionSelector } from "@/components/ui/mobile-section-selector";
 import {
   getBoardLabelFromMetadata,
   isLegacyPublicBoardCode,
@@ -13,6 +14,7 @@ import {
 
 import { EmptyState } from "@/components/ui/data-state";
 import {
+  PageActionButton,
   PageActionLink,
   PageContainer,
   DataViewBody,
@@ -45,11 +47,38 @@ export function BoardCategoryNavigation({
   category,
   lang,
 }: BoardCategoryNavigationProps) {
+  const navigate = useNavigate();
+  const categoryOptions = [
+    { value: "", label: lang === "ko" ? "전체" : "All" },
+    ...boards
+      .filter((board) => !isLegacyPublicBoardCode(board.code))
+      .map((board) => ({
+        value: board.code,
+        label: getBoardLabelFromMetadata(board, board.code, lang),
+      })),
+  ];
+
   return (
     <PageToolbar>
+      <MobileSectionSelector
+        ariaLabel={lang === "ko" ? "게시판 분류 선택" : "Select board category"}
+        closeLabel={lang === "ko" ? "게시판 분류 닫기" : "Close board categories"}
+        onChange={(value) => {
+          const nextPath = value
+            ? value === "faq"
+              ? "/board/faq"
+              : `/board/${value}`
+            : "/board";
+          navigate(nextPath);
+        }}
+        options={categoryOptions}
+        title={lang === "ko" ? "게시판 분류" : "Board categories"}
+        value={category ?? ""}
+      />
       <PageTabs
         aria-label={lang === "ko" ? "게시판 분류" : "Board categories"}
         variant="trackless"
+        className="hidden md:inline-flex"
       >
         <PageTabLink to="/board" active={!category}>
           {lang === "ko" ? "전체" : "All"}
@@ -135,6 +164,7 @@ export function BoardDataControls({
 }
 
 interface BoardArticleTableProps {
+  articleError: string | null;
   articles: ArticleListItem[];
   boardByCode: Map<string, BoardMetadata>;
   category?: string;
@@ -144,6 +174,7 @@ interface BoardArticleTableProps {
   lang: string;
   onPageChange: (page: number) => void;
   onPostsPerPageChange: (value: number) => void;
+  onRetry: () => void;
   postsPerPage: number;
   totalCount: number;
   totalPages: number;
@@ -156,6 +187,7 @@ function BoardTableSkeleton({ columns }: { columns: number }) {
 }
 
 export function BoardArticleTable({
+  articleError,
   articles,
   boardByCode,
   category,
@@ -165,6 +197,7 @@ export function BoardArticleTable({
   lang,
   onPageChange,
   onPostsPerPageChange,
+  onRetry,
   postsPerPage,
   totalCount,
   totalPages,
@@ -285,7 +318,18 @@ export function BoardArticleTable({
               isLoading && articles.length > 0 ? "opacity-70" : "opacity-100"
             }`}
           >
-            {articles.length > 0
+            {articleError ? (
+              <div className="flex min-h-48 flex-col items-center justify-center gap-3 px-5 py-8 text-center" role="alert">
+                <p className="text-sm font-normal text-red-600">
+                  {lang === "ko"
+                    ? "게시글을 불러오지 못했습니다."
+                    : "Failed to load posts."}
+                </p>
+                <PageActionButton type="button" onClick={onRetry}>
+                  {lang === "ko" ? "다시 시도" : "Retry"}
+                </PageActionButton>
+              </div>
+            ) : articles.length > 0
               ? articles.map((post) => renderArticleRow(post, post.isPinned))
               : !showInitialSkeleton ? (
                 <EmptyState

@@ -10,6 +10,7 @@ import { useBoardPageController } from "@/features/board-list/use-board-page-con
 
 export function BoardPage() {
   const {
+    articleError,
     articles,
     boardByCode,
     boards,
@@ -20,6 +21,7 @@ export function BoardPage() {
     handlePageChange,
     isBoardNotFound,
     isArticleLoading,
+    retryArticles,
     lang,
     postsPerPage,
     searchQuery,
@@ -62,6 +64,7 @@ export function BoardPage() {
             />
           }
           articles={articles}
+          articleError={articleError}
           boardByCode={boardByCode}
           category={category}
           currentPage={currentPage}
@@ -73,6 +76,7 @@ export function BoardPage() {
             setPostsPerPage(value);
             setCurrentPage(1);
           }}
+          onRetry={retryArticles}
           postsPerPage={postsPerPage}
           totalCount={totalCount}
           totalPages={totalPages}

@@ -10,6 +10,7 @@ import type {
 import { ArrowRight, Loader2 } from "lucide-react";
 
 import { PageActionButton, PageSearchField, PageTabButton, PageTabs } from "@/components/ui/page-layout";
+import { MobileSectionSelector } from "@/components/ui/mobile-section-selector";
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { getBoardLabelFromMetadata } from "@/lib/board-metadata";
@@ -120,22 +121,36 @@ export function SearchFilterTabs({
   ];
 
   return (
-    <PageTabs
-      variant="trackless"
-      aria-label={lang === "ko" ? "검색 결과 필터" : "Search result filters"}
-    >
-      {tabs.map((tab) => (
-        <PageTabButton
-          key={tab.filter}
-          active={activeFilter === tab.filter}
-          onClick={() => onFilterChange(tab.filter)}
-          className="!h-9 !min-h-9 gap-1.5 px-2.5 text-[length:var(--ui-text-body-sm-size)]"
-        >
-          <span>{tab.label}</span>
-          <span className="tabular-nums text-slate-400">{tab.count}</span>
-        </PageTabButton>
-      ))}
-    </PageTabs>
+    <>
+      <MobileSectionSelector
+        ariaLabel={lang === "ko" ? "검색 결과 필터 선택" : "Select search result filter"}
+        closeLabel={lang === "ko" ? "검색 결과 필터 닫기" : "Close search result filters"}
+        onChange={(value) => onFilterChange(value as SearchFilter)}
+        options={tabs.map((tab) => ({
+          label: `${tab.label} ${tab.count}`,
+          value: tab.filter,
+        }))}
+        title={lang === "ko" ? "검색 결과 필터" : "Search result filters"}
+        value={activeFilter}
+      />
+      <PageTabs
+        variant="trackless"
+        aria-label={lang === "ko" ? "검색 결과 필터" : "Search result filters"}
+        className="hidden md:inline-flex"
+      >
+        {tabs.map((tab) => (
+          <PageTabButton
+            key={tab.filter}
+            active={activeFilter === tab.filter}
+            onClick={() => onFilterChange(tab.filter)}
+            className="!h-9 !min-h-9 gap-1.5 px-2.5 text-[length:var(--ui-text-body-sm-size)]"
+          >
+            <span>{tab.label}</span>
+            <span className="tabular-nums text-slate-400">{tab.count}</span>
+          </PageTabButton>
+        ))}
+      </PageTabs>
+    </>
   );
 }
 
@@ -181,6 +196,7 @@ export function SearchResults({
   filter,
   lang,
   loading,
+  onRetry,
   query,
   surveys,
   totalCount,
@@ -196,6 +212,7 @@ export function SearchResults({
   filter: SearchFilter;
   lang: string;
   loading: boolean;
+  onRetry?: () => void;
   query: string;
   surveys: SurveyRecord[];
   totalCount: number;
@@ -211,12 +228,34 @@ export function SearchResults({
   }
 
   if (error) {
-    return <p className="px-1 py-4 text-sm font-normal text-red-600">{error}</p>;
+    return (
+      <div className="flex flex-col items-start gap-3 px-1 py-6 text-sm font-normal text-red-600" role="alert">
+        <p>{error}</p>
+        {onRetry ? (
+          <PageActionButton type="button" onClick={onRetry}>
+            {lang === "ko" ? "다시 시도" : "Retry"}
+          </PageActionButton>
+        ) : null}
+      </div>
+    );
   }
 
-  if (query && totalCount === 0) {
+  const visibleCount =
+    filter === "all"
+      ? totalCount
+      : filter === "board"
+        ? boardArticles.length
+        : filter === "faq"
+          ? faqArticles.length
+          : filter === "event"
+            ? eventArticles.length + calendarEvents.length
+            : filter === "survey"
+              ? surveys.length
+              : votes.length;
+
+  if (query && visibleCount === 0) {
     return (
-      <p className="px-1 py-10 text-center text-sm font-normal text-slate-500">
+      <p className="px-1 py-10 text-center text-sm font-normal text-slate-500" role="status">
         {lang === "ko" ? "검색 결과가 없습니다." : "No results found."}
       </p>
     );
@@ -294,7 +333,7 @@ function ArticleResults({
 
         return (
           <SearchLink key={article.articleId} to={`/board/${boardCode}/${article.articleId}`}>
-            <p className="truncate text-sm font-medium text-slate-900">
+            <p className="line-clamp-2 break-words text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
             </p>
             {snippet ? <Snippet value={snippet} query={query} /> : null}
@@ -331,7 +370,7 @@ function EventResults({
 
         return (
           <SearchLink key={article.articleId} to={`/events/${article.articleId}`}>
-            <p className="truncate text-sm font-medium text-slate-900">
+            <p className="line-clamp-2 break-words text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
             </p>
             {snippet ? <Snippet value={snippet} query={query} /> : null}
@@ -371,7 +410,7 @@ function CalendarResults({
 
         return (
           <SearchLink key={`${event.sourceType}-${event.id}`} to={href}>
-            <p className="truncate text-sm font-medium text-slate-900">
+            <p className="line-clamp-2 break-words text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
             </p>
             {event.location ? <Snippet value={event.location} query={query} /> : null}
@@ -415,7 +454,7 @@ function SurveyResults({
               <span className="text-[length:var(--ui-text-caption-size)] font-medium text-kaist-darkgreen">{getSurveyKindLabel(survey.kind, lang)}</span>
               <span className="text-[length:var(--ui-text-caption-size)] font-normal text-slate-400">· {getSurveyStateLabel(survey.computedState, lang)}</span>
             </div>
-            <p className="truncate text-sm font-medium text-slate-900">
+            <p className="line-clamp-2 break-words text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
             </p>
             {snippet ? <Snippet value={snippet} query={query} /> : null}
@@ -446,7 +485,7 @@ function FaqResults({
 
         return (
           <SearchLink key={article.articleId} to={`/board/faq/${article.articleId}`}>
-            <p className="truncate text-sm font-medium text-slate-900">
+            <p className="line-clamp-2 break-words text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
             </p>
             {snippet ? <Snippet value={snippet} query={query} /> : null}
@@ -485,7 +524,7 @@ function VoteResults({
 
         return (
           <SearchLink key={vote.id} to={`/votes/${vote.id}`}>
-            <p className="truncate text-sm font-medium text-slate-900">
+            <p className="line-clamp-2 break-words text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
             </p>
             {description ? <Snippet value={description} query={query} /> : null}
@@ -518,7 +557,7 @@ function AboutResults({
 
         return (
           <SearchLink key={item.id} to={item.href}>
-            <p className="truncate text-sm font-medium text-slate-900">
+            <p className="line-clamp-2 break-words text-sm font-medium text-slate-900">
               <HighlightedText value={title} query={query} />
             </p>
             <Snippet value={description} query={query} />
