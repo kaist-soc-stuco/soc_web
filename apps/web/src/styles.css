@@ -3619,6 +3619,45 @@
   }
 }
 
+@media (max-width: 63.9375rem) {
+  .email-composer-header .interaction-button,
+  .email-composer-page [data-radix-menu-content] :is(button, [role="menuitem"]) {
+    min-height: var(--ui-touch-target-min);
+  }
+
+  .email-composer-mode-tabs :is(button, a) {
+    height: var(--ui-touch-target-min) !important;
+    min-height: var(--ui-touch-target-min) !important;
+  }
+
+  .email-composer-editor > div:first-child,
+  .email-composer-mode-toolbar {
+    height: 4rem;
+    min-height: 4rem;
+  }
+
+  .email-composer-editor .tiptap-container {
+    padding: 1rem;
+  }
+
+  .email-composer-editor .tiptap {
+    min-height: 18rem;
+  }
+}
+
+@media (max-width: 39.9375rem) {
+  .email-review-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .email-review-footer > .interaction-button {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 /* Tiptap & Rich Content Styling */
 .rich-content,
 .tiptap {
