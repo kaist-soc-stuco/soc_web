@@ -13,7 +13,7 @@ export function SurveyResultsPage() {
   return (
     <PageShell>
       <Header />
-      <main className="flex-1 bg-[#f3f5f4] px-4 py-10 lg:px-0" aria-busy={loading}>
+      <main className="flex-1 bg-[#f3f5f4] px-4 py-6 sm:py-10 lg:px-0" aria-busy={loading}>
         <div className="mx-auto max-w-[52rem]">
           <div className="mb-4">
             <Button variant="ghost"
