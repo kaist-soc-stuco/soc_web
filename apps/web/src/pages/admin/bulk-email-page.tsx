@@ -39,7 +39,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { RichTextEditor } from "@/components/organisms/rich-text-editor";
 import { RichTextContent } from "@/components/ui/rich-text-content";
-import { AdminFormField, AdminPageShell } from "@/components/ui/admin-page";
+import { AdminEditorGuidance, AdminFormField, AdminPageShell } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { Modal } from "@/components/ui/modal";
@@ -656,10 +656,10 @@ function BulkEmailPageContent() {
 
   return (
     <AdminPageShell className="email-composer-page min-h-screen !bg-slate-50">
-      <main className="w-full px-5 pb-16 md:px-8">
-        <div className="email-composer-shell mx-auto mt-6 w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <header className="email-composer-header flex items-center justify-end gap-4 border-b border-slate-100 bg-white p-4 md:p-5">
-          <div className="flex flex-wrap items-center justify-end gap-2">
+      <main className="email-composer-main w-full px-4 pb-16 sm:px-5 md:px-8">
+        <div className="email-composer-shell mx-auto mt-4 w-full max-w-5xl overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm sm:mt-6 sm:rounded-2xl">
+        <header className="email-composer-header flex flex-wrap items-center justify-end gap-4 border-b border-slate-100 bg-white p-4 md:p-5">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
             <Button type="button" variant="ghost" size="sm" onClick={openHistory}>
               <History aria-hidden="true" />
               발송 이력
@@ -682,6 +682,12 @@ function BulkEmailPageContent() {
           </div>
         </header>
 
+        <div className="p-4 pb-0 sm:p-5 sm:pb-0 md:hidden">
+          <AdminEditorGuidance>
+            <p>긴 메일 본문은 데스크톱 편집을 권장합니다. 초안은 자동 저장되며 최종 발송 전 검토 화면에서 다시 확인하세요.</p>
+          </AdminEditorGuidance>
+        </div>
+
         {operationError ? (
           <div className="mx-4 mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700 md:mx-6" role="alert">
             {operationError}
@@ -694,7 +700,7 @@ function BulkEmailPageContent() {
         ) : null}
 
         <form id="bulk-email-compose" className="w-full" onSubmit={(event) => void handleReview(event)}>
-          <div className="email-composer-canvas bg-white p-6 md:p-8">
+          <div className="email-composer-canvas bg-white p-4 sm:p-6 md:p-8">
             {draftRestored && draftSavedAt && draftNoticeVisible ? (
               <DraftRestoredBanner
                 className="mb-5"
@@ -704,7 +710,7 @@ function BulkEmailPageContent() {
               />
             ) : null}
             <section className="border-b border-slate-100 pb-5" aria-label="수신 대상">
-              <div className="flex min-h-10 items-center justify-between gap-4">
+              <div className="flex min-h-10 flex-wrap items-start justify-between gap-3 sm:items-center sm:gap-4">
                 <div className="flex min-w-0 flex-wrap items-center gap-2.5">
                   <span className="shrink-0 text-sm font-medium text-slate-600">받는 사람:</span>
                   <RecipientToken label={selectedRecipientLabel} onRemove={() => setRecipientType("ALL")} />
@@ -761,7 +767,7 @@ function BulkEmailPageContent() {
                     </DropdownMenu.Portal>
                   </DropdownMenu.Root>
                 </div>
-                <span className="shrink-0 whitespace-nowrap text-sm font-normal text-slate-500">
+                <span className="w-full shrink-0 text-right text-sm font-normal text-slate-500 sm:w-auto sm:whitespace-nowrap">
                   수신 대상: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
                 </span>
               </div>
@@ -808,7 +814,7 @@ function BulkEmailPageContent() {
                 <div className="email-composer-mode-toolbar mt-2 flex items-center justify-end border-y border-slate-100">
                   {editorModeTabs}
                 </div>
-                <div className="tiptap-container min-h-[400px] px-6 py-6 prose prose-slate">
+                <div className="tiptap-container min-h-[400px] px-4 py-6 prose prose-slate sm:px-6">
                   {content.trim() ? (
                     <RichTextContent content={previewContent} className="text-[length:var(--ui-text-section-size)] leading-7 text-slate-800" />
                   ) : (
@@ -830,7 +836,7 @@ function BulkEmailPageContent() {
                     setContentType("html");
                   }}
                   spellCheck={false}
-                  className="min-h-[400px] w-full resize-none rounded-none border-0 bg-transparent px-6 py-6 font-mono text-sm font-normal leading-6 text-slate-700 shadow-none focus:border-0 focus:ring-0"
+                  className="min-h-[400px] w-full resize-none rounded-none border-0 bg-transparent px-4 py-6 font-mono text-sm font-normal leading-6 text-slate-700 shadow-none focus:border-0 focus:ring-0 sm:px-6"
                 />
               </>
             )}
@@ -853,7 +859,7 @@ function BulkEmailPageContent() {
                       size="icon"
                       aria-label={`${attachment.filename} 첨부 제거`}
                       onClick={() => setAttachments((previous) => previous.filter((item) => item.assetId !== attachment.assetId))}
-                      className="size-5 rounded text-slate-400 hover:bg-slate-200"
+                      className="min-h-11 min-w-11 rounded text-slate-400 hover:bg-slate-200 sm:size-5 sm:min-h-0 sm:min-w-0"
                     >
                       <X aria-hidden="true" />
                     </Button>
@@ -885,8 +891,12 @@ function BulkEmailPageContent() {
           </Button>
         }
         className="max-w-2xl"
+        mobileFullscreen
+        bodyClassName="space-y-5 px-4 py-5 sm:px-5"
       >
         <div className="space-y-5">
+          {operationError ? <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">{operationError}</div> : null}
+          {statusNotice ? <div role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700">{statusNotice}</div> : null}
           <section>
             {templatesLoading ? (
               <p className="py-6 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
@@ -908,7 +918,7 @@ function BulkEmailPageContent() {
                       {template.description ? <p className="mt-0.5 truncate text-xs font-normal text-slate-500">{template.description}</p> : null}
                     </button>
                     {template.createdBy ? (
-                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} title="템플릿 삭제" onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="size-8 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                      <Button type="button" variant="ghost" size="icon" aria-label={`${template.name} 삭제`} title="템플릿 삭제" onClick={() => void handleDeleteTemplate(template.id)} disabled={templateSaving} className="min-h-11 min-w-11 text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:size-8 sm:min-h-0 sm:min-w-0">
                         <Trash2 aria-hidden="true" />
                       </Button>
                     ) : null}
@@ -924,7 +934,9 @@ function BulkEmailPageContent() {
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         title="발송 이력"
+        mobileFullscreen
         className="max-w-2xl"
+        bodyClassName="space-y-5 px-4 py-5 sm:px-5"
         footer={<Button type="button" variant="outline" onClick={() => setHistoryOpen(false)}>닫기</Button>}
       >
         {historyLoading ? (
@@ -959,25 +971,29 @@ function BulkEmailPageContent() {
         open={reviewOpen}
         onClose={dismissReview}
         title="메일 발송 전 최종 검토"
+        mobileFullscreen
         className="max-w-2xl"
+        bodyClassName="space-y-5 px-4 py-5 sm:px-5"
         footer={
-          <>
+          <div className="email-review-footer flex w-full flex-wrap items-center gap-2">
             <Button type="button" variant="ghost" onClick={() => void handleTestSend()} disabled={sending || testSending} className="mr-auto">
               {testSending ? "테스트 발송 중…" : "내 계정으로 테스트 발송"}
             </Button>
             <Button type="button" variant="outline" onClick={dismissReview} disabled={sending || testSending}>취소</Button>
             <Button type="button" onClick={() => void handleConfirmSend()} disabled={sending || !reviewPreview}>{sending ? "발송 중…" : "최종 발송 확정"}</Button>
-          </>
+          </div>
         }
       >
         {reviewPreview ? (
           <div className="space-y-5">
+            {operationError ? <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">{operationError}</div> : null}
+            {statusNotice ? <div role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700">{statusNotice}</div> : null}
             <dl className="divide-y divide-slate-100 text-sm">
               <div className="grid grid-cols-[5rem_1fr] gap-3 py-2 first:pt-0">
                 <dt className="text-slate-500">발송 대상</dt>
                 <dd className="font-medium text-slate-800">
                   {selectedRecipientLabel} · 총 {reviewPreview.recipientCount}명{" "}
-                  <Button type="button" variant="link" size="sm" onClick={() => setRecipientListOpen((open) => !open)} className="ml-2 h-auto p-0 text-xs font-normal text-slate-500">
+                  <Button type="button" variant="link" size="sm" onClick={() => setRecipientListOpen((open) => !open)} className="ml-2 inline-flex min-h-11 items-center p-0 text-xs font-normal text-slate-500 sm:min-h-0">
                     {recipientListOpen ? "명단 닫기" : "명단 확인"}
                   </Button>
                   {activeFilterEntries.length ? <span className="mt-1 block text-xs font-normal text-slate-500">{activeFilterEntries.map((entry) => `${entry.label}: ${entry.value}`).join(" · ")}</span> : null}
@@ -1023,7 +1039,7 @@ function RecipientToken({ label, onRemove }: { label: string; onRemove: () => vo
     <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200/80 bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-700">
       <span aria-hidden="true" className="text-[length:var(--ui-text-caption-size)] leading-none">🏷️</span>
       <span className="max-w-[16rem] truncate">{label}</span>
-      <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="size-5 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+      <Button type="button" variant="ghost" size="icon" aria-label={`${label} 제거`} onClick={onRemove} className="min-h-11 min-w-11 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 sm:size-5 sm:min-h-0 sm:min-w-0">
         <X aria-hidden="true" />
       </Button>
     </span>
