@@ -1,7 +1,15 @@
 import { createPortal } from "react-dom";
 import { createApiClient } from "@soc/api-client";
 import type { QuestionType, SurveyQuestionConfig } from "@soc/contracts";
-import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type Modifier,
+} from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -81,6 +89,11 @@ const normalizeQuestionType = (value: unknown): QuestionType =>
   QUESTION_TYPES.some((option) => option.value === value)
     ? (value as QuestionType)
     : "short_text";
+
+const restrictOptionToVerticalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+});
 
 type ValidationType = NonNullable<SurveyQuestionConfig["validationType"]>;
 type ValidationOperator = NonNullable<SurveyQuestionConfig["validationOperator"]>;
@@ -377,8 +390,8 @@ function SortableOptionRow({
         transition,
         zIndex: isDragging ? 20 : undefined,
       }}
-      className={`group relative -mx-4 min-w-0 rounded-lg px-4 py-1.5 transition-colors hover:bg-slate-50/70 ${
-        isDragging ? "bg-emerald-50 shadow-md" : ""
+      className={`group relative min-w-0 rounded-lg px-4 py-1.5 transition-colors hover:bg-slate-50/70 md:px-5 ${
+        isDragging ? "shadow-md" : ""
       }`}
     >
       {!isOngoing ? (
@@ -387,7 +400,7 @@ function SortableOptionRow({
           type="button"
           aria-label={`${option.labelKo || option.value || "선택지"} 순서 이동`}
           aria-grabbed={isDragging ? "true" : undefined}
-          className="absolute left-0 top-1/2 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-300 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 active:cursor-grabbing"
+          className="absolute left-0 top-1/2 z-10 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-400 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 group-hover:text-slate-500 group-focus-within:opacity-100 group-focus-within:text-slate-500 active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
@@ -1133,10 +1146,11 @@ export function QuestionInlineEditor({
 
       {needsOptions ? (
           <div className="mt-4 pb-4 pt-1">
-           <div className="scrollbar-hidden max-h-80 space-y-1 overflow-y-auto pr-1">
+          <div className="scrollbar-hidden -ml-4 max-h-80 space-y-1 overflow-y-auto pr-1 md:-ml-5">
             <DndContext
               sensors={optionSensors}
               collisionDetection={closestCenter}
+              modifiers={[restrictOptionToVerticalAxis]}
               onDragEnd={handleOptionDragEnd}
             >
               <SortableContext
@@ -1168,7 +1182,7 @@ export function QuestionInlineEditor({
               </SortableContext>
             </DndContext>
              {!isOngoing ? (
-               <div className="flex min-w-0 items-center gap-2 px-0 py-1">
+               <div className="flex min-w-0 items-center gap-2 px-4 py-1 md:px-5">
                  {form.questionType === "dropdown" ? (
                    <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-400" aria-hidden="true">
                      {form.options.length + 1}
