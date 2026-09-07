@@ -154,6 +154,18 @@ export function useEventsSurveysPageController({
     staleTime: 24 * 60 * 60 * 1000,
   });
 
+  const retry = () => {
+    if (currentTab === "calendar") {
+      void Promise.all([
+        calendarEventsQuery.refetch(),
+        holidaysQuery.refetch(),
+      ]);
+      return;
+    }
+
+    void listQuery.refetch();
+  };
+
   useEffect(() => {
     const selected = parseSelectedCalendarDate(selectedParam);
     if (!selected) return;
@@ -357,6 +369,10 @@ export function useEventsSurveysPageController({
     );
   };
 
+  const calendarLoadError =
+    (calendarEventsQuery.isError && !calendarEventsQuery.data) ||
+    (holidaysQuery.isError && !holidaysQuery.data);
+
   return {
     calendarEvents,
     currentDate,
@@ -364,8 +380,7 @@ export function useEventsSurveysPageController({
     dateTo,
     error:
       currentTab === "calendar"
-        ? calendarEventsQuery.isError
-          && !calendarEventsQuery.data
+        ? calendarLoadError
           ? lang === "ko"
             ? "일정을 불러오는 중 오류가 발생했습니다."
             : "Failed to load calendar events."
@@ -381,6 +396,7 @@ export function useEventsSurveysPageController({
         ? calendarEventsQuery.isPending
           && !calendarEventsQuery.data
         : listQuery.isPending,
+    retry,
     selectedDate,
     calendarQuery,
     currentPage,

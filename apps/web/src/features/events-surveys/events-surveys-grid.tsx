@@ -250,7 +250,7 @@ export function EventsSurveysGrid({
                 to={href}
                 className="min-w-0 flex-1"
               >
-                <h3 className="line-clamp-2 text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong">
+                <h3 className="line-clamp-2 break-words text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong">
                   {title}
                 </h3>
                 {desc ? (
@@ -264,15 +264,15 @@ export function EventsSurveysGrid({
                 <Link
                   aria-label={`${title} ${getCardPeriodText(item, lang)}`}
                   to={href}
-                  className="flex min-w-0 items-center gap-1.5 text-xs font-normal text-slate-700"
+                  className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-700"
                 >
-                  <Clock className="h-3.5 w-3.5 shrink-0 text-slate-600" />
-                  <span className="truncate">{getCardPeriodText(item, lang)}</span>
+                  <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600" />
+                  <span className="min-w-0 break-words">{getCardPeriodText(item, lang)}</span>
                 </Link>
                 {item.location ? (
-                  <div className="flex min-w-0 items-center gap-1.5 text-xs font-normal text-slate-600">
-                    <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                    <span className="truncate">{item.location}</span>
+                  <div className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-600">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+                    <span className="min-w-0 break-words">{item.location}</span>
                   </div>
                 ) : null}
               </div>

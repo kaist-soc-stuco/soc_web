@@ -15,7 +15,7 @@ export function EventsSurveysCalendarManagement() {
   if (!canManage) return null;
 
   return (
-    <Button asChild variant="outline" size="sm" className="h-9 min-h-9 gap-1.5 px-3 text-xs font-normal">
+    <Button asChild variant="outline" size="sm" className="min-h-11 gap-1.5 px-3 text-xs font-normal">
       <Link to="/admin/calendar">
         <CalendarCog className="size-4" aria-hidden="true" />
         일정 관리

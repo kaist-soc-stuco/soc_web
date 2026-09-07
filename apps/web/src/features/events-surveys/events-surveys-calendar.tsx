@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { KoreanHolidayRecord } from "@soc/contracts";
-import { localDate } from "@soc/shared";
+import { localDate, nowDate } from "@soc/shared";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
@@ -14,6 +14,7 @@ import {
   toDateKey,
 } from "./events-surveys-calendar-utils";
 import { IconButton } from "@/components/ui/icon-button";
+import { Button } from "@/components/ui/button";
 import { PageSearchField } from "@/components/ui/page-layout";
 
 interface EventsSurveysCalendarProps {
@@ -71,16 +72,21 @@ export function EventsSurveysCalendar({
     lang === "ko"
       ? ["일", "월", "화", "수", "목", "금", "토"]
       : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const handleToday = () => {
+    const today = nowDate();
+    onCurrentDateChange(localDate(today.getFullYear(), today.getMonth(), 1));
+    onSelectedDateChange(today);
+  };
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-4">
-        <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white p-5 lg:col-span-3">
+        <div className="flex h-full min-w-0 flex-col rounded-lg border border-card-border-subtle bg-white p-4 sm:p-5 lg:col-span-3">
           <div className="mb-5 grid min-w-0 grid-cols-1 items-center gap-3 border-b border-slate-200 pb-4 select-none sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <div className="hidden sm:block" aria-hidden="true" />
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:gap-2">
               <IconButton
-                size="sm"
+                size="md"
                 tone="navigation"
                 type="button"
                 aria-label={lang === "ko" ? "이전 달" : "Previous month"}
@@ -90,11 +96,11 @@ export function EventsSurveysCalendar({
               >
                 <ChevronLeft className="h-4 w-4" />
               </IconButton>
-              <h3 className="whitespace-nowrap text-lg font-bold tracking-tight text-slate-800 md:text-xl">
+              <h3 className="whitespace-nowrap px-0.5 text-lg font-bold tracking-tight text-slate-800 md:text-xl">
                 {formatMonthTitle(currentYear, currentMonth, lang)}
               </h3>
               <IconButton
-                size="sm"
+                size="md"
                 tone="navigation"
                 type="button"
                 aria-label={lang === "ko" ? "다음 달" : "Next month"}
@@ -104,6 +110,15 @@ export function EventsSurveysCalendar({
               >
                 <ChevronRight className="h-4 w-4" />
               </IconButton>
+              <Button
+                className="min-h-11 px-3 text-xs"
+                onClick={handleToday}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {lang === "ko" ? "오늘" : "Today"}
+              </Button>
             </div>
             <div className="min-w-0 w-full justify-self-end sm:max-w-56">
               <PageSearchField
