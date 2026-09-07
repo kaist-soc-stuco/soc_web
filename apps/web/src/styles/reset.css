@@ -18,6 +18,13 @@
     min-width: 320px;
   }
 
+  @media (max-width: 22.5rem) {
+    html,
+    body {
+      min-width: 0;
+    }
+  }
+
   h1,
   h2,
   h3,

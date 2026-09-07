@@ -16,12 +16,15 @@ export function Hero() {
   const quickLinks = usePublicContentBlocksByType("QUICK_LINK");
   const imageUrl = hero?.imageUrl ? resolveAssetUrl(hero.imageUrl) : "/hero_background_1.jpg";
   const fallbackTitle = useLocalizedSiteContent("home.hero.title");
+  const fallbackDescription = useLocalizedSiteContent("home.hero.description");
   const heroText = hero ? resolveContentBlockText(hero, lang) : null;
   const title = heroText?.title || fallbackTitle;
+  const description = heroText?.body || fallbackDescription;
 
   return (
     <section
       data-home-hero
+      aria-labelledby="home-hero-title"
       className="hero-image-placeholder home-public-hero relative w-full overflow-hidden"
     >
       <img
@@ -39,9 +42,10 @@ export function Hero() {
 
       <div className="home-hero-content absolute inset-0 z-10 flex items-end">
         <div className="home-public-content w-full">
-          <h1 className="home-hero-title home-hero-title-enter whitespace-pre-line text-white">
+          <h1 id="home-hero-title" className="home-hero-title home-hero-title-enter whitespace-pre-line text-white">
             {title}
           </h1>
+          <p className="home-hero-description whitespace-pre-line">{description}</p>
           {quickLinks.length > 0 ? (
             <div className="home-hero-links-enter mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
               {quickLinks.map((block) => {

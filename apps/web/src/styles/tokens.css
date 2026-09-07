@@ -103,6 +103,9 @@
   /* Keep the home carousel compact and stable across desktop widths. */
   --home-event-card-height: 25rem;
   --home-event-card-height-mobile: 17.5rem;
+  --home-hero-height-mobile: 15rem;
+  --home-section-space-mobile: 2rem;
+  --home-empty-space-mobile: 1.5rem;
 }
 
 @media (max-width: 63.9375rem) {

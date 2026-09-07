@@ -297,9 +297,12 @@ function EventCarouselSkeleton() {
       <div className="home-section-heading">
         <div className="home-loading-surface h-8 w-24 rounded" />
       </div>
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="overflow-hidden rounded-xl border border-slate-200">
+          <div
+            key={index}
+            className={`overflow-hidden rounded-xl border border-slate-200 ${index > 0 ? "hidden sm:block" : ""}`}
+          >
             <div className="home-loading-surface aspect-[16/9]" />
             <div className="space-y-3 p-5">
               <div className="home-loading-surface h-3 w-20 rounded" />
@@ -319,7 +322,10 @@ export function EventCarousel() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(0);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [hasEnteredViewport, setHasEnteredViewport] = useState(false);
@@ -335,6 +341,8 @@ export function EventCarousel() {
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError(false);
     void apiClient.getArticles("_EVENT", { limit: 12 }).then((response) => {
       if (!active) return;
       const referenceTime = nowMs();
@@ -372,28 +380,38 @@ export function EventCarousel() {
         })
         .sort((a, b) => compareEventCards(a, b, referenceTime));
       setEvents(nextEvents);
+      setLoadError(false);
       setLoading(false);
     }).catch((error) => {
       console.error(error);
       if (active) {
         setEvents([]);
+        setLoadError(true);
         setLoading(false);
       }
     });
     return () => { active = false; };
-  }, [apiClient]);
+  }, [apiClient, retryCount]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsMobile(mediaQuery.matches);
+    const mobileQuery = window.matchMedia("(max-width: 639px)");
+    const tabletQuery = window.matchMedia("(max-width: 1023px)");
+    const update = () => {
+      setIsMobile(mobileQuery.matches);
+      setIsTablet(tabletQuery.matches);
+    };
     update();
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
+    mobileQuery.addEventListener("change", update);
+    tabletQuery.addEventListener("change", update);
+    return () => {
+      mobileQuery.removeEventListener("change", update);
+      tabletQuery.removeEventListener("change", update);
+    };
   }, []);
 
   const localizedEvents = useMemo(() => events.map((event) => localizeEvent(event, lang)), [events, lang]);
-  const pageSize = isMobile ? 1 : 3;
+  const pageSize = isMobile ? 1 : isTablet ? 2 : 3;
   const pages = useMemo(() => {
     const result: EventCardItem[][] = [];
     for (let index = 0; index < localizedEvents.length; index += pageSize) result.push(localizedEvents.slice(index, index + pageSize));
@@ -496,6 +514,33 @@ export function EventCarousel() {
 
   if (loading) return <EventCarouselSkeleton />;
 
+  if (loadError) {
+    return (
+      <section className="home-events-section" aria-labelledby="home-events-title">
+        <div className="home-section-heading home-section-heading-row">
+          <div>
+            <h2 id="home-events-title">{lang === "ko" ? "행사" : "Events"}</h2>
+          </div>
+          <Link to="/events" className="home-section-link">
+            {lang === "ko" ? "행사 전체 보기" : "View all events"}
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </div>
+        <div className="home-data-error" role="alert">
+          <p>{lang === "ko" ? "행사를 불러오지 못했습니다." : "We couldn't load events."}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={() => setRetryCount((count) => count + 1)}
+          >
+            {lang === "ko" ? "다시 시도" : "Try again"}
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       ref={sectionRef}
@@ -538,7 +583,7 @@ export function EventCarousel() {
                   {pages.map((page, pageIndex) => (
                     <div
                       key={pageIndex}
-                      className="grid flex-shrink-0 gap-6 md:grid-cols-3"
+                      className="grid flex-shrink-0 gap-4 sm:grid-cols-2 lg:grid-cols-3"
                       style={{ width: viewportWidth ? `${viewportWidth}px` : "100%", marginRight: pageIndex < pages.length - 1 ? `${pageGap}px` : undefined }}
                     >
                       {page.map((event, eventIndex) => (
@@ -567,9 +612,22 @@ export function EventCarousel() {
               ) : null}
 
               {totalPages > 1 ? (
-                <div className="mt-6 flex justify-center gap-2">
+                <div className="mt-4 flex justify-center gap-1" aria-label={lang === "ko" ? "행사 페이지" : "Event pages"}>
                   {pages.map((_, index) => (
-                    <Button key={index} type="button" variant="ghost" className={`h-1.5 min-h-0 border-0 p-0 ${index === currentPage ? "w-5 bg-slate-700" : "w-1.5 bg-slate-300"}`} onClick={() => setCurrentPage(index)} aria-label={`${index + 1}`} aria-current={index === currentPage ? "page" : undefined} />
+                    <Button
+                      key={index}
+                      type="button"
+                      variant="ghost"
+                      className="flex size-11 min-h-11 items-center justify-center border-0 p-0"
+                      onClick={() => setCurrentPage(index)}
+                      aria-label={lang === "ko" ? `행사 ${index + 1}페이지` : `Event page ${index + 1}`}
+                      aria-current={index === currentPage ? "page" : undefined}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`block rounded-full ${index === currentPage ? "h-1.5 w-5 bg-slate-700" : "size-1.5 bg-slate-300"}`}
+                      />
+                    </Button>
                   ))}
                 </div>
               ) : null}
