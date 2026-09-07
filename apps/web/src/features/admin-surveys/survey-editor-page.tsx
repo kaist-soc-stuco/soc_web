@@ -1943,7 +1943,7 @@ export function SurveyEditorPage() {
                                       className="inline-flex shrink-0 items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
                                     >
                                       <Plus className="size-4" />
-                                      문항 추가하기
+                                      문항 추가
                                     </Button>
                                     <div className="relative shrink-0">
                                       <Button
