@@ -727,7 +727,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
                     {canUseAdminDashboard ? (
                       <Button asChild variant="ghost" className="h-10 w-full justify-start rounded-none px-3.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-700">
-                        <Link to="/admin" onClick={closePopovers}>
+                        <Link to="/admin/content" onClick={closePopovers}>
                           <LayoutDashboard className="text-slate-500" />
                           <span>
                             {lang === "ko"
@@ -890,7 +890,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                 </Link>
                 {canUseAdminDashboard && (
                   <Link
-                    to="/admin"
+                    to="/admin/content"
                     onClick={closePopovers}
                     className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-kaist-darkgreen px-2 text-center text-xs font-medium text-white"
                   >

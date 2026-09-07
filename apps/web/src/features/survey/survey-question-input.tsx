@@ -5,7 +5,7 @@ import type {
   QuestionType,
   SurveyQuestionRecord,
 } from "@soc/contracts";
-import { Check, FileText, Loader2, Plus, Star, UploadCloud, X } from "lucide-react";
+import { Check, FileText, Heart, Loader2, Plus, Star, ThumbsUp, UploadCloud, X } from "lucide-react";
 
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -246,9 +246,15 @@ export function SurveyQuestionInput({
     case "rating": {
       const configuredMax = Number(question.config?.ratingMax ?? 5);
       const max = Number.isInteger(configuredMax)
-        ? Math.min(Math.max(configuredMax, 2), 10)
+        ? Math.min(Math.max(configuredMax, 3), 10)
         : 5;
       const selectedRating = typeof value === "string" ? Number(value) : Number.NaN;
+      const RatingIcon =
+        question.config?.ratingIcon === "heart"
+          ? Heart
+          : question.config?.ratingIcon === "thumbs_up"
+            ? ThumbsUp
+            : Star;
 
       return (
         <div>
@@ -271,7 +277,7 @@ export function SurveyQuestionInput({
                     className="group flex min-w-10 flex-col items-center gap-2 rounded-lg px-2 py-1 text-sm font-normal text-slate-700 outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/20 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="leading-5">{rating}</span>
-                    <Star
+                    <RatingIcon
                       aria-hidden="true"
                       className={`size-7 transition-colors ${selected ? "fill-amber-400 text-amber-400" : "text-slate-500 group-hover:text-slate-700"}`}
                       strokeWidth={1.8}
@@ -559,21 +565,6 @@ export function SurveyQuestionInput({
         </div>
       );
     }
-
-    case "datetime":
-      return (
-        <div>
-          <UiInput
-            className={controlClass}
-            type="datetime-local"
-            value={normalizeDatetimeLocalValue(value)}
-            onChange={(e) => onChange(e.target.value)}
-            aria-invalid={Boolean(error)}
-            disabled={disabled}
-          />
-          {renderError}
-        </div>
-      );
 
     default:
       return (

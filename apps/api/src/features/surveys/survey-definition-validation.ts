@@ -26,7 +26,7 @@ export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): 
   }
   if (question.questionType === "rating") {
     const ratingMax = question.config?.ratingMax ?? 5;
-    if (!Number.isInteger(ratingMax) || ratingMax < 2 || ratingMax > 10) {
+    if (!Number.isInteger(ratingMax) || ratingMax < 3 || ratingMax > 10) {
       throw new BadRequestException("survey_rating_scale_invalid");
     }
   }

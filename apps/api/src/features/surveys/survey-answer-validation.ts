@@ -118,7 +118,7 @@ function parseRating(value: unknown): number | null {
 
 function ratingMax(question: SurveyQuestionRecord): number {
   const configured = question.config?.ratingMax ?? 5;
-  return Number.isInteger(configured) && configured >= 2 && configured <= 10 ? configured : 5;
+  return Number.isInteger(configured) && configured >= 3 && configured <= 10 ? configured : 5;
 }
 
 export function isSurveyAnswerEmpty(
@@ -155,8 +155,7 @@ export function isSurveyAnswerEmpty(
     content.text ??
     content.value ??
     content.date ??
-    content.time ??
-    content.datetime;
+    content.time;
 
   return typeof value !== "string" || value.trim().length === 0;
 }
@@ -330,15 +329,6 @@ function validateAnswerContent(
           ? DURATION_PATTERN.test(timeValue)
           : TIME_PATTERN.test(timeValue));
       if (!isValid) {
-        throw new BadRequestException("answer_content_invalid");
-      }
-      break;
-    }
-    case "datetime": {
-      if (
-        typeof content.datetime !== "string" ||
-        !Number.isFinite(Date.parse(content.datetime))
-      ) {
         throw new BadRequestException("answer_content_invalid");
       }
       break;

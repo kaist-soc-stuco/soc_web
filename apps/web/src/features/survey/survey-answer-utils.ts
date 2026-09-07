@@ -73,8 +73,6 @@ export function toAnswerContent(
       return { date: value as string };
     case "time":
       return { time: value as string };
-    case "datetime":
-      return { datetime: value as string };
     default:
       return { value };
   }
@@ -159,9 +157,6 @@ export function answerContentToValue(
   }
   if (type === "time") {
     return typeof content.time === "string" ? content.time : "";
-  }
-  if (type === "datetime") {
-    return typeof content.datetime === "string" ? content.datetime : "";
   }
   return "";
 }

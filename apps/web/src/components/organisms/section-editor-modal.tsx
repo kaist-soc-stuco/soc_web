@@ -34,6 +34,9 @@ const escapeHtmlAttribute = (value: string) =>
 const appendInlineImage = (content: string, src: string) =>
   `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
 
+const DEFAULT_SECTION_DESCRIPTION_KO = "섹션 설명";
+const DEFAULT_SECTION_DESCRIPTION_EN = "Section description";
+
 export function SectionEditorModal({
   initial,
   isKoreanOnly = false,
@@ -41,7 +44,11 @@ export function SectionEditorModal({
   onSave,
   onCancel,
 }: SectionEditorModalProps) {
-  const [form, setForm] = useState<SectionFormState>(initial);
+  const [form, setForm] = useState<SectionFormState>(() => ({
+    ...initial,
+    descriptionKo: initial.descriptionKo.trim() || DEFAULT_SECTION_DESCRIPTION_KO,
+    descriptionEn: initial.descriptionEn.trim() || DEFAULT_SECTION_DESCRIPTION_EN,
+  }));
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [error, setError] = useState<string | null>(null);
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
@@ -148,11 +155,13 @@ export function SectionEditorModal({
               <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
               <RichTextEditor
                 compact
+                contentClassName="!text-lg leading-7"
                 disabled={isOngoing}
                 content={form.descriptionKo}
                 onImageUpload={handleDescriptionImageUpload}
                 onChange={(value) => update("descriptionKo", value)}
                 lang="ko"
+                placeholder={DEFAULT_SECTION_DESCRIPTION_KO}
               />
             </div>
           </div>
@@ -171,11 +180,13 @@ export function SectionEditorModal({
               <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
               <RichTextEditor
                 compact
+                contentClassName="!text-lg leading-7"
                 disabled={isOngoing || isKoreanOnly}
                 content={form.descriptionEn}
                 onImageUpload={handleDescriptionImageUpload}
                 onChange={(value) => update("descriptionEn", value)}
-                lang="ko"
+                lang="en"
+                placeholder={DEFAULT_SECTION_DESCRIPTION_EN}
               />
             </div>
           </div>

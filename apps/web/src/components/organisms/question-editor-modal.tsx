@@ -20,6 +20,7 @@ import {
   Circle,
   Clock3,
   Copy,
+  Heart,
   Grid3X3,
   GripVertical,
   ImagePlus,
@@ -29,6 +30,7 @@ import {
   SquareCheck,
   Star,
   Table2,
+  ThumbsUp,
   Trash2,
   Upload,
   X,
@@ -82,7 +84,6 @@ const QUESTION_TYPES: Array<{
   { value: "grid_multiple", label: "체크박스 그리드", icon: Grid3X3 },
   { value: "date", label: "날짜", icon: CalendarDays, separatorBefore: true },
   { value: "time", label: "시간", icon: Clock3 },
-  { value: "datetime", label: "날짜+시간", icon: CalendarDays },
 ];
 
 const normalizeQuestionType = (value: unknown): QuestionType =>
@@ -97,6 +98,13 @@ const restrictOptionToVerticalAxis: Modifier = ({ transform }) => ({
 
 type ValidationType = NonNullable<SurveyQuestionConfig["validationType"]>;
 type ValidationOperator = NonNullable<SurveyQuestionConfig["validationOperator"]>;
+type RatingIcon = NonNullable<SurveyQuestionConfig["ratingIcon"]>;
+
+const RATING_ICON_OPTIONS: Array<{ value: RatingIcon; label: string; icon: QuestionTypeIcon }> = [
+  { value: "star", label: "별표", icon: Star },
+  { value: "heart", label: "하트", icon: Heart },
+  { value: "thumbs_up", label: "좋아요", icon: ThumbsUp },
+];
 
 const VALIDATION_TYPE_OPTIONS: Array<{ value: ValidationType; label: string }> = [
   { value: "number", label: "숫자" },
@@ -423,7 +431,7 @@ function SortableOptionRow({
         <div className="grid min-w-0 flex-1 gap-2 md:grid-cols-2">
           <UiInput
             ref={index === optionCount - 1 ? (element) => { lastOptionLabelRef.current = element; } : undefined}
-            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
             placeholder={`옵션 ${index + 1}`}
             aria-label={`${index + 1}번 국문 옵션`}
             value={option.labelKo}
@@ -431,7 +439,7 @@ function SortableOptionRow({
             onChange={(event) => onUpdateOption(index, "labelKo", event.target.value)}
           />
           <UiInput
-            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+            className="!h-9 min-w-0 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
             placeholder={`Option ${index + 1}`}
             aria-label={`${index + 1}번 영문 옵션`}
             value={option.labelEn}
@@ -590,6 +598,16 @@ export function QuestionInlineEditor({
           : configuredValidationOperator ?? "min";
   const validationValue = form.config?.validationValue ?? 1;
   const validationValueMax = form.config?.validationValueMax ?? validationValue + 1;
+  const configuredRatingMax = Number(form.config?.ratingMax ?? 5);
+  const ratingPreviewMax = Number.isInteger(configuredRatingMax)
+    ? Math.min(Math.max(configuredRatingMax, 3), 10)
+    : 5;
+  const RatingPreviewIcon =
+    form.config?.ratingIcon === "heart"
+      ? Heart
+      : form.config?.ratingIcon === "thumbs_up"
+        ? ThumbsUp
+        : Star;
 
   const updateConfig = (updates: Partial<SurveyQuestionConfig>) => {
     set("config", { ...(form.config ?? {}), ...updates });
@@ -759,7 +777,16 @@ export function QuestionInlineEditor({
       shouldUpdateConfig = true;
     }
     if (questionType === "rating") {
-      nextConfig = { ...(nextConfig ?? {}), ratingMax: nextConfig?.ratingMax ?? 5 };
+      const configuredRatingMax = nextConfig?.ratingMax;
+      const ratingMax =
+        typeof configuredRatingMax === "number" && Number.isInteger(configuredRatingMax)
+          ? Math.min(Math.max(configuredRatingMax, 3), 10)
+          : 5;
+      nextConfig = {
+        ...(nextConfig ?? {}),
+        ratingMax,
+        ratingIcon: nextConfig?.ratingIcon ?? "star",
+      };
       shouldUpdateConfig = true;
     }
     const nextSupportsValidation =
@@ -1037,10 +1064,10 @@ export function QuestionInlineEditor({
   }, [moreMenuOpen]);
 
   const titleInputCls =
-    "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-sm font-normal text-slate-900 outline-none placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
+    "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-base font-normal text-slate-900 outline-none placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 pb-8 pt-7 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-5 md:pb-9 md:pt-7"
+      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-5 pb-5 pt-8 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-6 md:pb-5 md:pt-8"
     >
       {dragHandle ? (
         <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="문항 순서 이동">
@@ -1200,7 +1227,7 @@ export function QuestionInlineEditor({
                   placeholder="옵션 추가"
                   disabled={isOngoing}
                   onFocus={addOption}
-                   className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                   className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                 />
               </div>
             ) : null}
@@ -1227,7 +1254,7 @@ export function QuestionInlineEditor({
                         </span>
                         <UiInput
                           ref={index === items.length - 1 ? (element) => { lastGridLabelRef.current[kind] = element; } : undefined}
-                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                           placeholder={`${isRow ? "행" : "열"}${index + 1}`}
                           aria-label={`${isRow ? "행" : "열"} ${index + 1} 국문 라벨`}
                           value={option.labelKo}
@@ -1235,7 +1262,7 @@ export function QuestionInlineEditor({
                           onChange={(event) => updateGridOption(kind, index, "labelKo", event.target.value)}
                         />
                         <UiInput
-                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-900 shadow-none hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                           placeholder={`${isRow ? "row" : "col"}${index + 1}`}
                           aria-label={`${isRow ? "행" : "열"} ${index + 1} 영문 라벨`}
                           value={option.labelEn ?? ""}
@@ -1266,7 +1293,7 @@ export function QuestionInlineEditor({
                           aria-label={isRow ? "행 추가" : "열 추가"}
                           placeholder={isRow ? "행 추가" : "열 추가"}
                           onFocus={() => addGridOption(kind)}
-                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-sm font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                           className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                         />
                       </div>
                     ) : null}
@@ -1283,7 +1310,9 @@ export function QuestionInlineEditor({
           <span className="text-xs font-medium text-slate-600">등급 개수</span>
           <AdminSelectDropdown
             ariaLabel="등급 개수"
-            value={String(form.config?.ratingMax ?? 5)}
+            value={String(
+              Math.min(Math.max(form.config?.ratingMax ?? 5, 3), 10),
+            )}
             options={Array.from({ length: 8 }, (_, index) => ({
               value: String(index + 3),
               label: `${index + 3}개`,
@@ -1293,7 +1322,55 @@ export function QuestionInlineEditor({
             className="w-24"
             buttonClassName="!h-9 !text-sm"
           />
-          <span className="text-xs font-normal text-slate-400">별 아이콘으로 표시됩니다.</span>
+          <AdminSelectDropdown
+            ariaLabel="등급 아이콘"
+            value={form.config?.ratingIcon ?? "star"}
+            options={RATING_ICON_OPTIONS}
+            onChange={(value) => updateConfig({ ratingIcon: value as RatingIcon })}
+            disabled={isOngoing}
+            className="w-28"
+            buttonClassName="!h-9 !text-sm"
+          />
+        </div>
+      ) : null}
+
+      {form.questionType === "rating" ? (
+        <div className="mt-5 w-full max-w-3xl">
+          <div className="flex items-start justify-between gap-3 px-2">
+            {Array.from({ length: ratingPreviewMax }, (_, index) => (
+              <div
+                key={index + 1}
+                className="flex min-w-10 flex-1 flex-col items-center gap-2 text-base text-slate-700"
+              >
+                <span>{index + 1}</span>
+                <RatingPreviewIcon
+                  aria-hidden="true"
+                  className="size-7 text-slate-500"
+                  strokeWidth={1.8}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {form.questionType === "date" ? (
+        <div className="mt-5 flex items-center gap-4 text-base text-slate-500">
+          <span>
+            {form.config?.dateIncludeTime
+              ? `${form.config?.dateIncludeYear === false ? "월, 일" : "월, 일, 년"}, 시간`
+              : form.config?.dateIncludeYear === false
+                ? "월, 일"
+                : "월, 일, 년"}
+          </span>
+          <CalendarDays aria-hidden="true" className="size-5 text-slate-400" />
+        </div>
+      ) : null}
+
+      {form.questionType === "time" ? (
+        <div className="mt-5 flex items-center gap-4 text-base text-slate-500">
+          <span>{form.config?.timeAnswerType === "duration" ? "기간" : "시간"}</span>
+          <Clock3 aria-hidden="true" className="size-5 text-slate-400" />
         </div>
       ) : null}
 

@@ -48,7 +48,6 @@ function getQuestionTypeLabel(type: QuestionType, lang: string) {
     file_upload: { ko: "파일 업로드", en: "File upload" },
     date: { ko: "날짜", en: "Date" },
     time: { ko: "시간", en: "Time" },
-    datetime: { ko: "날짜와 시간", en: "Date & time" },
   };
 
   return lang === "ko" ? labels[type].ko : labels[type].en;

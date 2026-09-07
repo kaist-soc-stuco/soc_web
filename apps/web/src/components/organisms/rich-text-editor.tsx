@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 
 export interface RichTextEditorProps {
   className?: string;
+  contentClassName?: string;
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
@@ -348,6 +349,7 @@ function ShortcutHelpModal({
 
 function useTiptapEditor({
   content,
+  contentClassName,
   disabled,
   editorMinHeight,
   onImageUpload,
@@ -356,6 +358,7 @@ function useTiptapEditor({
   spellCheck,
 }: {
   content: string;
+  contentClassName?: string;
   disabled: boolean;
   editorMinHeight: string;
   onImageUpload?: (file: File) => Promise<string | null>;
@@ -397,7 +400,10 @@ function useTiptapEditor({
     },
     editorProps: {
       attributes: {
-        class: `${editorMinHeight} text-[length:var(--ui-text-section-size)] leading-normal text-slate-800`,
+        class: cn(
+          `${editorMinHeight} text-[length:var(--ui-text-section-size)] leading-normal text-slate-800`,
+          contentClassName,
+        ),
         spellcheck: spellCheck ? "true" : "false",
       },
       handlePaste: (view, event) => {
@@ -1003,6 +1009,7 @@ function EditorPane({
 
 export function RichTextEditor({
   className,
+  contentClassName,
   content,
   onChange,
   placeholder,
@@ -1027,6 +1034,7 @@ export function RichTextEditor({
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const editor = useTiptapEditor({
     content,
+    contentClassName,
     disabled,
     editorMinHeight: compact ? "min-h-[104px]" : "min-h-[380px]",
     onImageUpload,
@@ -1089,9 +1097,10 @@ export function RichTextEditor({
           className={cn(
             "tiptap-container min-w-0 flex-1 px-1 py-2 prose prose-slate max-w-none",
             canvasMinHeight,
+            contentClassName,
           )}
         >
-          <EditorContent editor={editor} />
+          <EditorContent editor={editor} className={contentClassName} />
         </div>
       </div>
       <ShortcutHelpModal

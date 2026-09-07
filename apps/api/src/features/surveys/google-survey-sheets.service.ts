@@ -194,7 +194,7 @@ export class GoogleSurveySheetsService implements OnModuleInit {
       const id = typeof content.assetId === "string" ? content.assetId : "";
       return id ? `${name} (asset:${id})` : name;
     }
-    for (const key of ["text", "date", "time", "datetime", "value"]) {
+    for (const key of ["text", "date", "time", "value"]) {
       if (typeof content[key] === "string") return content[key] as string;
     }
     return "";

@@ -448,7 +448,6 @@ export const QuestionTypeSchema = z.enum([
   "file_upload",
   "date",
   "time",
-  "datetime",
 ]);
 
 export const QuestionOptionSchema = z.object({
@@ -482,7 +481,8 @@ export const QuestionConfigSchema = z.object({
   imageUrlEn: SurveyImageReferenceSchema.nullable().optional(),
   rows: QuestionOptionsSchema.optional(),
   columns: QuestionOptionsSchema.optional(),
-  ratingMax: z.number().int().min(2).max(10).optional(),
+  ratingMax: z.number().int().min(3).max(10).optional(),
+  ratingIcon: z.enum(["star", "heart", "thumbs_up"]).optional(),
   maxFiles: z.number().int().positive().max(10).optional(),
   maxSizeBytes: z.number().int().positive().max(20_000_000).optional(),
   allowedMimeTypes: z.array(z.string().trim().min(1).max(100)).max(50).optional(),

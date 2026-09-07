@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
@@ -53,14 +53,19 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Clock3,
   Copy,
   Eye,
+  Heart,
+  GripVertical,
   MoreVertical,
   Move,
   Pencil,
   Plus,
   Save,
   Sheet,
+  Star,
+  ThumbsUp,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -237,7 +242,18 @@ const cloneQuestionConfig = (config: SurveyQuestionRecord["config"]) =>
     : undefined;
 
 const QUESTION_ROW_CLASS =
-  "group relative rounded-lg border border-slate-200 bg-white px-4 pb-5 pt-4 text-sm";
+  "group relative rounded-lg border border-slate-200 bg-white px-5 pb-7 pt-6 text-base";
+
+const DEFAULT_SURVEY_DESCRIPTION_KO = "설문지 설명";
+const DEFAULT_SURVEY_DESCRIPTION_EN = "Survey description";
+const DEFAULT_SECTION_DESCRIPTION_KO = "섹션 설명";
+const DEFAULT_SECTION_DESCRIPTION_EN = "Section description";
+
+const plainText = (value: string | null | undefined) =>
+  (value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 function QuestionDragHandleIcon() {
   return (
@@ -246,6 +262,97 @@ function QuestionDragHandleIcon() {
         <span key={index} className="size-0.5 rounded-full bg-current" />
       ))}
     </span>
+  );
+}
+
+type SortableSectionReorderRowProps = {
+  section: SurveyEditorSection;
+  index: number;
+  total: number;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  disabled: boolean;
+  onMove: (direction: -1 | 1) => void;
+};
+
+function SortableSectionReorderRow({
+  section,
+  index,
+  total,
+  canMoveUp,
+  canMoveDown,
+  disabled,
+  onMove,
+}: SortableSectionReorderRowProps) {
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.id });
+  const sectionTitle = section.titleKo || "제목 없는 섹션";
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={`flex min-h-20 items-center gap-4 px-6 py-4 ${
+        isDragging ? "relative z-10 bg-slate-50 shadow-md" : "bg-white"
+      }`}
+    >
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`${sectionTitle} 순서 이동`}
+        disabled={disabled}
+        className="flex size-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <GripVertical aria-hidden="true" className="size-5" />
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-base font-medium text-slate-900">
+          {sectionTitle}
+          {section.titleEn?.trim() ? (
+            <span className="ml-1 font-normal text-slate-400">
+              ({section.titleEn.trim()})
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-0.5 text-sm font-normal text-slate-500">
+          섹션 {total} 중 {index + 1}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <IconButton
+          type="button"
+          size="sm"
+          aria-label={`${sectionTitle} 위로 이동`}
+          onClick={() => onMove(-1)}
+          disabled={!canMoveUp || disabled}
+          className="text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+        >
+          <ChevronUp className="size-5" />
+        </IconButton>
+        <IconButton
+          type="button"
+          size="sm"
+          aria-label={`${sectionTitle} 아래로 이동`}
+          onClick={() => onMove(1)}
+          disabled={!canMoveDown || disabled}
+          className="text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+        >
+          <ChevronDown className="size-5" />
+        </IconButton>
+      </div>
+    </div>
   );
 }
 
@@ -276,8 +383,42 @@ const QUESTION_TYPE_LABELS: Record<string, string> = {
   file_upload: "파일 업로드",
   date: "날짜",
   time: "시간",
-  datetime: "날짜+시간",
 };
+
+function RatingQuestionPreview({ config }: { config: SurveyQuestionRecord["config"] }) {
+  const configuredMax = Number(config?.ratingMax ?? 5);
+  const max = Number.isInteger(configuredMax)
+    ? Math.min(Math.max(configuredMax, 3), 10)
+    : 5;
+  const RatingIcon =
+    config?.ratingIcon === "heart"
+      ? Heart
+      : config?.ratingIcon === "thumbs_up"
+        ? ThumbsUp
+        : Star;
+
+  return (
+    <div className="mt-3 w-full max-w-3xl">
+      <div className="flex items-start justify-between gap-3 px-2">
+        {Array.from({ length: max }, (_, index) => (
+          <div key={index + 1} className="flex min-w-10 flex-1 flex-col items-center gap-2 text-base text-slate-700">
+            <span>{index + 1}</span>
+            <RatingIcon aria-hidden="true" className="size-7 text-slate-500" strokeWidth={1.8} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimeQuestionPreview({ config }: { config: SurveyQuestionRecord["config"] }) {
+  return (
+    <div className="mt-3 flex items-center gap-4 text-base text-slate-500">
+      <span>{config?.timeAnswerType === "duration" ? "기간" : "시간"}</span>
+      <Clock3 aria-hidden="true" className="size-5 text-slate-400" />
+    </div>
+  );
+}
 
 function QuestionOptionPreview({
   questionType,
@@ -293,7 +434,7 @@ function QuestionOptionPreview({
   const isMultiple = questionType === "multiple_choice";
 
   return (
-    <div className="mt-3 grid max-w-2xl gap-2 text-xs text-slate-700">
+    <div className="mt-3 grid max-w-2xl gap-2 text-base text-slate-700">
       {fallbackOptions.slice(0, 8).map((option, index) => (
         <div key={`${option.value}-${index}`} className="flex min-w-0 items-center gap-2">
           {isDropdown ? (
@@ -312,8 +453,81 @@ function QuestionOptionPreview({
         </div>
       ))}
       {fallbackOptions.length > 8 ? (
-        <span className="text-xs text-slate-400">외 {fallbackOptions.length - 8}개</span>
+        <span className="text-base text-slate-400">외 {fallbackOptions.length - 8}개</span>
       ) : null}
+    </div>
+  );
+}
+
+function GridQuestionPreview({
+  questionType,
+  config,
+}: {
+  questionType: "grid_single" | "grid_multiple";
+  config: SurveyQuestionRecord["config"];
+}) {
+  const rows = config?.rows?.slice(0, 8) ?? [];
+  const columns = config?.columns?.slice(0, 8) ?? [];
+  const previewRows = rows.length > 0
+    ? rows
+    : [{ value: "row_1", labelKo: "행1", labelEn: "row1" }];
+  const previewColumns = columns.length > 0
+    ? columns
+    : [{ value: "column_1", labelKo: "열1", labelEn: "column1" }];
+  const isMultiple = questionType === "grid_multiple";
+
+  return (
+    <div className="mt-3 w-full max-w-4xl overflow-x-auto text-base text-slate-700">
+      <div
+        className="grid min-w-[28rem] items-center gap-y-3"
+        style={{
+          gridTemplateColumns: `minmax(8rem, 1.2fr) repeat(${previewColumns.length}, minmax(4rem, 1fr))`,
+        }}
+      >
+        <div aria-hidden="true" />
+        {previewColumns.map((column, index) => (
+          <div key={`${column.value}-${index}`} className="text-center">
+            {column.labelKo?.trim() || `열${index + 1}`}
+          </div>
+        ))}
+        {previewRows.map((row, rowIndex) => (
+          <Fragment key={`${row.value}-${rowIndex}`}>
+            <div className="min-w-0 truncate pr-3">
+              {row.labelKo?.trim() || `행${rowIndex + 1}`}
+            </div>
+            {previewColumns.map((column, columnIndex) => (
+              <div
+                key={`${row.value}-${column.value}-${columnIndex}`}
+                className="flex justify-center"
+                aria-hidden="true"
+              >
+                <span
+                  className={`size-5 border-2 border-slate-300 bg-white ${
+                    isMultiple ? "rounded" : "rounded-full"
+                  }`}
+                />
+              </div>
+            ))}
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DateQuestionPreview({
+  includeTime,
+  includeYear,
+}: {
+  includeTime: boolean;
+  includeYear: boolean;
+}) {
+  const dateParts = includeYear ? "월, 일, 년" : "월, 일";
+
+  return (
+    <div className="mt-3 flex items-center gap-4 text-base text-slate-500">
+      <span>{includeTime ? `${dateParts}, 시간` : dateParts}</span>
+      <CalendarIcon aria-hidden="true" className="size-5 text-slate-400" />
     </div>
   );
 }
@@ -326,7 +540,7 @@ function QuestionPreview({ question }: { question: SurveyQuestionRecord }) {
   switch (question.questionType) {
     case "short_text":
       return (
-        <div className="mt-3 max-w-md space-y-2 text-xs text-slate-500">
+        <div className="mt-3 max-w-md space-y-2 text-sm text-slate-500">
           {hasDescription ? <span className="block text-slate-600">설명</span> : null}
           <div className="w-3/4 border-b border-dotted border-slate-400 pb-1">
             단답형 텍스트
@@ -335,7 +549,7 @@ function QuestionPreview({ question }: { question: SurveyQuestionRecord }) {
       );
     case "long_text":
       return (
-        <div className="mt-3 max-w-2xl border-b border-dotted border-slate-400 pb-1 text-xs text-slate-500">
+        <div className="mt-3 max-w-2xl border-b border-dotted border-slate-400 pb-1 text-sm text-slate-500">
           장문형 텍스트
         </div>
       );
@@ -348,9 +562,28 @@ function QuestionPreview({ question }: { question: SurveyQuestionRecord }) {
           options={question.options ?? []}
         />
       );
+    case "grid_single":
+    case "grid_multiple":
+      return (
+        <GridQuestionPreview
+          questionType={question.questionType}
+          config={question.config}
+        />
+      );
+    case "rating":
+      return <RatingQuestionPreview config={question.config} />;
+    case "time":
+      return <TimeQuestionPreview config={question.config} />;
+    case "date":
+      return (
+        <DateQuestionPreview
+          includeTime={Boolean(question.config?.dateIncludeTime)}
+          includeYear={question.config?.dateIncludeYear ?? true}
+        />
+      );
     default:
       return (
-        <div className="mt-3 text-xs text-slate-400">
+        <div className="mt-3 text-sm text-slate-400">
           {QUESTION_TYPE_LABELS[question.questionType] ?? "문항"}
         </div>
       );
@@ -363,7 +596,7 @@ function QuestionRowContent({
   return (
     <div className="min-w-0">
       <div className="flex min-w-0 items-center gap-1">
-        <span className="min-w-0 truncate text-sm font-semibold text-slate-900">
+        <span className="min-w-0 truncate text-base font-medium text-slate-900">
           {question.titleKo || "질문"}
           {question.titleEn?.trim() ? (
             <span className="ml-1 font-normal text-slate-400">({question.titleEn.trim()})</span>
@@ -372,7 +605,7 @@ function QuestionRowContent({
         {question.isRequired ? (
           <span
             aria-label="필수 응답"
-            className="shrink-0 text-sm font-semibold text-red-500"
+            className="shrink-0 text-base font-semibold text-red-500"
             title="필수 응답"
           >
             *
@@ -395,9 +628,9 @@ function CollapsedQuestionRow({
     <button
       type="button"
       onClick={onEdit}
-      className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 text-left text-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+      className="flex min-h-20 w-full min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-5 text-left text-base transition-colors hover:border-slate-300 hover:bg-slate-50"
     >
-      <span className="flex min-w-0 flex-1 items-baseline gap-1 font-semibold text-slate-700">
+      <span className="flex min-w-0 flex-1 items-baseline gap-1 font-medium text-slate-700">
         <span className="min-w-0 truncate">
           {question.titleKo || "질문"}
           {question.titleEn?.trim() ? (
@@ -581,8 +814,8 @@ export function SurveyEditorPage() {
     defaultValues: {
       titleKo: "",
       titleEn: "",
-      descriptionKo: "",
-      descriptionEn: "",
+      descriptionKo: DEFAULT_SURVEY_DESCRIPTION_KO,
+      descriptionEn: DEFAULT_SURVEY_DESCRIPTION_EN,
       descriptionImageUrlKo: null,
       descriptionImageUrlEn: null,
       kind: "SURVEY",
@@ -630,7 +863,9 @@ export function SurveyEditorPage() {
     () => new Set(),
   );
   const [sectionMenuOpenId, setSectionMenuOpenId] = useState<string | null>(null);
-  const [sectionMoveOpenId, setSectionMoveOpenId] = useState<string | null>(null);
+  const [sectionReorderOpen, setSectionReorderOpen] = useState(false);
+  const [sectionReorderDraft, setSectionReorderDraft] = useState<SurveyEditorSection[]>([]);
+  const [sectionReorderSaving, setSectionReorderSaving] = useState(false);
 
   const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
@@ -641,9 +876,6 @@ export function SurveyEditorPage() {
   const [saveState, setSaveState] = useState<"idle" | "creating" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const [newSectionTitle, setNewSectionTitle] = useState("");
-  const [newSectionTitleEn, setNewSectionTitleEn] = useState("");
-  const [sectionAddOpenId, setSectionAddOpenId] = useState<string | null>(null);
   const [addingSection, setAddingSection] = useState(false);
 
   const [editingQuestion, setEditingQuestion] = useState<{
@@ -708,8 +940,8 @@ export function SurveyEditorPage() {
           form.reset({
             titleKo: detail.titleKo,
             titleEn: detail.titleEn ?? "",
-            descriptionKo: detail.descriptionKo ?? "",
-            descriptionEn: detail.descriptionEn ?? "",
+            descriptionKo: detail.descriptionKo?.trim() || DEFAULT_SURVEY_DESCRIPTION_KO,
+            descriptionEn: detail.descriptionEn?.trim() || DEFAULT_SURVEY_DESCRIPTION_EN,
             descriptionImageUrlKo: detail.descriptionImageUrlKo ?? null,
             descriptionImageUrlEn: detail.descriptionImageUrlEn ?? null,
             kind: (["SURVEY", "APPLICATION"] as const).includes(
@@ -838,6 +1070,10 @@ export function SurveyEditorPage() {
         const section = await client.createSection(created.id, {
           titleKo: "기본 섹션",
           titleEn: form.getValues("isKoreanOnly") ? undefined : "Default section",
+          descriptionKo: DEFAULT_SECTION_DESCRIPTION_KO,
+          descriptionEn: form.getValues("isKoreanOnly")
+            ? undefined
+            : DEFAULT_SECTION_DESCRIPTION_EN,
         });
         const detail = await client.getSurveyDetail(created.id);
         setLoadedSurveyId(created.id);
@@ -965,16 +1201,11 @@ export function SurveyEditorPage() {
       const target = event.target as Element | null;
       if (target?.closest("[data-section-menu]")) return;
       setSectionMenuOpenId(null);
-      setSectionMoveOpenId(null);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      if (sectionMoveOpenId) {
-        setSectionMoveOpenId(null);
-      } else {
-        setSectionMenuOpenId(null);
-      }
+      setSectionMenuOpenId(null);
     };
 
     document.addEventListener("pointerdown", closeOnOutsidePointer);
@@ -983,7 +1214,7 @@ export function SurveyEditorPage() {
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [sectionMenuOpenId, sectionMoveOpenId]);
+  }, [sectionMenuOpenId]);
 
   const toggleSectionCollapsed = (sectionId: string) => {
     setCollapsedSectionIds((previous) => {
@@ -1003,31 +1234,55 @@ export function SurveyEditorPage() {
     setSections([]);
     setCollapsedSectionIds(new Set());
     setSectionMenuOpenId(null);
-    setSectionMoveOpenId(null);
+    setSectionReorderOpen(false);
+    setSectionReorderDraft([]);
     setError(null);
     setSaveState("idle");
     form.reset();
     navigate("/admin/surveys/new", { state: { skipDraftRestore: true } });
   };
 
-  const handleAddSection = async () => {
-    if (!loadedSurveyId || !newSectionTitle.trim()) return;
-    if (!isKoreanOnly && !newSectionTitleEn.trim()) {
-      setError("영문 섹션 제목을 입력해주세요.");
-      return;
-    }
+  const handleAddSection = async (afterSectionId: string) => {
+    if (!loadedSurveyId || addingSection) return;
+    const sourceIndex = orderedSections.findIndex((section) => section.id === afterSectionId);
+    const source = sourceIndex >= 0 ? orderedSections[sourceIndex] : null;
+    if (!source) return;
+
     setAddingSection(true);
     setError(null);
     try {
-      await client.createSection(loadedSurveyId, {
-        titleKo: newSectionTitle.trim(),
-        titleEn: newSectionTitleEn.trim() || undefined,
+      const created = await client.createSection(loadedSurveyId, {
+        titleKo: "제목 없는 섹션",
+        titleEn: isKoreanOnly ? undefined : "Untitled section",
+        descriptionKo: DEFAULT_SECTION_DESCRIPTION_KO,
+        descriptionEn: isKoreanOnly ? undefined : DEFAULT_SECTION_DESCRIPTION_EN,
+        sortOrder: source.sortOrder + 1,
       });
+
+      const afterCreate = await client.getSurveyDetail(loadedSurveyId);
+      const afterCreateOrdered = [...afterCreate.sections].sort(compareSurveySectionOrder);
+      const createdIndex = afterCreateOrdered.findIndex((section) => section.id === created.id);
+      const insertIndex = Math.min(sourceIndex + 1, afterCreateOrdered.length - 1);
+      const reorderedSections = createdIndex >= 0 && createdIndex !== insertIndex
+        ? arrayMove(afterCreateOrdered, createdIndex, insertIndex)
+        : afterCreateOrdered;
+
+      if (createdIndex >= 0 && createdIndex !== insertIndex) {
+        await client.reorderSurveySections(loadedSurveyId, {
+          items: reorderedSections.map((section, index) => ({
+            id: section.id,
+            sortOrder: index,
+          })),
+        });
+      }
+
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
-      setNewSectionTitle("");
-      setNewSectionTitleEn("");
-      setSectionAddOpenId(null);
+      setCollapsedSectionIds((previous) => {
+        const next = new Set(previous);
+        next.delete(created.id);
+        return next;
+      });
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "섹션 추가 실패"));
@@ -1059,7 +1314,6 @@ export function SurveyEditorPage() {
         return next;
       });
       setSectionMenuOpenId(null);
-      setSectionMoveOpenId(null);
     } catch (err: unknown) {
       console.error(err);
       setError(getSurveyErrorMessage(err, "섹션 삭제 실패"));
@@ -1073,7 +1327,6 @@ export function SurveyEditorPage() {
     if (!source) return;
 
     setSectionMenuOpenId(null);
-    setSectionMoveOpenId(null);
     setError(null);
     try {
       // Insert the empty section directly after the source first. This keeps
@@ -1081,8 +1334,10 @@ export function SurveyEditorPage() {
       const created = await client.createSection(loadedSurveyId, {
         titleKo: source.titleKo,
         titleEn: source.titleEn ?? undefined,
-        descriptionKo: source.descriptionKo ?? undefined,
-        descriptionEn: source.descriptionEn ?? undefined,
+        descriptionKo: source.descriptionKo?.trim() || DEFAULT_SECTION_DESCRIPTION_KO,
+        descriptionEn: source.descriptionEn?.trim() || (
+          isKoreanOnly ? undefined : DEFAULT_SECTION_DESCRIPTION_EN
+        ),
         sortOrder: source.sortOrder + 1,
       });
       const afterCreate = await client.getSurveyDetail(loadedSurveyId);
@@ -1131,12 +1386,9 @@ export function SurveyEditorPage() {
     }
   };
 
-  const canMoveSectionTo = (sectionId: string, targetIndex: number) => {
-    const sourceIndex = orderedSections.findIndex((section) => section.id === sectionId);
-    if (sourceIndex < 0 || sourceIndex === targetIndex) return false;
-    const movedSections = arrayMove(orderedSections, sourceIndex, targetIndex);
-    return movedSections.every((section, index) => {
-      const laterIds = new Set(movedSections.slice(index + 1).map((item) => item.id));
+  const isValidSectionOrder = (candidateSections: SurveyEditorSection[]) =>
+    candidateSections.every((section, index) => {
+      const laterIds = new Set(candidateSections.slice(index + 1).map((item) => item.id));
       const defaultTarget = section.nextSectionId;
       if (defaultTarget && defaultTarget !== "SUBMIT" && !laterIds.has(defaultTarget)) return false;
       return section.questions.every((question) =>
@@ -1145,39 +1397,93 @@ export function SurveyEditorPage() {
         ),
       );
     });
+
+  const openSectionReorder = () => {
+    if (!commitEditingQuestion()) return;
+    setSectionMenuOpenId(null);
+    setSectionReorderDraft(orderedSections);
+    setSectionReorderOpen(true);
+    setError(null);
   };
 
-  const handleMoveSection = async (sectionId: string, targetIndex: number) => {
-    if (!loadedSurveyId || !commitEditingQuestion()) return;
-    const sourceIndex = orderedSections.findIndex((section) => section.id === sectionId);
-    if (sourceIndex < 0 || sourceIndex === targetIndex) return;
-    if (!canMoveSectionTo(sectionId, targetIndex)) {
-      setError("답변에 따른 섹션 이동 경로를 유지할 수 없는 위치입니다.");
+  const moveSectionReorderDraft = (index: number, direction: -1 | 1) => {
+    setSectionReorderDraft((current) => {
+      const targetIndex = index + direction;
+      if (index < 0 || targetIndex < 0 || targetIndex >= current.length) return current;
+      return arrayMove(current, index, targetIndex);
+    });
+  };
+
+  const canMoveSectionReorderDraft = (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= sectionReorderDraft.length) return false;
+    return isValidSectionOrder(arrayMove(sectionReorderDraft, index, targetIndex));
+  };
+
+  const handleSectionReorderDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id || sectionReorderSaving) return;
+
+    const sourceIndex = sectionReorderDraft.findIndex((section) => section.id === String(active.id));
+    const targetIndex = sectionReorderDraft.findIndex((section) => section.id === String(over.id));
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+
+    const nextDraft = arrayMove(sectionReorderDraft, sourceIndex, targetIndex);
+    if (!isValidSectionOrder(nextDraft)) {
+      setError("답변에 따른 섹션 이동 경로를 유지할 수 없는 순서입니다.");
+      return;
+    }
+
+    setSectionReorderDraft(nextDraft);
+    setError(null);
+  };
+
+  const handleSaveSectionReorder = async () => {
+    if (!loadedSurveyId || sectionReorderSaving) return;
+    if (!commitEditingQuestion()) return;
+    if (!isValidSectionOrder(sectionReorderDraft)) {
+      setError("답변에 따른 섹션 이동 경로를 유지할 수 없는 순서입니다.");
+      return;
+    }
+
+    const hasChanges = sectionReorderDraft.some(
+      (section, index) => section.id !== orderedSections[index]?.id,
+    );
+    if (!hasChanges) {
+      setSectionReorderOpen(false);
+      setSectionReorderDraft([]);
       return;
     }
 
     const previousSections = sections;
-    const nextSections = arrayMove(orderedSections, sourceIndex, targetIndex).map(
-      (section, index) => ({ ...section, sortOrder: index }),
-    );
-    setSectionMenuOpenId(null);
-    setSectionMoveOpenId(null);
-    setSections(nextSections);
+    const nextSections = sectionReorderDraft.map((section, index) => ({
+      ...section,
+      sortOrder: index,
+    }));
+    setSectionReorderSaving(true);
     setError(null);
+    setSections(nextSections);
     try {
-      const reordered = await client.reorderSurveySections(loadedSurveyId, {
+      await client.reorderSurveySections(loadedSurveyId, {
         items: nextSections.map((section) => ({ id: section.id, sortOrder: section.sortOrder })),
       });
-      const sortOrderById = new Map(reordered.map((section) => [section.id, section.sortOrder]));
-      setSections((current) => current.map((section) => ({
-        ...section,
-        sortOrder: sortOrderById.get(section.id) ?? section.sortOrder,
-      })));
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
+      setSectionReorderOpen(false);
+      setSectionReorderDraft([]);
     } catch (err: unknown) {
       console.error(err);
       setSections(previousSections);
-      setError(getSurveyErrorMessage(err, "섹션 이동 실패"));
+      setError(getSurveyErrorMessage(err, "섹션 재정렬 실패"));
+    } finally {
+      setSectionReorderSaving(false);
     }
+  };
+
+  const closeSectionReorder = () => {
+    if (sectionReorderSaving) return;
+    setSectionReorderOpen(false);
+    setSectionReorderDraft([]);
+    setError(null);
   };
 
   const handleSectionNavigationChange = async (sectionId: string, target: string) => {
@@ -1206,8 +1512,8 @@ export function SurveyEditorPage() {
       initial: {
         titleKo: section.titleKo,
         titleEn: section.titleEn ?? "",
-        descriptionKo: section.descriptionKo ?? "",
-        descriptionEn: section.descriptionEn ?? "",
+        descriptionKo: section.descriptionKo?.trim() || DEFAULT_SECTION_DESCRIPTION_KO,
+        descriptionEn: section.descriptionEn?.trim() || DEFAULT_SECTION_DESCRIPTION_EN,
       },
     });
   };
@@ -1220,7 +1526,9 @@ export function SurveyEditorPage() {
         titleKo: sectionForm.titleKo.trim(),
         titleEn: sectionForm.titleEn.trim() || undefined,
         descriptionKo: sectionForm.descriptionKo.trim() || undefined,
-        descriptionEn: sectionForm.descriptionEn.trim() || undefined,
+        descriptionEn: isKoreanOnly
+          ? undefined
+          : sectionForm.descriptionEn.trim() || DEFAULT_SECTION_DESCRIPTION_EN,
       });
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
@@ -1740,7 +2048,10 @@ export function SurveyEditorPage() {
                     <div className="space-y-6">
                       {orderedSections.map((section, sectionIndex) => {
                         const isCollapsed = collapsedSectionIds.has(section.id);
-                        const moveMenuOpen = sectionMoveOpenId === section.id;
+                        const sectionDescription =
+                          plainText(section.descriptionKo) ||
+                          plainText(section.descriptionEn) ||
+                          DEFAULT_SECTION_DESCRIPTION_KO;
 
                         return (
                            <section
@@ -1750,10 +2061,10 @@ export function SurveyEditorPage() {
                              <div className="relative overflow-visible rounded-lg border border-slate-200 bg-white">
                               <div className="flex min-w-0 items-start justify-between gap-4 px-5 py-4 md:px-6">
                                 <div className="min-w-0">
-                                  <div className="mb-1 text-xs font-medium text-slate-400">
+                                  <div className="mb-2 inline-flex min-h-8 items-center rounded-md bg-[#5546e8] px-3 py-1 text-sm font-medium text-white">
                                     섹션 {sectionIndex + 1} / {orderedSections.length}
                                   </div>
-                                  <h3 className="truncate text-lg font-semibold text-slate-900">
+                                  <h3 className="truncate text-lg font-medium text-slate-900">
                                     {section.titleKo || "제목 없는 섹션"}
                                     {section.titleEn?.trim() ? (
                                       <span className="ml-1 text-sm font-normal text-slate-400">
@@ -1761,6 +2072,11 @@ export function SurveyEditorPage() {
                                       </span>
                                     ) : null}
                                   </h3>
+                                  {sectionDescription ? (
+                                    <p className="mt-2 max-w-3xl text-base font-normal leading-7 text-slate-600">
+                                      {sectionDescription}
+                                    </p>
+                                  ) : null}
                                 </div>
                                 {!isOngoing ? (
                                   <div className="relative flex shrink-0 items-center gap-1" data-section-menu>
@@ -1786,7 +2102,6 @@ export function SurveyEditorPage() {
                                         aria-expanded={sectionMenuOpenId === section.id}
                                         onClick={() => {
                                           setSectionMenuOpenId((current) => current === section.id ? null : section.id);
-                                          setSectionMoveOpenId(null);
                                         }}
                                       >
                                         <MoreVertical className="size-4" />
@@ -1796,62 +2111,32 @@ export function SurveyEditorPage() {
                                           data-section-menu-popover
                                           className="scrollbar-hidden absolute left-0 top-full z-50 mt-2 max-h-80 w-60 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
                                         >
-                                          {moveMenuOpen ? (
-                                            <>
-                                              <div className="px-3 py-2 text-xs font-medium text-slate-400">섹션 이동</div>
-                                              {orderedSections.map((target, targetIndex) => {
-                                                if (target.id === section.id) return null;
-                                                const canMove = canMoveSectionTo(section.id, targetIndex);
-                                                return (
-                                                  <button
-                                                    key={target.id}
-                                                    type="button"
-                                                    disabled={!canMove}
-                                                    onClick={() => void handleMoveSection(section.id, targetIndex)}
-                                                    className="flex min-h-9 w-full items-center rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                                    title={!canMove ? "답변에 따른 이동 경로를 유지할 수 없습니다." : undefined}
-                                                  >
-                                                    {targetIndex + 1} 섹션({target.titleKo || "제목 없음"})
-                                                  </button>
-                                                );
-                                              })}
-                                              <div className="my-1 border-t border-slate-100" />
-                                              <button
-                                                type="button"
-                                                onClick={() => setSectionMoveOpenId(null)}
-                                                className="flex min-h-9 w-full items-center rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-500 hover:bg-slate-50"
-                                              >
-                                                뒤로
-                                              </button>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <button
-                                                type="button"
-                                                onClick={() => void handleDuplicateSection(section.id)}
-                                                className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50"
-                                              >
-                                                <Copy className="size-4 shrink-0 text-slate-500" />
-                                                섹션 복제
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => setSectionMoveOpenId(section.id)}
-                                                className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50"
-                                              >
-                                                <Move className="size-4 shrink-0 text-slate-500" />
-                                                섹션 이동
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => void handleDeleteSection(section.id)}
-                                                className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-rose-600 hover:bg-rose-50"
-                                              >
-                                                <Trash2 className="size-4 shrink-0" />
-                                                섹션 삭제
-                                              </button>
-                                            </>
-                                          )}
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleDuplicateSection(section.id)}
+                                              className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50"
+                                            >
+                                              <Copy className="size-4 shrink-0 text-slate-500" />
+                                              섹션 복제
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={openSectionReorder}
+                                              className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50"
+                                            >
+                                              <Move className="size-4 shrink-0 text-slate-500" />
+                                              섹션 이동
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleDeleteSection(section.id)}
+                                              className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-rose-600 hover:bg-rose-50"
+                                            >
+                                              <Trash2 className="size-4 shrink-0" />
+                                              섹션 삭제
+                                            </button>
+                                          </>
                                         </div>
                                       ) : null}
                                     </div>
@@ -1945,63 +2230,27 @@ export function SurveyEditorPage() {
                                       <Plus className="size-4" />
                                       문항 추가
                                     </Button>
-                                    <div className="relative shrink-0">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        aria-expanded={sectionAddOpenId === section.id}
-                                        onClick={() => setSectionAddOpenId((current) => current === section.id ? null : section.id)}
-                                        className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
-                                      >
-                                        <Plus className="size-4" />
-                                        섹션 추가
-                                      </Button>
-                                      {sectionAddOpenId === section.id ? (
-                                        <div className="absolute bottom-full left-0 z-40 mb-2 w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-slate-200 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.16)]">
-                                          <div className="grid gap-2 sm:grid-cols-2">
-                                            <UiInput
-                                              autoFocus
-                                              className="h-9 min-w-0 text-sm"
-                                              placeholder="새 섹션 제목 (국문)"
-                                              value={newSectionTitle}
-                                              onChange={(event) => setNewSectionTitle(event.target.value)}
-                                              onKeyDown={(event) => {
-                                                if (event.key === "Enter") void handleAddSection();
-                                              }}
-                                            />
-                                            <UiInput
-                                              className={`h-9 min-w-0 text-sm ${isKoreanOnly ? "cursor-not-allowed opacity-50" : ""}`}
-                                              placeholder="영문 섹션 제목"
-                                              value={newSectionTitleEn}
-                                              disabled={isKoreanOnly}
-                                              onChange={(event) => setNewSectionTitleEn(event.target.value)}
-                                              onKeyDown={(event) => {
-                                                if (event.key === "Enter") void handleAddSection();
-                                              }}
-                                            />
-                                          </div>
-                                          <div className="mt-2 flex justify-end">
-                                            <Button
-                                              type="button"
-                                              onClick={() => void handleAddSection()}
-                                              disabled={addingSection || !newSectionTitle.trim()}
-                                              className="h-9 bg-brand-primary px-3 text-sm text-white hover:bg-brand-primary/90"
-                                            >
-                                              {addingSection ? "추가 중…" : "섹션 추가"}
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : null}
-                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() => void handleAddSection(section.id)}
+                                      disabled={addingSection}
+                                      className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
+                                    >
+                                      <Plus className="size-4" />
+                                      {addingSection ? "섹션 추가 중…" : "섹션 추가"}
+                                    </Button>
                                   </div>
                                 ) : <span />}
-                                <SectionNavigationSelect
-                                  section={section}
-                                  sectionIndex={sectionIndex}
-                                  sections={orderedSections}
-                                  disabled={isOngoing}
-                                  onChange={(value) => void handleSectionNavigationChange(section.id, value)}
-                                />
+                                {sectionIndex < orderedSections.length - 1 ? (
+                                  <SectionNavigationSelect
+                                    section={section}
+                                    sectionIndex={sectionIndex}
+                                    sections={orderedSections}
+                                    disabled={isOngoing}
+                                    onChange={(value) => void handleSectionNavigationChange(section.id, value)}
+                                  />
+                                ) : null}
                               </div>
                             </div>
                           </section>
@@ -2041,6 +2290,72 @@ export function SurveyEditorPage() {
             onCancel={() => setEditingSection(null)}
           />
         )}
+
+        {sectionReorderOpen ? (
+          <Modal
+            open
+            onClose={closeSectionReorder}
+            title="섹션 재정렬"
+            className="max-w-2xl"
+            bodyClassName="!p-0"
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeSectionReorder}
+                  disabled={sectionReorderSaving}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleSaveSectionReorder()}
+                  disabled={sectionReorderSaving}
+                  className="bg-brand-primary text-white hover:bg-brand-primary/90"
+                >
+                  {sectionReorderSaving ? "저장 중…" : "저장"}
+                </Button>
+              </>
+            }
+          >
+            <div className="border-b border-slate-200 px-6 py-4">
+              <p className="text-sm font-normal text-slate-500">
+                재정렬한 후 섹션 탐색 논리를 확인하세요.
+              </p>
+            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleSectionReorderDragEnd}
+            >
+              <SortableContext
+                items={sectionReorderDraft.map((section) => section.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="divide-y divide-slate-200">
+                  {sectionReorderDraft.map((section, index) => (
+                    <SortableSectionReorderRow
+                      key={section.id}
+                      section={section}
+                      index={index}
+                      total={sectionReorderDraft.length}
+                      canMoveUp={canMoveSectionReorderDraft(index, -1)}
+                      canMoveDown={canMoveSectionReorderDraft(index, 1)}
+                      disabled={sectionReorderSaving}
+                      onMove={(direction) => moveSectionReorderDraft(index, direction)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+            {error ? (
+              <p className="border-t border-red-100 bg-red-50 px-6 py-3 text-sm font-normal text-red-700">
+                {error}
+              </p>
+            ) : null}
+          </Modal>
+        ) : null}
 
         {overwriteTarget && (
           <Modal
