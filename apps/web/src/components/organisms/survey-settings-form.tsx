@@ -462,7 +462,7 @@ export function SurveySettingsForm({
                    key="titleKo"
                    aria-label="설문 제목"
                    autoFocus={mode === "basic"}
-                   className={inputCls}
+                   className={`${inputCls} !h-14 !px-4 !text-2xl !font-medium leading-8`}
                   placeholder="설문 제목"
                   {...register("titleKo")}
                 />
@@ -470,7 +470,7 @@ export function SurveySettingsForm({
                 <UiInput
                   key="titleEn"
                   aria-label="Survey title"
-                  className={inputCls}
+                  className={`${inputCls} !h-14 !px-4 !text-2xl !font-medium leading-8`}
                   placeholder="Survey title"
                   {...register("titleEn")}
                 />
@@ -495,12 +495,13 @@ export function SurveySettingsForm({
                   render={({ field }) => (
                     <RichTextEditor
                       className="!mx-0 !max-w-none"
+                      contentClassName="!text-base leading-6"
                       compact
                       content={field.value ?? ""}
                       onImageUpload={handleDescriptionImageUpload}
                       onChange={field.onChange}
                       lang="ko"
-                      placeholder="설문 설명을 입력하세요"
+                      placeholder="설문지 설명"
                     />
                   )}
                 />
@@ -511,12 +512,13 @@ export function SurveySettingsForm({
                   render={({ field }) => (
                     <RichTextEditor
                       className="!mx-0 !max-w-none"
+                      contentClassName="!text-base leading-6"
                       compact
                       content={field.value ?? ""}
                       onImageUpload={handleDescriptionImageUpload}
                       onChange={field.onChange}
                       lang="en"
-                      placeholder="Enter a survey description"
+                      placeholder="Survey description"
                     />
                   )}
                 />
@@ -529,16 +531,16 @@ export function SurveySettingsForm({
             aria-label="설문 제목 및 설명 편집"
             aria-expanded={false}
             onClick={() => setBasicEditorExpanded(true)}
-            className={`${mode === "all" ? "lg:col-span-2" : ""} block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-5 py-4 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/20 md:px-6`}
+            className={`${mode === "all" ? "lg:col-span-2" : ""} block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-5 py-5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/20 md:px-6`}
           >
-            <div className="flex min-w-0 items-baseline gap-1 text-base font-semibold text-slate-900">
+            <div className="flex min-w-0 items-baseline gap-1 text-2xl font-medium leading-8 text-slate-900">
               <span className="min-w-0 truncate">{titleKo.trim() || "설문 제목"}</span>
               {titleEn.trim() ? (
-                <span className="min-w-0 truncate text-sm font-normal text-slate-400">({titleEn.trim()})</span>
+                <span className="min-w-0 truncate text-lg font-normal text-slate-400">({titleEn.trim()})</span>
               ) : null}
             </div>
             {plainText(descriptionKo) || (!isKoreanOnly && plainText(descriptionEn)) ? (
-              <p className="mt-1 truncate text-sm font-normal text-slate-500">
+              <p className="mt-2 truncate text-base font-normal leading-6 text-slate-500">
                 {plainText(descriptionKo) || plainText(descriptionEn)}
               </p>
             ) : null}

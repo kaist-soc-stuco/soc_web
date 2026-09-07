@@ -825,6 +825,8 @@ type QuestionOptionSeed = {
 type QuestionConfigSeed = {
   rows?: QuestionOptionSeed[];
   columns?: QuestionOptionSeed[];
+  ratingMax?: number;
+  ratingIcon?: "star" | "heart" | "thumbs_up";
   maxFiles?: number;
   maxSizeBytes?: number;
   allowedMimeTypes?: string[];
@@ -846,7 +848,7 @@ type QuestionSeed = {
     | "file_upload"
     | "date"
     | "time"
-    | "datetime";
+    | "rating";
   options?: QuestionOptionSeed[];
   config?: QuestionConfigSeed;
   isRequired?: boolean;
@@ -1182,8 +1184,8 @@ function makeAllQuestionTypesSurvey(): SurveySeed {
       {
         titleKo: "기본 입력",
         titleEn: "Basic inputs",
-        descriptionKo: "텍스트, 날짜, 시간 입력 문항을 확인해 보세요.",
-        descriptionEn: "Try the text, date, and time input questions.",
+        descriptionKo: "텍스트, 날짜, 시간, 등급 입력 문항을 확인해 보세요.",
+        descriptionEn: "Try the text, date, time, and rating input questions.",
         sortOrder: 0,
         questions: [
           {
@@ -1246,9 +1248,13 @@ function makeAllQuestionTypesSurvey(): SurveySeed {
             sortOrder: 6,
           },
           {
-            titleKo: "다음 모임에 참여 가능한 일시를 선택해 주세요.",
-            titleEn: "Choose a date and time when you can attend the next meetup.",
-            questionType: "datetime",
+            titleKo: "서비스 만족도를 평가해 주세요.",
+            titleEn: "Rate your satisfaction with the service.",
+            questionType: "rating",
+            config: {
+              ratingMax: 5,
+              ratingIcon: "star",
+            },
             sortOrder: 7,
           },
         ],

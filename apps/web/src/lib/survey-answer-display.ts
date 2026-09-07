@@ -1,5 +1,4 @@
 import type { SurveyAnswerRecord, SurveyQuestionRecord } from "@soc/contracts";
-import { formatKoreanDateTime } from "@soc/shared";
 
 function localizedLabel(
   option: { labelKo: string; labelEn?: string | null } | undefined,
@@ -67,12 +66,5 @@ export function formatSurveyAnswer(
   if (typeof content.text === "string") return content.text;
   if (typeof content.date === "string") return content.date;
   if (typeof content.time === "string") return content.time;
-  if (typeof content.datetime === "string") {
-    try {
-      return formatKoreanDateTime(content.datetime);
-    } catch {
-      return content.datetime;
-    }
-  }
   return "";
 }

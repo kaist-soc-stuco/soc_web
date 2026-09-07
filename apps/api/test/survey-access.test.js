@@ -141,17 +141,12 @@ test("public analytics never expose free-text, date, or time answer values", asy
     { questionId: "long", content: { text: "private-long-answer" } },
     { questionId: "date", content: { date: "2026-07-15" } },
     { questionId: "time", content: { time: "13:37" } },
-    {
-      questionId: "datetime",
-      content: { datetime: "2026-07-15T13:37:00.000Z" },
-    },
   ];
   const questions = [
     { id: "short", questionType: "short_text", titleKo: "단답", titleEn: null, options: null },
     { id: "long", questionType: "long_text", titleKo: "장문", titleEn: null, options: null },
     { id: "date", questionType: "date", titleKo: "날짜", titleEn: null, options: null },
     { id: "time", questionType: "time", titleKo: "시간", titleEn: null, options: null },
-    { id: "datetime", questionType: "datetime", titleKo: "일시", titleEn: null, options: null },
   ];
   const service = createService({
     answers: sensitiveAnswers,
@@ -162,7 +157,7 @@ test("public analytics never expose free-text, date, or time answer values", asy
   const analytics = await service.getAnalytics("survey-1", user);
   const serialized = JSON.stringify(analytics);
 
-  assert.equal(analytics.questions.length, 5);
+  assert.equal(analytics.questions.length, 4);
   for (const question of analytics.questions) {
     assert.equal(question.totalAnswers, 1);
     assert.equal(question.rawAnswersHidden, true);
