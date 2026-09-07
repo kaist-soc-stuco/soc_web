@@ -18,7 +18,7 @@ export function TextInput({
   return (
     <div
       className={cn(
-        "interaction-control select-none flex h-10 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-slate-700",
+        "interaction-control select-none flex h-[var(--ui-control-height)] min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-slate-700",
         containerClassName,
       )}
     >

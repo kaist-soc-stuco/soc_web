@@ -24,7 +24,7 @@ export function PageContainer({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-[var(--ui-page-max-width)] px-[var(--ui-space-page-x)] md:px-[var(--ui-space-page-x-wide)]",
+        "mx-auto w-full max-w-[var(--ui-page-max-width)] px-[var(--ui-space-page-x)] sm:px-[var(--ui-space-page-x-tablet)] lg:px-[var(--ui-space-page-x-wide)]",
         className,
       )}
       {...props}
@@ -80,19 +80,28 @@ export function PageHeader({
 }) {
   return (
     <section className={cn("mb-6 bg-[var(--ui-surface-canvas)]", className)} aria-labelledby={titleId}>
-      <PageContainer className={cn("flex items-end justify-between gap-4 pb-4 pt-6", containerClassName)}>
+      <PageContainer
+        className={cn(
+          "flex flex-col gap-4 pb-4 pt-6 sm:flex-row sm:items-end sm:justify-between",
+          containerClassName,
+        )}
+      >
         <div className="min-w-0">
           {breadcrumbs.length > 0 ? (
             <Breadcrumbs breadcrumbs={breadcrumbs} />
           ) : null}
           <h1
             id={titleId}
-            className="break-words text-[length:var(--ui-text-page-title-size)] font-bold leading-9 tracking-[-0.025em] text-app-text-strong"
+            className="break-words text-[length:var(--ui-text-page-title-mobile-size)] font-bold leading-8 tracking-[-0.025em] text-app-text-strong sm:text-[length:var(--ui-text-page-title-size)] sm:leading-9"
           >
             {title}
           </h1>
         </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
+        {actions ? (
+          <div className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 [&>div]:min-w-0 [&>div]:max-w-full [&>div]:flex-wrap">
+            {actions}
+          </div>
+        ) : null}
       </PageContainer>
     </section>
   );
@@ -292,14 +301,14 @@ export function PageSearchField({
         placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-[var(--ui-control-height)] w-full border-[var(--ui-border-subtle)] pl-9 pr-9 text-[length:var(--ui-control-font-size)] font-normal tracking-tight"
+        className="h-[var(--ui-control-height)] w-full border-[var(--ui-border-subtle)] pl-9 pr-12 text-[length:var(--ui-control-font-size)] font-normal tracking-tight"
       />
       {value ? (
         <IconButton
-          size="sm"
+          size="lg"
           aria-label={`${ariaLabel} 지우기`}
           onClick={onClear}
-          className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-slate-400"
+          className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400"
         >
           <X aria-hidden="true" />
         </IconButton>

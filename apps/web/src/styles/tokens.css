@@ -6,7 +6,9 @@
      - dvh/vw/clamp(): viewport-driven surfaces and responsive type only
      Do not add local text-[Npx] values in TSX; add or reuse a semantic role here. */
   /* Shared geometry: inputs, selects, buttons and filter controls use these values. */
+  --ui-touch-target-min: 2.75rem;
   --ui-control-height: 2.5rem;
+  --ui-control-height-mobile: var(--ui-touch-target-min);
   --ui-control-height-compact: 2.25rem;
   --ui-control-height-dense: 1.875rem;
   --ui-control-radius: 0.5rem;
@@ -17,6 +19,8 @@
   --ui-segmented-height: 2.5rem;
   --ui-segmented-item-height: 2rem;
   --ui-page-tab-height: 2.125rem;
+  --ui-page-tab-height-mobile: var(--ui-touch-target-min);
+  --ui-pagination-control-size: var(--ui-control-height-compact);
   --ui-table-head-height: 3rem;
   --ui-table-row-min-height: 3.5rem;
   --ui-card-radius: 0.75rem;
@@ -27,7 +31,9 @@
   --ui-article-max-width: 65rem;
   --ui-legal-max-width: 75rem;
   --ui-about-max-width: 61.25rem;
+  --ui-space-page-x-narrow: 1rem;
   --ui-space-page-x: 1.25rem;
+  --ui-space-page-x-tablet: 1.5rem;
   --ui-space-page-x-wide: 2rem;
   --ui-header-height: 4.25rem;
   --ui-brand-rail-width: 15rem;
@@ -97,4 +103,18 @@
   /* Keep the home carousel compact and stable across desktop widths. */
   --home-event-card-height: 25rem;
   --home-event-card-height-mobile: 17.5rem;
+}
+
+@media (max-width: 63.9375rem) {
+  :root {
+    --ui-control-height: var(--ui-control-height-mobile);
+    --ui-page-tab-height: var(--ui-page-tab-height-mobile);
+    --ui-pagination-control-size: var(--ui-control-height);
+  }
+}
+
+@media (max-width: 22.5rem) {
+  :root {
+    --ui-space-page-x: var(--ui-space-page-x-narrow);
+  }
 }
