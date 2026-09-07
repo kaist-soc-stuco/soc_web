@@ -2,7 +2,7 @@ import { SelectDropdown, type SelectDropdownProps } from "@/components/atoms/sel
 import { cn } from "@/lib/utils";
 
 const adminSelectButtonClassName =
-  "h-[var(--ui-control-height-compact)] rounded-[var(--ui-control-radius)] border-[var(--ui-border-subtle)] px-3 py-0 text-sm font-normal text-[#344054] shadow-none";
+  "h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-[var(--ui-border-subtle)] px-3 py-0 text-sm font-normal text-[#344054] shadow-none";
 
 /**
  * The shared select style for admin controls and pagination.

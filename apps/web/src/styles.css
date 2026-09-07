@@ -546,9 +546,9 @@
   .ui-pagination__controls button,
   .ui-pagination__controls > span {
     display: grid;
-    height: var(--ui-control-height-compact);
-    min-height: var(--ui-control-height-compact);
-    max-height: var(--ui-control-height-compact);
+    height: var(--ui-pagination-control-size);
+    min-height: var(--ui-pagination-control-size);
+    max-height: var(--ui-pagination-control-size);
     padding: 0;
     place-items: center;
     color: var(--j-color-text-secondary);
@@ -558,8 +558,8 @@
   }
 
   .ui-pagination__controls button {
-    width: var(--ui-control-height-compact);
-    min-width: var(--ui-control-height-compact);
+    width: var(--ui-pagination-control-size);
+    min-width: var(--ui-pagination-control-size);
     border: 0;
     border-radius: 8px;
     background: #ffffff;
@@ -585,8 +585,8 @@
 
   .ui-pagination__input-label {
     display: grid;
-    width: var(--ui-control-height-compact);
-    height: var(--ui-control-height-compact);
+    width: var(--ui-pagination-control-size);
+    height: var(--ui-pagination-control-size);
     place-items: center;
   }
 
@@ -594,7 +594,7 @@
     width: 100%;
     height: 100%;
     min-height: 0;
-    max-height: var(--ui-control-height-compact);
+    max-height: var(--ui-pagination-control-size);
     padding: 0 4px;
     border: 1px solid var(--ui-menu-divider);
     border-radius: 8px;
@@ -613,6 +613,34 @@
   .ui-pagination,
   .ui-pagination * {
     font-weight: 400 !important;
+  }
+
+  @media (max-width: 39.9375rem) {
+    .ui-pagination {
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+
+    .ui-pagination__summary,
+    .ui-pagination__controls {
+      width: 100%;
+    }
+
+    .ui-pagination__summary {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .ui-pagination__range {
+      min-width: 0;
+      white-space: normal;
+    }
+
+    .ui-pagination__controls {
+      justify-content: space-between;
+    }
   }
 
   .interaction-control,

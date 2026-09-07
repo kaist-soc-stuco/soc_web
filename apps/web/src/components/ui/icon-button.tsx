@@ -6,7 +6,7 @@ type IconButtonSize = "sm" | "md" | "lg";
 
 const sizeClasses: Record<IconButtonSize, string> = {
   sm: "h-8 w-8",
-  md: "h-[var(--ui-control-height-compact)] w-[var(--ui-control-height-compact)]",
+  md: "h-[var(--ui-control-height)] w-[var(--ui-control-height)]",
   lg: "h-[var(--ui-control-height)] w-[var(--ui-control-height)]",
 };
 
