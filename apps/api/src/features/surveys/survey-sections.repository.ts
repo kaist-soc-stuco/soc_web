@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -27,6 +27,7 @@ export class SurveySectionsRepository {
       titleEn: row.titleEn,
       descriptionKo: row.descriptionKo,
       descriptionEn: row.descriptionEn,
+      nextSectionId: row.nextSectionId,
       sortOrder: row.sortOrder,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -38,9 +39,15 @@ export class SurveySectionsRepository {
     tx?: PostgresTransaction,
   ): Promise<SurveySectionRecord[]> {
     const db = tx ?? this.db;
-    const rows = await db.query.surveySections.findMany({
-      where: eq(surveySections.surveyId, surveyId),
-    });
+    const rows = await db
+      .select()
+      .from(surveySections)
+      .where(eq(surveySections.surveyId, surveyId))
+      .orderBy(
+        asc(surveySections.sortOrder),
+        asc(surveySections.createdAt),
+        asc(surveySections.id),
+      );
     return rows.map((r) => this.map(r));
   }
 
@@ -62,6 +69,13 @@ export class SurveySectionsRepository {
     tx?: PostgresTransaction,
   ): Promise<SurveySectionRecord> {
     const db = tx ?? this.db;
+    const [lastSection] = await db
+      .select({ sortOrder: surveySections.sortOrder })
+      .from(surveySections)
+      .where(eq(surveySections.surveyId, surveyId))
+      .orderBy(desc(surveySections.sortOrder))
+      .limit(1);
+    const sortOrder = dto.sortOrder ?? (lastSection?.sortOrder ?? -1) + 1;
     const [row] = await db
       .insert(surveySections)
       .values({
@@ -70,7 +84,8 @@ export class SurveySectionsRepository {
         titleEn: dto.titleEn ?? null,
         descriptionKo: sanitizeSurveyRichText(dto.descriptionKo),
         descriptionEn: sanitizeSurveyRichText(dto.descriptionEn),
-        sortOrder: dto.sortOrder ?? 0,
+        nextSectionId: dto.nextSectionId ?? null,
+        sortOrder,
       })
       .returning();
     return this.map(row);
@@ -94,6 +109,7 @@ export class SurveySectionsRepository {
     if (dto.descriptionEn !== undefined) {
       set.descriptionEn = sanitizeSurveyRichText(dto.descriptionEn);
     }
+    if (dto.nextSectionId !== undefined) set.nextSectionId = dto.nextSectionId;
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
 
     const db = tx ?? this.db;

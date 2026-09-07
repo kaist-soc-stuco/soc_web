@@ -112,6 +112,7 @@ export const surveySections = pgTable("survey_sections", {
   titleEn: text("title_en"),
   descriptionKo: text("description_ko"),
   descriptionEn: text("description_en"),
+  nextSectionId: text("next_section_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

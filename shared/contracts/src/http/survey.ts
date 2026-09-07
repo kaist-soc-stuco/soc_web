@@ -91,6 +91,8 @@ export interface SurveySectionRecord {
   titleEn: string | null;
   descriptionKo: string | null;
   descriptionEn: string | null;
+  /** The default destination after this section. Null means continue in order. */
+  nextSectionId: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;

@@ -376,26 +376,24 @@ function SortableOptionRow({
         transition,
         zIndex: isDragging ? 20 : undefined,
       }}
-      className={`group min-w-0 rounded-lg px-1 py-1.5 transition-colors hover:bg-slate-50/70 ${
+      className={`group relative min-w-0 rounded-lg px-0 py-1.5 transition-colors hover:bg-slate-50/70 ${
         isDragging ? "bg-emerald-50 shadow-md" : ""
       }`}
     >
+      {!isOngoing ? (
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          aria-label={`${option.labelKo || option.value || "선택지"} 순서 이동`}
+          aria-grabbed={isDragging ? "true" : undefined}
+          className="absolute -left-4 top-1/2 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-300 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical aria-hidden="true" className="size-4" />
+        </button>
+      ) : null}
       <div className="flex min-w-0 items-center gap-2">
-        {!isOngoing ? (
-          <button
-            ref={setActivatorNodeRef}
-            type="button"
-            aria-label={`${option.labelKo || option.value || "선택지"} 순서 이동`}
-            aria-grabbed={isDragging ? "true" : undefined}
-            className="inline-flex size-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-slate-300 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical aria-hidden="true" className="size-4" />
-          </button>
-        ) : (
-          <span aria-hidden="true" className="size-5 shrink-0" />
-        )}
         <span
           className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 bg-white ${
             isCircular ? "rounded-full" : "rounded"
@@ -469,7 +467,7 @@ function SortableOptionRow({
         value={optionImage}
         disabled={isOngoing}
         onRemove={() => onUpdateOptionImage(index, null)}
-        className="ml-[4.5rem] mt-2"
+        className="ml-7 mt-2"
       />
     </div>
   );
@@ -972,13 +970,14 @@ export function QuestionInlineEditor({
       );
       const menuWidth = Math.min(naturalWidth, availableWidth);
       const rightEdge = window.innerWidth - viewportPadding;
-      const preferredLeft = triggerRect.right + gap;
-      const left = preferredLeft + menuWidth <= rightEdge
-        ? preferredLeft
-        : Math.min(
-            Math.max(viewportPadding, triggerRect.right - menuWidth),
-            Math.max(viewportPadding, rightEdge - menuWidth),
-          );
+      // Keep the menu's left edge aligned with the trigger. This matches the
+      // editor toolbar and prevents the menu from drifting into the question
+      // body when the trigger is near the right edge.
+      const preferredLeft = triggerRect.left;
+      const left = Math.min(
+        Math.max(viewportPadding, preferredLeft),
+        Math.max(viewportPadding, rightEdge - menuWidth),
+      );
       const bottomEdge = window.innerHeight - viewportPadding;
       const preferredTop = triggerRect.bottom + gap;
       const top = preferredTop + naturalHeight <= bottomEdge
@@ -1052,6 +1051,7 @@ export function QuestionInlineEditor({
         <CompactImagePicker
           label="문항 이미지"
           value={questionImage}
+          hideWhenValue
           onChange={updateQuestionImage}
           disabled={isOngoing}
           onError={(message) => toast({ type: "error", message })}
@@ -1151,8 +1151,7 @@ export function QuestionInlineEditor({
               </SortableContext>
             </DndContext>
             {!isOngoing ? (
-              <div className="flex min-w-0 items-center gap-2 px-1 py-1">
-                <span aria-hidden="true" className="size-5 shrink-0" />
+              <div className="flex min-w-0 items-center gap-2 px-0 py-1">
                 <span
                   className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 text-[length:var(--ui-text-micro-size)] text-slate-300 ${form.questionType === "single_choice" || form.questionType === "dropdown" ? "rounded-full" : "rounded"}`}
                   aria-hidden="true"

@@ -5,6 +5,9 @@ const {
   getReachableSurveyQuestions,
   assertQuestionBranchConfiguration,
 } = require("../dist/apps/api/src/features/surveys/survey-branching.js");
+const { assertSurveyBranchDefinitions } = require(
+  "../dist/apps/api/src/features/surveys/survey-definition-validation.js",
+);
 
 const question = (overrides = {}) => ({
   id: "question-1",
@@ -81,6 +84,38 @@ test("survey branching rejects option and section references that do not exist",
   assert.throws(
     () => assertQuestionBranchConfiguration(invalid, new Set(["section-1", "section-2"]), "section-1"),
     /survey_branch_option_not_found/,
+  );
+});
+
+test("survey sections with a shared sort order still resolve by creation order", () => {
+  const first = question({
+    id: "q-1",
+    questionType: "single_choice",
+    options: [{ value: "next", labelKo: "다음" }],
+    config: { goToSectionByValue: { next: "section-2" } },
+  });
+  const second = question({ id: "q-2", sectionId: "section-2" });
+  const sections = [
+    {
+      id: "section-2",
+      sortOrder: 0,
+      createdAt: "2026-08-20T00:00:01.000Z",
+      questions: [second],
+    },
+    {
+      id: "section-1",
+      sortOrder: 0,
+      createdAt: "2026-08-20T00:00:00.000Z",
+      questions: [first],
+    },
+  ];
+
+  assert.doesNotThrow(() => assertSurveyBranchDefinitions(sections));
+  assert.deepEqual(
+    getReachableSurveyQuestions(sections, [
+      { questionId: "q-1", content: { value: "next" } },
+    ]).map((item) => item.id),
+    ["q-1", "q-2"],
   );
 });
 

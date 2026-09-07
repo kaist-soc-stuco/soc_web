@@ -2,7 +2,11 @@ import { BadRequestException } from "@nestjs/common";
 
 import type { SurveyQuestionRecord, SurveySectionRecord } from "@soc/contracts";
 
-import { assertQuestionBranchConfiguration } from "./survey-branching";
+import {
+  assertQuestionBranchConfiguration,
+  assertSectionNavigation,
+  compareSurveySections,
+} from "./survey-branching";
 
 type SectionWithQuestions = SurveySectionRecord & { questions: SurveyQuestionRecord[] };
 
@@ -47,13 +51,12 @@ export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): 
 }
 
 export function assertSurveyBranchDefinitions(sections: SectionWithQuestions[]): void {
-  const ordered = [...sections].sort(
-    (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
-  );
+  const ordered = [...sections].sort(compareSurveySections);
   const sectionIds = new Set(ordered.map((section) => section.id));
 
   ordered.forEach((section, index) => {
     const forwardIds = new Set(ordered.slice(index + 1).map((item) => item.id));
+    assertSectionNavigation(section, sectionIds, forwardIds);
     const branchingQuestions = section.questions.filter(
       (question) => Object.keys(question.config?.goToSectionByValue ?? {}).length > 0,
     );

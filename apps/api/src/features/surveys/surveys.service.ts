@@ -546,6 +546,8 @@ export class SurveysService {
             titleEn: section.titleEn ?? undefined,
             descriptionKo: section.descriptionKo ?? undefined,
             descriptionEn: section.descriptionEn ?? undefined,
+            // Resolve section destinations after every copied section has an id.
+            nextSectionId: null,
             sortOrder: section.sortOrder,
           },
           tx,
@@ -553,6 +555,20 @@ export class SurveysService {
 
         copiedSectionIdBySourceId.set(section.id, newSection.id);
         copiedSections.push({ source: section, copy: newSection });
+      }
+
+      for (const { source, copy } of copiedSections) {
+        if (source.nextSectionId) {
+          await this.sectionsRepo.update(
+            copy.id,
+            newSurvey.id,
+            {
+              nextSectionId:
+                copiedSectionIdBySourceId.get(source.nextSectionId) ?? source.nextSectionId,
+            },
+            tx,
+          );
+        }
       }
 
       for (const { source, copy } of copiedSections) {

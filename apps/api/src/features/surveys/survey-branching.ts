@@ -9,7 +9,38 @@ export const SUBMIT_BRANCH_TARGET = "SUBMIT" as const;
 export interface SurveySectionWithQuestions {
   id: string;
   sortOrder: number;
+  createdAt?: string;
+  nextSectionId?: string | null;
   questions: SurveyQuestionRecord[];
+}
+
+export function compareSurveySections(
+  left: Pick<SurveySectionWithQuestions, "id" | "sortOrder" | "createdAt">,
+  right: Pick<SurveySectionWithQuestions, "id" | "sortOrder" | "createdAt">,
+): number {
+  return (
+    left.sortOrder - right.sortOrder ||
+    (left.createdAt ?? "").localeCompare(right.createdAt ?? "") ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+export function assertSectionNavigation(
+  section: Pick<SurveySectionWithQuestions, "id" | "nextSectionId">,
+  sectionIds: ReadonlySet<string>,
+  forwardSectionIds?: ReadonlySet<string>,
+): void {
+  const target = section.nextSectionId;
+  if (!target || target === SUBMIT_BRANCH_TARGET) return;
+  if (!sectionIds.has(target)) {
+    throw new BadRequestException("survey_branch_section_not_found");
+  }
+  if (target === section.id) {
+    throw new BadRequestException("survey_branch_self_reference");
+  }
+  if (forwardSectionIds && !forwardSectionIds.has(target)) {
+    throw new BadRequestException("survey_branch_must_target_later_section");
+  }
 }
 
 function isBranchableQuestion(question: SurveyQuestionRecord): boolean {
@@ -71,9 +102,7 @@ export function getReachableSurveyQuestions(
   sections: SurveySectionWithQuestions[],
   answerInputs: Array<{ questionId: string; content: Record<string, unknown> }>,
 ): SurveyQuestionRecord[] {
-  const orderedSections = [...sections].sort(
-    (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
-  );
+  const orderedSections = [...sections].sort(compareSurveySections);
   if (orderedSections.length === 0) return [];
 
   const sectionIds = new Set(orderedSections.map((section) => section.id));
@@ -91,6 +120,13 @@ export function getReachableSurveyQuestions(
     }
     visitedSections.add(current.id);
 
+    const currentIndex = orderedSections.findIndex((section) => section.id === current!.id);
+    assertSectionNavigation(
+      current,
+      sectionIds,
+      new Set(orderedSections.slice(currentIndex + 1).map((section) => section.id)),
+    );
+
     const questions = [...current.questions].sort(
       (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
     );
@@ -107,8 +143,12 @@ export function getReachableSurveyQuestions(
       : null;
 
     if (!target) {
-      const nextIndex = orderedSections.findIndex((section) => section.id === current!.id) + 1;
-      current = orderedSections[nextIndex];
+      if (current.nextSectionId === SUBMIT_BRANCH_TARGET) break;
+      if (current.nextSectionId) {
+        current = sectionById.get(current.nextSectionId);
+        continue;
+      }
+      current = orderedSections[currentIndex + 1];
       continue;
     }
 

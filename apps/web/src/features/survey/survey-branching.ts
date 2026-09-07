@@ -2,6 +2,17 @@ import type { SurveyDetailResponse, SurveyQuestionRecord } from "@soc/contracts"
 
 export const SUBMIT_BRANCH_TARGET = "SUBMIT";
 
+function compareSurveySections(
+  left: SurveyDetailResponse["sections"][number],
+  right: SurveyDetailResponse["sections"][number],
+) {
+  return (
+    left.sortOrder - right.sortOrder ||
+    left.createdAt.localeCompare(right.createdAt) ||
+    left.id.localeCompare(right.id)
+  );
+}
+
 function branchTargetForQuestion(
   question: SurveyQuestionRecord,
   answers: Record<string, import("./survey-answer-utils").AnswerValue>,
@@ -20,7 +31,7 @@ export function getVisibleSurveySectionIds(
   answers: Record<string, import("./survey-answer-utils").AnswerValue>,
 ): Set<string> {
   const sections = [...survey.sections].sort(
-    (left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
+    compareSurveySections,
   );
   const visible = new Set<string>();
   const visited = new Set<string>();
@@ -39,8 +50,13 @@ export function getVisibleSurveySectionIds(
       : null;
 
     if (!target) {
-      const nextIndex = sections.findIndex((section) => section.id === current!.id) + 1;
-      current = sections[nextIndex];
+      if (current.nextSectionId === SUBMIT_BRANCH_TARGET) break;
+      if (current.nextSectionId) {
+        current = sectionById.get(current.nextSectionId);
+      } else {
+        const nextIndex = sections.findIndex((section) => section.id === current!.id) + 1;
+        current = sections[nextIndex];
+      }
     } else if (target === SUBMIT_BRANCH_TARGET) {
       break;
     } else {

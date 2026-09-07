@@ -428,6 +428,9 @@ export const CreateSectionSchema = z.object({
   titleEn: z.string().optional(),
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,
+  // Google Forms-style default navigation. `SUBMIT` ends the survey and an
+  // ordinary value is the id of a later section.
+  nextSectionId: z.string().trim().min(1).max(100).nullable().optional(),
   sortOrder: z.number().int().min(0).optional(),
 });
 
