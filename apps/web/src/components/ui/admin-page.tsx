@@ -55,6 +55,14 @@ export function AdminPageHeader({ actions, eyebrow, title }: AdminPageHeaderProp
   );
 }
 
+export function AdminEditorGuidance({ children }: { children: ReactNode }) {
+  return (
+    <aside className="admin-editor-guidance flex items-start rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-5 text-[#344054] md:hidden" role="note">
+      {children}
+    </aside>
+  );
+}
+
 export function AdminCard({ className, ...props }: ComponentProps<"section">) {
   return (
     <section
