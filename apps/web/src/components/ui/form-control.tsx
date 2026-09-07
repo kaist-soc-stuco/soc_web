@@ -79,7 +79,7 @@ export const UiTextarea = React.forwardRef<HTMLTextAreaElement, UiTextareaProps>
         onInput={autoResize ? handleInput : onInput}
         className={cn(
           "interaction-control select-text min-h-24 !rounded-[var(--ui-control-radius)] border border-slate-200 bg-white px-3 py-2.5 text-[length:var(--ui-control-font-size)] [font-weight:var(--ui-control-font-weight)] leading-relaxed text-[#172033] outline-none placeholder:font-normal placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:opacity-70",
-          autoResize ? "resize-none overflow-hidden" : "resize-y overflow-y-auto",
+          autoResize ? "resize-none overflow-hidden" : "resize-none overflow-y-auto",
           className,
         )}
         {...props}

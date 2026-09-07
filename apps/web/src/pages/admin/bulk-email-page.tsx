@@ -830,7 +830,7 @@ function BulkEmailPageContent() {
                     setContentType("html");
                   }}
                   spellCheck={false}
-                  className="min-h-[400px] w-full resize-y rounded-none border-0 bg-transparent px-6 py-6 font-mono text-sm font-normal leading-6 text-slate-700 shadow-none focus:border-0 focus:ring-0"
+                  className="min-h-[400px] w-full resize-none rounded-none border-0 bg-transparent px-6 py-6 font-mono text-sm font-normal leading-6 text-slate-700 shadow-none focus:border-0 focus:ring-0"
                 />
               </>
             )}
