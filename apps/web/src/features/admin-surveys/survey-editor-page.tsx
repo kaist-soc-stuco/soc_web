@@ -33,7 +33,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AuthGuard } from "@/components/guards/auth-guard";
-import { AdminCard, AdminPageHeader, AdminPageShell } from "@/components/ui/admin-page";
+import { AdminPageHeader, AdminPageShell } from "@/components/ui/admin-page";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { resolveApiBaseUrl } from "@/lib/api";
@@ -47,7 +47,22 @@ import {
   SectionEditorModal,
   type SectionFormState,
 } from "@/components/organisms/section-editor-modal";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Eye, Pencil, Plus, Save, Sheet, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar as CalendarIcon,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Eye,
+  MoreVertical,
+  Move,
+  Pencil,
+  Plus,
+  Save,
+  Sheet,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { UiInput } from "@/components/ui/form-control";
@@ -55,6 +70,7 @@ import { Modal } from "@/components/ui/modal";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
+import { AdminSelectDropdown } from "@/components/ui/admin-select";
 
 const formatCompactDateTime = (value: string | null) => {
   if (!value) return "";
@@ -187,6 +203,39 @@ const client = createApiClient({ baseUrl: resolveApiBaseUrl() });
 const getErrorMessage = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
 
+const getSurveyErrorMessage = (err: unknown, fallback: string) => {
+  const message = getErrorMessage(err, fallback);
+  if (message.includes("survey_branch_must_target_later_section")) {
+    return "섹션 이동 경로는 현재 섹션보다 뒤에 있는 섹션만 선택할 수 있습니다.";
+  }
+  if (message.includes("survey_branch_target_section_in_use")) {
+    return "다른 문항의 이동 경로에서 사용 중인 섹션은 삭제할 수 없습니다.";
+  }
+  return message;
+};
+
+type SurveyEditorSection = SurveySectionRecord & { questions: SurveyQuestionRecord[] };
+
+const compareSurveySectionOrder = (
+  left: Pick<SurveySectionRecord, "id" | "sortOrder" | "createdAt">,
+  right: Pick<SurveySectionRecord, "id" | "sortOrder" | "createdAt">,
+) =>
+  left.sortOrder - right.sortOrder ||
+  left.createdAt.localeCompare(right.createdAt) ||
+  left.id.localeCompare(right.id);
+
+const cloneQuestionConfig = (config: SurveyQuestionRecord["config"]) =>
+  config
+    ? {
+        ...config,
+        rows: config.rows?.map((option) => ({ ...option })),
+        columns: config.columns?.map((option) => ({ ...option })),
+        goToSectionByValue: config.goToSectionByValue
+          ? { ...config.goToSectionByValue }
+          : undefined,
+      }
+    : undefined;
+
 const QUESTION_ROW_CLASS =
   "group relative rounded-lg border border-slate-200 bg-white px-4 pb-5 pt-4 text-sm";
 
@@ -312,6 +361,9 @@ function QuestionRowContent({
       <div className="flex min-w-0 items-center gap-1">
         <span className="min-w-0 truncate text-sm font-semibold text-slate-900">
           {question.titleKo || "질문"}
+          {question.titleEn?.trim() ? (
+            <span className="ml-1 font-normal text-slate-400">({question.titleEn.trim()})</span>
+          ) : null}
         </span>
         {question.isRequired ? (
           <span
@@ -324,6 +376,74 @@ function QuestionRowContent({
         ) : null}
       </div>
       <QuestionPreview question={question} />
+    </div>
+  );
+}
+
+function CollapsedQuestionRow({
+  question,
+  onEdit,
+}: {
+  question: SurveyQuestionRecord;
+  onEdit: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 text-left text-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+    >
+      <span className="min-w-0 flex-1 truncate font-normal text-slate-700">
+        {question.titleKo || "질문"}
+        {question.titleEn?.trim() ? (
+          <span className="ml-1 text-slate-400">({question.titleEn.trim()})</span>
+        ) : null}
+      </span>
+      {question.isRequired ? (
+        <span aria-label="필수 응답" className="shrink-0 font-semibold text-red-500">*</span>
+      ) : null}
+    </button>
+  );
+}
+
+function SectionNavigationSelect({
+  section,
+  sectionIndex,
+  sections,
+  disabled,
+  onChange,
+}: {
+  section: SurveyEditorSection;
+  sectionIndex: number;
+  sections: SurveyEditorSection[];
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const laterSections = sections.slice(sectionIndex + 1);
+  const options = [
+    { value: "", label: "다음 섹션으로 진행하기" },
+    ...laterSections.map((target, index) => ({
+      value: target.id,
+      label: `${sectionIndex + index + 2} 섹션(${target.titleKo || "제목 없음"})으로 이동`,
+    })),
+    { value: "SUBMIT", label: "설문지 제출" },
+  ];
+  const selectedValue = options.some((option) => option.value === section.nextSectionId)
+    ? section.nextSectionId ?? ""
+    : "";
+
+  return (
+    <div className="flex justify-end pt-1">
+      <AdminSelectDropdown
+        ariaLabel={`${section.titleKo || "섹션"} 다음 이동`}
+        value={selectedValue}
+        options={options}
+        onChange={onChange}
+        disabled={disabled}
+        className="w-fit min-w-56"
+        buttonClassName="!h-9 !border-0 !bg-transparent !px-2 !text-sm !font-normal !text-slate-600 !shadow-none hover:!bg-slate-50"
+        menuClassName="min-w-64"
+      />
     </div>
   );
 }
@@ -500,8 +620,13 @@ export function SurveyEditorPage() {
     eventEndDate: string;
   } | null>(null);
 
-  const [sections, setSections] = useState<(SurveySectionRecord & { questions: SurveyQuestionRecord[] })[]>([]);
-  const [tab, setTab] = useState<"settings" | "content" | "delivery">("settings");
+  const [sections, setSections] = useState<SurveyEditorSection[]>([]);
+  const [tab, setTab] = useState<"content" | "delivery">("content");
+  const [collapsedSectionIds, setCollapsedSectionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [sectionMenuOpenId, setSectionMenuOpenId] = useState<string | null>(null);
+  const [sectionMoveOpenId, setSectionMoveOpenId] = useState<string | null>(null);
 
   const [loadedSurveyId, setLoadedSurveyId] = useState<string | null>(null);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
@@ -525,14 +650,18 @@ export function SurveyEditorPage() {
     sectionId: string;
     initial: SectionFormState;
   } | null>(null);
+  const orderedSections = useMemo(
+    () => [...sections].sort(compareSurveySectionOrder),
+    [sections],
+  );
   const branchTargetsForEditing = useMemo(() => {
     if (!editingQuestion) return [];
-    const currentIndex = sections.findIndex((section) => section.id === editingQuestion.sectionId);
-    return sections.slice(currentIndex >= 0 ? currentIndex + 1 : 0).map((section) => ({
+    const currentIndex = orderedSections.findIndex((section) => section.id === editingQuestion.sectionId);
+    return orderedSections.slice(currentIndex >= 0 ? currentIndex + 1 : 0).map((section) => ({
       id: section.id,
       titleKo: section.titleKo,
     }));
-  }, [editingQuestion, sections]);
+  }, [editingQuestion, orderedSections]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -813,7 +942,7 @@ export function SurveyEditorPage() {
     }
   };
 
-  const handleTabChange = async (nextTab: "settings" | "content" | "delivery") => {
+  const handleTabChange = async (nextTab: "content" | "delivery") => {
     if (nextTab === "content" && !loadedSurveyId) {
       try {
         await ensureDraft();
@@ -824,6 +953,42 @@ export function SurveyEditorPage() {
     setTab(nextTab);
   };
 
+  useEffect(() => {
+    if (!sectionMenuOpenId) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest("[data-section-menu]")) return;
+      setSectionMenuOpenId(null);
+      setSectionMoveOpenId(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (sectionMoveOpenId) {
+        setSectionMoveOpenId(null);
+      } else {
+        setSectionMenuOpenId(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [sectionMenuOpenId, sectionMoveOpenId]);
+
+  const toggleSectionCollapsed = (sectionId: string) => {
+    setCollapsedSectionIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  };
+
   const handleStartNewSurvey = () => {
     setDraftBannerVisible(false);
     setDraftRestoredAt(null);
@@ -831,6 +996,9 @@ export function SurveyEditorPage() {
     setSpreadsheetUrl(null);
     setLoadedLifecycleStatus(null);
     setSections([]);
+    setCollapsedSectionIds(new Set());
+    setSectionMenuOpenId(null);
+    setSectionMoveOpenId(null);
     setError(null);
     setSaveState("idle");
     form.reset();
@@ -879,9 +1047,150 @@ export function SurveyEditorPage() {
       await client.deleteSection(loadedSurveyId, sectionId);
       const updated = await client.getSurveyDetail(loadedSurveyId);
       setSections(updated.sections);
+      setCollapsedSectionIds((previous) => {
+        const next = new Set(previous);
+        next.delete(sectionId);
+        return next;
+      });
+      setSectionMenuOpenId(null);
+      setSectionMoveOpenId(null);
     } catch (err: unknown) {
       console.error(err);
-      setError(getErrorMessage(err, "섹션 삭제 실패"));
+      setError(getSurveyErrorMessage(err, "섹션 삭제 실패"));
+    }
+  };
+
+  const handleDuplicateSection = async (sectionId: string) => {
+    if (!loadedSurveyId || !commitEditingQuestion()) return;
+    const sourceIndex = orderedSections.findIndex((section) => section.id === sectionId);
+    const source = sourceIndex >= 0 ? orderedSections[sourceIndex] : null;
+    if (!source) return;
+
+    setSectionMenuOpenId(null);
+    setSectionMoveOpenId(null);
+    setError(null);
+    try {
+      // Insert the empty section directly after the source first. This keeps
+      // copied branch targets valid while its questions are being created.
+      const created = await client.createSection(loadedSurveyId, {
+        titleKo: source.titleKo,
+        titleEn: source.titleEn ?? undefined,
+        descriptionKo: source.descriptionKo ?? undefined,
+        descriptionEn: source.descriptionEn ?? undefined,
+        sortOrder: source.sortOrder + 1,
+      });
+      const afterCreate = await client.getSurveyDetail(loadedSurveyId);
+      const afterCreateOrdered = [...afterCreate.sections].sort(compareSurveySectionOrder);
+      const createdIndex = afterCreateOrdered.findIndex((section) => section.id === created.id);
+      const insertIndex = Math.min(sourceIndex + 1, afterCreateOrdered.length - 1);
+      const reorderedSections = createdIndex >= 0 && createdIndex !== insertIndex
+        ? arrayMove(afterCreateOrdered, createdIndex, insertIndex)
+        : afterCreateOrdered;
+      await client.reorderSurveySections(loadedSurveyId, {
+        items: reorderedSections.map((section, index) => ({ id: section.id, sortOrder: index })),
+      });
+
+      if (source.nextSectionId) {
+        await client.updateSection(loadedSurveyId, created.id, {
+          nextSectionId: source.nextSectionId,
+        });
+      }
+
+      for (const [index, question] of source.questions.entries()) {
+        await client.createQuestion(loadedSurveyId, created.id, {
+          titleKo: question.titleKo,
+          titleEn: question.titleEn ?? undefined,
+          descriptionKo: question.descriptionKo ?? undefined,
+          descriptionEn: question.descriptionEn ?? undefined,
+          questionType: question.questionType,
+          options: question.options?.map((option) => ({ ...option })) ?? undefined,
+          config: cloneQuestionConfig(question.config),
+          answerRegex: question.answerRegex ?? undefined,
+          isRequired: question.isRequired,
+          sortOrder: index,
+        });
+      }
+
+      const updated = await client.getSurveyDetail(loadedSurveyId);
+      setSections(updated.sections);
+      setCollapsedSectionIds((previous) => {
+        const next = new Set(previous);
+        next.delete(created.id);
+        return next;
+      });
+      toast({ type: "success", message: "섹션이 복제되었습니다." });
+    } catch (err: unknown) {
+      console.error(err);
+      setError(getSurveyErrorMessage(err, "섹션 복제 실패"));
+    }
+  };
+
+  const canMoveSectionTo = (sectionId: string, targetIndex: number) => {
+    const sourceIndex = orderedSections.findIndex((section) => section.id === sectionId);
+    if (sourceIndex < 0 || sourceIndex === targetIndex) return false;
+    const movedSections = arrayMove(orderedSections, sourceIndex, targetIndex);
+    return movedSections.every((section, index) => {
+      const laterIds = new Set(movedSections.slice(index + 1).map((item) => item.id));
+      const defaultTarget = section.nextSectionId;
+      if (defaultTarget && defaultTarget !== "SUBMIT" && !laterIds.has(defaultTarget)) return false;
+      return section.questions.every((question) =>
+        Object.values(question.config?.goToSectionByValue ?? {}).every(
+          (target) => target === "SUBMIT" || laterIds.has(target),
+        ),
+      );
+    });
+  };
+
+  const handleMoveSection = async (sectionId: string, targetIndex: number) => {
+    if (!loadedSurveyId || !commitEditingQuestion()) return;
+    const sourceIndex = orderedSections.findIndex((section) => section.id === sectionId);
+    if (sourceIndex < 0 || sourceIndex === targetIndex) return;
+    if (!canMoveSectionTo(sectionId, targetIndex)) {
+      setError("답변에 따른 섹션 이동 경로를 유지할 수 없는 위치입니다.");
+      return;
+    }
+
+    const previousSections = sections;
+    const nextSections = arrayMove(orderedSections, sourceIndex, targetIndex).map(
+      (section, index) => ({ ...section, sortOrder: index }),
+    );
+    setSectionMenuOpenId(null);
+    setSectionMoveOpenId(null);
+    setSections(nextSections);
+    setError(null);
+    try {
+      const reordered = await client.reorderSurveySections(loadedSurveyId, {
+        items: nextSections.map((section) => ({ id: section.id, sortOrder: section.sortOrder })),
+      });
+      const sortOrderById = new Map(reordered.map((section) => [section.id, section.sortOrder]));
+      setSections((current) => current.map((section) => ({
+        ...section,
+        sortOrder: sortOrderById.get(section.id) ?? section.sortOrder,
+      })));
+    } catch (err: unknown) {
+      console.error(err);
+      setSections(previousSections);
+      setError(getSurveyErrorMessage(err, "섹션 이동 실패"));
+    }
+  };
+
+  const handleSectionNavigationChange = async (sectionId: string, target: string) => {
+    if (!loadedSurveyId) return;
+    const previousSections = sections;
+    setSections((current) => current.map((section) =>
+      section.id === sectionId
+        ? { ...section, nextSectionId: target || null }
+        : section,
+    ));
+    setError(null);
+    try {
+      await client.updateSection(loadedSurveyId, sectionId, {
+        nextSectionId: target || null,
+      });
+    } catch (err: unknown) {
+      console.error(err);
+      setSections(previousSections);
+      setError(getSurveyErrorMessage(err, "섹션 이동 설정 실패"));
     }
   };
 
@@ -923,6 +1232,11 @@ export function SurveyEditorPage() {
 
   const openNewQuestion = (sectionId: string) => {
     if (!commitEditingQuestion()) return;
+    setCollapsedSectionIds((previous) => {
+      const next = new Set(previous);
+      next.delete(sectionId);
+      return next;
+    });
     setEditingQuestion({
       sectionId,
       initial: emptyQuestion(),
@@ -932,6 +1246,11 @@ export function SurveyEditorPage() {
   const openEditQuestion = (sectionId: string, q: SurveyQuestionRecord) => {
     if (editingQuestion?.questionId === q.id) return;
     if (!commitEditingQuestion()) return;
+    setCollapsedSectionIds((previous) => {
+      const next = new Set(previous);
+      next.delete(sectionId);
+      return next;
+    });
     setEditingQuestion({
       sectionId,
       questionId: q.id,
@@ -944,7 +1263,24 @@ export function SurveyEditorPage() {
     setError(null);
     const editingSnapshot = editingQuestion;
     const { sectionId, questionId } = editingSnapshot;
-    const questionConfig = qForm.config ? { ...qForm.config } : undefined;
+    let questionConfig = qForm.config ? { ...qForm.config } : undefined;
+    if (questionConfig?.goToSectionByValue) {
+      const currentSectionIndex = orderedSections.findIndex((section) => section.id === sectionId);
+      const laterSectionIds = new Set(
+        orderedSections.slice(currentSectionIndex + 1).map((section) => section.id),
+      );
+      const validBranchMap = Object.fromEntries(
+        Object.entries(questionConfig.goToSectionByValue).filter(
+          ([, target]) => target === "SUBMIT" || laterSectionIds.has(target),
+        ),
+      );
+      if (Object.keys(validBranchMap).length > 0) {
+        questionConfig.goToSectionByValue = validBranchMap;
+      } else {
+        delete questionConfig.goToSectionByValue;
+        delete questionConfig.branchingEnabled;
+      }
+    }
     if (!qForm.answerValidationEnabled && questionConfig) {
       delete questionConfig.validationErrorMessage;
       delete questionConfig.validationType;
@@ -984,7 +1320,7 @@ export function SurveyEditorPage() {
       setEditingQuestion((current) => (current === editingSnapshot ? null : current));
     } catch (err: unknown) {
       console.error(err);
-      setError(getErrorMessage(err, "문항 저장 실패"));
+      setError(getSurveyErrorMessage(err, "문항 저장 실패"));
     }
   };
 
@@ -1343,8 +1679,7 @@ export function SurveyEditorPage() {
             value={tab}
             onChange={(value) => void handleTabChange(value)}
             options={[
-              { value: "settings", label: "기본 정보" },
-              { value: "content", label: `문항 구성${sections.length ? ` (${sections.reduce((count, section) => count + section.questions.length, 0)})` : ""}` },
+              { value: "content", label: "질문" },
               { value: "delivery", label: "설정" },
             ]}
           />
@@ -1355,10 +1690,10 @@ export function SurveyEditorPage() {
             </div>
           )}
 
-          {(tab === "settings" || tab === "delivery") && (
+          {tab === "delivery" && (
             <FormProvider {...form}>
               <SurveySettingsForm
-                mode={tab === "settings" ? "basic" : "delivery"}
+                mode="delivery"
                 isOngoing={isOngoing}
                 articleSearchResults={articleSearchResults}
                 selectedArticleTitle={selectedArticleTitle}
@@ -1370,15 +1705,25 @@ export function SurveyEditorPage() {
           )}
 
           {tab === "content" && (
-            <AdminCard className="space-y-5 p-5 md:p-6">
-              {!loadedSurveyId && (
-                <div className="bg-gray-50 border border-kaist-grey/10 p-12 rounded-2xl text-center text-sm font-bold text-kaist-grey/60">
-                  설정 탭에서 설문을 먼저 저장해주세요.
-                </div>
-              )}
+            <div className="space-y-6">
+              <FormProvider {...form}>
+                <SurveySettingsForm
+                  mode="basic"
+                  isOngoing={isOngoing}
+                  articleSearchResults={articleSearchResults}
+                  selectedArticleTitle={selectedArticleTitle}
+                  onFetchArticles={handleFetchArticles}
+                  onSelectArticle={handleSelectArticle}
+                  onSubmit={handleSaveSettings}
+                />
+              </FormProvider>
 
-                {loadedSurveyId && (
-                  <>
+              {!loadedSurveyId ? (
+                <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-medium text-slate-400">
+                  설문 문항을 준비 중입니다.
+                </div>
+              ) : (
+                <>
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}
@@ -1386,121 +1731,226 @@ export function SurveyEditorPage() {
                       onDragCancel={handleQuestionDragCancel}
                       onDragEnd={handleQuestionDragEnd}
                     >
-                    <div className="space-y-4">
-                      {sections.map((section) => (
-                        <div
-                          key={section.id}
-                          className="overflow-hidden rounded-xl border border-slate-200 bg-white"
-                        >
-                          {/* 섹션 헤더 (국문/영문 제목 지원) */}
-                          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-5 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <h3 className="text-sm font-semibold text-slate-900">
-                                {section.titleKo}
-                              </h3>
-                              {section.titleEn && (
-                                <span className="text-xs font-normal text-slate-500">
-                                  {section.titleEn}
-                                </span>
-                              )}
-                            </div>
-                            {!isOngoing && (
-                              <div className="flex items-center gap-1">
-                                <IconButton
-                                  size="sm"
-                                  aria-label={`${section.titleKo} 섹션 편집`}
-                                  onClick={() => openEditSection(section)}
-                                >
-                                  <Pencil className="size-4" />
-                                </IconButton>
-                                <IconButton
-                                  size="sm"
-                                  aria-label={`${section.titleKo} 섹션 삭제`}
-                                  onClick={() => handleDeleteSection(section.id)}
-                                  className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
-                                >
-                                  <Trash2 className="size-4" />
-                                </IconButton>
+                    <div className="space-y-6">
+                      {orderedSections.map((section, sectionIndex) => {
+                        const isCollapsed = collapsedSectionIds.has(section.id);
+                        const moveMenuOpen = sectionMoveOpenId === section.id;
+
+                        return (
+                          <section
+                            key={section.id}
+                            className="relative border-b border-slate-200 pb-6 last:border-b-0"
+                          >
+                            <div className="relative overflow-visible border-l-4 border-brand-primary bg-white shadow-none">
+                              <div className="flex min-w-0 items-start justify-between gap-4 px-5 py-4 md:px-6">
+                                <div className="min-w-0">
+                                  <div className="mb-1 text-xs font-medium text-slate-400">
+                                    {orderedSections.length} 중 {sectionIndex + 1} 섹션
+                                  </div>
+                                  <h3 className="truncate text-lg font-semibold text-slate-900">
+                                    {section.titleKo || "제목 없는 섹션"}
+                                    {section.titleEn?.trim() ? (
+                                      <span className="ml-1 text-sm font-normal text-slate-400">
+                                        ({section.titleEn.trim()})
+                                      </span>
+                                    ) : null}
+                                  </h3>
+                                </div>
+                                {!isOngoing ? (
+                                  <div className="relative flex shrink-0 items-center gap-1" data-section-menu>
+                                    <IconButton
+                                      size="sm"
+                                      aria-label={`${section.titleKo} 섹션 편집`}
+                                      onClick={() => openEditSection(section)}
+                                    >
+                                      <Pencil className="size-4" />
+                                    </IconButton>
+                                    <IconButton
+                                      size="sm"
+                                      aria-label={isCollapsed ? `${section.titleKo} 섹션 펼치기` : `${section.titleKo} 섹션 접기`}
+                                      aria-expanded={!isCollapsed}
+                                      onClick={() => toggleSectionCollapsed(section.id)}
+                                    >
+                                      {isCollapsed ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
+                                    </IconButton>
+                                    <div className="relative">
+                                      <IconButton
+                                        size="sm"
+                                        aria-label={`${section.titleKo} 섹션 더보기`}
+                                        aria-expanded={sectionMenuOpenId === section.id}
+                                        onClick={() => {
+                                          setSectionMenuOpenId((current) => current === section.id ? null : section.id);
+                                          setSectionMoveOpenId(null);
+                                        }}
+                                      >
+                                        <MoreVertical className="size-4" />
+                                      </IconButton>
+                                      {sectionMenuOpenId === section.id ? (
+                                        <div
+                                          data-section-menu-popover
+                                          className="scrollbar-hidden absolute left-0 top-full z-50 mt-2 max-h-80 w-60 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+                                        >
+                                          {moveMenuOpen ? (
+                                            <>
+                                              <div className="px-3 py-2 text-xs font-medium text-slate-400">섹션 이동</div>
+                                              {orderedSections.map((target, targetIndex) => {
+                                                if (target.id === section.id) return null;
+                                                const canMove = canMoveSectionTo(section.id, targetIndex);
+                                                return (
+                                                  <button
+                                                    key={target.id}
+                                                    type="button"
+                                                    disabled={!canMove}
+                                                    onClick={() => void handleMoveSection(section.id, targetIndex)}
+                                                    className="flex min-h-9 w-full items-center rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    title={!canMove ? "답변에 따른 이동 경로를 유지할 수 없습니다." : undefined}
+                                                  >
+                                                    {targetIndex + 1} 섹션({target.titleKo || "제목 없음"})
+                                                  </button>
+                                                );
+                                              })}
+                                              <div className="my-1 border-t border-slate-100" />
+                                              <button
+                                                type="button"
+                                                onClick={() => setSectionMoveOpenId(null)}
+                                                className="flex min-h-9 w-full items-center rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-500 hover:bg-slate-50"
+                                              >
+                                                뒤로
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={() => void handleDuplicateSection(section.id)}
+                                                className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50"
+                                              >
+                                                <Copy className="size-4 shrink-0 text-slate-500" />
+                                                섹션 복제
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setSectionMoveOpenId(section.id)}
+                                                className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 hover:bg-slate-50"
+                                              >
+                                                <Move className="size-4 shrink-0 text-slate-500" />
+                                                섹션 이동
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => void handleDeleteSection(section.id)}
+                                                className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-rose-600 hover:bg-rose-50"
+                                              >
+                                                <Trash2 className="size-4 shrink-0" />
+                                                섹션 삭제
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                ) : null}
                               </div>
-                            )}
-                          </div>
+                            </div>
 
-                          {/* 섹션 질문 목록 */}
-                          <div className="space-y-2 p-4">
-                            {section.questions.length === 0 &&
-                              !(editingQuestion?.sectionId === section.id && !editingQuestion.questionId) && (
-                              <p className="text-kaist-grey/40 text-sm text-center py-6 font-bold">
-                                등록된 질문이 없습니다.
-                              </p>
-                            )}
-
-                            <SortableContext
-                              items={section.questions.map((question) => question.id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {section.questions.map((question) => {
-                                const isEditing = editingQuestion?.questionId === question.id;
-
-                                return (
-                                  <SortableQuestionRow
+                            <div className="space-y-3 px-4 pt-4 md:px-6">
+                              {isCollapsed ? (
+                                section.questions.map((question) => (
+                                  <CollapsedQuestionRow
                                     key={question.id}
                                     question={question}
-                                    isOngoing={isOngoing}
-                                    isEditing={isEditing}
-                                    editor={
-                                      isEditing
-                                          ? (dragHandle) => (
-                                            <QuestionInlineEditor
-                                              key={question.id}
-                                              initial={editingQuestion.initial}
-                                              isKoreanOnly={isKoreanOnly}
-                                              isOngoing={isOngoing}
-                                              currentSectionId={section.id}
-                                              branchTargets={branchTargetsForEditing}
-                                              isNewQuestion={false}
-                                              dragHandle={dragHandle}
-                                              commitRef={questionCommitRef}
-                                              onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
-                                              onDelete={() => void handleDeleteQuestion(section.id, question.id)}
-                                              onSave={handleSaveQuestion}
-                                              onCancel={() => setEditingQuestion(null)}
-                                            />
-                                          )
-                                        : undefined
-                                    }
                                     onEdit={() => openEditQuestion(section.id, question)}
                                   />
-                                );
-                              })}
-                            </SortableContext>
-                            {editingQuestion?.sectionId === section.id && !editingQuestion.questionId ? (
-                              <QuestionInlineEditor
-                                key={`${section.id}-new`}
-                                initial={editingQuestion.initial}
-                                isKoreanOnly={isKoreanOnly}
-                                isOngoing={isOngoing}
-                                currentSectionId={section.id}
-                                branchTargets={branchTargetsForEditing}
-                                isNewQuestion
-                                commitRef={questionCommitRef}
-                                onSave={handleSaveQuestion}
-                                onCancel={() => setEditingQuestion(null)}
+                                ))
+                              ) : (
+                                <>
+                                  {section.questions.length === 0 &&
+                                    !(editingQuestion?.sectionId === section.id && !editingQuestion.questionId) && (
+                                    <p className="py-6 text-center text-sm font-medium text-slate-400">
+                                      등록된 질문이 없습니다.
+                                    </p>
+                                  )}
+
+                                  <SortableContext
+                                    items={section.questions.map((question) => question.id)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {section.questions.map((question) => {
+                                      const isEditing = editingQuestion?.questionId === question.id;
+
+                                      return (
+                                        <SortableQuestionRow
+                                          key={question.id}
+                                          question={question}
+                                          isOngoing={isOngoing}
+                                          isEditing={isEditing}
+                                          editor={
+                                            isEditing
+                                              ? (dragHandle) => (
+                                                <QuestionInlineEditor
+                                                  key={question.id}
+                                                  initial={editingQuestion.initial}
+                                                  isKoreanOnly={isKoreanOnly}
+                                                  isOngoing={isOngoing}
+                                                  currentSectionId={section.id}
+                                                  branchTargets={branchTargetsForEditing}
+                                                  isNewQuestion={false}
+                                                  dragHandle={dragHandle}
+                                                  commitRef={questionCommitRef}
+                                                  onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
+                                                  onDelete={() => void handleDeleteQuestion(section.id, question.id)}
+                                                  onSave={handleSaveQuestion}
+                                                  onCancel={() => setEditingQuestion(null)}
+                                                />
+                                              )
+                                              : undefined
+                                          }
+                                          onEdit={() => openEditQuestion(section.id, question)}
+                                        />
+                                      );
+                                    })}
+                                  </SortableContext>
+                                  {editingQuestion?.sectionId === section.id && !editingQuestion.questionId ? (
+                                    <QuestionInlineEditor
+                                      key={`${section.id}-new`}
+                                      initial={editingQuestion.initial}
+                                      isKoreanOnly={isKoreanOnly}
+                                      isOngoing={isOngoing}
+                                      currentSectionId={section.id}
+                                      branchTargets={branchTargetsForEditing}
+                                      isNewQuestion
+                                      commitRef={questionCommitRef}
+                                      onSave={handleSaveQuestion}
+                                      onCancel={() => setEditingQuestion(null)}
+                                    />
+                                  ) : null}
+                                  {!isOngoing ? (
+                                    <div className="pt-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => openNewQuestion(section.id)}
+                                        className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
+                                      >
+                                        <Plus className="size-4" />
+                                        문항 추가하기
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
+                              <SectionNavigationSelect
+                                section={section}
+                                sectionIndex={sectionIndex}
+                                sections={orderedSections}
+                                disabled={isOngoing}
+                                onChange={(value) => void handleSectionNavigationChange(section.id, value)}
                               />
-                            ) : null}
-                            {!isOngoing && (
-                              <div className="pt-2">
-                                <Button type="button" variant="ghost"
-                                  onClick={() => openNewQuestion(section.id)}
-                                  className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                  문항 추가하기
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                            </div>
+                          </section>
+                        );
+                      })}
                     </div>
                     {typeof document !== "undefined"
                       ? createPortal(
@@ -1550,7 +2000,7 @@ export function SurveyEditorPage() {
                     )}
                   </>
                 )}
-              </AdminCard>
+              </div>
             )}
         </main>
 

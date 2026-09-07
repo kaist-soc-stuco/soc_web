@@ -5,6 +5,7 @@ export interface SurveySectionRecord {
   titleEn: string | null;
   descriptionKo: string | null;
   descriptionEn: string | null;
+  nextSectionId: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;

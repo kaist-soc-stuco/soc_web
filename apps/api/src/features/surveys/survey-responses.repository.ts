@@ -243,7 +243,11 @@ export class SurveyResponsesRepository {
         .select({ section: surveySections })
         .from(surveySections)
         .where(eq(surveySections.surveyId, surveyId))
-        .orderBy(asc(surveySections.sortOrder), asc(surveySections.id)),
+        .orderBy(
+          asc(surveySections.sortOrder),
+          asc(surveySections.createdAt),
+          asc(surveySections.id),
+        ),
       tx
         .select({ question: surveyQuestions })
         .from(surveyQuestions)
@@ -265,6 +269,8 @@ export class SurveyResponsesRepository {
     return sectionRows.map(({ section }) => ({
       id: section.id,
       sortOrder: section.sortOrder,
+      createdAt: msToIso(section.createdAt.valueOf()),
+      nextSectionId: section.nextSectionId,
       questions: questionsBySectionId.get(section.id) ?? [],
     }));
   }

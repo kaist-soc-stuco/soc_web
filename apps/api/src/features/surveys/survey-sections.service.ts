@@ -17,6 +17,7 @@ const surveySectionAuditSnapshot = (section: SurveySectionRecord): Record<string
   titleKo: section.titleKo,
   titleEn: section.titleEn,
   sortOrder: section.sortOrder,
+  nextSectionId: section.nextSectionId,
 });
 
 @Injectable()
@@ -43,9 +44,11 @@ export class SurveySectionsService {
     dto: CreateSectionDto,
     actorUserId?: string,
   ): Promise<SurveySectionRecord> {
-    const created = await this.mutationPolicy.withStructureMutation(surveyId, (tx) =>
-      this.sectionsRepo.insert(surveyId, dto, tx),
-    );
+    const created = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
+      const section = await this.sectionsRepo.insert(surveyId, dto, tx);
+      await this.assertBranchDefinitions(surveyId, tx);
+      return section;
+    });
     await this.auditLogService?.record({
       action: "survey.section.create",
       actorUserId: actorUserId ?? null,
@@ -70,7 +73,7 @@ export class SurveySectionsService {
         tx,
       );
       if (!section) throw new NotFoundException("section_not_found");
-      if (dto.sortOrder !== undefined) {
+      if (dto.sortOrder !== undefined || dto.nextSectionId !== undefined) {
         await this.assertBranchDefinitions(surveyId, tx);
       }
       return section;
@@ -102,7 +105,10 @@ export class SurveySectionsService {
         const hasBranchReference = siblingQuestions.flat().some((question) =>
           Object.values(question.config?.goToSectionByValue ?? {}).includes(sectionId),
         );
-        if (hasBranchReference) {
+        const hasSectionNavigationReference = siblingSections.some(
+          (item) => item.id !== sectionId && item.nextSectionId === sectionId,
+        );
+        if (hasBranchReference || hasSectionNavigationReference) {
           throw new ConflictException("survey_branch_target_section_in_use");
         }
       }
