@@ -1,4 +1,4 @@
-# Default compose file: development/test stack with mock SSO and demo seed support.
+# Default compose file: development/test stack with demo seed support.
 # Production deployments should continue to use infra/docker/compose.prod.yml.
 services:
   api:

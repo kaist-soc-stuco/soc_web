@@ -16,11 +16,6 @@ export interface LoginResultResponse {
   userId?: string;
 }
 
-export interface MockLoginResponse {
-  storageMode: "persisted";
-  userId: string;
-}
-
 export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) => ({
   getLoginStartPayload: async (): Promise<LoginStartResponse> => {
     return requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, {
@@ -108,17 +103,4 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
     });
   },
 
-  loginWithMockSession: async (): Promise<MockLoginResponse> => {
-    return requestJson<MockLoginResponse>(
-      `${authBaseUrl}/login/mock`,
-      {
-        body: JSON.stringify({}),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      },
-      { retryOnUnauthorized: true },
-    );
-  },
 });
