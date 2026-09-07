@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { PopoverPanel } from "@/components/ui/popover-panel";
 import { TextInput } from "@/components/ui/text-input";
+import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
 import { useBoardCatalog } from "@/hooks/use-board-catalog";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
@@ -47,6 +48,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const { data: session } = useCurrentSession();
@@ -62,8 +64,23 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [loginStarting, setLoginStarting] = useState(false);
   const { lang, setLanguage } = useLanguage();
+  const handleMobileMenuKeyDown = useOverlayBehavior({
+    onClose: () => setMobileMenuOpen(false),
+    open: mobileMenuOpen,
+    surfaceRef: mobileMenuRef,
+  });
 
   const [homeHeaderScrolled, setHomeHeaderScrolled] = useState(false);
+
+  useEffect(() => {
+    const closeMobileMenuOnDesktop = () => {
+      if (window.innerWidth >= 1280) setMobileMenuOpen(false);
+    };
+
+    window.addEventListener("resize", closeMobileMenuOnDesktop);
+    closeMobileMenuOnDesktop();
+    return () => window.removeEventListener("resize", closeMobileMenuOnDesktop);
+  }, []);
 
   useEffect(() => {
     if (variant !== "home" || typeof window === "undefined") {
@@ -579,9 +596,8 @@ export function Header({ variant = "default" }: HeaderProps) {
           <Button
             type="button"
             variant="ghost"
-            size="sm"
             onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
-            className={`hidden h-9 gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium shadow-none transition-colors duration-300 md:flex ${
+            className={`hidden h-[var(--ui-control-height)] gap-1.5 border-0 bg-transparent px-2.5 text-xs font-medium shadow-none transition-colors duration-300 md:flex ${
               homeHeaderDark
                 ? "text-white hover:bg-white/10 [&_svg]:text-white/70"
                 : "text-slate-700 hover:bg-slate-100 [&_svg]:text-slate-500"
@@ -790,24 +806,44 @@ export function Header({ variant = "default" }: HeaderProps) {
       </div>
 
       {mobileMenuOpen && (
-        <div
-          id="mobile-primary-navigation"
-          className="absolute left-0 right-0 top-full z-50 border-t border-slate-100 bg-white px-4 pb-5 pt-4 shadow-xl xl:hidden"
-        >
-          <nav aria-label={lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}>
-            <div className="grid grid-cols-3 gap-2">
+        <>
+          <button
+            type="button"
+            aria-label={lang === "ko" ? "메뉴 닫기" : "Close menu"}
+            tabIndex={-1}
+            className="fixed inset-x-0 bottom-0 top-[var(--ui-header-height)] z-40 cursor-default bg-slate-950/20 backdrop-blur-[1px] xl:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div
+            ref={mobileMenuRef}
+            id="mobile-primary-navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-primary-navigation-title"
+            tabIndex={-1}
+            onKeyDown={handleMobileMenuKeyDown}
+            className="fixed inset-x-0 bottom-0 top-[var(--ui-header-height)] z-50 flex w-full flex-col overflow-hidden border-t border-slate-100 bg-white shadow-xl xl:hidden sm:inset-x-auto sm:left-auto sm:right-0 sm:max-w-[30rem] sm:border-l"
+          >
+            <h2 id="mobile-primary-navigation-title" className="sr-only">
+              {lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}
+            </h2>
+            <nav
+              className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4"
+              aria-label={lang === "ko" ? "모바일 주요 메뉴" : "Mobile primary navigation"}
+            >
+            <div className="grid gap-2">
               {navItems.map((item) => {
                 const active = isNavItemActive(item);
                 return (
                   <div
                     key={item.href}
-                    className="col-span-3"
+                    className="min-w-0"
                   >
                     <Link
                       to={item.href}
                       onClick={closePopovers}
                       aria-current={active ? "page" : undefined}
-                      className={`flex min-h-11 items-center justify-center rounded-xl border px-2 text-center text-xs font-medium transition-colors ${
+                      className={`flex min-h-11 items-center justify-start rounded-xl border px-3 text-left text-xs font-semibold transition-colors ${
                         active
                           ? "border-kaist-darkgreen/30 bg-kaist-lightgreen/15 text-kaist-darkgreen"
                           : "border-slate-200 bg-slate-50 text-slate-800 hover:border-kaist-darkgreen/20 hover:bg-kaist-lightgreen/10 hover:text-kaist-darkgreen"
@@ -816,13 +852,13 @@ export function Header({ variant = "default" }: HeaderProps) {
                       {item.label}
                     </Link>
                     {item.megaItems.length > 0 ? (
-                      <div className="mt-2 grid grid-cols-3 gap-2">
+                      <div className="mt-1 grid gap-1 pl-3">
                         {item.megaItems.map((child) => (
                           <Link
                             key={child.href}
                             to={child.href}
                             onClick={closePopovers}
-                            className="flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-center text-[length:var(--ui-text-caption-size)] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
+                            className="flex min-h-11 items-center justify-start rounded-lg border border-slate-200 bg-white px-3 text-left text-[length:var(--ui-text-caption-size)] font-medium text-slate-600 hover:bg-slate-50 hover:text-brand-primary"
                           >
                             {child.label}
                           </Link>
@@ -833,9 +869,9 @@ export function Header({ variant = "default" }: HeaderProps) {
                 );
               })}
             </div>
-          </nav>
+            </nav>
 
-          <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4">
+          <div className="shrink-0 grid gap-3 border-t border-slate-100 bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
             <Button variant="ghost"
               type="button"
               onClick={() => setLanguage(lang === "ko" ? "en" : "ko")}
@@ -896,7 +932,8 @@ export function Header({ variant = "default" }: HeaderProps) {
               </div>
             )}
           </div>
-        </div>
+          </div>
+        </>
       )}
 
     </header>
