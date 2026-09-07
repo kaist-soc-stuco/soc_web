@@ -20,6 +20,14 @@ const ALLOWED_TAGS = new Set([
   "BLOCKQUOTE",
   "PRE",
   "CODE",
+  "TABLE",
+  "THEAD",
+  "TBODY",
+  "TFOOT",
+  "TR",
+  "TH",
+  "TD",
+  "CAPTION",
   "HR",
   "A",
   "SPAN",
@@ -117,6 +125,15 @@ function sanitizeForDisplay(value: string) {
 
         if (element.tagName === "IMG" && name === "alt") continue;
 
+        if (["TH", "TD"].includes(element.tagName) && ["colspan", "rowspan"].includes(name)) {
+          const span = Number.parseInt(attribute.value, 10);
+          if (Number.isInteger(span) && span > 0 && span <= 100) continue;
+        }
+
+        if (element.tagName === "TH" && name === "scope" && /^(?:row|col|rowgroup|colgroup)$/i.test(attribute.value)) {
+          continue;
+        }
+
         if (element.tagName === "A" && ["href", "target", "rel"].includes(name)) {
           if (name === "href") {
             try {
@@ -143,6 +160,13 @@ function sanitizeForDisplay(value: string) {
         element.setAttribute("draggable", "false");
       }
     });
+
+  root.querySelectorAll("table").forEach((table) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "rich-content-table-scroll";
+    table.replaceWith(wrapper);
+    wrapper.append(table);
+  });
 
   return root.innerHTML;
 }

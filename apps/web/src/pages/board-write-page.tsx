@@ -39,6 +39,7 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
     canWriteSelected,
     contentEn,
     contentKo,
+    draftStatus,
     draftRestoredAt,
     eventDescriptionKo,
     eventDescriptionEn,
@@ -218,6 +219,14 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
         boardByCode={boardByCode}
         isKoreanOnly={isKoreanOnly}
         lang={lang}
+        leadingActions={canManageTemplates ? (
+          <ArticleTemplateControl
+            boardCode={selectedCategory}
+            lang={lang}
+            onApply={applyTemplate}
+            snapshot={templateSnapshot}
+          />
+        ) : null}
         onCategoryChange={handleCategoryChange}
         onKoreanOnlyChange={(checked) => {
           setIsKoreanOnly(checked);
@@ -278,21 +287,15 @@ export function BoardWritePage({ forcedCategory }: { forcedCategory?: string } =
           </Link>
         }
         actions={
-          <div className="flex items-center justify-end gap-2">
+          <div className="board-write-page-actions flex items-center justify-end gap-2">
             <BoardWriteFooter
               compact
               lang={lang}
               isSubmitting={isSubmitting}
+              draftStatus={draftStatus}
               canWriteSelected={canWriteSelected}
-              leadingActions={canManageTemplates ? (
-                <ArticleTemplateControl
-                  boardCode={selectedCategory}
-                  lang={lang}
-                  onApply={applyTemplate}
-                  snapshot={templateSnapshot}
-                />
-              ) : null}
               onCancel={() => navigate(-1)}
+              onSaveDraft={handleSaveDraft}
               onSubmit={handleSubmit}
             />
           </div>
