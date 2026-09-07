@@ -23,7 +23,7 @@ export function AdminPageMain({ className, ...props }: ComponentProps<"main">) {
   return (
     <main
       className={cn(
-        "admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10",
+        "admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-5 px-4 py-6 sm:px-5 md:gap-6 md:px-8 md:py-7 xl:px-10",
         className,
       )}
       {...props}
@@ -46,11 +46,11 @@ export function AdminPageHeader({ actions, eyebrow, title }: AdminPageHeaderProp
             {eyebrow}
           </div>
         ) : null}
-        <AdminPageTitle className="truncate text-[length:var(--ui-text-page-title-mobile-size)] leading-8 md:text-[length:var(--ui-text-page-title-size)] md:leading-9">
+        <AdminPageTitle className="break-words text-[length:var(--ui-text-page-title-mobile-size)] leading-8 md:text-[length:var(--ui-text-page-title-size)] md:leading-9">
           {title}
         </AdminPageTitle>
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 md:w-auto">{actions}</div> : null}
     </header>
   );
 }
@@ -95,7 +95,7 @@ export function AdminTableCard({
       {toolbar ? <div className="border-b border-slate-100">{toolbar}</div> : null}
       {children}
       {pagination ? (
-        <div className="flex min-h-16 items-center border-t border-slate-100 bg-white px-5 py-3 [&_.ui-pagination]:m-0">
+        <div className="flex min-h-16 items-center border-t border-slate-100 bg-white px-4 py-3 sm:px-5 [&_.ui-pagination]:m-0">
           {pagination}
         </div>
       ) : null}
@@ -107,7 +107,7 @@ export function AdminCardHeader({ className, ...props }: ComponentProps<"div">) 
   return (
     <div
       className={cn(
-        "flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3",
+        "flex min-h-14 flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 md:items-center",
         className,
       )}
       {...props}
@@ -119,7 +119,7 @@ export function AdminToolbar({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "admin-toolbar flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e5eaf0] bg-white px-4 py-3",
+        "admin-toolbar flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#e5eaf0] bg-white px-3 py-3 sm:px-4 md:items-center",
         className,
       )}
       {...props}

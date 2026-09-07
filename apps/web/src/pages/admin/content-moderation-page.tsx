@@ -143,18 +143,18 @@ function ContentModerationPageContent() {
           ) : undefined}
         >
           {loading && items.length === 0 && comments.length === 0 ? null : view === "articles" ? (
-            <AdminDataTable minWidth={920}>
+            <AdminDataTable minWidth={920} mobileMode="cards">
               <colgroup><col style={{ width: 120 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 300 }} /><col style={{ width: 170 }} /><col style={{ width: 92 }} /></colgroup>
               <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>제목</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>처리 일시</AdminTableHead><AdminTableHead>작업</AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {pageItems.length === 0 ? <AdminTableEmpty colSpan={6}>숨긴 게시글이 없습니다.</AdminTableEmpty> : pageItems.map((article) => (
                   <tr key={`${article.boardCode}:${article.articleId}`}>
                     <AdminTableCell>{article.boardCode}</AdminTableCell>
-                    <AdminTableCell truncate><span className="font-medium text-app-text-strong">{article.titleKo}</span></AdminTableCell>
-                    <AdminTableCell truncate>{article.authorName}</AdminTableCell>
-                    <AdminTableCell><span className="line-clamp-2 font-normal">{article.hiddenReason}</span></AdminTableCell>
-                    <AdminTableCell>{formatDate(article.hiddenAt)}</AdminTableCell>
-                    <AdminTableCell className="text-center align-middle">
+                    <AdminTableCell data-mobile-label="제목" truncate><span className="font-medium text-app-text-strong">{article.titleKo}</span></AdminTableCell>
+                    <AdminTableCell data-mobile-label="작성자" truncate>{article.authorName}</AdminTableCell>
+                    <AdminTableCell data-mobile-label="숨김 사유"><span className="line-clamp-2 font-normal">{article.hiddenReason}</span></AdminTableCell>
+                    <AdminTableCell data-mobile-label="처리 일시">{formatDate(article.hiddenAt)}</AdminTableCell>
+                    <AdminTableCell data-mobile-label="작업" className="text-center align-middle">
                       <Button type="button" variant="ghost" size="sm" disabled={restoringId === article.articleId} onClick={() => void restore(article)}>
                         <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
                       </Button>
@@ -164,18 +164,18 @@ function ContentModerationPageContent() {
               </AdminTableBody>
             </AdminDataTable>
           ) : (
-            <AdminDataTable minWidth={920}>
+            <AdminDataTable minWidth={920} mobileMode="cards">
               <colgroup><col style={{ width: 120 }} /><col style={{ width: 260 }} /><col /><col style={{ width: 140 }} /><col style={{ width: 220 }} /><col style={{ width: 92 }} /></colgroup>
               <AdminTableHeader><tr><AdminTableHead>게시판</AdminTableHead><AdminTableHead>게시글</AdminTableHead><AdminTableHead>댓글 내용</AdminTableHead><AdminTableHead>작성자</AdminTableHead><AdminTableHead>숨김 사유</AdminTableHead><AdminTableHead>작업</AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {pageComments.length === 0 ? <AdminTableEmpty colSpan={6}>숨긴 댓글이 없습니다.</AdminTableEmpty> : pageComments.map((comment) => (
                   <tr key={comment.commentId}>
                     <AdminTableCell>{comment.boardCode}</AdminTableCell>
-                    <AdminTableCell truncate>{comment.articleTitleKo}</AdminTableCell>
-                    <AdminTableCell><span className="line-clamp-2 font-normal text-app-text-strong">{comment.content}</span></AdminTableCell>
-                    <AdminTableCell truncate>{comment.authorName}</AdminTableCell>
-                    <AdminTableCell><span className="line-clamp-2 font-normal">{comment.hiddenReason}</span></AdminTableCell>
-                    <AdminTableCell className="text-center align-middle">
+                    <AdminTableCell data-mobile-label="게시글" truncate>{comment.articleTitleKo}</AdminTableCell>
+                    <AdminTableCell data-mobile-label="댓글 내용"><span className="line-clamp-2 font-normal text-app-text-strong">{comment.content}</span></AdminTableCell>
+                    <AdminTableCell data-mobile-label="작성자" truncate>{comment.authorName}</AdminTableCell>
+                    <AdminTableCell data-mobile-label="숨김 사유"><span className="line-clamp-2 font-normal">{comment.hiddenReason}</span></AdminTableCell>
+                    <AdminTableCell data-mobile-label="작업" className="text-center align-middle">
                       <Button type="button" variant="ghost" size="sm" disabled={restoringId === `comment:${comment.commentId}`} onClick={() => void restoreComment(comment)}>
                         <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
                       </Button>

@@ -255,7 +255,7 @@ export function AuditLogPage() {
 
             <div className={refreshing ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
               {error && data === null ? <div className="p-6"><EmptyState message={error} /></div> : data && data.items.length > 0 ? (
-                <AdminDataTable minWidth={900}>
+                <AdminDataTable minWidth={900} mobileMode="cards">
                   <colgroup><col style={{ width: 150 }} /><col style={{ width: 112 }} /><col style={{ width: 230 }} /><col /><col style={{ width: 150 }} /></colgroup>
                   <AdminTableHeader>
                     <tr>
@@ -276,10 +276,10 @@ export function AuditLogPage() {
                         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedLog(log); } }}
                       >
                         <AdminTableCell className="whitespace-nowrap text-sm tabular-nums text-slate-600">{formatDateTime(log.createdAt)}</AdminTableCell>
-                        <AdminTableCell><Badge className="border-0 bg-slate-100 text-slate-700">{log.domainLabel}</Badge></AdminTableCell>
-                        <AdminTableCell className="admin-table-text-emphasis">{log.actionLabel}</AdminTableCell>
-                        <AdminTableCell className="max-w-0"><span className="block truncate text-sm font-normal text-slate-700" title={log.targetLabel}>{log.targetLabel}</span></AdminTableCell>
-                        <AdminTableCell className="text-sm font-normal text-slate-600">{log.actorNameKo ?? "시스템"}</AdminTableCell>
+                        <AdminTableCell data-mobile-label="구분"><Badge className="border-0 bg-slate-100 text-slate-700">{log.domainLabel}</Badge></AdminTableCell>
+                        <AdminTableCell data-mobile-label="액션" className="admin-table-text-emphasis">{log.actionLabel}</AdminTableCell>
+                        <AdminTableCell data-mobile-label="대상" className="max-w-0"><span className="block truncate text-sm font-normal text-slate-700" title={log.targetLabel}>{log.targetLabel}</span></AdminTableCell>
+                        <AdminTableCell data-mobile-label="담당자" className="text-sm font-normal text-slate-600">{log.actorNameKo ?? "시스템"}</AdminTableCell>
                       </tr>
                     ))}
                   </AdminTableBody>

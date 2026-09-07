@@ -10,10 +10,12 @@ export function AdminDataTable({
   className,
   isDragging = false,
   minWidth = "47.5rem",
+  mobileMode = "table",
   viewportClassName,
   ...props
 }: ComponentProps<"table"> & {
   isDragging?: boolean;
+  mobileMode?: "cards" | "table";
   minWidth?: CSSProperties["minWidth"];
   viewportClassName?: string;
 }) {
@@ -28,7 +30,8 @@ export function AdminDataTable({
       )}
     >
       <table
-        className={cn("admin-data-table w-full table-fixed text-left", className)}
+        className={cn("admin-data-table w-full table-fixed text-left", mobileMode === "cards" && "admin-data-table--mobile-cards", className)}
+        data-mobile-mode={mobileMode}
         style={{ minWidth: resolvedMinWidth }}
         {...props}
       >

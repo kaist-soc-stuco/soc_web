@@ -90,8 +90,8 @@ export function AdminLayout() {
   );
 
   const adminHeader = (
-    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between border-b border-[#e5eaf0] bg-white/95 px-6 backdrop-blur">
-      <div className="flex min-w-0 shrink-0 items-center gap-6">
+    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between border-b border-[#e5eaf0] bg-white/95 px-4 backdrop-blur sm:px-6">
+      <div className="flex min-w-0 shrink-0 items-center gap-4 sm:gap-6">
         <Logo />
         <span className="hidden border-l border-slate-200 pl-6 text-sm font-semibold text-slate-800 md:inline">
           {lang === "ko" ? "관리자 대시보드" : "Admin Dashboard"}
@@ -106,7 +106,7 @@ export function AdminLayout() {
               aria-label={lang === "ko" ? `${user.name} 관리자 메뉴` : `${user.name} admin menu`}
               aria-expanded={dropdownOpen}
               onClick={() => setDropdownOpen((value) => !value)}
-              className="flex min-h-10 items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-app-text-strong transition-colors hover:border-slate-200 hover:bg-slate-50"
+              className="flex min-h-11 items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-app-text-strong transition-colors hover:border-slate-200 hover:bg-slate-50"
             >
               <User className="h-4 w-4 text-kaist-greygreen" />
               <span className="hidden max-w-44 truncate sm:inline">{user.name}</span>
@@ -117,7 +117,7 @@ export function AdminLayout() {
               <PopoverPanel className="right-0 top-full w-28 select-none rounded-lg p-1">
                 <Button variant="ghost"
                   type="button"
-                  className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:!text-red-700"
+                  className="flex h-11 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:!text-red-700"
                   onClick={() => void handleLogout()}
                 >
                   <LogOut className="h-3.5 w-3.5" />
