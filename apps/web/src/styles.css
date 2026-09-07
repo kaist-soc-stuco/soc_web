@@ -3164,6 +3164,205 @@
   word-break: keep-all;
 }
 
+/* List-style admin tables become readable cards before the desktop table
+   comparison layout has enough room. The table remains the single DOM/data
+   source, so sorting, keyboard activation, and row actions keep their
+   existing handlers. */
+@media (max-width: 63.9375rem) {
+  .admin-data-table[data-mobile-mode="cards"] {
+    display: block;
+    min-width: 0 !important;
+    table-layout: auto;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] colgroup,
+  .admin-data-table[data-mobile-mode="cards"] thead {
+    display: none;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+    min-width: 0;
+    padding: 0.875rem;
+    border: 1px solid #e5eaf0;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    box-shadow: 0 5px 18px rgb(15 23 42 / 0.04);
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody tr:hover {
+    background: #ffffff;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody td {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+    border: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody td[data-mobile-label]::before {
+    flex: 0 0 4.5rem;
+    color: #7a8794;
+    content: attr(data-mobile-label);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody td:first-child {
+    grid-column: 1 / -1;
+    display: block;
+    padding-top: 0;
+    padding-bottom: 0.625rem;
+    border-bottom: 1px solid #eef2f4;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody td:last-child {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    padding-top: 0.625rem;
+    border-top: 1px solid #eef2f4;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody td[colspan] {
+    display: block;
+    grid-column: 1 / -1;
+    padding: 2rem 0;
+    border: 0;
+    text-align: center;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] .truncate {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] .ui-icon-button {
+    width: var(--ui-touch-target-min);
+    height: var(--ui-touch-target-min);
+  }
+
+  .admin-data-table[data-mobile-mode="cards"] tbody td:last-child :is(button, a) {
+    min-width: var(--ui-touch-target-min);
+    min-height: var(--ui-touch-target-min);
+  }
+
+  /* The contact directory uses an accessible grid rather than a native
+     table because it also supports drag reordering. Keep the same row data,
+     but present one person as a readable card on narrow screens. */
+  .admin-contacts-table {
+    min-width: 0 !important;
+  }
+
+  .admin-contacts-table__header {
+    display: none !important;
+  }
+
+  .admin-contacts-table__row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    min-width: 0 !important;
+    gap: 0.125rem 0.75rem;
+    margin: 0.75rem 1rem;
+    padding: 0.875rem;
+    border: 1px solid #e5eaf0;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    box-shadow: 0 5px 18px rgb(15 23 42 / 0.04);
+  }
+
+  .admin-contacts-table__row > [role="cell"] {
+    min-width: 0;
+    padding: 0.25rem 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  .admin-contacts-table__row > [role="cell"][data-mobile-label] {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .admin-contacts-table__row > [role="cell"][data-mobile-label]::before {
+    flex: 0 0 4.5rem;
+    color: #7a8794;
+    content: attr(data-mobile-label);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:nth-child(1) {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 2.5rem;
+    justify-content: flex-end;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:nth-child(2) {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    padding-top: 0;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:nth-child(3) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:nth-child(5),
+  .admin-contacts-table__row > [role="cell"]:nth-child(6) {
+    grid-column: 1 / -1;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:nth-child(5) {
+    margin-top: 0.25rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid #eef2f4;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:nth-child(6) {
+    padding-bottom: 0;
+  }
+
+  .admin-contacts-table__row .truncate {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .admin-contacts-table__row > [role="cell"]:first-child button {
+    min-width: var(--ui-touch-target-min);
+    min-height: var(--ui-touch-target-min);
+  }
+}
+
 /* A transformed sortable row must not turn its table viewport into a second
    scroll surface while it is being dragged. The drag overlay remains visible
    outside the clipped table surface. */

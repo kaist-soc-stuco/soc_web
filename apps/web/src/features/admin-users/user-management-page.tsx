@@ -385,7 +385,7 @@ export function UserManagementPage() {
             ) : (data?.items ?? []).length === 0 ? (
               <AdminEmptyState message="조건에 맞는 사용자가 없습니다." />
             ) : (
-              <AdminDataTable minWidth={1120}>
+              <AdminDataTable minWidth={1120} mobileMode="cards">
                 <colgroup>
                   <col style={{ width: 240 }} />
                   <col style={{ width: 290 }} />
@@ -443,22 +443,22 @@ export function UserManagementPage() {
                             {displayStudentId(user)}
                           </div>
                         </AdminTableCell>
-                        <AdminTableCell className="py-3">
+                        <AdminTableCell data-mobile-label="연락처" className="py-3">
                           <div className="truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={user.email}>{user.email}</div>
                           <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={user.phoneNumber ?? undefined}>{user.phoneNumber ?? ""}</div>
                         </AdminTableCell>
-                        <AdminTableCell className="py-3">
+                        <AdminTableCell data-mobile-label="전공" className="py-3">
                           {major ? <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{major}</div> : null}
                         </AdminTableCell>
-                        <AdminTableCell className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
+                        <AdminTableCell data-mobile-label="동의 시각" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
                           {user.privacyConsentAt ? formatShortDateTime(user.privacyConsentAt) : ""}
                         </AdminTableCell>
-                        <AdminTableCell className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
+                        <AdminTableCell data-mobile-label="최근 접속" className="py-3 text-sm font-normal text-[var(--j-color-text-secondary)]">
                           <time dateTime={user.lastLoginAt ?? undefined} title={formatShortDateTime(user.lastLoginAt)}>
                             {formatRelativeTime(user.lastLoginAt)}
                           </time>
                         </AdminTableCell>
-                        <AdminTableCell className="py-3 text-center">
+                        <AdminTableCell data-mobile-label="작업" className="py-3 text-center">
                           <Button
                             type="button"
                             variant="ghost"

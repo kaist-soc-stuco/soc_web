@@ -385,7 +385,7 @@ export function SurveyListPage() {
             ) : null}
 
             {!showInitialLoading && filteredSurveys.length > 0 ? (
-              <AdminDataTable minWidth={1304}>
+              <AdminDataTable minWidth={1304} mobileMode="cards">
                 <colgroup>
                   <col style={{ width: 360 }} />
                   <col style={{ width: 110 }} />
@@ -440,20 +440,20 @@ export function SurveyListPage() {
                             {survey.titleKo}
                           </button>
                         </AdminTableCell>
-                        <AdminTableCell className="text-center">
+                        <AdminTableCell data-mobile-label="상태" className="text-center">
                           <SurveyStatusBadge survey={survey} />
                         </AdminTableCell>
-                        <AdminTableCell className="text-center">{renderTypeLabel(survey)}</AdminTableCell>
-                        <AdminTableCell className="text-center tabular-nums">
+                        <AdminTableCell data-mobile-label="유형" className="text-center">{renderTypeLabel(survey)}</AdminTableCell>
+                        <AdminTableCell data-mobile-label="응답자 수" className="text-center tabular-nums">
                           {survey.responseCount ?? 0}명
                         </AdminTableCell>
-                        <AdminTableCell className="text-center tabular-nums whitespace-nowrap">
+                        <AdminTableCell data-mobile-label="일시" className="text-center tabular-nums whitespace-nowrap">
                           {formatSurveyPeriod(survey)}
                         </AdminTableCell>
-                        <AdminTableCell className="text-center whitespace-nowrap">
+                        <AdminTableCell data-mobile-label="최근 수정" className="text-center whitespace-nowrap">
                           {formatRelativeTime(survey.updatedAt)}
                         </AdminTableCell>
-                        <AdminTableCell className="text-center">
+                        <AdminTableCell data-mobile-label="작업" className="text-center">
                           <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-50/80 p-0.5">
                             <IconButton
                               size="sm"

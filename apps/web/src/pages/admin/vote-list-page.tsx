@@ -54,7 +54,7 @@ export function VoteListPage() {
               totalPages={totalPages}
             />
           )}>
-            <AdminDataTable minWidth="56rem">
+            <AdminDataTable minWidth="56rem" mobileMode="cards">
               <AdminTableHeader><tr><AdminTableHead className="w-[42%]">투표</AdminTableHead><AdminTableHead className="w-28">상태</AdminTableHead><AdminTableHead>기간</AdminTableHead><AdminTableHead className="w-32">참여</AdminTableHead></tr></AdminTableHeader>
               <AdminTableBody>
                 {loading ? <AdminTableEmpty colSpan={4}>불러오는 중...</AdminTableEmpty> : visible.length === 0 ? <AdminTableEmpty colSpan={4}>등록된 투표가 없습니다.</AdminTableEmpty> : visible.map((vote) => (
@@ -72,9 +72,9 @@ export function VoteListPage() {
                     aria-label={`${vote.titleKo} 투표 관리`}
                   >
                     <AdminTableCell><div className="font-medium text-[#172033]">{vote.titleKo}</div><div className="mt-1 text-xs font-normal text-[#344054]">전산학부 주전공 학부생 명부</div></AdminTableCell>
-                    <AdminTableCell><VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} /></AdminTableCell>
-                    <AdminTableCell className="text-sm font-normal text-[#344054]"><time dateTime={vote.startsAt} className="whitespace-nowrap">{formatNumericDateRange(vote.startsAt, vote.endsAt, { includeTime: true })}</time></AdminTableCell>
-                    <AdminTableCell className="text-sm font-normal text-[#344054]">{vote.votedCount} / {vote.eligibleCount}명</AdminTableCell>
+                    <AdminTableCell data-mobile-label="상태"><VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} /></AdminTableCell>
+                    <AdminTableCell data-mobile-label="기간" className="text-sm font-normal text-[#344054]"><time dateTime={vote.startsAt} className="whitespace-nowrap">{formatNumericDateRange(vote.startsAt, vote.endsAt, { includeTime: true })}</time></AdminTableCell>
+                    <AdminTableCell data-mobile-label="참여" className="text-sm font-normal text-[#344054]">{vote.votedCount} / {vote.eligibleCount}명</AdminTableCell>
                   </tr>
                 ))}
               </AdminTableBody>
