@@ -1357,6 +1357,11 @@
     .home-footer-copyright {
       margin-left: 0;
     }
+
+    .home-footer-instagram {
+      min-height: var(--ui-touch-target-min);
+      min-width: var(--ui-touch-target-min);
+    }
   }
 
   .home-event-card {
@@ -1681,6 +1686,7 @@
       background: linear-gradient(to bottom, rgb(4 18 13 / 0.58), transparent);
     }
 
+    .site-header-brand,
     .site-header-home .site-header-brand {
       width: 12rem !important;
       padding-inline: 1rem 0.5rem;

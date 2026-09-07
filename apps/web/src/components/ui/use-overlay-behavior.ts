@@ -13,11 +13,17 @@ const FOCUSABLE_SELECTOR = [
 const overlayStack: HTMLElement[] = [];
 let bodyScrollLockCount = 0;
 let previousBodyOverflow: string | null = null;
+let previousDocumentOverflow: string | null = null;
+let previousDocumentScrollbarGutter: string | null = null;
 
 function lockBodyScroll() {
   if (bodyScrollLockCount === 0) {
     previousBodyOverflow = document.body.style.overflow;
+    previousDocumentOverflow = document.documentElement.style.overflow;
+    previousDocumentScrollbarGutter = document.documentElement.style.scrollbarGutter;
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    document.documentElement.style.scrollbarGutter = "auto";
   }
   bodyScrollLockCount += 1;
 
@@ -25,7 +31,11 @@ function lockBodyScroll() {
     bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
     if (bodyScrollLockCount === 0) {
       document.body.style.overflow = previousBodyOverflow ?? "";
+      document.documentElement.style.overflow = previousDocumentOverflow ?? "";
+      document.documentElement.style.scrollbarGutter = previousDocumentScrollbarGutter ?? "";
       previousBodyOverflow = null;
+      previousDocumentOverflow = null;
+      previousDocumentScrollbarGutter = null;
     }
   };
 }
@@ -34,6 +44,7 @@ function getFocusableElements(surface: HTMLElement) {
   return Array.from(surface.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     (element) =>
       element.getAttribute("aria-hidden") !== "true" &&
+      element.tabIndex >= 0 &&
       element.offsetWidth > 0 &&
       element.offsetHeight > 0,
   );
