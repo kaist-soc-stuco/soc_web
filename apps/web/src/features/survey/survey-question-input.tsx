@@ -97,7 +97,7 @@ export function SurveyQuestionInput({
         <div>
           <UiTextarea
             autoResize={false}
-            className={`${controlClass} min-h-[100px] resize-y`}
+            className={`${controlClass} min-h-[100px] resize-none`}
             value={value as string}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={Boolean(error)}
