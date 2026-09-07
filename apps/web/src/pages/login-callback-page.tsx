@@ -11,6 +11,7 @@ import {
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 
 const LAST_CONSUMED_RESULT_TOKEN_KEY = "soc.auth.last-consumed-result-token";
@@ -275,37 +276,20 @@ export function LoginCallbackPage() {
       </section>
 
       {pendingConsentToken ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
-          <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <h1 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-kaist-black">
-              {lang === "ko" ? "개인정보 제공 동의" : "Personal Data Consent"}
-            </h1>
-            <div className="mt-4 space-y-3 text-sm font-medium leading-6 text-slate-600">
-              <p>
-                {lang === "ko"
-                  ? "SSO 로그인으로 받은 이름, 이메일, 학번 정보를 서비스 이용에 사용합니다."
-                  : "We use your name, email address, and student number received through SSO to provide this service."}
-              </p>
-              <p>
-                {lang === "ko"
-                  ? (
-                    <>
-                      동의하면 다음 로그인부터 필요한 기능을 바로 사용할 수 있습니다.
-                      <br />
-                      동의하지 않아도 이번 세션에서는 임시 로그인으로 계속 이용할 수 있습니다.
-                    </>
-                  )
-                  : "If you consent, account features will remain available on future visits. If you decline, you can continue with a temporary session for this visit."}
-              </p>
-            </div>
-
-            {consentErrorMessage ? (
-              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
-                {consentErrorMessage}
-              </div>
-            ) : null}
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <Modal
+          open
+          onClose={() =>
+            returnToPreviousPage(
+              lang === "ko"
+                ? "로그인을 취소했습니다."
+                : "Sign-in was canceled.",
+            )
+          }
+          title={lang === "ko" ? "개인정보 제공 동의" : "Personal Data Consent"}
+          className="max-w-lg"
+          bodyClassName="space-y-3"
+          footer={
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
                 type="button"
@@ -337,8 +321,33 @@ export function LoginCallbackPage() {
                     : "Consent and save"}
               </Button>
             </div>
-          </section>
-        </div>
+          }
+        >
+          <div className="space-y-3 text-sm font-medium leading-6 text-slate-600">
+            <p>
+              {lang === "ko"
+                ? "SSO 로그인으로 받은 이름, 이메일, 학번 정보를 서비스 이용에 사용합니다."
+                : "We use your name, email address, and student number received through SSO to provide this service."}
+            </p>
+            <p>
+              {lang === "ko"
+                ? (
+                  <>
+                    동의하면 다음 로그인부터 필요한 기능을 바로 사용할 수 있습니다.
+                    <br />
+                    동의하지 않아도 이번 세션에서는 임시 로그인으로 계속 이용할 수 있습니다.
+                  </>
+                )
+                : "If you consent, account features will remain available on future visits. If you decline, you can continue with a temporary session for this visit."}
+            </p>
+          </div>
+
+          {consentErrorMessage ? (
+            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+              {consentErrorMessage}
+            </div>
+          ) : null}
+        </Modal>
       ) : null}
     </main>
   );

@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
+import { useOverlayBehavior } from "@/components/ui/use-overlay-behavior";
 import { cn } from "@/lib/utils";
 
 export function Modal({
@@ -29,41 +30,21 @@ export function Modal({
   title: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const previousActiveElementRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    previousActiveElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusFrame = window.requestAnimationFrame(() => {
-      surfaceRef.current?.focus({ preventScroll: true });
-    });
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      const previous = previousActiveElementRef.current;
-      previousActiveElementRef.current = null;
-      if (previous && document.contains(previous)) {
-        window.requestAnimationFrame(() => previous.focus({ preventScroll: true }));
-      }
-    };
-  }, [open]);
+  const titleId = useId();
+  const handleOverlayKeyDown = useOverlayBehavior({
+    onClose,
+    open,
+    surfaceRef,
+  });
 
   if (!open) return null;
 
   return createPortal(
-    <div className="ui-modal fixed inset-0 z-[70] flex items-center justify-center px-4 py-6">
+    <div className="ui-modal fixed inset-0 z-[70] flex items-end justify-center p-0 sm:items-center sm:px-4 sm:py-6">
       <button
         type="button"
         aria-label="닫기"
+        tabIndex={-1}
         className="ui-modal__scrim absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
         onClick={onClose}
       />
@@ -71,9 +52,11 @@ export function Modal({
         ref={surfaceRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         tabIndex={-1}
+        onKeyDown={handleOverlayKeyDown}
         className={cn(
-          "ui-modal__surface relative flex max-h-[calc(100vh-3rem)] w-full max-w-md flex-col overflow-hidden rounded-[var(--ui-panel-radius)] border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_24px_80px_rgba(15,23,42,0.18)]",
+          "ui-modal__surface relative flex max-h-[calc(100dvh-1rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[var(--ui-panel-radius)] border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[var(--ui-panel-radius)]",
           className,
         )}
       >
@@ -83,11 +66,11 @@ export function Modal({
             dividerless ? "px-6" : "px-5",
           )}
         >
-          <h2 className="text-lg font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
+          <h2 id={titleId} className="min-w-0 break-words text-lg font-semibold leading-6 text-[var(--ui-text-strong)]">{title}</h2>
           <div className="flex shrink-0 items-center gap-1.5">
             {headerActions}
             {showClose ? (
-              <IconButton size="sm" aria-label="닫기" onClick={onClose}>
+              <IconButton aria-label="닫기" onClick={onClose}>
                 <X aria-hidden="true" />
               </IconButton>
             ) : null}
@@ -97,10 +80,10 @@ export function Modal({
         {footer ? (
           <div
             className={cn(
-              "ui-modal__footer flex shrink-0 justify-end gap-2",
+              "ui-modal__footer flex shrink-0 flex-wrap justify-end gap-2",
               dividerless
-                ? "bg-transparent px-6 pb-6 pt-0"
-                : "bg-transparent px-5 pb-5 pt-0",
+                ? "bg-transparent px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-0"
+                : "bg-transparent px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-0",
             )}
           >
             {footer}
