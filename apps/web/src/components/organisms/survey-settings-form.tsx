@@ -67,6 +67,12 @@ const escapeHtmlAttribute = (value: string) =>
 const appendInlineImage = (content: string, src: string) =>
   `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
 
+const plainText = (value: string | undefined) =>
+  (value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 function SettingCheckbox({
   checked,
   className,
@@ -299,6 +305,7 @@ export function SurveySettingsForm({
   onSubmit,
 }: SurveySettingsFormProps) {
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
+  const [basicEditorExpanded, setBasicEditorExpanded] = useState(mode !== "basic");
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const {
     register,
@@ -323,6 +330,10 @@ export function SurveySettingsForm({
   const connectedArticleId = watch("connectedArticleId") ?? "";
   const openAt = watch("openAt") ?? "";
   const closeAt = watch("closeAt") ?? "";
+  const titleKo = watch("titleKo") ?? "";
+  const titleEn = watch("titleEn") ?? "";
+  const descriptionKo = watch("descriptionKo") ?? "";
+  const descriptionEn = watch("descriptionEn") ?? "";
 
   useEffect(() => {
     if (isKoreanOnly && activeTab === "en") {
@@ -394,7 +405,16 @@ export function SurveySettingsForm({
       >
       <div className={mode === "all" ? "grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3" : "grid grid-cols-1"}>
         {/* 좌측 메인 영역 */}
-        {mode !== "delivery" ? <div className={`${mode === "all" ? "lg:col-span-2" : ""} h-full space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}>
+        {mode !== "delivery" ? basicEditorExpanded ? <div
+          className={`${mode === "all" ? "lg:col-span-2" : ""} h-full space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}
+          onFocusCapture={() => setBasicEditorExpanded(true)}
+          onBlurCapture={(event) => {
+            const nextTarget = event.relatedTarget;
+            if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
+              setBasicEditorExpanded(false);
+            }
+          }}
+        >
           {/* 탭 및 Korean Only 옵션 */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <SegmentedControl
@@ -438,10 +458,11 @@ export function SurveySettingsForm({
           <div className="space-y-4">
             <div>
               {activeTab === "ko" ? (
-                <UiInput
-                  key="titleKo"
-                  aria-label="설문 제목"
-                  className={inputCls}
+                 <UiInput
+                   key="titleKo"
+                   aria-label="설문 제목"
+                   autoFocus={mode === "basic"}
+                   className={inputCls}
                   placeholder="설문 제목"
                   {...register("titleKo")}
                 />
@@ -502,7 +523,27 @@ export function SurveySettingsForm({
               )}
             </div>
           </div>
-        </div> : null}
+        </div> : (
+          <button
+            type="button"
+            aria-label="설문 제목 및 설명 편집"
+            aria-expanded={false}
+            onClick={() => setBasicEditorExpanded(true)}
+            className={`${mode === "all" ? "lg:col-span-2" : ""} block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-5 py-4 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/20 md:px-6`}
+          >
+            <div className="flex min-w-0 items-baseline gap-1 text-base font-semibold text-slate-900">
+              <span className="min-w-0 truncate">{titleKo.trim() || "설문 제목"}</span>
+              {titleEn.trim() ? (
+                <span className="min-w-0 truncate text-sm font-normal text-slate-400">({titleEn.trim()})</span>
+              ) : null}
+            </div>
+            {plainText(descriptionKo) || (!isKoreanOnly && plainText(descriptionEn)) ? (
+              <p className="mt-1 truncate text-sm font-normal text-slate-500">
+                {plainText(descriptionKo) || plainText(descriptionEn)}
+              </p>
+            ) : null}
+          </button>
+        ) : null}
 
         {/* 우측 메타데이터 영역 */}
         {mode !== "basic" ? <div className={`${mode === "all" ? "lg:col-span-1" : ""} h-full space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}>

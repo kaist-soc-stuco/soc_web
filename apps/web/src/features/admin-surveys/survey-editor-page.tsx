@@ -319,11 +319,15 @@ function QuestionOptionPreview({
 }
 
 function QuestionPreview({ question }: { question: SurveyQuestionRecord }) {
+  const hasDescription = Boolean(
+    question.descriptionKo?.trim() || question.descriptionEn?.trim(),
+  );
+
   switch (question.questionType) {
     case "short_text":
       return (
         <div className="mt-3 max-w-md space-y-2 text-xs text-slate-500">
-          <span className="block text-slate-600">설명</span>
+          {hasDescription ? <span className="block text-slate-600">설명</span> : null}
           <div className="w-3/4 border-b border-dotted border-slate-400 pb-1">
             단답형 텍스트
           </div>
@@ -393,15 +397,17 @@ function CollapsedQuestionRow({
       onClick={onEdit}
       className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 text-left text-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
     >
-      <span className="min-w-0 flex-1 truncate font-normal text-slate-700">
-        {question.titleKo || "질문"}
-        {question.titleEn?.trim() ? (
-          <span className="ml-1 text-slate-400">({question.titleEn.trim()})</span>
+      <span className="flex min-w-0 flex-1 items-baseline gap-1 font-semibold text-slate-700">
+        <span className="min-w-0 truncate">
+          {question.titleKo || "질문"}
+          {question.titleEn?.trim() ? (
+            <span className="ml-1 font-normal text-slate-400">({question.titleEn.trim()})</span>
+          ) : null}
+        </span>
+        {question.isRequired ? (
+          <span aria-label="필수 응답" className="shrink-0 font-semibold text-red-500">*</span>
         ) : null}
       </span>
-      {question.isRequired ? (
-        <span aria-label="필수 응답" className="shrink-0 font-semibold text-red-500">*</span>
-      ) : null}
     </button>
   );
 }
@@ -433,18 +439,16 @@ function SectionNavigationSelect({
     : "";
 
   return (
-    <div className="flex justify-end pt-1">
-      <AdminSelectDropdown
-        ariaLabel={`${section.titleKo || "섹션"} 다음 이동`}
-        value={selectedValue}
-        options={options}
-        onChange={onChange}
-        disabled={disabled}
-        className="w-fit min-w-56"
-        buttonClassName="!h-9 !border-0 !bg-transparent !px-2 !text-sm !font-normal !text-slate-600 !shadow-none hover:!bg-slate-50"
-        menuClassName="min-w-64"
-      />
-    </div>
+    <AdminSelectDropdown
+      ariaLabel={`${section.titleKo || "섹션"} 다음 이동`}
+      value={selectedValue}
+      options={options}
+      onChange={onChange}
+      disabled={disabled}
+      className="w-fit min-w-56 shrink-0"
+      buttonClassName="!h-9 !border-0 !bg-transparent !px-2 !text-sm !font-normal !text-slate-600 !shadow-none hover:!bg-slate-50"
+      menuClassName="min-w-64"
+    />
   );
 }
 
@@ -639,6 +643,7 @@ export function SurveyEditorPage() {
 
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [newSectionTitleEn, setNewSectionTitleEn] = useState("");
+  const [sectionAddOpenId, setSectionAddOpenId] = useState<string | null>(null);
   const [addingSection, setAddingSection] = useState(false);
 
   const [editingQuestion, setEditingQuestion] = useState<{
@@ -1022,6 +1027,7 @@ export function SurveyEditorPage() {
       setSections(updated.sections);
       setNewSectionTitle("");
       setNewSectionTitleEn("");
+      setSectionAddOpenId(null);
     } catch (err: unknown) {
       console.error(err);
       setError(getErrorMessage(err, "섹션 추가 실패"));
@@ -1737,15 +1743,15 @@ export function SurveyEditorPage() {
                         const moveMenuOpen = sectionMoveOpenId === section.id;
 
                         return (
-                          <section
-                            key={section.id}
-                            className="relative border-b border-slate-200 pb-6 last:border-b-0"
-                          >
-                            <div className="relative overflow-visible border-l-4 border-brand-primary bg-white shadow-none">
+                           <section
+                             key={section.id}
+                             className="relative space-y-3"
+                           >
+                             <div className="relative overflow-visible rounded-lg border border-slate-200 bg-white">
                               <div className="flex min-w-0 items-start justify-between gap-4 px-5 py-4 md:px-6">
                                 <div className="min-w-0">
                                   <div className="mb-1 text-xs font-medium text-slate-400">
-                                    {orderedSections.length} 중 {sectionIndex + 1} 섹션
+                                    섹션 {sectionIndex + 1} / {orderedSections.length}
                                   </div>
                                   <h3 className="truncate text-lg font-semibold text-slate-900">
                                     {section.titleKo || "제목 없는 섹션"}
@@ -1854,7 +1860,7 @@ export function SurveyEditorPage() {
                               </div>
                             </div>
 
-                            <div className="space-y-3 px-4 pt-4 md:px-6">
+                             <div className="space-y-3 pt-1">
                               {isCollapsed ? (
                                 section.questions.map((question) => (
                                   <CollapsedQuestionRow
@@ -1925,28 +1931,78 @@ export function SurveyEditorPage() {
                                       onCancel={() => setEditingQuestion(null)}
                                     />
                                   ) : null}
-                                  {!isOngoing ? (
-                                    <div className="pt-2">
+                                </>
+                              )}
+                              <div className="flex min-w-0 items-center justify-between gap-3 pt-2">
+                                {!isOngoing ? (
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() => openNewQuestion(section.id)}
+                                      className="inline-flex shrink-0 items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
+                                    >
+                                      <Plus className="size-4" />
+                                      문항 추가하기
+                                    </Button>
+                                    <div className="relative shrink-0">
                                       <Button
                                         type="button"
                                         variant="ghost"
-                                        onClick={() => openNewQuestion(section.id)}
+                                        aria-expanded={sectionAddOpenId === section.id}
+                                        onClick={() => setSectionAddOpenId((current) => current === section.id ? null : section.id)}
                                         className="inline-flex items-center gap-1.5 border-0 bg-transparent px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-emerald-50"
                                       >
                                         <Plus className="size-4" />
-                                        문항 추가하기
+                                        섹션 추가
                                       </Button>
+                                      {sectionAddOpenId === section.id ? (
+                                        <div className="absolute bottom-full left-0 z-40 mb-2 w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-slate-200 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.16)]">
+                                          <div className="grid gap-2 sm:grid-cols-2">
+                                            <UiInput
+                                              autoFocus
+                                              className="h-9 min-w-0 text-sm"
+                                              placeholder="새 섹션 제목 (국문)"
+                                              value={newSectionTitle}
+                                              onChange={(event) => setNewSectionTitle(event.target.value)}
+                                              onKeyDown={(event) => {
+                                                if (event.key === "Enter") void handleAddSection();
+                                              }}
+                                            />
+                                            <UiInput
+                                              className={`h-9 min-w-0 text-sm ${isKoreanOnly ? "cursor-not-allowed opacity-50" : ""}`}
+                                              placeholder="영문 섹션 제목"
+                                              value={newSectionTitleEn}
+                                              disabled={isKoreanOnly}
+                                              onChange={(event) => setNewSectionTitleEn(event.target.value)}
+                                              onKeyDown={(event) => {
+                                                if (event.key === "Enter") void handleAddSection();
+                                              }}
+                                            />
+                                          </div>
+                                          <div className="mt-2 flex justify-end">
+                                            <Button
+                                              type="button"
+                                              onClick={() => void handleAddSection()}
+                                              disabled={addingSection || !newSectionTitle.trim()}
+                                              className="h-9 bg-brand-primary px-3 text-sm text-white hover:bg-brand-primary/90"
+                                            >
+                                              {addingSection ? "추가 중…" : "섹션 추가"}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : null}
                                     </div>
-                                  ) : null}
-                                </>
-                              )}
-                              <SectionNavigationSelect
-                                section={section}
-                                sectionIndex={sectionIndex}
-                                sections={orderedSections}
-                                disabled={isOngoing}
-                                onChange={(value) => void handleSectionNavigationChange(section.id, value)}
-                              />
+                                  </div>
+                                ) : <span />}
+                                <SectionNavigationSelect
+                                  section={section}
+                                  sectionIndex={sectionIndex}
+                                  sections={orderedSections}
+                                  disabled={isOngoing}
+                                  onChange={(value) => void handleSectionNavigationChange(section.id, value)}
+                                />
+                              </div>
                             </div>
                           </section>
                         );
@@ -1970,34 +2026,6 @@ export function SurveyEditorPage() {
                       : null}
                     </DndContext>
 
-                    {/* 새 섹션 추가 영역 */}
-                    {!isOngoing && (
-                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4 md:flex-row">
-                        <UiInput
-                          className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-kaist-black bg-white border border-kaist-grey/10 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen/30 transition-all placeholder:text-kaist-grey/40"
-                          placeholder="새로운 섹션 제목 (국문)"
-                          value={newSectionTitle}
-                          onChange={(e) => setNewSectionTitle(e.target.value)}
-                        />
-                        <UiInput
-                          className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-kaist-black bg-white border border-kaist-grey/10 focus:outline-none focus:ring-2 focus:ring-kaist-darkgreen/30 transition-all placeholder:text-kaist-grey/40 ${
-                             isKoreanOnly ? "opacity-35 cursor-not-allowed bg-gray-100" : ""
-                           }`}
-                          placeholder="영문 섹션 제목"
-                          value={newSectionTitleEn}
-                          disabled={isKoreanOnly}
-                          onChange={(e) => setNewSectionTitleEn(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
-                        />
-                        <Button variant="ghost"
-                          onClick={handleAddSection}
-                          disabled={addingSection || !newSectionTitle.trim()}
-                          className="px-6 py-2.5 text-sm font-bold text-white bg-kaist-darkgreen hover:bg-kaist-darkgreen/90 rounded-xl transition-all disabled:opacity-50 shadow-md shadow-kaist-darkgreen/15 cursor-pointer border-0"
-                        >
-                          {addingSection ? "추가 중…" : "섹션 추가"}
-                        </Button>
-                      </div>
-                    )}
                   </>
                 )}
               </div>
