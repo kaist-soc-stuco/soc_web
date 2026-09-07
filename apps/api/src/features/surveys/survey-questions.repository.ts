@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -44,9 +44,15 @@ export class SurveyQuestionsRepository {
     tx?: PostgresTransaction,
   ): Promise<SurveyQuestionRecord[]> {
     const db = tx ?? this.db;
-    const rows = await db.query.surveyQuestions.findMany({
-      where: eq(surveyQuestions.sectionId, sectionId),
-    });
+    const rows = await db
+      .select()
+      .from(surveyQuestions)
+      .where(eq(surveyQuestions.sectionId, sectionId))
+      .orderBy(
+        asc(surveyQuestions.sortOrder),
+        asc(surveyQuestions.createdAt),
+        asc(surveyQuestions.id),
+      );
     return rows.map((r) => this.map(r));
   }
 
@@ -68,6 +74,13 @@ export class SurveyQuestionsRepository {
     tx?: PostgresTransaction,
   ): Promise<SurveyQuestionRecord> {
     const db = tx ?? this.db;
+    const [lastQuestion] = await db
+      .select({ sortOrder: surveyQuestions.sortOrder })
+      .from(surveyQuestions)
+      .where(eq(surveyQuestions.sectionId, sectionId))
+      .orderBy(desc(surveyQuestions.sortOrder))
+      .limit(1);
+    const sortOrder = dto.sortOrder ?? (lastQuestion?.sortOrder ?? -1) + 1;
     const [row] = await db
       .insert(surveyQuestions)
       .values({
@@ -81,7 +94,7 @@ export class SurveyQuestionsRepository {
         config: dto.config ?? null,
         answerRegex: dto.answerRegex ?? null,
         isRequired: dto.isRequired ?? true,
-        sortOrder: dto.sortOrder ?? 0,
+        sortOrder,
         createdAt: nowDate(),
         updatedAt: nowDate(),
       })
