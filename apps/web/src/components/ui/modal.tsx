@@ -13,6 +13,7 @@ export function Modal({
   dividerless = false,
   footer,
   headerActions,
+  mobileFullscreen = false,
   onClose,
   open,
   showClose = true,
@@ -24,6 +25,7 @@ export function Modal({
   dividerless?: boolean;
   footer?: ReactNode;
   headerActions?: ReactNode;
+  mobileFullscreen?: boolean;
   onClose: () => void;
   open: boolean;
   showClose?: boolean;
@@ -57,6 +59,7 @@ export function Modal({
         onKeyDown={handleOverlayKeyDown}
         className={cn(
           "ui-modal__surface relative flex max-h-[calc(100dvh-1rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[var(--ui-panel-radius)] border border-[var(--ui-border-subtle)] bg-[var(--card)] shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[var(--ui-panel-radius)]",
+          mobileFullscreen && "ui-modal__surface--mobile-fullscreen",
           className,
         )}
       >

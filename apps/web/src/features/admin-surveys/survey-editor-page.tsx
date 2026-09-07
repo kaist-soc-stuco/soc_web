@@ -302,7 +302,7 @@ function SortableSectionReorderRow({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`flex min-h-20 items-center gap-4 px-6 py-4 ${
+      className={`flex min-h-20 items-center gap-4 px-4 py-4 sm:px-6 ${
         isDragging ? "relative z-10 bg-slate-50 shadow-md" : "bg-white"
       }`}
     >
@@ -313,7 +313,7 @@ function SortableSectionReorderRow({
         {...listeners}
         aria-label={`${sectionTitle} 순서 이동`}
         disabled={disabled}
-        className="flex size-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex min-h-11 min-w-11 shrink-0 touch-none cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
       >
         <GripVertical aria-hidden="true" className="size-5" />
       </button>
@@ -679,7 +679,7 @@ function SectionNavigationSelect({
       onChange={onChange}
       disabled={disabled}
       className="w-fit min-w-56 shrink-0"
-      buttonClassName="!h-9 !border-0 !bg-transparent !px-2 !text-sm !font-normal !text-slate-600 !shadow-none hover:!bg-slate-50"
+      buttonClassName="!h-11 !border-0 !bg-transparent !px-2 !text-sm !font-normal !text-slate-600 !shadow-none hover:!bg-slate-50 md:!h-9"
       menuClassName="min-w-64"
     />
   );
@@ -689,6 +689,9 @@ type SortableQuestionRowProps = {
   question: SurveyQuestionRecord;
   isOngoing: boolean;
   onEdit: () => void;
+  questionIndex?: number;
+  questionCount?: number;
+  onMove?: (direction: -1 | 1) => void;
   isEditing?: boolean;
   editor?: (dragHandle: ReactNode) => ReactNode;
 };
@@ -697,6 +700,9 @@ function SortableQuestionRow({
   question,
   isOngoing,
   onEdit,
+  questionIndex,
+  questionCount,
+  onMove,
   isEditing = false,
   editor,
 }: SortableQuestionRowProps) {
@@ -768,6 +774,28 @@ function SortableQuestionRow({
           {!isOngoing ? (
             <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2">
               {dragHandle}
+            </div>
+          ) : null}
+          {!isOngoing && onMove && questionIndex !== undefined && questionCount !== undefined ? (
+            <div className="absolute right-3 top-3 z-10 flex items-center gap-0.5">
+              <IconButton
+                type="button"
+                size="sm"
+                aria-label={`${question.titleKo || "문항"} 위로 이동`}
+                disabled={questionIndex === 0}
+                onClick={() => onMove(-1)}
+              >
+                <ChevronUp aria-hidden="true" className="size-4" />
+              </IconButton>
+              <IconButton
+                type="button"
+                size="sm"
+                aria-label={`${question.titleKo || "문항"} 아래로 이동`}
+                disabled={questionIndex === questionCount - 1}
+                onClick={() => onMove(1)}
+              >
+                <ChevronDown aria-hidden="true" className="size-4" />
+              </IconButton>
             </div>
           ) : null}
           <QuestionRowContent question={question} />
@@ -1843,6 +1871,17 @@ export function SurveyEditorPage() {
     void persistQuestionOrder(sourceSection.id, nextQuestions, backup);
   };
 
+  const moveQuestion = (sectionId: string, index: number, direction: -1 | 1) => {
+    const section = sections.find((candidate) => candidate.id === sectionId);
+    if (!section || isOngoing) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= section.questions.length) return;
+    const backup = section.questions;
+    const nextQuestions = arrayMove(section.questions, index, targetIndex);
+    setSections((prev) => prev.map((candidate) => candidate.id === sectionId ? { ...candidate, questions: nextQuestions } : candidate));
+    void persistQuestionOrder(sectionId, nextQuestions, backup);
+  };
+
   const handleFetchArticles = async (query = "") => {
     try {
       const results = await client.searchArticles(query, 30);
@@ -1897,9 +1936,9 @@ export function SurveyEditorPage() {
     <AuthGuard requirePermission={Permissions.MANAGE_SURVEY}>
       <AdminPageShell>
         {ConfirmDialog}
-        <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-editor-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
+        <main className="admin-page__main admin-survey-editor mx-auto flex w-full max-w-[var(--ui-admin-editor-max-width)] flex-col gap-5 px-4 py-6 sm:px-5 md:gap-6 md:px-8 md:py-7 xl:px-10">
 
-          <div className="sticky top-16 z-40 -mx-5 bg-[#f7f9fc]/95 px-5 pt-1 backdrop-blur md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
+          <div className="sticky top-16 z-40 -mx-4 bg-[#f7f9fc]/95 px-4 pt-1 backdrop-blur sm:-mx-5 sm:px-5 md:-mx-8 md:px-8 xl:-mx-10 xl:px-10">
           <AdminPageHeader
             eyebrow={
               <button
@@ -2167,7 +2206,7 @@ export function SurveyEditorPage() {
                                     items={section.questions.map((question) => question.id)}
                                     strategy={verticalListSortingStrategy}
                                   >
-                                    {section.questions.map((question) => {
+                                    {section.questions.map((question, questionIndex) => {
                                       const isEditing = editingQuestion?.questionId === question.id;
 
                                       return (
@@ -2175,6 +2214,9 @@ export function SurveyEditorPage() {
                                           key={question.id}
                                           question={question}
                                           isOngoing={isOngoing}
+                                          questionIndex={questionIndex}
+                                          questionCount={section.questions.length}
+                                          onMove={(direction) => moveQuestion(section.id, questionIndex, direction)}
                                           isEditing={isEditing}
                                           editor={
                                             isEditing
@@ -2296,6 +2338,7 @@ export function SurveyEditorPage() {
             open
             onClose={closeSectionReorder}
             title="섹션 재정렬"
+            mobileFullscreen
             className="max-w-2xl"
             bodyClassName="!p-0"
             footer={

@@ -96,8 +96,9 @@ export function SectionEditorModal({
       open
       onClose={onCancel}
       title="섹션 편집"
+      mobileFullscreen
       className="max-w-4xl"
-      bodyClassName="space-y-6 px-6 py-6 md:px-8"
+      bodyClassName="space-y-6 px-4 py-5 sm:px-6 md:px-8"
       footer={
         <>
           <Button type="button" variant="outline" onClick={onCancel}>
@@ -118,7 +119,7 @@ export function SectionEditorModal({
           <Button variant="ghost"
             type="button"
             onClick={() => setActiveTab("ko")}
-            className={`flex-1 rounded-lg py-2 text-xs font-bold transition ${
+            className={`min-h-11 flex-1 rounded-lg py-2 text-xs font-bold transition ${
               activeTab === "ko"
                 ? "bg-white text-kaist-darkgreen shadow-sm"
                 : "text-slate-500 hover:bg-white/70"
@@ -130,7 +131,7 @@ export function SectionEditorModal({
             type="button"
             onClick={() => setActiveTab("en")}
             disabled={isKoreanOnly}
-            className={`flex-1 rounded-lg py-2 text-xs font-bold transition ${
+            className={`min-h-11 flex-1 rounded-lg py-2 text-xs font-bold transition ${
               activeTab === "en"
                 ? "bg-white text-kaist-darkgreen shadow-sm"
                 : "text-slate-500 hover:bg-white/70"

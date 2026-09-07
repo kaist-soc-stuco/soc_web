@@ -17,6 +17,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronUp,
   Circle,
   Clock3,
   Copy,
@@ -355,6 +356,7 @@ interface SortableOptionRowProps {
   onUpdateOptionImage: (index: number, value: string | null) => void;
   onUpdateBranchTarget: (optionValue: string, target: string) => void;
   onRemoveOption: (index: number) => void;
+  onMoveOption: (fromIndex: number, toIndex: number) => void;
   onError: (message: string) => void;
 }
 
@@ -375,6 +377,7 @@ function SortableOptionRow({
   onUpdateOptionImage,
   onUpdateBranchTarget,
   onRemoveOption,
+  onMoveOption,
   onError,
 }: SortableOptionRowProps) {
   const {
@@ -398,7 +401,7 @@ function SortableOptionRow({
         transition,
         zIndex: isDragging ? 20 : undefined,
       }}
-      className={`group relative min-w-0 rounded-lg px-4 py-1.5 transition-colors hover:bg-slate-50/70 md:px-5 ${
+      className={`question-option-row group relative min-w-0 rounded-lg px-4 py-1.5 transition-colors hover:bg-slate-50/70 md:px-5 ${
         isDragging ? "shadow-md" : ""
       }`}
     >
@@ -447,7 +450,7 @@ function SortableOptionRow({
             onChange={(event) => onUpdateOption(index, "labelEn", event.target.value)}
           />
         </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+        <div className="question-option-image-action flex h-9 w-9 shrink-0 items-center justify-center">
           {!optionImage ? (
             <div className="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
               <CompactImagePicker
@@ -475,7 +478,7 @@ function SortableOptionRow({
         {hasBranchingControls ? (
           <AdminSelectDropdown
             ariaLabel={`${option.labelKo || option.value || "선택지"} 다음 섹션`}
-            className="w-44 max-w-full shrink-0"
+            className="question-option-branch w-44 max-w-full shrink-0"
             value={branchMap[option.value] ?? ""}
             disabled={isOngoing || !option.value.trim()}
             onChange={(target) => onUpdateBranchTarget(option.value, target)}
@@ -489,6 +492,26 @@ function SortableOptionRow({
             buttonClassName="!h-9 !text-xs"
           />
         ) : null}
+        <div className="question-option-order-actions flex shrink-0 items-center gap-0.5">
+          <IconButton
+            type="button"
+            size="sm"
+            aria-label={`${option.labelKo || option.value || "선택지"} 위로 이동`}
+            disabled={isOngoing || index === 0}
+            onClick={() => onMoveOption(index, index - 1)}
+          >
+            <ChevronUp aria-hidden="true" className="size-4" />
+          </IconButton>
+          <IconButton
+            type="button"
+            size="sm"
+            aria-label={`${option.labelKo || option.value || "선택지"} 아래로 이동`}
+            disabled={isOngoing || index === optionCount - 1}
+            onClick={() => onMoveOption(index, index + 1)}
+          >
+            <ChevronDown aria-hidden="true" className="size-4" />
+          </IconButton>
+        </div>
       </div>
       <ImagePreview
         label="선택지 이미지"
@@ -1067,7 +1090,7 @@ export function QuestionInlineEditor({
     "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-base font-normal text-slate-900 outline-none placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      className="relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-5 pb-5 pt-8 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 md:p-6 md:pb-5 md:pt-8"
+      className="question-inline-editor relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 sm:p-5 md:p-6 md:pb-5 md:pt-8"
     >
       {dragHandle ? (
         <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="문항 순서 이동">
@@ -1203,6 +1226,7 @@ export function QuestionInlineEditor({
                     onUpdateOptionImage={updateOptionImage}
                     onUpdateBranchTarget={updateBranchTarget}
                     onRemoveOption={removeOption}
+                    onMoveOption={moveOption}
                     onError={(message) => toast({ type: "error", message })}
                   />
                 ))}
@@ -1576,7 +1600,7 @@ function QuestionMoreMenu({
       style={menuStyle}
       role="menu"
       aria-label="문항 옵션"
-      className="fixed z-[100] min-w-60 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+      className="question-editor-more-menu fixed z-[100] min-w-60 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
     >
       <MoreMenuItem
         label="설명"
