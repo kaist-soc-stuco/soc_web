@@ -8,6 +8,7 @@ import { ChevronRight } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatNumericDate } from "@/lib/date-display";
 import { useLanguage } from "@/hooks/use-language";
+import { Button } from "@/components/ui/button";
 
 interface HomeScheduleItem {
   id: string;
@@ -126,6 +127,13 @@ export function Calendar() {
 
       {eventsQuery.isPending ? (
         <ScheduleSkeleton />
+      ) : eventsQuery.isError ? (
+        <div className="home-data-error flex-1" role="alert">
+          <p>{lang === "ko" ? "일정을 불러오지 못했습니다." : "We couldn't load the schedule."}</p>
+          <Button type="button" variant="outline" size="lg" onClick={() => void eventsQuery.refetch()}>
+            {lang === "ko" ? "다시 시도" : "Try again"}
+          </Button>
+        </div>
       ) : schedules.length > 0 ? (
         <ul
           className="grid min-h-0 flex-none content-start divide-y divide-slate-100"

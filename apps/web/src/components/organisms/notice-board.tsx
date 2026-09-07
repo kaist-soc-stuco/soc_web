@@ -5,6 +5,7 @@ import { isoToMs, nowMs } from "@soc/shared";
 import { ChevronRight } from "lucide-react";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { formatNumericDate } from "@/lib/date-display";
+import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { EmptyState } from "@/components/ui/data-state";
@@ -105,10 +106,24 @@ function formatDate(dateIso: string) {
   return formatNumericDate(dateIso);
 }
 
+function NoticeBoardSkeleton() {
+  return (
+    <div className="grid flex-1 content-start divide-y divide-slate-100" aria-busy="true">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="flex h-10 items-center gap-3 px-3">
+          <div className="home-loading-surface h-3.5 w-16 rounded" />
+          <div className="home-loading-surface h-3.5 min-w-0 flex-1 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function NoticeBoard() {
   const { lang } = useLanguage();
   const [activeTab, setActiveTab] = useState(0);
   const [notices, setNotices] = useState<Record<string, NoticeItemProps[]>>({});
+  const [noticeErrors, setNoticeErrors] = useState<Record<string, boolean>>({});
   const [lastLoadedNotices, setLastLoadedNotices] = useState<NoticeItemProps[]>([]);
 
   const tabs = [
@@ -185,10 +200,14 @@ export function NoticeBoard() {
         }));
         if (active) {
           setNotices((prev) => ({ ...prev, [activeNoticeKey]: items }));
+          setNoticeErrors((prev) => ({ ...prev, [activeNoticeKey]: false }));
           setLastLoadedNotices(items);
         }
       } catch (err) {
         console.error(err);
+        if (active) {
+          setNoticeErrors((prev) => ({ ...prev, [activeNoticeKey]: true }));
+        }
       }
     };
 
@@ -202,6 +221,18 @@ export function NoticeBoard() {
     notices,
     apiClient,
   ]);
+
+  const hasNoticeError = noticeErrors[activeNoticeKey] === true;
+  const isLoadingNotices = !hasCurrentNoticeData && !hasNoticeError;
+
+  const retryNotice = () => {
+    setNoticeErrors((prev) => ({ ...prev, [activeNoticeKey]: false }));
+    setNotices((prev) => {
+      const next = { ...prev };
+      delete next[activeNoticeKey];
+      return next;
+    });
+  };
 
   return (
     <section className="home-bento-card flex min-h-[24rem] min-w-0 flex-col overflow-hidden">
@@ -236,7 +267,16 @@ export function NoticeBoard() {
 
         {/* Notice List */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 pb-1 pt-1">
-          {renderedNotices.length > 0 ? (
+          {hasNoticeError ? (
+            <div className="home-data-error flex-1" role="alert">
+              <p>{lang === "ko" ? "게시글을 불러오지 못했습니다." : "We couldn't load posts."}</p>
+              <Button type="button" variant="outline" size="lg" onClick={retryNotice}>
+                {lang === "ko" ? "다시 시도" : "Try again"}
+              </Button>
+            </div>
+          ) : isLoadingNotices ? (
+            <NoticeBoardSkeleton />
+          ) : renderedNotices.length > 0 ? (
             <div
               className="grid min-h-0 flex-none content-start"
               style={{
