@@ -115,7 +115,10 @@ export function EventsSurveysDayDetails({
 
   return (
     <>
-      <aside className="sticky top-24 flex h-full min-h-[500px] flex-col rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:col-span-1">
+      <aside
+        className="scroll-mt-4 flex h-full min-h-0 flex-col self-start rounded-lg border border-card-border-subtle bg-white p-5 shadow-none lg:sticky lg:top-24 lg:min-h-[500px] lg:col-span-1"
+        id="calendar-day-details"
+      >
       <div className="shrink-0 border-b border-slate-100 pb-4 select-none">
         <h3 className="text-lg font-semibold text-slate-800">{selectedDateStr}</h3>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -151,7 +154,7 @@ export function EventsSurveysDayDetails({
               Boolean(event.calendarEventId) &&
               openMenuId === event.calendarEventId;
             const cardClassName =
-              `group relative block w-full shrink-0 select-none rounded-lg border border-slate-200 bg-white p-3.5 transition hover:border-slate-300 ${showAdminMenu ? "z-20" : "z-0"}`;
+              `group relative block min-h-11 w-full shrink-0 select-none rounded-lg border border-slate-200 bg-white p-3.5 transition hover:border-slate-300 ${showAdminMenu ? "z-20" : "z-0"}`;
             const cardContent = (
               <>
                 <div className="flex items-start gap-2.5">
@@ -160,16 +163,16 @@ export function EventsSurveysDayDetails({
                     aria-hidden="true"
                   />
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-[length:var(--ui-text-body-sm-size)] font-medium leading-[1.125rem] text-slate-800">
+                    <h4 className="break-words text-[length:var(--ui-text-body-sm-size)] font-medium leading-[1.125rem] text-slate-800">
                       {shortTitle}
                     </h4>
                     {event.description && (
-                      <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-slate-500">
+                      <p className="mt-1 line-clamp-2 break-words text-xs font-medium leading-relaxed text-slate-500">
                         {event.description}
                       </p>
                     )}
                     <div className="mt-1.5 flex items-center gap-2 text-xs font-normal text-slate-400 select-none">
-                      <span className="min-w-0 truncate">{scheduleText}</span>
+                      <span className="min-w-0 break-words whitespace-normal">{scheduleText}</span>
                     </div>
                   </div>
                   {eventHref ? (
@@ -179,6 +182,7 @@ export function EventsSurveysDayDetails({
                     />
                   ) : canManage && event.calendarEventId ? (
                     <IconButton
+                      className="min-h-11 min-w-11"
                       size="sm"
                       aria-label={`${shortTitle} 관리`}
                       data-calendar-menu-trigger={event.calendarEventId}

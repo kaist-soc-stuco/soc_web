@@ -38,6 +38,7 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     holidays,
     handleSetEngagement,
     loading,
+    retry,
     selectedDate,
     setCurrentDate,
     setCalendarQuery,
@@ -113,9 +114,21 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               </p>
             </div>
           ) : error ? (
-            <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-700">
+            <div
+              className="flex flex-col items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-700 sm:flex-row sm:items-center"
+              role="alert"
+            >
               <AlertCircle className="h-5 w-5 shrink-0" />
-              <span>{error}</span>
+              <span className="min-w-0 flex-1">{error}</span>
+              <Button
+                className="min-h-11 shrink-0"
+                onClick={retry}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {lang === "ko" ? "다시 시도" : "Try again"}
+              </Button>
             </div>
           ) : currentTab === "calendar" ? (
             <EventsSurveysCalendar
