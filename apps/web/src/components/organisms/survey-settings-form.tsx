@@ -67,6 +67,8 @@ const escapeHtmlAttribute = (value: string) =>
 const appendInlineImage = (content: string, src: string) =>
   `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
 
+const RICH_TEXT_OVERLAY_SELECTOR = "[data-rich-text-overlay], .rich-text-editor-menu";
+
 const plainText = (value: string | undefined) =>
   (value ?? "")
     .replace(/<[^>]*>/g, " ")
@@ -306,6 +308,7 @@ export function SurveySettingsForm({
 }: SurveySettingsFormProps) {
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [basicEditorExpanded, setBasicEditorExpanded] = useState(mode !== "basic");
+  const basicEditorRef = useRef<HTMLDivElement>(null);
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const {
     register,
@@ -340,6 +343,21 @@ export function SurveySettingsForm({
       setActiveTab("ko");
     }
   }, [isKoreanOnly, activeTab]);
+
+  useEffect(() => {
+    if (mode === "delivery" || !basicEditorExpanded) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (basicEditorRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest(RICH_TEXT_OVERLAY_SELECTOR)) return;
+      setBasicEditorExpanded(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [basicEditorExpanded, mode]);
 
   useEffect(() => {
     if (!isAlwaysOpen) return;
@@ -406,13 +424,14 @@ export function SurveySettingsForm({
       <div className={mode === "all" ? "grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3" : "grid grid-cols-1"}>
         {/* 좌측 메인 영역 */}
         {mode !== "delivery" ? basicEditorExpanded ? <div
+          ref={basicEditorRef}
           className={`${mode === "all" ? "lg:col-span-2" : ""} h-full space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}
           onFocusCapture={() => setBasicEditorExpanded(true)}
           onBlurCapture={(event) => {
             const nextTarget = event.relatedTarget;
-            if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
-              setBasicEditorExpanded(false);
-            }
+            if (nextTarget && event.currentTarget.contains(nextTarget as Node)) return;
+            if (nextTarget instanceof Element && nextTarget.closest(RICH_TEXT_OVERLAY_SELECTOR)) return;
+            if (nextTarget) setBasicEditorExpanded(false);
           }}
         >
           {/* 탭 및 Korean Only 옵션 */}

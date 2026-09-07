@@ -155,7 +155,7 @@ export function SectionEditorModal({
               <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
               <RichTextEditor
                 compact
-                contentClassName="!text-lg leading-7"
+                contentClassName="leading-7"
                 disabled={isOngoing}
                 content={form.descriptionKo}
                 onImageUpload={handleDescriptionImageUpload}
@@ -180,7 +180,7 @@ export function SectionEditorModal({
               <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
               <RichTextEditor
                 compact
-                contentClassName="!text-lg leading-7"
+                contentClassName="leading-7"
                 disabled={isOngoing || isKoreanOnly}
                 content={form.descriptionEn}
                 onImageUpload={handleDescriptionImageUpload}
