@@ -5,7 +5,6 @@ import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from './features/auth/auth.module';
-import { AuthDevModule } from "./features/auth/auth-dev.module";
 import { HealthModule } from './features/health/health.module';
 import { MockModule } from './features/mock/mock.module';
 import { SurveysModule } from './features/surveys/surveys.module';
@@ -26,8 +25,7 @@ import { NotificationsModule } from "./features/notifications/notifications.modu
 import { VotesModule } from "./features/votes/votes.module";
 import { RoadmapModule } from "./features/roadmap/roadmap.module";
 
-const devOnlyModules =
-  process.env.NODE_ENV === "production" ? [] : [AuthDevModule, MockModule];
+const devOnlyModules = process.env.NODE_ENV === "production" ? [] : [MockModule];
 
 @Module({
   imports: [

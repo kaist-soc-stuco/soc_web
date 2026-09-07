@@ -65,7 +65,7 @@ SEED_MODE=demo pnpm --filter @soc/api db:seed
 3. 일반 사용자가 비공개 설문 결과와 미공개 설문에 접근할 때 차단되는지 확인합니다.
 4. 설문 관리자 권한 사용자가 미공개 설문 preview와 비공개 결과를 볼 수 있는지 확인합니다.
 5. 회비 납부자 전용 설문/행사는 백엔드 응답 기준으로 차단되는지 확인합니다.
-6. production에서는 mock login endpoint가 막혀 있어야 합니다.
+6. mock login endpoint는 제거되어 있어야 합니다. 인증은 승인된 SSO 경로만 사용합니다.
 7. `INITIAL__ADMIN_STDNOS`에 포함된 학번은 첫 개인정보 동의 직후 최고 관리자 메뉴에 접근할 수 있어야 합니다.
 8. 목록에 없는 일반 사용자는 기본 권한만 받아야 합니다.
 

@@ -64,8 +64,8 @@
    - `SSO_REDIRECT_URI`는 SSO에 등록된 API callback URL과 정확히 일치해야 합니다.
    - 프론트 `VITE_*`가 아니라 API 서버 env에서만 관리하는 현재 구조가 맞습니다.
 
-4. mock login 노출 확인
-   - `POST /auth/login/mock`은 production에서 막혀 있지만, 배포 env의 `NODE_ENV=production` 설정을 확인해야 합니다.
+4. mock login 제거 확인
+   - `POST /auth/login/mock` endpoint와 개발용 mock 관리자 세션 발급 경로가 코드에 존재하지 않아야 합니다.
 
 ### P1: 보안 hardening
 
