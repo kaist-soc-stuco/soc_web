@@ -39,20 +39,44 @@ export function MyPage() {
     <PageShell className="text-slate-950">
       <Header />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 md:px-8 flex gap-8 items-start">
+      <main className="mx-auto flex min-w-0 w-full max-w-7xl flex-1 flex-col items-stretch gap-6 px-4 py-6 sm:px-6 md:flex-row md:items-start md:gap-8 md:px-8 md:py-8">
         {canUseMyPage ? (
-          <MyPageSidebar
-            activeMenu={activeMenu}
-            lang={lang}
-            menuItems={menuItems}
-            onMenuChange={(menu) => {
-              setActiveMenu(menu);
-              setCurrentPage(1);
-            }}
-          />
+          <>
+            <div className="w-full md:hidden">
+              <label className="sr-only" htmlFor="my-page-menu">
+                {lang === "ko" ? "마이페이지 메뉴 선택" : "Choose a My Page section"}
+              </label>
+              <select
+                id="my-page-menu"
+                value={activeMenu}
+                onChange={(event) => {
+                  const nextMenu = menuItems.find((item) => item.id === event.currentTarget.value)?.id;
+                  if (!nextMenu) return;
+                  setActiveMenu(nextMenu);
+                  setCurrentPage(1);
+                }}
+                className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/15"
+              >
+                {menuItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <MyPageSidebar
+              activeMenu={activeMenu}
+              lang={lang}
+              menuItems={menuItems}
+              onMenuChange={(menu) => {
+                setActiveMenu(menu);
+                setCurrentPage(1);
+              }}
+            />
+          </>
         ) : null}
 
-        <section className="flex-1 min-w-0">
+        <section className="w-full min-w-0 flex-1">
           {initialLoading ? (
             <MyPageLoadingState lang={lang} />
           ) : !canUseMyPage ? (
@@ -63,7 +87,7 @@ export function MyPage() {
           ) : (
             <div className="flex flex-col gap-5 w-full">
               {loadError && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 text-xs font-bold text-amber-800">
+                <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 text-xs font-bold text-amber-800">
                   {loadError}
                 </div>
               )}

@@ -125,6 +125,23 @@ export function AboutSectionNavigation({
 
   return (
     <nav className="about-section-nav" aria-label={lang === "ko" ? "집행위원회 소개 목차" : "About page sections"}>
+      <div className="about-section-nav-mobile about-landing-container">
+        <label className="sr-only" htmlFor="about-section-select">
+          {lang === "ko" ? "소개 페이지 섹션 선택" : "Choose an about page section"}
+        </label>
+        <select
+          id="about-section-select"
+          value={activeSection}
+          onChange={(event) => onNavigate(event.currentTarget.value as AboutSectionId)}
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/15"
+        >
+          {SECTIONS.map((section) => (
+            <option key={section.id} value={section.id}>
+              {labels[section.id]}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="about-landing-container about-section-nav-inner">
         {SECTIONS.map((section) => {
           const active = activeSection === section.id;

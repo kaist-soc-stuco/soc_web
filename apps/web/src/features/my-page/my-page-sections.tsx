@@ -62,7 +62,7 @@ export function MyPageSidebar({
             <Button variant="ghost"
               key={item.id}
               onClick={() => onMenuChange(item.id)}
-              className={`w-full flex items-center justify-start gap-2.5 rounded-lg px-3.5 py-2.5 text-[length:var(--ui-text-body-sm-size)] font-semibold border-0 transition-colors cursor-pointer text-left ${
+              className={`min-h-11 w-full flex items-center justify-start gap-2.5 rounded-lg px-3.5 py-2.5 text-[length:var(--ui-text-body-sm-size)] font-semibold border-0 transition-colors cursor-pointer text-left ${
                 isActive
                   ? "bg-emerald-50/70 text-kaist-darkgreen shadow-sm shadow-emerald-500/5"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -153,7 +153,7 @@ export function MyPageUnavailableState({ authenticated, lang }: UnavailableState
       </p>
       <Link
         to="/login"
-        className="mt-5 inline-flex items-center rounded-lg border border-kaist-darkgreen px-4 py-2 text-xs font-bold text-kaist-darkgreen hover:bg-kaist-darkgreen/5 select-none"
+        className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-kaist-darkgreen px-4 py-2 text-xs font-bold text-kaist-darkgreen hover:bg-kaist-darkgreen/5 select-none"
       >
         {lang === "ko" ? "로그인 페이지로 이동" : "Go to sign in"}
       </Link>
@@ -174,7 +174,7 @@ function ActivityRows({ items, lang }: { items: ActivityItem[]; lang: string }) 
           <Link
             key={`${item.type}-${item.href}-${index}`}
             to={item.href}
-            className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-3.5 transition-colors group hover:bg-slate-50/50 px-3 -mx-3 rounded-lg"
+            className="group grid min-h-11 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 px-3 py-3.5 transition-colors hover:bg-slate-50/50 -mx-3 rounded-lg sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-center sm:gap-4"
           >
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded text-[length:var(--ui-text-micro-size)] font-bold border shrink-0 select-none ${badgeBg}`}
@@ -182,20 +182,20 @@ function ActivityRows({ items, lang }: { items: ActivityItem[]; lang: string }) 
               {item.label}
             </span>
             <span className="min-w-0 pr-2">
-              <span className="block truncate text-[length:var(--ui-text-body-sm-size)] font-semibold text-slate-800 group-hover:text-kaist-darkgreen transition-colors">
+              <span className="block break-words text-[length:var(--ui-text-body-sm-size)] font-semibold text-slate-800 group-hover:text-kaist-darkgreen transition-colors">
                 {item.title}
               </span>
               {item.context && (
-                <span className="mt-0.5 block truncate text-[length:var(--ui-text-caption-size)] font-medium text-slate-400">
+                <span className="mt-0.5 block break-words text-[length:var(--ui-text-caption-size)] font-medium text-slate-400">
                   {item.context}
                 </span>
               )}
             </span>
-            <span className="whitespace-nowrap text-xs font-medium text-slate-400 mr-1.5">
+            <span className="col-start-2 row-start-2 mr-0 whitespace-nowrap text-xs font-medium text-slate-400 sm:col-auto sm:row-auto sm:mr-1.5">
               {formatRelative(item.date, lang)}
             </span>
             <svg
-              className="w-3.5 h-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 shrink-0"
+              className="hidden w-3.5 h-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 shrink-0 sm:block"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -220,12 +220,12 @@ function ActivityRowsSkeleton({ rows = 6 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, index) => (
         <div
           key={index}
-          className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-3 py-3.5"
+          className="grid min-h-11 grid-cols-[auto_minmax(0,1fr)] items-center gap-3 px-3 py-3.5 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:gap-4"
         >
           <Skeleton className="h-5 w-10 rounded" />
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-3 w-14" />
-          <Skeleton className="h-3.5 w-3.5 rounded" />
+          <Skeleton className="hidden h-3 w-14 sm:block" />
+          <Skeleton className="hidden h-3.5 w-3.5 rounded sm:block" />
         </div>
       ))}
     </div>
@@ -372,17 +372,17 @@ export function MyPageActivityPanel({
               <Link
                 key={item.articleId}
                 to={item.boardCode === "_EVENT" ? `/events/${item.articleId}` : `/board/${item.boardCode}/${item.articleId}`}
-                className="group flex items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50"
+                className="group flex min-h-11 items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 sm:items-center"
               >
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[length:var(--ui-text-caption-size)] font-semibold tracking-tight text-slate-700">
                   <Bookmark className="h-3 w-3" aria-hidden="true" />
                   {isEvent ? (lang === "ko" ? "행사" : "Event") : item.boardNameKo}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-normal text-slate-800 group-hover:text-kaist-darkgreen">
+                  <span className="block break-words text-sm font-normal text-slate-800 group-hover:text-kaist-darkgreen">
                     {item.titleKo}
                   </span>
-                  <span className="mt-1 block truncate text-[length:var(--ui-text-caption-size)] font-normal text-slate-400">
+                  <span className="mt-1 block break-words text-[length:var(--ui-text-caption-size)] font-normal text-slate-400">
                     {item.boardNameKo} · {formatRelative(item.scrapUpdatedAt, lang)}
                   </span>
                 </span>
@@ -421,7 +421,7 @@ export function MyPageActivityPanel({
               <Button variant="ghost"
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`relative flex h-8 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[length:var(--ui-text-body-sm-size)] font-normal cursor-pointer transition-colors ${
+                className={`relative flex min-h-11 shrink-0 items-center justify-center border-0 bg-transparent px-2.5 pb-2 text-[length:var(--ui-text-body-sm-size)] font-normal cursor-pointer transition-colors ${
                   isActive
                     ? "text-kaist-darkgreen"
                     : "text-slate-400 hover:text-kaist-darkgreen"
