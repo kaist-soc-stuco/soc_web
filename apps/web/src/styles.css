@@ -3516,3 +3516,137 @@
   height: 0;
   pointer-events: none;
 }
+
+/* Survey matrices keep one set of controls and change their presentation at
+   the mobile breakpoint. This avoids duplicate form fields while allowing
+   each row to become a readable vertical choice card on narrow screens. */
+.survey-grid {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.survey-grid__header,
+.survey-grid__row {
+  display: grid;
+  grid-template-columns: minmax(8.75rem, 28%) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.survey-grid__column-list,
+.survey-grid__options {
+  display: grid;
+  grid-template-columns: repeat(var(--survey-grid-column-count), minmax(6rem, 1fr));
+  min-width: 0;
+}
+
+.survey-grid__column-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.survey-grid__row-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.survey-grid__option {
+  display: flex;
+  min-width: 0;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-width: 1px;
+  border-radius: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+}
+
+.survey-grid__option-label {
+  display: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--ui-text-body-size);
+  line-height: 1.4;
+  text-align: left;
+}
+
+.survey-grid-results {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.survey-grid-results__cards {
+  display: none;
+}
+
+.survey-response-actions {
+  position: sticky;
+  z-index: 10;
+  bottom: 0;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 -8px 18px rgb(15 23 42 / 5%);
+  backdrop-filter: blur(10px);
+}
+
+@media (min-width: 768px) {
+  .survey-response-actions {
+    position: static;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .survey-grid {
+    overflow: visible;
+  }
+
+  .survey-grid__header {
+    display: none;
+  }
+
+  .survey-grid__row {
+    display: block;
+    padding: 0.875rem 1rem;
+  }
+
+  .survey-grid__row-label {
+    display: block;
+    padding: 0;
+    font-size: var(--ui-text-body-size);
+    line-height: 1.45;
+  }
+
+  .survey-grid__options {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .survey-grid__option {
+    justify-content: flex-start;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+  }
+
+  .survey-grid__option-label {
+    display: block;
+    flex: 1 1 auto;
+  }
+
+  .survey-grid-results__table {
+    display: none;
+  }
+
+  .survey-grid-results__cards {
+    display: block;
+  }
+
+  .survey-response-actions {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}

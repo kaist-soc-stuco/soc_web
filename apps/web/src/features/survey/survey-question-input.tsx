@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { createApiClient } from "@soc/api-client";
 import type {
   QuestionOption,
@@ -49,7 +49,7 @@ export function SurveyQuestionInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const base =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20";
+    "min-h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20 md:text-sm";
   const controlClass = base;
   const renderError = error ? (
     <p className="mt-1 text-xs font-normal text-rose-600" role="alert">
@@ -173,7 +173,7 @@ export function SurveyQuestionInput({
                   disabled={disabled}
                   className="hidden"
                 />
-                <span className="text-[length:var(--ui-text-body-size)] leading-5">
+                <span className="min-w-0 break-words text-[length:var(--ui-text-body-size)] leading-5">
                   {getOptionLabel(opt)}
                 </span>
                 {getOptionImage(opt) ? (
@@ -229,7 +229,7 @@ export function SurveyQuestionInput({
                   disabled={disabled}
                   className="hidden"
                 />
-                <span className="text-[length:var(--ui-text-body-size)] leading-5">
+                <span className="min-w-0 break-words text-[length:var(--ui-text-body-size)] leading-5">
                   {getOptionLabel(opt)}
                 </span>
                 {getOptionImage(opt) ? (
@@ -317,45 +317,74 @@ export function SurveyQuestionInput({
         onChange({ kind: "grid", values: { ...gridValue, [rowValue]: columnValue } });
       };
 
+      const gridStyle = {
+        "--survey-grid-column-count": Math.max(columns.length, 1),
+      } as CSSProperties;
+
       return (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="min-w-full table-fixed border-collapse text-sm">
-            <thead className="bg-slate-50 text-xs font-bold text-slate-500">
-              <tr>
-                <th className="w-[28%] min-w-[140px] border-b border-slate-200 px-3 py-3 pr-1 text-left">항목</th>
-                {columns.map((column) => (
-                  <th key={column.value} className="min-w-[96px] border-b border-slate-200 px-2 py-3 text-center">
-                    {getOptionLabel(column)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((row) => (
-                <tr key={row.value}>
-                  <th className="border-r border-slate-100 px-3 py-3 pr-1 text-left font-medium text-slate-700">{getOptionLabel(row)}</th>
+        <div
+          className="survey-grid rounded-xl border border-slate-200"
+          style={gridStyle}
+        >
+          <div className="survey-grid__header bg-slate-50 text-xs font-bold text-slate-500">
+            <span className="survey-grid__row-label px-3 py-3 pr-1 text-left">
+              항목
+            </span>
+            <div className="survey-grid__column-list">
+              {columns.map((column) => (
+                <span
+                  key={column.value}
+                  className="survey-grid__column-label px-2 py-3 text-center"
+                >
+                  {getOptionLabel(column)}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="survey-grid__body divide-y divide-slate-100">
+            {rows.map((row) => (
+              <fieldset key={row.value} className="survey-grid__row">
+                <legend className="survey-grid__row-label px-3 py-3 pr-1 text-left font-medium text-slate-700">
+                  {getOptionLabel(row)}
+                </legend>
+                <div className="survey-grid__options">
                   {columns.map((column) => {
                     const selected = isMultiple
-                      ? Array.isArray(gridValue[row.value]) && gridValue[row.value].includes(column.value)
+                      ? Array.isArray(gridValue[row.value]) &&
+                        gridValue[row.value].includes(column.value)
                       : gridValue[row.value] === column.value;
                     return (
-                      <td key={column.value} className="px-2 py-3 text-center">
+                      <label
+                        key={column.value}
+                        className={`survey-grid__option ${
+                          selected
+                            ? "border-kaist-darkgreen/30 bg-emerald-50/60"
+                            : "border-transparent"
+                        }`}
+                      >
                         <UiInput
                           type={isMultiple ? "checkbox" : "radio"}
-                          name={isMultiple ? `${question.id}-${row.value}-${column.value}` : `${question.id}-${row.value}`}
+                          name={
+                            isMultiple
+                              ? `${question.id}-${row.value}-${column.value}`
+                              : `${question.id}-${row.value}`
+                          }
                           checked={selected}
                           onChange={() => updateGrid(row.value, column.value)}
                           disabled={disabled}
-                          className="h-4 w-4 accent-kaist-darkgreen focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/30"
+                          className="size-4 shrink-0 accent-kaist-darkgreen focus-visible:ring-2 focus-visible:ring-kaist-darkgreen/30"
                           aria-label={`${getOptionLabel(row)} - ${getOptionLabel(column)}`}
                         />
-                      </td>
+                        <span className="survey-grid__option-label">
+                          {getOptionLabel(column)}
+                        </span>
+                      </label>
                     );
                   })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </div>
+              </fieldset>
+            ))}
+          </div>
           {renderError}
         </div>
       );
@@ -487,13 +516,13 @@ export function SurveyQuestionInput({
           {currentFiles.length > 0 ? (
             <div className="space-y-2" aria-label="업로드된 파일 목록">
               {currentFiles.map((file) => (
-                <div key={file.assetId} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+                <div key={file.assetId} className="flex min-w-0 flex-wrap items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
                     <FileText aria-hidden="true" className="size-4" />
                   </span>
-                  <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+                  <span className="min-w-0 flex-1 break-words">{file.fileName}</span>
                   {typeof file.sizeBytes === "number" ? <span className="shrink-0 text-xs text-slate-400">{(file.sizeBytes / 1_000_000).toFixed(1)}MB</span> : null}
-                  <button type="button" className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => removeFile(file.assetId)} disabled={disabled || uploading} aria-label={`${file.fileName} 삭제`}>
+                  <button type="button" className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => removeFile(file.assetId)} disabled={disabled || uploading} aria-label={`${file.fileName} 삭제`}>
                     <X aria-hidden="true" className="size-3.5" />
                   </button>
                 </div>
@@ -506,14 +535,26 @@ export function SurveyQuestionInput({
               type="button"
               onClick={openFilePicker}
               disabled={disabled || uploading}
-              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-kaist-darkgreen transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-kaist-darkgreen transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Plus aria-hidden="true" className="size-3.5" />
               파일 추가
             </button>
           ) : null}
 
-          {uploadError ? <p className="text-xs font-normal text-rose-600" role="alert">{uploadError}</p> : null}
+          {uploadError ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs font-normal text-rose-600" role="alert">
+              <p>{uploadError}</p>
+              <button
+                type="button"
+                onClick={openFilePicker}
+                disabled={disabled || uploading}
+                className="min-h-11 rounded-lg px-3 font-semibold text-rose-700 underline underline-offset-2 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : null}
           {renderError}
         </div>
       );

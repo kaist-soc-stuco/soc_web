@@ -112,13 +112,16 @@ function getResponsePolicyLabel(
 function ResultShell({
   children,
   className = "",
+  role,
 }: {
   children: ReactNode;
   className?: string;
+  role?: "alert";
 }) {
   return (
     <div
       className={`rounded-2xl border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)] ${className}`}
+      role={role}
     >
       {children}
     </div>
@@ -142,8 +145,8 @@ function ChoiceResult({
 
         return (
           <div key={choice.value} className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="truncate text-sm font-medium text-slate-700">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+              <span className="min-w-0 break-words text-sm font-medium text-slate-700">
                 {label}
               </span>
               <span className="shrink-0 text-xs font-bold text-slate-500">
@@ -174,8 +177,8 @@ function GridResult({ grid, lang }: { grid: SurveyGridAnalytics; lang: string })
   );
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="w-full min-w-[560px] border-collapse text-left">
+    <div className="survey-grid-results rounded-lg border border-slate-200">
+      <table className="survey-grid-results__table w-full min-w-[560px] border-collapse text-left">
         <thead className="bg-slate-50">
           <tr>
             <th className="h-11 border-b border-slate-200 px-3 text-xs font-normal text-[#344054]">항목</th>
@@ -204,6 +207,33 @@ function GridResult({ grid, lang }: { grid: SurveyGridAnalytics; lang: string })
           ))}
         </tbody>
       </table>
+      <div className="survey-grid-results__cards divide-y divide-slate-100">
+        {grid.rows.map((row) => (
+          <div key={row.value} className="space-y-3 px-3 py-3">
+            <h3 className="break-words text-sm font-semibold text-[#172033]">
+              {getLocalizedTitle(lang, row.labelKo, row.labelEn)}
+            </h3>
+            <div className="grid gap-2">
+              {grid.columns.map((column) => {
+                const cell = cellByKey.get(`${row.value}\u0000${column.value}`);
+                return (
+                  <div
+                    key={column.value}
+                    className="flex min-w-0 items-baseline justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-[#344054]"
+                  >
+                    <span className="min-w-0 break-words">
+                      {getLocalizedTitle(lang, column.labelKo, column.labelEn)}
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {cell?.count ?? 0}{cell?.percentage ? ` (${cell.percentage}%)` : ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -278,7 +308,7 @@ function QuestionResultCard({
   const title = getLocalizedTitle(lang, question.titleKo, question.titleEn);
 
   return (
-    <ResultShell className="px-5 py-4">
+    <ResultShell className="min-w-0 px-4 py-4 sm:px-5">
       <div className="mb-3.5 flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
@@ -325,7 +355,7 @@ export function SurveyResultsContent({
 
   if (error === "forbidden") {
     return (
-      <ResultShell className="mx-auto my-10 flex max-w-md flex-col items-center p-8 text-center sm:p-10">
+      <ResultShell className="mx-auto my-10 flex max-w-md flex-col items-center p-6 text-center sm:p-10">
         <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-100 bg-rose-50 text-rose-500">
           <Lock className="h-8 w-8" />
         </div>
@@ -349,7 +379,7 @@ export function SurveyResultsContent({
 
   if (error || !analytics) {
     return (
-      <ResultShell className="flex flex-col items-center gap-3 p-10 text-center text-sm font-semibold text-rose-500">
+      <ResultShell className="flex flex-col items-center gap-3 p-6 text-center text-sm font-semibold text-rose-500 sm:p-10" role="alert">
         <AlertCircle className="h-10 w-10" />
         <span>
           {lang === "ko"
@@ -373,7 +403,7 @@ export function SurveyResultsContent({
 
   return (
     <div className="space-y-5">
-      <ResultShell className="p-6 sm:p-8">
+      <ResultShell className="min-w-0 p-4 sm:p-8">
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-md border border-kaist-darkgreen/15 bg-kaist-lightgreen/20 px-3 py-1.5 text-xs font-semibold text-kaist-darkgreen">
             <ListChecks className="h-3.5 w-3.5 text-kaist-darkgreen" />
@@ -391,7 +421,7 @@ export function SurveyResultsContent({
           </span>
         </div>
 
-        <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-950 sm:text-3xl">
+        <h1 className="break-words text-2xl font-bold leading-tight tracking-tight text-slate-950 sm:text-3xl">
           {getLocalizedTitle(lang, analytics.titleKo, analytics.titleEn)}
         </h1>
         {getLocalizedTitle(
@@ -409,20 +439,20 @@ export function SurveyResultsContent({
           />
         )}
         <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-xs font-normal text-slate-500">
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex min-w-0 items-start gap-1.5 break-words">
             <Users className="h-3.5 w-3.5 text-kaist-darkgreen" />
             {getAudienceLabel(analytics, lang)}
           </span>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex min-w-0 items-start gap-1.5 break-words">
             <ShieldCheck className="h-3.5 w-3.5 text-kaist-darkgreen" />
             {getResponsePolicyLabel(analytics, lang)}
           </span>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex min-w-0 items-start gap-1.5 break-words">
             <Calendar className="h-3.5 w-3.5 text-kaist-darkgreen" />
             {getScheduleLabel(analytics, lang)}
           </span>
           {analytics.isKoreanOnly && (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex min-w-0 items-start gap-1.5 break-words">
               <Languages className="h-3.5 w-3.5 text-kaist-darkgreen" />
               {lang === "ko"
                 ? "한국어 전용"

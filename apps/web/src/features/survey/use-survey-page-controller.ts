@@ -254,12 +254,6 @@ export function useSurveyPageController(surveyId: string | undefined) {
     return false;
   };
 
-  const handleNextSection = (sectionId: string) => {
-    if (!survey || survey.isPreview || !survey.isPublished) return true;
-    const section = survey.sections.find((candidate) => candidate.id === sectionId);
-    return section ? validateRequiredQuestions(section.questions) : true;
-  };
-
   const handleSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!survey || !surveyId) return;
@@ -373,7 +367,6 @@ export function useSurveyPageController(surveyId: string | undefined) {
     answers,
     draftRestored,
     handleAnswerChange,
-    handleNextSection,
     handleSubmit,
     lang,
     loadError,

@@ -32,8 +32,8 @@ export function SurveySummaryCard({ lang, survey }: SurveySummaryCardProps) {
   const hasInlineDescriptionImage = /<img\b/i.test(description);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in duration-300 sm:p-8">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_6px_20px_rgba(15,23,42,0.04)] animate-in fade-in duration-300 sm:p-8">
+      <h1 className="break-words text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
         {getLocalizedText(lang, survey.titleKo, survey.titleEn)}
       </h1>
       {description && (
