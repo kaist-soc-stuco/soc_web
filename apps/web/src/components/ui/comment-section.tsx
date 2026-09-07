@@ -14,7 +14,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 
 const COMMENT_TEXTAREA_CLASS =
-  "block w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[length:var(--ui-text-body-size)] leading-normal text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
+  "block w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-base leading-normal text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 md:text-[length:var(--ui-text-body-size)]";
 
 type CommentSectionProps = {
   allowEngagement: boolean;
@@ -97,7 +97,7 @@ export function CommentSection({
     });
 
   return (
-    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-6 py-6 shadow-[0_8px_28px_rgba(15,23,42,0.04)] md:px-[52px] md:py-[24px]">
+    <section className="flex w-full flex-col rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-[0_8px_28px_rgba(15,23,42,0.04)] min-[360px]:px-5 min-[640px]:px-6 md:px-[52px] md:py-[24px]">
       <div className="flex items-center justify-between">
         <h2 className="text-[length:var(--ui-text-title-sm-size)] font-semibold leading-6 text-slate-800">
           <span>{lang === "ko" ? "댓글" : "Comments"}</span>
@@ -143,7 +143,7 @@ export function CommentSection({
                   />
 
                   {showReplyComposer && canCreateComment && isAuthenticated ? (
-                    <div className="ml-11 border-l-2 border-brand-primary/15 pb-2 pl-4 pt-1">
+                    <div className="ml-5 min-w-0 border-l-2 border-brand-primary/15 pb-2 pl-2 pt-1 sm:ml-9 sm:pl-3">
                       <CommentComposer
                         ariaLabel={lang === "ko" ? "대댓글 입력" : "Reply input"}
                         disabled={!canCreateComment}
@@ -303,7 +303,7 @@ function CommentRow({
     <article
       className={cn(
         "group flex items-start gap-2.5 py-3.5",
-        isNested ? "ml-9 border-l border-r border-t border-slate-100 pl-3" : "",
+        isNested ? "ml-5 border-l border-r border-t border-slate-100 pl-2 sm:ml-9 sm:pl-3" : "",
         comment.status === "HIDDEN" && "rounded-lg bg-amber-50/70 px-3 py-3",
       )}
     >
@@ -317,9 +317,9 @@ function CommentRow({
         />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex items-baseline gap-2">
-            <span className="truncate text-[length:var(--ui-text-body-size)] font-semibold text-slate-800">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="min-w-0 break-words text-[length:var(--ui-text-body-size)] font-semibold text-slate-800 [overflow-wrap:anywhere]">
               {comment.author.name}
             </span>
             {comment.isOfficial ? (
@@ -340,7 +340,7 @@ function CommentRow({
               {formatRelativeTime(comment.createdAt, lang)}
             </time>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0.5 self-start sm:self-auto">
             {allowEngagement ? <EngagementActionButton
               active={likeActive}
               className="h-7 gap-1 rounded-md border-0 px-1.5 text-xs font-medium"
@@ -602,7 +602,7 @@ function CommentComposer({
         placeholder={placeholder}
         aria-label={ariaLabel}
         disabled={disabled}
-        className={cn(COMMENT_TEXTAREA_CLASS, "min-h-[2.625rem] pr-12 font-medium")}
+        className={cn(COMMENT_TEXTAREA_CLASS, "min-h-[var(--ui-control-height-mobile)] pr-14 font-medium")}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey && hasText && !disabled) {
             event.preventDefault();
@@ -619,7 +619,7 @@ function CommentComposer({
           onClick={() => void onSubmit()}
           disabled={disabled || isSubmitting || !hasText}
           className={cn(
-            "animate-in fade-in zoom-in-95 absolute right-2 top-1/2 size-8 -translate-y-1/2 rounded-full p-0 text-white duration-200",
+            "animate-in fade-in zoom-in-95 absolute right-1 top-1/2 size-11 -translate-y-1/2 rounded-full p-0 text-white duration-200",
             hasText
               ? "bg-brand-primary hover:bg-brand-primary/90"
               : "bg-brand-primary/20 hover:bg-brand-primary/20",

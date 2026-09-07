@@ -4,6 +4,7 @@ import type { SurveyRecord } from "@soc/contracts";
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   FileText,
   Image,
   Loader2,
@@ -57,6 +58,7 @@ interface HeaderControlsProps {
   boardByCode: Map<string, BoardMetadata>;
   isKoreanOnly: boolean;
   lang: string;
+  leadingActions?: ReactNode;
   onCategoryChange: (category: string) => void;
   onKoreanOnlyChange: (checked: boolean) => void;
   selectedCategory: string;
@@ -67,14 +69,15 @@ export function BoardWriteHeaderControls({
   boardByCode,
   isKoreanOnly,
   lang,
+  leadingActions,
   onCategoryChange,
   onKoreanOnlyChange,
   selectedCategory,
   writableBoardCodes,
 }: HeaderControlsProps) {
   return (
-    <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col gap-3 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <SelectDropdown
             id="board-category-select"
@@ -98,8 +101,8 @@ export function BoardWriteHeaderControls({
                     },
                   ]
             }
-            className="w-36"
-            buttonClassName="h-8 rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold text-slate-800 shadow-xs"
+            className="w-full sm:w-36"
+            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold text-slate-800 shadow-xs"
             menuClassName="rounded-lg border-slate-200"
             optionClassName="text-xs"
             emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
@@ -107,8 +110,9 @@ export function BoardWriteHeaderControls({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {leadingActions}
+        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
           <div
             className={`flex h-4 w-4 items-center justify-center rounded border ${
               isKoreanOnly
@@ -139,6 +143,7 @@ interface EditHeaderControlsProps {
   category: string;
   isKoreanOnly: boolean;
   lang: string;
+  leadingActions?: ReactNode;
   onKoreanOnlyChange: (checked: boolean) => void;
 }
 
@@ -146,11 +151,12 @@ export function BoardEditHeaderControls({
   category,
   isKoreanOnly,
   lang,
+  leadingActions,
   onKoreanOnlyChange,
 }: EditHeaderControlsProps) {
   return (
-    <div className="flex items-center justify-between flex-wrap gap-4 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col gap-3 bg-slate-50/40 px-4 py-3 border-b border-slate-200 rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <SelectDropdown
             id="edit-board-category-select"
@@ -163,14 +169,15 @@ export function BoardEditHeaderControls({
                 label: getBoardLabelFromMetadata(undefined, category, lang),
               },
             ]}
-            className="w-36"
-            buttonClassName="h-8 rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold shadow-xs"
+            className="w-full sm:w-36"
+            buttonClassName="h-[var(--ui-control-height)] rounded-lg border-slate-200 px-2.5 py-0 text-xs font-bold shadow-xs"
           />
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {leadingActions}
+        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
           <div
             className={`flex h-4 w-4 items-center justify-center rounded border ${
               isKoreanOnly
@@ -597,50 +604,61 @@ export function BoardWriteSettings({
   stacked = false,
 }: BoardWriteSettingsProps) {
   return (
-    <div className="space-y-4 border-t border-slate-200 px-6 py-5 md:px-8">
-      <div
-        className={`grid grid-cols-1 items-center gap-x-8 gap-y-4 ${
-          stacked ? "" : "md:grid-cols-2"
-        }`}
-      >
-        {canConfigurePostSettings && (
-          <div className="w-full space-y-1.5">
-            <SelectDropdown
-              id="settings-survey-select"
-              aria-label={lang === "ko" ? "연결된 설문조사" : "Linked survey"}
-              value={selectedSurveyId}
-              onChange={onSelectedSurveyIdChange}
-              options={[
-                {
-                  value: "",
-                  label: lang === "ko" ? "연동하지 않음" : "No linked survey",
-                },
-                ...surveys.map((survey) => ({
-                  value: survey.id,
-                  label:
-                    lang === "ko"
-                      ? survey.titleKo
-                      : survey.titleEn || survey.titleKo,
-                })),
-              ]}
-              className="w-full"
-              buttonClassName="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-slate-200 bg-white px-3.5 py-0 text-xs font-normal text-slate-700 shadow-none"
-              menuClassName="rounded-[var(--ui-control-radius)] border-slate-200 shadow-elevated"
-              optionClassName="text-xs !font-normal"
-              emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
-            />
-          </div>
-        )}
+    <details className="board-write-settings group border-t border-slate-200">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden md:hidden">
+        <span>{lang === "ko" ? "게시 설정" : "Post settings"}</span>
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="board-write-settings__body space-y-4 px-4 pb-5 md:px-8 md:py-5">
+        <div
+          className={`grid grid-cols-1 items-center gap-x-8 gap-y-4 ${
+            stacked ? "" : "md:grid-cols-2"
+          }`}
+        >
+          {canConfigurePostSettings && (
+            <div className="w-full space-y-1.5">
+              <label
+                className="block text-xs font-medium text-slate-500"
+                htmlFor="settings-survey-select"
+              >
+                {lang === "ko" ? "연결된 설문조사" : "Linked survey"}
+              </label>
+              <SelectDropdown
+                id="settings-survey-select"
+                aria-label={lang === "ko" ? "연결된 설문조사" : "Linked survey"}
+                value={selectedSurveyId}
+                onChange={onSelectedSurveyIdChange}
+                options={[
+                  {
+                    value: "",
+                    label: lang === "ko" ? "연동하지 않음" : "No linked survey",
+                  },
+                  ...surveys.map((survey) => ({
+                    value: survey.id,
+                    label:
+                      lang === "ko"
+                        ? survey.titleKo
+                        : survey.titleEn || survey.titleKo,
+                  })),
+                ]}
+                className="w-full"
+                buttonClassName="h-[var(--ui-control-height)] rounded-[var(--ui-control-radius)] border-slate-200 bg-white px-3.5 py-0 text-xs font-normal text-slate-700 shadow-none"
+                menuClassName="rounded-[var(--ui-control-radius)] border-slate-200 shadow-elevated"
+                optionClassName="text-xs !font-normal"
+                emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
+              />
+            </div>
+          )}
 
-        <div className="w-full self-center space-y-3">
+          <div className="w-full self-center space-y-3">
           {isEvent ? (
             <p className="text-xs font-semibold text-slate-700">
               {lang === "ko" ? "공개 및 게시 옵션" : "Visibility and publishing options"}
             </p>
           ) : null}
-          <div className={isEvent ? "grid grid-cols-2 gap-x-4 gap-y-3" : stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
+            <div className={isEvent ? "grid grid-cols-2 gap-x-4 gap-y-3" : stacked ? "grid grid-cols-1 gap-y-3" : "flex flex-wrap gap-x-10 gap-y-4"}>
             {canConfigurePostSettings && (
-              <label className="flex items-center gap-2.5 cursor-pointer group">
+              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
                 <div
                   className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
                     isAnonymous
@@ -666,7 +684,7 @@ export function BoardWriteSettings({
             )}
 
             {canConfigurePostSettings && (
-              <label className="flex items-center gap-2.5 cursor-pointer group">
+              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
                 <div
                   className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
                     isPinned
@@ -692,7 +710,7 @@ export function BoardWriteSettings({
             )}
 
             {allowSecret && (
-              <label className="flex items-center gap-2.5 cursor-pointer group">
+              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
                 <div
                   className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
                     isSecret
@@ -717,7 +735,7 @@ export function BoardWriteSettings({
             )}
 
             {boardCode !== "suggestions" ? (
-              <label className="flex items-center gap-2.5 cursor-pointer group">
+              <label className="flex min-h-11 items-center gap-2.5 cursor-pointer group">
                 <div
                   className={`w-4.5 h-4.5 rounded border transition-all flex items-center justify-center ${
                     allowComment
@@ -742,7 +760,7 @@ export function BoardWriteSettings({
             ) : null}
 
             {isEvent && canConfigurePostSettings && onHomeVisibleChange ? (
-              <label className="flex cursor-pointer items-center gap-2.5 group">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 group">
                 <div
                   className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all ${
                     homeVisible
@@ -763,20 +781,23 @@ export function BoardWriteSettings({
                 </span>
               </label>
             ) : null}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </details>
   );
 }
 
 interface BoardWriteFooterProps {
   lang: string;
   isSubmitting: boolean;
+  draftStatus?: "idle" | "saving" | "saved" | "failed" | "conflict";
   canWriteSelected?: boolean;
   compact?: boolean;
   leadingActions?: ReactNode;
   onCancel?: () => void;
+  onSaveDraft?: () => void | Promise<void>;
   onSubmit: () => void;
   submitLabel?: string;
   submittingLabel?: string;
@@ -785,38 +806,62 @@ interface BoardWriteFooterProps {
 export function BoardWriteFooter({
   lang,
   isSubmitting,
+  draftStatus = "idle",
   canWriteSelected = true,
   compact = false,
   leadingActions,
   onCancel,
+  onSaveDraft,
   onSubmit,
   submitLabel,
   submittingLabel,
 }: BoardWriteFooterProps) {
   const defaultSubmitLabel = lang === "ko" ? "등록" : "Publish Post";
   const defaultSubmittingLabel = lang === "ko" ? "등록 중..." : "Publishing...";
+  const defaultSaveLabel = lang === "ko" ? "임시저장" : "Save draft";
+  const defaultSavingLabel = lang === "ko" ? "저장 중..." : "Saving...";
+  const isSavingDraft = draftStatus === "saving";
 
   return (
-    <div className={`flex items-center gap-2 ${compact ? "justify-end" : "justify-between"}`}>
+    <div className={`flex min-w-0 items-center gap-2 ${compact ? "justify-end" : "justify-between"}`}>
       {onCancel ? (
         <Button
           variant="outline"
           type="button"
           onClick={onCancel}
-          disabled={isSubmitting}
-          className="h-[var(--ui-control-height)] !font-medium text-slate-600"
+          disabled={isSubmitting || isSavingDraft}
+          className="h-[var(--ui-control-height)] shrink-0 px-3 !font-medium text-slate-600"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           {lang === "ko" ? "취소" : "Cancel"}
         </Button>
       ) : null}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        {onSaveDraft ? (
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => void onSaveDraft()}
+            disabled={isSubmitting || isSavingDraft || !canWriteSelected}
+            aria-busy={isSavingDraft}
+            className="h-[var(--ui-control-height)] min-w-0 px-3 !font-medium text-slate-700"
+          >
+            {isSavingDraft ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="size-4 animate-spin" />
+                <span>{defaultSavingLabel}</span>
+              </span>
+            ) : (
+              <span>{defaultSaveLabel}</span>
+            )}
+          </Button>
+        ) : null}
         {leadingActions}
         <Button
           type="button"
           onClick={onSubmit}
           disabled={isSubmitting || !canWriteSelected}
-          className="h-[var(--ui-control-height)] !font-medium bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
+          className="h-[var(--ui-control-height)] min-w-0 px-3 !font-medium bg-kaist-darkgreen text-white hover:bg-kaist-darkgreen/90"
         >
           {isSubmitting ? (
             <span className="flex items-center gap-1.5">

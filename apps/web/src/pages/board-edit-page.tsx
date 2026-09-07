@@ -36,6 +36,7 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
     category,
     contentEn,
     contentKo,
+    draftStatus,
     error,
     eventDescriptionKo,
     eventDescriptionEn,
@@ -219,6 +220,14 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
         category={category}
         isKoreanOnly={isKoreanOnly}
         lang={lang}
+        leadingActions={canManageTemplates ? (
+          <ArticleTemplateControl
+            boardCode={category}
+            lang={lang}
+            onApply={applyTemplate}
+            snapshot={templateSnapshot}
+          />
+        ) : null}
         onKoreanOnlyChange={(checked) => {
           setIsKoreanOnly(checked);
         }}
@@ -276,20 +285,14 @@ export function BoardEditPage({ forcedCategory }: { forcedCategory?: string } = 
           </Link>
         }
         actions={
-          <div className="flex items-center justify-end gap-2">
+          <div className="board-write-page-actions flex items-center justify-end gap-2">
             <BoardWriteFooter
               compact
               lang={lang}
               isSubmitting={isSubmitting}
-              leadingActions={canManageTemplates ? (
-                <ArticleTemplateControl
-                  boardCode={category}
-                  lang={lang}
-                  onApply={applyTemplate}
-                  snapshot={templateSnapshot}
-                />
-              ) : null}
+              draftStatus={draftStatus}
               onCancel={backToArticle}
+              onSaveDraft={handleSaveDraft}
               onSubmit={handleSubmit}
               submitLabel={lang === "ko" ? "수정" : "Save"}
               submittingLabel={lang === "ko" ? "저장 중..." : "Saving..."}

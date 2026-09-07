@@ -401,7 +401,7 @@ function useTiptapEditor({
     editorProps: {
       attributes: {
         class: cn(
-          `${editorMinHeight} text-[length:var(--ui-text-body-size)] leading-normal text-slate-800`,
+          `${editorMinHeight} text-base leading-normal text-slate-800 md:text-[length:var(--ui-text-body-size)]`,
           contentClassName,
         ),
         spellcheck: spellCheck ? "true" : "false",
@@ -734,8 +734,8 @@ function RichTextToolbar({
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 bg-slate-50/60 px-3 py-2">
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+    <div className="rich-text-toolbar flex min-w-0 max-w-full items-center justify-between gap-3 bg-slate-50/60 px-3 py-2">
+      <div className="flex min-w-0 max-w-full flex-1 flex-wrap items-center gap-1.5">
       <label className="sr-only" htmlFor={`${editorId}-font-size`}>
         {lang === "ko" ? "글자 크기" : "Font size"}
       </label>
@@ -978,6 +978,7 @@ function RichTextToolbar({
 
 function EditorPane({
   editor,
+  languageLabel,
   onFocus,
   onTitleChange,
   placeholder,
@@ -985,6 +986,7 @@ function EditorPane({
   titleLabel,
 }: {
   editor: Editor;
+  languageLabel: string;
   onFocus: () => void;
   onTitleChange: (value: string) => void;
   placeholder: string;
@@ -993,6 +995,11 @@ function EditorPane({
 }) {
   return (
     <section className="min-w-0 px-4 py-4 md:px-6 md:py-5" onFocusCapture={onFocus}>
+      <div className="mb-2 flex min-h-5 items-center">
+        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
+          {languageLabel}
+        </span>
+      </div>
       <input
         type="text"
         spellCheck={false}
@@ -1000,7 +1007,7 @@ function EditorPane({
         placeholder={placeholder}
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}
-        className="h-9 w-full border-0 border-b border-slate-100 bg-transparent px-0 pb-2 text-lg font-semibold leading-7 text-slate-800 outline-none placeholder:text-slate-300"
+        className="min-h-[var(--ui-control-height-mobile)] w-full border-0 border-b border-slate-100 bg-transparent px-0 py-2 text-lg font-semibold leading-7 text-slate-800 outline-none placeholder:text-slate-300"
       />
       <div className="tiptap-container mt-4 min-w-0 max-w-none prose prose-slate">
         <EditorContent editor={editor} />
@@ -1205,6 +1212,7 @@ export function BilingualRichTextEditor({
       <div className={cn("grid min-w-0", !isKoreanOnly && "md:grid-cols-2")}>
         <EditorPane
           editor={koreanEditor}
+          languageLabel={lang === "ko" ? "국문" : "Korean"}
           onFocus={() => setActiveLanguage("ko")}
           onTitleChange={onTitleKoChange}
           placeholder={lang === "ko" ? "국문 제목을 입력하세요" : "Enter Korean title"}
@@ -1215,6 +1223,7 @@ export function BilingualRichTextEditor({
           <div className="min-w-0 border-t border-slate-200 md:border-l md:border-t-0">
             <EditorPane
               editor={englishEditor}
+              languageLabel={lang === "ko" ? "영문" : "English"}
               onFocus={() => setActiveLanguage("en")}
               onTitleChange={onTitleEnChange}
               placeholder={lang === "ko" ? "영문 제목을 입력하세요" : "Enter English title"}

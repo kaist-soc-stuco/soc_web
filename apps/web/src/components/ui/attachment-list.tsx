@@ -28,7 +28,7 @@ export function AttachmentList({
       </h2>
 
       <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <table className="w-full border-collapse text-left">
+        <table className="w-full table-fixed border-collapse text-left">
           <tbody className="divide-y divide-slate-100">
             {assets.map((asset) => {
               const assetUrl = resolveAssetUrl(asset.storageKey);
@@ -38,16 +38,19 @@ export function AttachmentList({
                   key={asset.assetId}
                   className="transition-colors hover:bg-slate-50/50"
                 >
-                  <td className="min-w-0 px-4 py-2.5 align-middle">
+                  <td className="w-full min-w-0 px-4 py-2.5 align-middle">
                     <a
                       href={assetUrl}
                       download={asset.originalFilename}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-w-0 items-center gap-2 transition-colors hover:text-kaist-darkgreen"
+                      className="flex w-full min-w-0 items-center gap-2 transition-colors hover:text-kaist-darkgreen"
                     >
                       <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span className="truncate text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-700">
+                      <span
+                        className="min-w-0 flex-1 truncate text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-700"
+                        title={asset.originalFilename}
+                      >
                         {asset.originalFilename}
                       </span>
                       <span className="shrink-0 text-[length:var(--ui-text-caption-size)] font-medium text-slate-400">
@@ -55,13 +58,13 @@ export function AttachmentList({
                       </span>
                     </a>
                   </td>
-                  <td className="w-10 shrink-0 py-2.5 pl-2 pr-4 text-right align-middle">
+                  <td className="w-11 shrink-0 py-0 pl-1 pr-1 text-right align-middle sm:pr-2">
                     <a
                       href={assetUrl}
                       download={asset.originalFilename}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-slate-400 transition-colors hover:text-slate-650"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-650"
                       title={lang === "ko" ? "다운로드" : "Download"}
                     >
                       <Download className="inline-block h-4 w-4" />

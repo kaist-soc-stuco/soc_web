@@ -80,8 +80,8 @@ export function BoardDetailArticleCard({
 }: ArticleCardProps) {
   return (
     <article className={article.status === "HIDDEN"
-      ? "w-full rounded-xl border border-amber-200 bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]"
-      : "w-full rounded-xl border border-card-border-subtle bg-white px-6 py-6 shadow-card md:px-[52px] md:py-[32px]"}>
+      ? "w-full rounded-xl border border-amber-200 bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"
+      : "w-full rounded-xl border border-card-border-subtle bg-white px-4 py-5 shadow-card min-[640px]:px-5 md:py-6 lg:px-[52px] lg:py-[32px]"}>
       {article.status === "HIDDEN" ? (
         <div
           role="status"
@@ -99,11 +99,11 @@ export function BoardDetailArticleCard({
         </div>
       ) : null}
       <header>
-        <h1 className="text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong md:text-[1.45rem]">
+        <h1 className="break-words text-[1.18rem] font-semibold leading-snug tracking-tight text-app-text-strong [overflow-wrap:anywhere] md:text-[1.45rem]">
           {title}
         </h1>
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-x-2 text-xs font-normal text-slate-400">
+        <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-slate-400">
             <span>
             {article.isAnonymous
                 ? lang === "ko"
@@ -127,7 +127,7 @@ export function BoardDetailArticleCard({
                   variant="ghost"
                   size="icon"
                   aria-label={lang === "ko" ? "게시글 더보기" : "More post actions"}
-                  className="size-8 bg-transparent text-slate-400 hover:bg-transparent hover:text-slate-700"
+                  className="min-h-11 min-w-11 bg-transparent text-slate-400 hover:bg-transparent hover:text-slate-700"
                 >
                   <EllipsisVertical className="size-4" aria-hidden="true" />
                 </Button>
@@ -193,7 +193,7 @@ export function BoardDetailArticleCard({
 
         <RichTextContent
           content={content}
-          className="text-[0.94rem] font-medium leading-7 text-app-text-body"
+          className="text-base font-medium leading-7 text-app-text-body md:text-[0.94rem]"
         />
       </div>
 
@@ -215,7 +215,7 @@ export function BoardDetailArticleCard({
                 <ClipboardCheck className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-[length:var(--ui-text-body-size)] font-semibold leading-snug tracking-tight text-app-text-strong">
+                <h2 className="line-clamp-2 break-words text-[length:var(--ui-text-body-size)] font-semibold leading-snug tracking-tight text-app-text-strong">
                   {surveyTitle}
                 </h2>
                 {surveyDescription && (
@@ -309,7 +309,7 @@ export function BoardDetailBackLink({
   return (
     <Link
       to={to ?? `/board/${category}`}
-      className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-md px-2.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+      className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-md px-2.5 text-[length:var(--ui-text-body-sm-size)] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
     >
       <ArrowLeft className="size-4" aria-hidden="true" />
       {lang === "ko" ? "목록으로" : "Back to list"}
@@ -345,7 +345,7 @@ export function BoardDetailAdjacentNav({
         ) : null}
         <span className="min-w-0 flex-1">
           <span className="block text-[0.6875rem] font-medium leading-4 text-slate-400">{label}</span>
-          <span className="mt-0.5 block truncate text-sm font-medium leading-5 text-slate-700 group-hover:text-slate-900">
+          <span className="mt-0.5 block line-clamp-2 break-words text-sm font-medium leading-5 text-slate-700 group-hover:text-slate-900">
             {lang === "ko" ? article.titleKo : article.titleEn || article.titleKo}
           </span>
         </span>

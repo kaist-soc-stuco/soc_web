@@ -148,7 +148,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
       <Header />
 
       <main className="flex-1 w-full mx-auto pb-28">
-        <div className="mx-auto max-w-[var(--ui-article-max-width)] px-6 lg:px-8 pt-6 pb-16 flex flex-col gap-3 w-full">
+        <div className="mx-auto flex w-full max-w-[var(--ui-article-max-width)] flex-col gap-3 px-4 pb-16 pt-6 min-[360px]:px-5 min-[640px]:px-6 lg:px-8">
           <BoardDetailBackLink
             category={category}
             lang={lang}

@@ -82,6 +82,9 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const [contentKo, setContentKo] = useState("");
   const [contentEn, setContentEn] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<
+    "idle" | "saving" | "saved" | "failed"
+  >("idle");
   const [assets, setAssets] = useState<AttachedAsset[]>([]);
   const [uploading, setUploading] = useState(false);
   const [eventStartDate, setEventStartDate] = useState("");
@@ -438,6 +441,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
   ]);
 
   const handleSaveDraft = async () => {
+    setDraftStatus("saving");
     const key = `draft_${selectedCategory}`;
     const data = {
       titleKo,
@@ -460,7 +464,13 @@ export function useBoardWritePageController(forcedCategory?: string) {
       eventDescriptionEn,
       updatedAt: nowMs(),
     };
-    localStorage.setItem(key, JSON.stringify(data));
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error(error);
+      setDraftStatus("failed");
+      return;
+    }
 
     const draftPayload = {
       boardCode: selectedCategory,
@@ -525,6 +535,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         console.error(error);
       }
     }
+    setDraftStatus("saved");
   };
 
   const handleRestoreDraft = async (draftId?: string) => {
@@ -965,6 +976,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
     canWriteSelected,
     contentEn,
     contentKo,
+    draftStatus,
     drafts,
     draftRestoredAt,
     eventDescriptionKo,
