@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
 import { normalizeBoardCode, type ArticleEngagementKind, type ArticleListItem } from "@soc/contracts";
 import { isoToMs } from "@soc/shared";
@@ -32,14 +32,36 @@ function comparePinnedArticles(a: ArticleListItem, b: ArticleListItem) {
   return 0;
 }
 
+const BOARD_PAGE_SIZES = [20, 50, 100] as const;
+
+function parsePageParam(value: string | null) {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function parsePageSizeParam(value: string | null) {
+  const pageSize = Number(value);
+  return BOARD_PAGE_SIZES.includes(pageSize as (typeof BOARD_PAGE_SIZES)[number])
+    ? pageSize
+    : 20;
+}
+
 export function useBoardPageController() {
   const { category: routeCategory } = useParams<{ category?: string }>();
   const category = routeCategory ? normalizeBoardCode(routeCategory) : undefined;
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchQuery, setSearchQueryState] = useState(
+    () => searchParams.get("q")?.trim() ?? "",
+  );
+  const [currentPage, setCurrentPageState] = useState(() =>
+    parsePageParam(searchParams.get("page")),
+  );
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [isArticleLoading, setIsArticleLoading] = useState(true);
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
+  const [articleError, setArticleError] = useState<string | null>(null);
+  const [articleRetryKey, setArticleRetryKey] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const { lang } = useLanguage();
   const { data: session } = useCurrentSession();
@@ -47,7 +69,9 @@ export function useBoardPageController() {
   const { toast } = useToast();
   const [searchCriteria, setSearchCriteria] =
     useState<BoardSearchCriteria>("title_content");
-  const [postsPerPage, setPostsPerPage] = useState(20);
+  const [postsPerPage, setPostsPerPageState] = useState(() =>
+    parsePageSizeParam(searchParams.get("limit")),
+  );
   const [engagementSubmitting, setEngagementSubmitting] = useState<string | null>(null);
 
   const apiClient = useMemo(
@@ -66,14 +90,69 @@ export function useBoardPageController() {
 
   const totalPages = Math.ceil(totalCount / postsPerPage);
 
+  const updateListParams = useCallback(
+    (updates: { limit?: number; page?: number; query?: string }) => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        if (updates.query !== undefined) {
+          const query = updates.query.trim();
+          if (query) next.set("q", query);
+          else next.delete("q");
+        }
+        if (updates.page !== undefined) {
+          if (updates.page > 1) next.set("page", String(updates.page));
+          else next.delete("page");
+        }
+        if (updates.limit !== undefined) {
+          if (updates.limit === 20) next.delete("limit");
+          else next.set("limit", String(updates.limit));
+        }
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
+  const setCurrentPage = useCallback(
+    (page: number) => {
+      setCurrentPageState(page);
+      updateListParams({ page });
+    },
+    [updateListParams],
+  );
+
+  const setPostsPerPage = useCallback(
+    (value: number) => {
+      setPostsPerPageState(value);
+      updateListParams({ limit: value });
+    },
+    [updateListParams],
+  );
+
+  const setSearchQuery = useCallback(
+    (query: string) => {
+      setSearchQueryState(query);
+      setCurrentPageState(1);
+      updateListParams({ page: 1, query });
+    },
+    [updateListParams],
+  );
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
+    setSearchQueryState(searchParams.get("q")?.trim() ?? "");
+    setCurrentPageState(parsePageParam(searchParams.get("page")));
+    setPostsPerPageState(parsePageSizeParam(searchParams.get("limit")));
+  }, [searchParams]);
+
+  useEffect(() => {
     let cancelled = false;
     setIsArticleLoading(true);
+    setArticleError(null);
 
     const queryParam = searchQuery;
     const fetchPromise = category
@@ -105,6 +184,11 @@ export function useBoardPageController() {
       })
       .catch((error) => {
         console.error("Failed to load board articles:", error);
+        if (!cancelled) {
+          setArticles([]);
+          setTotalCount(0);
+          setArticleError("failed");
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -120,16 +204,37 @@ export function useBoardPageController() {
     apiClient,
     category,
     currentPage,
+    articleRetryKey,
     searchQuery,
     searchCriteria,
     postsPerPage,
   ]);
 
   useEffect(() => {
-    setCurrentPage(1);
-    setSearchQuery("");
     setSearchCriteria("title_content");
   }, [category]);
+
+  useEffect(() => {
+    const scrollKey = `board-list-scroll:${location.pathname}${location.search}`;
+    const handleScroll = () => {
+      sessionStorage.setItem(scrollKey, String(window.scrollY));
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!hasCompletedInitialLoad) return;
+    const scrollKey = `board-list-scroll:${location.pathname}${location.search}`;
+    const savedScrollY = Number(sessionStorage.getItem(scrollKey));
+    if (!Number.isFinite(savedScrollY) || savedScrollY <= 0) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: savedScrollY, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [hasCompletedInitialLoad, location.pathname, location.search]);
 
   const canUseWriteFeatures = hasPersistedProfile(session ?? null);
   const userPermission = session?.permission ?? 0;
@@ -266,6 +371,7 @@ export function useBoardPageController() {
 
   return {
     articles,
+    articleError,
     boardByCode,
     boardDescription,
     boards,
@@ -278,6 +384,7 @@ export function useBoardPageController() {
     engagementSubmitting,
     isBoardNotFound,
     isArticleLoading,
+    retryArticles: () => setArticleRetryKey((current) => current + 1),
     showInitialSkeleton: isArticleLoading && !hasCompletedInitialLoad,
     lang,
     postsPerPage,

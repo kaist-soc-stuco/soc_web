@@ -32,6 +32,7 @@ export function useSearchPageController() {
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   const apiClient = useMemo(
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
@@ -148,7 +149,7 @@ export function useSearchPageController() {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, lang, query, searchBy]);
+  }, [apiClient, lang, query, retryKey, searchBy]);
 
   const boardById = useMemo(
     () => new Map(boards.map((board) => [board.boardId, board])),
@@ -210,6 +211,7 @@ export function useSearchPageController() {
     lang,
     loading,
     query,
+    retrySearch: () => setRetryKey((current) => current + 1),
     setInputValue,
     setFilter,
     searchBy,

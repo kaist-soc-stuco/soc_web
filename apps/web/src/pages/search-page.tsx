@@ -22,6 +22,7 @@ export function SearchPage() {
     inputValue,
     lang,
     loading,
+    retrySearch,
     query,
     setInputValue,
     setFilter,
@@ -75,6 +76,7 @@ export function SearchPage() {
           filter={filter}
           lang={lang}
           loading={loading}
+          onRetry={retrySearch}
           query={query}
           surveys={surveys}
           totalCount={totalCount}
