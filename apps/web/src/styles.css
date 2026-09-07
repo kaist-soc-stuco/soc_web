@@ -3533,6 +3533,77 @@
   border-color: color-mix(in srgb, var(--ui-border-subtle) 88%, transparent);
 }
 
+@media (max-width: 39.9375rem) {
+  .ui-modal__surface--mobile-fullscreen {
+    height: 100dvh;
+    max-height: 100dvh !important;
+    max-width: none;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .ui-modal__surface--mobile-fullscreen .ui-modal__header {
+    min-height: 4rem;
+  }
+
+  .ui-modal__surface--mobile-fullscreen .ui-icon-button {
+    min-width: var(--ui-touch-target-min);
+    min-height: var(--ui-touch-target-min);
+  }
+
+  .admin-survey-editor .question-inline-editor .interaction-control {
+    height: var(--ui-touch-target-min) !important;
+    min-height: var(--ui-touch-target-min) !important;
+  }
+
+  .admin-survey-editor .question-inline-editor .ui-icon-button,
+  .admin-survey-editor .question-inline-editor button[aria-label*="순서 이동"] {
+    width: var(--ui-touch-target-min);
+    min-width: var(--ui-touch-target-min);
+    height: var(--ui-touch-target-min);
+    min-height: var(--ui-touch-target-min);
+  }
+
+  .admin-survey-editor .question-option-row > .flex {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: 0.5rem;
+  }
+
+  .admin-survey-editor .question-option-row > .flex > .grid {
+    width: calc(100% - 1.75rem);
+    min-width: calc(100% - 1.75rem);
+    flex: 1 1 calc(100% - 1.75rem);
+  }
+
+  .admin-survey-editor .question-option-image-action {
+    width: var(--ui-touch-target-min) !important;
+    min-width: var(--ui-touch-target-min);
+    height: var(--ui-touch-target-min) !important;
+  }
+
+  .admin-survey-editor .question-option-image-action > div {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  .admin-survey-editor .question-option-branch {
+    width: 100% !important;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .admin-survey-editor .question-option-order-actions {
+    margin-left: auto;
+  }
+
+  .question-editor-more-menu button {
+    min-height: var(--ui-touch-target-min);
+  }
+}
+
 /* Tiptap & Rich Content Styling */
 .rich-content,
 .tiptap {
