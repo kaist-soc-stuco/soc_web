@@ -199,9 +199,13 @@ function formatCalendarEventRange(event: CalendarEvent, lang: Language) {
 function getTooltipPosition({ x, y }: Pick<CalendarTooltipState, "x" | "y">) {
   const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
   const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
+  const isMobile = viewportWidth < 768;
+  const tooltipWidth = isMobile ? Math.min(288, viewportWidth - 16) : 304;
 
   return {
-    left: Math.min(x + 14, Math.max(8, viewportWidth - 304)),
+    left: isMobile
+      ? Math.max(8, Math.min(x + 14, viewportWidth - tooltipWidth - 8))
+      : Math.min(x + 14, Math.max(8, viewportWidth - 304)),
     top: Math.min(y + 18, Math.max(8, viewportHeight - 96)),
   };
 }
@@ -284,10 +288,14 @@ export function EventsSurveysCalendarGrid({
         </div>
 
         <div
-          className="grid grid-cols-7 overflow-visible"
+          className="calendar-grid-body grid grid-cols-7 overflow-visible"
           style={{
             gridTemplateRows: weekRowHeights
-              .map((height) => `${height}px`)
+              .map((height) =>
+                height === CALENDAR_WEEK_OVERFLOW_HEIGHT
+                  ? "var(--calendar-week-overflow-row-height)"
+                  : "var(--calendar-week-row-height)",
+              )
               .join(" "),
           }}
         >
@@ -461,7 +469,7 @@ export function EventsSurveysCalendarGrid({
       {tooltip && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[2000] flex max-w-[calc(100vw-1rem)] -translate-y-0 flex-col rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-md"
+              className="calendar-tooltip pointer-events-none fixed z-[2000] flex max-w-[calc(100vw-1rem)] -translate-y-0 flex-col rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-md"
               data-calendar-tooltip="true"
               role="tooltip"
               style={getTooltipPosition(tooltip)}

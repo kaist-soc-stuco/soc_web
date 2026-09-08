@@ -5,7 +5,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { Language } from "@/hooks/use-language";
 import { formatShortDateWithWeekday } from "@/lib/date-display";
-import { isCalendarEventOnDay, type CalendarEvent } from "@/lib/events-surveys";
+import {
+  isCalendarEventOnDay,
+  stripCalendarPrefix,
+  type CalendarEvent,
+} from "@/lib/events-surveys";
 import { EventsSurveysCalendarGrid } from "./events-surveys-calendar-grid";
 import { EventsSurveysCalendarManagement } from "./events-surveys-calendar-management";
 import { EventsSurveysDayDetails } from "./events-surveys-day-details";
@@ -151,6 +155,28 @@ export function EventsSurveysCalendar({
               </span>
             </div>
             <EventsSurveysCalendarManagement />
+          </div>
+
+          <div
+            aria-live="polite"
+            className="calendar-mobile-selection-summary mb-4 rounded-lg border border-brand-primary/15 bg-emerald-50/45 px-3.5 py-3 lg:hidden"
+            data-calendar-mobile-selection="true"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h3 className="text-sm font-semibold text-slate-800">{selectedDateStr}</h3>
+              <span className="text-xs font-medium text-slate-500">
+                {lang === "ko"
+                  ? `${selectedDayEvents.length}개의 일정`
+                  : `${selectedDayEvents.length} event${selectedDayEvents.length === 1 ? "" : "s"}`}
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-2 break-words text-xs font-medium leading-relaxed text-slate-600">
+              {selectedDayEvents.length > 0
+                ? `${lang === "ko" ? "첫 일정" : "First event"}: ${stripCalendarPrefix(selectedDayEvents[0].title)}`
+                : lang === "ko"
+                  ? "등록된 일정이 없습니다."
+                  : "No events scheduled."}
+            </p>
           </div>
 
           <EventsSurveysCalendarGrid

@@ -48,9 +48,11 @@ export function Header({ variant = "default" }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const notificationTriggerRef = useRef<HTMLButtonElement>(null);
   const { data: session } = useCurrentSession();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -63,6 +65,8 @@ export function Header({ variant = "default" }: HeaderProps) {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [loginStarting, setLoginStarting] = useState(false);
+  const previousSearchOpen = useRef(false);
+  const previousNotificationOpen = useRef(false);
   const { lang, setLanguage } = useLanguage();
   const handleMobileMenuKeyDown = useOverlayBehavior({
     onClose: () => setMobileMenuOpen(false),
@@ -81,6 +85,13 @@ export function Header({ variant = "default" }: HeaderProps) {
     closeMobileMenuOnDesktop();
     return () => window.removeEventListener("resize", closeMobileMenuOnDesktop);
   }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    document.body.classList.toggle("site-mobile-menu-open", mobileMenuOpen);
+    return () => document.body.classList.remove("site-mobile-menu-open");
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     if (variant !== "home" || typeof window === "undefined") {
@@ -265,6 +276,40 @@ export function Header({ variant = "default" }: HeaderProps) {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    const wasOpen = previousSearchOpen.current;
+    previousSearchOpen.current = searchOpen;
+    if (!wasOpen || searchOpen) return;
+
+    const activeElement = document.activeElement;
+    if (
+      notificationRef.current?.contains(activeElement) ||
+      profileRef.current?.contains(activeElement) ||
+      mobileMenuRef.current?.contains(activeElement)
+    ) {
+      return;
+    }
+
+    searchTriggerRef.current?.focus({ preventScroll: true });
+  }, [searchOpen]);
+
+  useEffect(() => {
+    const wasOpen = previousNotificationOpen.current;
+    previousNotificationOpen.current = notificationOpen;
+    if (!wasOpen || notificationOpen) return;
+
+    const activeElement = document.activeElement;
+    if (
+      searchRef.current?.contains(activeElement) ||
+      profileRef.current?.contains(activeElement) ||
+      mobileMenuRef.current?.contains(activeElement)
+    ) {
+      return;
+    }
+
+    notificationTriggerRef.current?.focus({ preventScroll: true });
+  }, [notificationOpen]);
 
   const publicBoardItems = boardNavItems.filter(
     (board) => !isLegacyPublicBoardCode(board.code),
@@ -544,6 +589,7 @@ export function Header({ variant = "default" }: HeaderProps) {
         <div className="home-header-utilities relative flex items-center gap-1.5 pr-3 md:gap-2 md:pr-6">
           <div ref={searchRef} className="relative">
             <IconButton
+              ref={searchTriggerRef}
               aria-label={lang === "ko" ? "통합검색" : "Search"}
               aria-expanded={searchOpen}
               onClick={() => {
@@ -558,7 +604,7 @@ export function Header({ variant = "default" }: HeaderProps) {
             </IconButton>
 
             {searchOpen && (
-              <PopoverPanel className="right-0 top-full w-[min(22rem,calc(100vw-2rem))]">
+              <PopoverPanel className="site-header-search-panel right-0 top-full w-[min(22rem,calc(100vw-2rem))]">
                 <form className="p-3.5" onSubmit={handleSearchSubmit}>
                   <TextInput
                       leading={<Search aria-hidden="true" className="h-4 w-4" />}
@@ -610,6 +656,7 @@ export function Header({ variant = "default" }: HeaderProps) {
           {user && (
             <div ref={notificationRef} className="relative">
               <IconButton
+                ref={notificationTriggerRef}
                 aria-label={lang === "ko" ? "알림" : "Notifications"}
                 aria-expanded={notificationOpen}
                 onClick={() => {
@@ -628,7 +675,7 @@ export function Header({ variant = "default" }: HeaderProps) {
               </IconButton>
 
               {notificationOpen && (
-                <PopoverPanel className="right-0 top-full w-[min(25rem,calc(100vw-2rem))]">
+                <PopoverPanel className="site-header-notification-panel right-0 top-full w-[min(25rem,calc(100vw-2rem))]">
                   <div className="flex h-14 items-center justify-between border-b border-slate-100 px-4">
                     <p className="text-base font-bold text-slate-900">
                       {lang === "ko" ? "알림" : "Notifications"}
