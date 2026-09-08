@@ -343,7 +343,7 @@ function CommentRow({
           <div className="flex shrink-0 items-center gap-0.5 self-start sm:self-auto">
             {allowEngagement ? <EngagementActionButton
               active={likeActive}
-              className="h-7 gap-1 rounded-md border-0 px-1.5 text-xs font-medium"
+              className="comment-engagement-action h-7 gap-1 rounded-md border-0 px-2 text-xs font-medium"
               count={comment.likeCount}
               icon={
                 <Heart
@@ -371,7 +371,7 @@ function CommentRow({
                 variant="ghost"
                 size="sm"
                 onClick={onReplyToggle}
-                className="h-7 rounded-md border-0 bg-transparent px-1.5 text-xs font-medium text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-400"
+                className="comment-reply-action h-7 rounded-md border-0 bg-transparent px-2 text-xs font-medium text-slate-400 hover:border-0 hover:bg-slate-100 hover:text-slate-400"
               >
                 {lang === "ko" ? "답글" : "Reply"}
               </Button>
@@ -392,7 +392,7 @@ function CommentRow({
                     setHideReason("");
                     setHideModalOpen(true);
                   }}
-                  className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                   title={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                 >
                   {canDelete ? <Trash2 className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
@@ -410,7 +410,7 @@ function CommentRow({
                     setHideReason("");
                     setHideModalOpen(true);
                   }}
-                  className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                   title={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                 >
                   {canRestore ? <Eye className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
@@ -427,7 +427,7 @@ function CommentRow({
                   setEditText(comment.content);
                   setEditing(true);
                 }}
-                className="pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-slate-400 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
               >
                 <Edit2 className="size-3.5" aria-hidden="true" />
               </Button>

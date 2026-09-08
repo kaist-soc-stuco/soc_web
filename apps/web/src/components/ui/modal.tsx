@@ -1,4 +1,4 @@
-import { useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -38,6 +38,13 @@ export function Modal({
     open,
     surfaceRef,
   });
+
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+
+    document.body.classList.add("ui-modal-open");
+    return () => document.body.classList.remove("ui-modal-open");
+  }, [open]);
 
   if (!open) return null;
 
