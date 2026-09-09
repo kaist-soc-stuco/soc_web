@@ -37,10 +37,20 @@ export const getAuthSessionSummary = async (
   apiClient: SessionApiClient,
 ): Promise<AuthSession> => {
   const temporarySessionId = getTemporarySessionId();
+  const temporaryAccessTokenAtStart =
+    readStoredAuthState()?.temporarySession?.accessToken;
 
   try {
     const session = await apiClient.getSession(temporarySessionId);
-    if (!session.authenticated && readStoredAuthState()?.temporarySession) {
+    // A session request can have started before a login or account switch and
+    // finish afterwards. Only clear the token that this request observed; a
+    // late unauthenticated response must never erase a newer temporary login.
+    if (
+      !session.authenticated &&
+      temporaryAccessTokenAtStart &&
+      readStoredAuthState()?.temporarySession?.accessToken ===
+        temporaryAccessTokenAtStart
+    ) {
       clearStoredAuthState();
     }
     return session;

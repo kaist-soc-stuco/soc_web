@@ -8,7 +8,7 @@ import type {
   SurveyResponseRecord,
   SurveyResponseWithAnswers,
 } from "@soc/contracts";
-import { isoToDate, isoToMs } from "@soc/shared";
+import { isoToDate } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminCard, AdminEmptyState, AdminPageHeader, AdminPageMain, AdminPageShell, AdminTableCard } from "@/components/ui/admin-page";
@@ -72,6 +72,7 @@ export function SurveyResponseListPage() {
   const { id: surveyId } = useParams<{ id: string }>();
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
   const [responses, setResponses] = useState<SurveyResponseWithAnswers[]>([]);
+  const [responseTotal, setResponseTotal] = useState(0);
   const [analytics, setAnalytics] = useState<SurveyAnalyticsResponse | null>(null);
   const [activeView, setActiveView] = useState<ResponseView>("summary");
   const [loading, setLoading] = useState(true);
@@ -95,11 +96,17 @@ export function SurveyResponseListPage() {
     try {
       const [surveyData, responsesData, analyticsData] = await Promise.all([
         client.getSurveyDetail(surveyId),
-        client.listResponsesWithAnswers(surveyId),
+        client.listResponsesWithAnswers(surveyId, {
+          page: currentPage,
+          pageSize,
+          query: searchQuery,
+          sortOrder,
+        }),
         client.getSurveyAnalytics(surveyId),
       ]);
       setSurvey(surveyData);
-      setResponses(responsesData);
+      setResponses(responsesData.items);
+      setResponseTotal(responsesData.total);
       setAnalytics(analyticsData);
     } catch {
       setError("데이터를 불러오지 못했습니다.");
@@ -113,7 +120,7 @@ export function SurveyResponseListPage() {
       return;
     }
     fetchSurveyAndResponses();
-  }, [surveyId, client, session, sessionLoading]);
+  }, [surveyId, client, session, sessionLoading, currentPage, pageSize, searchQuery, sortOrder]);
 
   const handleSheet = async () => {
     if (!surveyId || sheetBusy) return;
@@ -135,45 +142,19 @@ export function SurveyResponseListPage() {
     }
   };
 
-  // Dynamic Client-Side Filtering, Searching, and Sorting
-  const filteredResponses = useMemo(() => {
-    let result = [...responses];
-
-    // 1. Search filter matching mock name or email
-    if (searchQuery.trim().length > 0) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter((r) => {
-        return formatResponseName(r).toLowerCase().includes(q) || formatResponseEmail(r).toLowerCase().includes(q);
-      });
-    }
-
-    // 2. Sorting (submittedAt time)
-    result.sort((a, b) => {
-      const dateA = a.submittedAt ? isoToMs(a.submittedAt) : 0;
-      const dateB = b.submittedAt ? isoToMs(b.submittedAt) : 0;
-      return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
-    });
-
-    return result;
-  }, [responses, searchQuery, sortOrder]);
-
-  // Total pages
-  const totalPages = Math.max(1, Math.ceil(filteredResponses.length / pageSize));
-  const rangeStart = filteredResponses.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const rangeEnd = Math.min(filteredResponses.length, currentPage * pageSize);
-
-  // Paginated List
-  const paginatedResponses = useMemo(() => {
-    const startIdx = (currentPage - 1) * pageSize;
-    return filteredResponses.slice(startIdx, startIdx + pageSize);
-  }, [filteredResponses, currentPage, pageSize]);
+  // Filtering, sorting, and pagination are performed by the API. The page
+  // only renders the bounded response set returned for the current query.
+  const totalPages = Math.max(1, Math.ceil(responseTotal / pageSize));
+  const rangeStart = responseTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(responseTotal, currentPage * pageSize);
+  const paginatedResponses = responses;
 
   // Adjust page number if filtered list shrinks
   useEffect(() => {
     if (currentPage > 1 && currentPage > totalPages) {
       setCurrentPage(Math.max(1, totalPages));
     }
-  }, [filteredResponses, totalPages, currentPage]);
+  }, [responseTotal, totalPages, currentPage]);
 
   // Generate page items exactly as `< 1 2 3 ... 29 >`
   return (
@@ -209,7 +190,7 @@ export function SurveyResponseListPage() {
                 <span className="truncate text-sm font-normal text-[#172033]" title={survey.titleKo}>{survey.titleKo}</span>
                 <SurveyStatusBadge survey={survey} showDday={false} size="sm" />
               </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-normal text-[#344054]"><span>{format24hDateTime(survey.opensAt) ?? "상시"}</span><span>응답 {responses.length}건</span></div>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs font-normal text-[#344054]"><span>{format24hDateTime(survey.opensAt) ?? "상시"}</span><span>응답 {responseTotal}건</span></div>
             </AdminCard>
           )}
 
@@ -271,11 +252,11 @@ export function SurveyResponseListPage() {
           {/* Table */}
           <div className="flex min-w-0 flex-col overflow-visible">
             
-            {filteredResponses.length === 0 && (
+            {responses.length === 0 && (
               <AdminEmptyState message="조건에 맞는 응답이 없습니다." />
             )}
 
-            {filteredResponses.length > 0 && (
+            {responses.length > 0 && (
               <div className="bg-white">
                 <AdminDataTable minWidth={1076}>
                   <colgroup>
@@ -299,7 +280,9 @@ export function SurveyResponseListPage() {
                     <AdminTableBody>
                       {paginatedResponses.map((r, index) => {
                         const globalIndex = (currentPage - 1) * pageSize + index;
-                        const rowNo = filteredResponses.length - globalIndex;
+                        const rowNo = sortOrder === "desc"
+                          ? responseTotal - globalIndex
+                          : globalIndex + 1;
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/30 transition-colors">
@@ -372,7 +355,7 @@ export function SurveyResponseListPage() {
                     }}
                   />
                 }
-                range={`총 ${filteredResponses.length}건 중 ${rangeStart}–${rangeEnd}`}
+                range={`총 ${responseTotal}건 중 ${rangeStart}–${rangeEnd}`}
                 totalPages={totalPages}
               />
             </div>

@@ -72,13 +72,15 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
     );
   },
 
-  consumeLoginResult: async (
-    resultToken: string,
-  ): Promise<LoginResultResponse> => {
+  consumeLoginResult: async (): Promise<LoginResultResponse> => {
     return requestJson<LoginResultResponse>(
-      `${authBaseUrl}/login/result?resultToken=${encodeURIComponent(resultToken)}`,
+      `${authBaseUrl}/login/result`,
       {
-        method: "GET",
+        body: JSON.stringify({}),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
       },
     );
   },

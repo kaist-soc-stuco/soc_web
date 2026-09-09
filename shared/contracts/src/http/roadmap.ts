@@ -152,6 +152,23 @@ export interface RoadmapOfferingTermSummary {
   importedAt: string;
 }
 
+/** Fields intentionally safe for the unauthenticated roadmap catalogue. */
+export type PublicRoadmapCourseRecord = Omit<
+  RoadmapCourseRecord,
+  "courseId" | "isVisible" | "source" | "createdAt" | "updatedAt"
+>;
+
+/** Fields intentionally safe for the unauthenticated offering catalogue. */
+export type PublicRoadmapOfferingRecord = Omit<
+  RoadmapOfferingRecord,
+  "offeringId" | "sourceFileName" | "importedAt"
+>;
+
+export type PublicRoadmapOfferingTermSummary = Omit<
+  RoadmapOfferingTermSummary,
+  "sourceFileName" | "importedAt"
+>;
+
 export interface RoadmapImportPreviewCourse {
   courseCode: string;
   legacyCourseCode: string | null;
@@ -163,13 +180,14 @@ export interface RoadmapImportPreviewCourse {
 }
 
 export interface RoadmapOfferingListResponse {
-  items: RoadmapOfferingRecord[];
-  courses?: RoadmapCourseRecord[];
+  items: PublicRoadmapOfferingRecord[];
+  courses?: PublicRoadmapCourseRecord[];
   relations?: RoadmapCourseRelationRecord[];
-  terms?: RoadmapOfferingTermSummary[];
+  terms?: PublicRoadmapOfferingTermSummary[];
 }
 
-export interface AdminRoadmapOfferingListResponse extends RoadmapOfferingListResponse {
+export interface AdminRoadmapOfferingListResponse {
+  items: RoadmapOfferingRecord[];
   courses: RoadmapCourseRecord[];
   relations: RoadmapCourseRelationRecord[];
   terms: RoadmapOfferingTermSummary[];

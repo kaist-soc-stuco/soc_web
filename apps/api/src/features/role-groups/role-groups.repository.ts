@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 
-import { and, asc, desc, eq, ilike, inArray, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
@@ -15,6 +15,10 @@ import {
   users,
 } from "../../infrastructure/postgres/postgres.schema";
 
+import {
+  PERMISSION_REGISTRY,
+  Permissions,
+} from "@soc/contracts";
 import type {
   AdminUserRecord,
   AssignRoleGroupMemberRequest,
@@ -167,6 +171,50 @@ export class RoleGroupsRepository {
   async findRoleGroupById(roleGroupId: number): Promise<RoleGroupRecord | null> {
     const items = await this.listRoleGroups();
     return items.find((item) => item.roleGroupId === roleGroupId) ?? null;
+  }
+
+  /**
+   * A system administrator is an explicitly provisioned system role with the
+   * complete active permission set. Combining delegated roles must not qualify.
+   */
+  async isSystemAdministrator(userId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({
+        permissionBitValue: permissions.bitValue,
+        roleGroupId: roleGroups.roleGroupId,
+      })
+      .from(userRoleGroups)
+      .innerJoin(roleGroups, eq(userRoleGroups.roleGroupId, roleGroups.roleGroupId))
+      .innerJoin(
+        roleGroupPermissions,
+        eq(roleGroups.roleGroupId, roleGroupPermissions.roleGroupId),
+      )
+      .innerJoin(
+        permissions,
+        eq(roleGroupPermissions.permissionId, permissions.permissionId),
+      )
+      .where(
+        and(
+          eq(userRoleGroups.userId, userId),
+          eq(userRoleGroups.isActive, true),
+          eq(roleGroups.isSystem, true),
+          eq(permissions.isActive, true),
+          or(isNull(userRoleGroups.validFrom), lte(userRoleGroups.validFrom, nowDate())),
+          or(isNull(userRoleGroups.validTo), gte(userRoleGroups.validTo, nowDate())),
+        ),
+      );
+
+    const maskByRole = new Map<number, number>();
+    for (const row of rows) {
+      maskByRole.set(
+        row.roleGroupId,
+        (maskByRole.get(row.roleGroupId) ?? 0) | Number(row.permissionBitValue),
+      );
+    }
+
+    return [...maskByRole.values()].some((mask) =>
+      Permissions.has(mask, ...PERMISSION_REGISTRY.map((permission) => permission.bit)),
+    );
   }
 
   async createRoleGroup(input: CreateRoleGroupRequest): Promise<RoleGroupRecord | null> {

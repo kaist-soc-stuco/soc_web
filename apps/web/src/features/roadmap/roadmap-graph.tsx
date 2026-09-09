@@ -16,9 +16,9 @@ import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRe
 
 import {
   normalizeRoadmapCourseCode,
-  type RoadmapCourseRecord,
+  type PublicRoadmapCourseRecord,
+  type PublicRoadmapOfferingRecord,
   type RoadmapCourseRelationRecord,
-  type RoadmapOfferingRecord,
 } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
 import { useQuery } from "@tanstack/react-query";
@@ -279,7 +279,7 @@ function getCourseSearchText(
   ].join(" ");
 }
 
-function toRoadmapOffering(record: RoadmapOfferingRecord): RoadmapOffering {
+function toRoadmapOffering(record: PublicRoadmapOfferingRecord): RoadmapOffering {
   return {
     capacity: record.capacity,
     courseCode: normalizeRoadmapCourseCode(record.courseCode),
@@ -297,7 +297,7 @@ function toRoadmapOffering(record: RoadmapOfferingRecord): RoadmapOffering {
   };
 }
 
-function toRoadmapCourse(record: RoadmapCourseRecord): RoadmapCourse {
+function toRoadmapCourse(record: PublicRoadmapCourseRecord): RoadmapCourse {
   return {
     ai: record.ai,
     category: record.category,
@@ -355,7 +355,7 @@ export function RoadmapGraph({
   const activeCourseCode = hoveredCourseCode ?? selectedCourseCode;
 
   const remoteCourses = useMemo(
-    () => (importedOfferingsResponse?.courses ?? []).filter((course) => course.isVisible).map(toRoadmapCourse),
+    () => (importedOfferingsResponse?.courses ?? []).map(toRoadmapCourse),
     [importedOfferingsResponse?.courses],
   );
   const hasRemoteCatalog = remoteCourses.length > 0;

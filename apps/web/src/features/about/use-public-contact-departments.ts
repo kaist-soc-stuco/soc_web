@@ -1,5 +1,5 @@
 import { createApiClient } from "@soc/api-client";
-import type { ContactDepartmentRecord } from "@soc/contracts";
+import type { PublicContactDepartmentRecord } from "@soc/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -8,7 +8,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 export const PUBLIC_CONTACT_DEPARTMENTS_QUERY_KEY = ["contacts", "departments", "public"] as const;
 
 export function usePublicContactDepartments(): {
-  departments: ContactDepartmentRecord[];
+  departments: PublicContactDepartmentRecord[];
   isLoading: boolean;
 } {
   const apiClient = useMemo(

@@ -15,6 +15,8 @@ import type { UpdateSectionDto } from "./dto/update-section.dto";
 import type { ReorderSurveySectionsRequest } from "@soc/contracts";
 import { sanitizeSurveyRichText } from "./survey-rich-text";
 
+const MAX_SURVEY_SECTIONS = 200;
+
 @Injectable()
 export class SurveySectionsRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
@@ -47,7 +49,11 @@ export class SurveySectionsRepository {
         asc(surveySections.sortOrder),
         asc(surveySections.createdAt),
         asc(surveySections.id),
-      );
+      )
+      .limit(MAX_SURVEY_SECTIONS + 1);
+    if (rows.length > MAX_SURVEY_SECTIONS) {
+      throw new Error("survey_section_limit_exceeded");
+    }
     return rows.map((r) => this.map(r));
   }
 

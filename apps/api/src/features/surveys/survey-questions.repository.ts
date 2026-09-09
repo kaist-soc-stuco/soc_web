@@ -16,6 +16,8 @@ import type { QuestionType, QuestionOption, SurveyQuestionConfig } from "@soc/co
 import type { ReorderSurveyQuestionsRequest } from "@soc/contracts";
 import { sanitizeSurveyRichText } from "./survey-rich-text";
 
+const MAX_SURVEY_QUESTIONS = 200;
+
 @Injectable()
 export class SurveyQuestionsRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
@@ -52,7 +54,11 @@ export class SurveyQuestionsRepository {
         asc(surveyQuestions.sortOrder),
         asc(surveyQuestions.createdAt),
         asc(surveyQuestions.id),
-      );
+      )
+      .limit(MAX_SURVEY_QUESTIONS + 1);
+    if (rows.length > MAX_SURVEY_QUESTIONS) {
+      throw new Error("survey_question_limit_exceeded");
+    }
     return rows.map((r) => this.map(r));
   }
 

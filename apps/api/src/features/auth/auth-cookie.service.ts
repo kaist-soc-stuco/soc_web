@@ -4,9 +4,11 @@ import type { Request, Response } from "express";
 import {
   AUTH_ACCESS_COOKIE_NAME,
   AUTH_ACCESS_TOKEN_TTL_SECONDS,
+  AUTH_LOGIN_TRANSACTION_COOKIE_NAME,
   AUTH_REFRESH_COOKIE_NAME,
   AUTH_REFRESH_TOKEN_TTL_SECONDS,
   AUTH_SESSION_COOKIE_NAME,
+  AUTH_SSO_TRANSACTION_COOKIE_NAME,
 } from "./auth.tokens";
 
 @Injectable()
@@ -20,8 +22,55 @@ export class AuthCookieService {
       // Production can still be served over plain HTTP behind a local or
       // campus reverse proxy. Use the original request protocol so the
       // browser can actually store the session cookie in that deployment.
-      secure: request ? request.secure : process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || Boolean(request?.secure),
     };
+  }
+
+  private getSsoTransactionOptions(request?: Request) {
+    const secure = process.env.NODE_ENV === "production" || Boolean(request?.secure);
+    return {
+      ...this.getCookieOptions(5 * 60 * 1000, request),
+      sameSite: secure ? ("none" as const) : ("lax" as const),
+      secure,
+    };
+  }
+
+  setSsoTransactionCookie(
+    response: Response,
+    transaction: string,
+    request?: Request,
+  ): void {
+    response.cookie(
+      AUTH_SSO_TRANSACTION_COOKIE_NAME,
+      transaction,
+      this.getSsoTransactionOptions(request),
+    );
+  }
+
+  clearSsoTransactionCookie(response: Response, request?: Request): void {
+    response.clearCookie(
+      AUTH_SSO_TRANSACTION_COOKIE_NAME,
+      this.getSsoTransactionOptions(request),
+    );
+  }
+
+  setLoginTransactionCookie(
+    response: Response,
+    transaction: string,
+    request?: Request,
+  ): void {
+    response.cookie(
+      AUTH_LOGIN_TRANSACTION_COOKIE_NAME,
+      transaction,
+      this.getCookieOptions(10 * 60 * 1000, request),
+    );
+  }
+
+  clearLoginTransactionCookie(response: Response, request?: Request): void {
+    response.clearCookie(
+      AUTH_LOGIN_TRANSACTION_COOKIE_NAME,
+      this.getCookieOptions(0, request),
+    );
   }
 
   setAuthCookies(

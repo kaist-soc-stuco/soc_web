@@ -18,6 +18,8 @@ import type {
   BulkImportContactsRequest,
   BulkImportContactsResponse,
   ContactListResponse,
+  PublicContactListResponse,
+  PublicContactDepartmentListResponse,
   ContactRecord,
   ContactDepartmentListResponse,
   ContactDepartmentRecord,
@@ -42,17 +44,19 @@ export class ContactsController {
   ) {}
 
   @Get()
-  async getContacts(): Promise<ContactListResponse> {
-    const items = await this.contactsService.findAll();
-    return { items };
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  async getContacts(): Promise<PublicContactListResponse> {
+    return this.contactsService.findPublic();
   }
 
   @Get("departments")
-  async getContactDepartments(): Promise<ContactDepartmentListResponse> {
-    return this.contactsService.findDepartments(false);
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  async getContactDepartments(): Promise<PublicContactDepartmentListResponse> {
+    return this.contactsService.findPublicDepartments();
   }
 
   @Get("manage/export.xlsx")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="executive_contacts.xlsx"')
@@ -68,7 +72,7 @@ export class ContactsController {
       auditMetadataFromRequest(request),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
+      ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "공개조직도", "표시순서"],
       ...items.map((item) => [
         item.nameKo,
         item.nameEn,
@@ -81,12 +85,13 @@ export class ContactsController {
         item.email,
         item.phoneNumber,
         item.privacyConsented ? "동의" : "미동의",
+        item.publiclyListed ? "공개" : "비공개",
         item.sortOrder,
       ]),
     ]);
     worksheet["!cols"] = [
       { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 22 },
-      { wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
+      { wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 12 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
@@ -95,12 +100,14 @@ export class ContactsController {
   }
 
   @Get("manage/departments")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async getManagedContactDepartments(): Promise<ContactDepartmentListResponse> {
     return this.contactsService.findDepartments(true);
   }
 
   @Get("portal-members")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async searchPortalMembers(
     @Query("q") query?: string,
@@ -114,6 +121,7 @@ export class ContactsController {
   }
 
   @Get("manage")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async getManagedContacts(
     @Req() request: AuthenticatedRequest,
@@ -140,6 +148,7 @@ export class ContactsController {
   }
 
   @Post("spreadsheet/sync")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async syncContactSpreadsheet(
     @Req() request: AuthenticatedRequest,
@@ -148,6 +157,7 @@ export class ContactsController {
   }
 
   @Get("spreadsheet")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_CONTACTS)
   async getContactSpreadsheet(
     @Req() request: AuthenticatedRequest,

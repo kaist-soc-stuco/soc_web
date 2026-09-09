@@ -1,13 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileText, Save, Trash2 } from "lucide-react";
 import { msToIso, nowMs } from "@soc/shared";
 
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { getDraftStorageKey } from "@/lib/draft-storage";
 
 import type { AttachedAsset } from "./board-write-form-sections";
-
-const STORAGE_KEY = "soc:admin:board-article-templates";
 
 export interface BoardTemplateSnapshot {
   boardCode: string;
@@ -47,11 +47,12 @@ interface ArticleTemplateControlProps {
   onApply: (snapshot: BoardTemplateSnapshot) => void;
 }
 
-function readTemplates() {
+function readTemplates(storageKey: string | null) {
   if (typeof window === "undefined") return [] as StoredBoardTemplate[];
+  if (!storageKey) return [] as StoredBoardTemplate[];
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -68,9 +69,10 @@ function readTemplates() {
   }
 }
 
-function writeTemplates(templates: StoredBoardTemplate[]) {
+function writeTemplates(storageKey: string | null, templates: StoredBoardTemplate[]) {
+  if (!storageKey) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+    window.localStorage.setItem(storageKey, JSON.stringify(templates));
   } catch {
     // The editor remains usable when browser storage is unavailable.
   }
@@ -93,15 +95,29 @@ export function ArticleTemplateControl({
   snapshot,
   onApply,
 }: ArticleTemplateControlProps) {
-  const [templates, setTemplates] = useState<StoredBoardTemplate[]>(readTemplates);
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
+  const storageKey =
+    !sessionLoading && session?.authenticated && session.userId
+      ? getDraftStorageKey("article-template", "collection", session)
+      : null;
+  const [templates, setTemplates] = useState<StoredBoardTemplate[]>([]);
+  const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setTemplates(readTemplates(storageKey));
+    setLoadedStorageKey(storageKey);
+    setOpen(false);
+  }, [storageKey]);
+
   const currentTemplates = useMemo(() => {
+    if (loadedStorageKey !== storageKey) return [];
     return templates.filter((template) => template.boardCode === boardCode);
-  }, [boardCode, templates]);
+  }, [boardCode, loadedStorageKey, storageKey, templates]);
 
   const saveTemplate = () => {
+    if (!storageKey || loadedStorageKey !== storageKey) return;
     const name = snapshot.titleKo.trim();
     const description = firstBodyLine(snapshot.contentKo);
     if (!name || !description) {
@@ -126,14 +142,15 @@ export function ArticleTemplateControl({
     };
     const next = [template, ...templates];
     setTemplates(next);
-    writeTemplates(next);
+    writeTemplates(storageKey, next);
     setError(null);
   };
 
   const deleteTemplate = (templateId: string) => {
+    if (!storageKey || loadedStorageKey !== storageKey) return;
     const next = templates.filter((template) => template.id !== templateId);
     setTemplates(next);
-    writeTemplates(next);
+    writeTemplates(storageKey, next);
   };
 
   return (

@@ -9,6 +9,7 @@ import { GoogleSheetsClient } from "../../infrastructure/google/google-sheets.cl
 import {
   GOOGLE_SHEET_RESOURCE,
   GoogleSpreadsheetSyncQueueService,
+  type GoogleSpreadsheetSyncJobContext,
 } from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 import { resolveFeeReferenceSemester } from "./fee-semester";
 import { UsersService } from "./users.service";
@@ -40,8 +41,8 @@ export class GoogleFeeSheetsService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.STUDENT_FEES, () =>
-      this.sync().then(() => undefined),
+    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.STUDENT_FEES, (_resourceKey, job) =>
+      this.sync({}, undefined, job).then(() => undefined),
     );
   }
 
@@ -66,6 +67,34 @@ export class GoogleFeeSheetsService implements OnModuleInit {
   async sync(
     options: FeeSpreadsheetSyncOptions = {},
     audit?: AuditMetadata,
+    job?: GoogleSpreadsheetSyncJobContext,
+  ): Promise<StudentFeeSpreadsheetSyncResponse> {
+    try {
+      return await this.syncInternal(options, audit, job);
+    } catch (error) {
+      await this.recordAuditSafely({
+        action: "student_fee.spreadsheet.sync",
+        actorUserId: audit?.actorUserId ?? null,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          executor: job ? "background-worker" : "request",
+          jobId: job?.jobId ?? null,
+          resource: job?.resourceKey ?? "global",
+          revision: job?.revision ?? null,
+          result: "failed",
+          errorCode: error instanceof Error ? error.name : "unknown_error",
+        },
+        targetId: job?.resourceKey ?? "student-fee-status",
+        targetType: "student_fee_status",
+      });
+      throw error;
+    }
+  }
+
+  private async syncInternal(
+    options: FeeSpreadsheetSyncOptions = {},
+    audit?: AuditMetadata,
+    job?: GoogleSpreadsheetSyncJobContext,
   ): Promise<StudentFeeSpreadsheetSyncResponse> {
     const referenceSemester = resolveFeeReferenceSemester(options.referenceSemester);
     const rows = await this.usersService.exportStudentsByFeeStatus(
@@ -83,6 +112,10 @@ export class GoogleFeeSheetsService implements OnModuleInit {
       sheetTitle: SHEET_TITLE,
       purpose: SPREADSHEET_PURPOSE,
     });
+
+    if (job && !(await job.isCurrentClaim())) {
+      throw new Error("google_sheet_sync_claim_lost");
+    }
 
     await this.sheets.syncSheet({
       spreadsheetId: spreadsheet.spreadsheetId,
@@ -134,16 +167,36 @@ export class GoogleFeeSheetsService implements OnModuleInit {
       syncedCount: rows.length,
       syncedAt: nowIso(),
     };
-    if (audit) {
-      await this.auditLogService?.record({
-        action: "student_fee.spreadsheet.sync",
-        actorUserId: audit.actorUserId ?? null,
-        ipAddress: audit.ipAddress ?? null,
-        payload: { syncedCount: result.syncedCount, spreadsheetId: result.spreadsheetId },
-        targetId: result.spreadsheetId,
-        targetType: "student_fee_status",
-      });
-    }
+    await this.recordAuditSafely({
+      action: "student_fee.spreadsheet.sync",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        executor: job ? "background-worker" : "request",
+        jobId: job?.jobId ?? null,
+        resource: job?.resourceKey ?? "global",
+        revision: job?.revision ?? null,
+        result: "succeeded",
+        syncedCount: result.syncedCount,
+      },
+      targetId: result.spreadsheetId,
+      targetType: "student_fee_status",
+    });
     return result;
+  }
+
+  private async recordAuditSafely(input: {
+    action: string;
+    actorUserId: string | null;
+    ipAddress: string | null;
+    payload: Record<string, unknown>;
+    targetId: string;
+    targetType: string;
+  }): Promise<void> {
+    try {
+      await this.auditLogService?.record(input);
+    } catch {
+      // Do not rerun a Google write merely because its audit row failed.
+    }
   }
 }

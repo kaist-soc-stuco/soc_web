@@ -3,12 +3,14 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Req,
   UseGuards,
+  Query,
 } from "@nestjs/common";
 import { CreateSurveySchema, UpdateSurveySchema } from "@soc/contracts";
 import { Request } from "express";
@@ -55,8 +57,17 @@ export class SurveysController {
 
   @Get("list/public")
   @UseGuards(OptionalAuthGuard)
-  findPublic(@Req() req: OptionalAuthedRequest) {
-    return this.surveysService.findPublished(getSurveyCaller(req));
+  findPublic(
+    @Req() req: OptionalAuthedRequest,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("q") query?: string,
+  ) {
+    return this.surveysService.findPublished(getSurveyCaller(req), {
+      page: Number(page),
+      pageSize: Number(pageSize),
+      query,
+    });
   }
 
   @Get(":id")
@@ -66,6 +77,7 @@ export class SurveysController {
   }
 
   @Get(":id/analytics")
+  @Header("Cache-Control", "private, no-store")
   @UseGuards(OptionalAuthGuard)
   getAnalytics(@Param("id", ParseUUIDPipe) id: string, @Req() req: OptionalAuthedRequest) {
     return this.surveysService.getAnalytics(id, getSurveyCaller(req));

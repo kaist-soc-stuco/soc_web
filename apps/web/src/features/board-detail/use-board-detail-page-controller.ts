@@ -79,13 +79,8 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const catalogBoard = boardByCode.get(category);
 
   const canEdit = useMemo(() => {
-    return Boolean(
-      article &&
-        session?.authenticated &&
-        session.userId &&
-        session.userId === article.author.userId,
-    );
-  }, [article, session]);
+    return Boolean(article?.canEdit);
+  }, [article]);
 
   const canManageComments = useMemo(() => {
     if (!board) return false;

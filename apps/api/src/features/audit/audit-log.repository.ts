@@ -125,6 +125,7 @@ const ACTION_DEFINITIONS: Record<string, { label: string; kind: AuditLogEventKin
   "executive_contact.spreadsheet.sync": { label: "연락망 시트 동기화", kind: "EXECUTE" },
   "executive_contact.update": { label: "연락망 구성원 수정", kind: "UPDATE" },
   "student_fee.export": { label: "과비 내보내기", kind: "EXECUTE" },
+  "student_fee_status.bulk_update": { label: "과비 상태 일괄 변경", kind: "BATCH" },
   "student_fee.spreadsheet.connect": { label: "과비 시트 연결", kind: "EXECUTE" },
   "student_fee.spreadsheet.sync": { label: "과비 시트 동기화", kind: "EXECUTE" },
   "site_content.create": { label: "공개 문구 생성", kind: "CREATE" },

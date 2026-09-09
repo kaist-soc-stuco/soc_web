@@ -21,9 +21,21 @@ export interface ContactRecord {
   email: string | null;
   phoneNumber: string | null;
   privacyConsented: boolean;
+  publiclyListed: boolean;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Public organization-chart fields. Direct contact data is never included. */
+export interface PublicContactRecord {
+  nameKo: string;
+  nameEn: string;
+  departmentKo: string | null;
+  departmentEn: string | null;
+  roleKo: string;
+  roleEn: string;
+  sortOrder: number;
 }
 
 export type CreateContactRequest = z.infer<typeof CreateContactSchema>;
@@ -41,6 +53,10 @@ export interface ContactListResponse {
   total?: number;
   page?: number;
   pageSize?: number;
+}
+
+export interface PublicContactListResponse {
+  items: PublicContactRecord[];
 }
 
 export interface ContactListOptions {
@@ -75,6 +91,15 @@ export type UpdateContactDepartmentRequest = z.infer<
 
 export interface ContactDepartmentListResponse {
   items: ContactDepartmentRecord[];
+}
+
+export type PublicContactDepartmentRecord = Omit<
+  ContactDepartmentRecord,
+  "inquiryEmail" | "createdAt" | "updatedAt"
+>;
+
+export interface PublicContactDepartmentListResponse {
+  items: PublicContactDepartmentRecord[];
 }
 
 export interface ContactSpreadsheetSyncResponse {

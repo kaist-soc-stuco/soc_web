@@ -2,8 +2,8 @@ import type {
   ArticleListItem,
   ComputedSurveyState,
   PublicCalendarEventItem,
+  PublicSurveyRecord,
   SurveyParticipationEligibility,
-  SurveyRecord,
 } from "@soc/contracts";
 import { isoToDate, isoToMs, localDate, msToTimeObj, nowDate, nowMs } from "@soc/shared";
 
@@ -14,11 +14,9 @@ export type EventsSurveysSortKey = "latest" | "deadline";
 export type EventsSurveysStateFilter =
   | "all"
   | ComputedSurveyState;
-export type UnifiedItemKind = SurveyRecord["kind"] | "EVENT";
+export type UnifiedItemKind = PublicSurveyRecord["kind"] | "EVENT";
 
-export type SurveyRecordWithState = SurveyRecord & {
-  computedState: ComputedSurveyState;
-};
+export type SurveyRecordWithState = PublicSurveyRecord;
 
 export interface UnifiedItem {
   id: string;

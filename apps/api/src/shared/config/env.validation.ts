@@ -129,6 +129,9 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
       config.CHANNELTALK_MEMBER_HASH_SECRET,
     ),
     CALENDAR_EXTERNAL_ICS_URLS: asOptionalString(config.CALENDAR_EXTERNAL_ICS_URLS),
+    CALENDAR_EXTERNAL_ICS_ALLOWED_HOSTS: asOptionalString(
+      config.CALENDAR_EXTERNAL_ICS_ALLOWED_HOSTS,
+    ),
     GOOGLE_CALENDAR_ID: asOptionalString(config.GOOGLE_CALENDAR_ID),
     GOOGLE_KAIST_CALENDAR_ID: asOptionalString(config.GOOGLE_KAIST_CALENDAR_ID),
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: asOptionalString(
@@ -213,6 +216,16 @@ export const validateEnv = (config: Record<string, unknown>): Record<string, unk
     ),
     ASSET_STORAGE_PROVIDER: assetStorageProvider,
     ASSET_UPLOAD_DIR: asOptionalString(config.ASSET_UPLOAD_DIR),
+    ASSET_USER_MAX_COUNT: asOptionalPositiveInt(
+      config.ASSET_USER_MAX_COUNT,
+      'ASSET_USER_MAX_COUNT',
+      100,
+    ),
+    ASSET_USER_MAX_BYTES: asOptionalPositiveInt(
+      config.ASSET_USER_MAX_BYTES,
+      'ASSET_USER_MAX_BYTES',
+      512 * 1024 * 1024,
+    ),
     AWS_REGION: awsRegion,
     AWS_S3_BUCKET: awsS3Bucket,
     AWS_S3_PREFIX: asOptionalString(config.AWS_S3_PREFIX) ?? "assets",

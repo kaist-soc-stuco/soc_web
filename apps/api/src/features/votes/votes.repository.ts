@@ -233,9 +233,41 @@ export class VotesRepository {
 
   async submitBallot(input: { voteId: string; userId: string; ciphertext: string; iv: string; authTag: string; receiptHash: string }) {
     return this.transaction(async (tx) => {
-      await tx.execute(sql`select 1 from ${voteVoters} where ${voteVoters.voteId} = ${input.voteId} and ${voteVoters.userId} = ${input.userId} for update`);
-      const voter = await this.findVoter(input.voteId, input.userId, tx);
-      if (!voter || voter.status !== "ELIGIBLE" || voter.hasVoted) return false;
+      // Every vote-closing and vote-submission path locks the vote row first,
+      // then the voter row. This makes close-before-submit and submit-before-
+      // close deterministic under concurrent requests.
+      const [lockedVote] = await tx
+        .select({ status: votes.status, startsAt: votes.startsAt, endsAt: votes.endsAt })
+        .from(votes)
+        .where(eq(votes.voteId, input.voteId))
+        .for("update")
+        .limit(1);
+      if (!lockedVote) return "vote_not_found" as const;
+
+      const [voter] = await tx
+        .select()
+        .from(voteVoters)
+        .where(and(eq(voteVoters.voteId, input.voteId), eq(voteVoters.userId, input.userId)))
+        .for("update")
+        .limit(1);
+      if (!voter || voter.status !== "ELIGIBLE") return "vote_not_eligible" as const;
+      if (voter.hasVoted) return "already_submitted" as const;
+
+      const clockResult = await tx.execute(sql`select clock_timestamp() as now`);
+      const clockValue = (clockResult.rows[0] as { now?: Date | string } | undefined)?.now;
+      const now = clockValue
+        ? clockValue instanceof Date
+          ? clockValue.valueOf()
+          : isoToDate(clockValue).valueOf()
+        : nowMs();
+      if (
+        lockedVote.status !== "PUBLISHED" ||
+        now < lockedVote.startsAt.valueOf() ||
+        now >= lockedVote.endsAt.valueOf()
+      ) {
+        return "vote_not_open" as const;
+      }
+
       await tx.insert(voteBallots).values({
         voteId: input.voteId,
         ciphertext: input.ciphertext,
@@ -246,14 +278,26 @@ export class VotesRepository {
       const votedAtMinute = msToDate(Math.floor(nowMs() / 60_000) * 60_000);
       await tx.update(voteVoters).set({ hasVoted: true, votedAt: votedAtMinute })
         .where(and(eq(voteVoters.voteId, input.voteId), eq(voteVoters.userId, input.userId)));
-      return true;
+      return "accepted" as const;
     });
   }
 
   async close(id: string) {
-    const [row] = await this.db.update(votes).set({ status: "CLOSED", updatedAt: nowDate() })
-      .where(and(eq(votes.voteId, id), eq(votes.status, "PUBLISHED"))).returning();
-    return row ?? null;
+    return this.transaction(async (tx) => {
+      const [lockedVote] = await tx
+        .select({ voteId: votes.voteId, status: votes.status })
+        .from(votes)
+        .where(eq(votes.voteId, id))
+        .for("update")
+        .limit(1);
+      if (!lockedVote || lockedVote.status !== "PUBLISHED") return null;
+      const [row] = await tx
+        .update(votes)
+        .set({ status: "CLOSED", updatedAt: nowDate() })
+        .where(and(eq(votes.voteId, id), eq(votes.status, "PUBLISHED")))
+        .returning();
+      return row ?? null;
+    });
   }
 
   async listBallots(id: string) {

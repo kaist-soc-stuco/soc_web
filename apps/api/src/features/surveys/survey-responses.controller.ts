@@ -2,12 +2,14 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Req,
   UseGuards,
+  Query,
 } from "@nestjs/common";
 import { SubmitResponseSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
@@ -50,12 +52,25 @@ export class SurveyResponsesController {
   }
 
   @Get()
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
-  findAll(@Param("surveyId", ParseUUIDPipe) surveyId: string) {
-    return this.responsesService.findAll(surveyId);
+  findAll(
+    @Param("surveyId", ParseUUIDPipe) surveyId: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("q") query?: string,
+    @Query("sort") sortOrder?: "asc" | "desc",
+  ) {
+    return this.responsesService.findAll(surveyId, {
+      page: Number(page),
+      pageSize: Number(pageSize),
+      query,
+      sortOrder: sortOrder === "asc" ? "asc" : "desc",
+    });
   }
 
   @Get("mine")
+  @Header("Cache-Control", "private, no-store")
   @UseGuards(OptionalAuthGuard)
   findMine(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
@@ -65,6 +80,7 @@ export class SurveyResponsesController {
   }
 
   @Patch("mine")
+  @Header("Cache-Control", "private, no-store")
   @UseGuards(OptionalAuthGuard)
   updateMine(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,
@@ -75,12 +91,25 @@ export class SurveyResponsesController {
   }
 
   @Get("with-answers")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
-  findAllWithAnswers(@Param("surveyId", ParseUUIDPipe) surveyId: string) {
-    return this.responsesService.findAllWithAnswers(surveyId);
+  findAllWithAnswers(
+    @Param("surveyId", ParseUUIDPipe) surveyId: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("q") query?: string,
+    @Query("sort") sortOrder?: "asc" | "desc",
+  ) {
+    return this.responsesService.findAllWithAnswers(surveyId, {
+      page: Number(page),
+      pageSize: Number(pageSize),
+      query,
+      sortOrder: sortOrder === "asc" ? "asc" : "desc",
+    });
   }
 
   @Get(":responseId")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_SURVEY)
   findDetail(
     @Param("surveyId", ParseUUIDPipe) surveyId: string,

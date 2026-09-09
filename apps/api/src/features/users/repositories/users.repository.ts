@@ -1,4 +1,10 @@
-import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { DEFAULT_AUTHENTICATED_PERMISSION_BITS } from "@soc/contracts";
 import Redis from "ioredis";
@@ -14,6 +20,7 @@ import { REDIS_CLIENT } from "../../../infrastructure/redis/redis.provider";
 import {
   permissions,
   roleGroupPermissions,
+  studentFeePaymentBatches,
   studentFeePayments,
   studentFeeStatus,
   userRoleGroups,
@@ -28,9 +35,11 @@ import {
 } from "../../../infrastructure/postgres/postgres.schema";
 
 import type { UserRecord } from "../entities/user";
+import { hashStudentFeePaymentPayload } from "../fee-payment-idempotency";
 import type {
   AdminUserListResponse,
   AdminUserRecord,
+  BulkUpdateStudentFeeStatusRequest,
   BulkProcessStudentFeePaymentsRequest,
   BulkProcessStudentFeePaymentsResponse,
   ArticleStatus,
@@ -801,6 +810,22 @@ export class UsersRepository {
     };
   }
 
+  private mapFeeStatusRow(
+    row: typeof studentFeeStatus.$inferSelect,
+  ): StudentFeeStatusRecord {
+    return {
+      userId: row.userId,
+      status: row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID",
+      coverageSemesters: row.coverageSemesters,
+      paidAmount: row.paidAmount,
+      paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
+      verifiedBy: row.verifiedBy,
+      verifiedAt: row.verifiedAt ? msToIso(row.verifiedAt.valueOf()) : null,
+      note: row.note,
+      updatedAt: msToIso(row.updatedAt.valueOf()),
+    };
+  }
+
   async getStudentFeeDetail(userId: string): Promise<StudentFeeDetailResponse | null> {
     const [user, statusRecord, history] = await Promise.all([
       this.db
@@ -840,11 +865,120 @@ export class UsersRepository {
     };
   }
 
+  /** Apply every status update under one transaction and a deterministic user lock order. */
+  async bulkUpdateStudentFeeStatuses(
+    updates: Array<{
+      userId: string;
+      update: BulkUpdateStudentFeeStatusRequest["updates"][number];
+    }>,
+    verifiedBy?: string,
+  ): Promise<StudentFeeStatusRecord[]> {
+    return this.db.transaction(async (tx) => {
+      const userIds = [...new Set(updates.map(({ userId }) => userId))].sort();
+      const lockedUsers = await tx
+        .select({ userId: users.userId })
+        .from(users)
+        .where(inArray(users.userId, userIds))
+        .orderBy(asc(users.userId))
+        .for("update");
+      if (lockedUsers.length !== userIds.length) {
+        throw new BadRequestException("fee_user_not_found");
+      }
+
+      const result: StudentFeeStatusRecord[] = [];
+      for (const { userId, update } of updates) {
+        const [current] = await tx
+          .select()
+          .from(studentFeeStatus)
+          .where(eq(studentFeeStatus.userId, userId))
+          .for("update")
+          .limit(1);
+        const currentStatus: FeeStatus =
+          current?.status === "PAID" || current?.status === "PARTIAL"
+            ? current.status
+            : "UNPAID";
+        const nextStatus = update.status ?? currentStatus;
+        const statusChanged = update.status !== undefined && update.status !== currentStatus;
+        const now = nowDate();
+        const nextRecord = {
+          coverageSemesters: update.coverageSemesters ?? current?.coverageSemesters ?? 4,
+          paidAmount: update.paidAmount ?? current?.paidAmount ?? 0,
+          note: update.note !== undefined ? update.note : current?.note ?? null,
+          paidAt: statusChanged ? (nextStatus === "PAID" ? now : null) : current?.paidAt ?? null,
+          status: nextStatus,
+          updatedAt: now,
+          verifiedAt: statusChanged ? now : current?.verifiedAt ?? null,
+          verifiedBy: statusChanged ? verifiedBy ?? null : current?.verifiedBy ?? null,
+        } as const;
+
+        const saved = current
+          ? (await tx
+              .update(studentFeeStatus)
+              .set(nextRecord)
+              .where(eq(studentFeeStatus.userId, userId))
+              .returning())[0]
+          : (await tx
+              .insert(studentFeeStatus)
+              .values({ ...nextRecord, userId })
+              .returning())[0];
+        if (!saved) throw new InternalServerErrorException("fee_status_update_failed");
+        result.push(this.mapFeeStatusRow(saved));
+      }
+      return result;
+    });
+  }
+
   async processStudentFeePayments(
     input: BulkProcessStudentFeePaymentsRequest,
     recordedBy?: string,
   ): Promise<BulkProcessStudentFeePaymentsResponse> {
+    const actorUserId = recordedBy?.trim();
+    if (!actorUserId) throw new BadRequestException("actor_required");
+    const idempotencyKey = input.idempotencyKey.trim();
+    if (!idempotencyKey) throw new BadRequestException("idempotency_key_required");
+    const payloadHash = hashStudentFeePaymentPayload(input);
+
     const result = await this.db.transaction(async (tx) => {
+      const [claimedBatch] = await tx
+        .insert(studentFeePaymentBatches)
+        .values({
+          actorUserId,
+          idempotencyKey,
+          payloadHash,
+          result: null,
+          updatedAt: nowDate(),
+        })
+        .onConflictDoNothing({
+          target: [
+            studentFeePaymentBatches.actorUserId,
+            studentFeePaymentBatches.idempotencyKey,
+          ],
+        })
+        .returning();
+
+      if (!claimedBatch) {
+        const [existingBatch] = await tx
+          .select()
+          .from(studentFeePaymentBatches)
+          .where(
+            and(
+              eq(studentFeePaymentBatches.actorUserId, actorUserId),
+              eq(studentFeePaymentBatches.idempotencyKey, idempotencyKey),
+            ),
+          )
+          .for("update");
+        if (!existingBatch) {
+          throw new InternalServerErrorException("fee_payment_idempotency_record_missing");
+        }
+        if (existingBatch.payloadHash !== payloadHash) {
+          throw new ConflictException("fee_payment_idempotency_conflict");
+        }
+        if (!existingBatch.result) {
+          throw new ConflictException("fee_payment_idempotency_in_progress");
+        }
+        return existingBatch.result as unknown as BulkProcessStudentFeePaymentsResponse;
+      }
+
       const updated: StudentFeeStatusRecord[] = [];
       const payments: StudentFeePaymentRecord[] = [];
 
@@ -856,7 +990,7 @@ export class UsersRepository {
           .for("update")
           .limit(1);
         if (!lockedUser[0]) {
-          throw new InternalServerErrorException(`fee_user_not_found:${payment.userId}`);
+          throw new BadRequestException("fee_user_not_found");
         }
 
         const [insertedPayment] = await tx
@@ -919,10 +1053,15 @@ export class UsersRepository {
         });
       }
 
-      return { updated, payments };
+      const response = { updated, payments, count: updated.length };
+      await tx
+        .update(studentFeePaymentBatches)
+        .set({ result: response, updatedAt: nowDate() })
+        .where(eq(studentFeePaymentBatches.batchId, claimedBatch.batchId));
+      return response;
     });
 
-    return { ...result, count: result.updated.length };
+    return result;
   }
 
   async updateStudentFeeStatus(

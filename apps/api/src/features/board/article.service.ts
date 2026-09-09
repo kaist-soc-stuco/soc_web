@@ -28,8 +28,12 @@ import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import {
   assertArticleScopeAssignable,
+  canReadSecretArticle,
+  canReadSecretArticles,
   type CurrentUserContext,
   getReadableArticleScopes,
+  toPublicArticleDetail,
+  toPublicArticleListItem,
 } from "./article-access";
 import { ARTICLE_STATUS } from "./board.constants";
 import { sanitizeArticleHtml } from "./article-html-sanitizer";
@@ -57,19 +61,6 @@ interface AuthenticatedUser {
 const MAX_CONTENT_LENGTH = 50_000;
 const MAX_PAGE_SIZE = 100;
 const PUBLIC_NON_AGGREGATE_BOARD_CODES = new Set(["_EVENT", "faq"]);
-
-const canReadSecretArticle = (
-  article: Pick<ArticleListItem, "isSecret" | "author">,
-  currentUser: CurrentUserContext,
-): boolean => {
-  if (!article.isSecret) return true;
-  if (currentUser.user?.id === article.author.userId) return true;
-  return Boolean(currentUser.user && Permissions.hasAny(
-    currentUser.user.permission,
-    Permissions.WRITE_REPLY,
-    Permissions.MODERATE_CONTENT,
-  ));
-};
 
 const maskSecretListItem = (item: ArticleListItem): ArticleListItem => ({
   ...item,
@@ -144,7 +135,7 @@ export class ArticleService {
 
     const visibleItems = result.items.map((item) =>
       canReadSecretArticle(item, currentUser)
-        ? item
+        ? toPublicArticleListItem(item)
         : maskSecretListItem(item),
     );
 
@@ -215,7 +206,7 @@ export class ArticleService {
     const visibleItems = result.items.map((item) => {
       const board = boardById.get(item.boardId);
       return board && canReadSecretArticle(item, currentUser)
-        ? item
+        ? toPublicArticleListItem(item)
         : board
           ? maskSecretListItem(item)
           : item;
@@ -251,12 +242,13 @@ export class ArticleService {
         Permissions.has(currentUser.user.permission, Permissions.MODERATE_CONTENT),
     );
 
-    const article = await this.articleRepository.findDetailById(
+  const article = await this.articleRepository.findDetailById(
       board.boardId,
       articleId,
       readableScopes,
       currentUser.user?.id,
       canModerate,
+      canReadSecretArticles(currentUser),
     );
 
     if (!article) {
@@ -275,7 +267,7 @@ export class ArticleService {
       if (wasRecorded) article.viewCount += 1;
     }
 
-    return article;
+    return toPublicArticleDetail(article, currentUser);
   }
 
   async createArticle(
@@ -762,6 +754,8 @@ export class ArticleService {
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
       user.id,
+      false,
+      canReadSecretArticles({ authenticated: true, user }),
     );
     if (!article) {
       throw new NotFoundException("article_not_found");

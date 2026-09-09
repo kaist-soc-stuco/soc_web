@@ -7,6 +7,7 @@ import { AuthSessionRepository } from "../auth-session.repository";
 import { AuthSessionService } from "../auth-session.service";
 import { AUTH_SESSION_COOKIE_NAME, extractBearerToken } from "../auth.tokens";
 import type { TemporaryAccessTokenClaims } from "../auth.types";
+import { RequestRateLimitService } from "../../../infrastructure/redis/request-rate-limit.service";
 
 interface AuthenticatedRequest {
   cookies?: Record<string, string | undefined>;
@@ -20,6 +21,7 @@ export class OptionalAuthGuard implements CanActivate {
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly usersService: UsersService,
     private readonly authSessionService: AuthSessionService,
+    private readonly requestRateLimitService: RequestRateLimitService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,13 +33,20 @@ export class OptionalAuthGuard implements CanActivate {
     if (!sessionId) {
       const accessToken = extractBearerToken(request.headers.authorization);
       if (accessToken) {
+        let temporaryUser: TemporaryAccessTokenClaims;
         try {
-          request.temporaryUser =
+          temporaryUser =
             this.authSessionService.validateTemporaryAccessToken(accessToken);
         } catch {
           // Optional authentication treats invalid/expired credentials as
           // anonymous; protected routes still use AuthGuard separately.
+          return true;
         }
+        request.temporaryUser = temporaryUser;
+        await this.requestRateLimitService.enforceAuthenticated(
+          request,
+          temporaryUser.sub,
+        );
       }
       return true;
     }
@@ -61,6 +70,7 @@ export class OptionalAuthGuard implements CanActivate {
         permission:
           await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
       };
+      await this.requestRateLimitService.enforceAuthenticated(request, user.userId);
     }
 
     return true;

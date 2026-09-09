@@ -37,6 +37,32 @@ export const bulkEmails = pgTable("bulk_email", {
   uniqueIndex("bulk_email_idempotency_unique").on(table.senderId, table.idempotencyKey),
 ]);
 
+/** Provider attempts are separate from the user-visible aggregate status. */
+export const bulkEmailDeliveryAttempts = pgTable(
+  "bulk_email_delivery_attempt",
+  {
+    attemptId: uuid("attempt_id").defaultRandom().primaryKey(),
+    emailId: uuid("email_id")
+      .notNull()
+      .references(() => bulkEmails.id, { onDelete: "cascade" }),
+    attemptNumber: integer("attempt_number").notNull(),
+    messageId: varchar("message_id", { length: 255 }).notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("PENDING"),
+    acceptedCount: integer("accepted_count").notNull().default(0),
+    rejectedCount: integer("rejected_count").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    errorCode: varchar("error_code", { length: 120 }),
+  },
+  (table) => [
+    uniqueIndex("bulk_email_delivery_attempt_email_number_idx").on(
+      table.emailId,
+      table.attemptNumber,
+    ),
+    index("bulk_email_delivery_attempt_email_idx").on(table.emailId, table.startedAt),
+  ],
+);
+
 export const bulkEmailTemplates = pgTable("bulk_email_template", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),

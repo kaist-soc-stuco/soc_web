@@ -23,7 +23,11 @@ import { Permissions } from "@soc/contracts";
 import { BoardRepository } from "./repositories/board.repository";
 import { ArticleRepository } from "./repositories/article.repository";
 import { CommentRepository } from "./repositories/comment.repository";
-import { getReadableArticleScopes, type CurrentUserContext } from "./article-access";
+import {
+  canReadSecretArticles,
+  getReadableArticleScopes,
+  type CurrentUserContext,
+} from "./article-access";
 import { ARTICLE_STATUS, COMMENT_STATUS } from "./board.constants";
 import { NotificationsService } from "../notifications/notifications.service";
 import { AuditLogService } from "../audit/audit-log.service";
@@ -79,7 +83,9 @@ export class CommentService {
       board.boardId,
       articleId,
       readableScopes,
-      canModerate,
+      currentUser.user?.id,
+      false,
+      canReadSecretArticles(currentUser),
     );
 
     if (!articleReadable) {
@@ -169,6 +175,8 @@ export class CommentService {
       board.boardId,
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
+      user.id,
+      canReadSecretArticles({ authenticated: true, user }),
     );
 
     if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
@@ -255,6 +263,9 @@ export class CommentService {
       board.boardId,
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
+      user.id,
+      false,
+      canReadSecretArticles({ authenticated: true, user }),
     );
 
     if (!articleReadable) {
@@ -310,6 +321,9 @@ export class CommentService {
       board.boardId,
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
+      user.id,
+      false,
+      canReadSecretArticles({ authenticated: true, user }),
     );
 
     if (!articleReadable) {
@@ -429,6 +443,9 @@ export class CommentService {
       board.boardId,
       articleId,
       getReadableArticleScopes({ authenticated: true, user }),
+      user.id,
+      false,
+      canReadSecretArticles({ authenticated: true, user }),
     );
 
     if (!articleReadable) {

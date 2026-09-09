@@ -5,7 +5,7 @@ import type {
   ArticleListItem,
   BoardSummary,
   PublicCalendarEventItem,
-  SurveyRecord,
+  PublicSurveyRecord,
   VoteRecord,
 } from "@soc/contracts";
 
@@ -15,6 +15,7 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { ABOUT_ITEMS, includesQuery, type SearchFilter } from "./search-utils";
 
 export type SearchBy = "title" | "title_content";
+const PUBLIC_LIST_PAGE_REQUIRED = "public_list_page_required";
 
 export function useSearchPageController() {
   const { lang } = useLanguage();
@@ -26,7 +27,7 @@ export function useSearchPageController() {
   const [searchBy, setSearchBy] = useState<SearchBy>("title_content");
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<PublicCalendarEventItem[]>([]);
-  const [surveys, setSurveys] = useState<SurveyRecord[]>([]);
+  const [surveys, setSurveys] = useState<PublicSurveyRecord[]>([]);
   const [faqArticles, setFaqArticles] = useState<ArticleListItem[]>([]);
   const [votes, setVotes] = useState<VoteRecord[]>([]);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
@@ -68,7 +69,7 @@ export function useSearchPageController() {
         q: query,
         searchBy,
       }),
-      apiClient.getPublicSurveys(),
+      apiClient.getPublicSurveys({ page: 1, pageSize: 100, query }),
       apiClient
         .getArticles("faq", {
           page: 1,
@@ -99,8 +100,14 @@ export function useSearchPageController() {
       apiClient.getBoards().catch(() => ({ items: [] as BoardSummary[] })),
       apiClient.searchPublicCalendarEvents(query, 40),
     ])
-      .then(([articleItems, eventResponse, surveyItems, faqItems, voteItems, boardResponse, calendarResponse]) => {
+      .then(([articleItems, eventResponse, surveyResponse, faqItems, voteItems, boardResponse, calendarResponse]) => {
         if (cancelled) return;
+        if (
+          eventResponse.total > eventResponse.items.length ||
+          surveyResponse.total > surveyResponse.items.length
+        ) {
+          throw new Error(PUBLIC_LIST_PAGE_REQUIRED);
+        }
         setArticles([
           ...articleItems,
           ...eventResponse.items.map((item) => ({ ...item, boardCode: "_EVENT" })),
@@ -111,7 +118,7 @@ export function useSearchPageController() {
           ),
         );
         setSurveys(
-          surveyItems.filter((survey) =>
+          surveyResponse.items.filter((survey) =>
             includesQuery(
               [
                 survey.titleKo,
@@ -128,7 +135,7 @@ export function useSearchPageController() {
         setVotes(voteItems);
         setBoards(boardResponse.items);
       })
-      .catch(() => {
+      .catch((cause) => {
         if (!cancelled) {
           setArticles([]);
           setCalendarEvents([]);
@@ -136,9 +143,13 @@ export function useSearchPageController() {
           setFaqArticles([]);
           setVotes([]);
           setError(
-            lang === "ko"
-              ? "검색 결과를 불러오지 못했습니다."
-              : "Failed to load search results.",
+            cause instanceof Error && cause.message === PUBLIC_LIST_PAGE_REQUIRED
+              ? lang === "ko"
+                ? "검색 결과가 많아 한 번에 표시할 수 없습니다. 검색어를 더 구체적으로 입력해 주세요."
+                : "There are too many search results to display at once. Make your search more specific."
+              : lang === "ko"
+                ? "검색 결과를 불러오지 못했습니다."
+                : "Failed to load search results.",
           );
         }
       })

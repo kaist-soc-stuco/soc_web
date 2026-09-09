@@ -8,7 +8,9 @@ import {
   OnModuleDestroy,
   OnModuleInit,
   Optional,
+  ServiceUnavailableException,
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { BulkEmailRepository, type BulkEmailStoredRecord } from "./bulk-email.repository";
 import { BulkEmailTemplateRepository } from "./bulk-email-template.repository";
@@ -31,6 +33,10 @@ import sanitizeHtml from "sanitize-html";
 import { isoToDate, nowDate, nowMs } from "@soc/shared";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
+import {
+  EmailDeliveryError,
+  isAmbiguousEmailDeliveryFailure,
+} from "./email-delivery-error";
 
 export const BULK_EMAIL_DELIVERY_NOT_CONFIGURED =
   "bulk_email_delivery_not_configured";
@@ -101,6 +107,13 @@ type EmailRecipient = {
   studentNumber: string | null;
 };
 
+type EmailDeliverySummary = {
+  dryRun: boolean;
+  acceptedCount?: number;
+  rejectedCount?: number;
+  messageId?: string;
+};
+
 @Injectable()
 export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BulkEmailService.name);
@@ -149,7 +162,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     return records.filter((record) =>
       record.status === "SUCCESS" ||
       record.status === "SCHEDULED" ||
-      record.status === "DRY_RUN",
+      record.status === "DRY_RUN" ||
+      record.status === "SENDING" ||
+      record.status === "UNKNOWN",
     );
   }
 
@@ -356,8 +371,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
+    let delivery: EmailDeliverySummary;
     try {
-      const delivery = await this.deliver({
+      delivery = await this.deliver({
         emailId,
         senderId,
         recipients,
@@ -371,29 +387,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
         },
       });
 
-      const result: SendBulkEmailResponse = {
-        success: true,
-        recipientCount: recipients.length,
-        emailId,
-        deliveryMode: delivery.dryRun ? "dry_run" : "sent",
-      };
-      await this.auditLogService?.record({
-        action: "bulk_email.send",
-        actorUserId: audit?.actorUserId ?? senderId,
-        ipAddress: audit?.ipAddress ?? null,
-        payload: {
-          attachmentCount: attachmentAssetIds.length,
-          deliveryMode: result.deliveryMode,
-          recipientCount: result.recipientCount,
-          recipientType,
-        },
-        targetId: emailId,
-        targetType: "bulk_email",
-      });
-      return result;
     } catch (error) {
-      await this.markFailed(emailId, error);
-      await this.auditLogService?.record({
+      await this.recordDeliveryFailure(emailId, error);
+      await this.recordAuditSafely({
         action: "bulk_email.send_failed",
         actorUserId: audit?.actorUserId ?? senderId,
         ipAddress: audit?.ipAddress ?? null,
@@ -408,6 +404,29 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Bulk email delivery failed for ${emailId}`, error);
       throw error;
     }
+
+    const result: SendBulkEmailResponse = {
+      success: true,
+      recipientCount: recipients.length,
+      emailId,
+      deliveryMode: delivery.dryRun ? "dry_run" : "sent",
+    };
+    // Audit persistence is post-delivery bookkeeping. Its failure must not
+    // enter the delivery catch path or make a sent email retryable.
+    await this.recordAuditSafely({
+      action: "bulk_email.send",
+      actorUserId: audit?.actorUserId ?? senderId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        attachmentCount: attachmentAssetIds.length,
+        deliveryMode: result.deliveryMode,
+        recipientCount: result.recipientCount,
+        recipientType,
+      },
+      targetId: emailId,
+      targetType: "bulk_email",
+    });
+    return result;
   }
 
   async sendTestEmail(
@@ -447,7 +466,7 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       recipientEmail,
       deliveryMode: delivery.dryRun ? "dry_run" : "sent",
     };
-    await this.auditLogService?.record({
+    await this.recordAuditSafely({
       action: "bulk_email.test_send",
       actorUserId: audit?.actorUserId ?? senderId,
       ipAddress: audit?.ipAddress ?? null,
@@ -474,20 +493,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
 
         try {
           await this.deliverStored(record);
-          await this.auditLogService?.record({
-            action: "bulk_email.send",
-            payload: {
-              deliveryMode: "sent",
-              recipientCount: record.recipientCount,
-              recipientType: record.recipientType,
-              source: "scheduler",
-            },
-            targetId: record.id,
-            targetType: "bulk_email",
-          });
         } catch (error) {
-          await this.markFailed(record.id, error);
-          await this.auditLogService?.record({
+          await this.recordDeliveryFailure(record.id, error);
+          await this.recordAuditSafely({
             action: "bulk_email.send_failed",
             payload: {
               error: auditErrorCode(error),
@@ -499,7 +507,19 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
             targetType: "bulk_email",
           });
           this.logger.error(`Scheduled bulk email failed for ${record.id}`, error);
+          continue;
         }
+        await this.recordAuditSafely({
+          action: "bulk_email.send",
+          payload: {
+            deliveryMode: "sent",
+            recipientCount: record.recipientCount,
+            recipientType: record.recipientType,
+            source: "scheduler",
+          },
+          targetId: record.id,
+          targetType: "bulk_email",
+        });
       }
     } catch (error) {
       this.logger.error(
@@ -553,12 +573,13 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     );
     if (recipients.length === 0) {
       const error = new BadRequestException("bulk_email_no_recipients");
-      await this.markFailed(record.id, error);
+      await this.recordDeliveryFailure(record.id, error);
       throw error;
     }
 
+    let delivery: EmailDeliverySummary;
     try {
-      const delivery = await this.deliver({
+      delivery = await this.deliver({
         emailId: record.id,
         senderId,
         recipients,
@@ -571,28 +592,9 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
           attachmentAssetIds: record.attachmentAssetIds,
         },
       });
-      const result: SendBulkEmailResponse = {
-        success: true,
-        recipientCount: recipients.length,
-        emailId: record.id,
-        deliveryMode: delivery.dryRun ? "dry_run" : "sent",
-      };
-      await this.auditLogService?.record({
-        action: "bulk_email.retry",
-        actorUserId: audit?.actorUserId ?? senderId,
-        ipAddress: audit?.ipAddress ?? null,
-        payload: {
-          deliveryMode: result.deliveryMode,
-          recipientCount: result.recipientCount,
-          recipientType: record.recipientType,
-        },
-        targetId: record.id,
-        targetType: "bulk_email",
-      });
-      return result;
     } catch (error) {
-      await this.markFailed(record.id, error);
-      await this.auditLogService?.record({
+      await this.recordDeliveryFailure(record.id, error);
+      await this.recordAuditSafely({
         action: "bulk_email.send_failed",
         actorUserId: audit?.actorUserId ?? senderId,
         ipAddress: audit?.ipAddress ?? null,
@@ -607,6 +609,26 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
       });
       throw error;
     }
+
+    const result: SendBulkEmailResponse = {
+      success: true,
+      recipientCount: recipients.length,
+      emailId: record.id,
+      deliveryMode: delivery.dryRun ? "dry_run" : "sent",
+    };
+    await this.recordAuditSafely({
+      action: "bulk_email.retry",
+      actorUserId: audit?.actorUserId ?? senderId,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: {
+        deliveryMode: result.deliveryMode,
+        recipientCount: result.recipientCount,
+        recipientType: record.recipientType,
+      },
+      targetId: record.id,
+      targetType: "bulk_email",
+    });
+    return result;
   }
 
   private async deliverStored(record: BulkEmailStoredRecord): Promise<void> {
@@ -639,32 +661,132 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     senderId: string;
     recipients: EmailRecipient[];
     compose: EmailCompose;
-  }): Promise<{ dryRun: boolean }> {
+  }): Promise<EmailDeliverySummary> {
     const attachments = await this.loadAttachments(
       input.senderId,
       input.compose.attachmentAssetIds,
     );
+    const messageId = `<soc-bulk-${input.emailId}-${randomUUID()}@soc.local>`;
+    const attempt = await this.bulkEmailRepo.createDeliveryAttempt(
+      input.emailId,
+      messageId,
+    );
+    if (!(await this.bulkEmailRepo.markDeliveryAttemptSending(attempt.attemptId))) {
+      throw new ConflictException("bulk_email_attempt_claim_failed");
+    }
+    try {
+      const claimed = await this.bulkEmailRepo.updateStatus(input.emailId, "SENDING");
+      if (claimed === false) {
+        throw new ConflictException("bulk_email_state_claim_failed");
+      }
+    } catch (error) {
+      await this.finishAttemptSafely(attempt.attemptId, "FAILED", error);
+      throw error;
+    }
+
     const hasTemplateTokens = hasBulkEmailTemplateTokens(input.compose.subject) ||
       hasBulkEmailTemplateTokens(input.compose.content);
-    const delivery = hasTemplateTokens
-      ? await this.deliverPersonalized(input.recipients, input.compose, attachments)
-      : await this.emailDeliveryService.send({
-          recipients: input.recipients.map((recipient) => recipient.email),
-          subject: input.compose.subject,
-          content:
-            input.compose.contentType === "html"
-              ? stripHtml(input.compose.content)
-              : input.compose.content,
-          ...(input.compose.contentType === "html"
-            ? { html: sanitizeBulkEmailHtml(inlineImageSources(input.compose.content, attachments)) }
-            : {}),
-          ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
-        });
+    let delivery: EmailDeliverySummary;
+    try {
+      delivery = hasTemplateTokens
+        ? await this.deliverPersonalized(input.recipients, input.compose, attachments, messageId)
+        : await this.emailDeliveryService.send({
+            recipients: input.recipients.map((recipient) => recipient.email),
+            subject: input.compose.subject,
+            content:
+              input.compose.contentType === "html"
+                ? stripHtml(input.compose.content)
+                : input.compose.content,
+            ...(input.compose.contentType === "html"
+              ? { html: sanitizeBulkEmailHtml(inlineImageSources(input.compose.content, attachments)) }
+              : {}),
+            ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
+            messageId,
+          });
+    } catch (error) {
+      const ambiguous = !isDefinitelyPreSendFailure(error);
+      await this.finishAttemptSafely(
+        attempt.attemptId,
+        ambiguous ? "UNKNOWN" : "FAILED",
+        error,
+      );
+      await this.updateStatusSafely(
+        input.emailId,
+        ambiguous ? "UNKNOWN" : "FAILED",
+        auditErrorCode(error),
+      );
+      throw error;
+    }
 
-    await this.bulkEmailRepo.updateStatus(
-      input.emailId,
-      delivery.dryRun ? "DRY_RUN" : "SUCCESS",
-    );
+    try {
+      const acceptedCount = delivery.acceptedCount ?? input.recipients.length;
+      const rejectedCount = delivery.rejectedCount ?? 0;
+      if (rejectedCount > 0) {
+        const partial = new EmailDeliveryError(
+          "email_delivery_partial_acceptance",
+          "ambiguous",
+          {
+            acceptedCount,
+            rejectedCount,
+            providerMessageId: delivery.messageId ?? messageId,
+          },
+        );
+        await this.finishAttemptSafely(attempt.attemptId, "UNKNOWN", partial);
+        await this.updateStatusSafely(input.emailId, "UNKNOWN", auditErrorCode(partial));
+        throw partial;
+      }
+
+      const attemptFinished = await this.bulkEmailRepo.finishDeliveryAttempt(
+        attempt.attemptId,
+        "SENT",
+        {
+          acceptedCount,
+          rejectedCount,
+        },
+      );
+      if (attemptFinished === false) {
+        throw new EmailDeliveryError(
+          "email_delivery_attempt_state_ambiguous",
+          "ambiguous",
+          {
+            acceptedCount,
+            rejectedCount,
+            providerMessageId: delivery.messageId ?? messageId,
+          },
+        );
+      }
+      const aggregateFinished = await this.bulkEmailRepo.updateStatus(
+        input.emailId,
+        delivery.dryRun ? "DRY_RUN" : "SUCCESS",
+      );
+      if (aggregateFinished === false) {
+        throw new EmailDeliveryError(
+          "email_delivery_aggregate_state_ambiguous",
+          "ambiguous",
+          {
+            acceptedCount,
+            rejectedCount,
+            providerMessageId: delivery.messageId ?? messageId,
+          },
+        );
+      }
+    } catch (error) {
+      // The provider may already have accepted the message. A DB failure at
+      // this boundary is therefore UNKNOWN, never a retryable FAILED state.
+      const ambiguous = new EmailDeliveryError(
+        "email_delivery_result_persistence_ambiguous",
+        "ambiguous",
+        {
+          acceptedCount: delivery.acceptedCount ?? input.recipients.length,
+          rejectedCount: delivery.rejectedCount ?? 0,
+          providerMessageId: delivery.messageId ?? messageId,
+          cause: error,
+        },
+      );
+      await this.finishAttemptSafely(attempt.attemptId, "UNKNOWN", ambiguous);
+      await this.updateStatusSafely(input.emailId, "UNKNOWN", auditErrorCode(ambiguous));
+      throw ambiguous;
+    }
     return delivery;
   }
 
@@ -672,9 +794,10 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     recipients: EmailRecipient[],
     compose: EmailCompose,
     attachments: DeliveryAttachment[],
-  ): Promise<{ dryRun: boolean }> {
-    const deliveries = await Promise.all(
-      recipients.map((recipient) => {
+    messageId: string,
+  ): Promise<EmailDeliverySummary> {
+    const deliveries = await Promise.allSettled(
+      recipients.map((recipient, index) => {
         const subject = renderBulkEmailTemplate(compose.subject, recipient);
         const content = renderBulkEmailTemplate(compose.content, recipient);
         return this.emailDeliveryService.send({
@@ -683,11 +806,44 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
           content: compose.contentType === "html" ? stripHtml(content) : content,
           ...(compose.contentType === "html" ? { html: sanitizeBulkEmailHtml(inlineImageSources(content, attachments)) } : {}),
           ...(attachments.length ? { attachments: toMailAttachments(attachments) } : {}),
+          messageId: `${messageId}.${index + 1}`,
         });
       }),
     );
 
-    return { dryRun: deliveries.every((delivery) => delivery.dryRun) };
+    const successful = deliveries.flatMap((delivery) =>
+      delivery.status === "fulfilled" ? [delivery.value] : [],
+    );
+    const failed = deliveries.filter((delivery) => delivery.status === "rejected");
+    if (failed.length > 0) {
+      const acceptedCount = successful.reduce(
+        (sum, delivery) => sum + (delivery.acceptedCount ?? 1),
+        0,
+      );
+      const rejectedCount = failed.length;
+      const allPreSend =
+        successful.length === 0 &&
+        failed.every((delivery) => isDefinitelyPreSendFailure(delivery.reason));
+      if (allPreSend) throw failed[0].reason;
+      throw new EmailDeliveryError("email_delivery_ambiguous", "ambiguous", {
+        acceptedCount,
+        rejectedCount,
+        cause: failed[0].reason,
+      });
+    }
+
+    return {
+      dryRun: successful.every((delivery) => delivery.dryRun),
+      acceptedCount: successful.reduce(
+        (sum, delivery) => sum + (delivery.acceptedCount ?? 1),
+        0,
+      ),
+      rejectedCount: successful.reduce(
+        (sum, delivery) => sum + (delivery.rejectedCount ?? 0),
+        0,
+      ),
+      messageId,
+    };
   }
 
   private async loadAttachments(
@@ -723,9 +879,73 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     return attachments.map(({ sizeBytes: _sizeBytes, ...attachment }) => attachment);
   }
 
+  private async recordDeliveryFailure(emailId: string, error: unknown): Promise<void> {
+    try {
+      if (isAmbiguousEmailDeliveryFailure(error)) {
+        await this.markUnknown(emailId, error);
+        return;
+      }
+      await this.markFailed(emailId, error);
+    } catch (statusError) {
+      // A failed status write is itself not evidence that SMTP was not
+      // accepted. Preserve the original result and never make the caller
+      // retry because bookkeeping failed.
+      this.logger.error(
+        `Failed to persist delivery failure ${emailId}: ${auditErrorCode(statusError)}`,
+      );
+    }
+  }
+
   private async markFailed(emailId: string, error: unknown): Promise<void> {
-    const message = error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
-    await this.bulkEmailRepo.updateStatus(emailId, "FAILED", message);
+    await this.bulkEmailRepo.updateStatus(emailId, "FAILED", auditErrorCode(error));
+  }
+
+  private async markUnknown(emailId: string, error: unknown): Promise<void> {
+    await this.bulkEmailRepo.updateStatus(emailId, "UNKNOWN", auditErrorCode(error));
+  }
+
+  private async finishAttemptSafely(
+    attemptId: string,
+    status: "SENT" | "UNKNOWN" | "FAILED",
+    error?: unknown,
+  ): Promise<void> {
+    try {
+      await this.bulkEmailRepo.finishDeliveryAttempt(attemptId, status, {
+        acceptedCount: isEmailDeliveryError(error) ? error.acceptedCount : undefined,
+        rejectedCount: isEmailDeliveryError(error) ? error.rejectedCount : undefined,
+        errorCode: error ? auditErrorCode(error) : null,
+      });
+    } catch (finishError) {
+      this.logger.error(
+        `Failed to persist email attempt ${attemptId}: ${auditErrorCode(finishError)}`,
+      );
+    }
+  }
+
+  private async updateStatusSafely(
+    emailId: string,
+    status: "UNKNOWN" | "FAILED",
+    errorCode: string,
+  ): Promise<void> {
+    try {
+      await this.bulkEmailRepo.updateStatus(emailId, status, errorCode);
+    } catch (statusError) {
+      this.logger.error(
+        `Failed to persist email status ${emailId}: ${auditErrorCode(statusError)}`,
+      );
+    }
+  }
+
+  private async recordAuditSafely(
+    entry: Parameters<AuditLogService["record"]>[0],
+  ): Promise<void> {
+    try {
+      await this.auditLogService?.record(entry);
+    } catch (error) {
+      this.logger.error(
+        `Bulk email audit persistence failed (${entry.action}): ${auditErrorCode(error)}`,
+      );
+    }
   }
 }
 
@@ -750,17 +970,33 @@ function auditErrorCode(error: unknown): string {
   return error instanceof Error ? error.name : "unknown_error";
 }
 
+function isDefinitelyPreSendFailure(error: unknown): boolean {
+  if (error instanceof EmailDeliveryError) return error.kind === "pre_send";
+  // Missing configuration and validation failures happen before SMTP is
+  // contacted. Network/timeouts remain ambiguous by design.
+  return error instanceof ServiceUnavailableException || error instanceof BadRequestException;
+}
+
+function isEmailDeliveryError(error: unknown): error is EmailDeliveryError {
+  return error instanceof EmailDeliveryError;
+}
+
 function responseForExistingRecord(record: BulkEmailStoredRecord): SendBulkEmailResponse {
+  const uncertain = record.status === "UNKNOWN" ||
+    record.status === "SENDING" ||
+    record.status === "FAILED";
   return {
-    success: true,
+    success: !uncertain,
     recipientCount: record.recipientCount,
     emailId: record.id,
     deliveryMode:
       record.status === "SCHEDULED"
-        ? "scheduled"
-        : record.status === "DRY_RUN"
-          ? "dry_run"
-          : "sent",
+          ? "scheduled"
+          : record.status === "DRY_RUN"
+            ? "dry_run"
+              : uncertain
+                ? "unknown"
+              : "sent",
   };
 }
 

@@ -10,6 +10,8 @@ import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import type { ReorderSurveySectionsRequest } from "@soc/contracts";
 import { assertSurveyBranchDefinitions } from "./survey-definition-validation";
 import { AuditLogService } from "../audit/audit-log.service";
+import { AssetRepository } from "../asset/repositories/asset.repository";
+import { assertSurveyAssetReferences } from "./survey-asset-access";
 
 const surveySectionAuditSnapshot = (section: SurveySectionRecord): Record<string, unknown> => ({
   id: section.id,
@@ -27,6 +29,7 @@ export class SurveySectionsService {
     private readonly mutationPolicy: SurveyMutationPolicy,
     @Optional() private readonly questionsRepo?: SurveyQuestionsRepository,
     @Optional() private readonly auditLogService?: AuditLogService,
+    @Optional() private readonly assetRepository?: AssetRepository,
   ) {}
 
   private async assertBranchDefinitions(surveyId: string, tx: Parameters<SurveySectionsRepository["findBySurveyId"]>[1]) {
@@ -46,6 +49,7 @@ export class SurveySectionsService {
   ): Promise<SurveySectionRecord> {
     const created = await this.mutationPolicy.withStructureMutation(surveyId, async (tx) => {
       const section = await this.sectionsRepo.insert(surveyId, dto, tx);
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, section, tx);
       await this.assertBranchDefinitions(surveyId, tx);
       return section;
     });
@@ -73,6 +77,7 @@ export class SurveySectionsService {
         tx,
       );
       if (!section) throw new NotFoundException("section_not_found");
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, section, tx);
       if (dto.sortOrder !== undefined || dto.nextSectionId !== undefined) {
         await this.assertBranchDefinitions(surveyId, tx);
       }

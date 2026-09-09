@@ -7,6 +7,7 @@ import { GoogleSheetsClient } from "../../infrastructure/google/google-sheets.cl
 import {
   GOOGLE_SHEET_RESOURCE,
   GoogleSpreadsheetSyncQueueService,
+  type GoogleSpreadsheetSyncJobContext,
 } from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 import { ContactsRepository } from "./contacts.repository";
 import { AuditLogService } from "../audit/audit-log.service";
@@ -26,8 +27,8 @@ export class GoogleContactSheetsService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.CONTACTS, () =>
-      this.sync().then(() => undefined),
+    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.CONTACTS, (_resourceKey, job) =>
+      this.sync(undefined, job).then(() => undefined),
     );
   }
 
@@ -43,7 +44,7 @@ export class GoogleContactSheetsService implements OnModuleInit {
       purpose: SPREADSHEET_PURPOSE,
     });
     await this.syncQueue.enqueue(GOOGLE_SHEET_RESOURCE.CONTACTS);
-    await this.auditLogService?.record({
+    await this.recordAuditSafely({
       action: "executive_contact.spreadsheet.connect",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
@@ -54,63 +55,120 @@ export class GoogleContactSheetsService implements OnModuleInit {
     return spreadsheet;
   }
 
-  async sync(audit?: AuditMetadata): Promise<ContactSpreadsheetSyncResponse> {
-    const contacts = await this.contactsRepo.findManaged({ page: 1, pageSize: 500 });
-    const spreadsheet = await this.sheets.getOrCreateSpreadsheet({
-      configuredSpreadsheetId: this.config.get<string>("GOOGLE_CONTACTS_SPREADSHEET_ID"),
-      title: "KAIST SOC 집행위 연락망",
-      sheetTitle: SHEET_TITLE,
-      purpose: SPREADSHEET_PURPOSE,
-    });
-
-    await this.sheets.syncSheet({
-      spreadsheetId: spreadsheet.spreadsheetId,
-      sheetTitle: SHEET_TITLE,
-      headers: [
-        "이름",
-        "영문명",
-        "학번",
-        "부서",
-        "영문부서",
-        "직책",
-        "영문직책",
-        "활동 연도",
-        "이메일",
-        "전화번호",
-      ],
-      rows: contacts.items.map((contact) => [
-        contact.nameKo,
-        contact.nameEn,
-        contact.studentNumber ?? "",
-        contact.departmentKo ?? "",
-        contact.departmentEn ?? "",
-        contact.roleKo,
-        contact.roleEn,
-        contact.cohort ? formatActivityYear(contact.cohort) : "",
-        contact.email ?? "",
-        contact.phoneNumber ?? "",
-      ]),
-      columnWidths: [120, 160, 100, 140, 160, 140, 160, 100, 230, 140],
-      protectionDescription: "KAIST SOC · 집행부원 연락망 (읽기 전용)",
-    });
-
-    const result = {
-      spreadsheetId: spreadsheet.spreadsheetId,
-      spreadsheetUrl: spreadsheet.spreadsheetUrl,
-      syncedCount: contacts.items.length,
-      syncedAt: nowIso(),
+  async sync(
+    audit?: AuditMetadata,
+    job?: GoogleSpreadsheetSyncJobContext,
+  ): Promise<ContactSpreadsheetSyncResponse> {
+    let spreadsheet: { spreadsheetId: string; spreadsheetUrl: string } | null = null;
+    const auditContext = {
+      executor: job ? "background-worker" : "request",
+      jobId: job?.jobId ?? null,
+      resourceKey: job?.resourceKey ?? "global",
+      resourceType: job?.resourceType ?? GOOGLE_SHEET_RESOURCE.CONTACTS,
+      revision: job?.revision ?? null,
     };
-    if (audit) {
-      await this.auditLogService?.record({
+
+    try {
+      spreadsheet = await this.sheets.getOrCreateSpreadsheet({
+        configuredSpreadsheetId: this.config.get<string>("GOOGLE_CONTACTS_SPREADSHEET_ID"),
+        title: "KAIST SOC 집행위 연락망",
+        sheetTitle: SHEET_TITLE,
+        purpose: SPREADSHEET_PURPOSE,
+      });
+
+      // Read consent immediately before constructing the external payload. A
+      // revoke deletes the local row and queues another full replacement, so
+      // retries never reuse an old PII snapshot.
+      const contacts = await this.contactsRepo.findManaged({
+        page: 1,
+        pageSize: 500,
+        privacyConsented: true,
+      });
+
+      if (job && typeof job.isCurrentClaim === "function" && !(await job.isCurrentClaim())) {
+        throw new Error("google_sheet_sync_claim_lost");
+      }
+
+      await this.sheets.syncSheet({
+        spreadsheetId: spreadsheet.spreadsheetId,
+        sheetTitle: SHEET_TITLE,
+        headers: [
+          "이름",
+          "영문명",
+          "학번",
+          "부서",
+          "영문부서",
+          "직책",
+          "영문직책",
+          "활동 연도",
+          "이메일",
+          "전화번호",
+        ],
+        rows: contacts.items.map((contact) => [
+          contact.nameKo,
+          contact.nameEn,
+          contact.studentNumber ?? "",
+          contact.departmentKo ?? "",
+          contact.departmentEn ?? "",
+          contact.roleKo,
+          contact.roleEn,
+          contact.cohort ? formatActivityYear(contact.cohort) : "",
+          contact.email ?? "",
+          contact.phoneNumber ?? "",
+        ]),
+        columnWidths: [120, 160, 100, 140, 160, 140, 160, 100, 230, 140],
+        protectionDescription: "KAIST SOC · 집행부원 연락망 (읽기 전용)",
+      });
+
+      const result = {
+        spreadsheetId: spreadsheet.spreadsheetId,
+        spreadsheetUrl: spreadsheet.spreadsheetUrl,
+        syncedCount: contacts.items.length,
+        syncedAt: nowIso(),
+      };
+      await this.recordAuditSafely({
         action: "executive_contact.spreadsheet.sync",
-        actorUserId: audit.actorUserId ?? null,
-        ipAddress: audit.ipAddress ?? null,
-        payload: { syncedCount: result.syncedCount, spreadsheetId: result.spreadsheetId },
+        actorUserId: audit?.actorUserId ?? null,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          ...auditContext,
+          result: "succeeded",
+          syncedCount: result.syncedCount,
+        },
         targetId: result.spreadsheetId,
         targetType: "executive_contact",
       });
+      return result;
+    } catch (error) {
+      await this.recordAuditSafely({
+        action: "executive_contact.spreadsheet.sync",
+        actorUserId: audit?.actorUserId ?? null,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: {
+          ...auditContext,
+          result: "failed",
+          errorCode: error instanceof Error ? error.name : "unknown_error",
+        },
+        targetId: spreadsheet?.spreadsheetId ?? null,
+        targetType: "executive_contact",
+      });
+      throw error;
     }
-    return result;
+  }
+
+  private async recordAuditSafely(input: {
+    action: string;
+    actorUserId: string | null;
+    ipAddress: string | null;
+    payload: Record<string, unknown>;
+    targetId: string | null;
+    targetType: string;
+  }): Promise<void> {
+    try {
+      await this.auditLogService?.record(input);
+    } catch {
+      // The Google write is already complete; audit retry must not rerun it.
+    }
   }
 }
 

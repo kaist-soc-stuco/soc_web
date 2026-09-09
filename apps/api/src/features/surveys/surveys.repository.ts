@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -18,6 +18,8 @@ interface SurveyVersionLineage {
   previousVersionId: string;
   versionNumber: number;
 }
+
+const MAX_ADMIN_SURVEYS = 500;
 
 @Injectable()
 export class SurveysRepository {
@@ -72,7 +74,11 @@ export class SurveysRepository {
         responseCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${surveyResponses} WHERE ${surveyResponses.surveyId} = ${surveys.surveyId} AND ${surveyResponses.status} != 'draft'), 0)`,
         derivedVersionCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM "survey" AS child WHERE child."previous_version_id" = ${surveys.surveyId}), 0)`,
       })
-      .from(surveys);
+      .from(surveys)
+      .limit(MAX_ADMIN_SURVEYS + 1);
+    if (rows.length > MAX_ADMIN_SURVEYS) {
+      throw new Error("survey_admin_list_limit_exceeded");
+    }
     return rows.map((r) => ({
       ...this.map(r.survey),
       responseCount: r.responseCount,
@@ -255,6 +261,41 @@ export class SurveysRepository {
       .where(eq(surveys.surveyId, id));
   }
 
+  /**
+   * Resource metadata is fenced by the queue claim in the same SQL update.
+   * A stale worker cannot turn a newer revision back to ERROR/CONNECTED even
+   * if its pre-flight claim check raced with reclamation.
+   */
+  async updateSpreadsheetSyncStateForClaim(
+    id: string,
+    status: "CONNECTED" | "ERROR",
+    claim: { jobId: string; revision: number; claimToken: string },
+  ): Promise<boolean> {
+    const updated = await this.db
+      .update(surveys)
+      .set({
+        spreadsheetSyncStatus: status,
+        spreadsheetLastSyncedAt: status === "CONNECTED" ? nowDate() : undefined,
+        updatedAt: nowDate(),
+      })
+      .where(and(
+        eq(surveys.surveyId, id),
+        sql`EXISTS (
+          SELECT 1
+          FROM "google_spreadsheet_sync_job" job
+          WHERE job."google_spreadsheet_sync_job_id" = ${Number(claim.jobId)}
+            AND job."resource_type" = 'SURVEY'
+            AND job."resource_key" = ${id}
+            AND job."status" = 'PROCESSING'
+            AND job."revision" = ${claim.revision}
+            AND job."claim_token" = ${claim.claimToken}
+            AND job."lease_until" > now()
+        )`,
+      ))
+      .returning({ surveyId: surveys.surveyId });
+    return updated.length > 0;
+  }
+
   async findByConnectedArticleId(
     articleId: string,
     tx?: PostgresTransaction,
@@ -274,7 +315,28 @@ export class SurveysRepository {
     return result[0]?.count ?? 0;
   }
 
-  async findPublished(): Promise<SurveyRecord[]> {
+  async findPublished(input: {
+    page: number;
+    pageSize: number;
+    query?: string;
+  }): Promise<{ items: SurveyRecord[]; total: number }> {
+    const offset = (input.page - 1) * input.pageSize;
+    const query = input.query?.trim();
+    const whereClause = and(
+      eq(surveys.lifecycleStatus, "PUBLISHED"),
+      query
+        ? or(
+            ilike(surveys.titleKo, `%${query}%`),
+            ilike(surveys.titleEn, `%${query}%`),
+            ilike(surveys.descriptionKo, `%${query}%`),
+            ilike(surveys.descriptionEn, `%${query}%`),
+          )
+        : undefined,
+    );
+    const [countRow] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(surveys)
+      .where(whereClause);
     const rows = await this.db
       .select({
         survey: surveys,
@@ -282,11 +344,17 @@ export class SurveysRepository {
         derivedVersionCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM "survey" AS child WHERE child."previous_version_id" = ${surveys.surveyId}), 0)`,
       })
       .from(surveys)
-      .where(eq(surveys.lifecycleStatus, "PUBLISHED"));
-    return rows.map((r) => ({
-      ...this.map(r.survey),
-      responseCount: r.responseCount,
-      derivedVersionCount: r.derivedVersionCount,
-    }));
+      .where(whereClause)
+      .orderBy(desc(surveys.createdAt))
+      .limit(input.pageSize)
+      .offset(offset);
+    return {
+      items: rows.map((r) => ({
+        ...this.map(r.survey),
+        responseCount: r.responseCount,
+        derivedVersionCount: r.derivedVersionCount,
+      })),
+      total: Number(countRow?.count ?? 0),
+    };
   }
 }
