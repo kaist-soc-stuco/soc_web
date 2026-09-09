@@ -257,6 +257,7 @@ function EventCard({
   lang: string;
 }) {
   const dateRange = formatEventDateRange(event.startAt, event.endAt);
+  const location = event.location?.trim();
   const style = {
     "--home-event-card-delay": `${enterIndex * 80}ms`,
   } as CSSProperties;
@@ -280,12 +281,16 @@ function EventCard({
         {dateRange ? <time className="home-portal-event-date">{dateRange}</time> : null}
         <h3 className="line-clamp-2">{event.title}</h3>
         {event.description ? <p className="line-clamp-2">{event.description}</p> : null}
-        {event.location ? (
-          <div className="home-portal-event-location mt-auto flex min-w-0 items-center gap-1.5">
+        <div className={`home-portal-event-location mt-auto flex min-w-0 items-center gap-1.5 ${location ? "" : "text-slate-400"}`}>
+          {location ? (
             <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-            <span className="truncate">{event.location}</span>
-          </div>
-        ) : null}
+          ) : (
+            <span aria-hidden="true" className="shrink-0">📍</span>
+          )}
+          <span className="truncate">
+            {location ?? (lang === "ko" ? "장소 미정" : "Location TBD")}
+          </span>
+        </div>
       </div>
     </Link>
   );

@@ -128,6 +128,21 @@ test("builds unified survey and event items", () => {
   assert.equal(items[1].descriptionEn, "Event description");
 });
 
+test("keeps event locations separate from survey cards", () => {
+  const items = buildUnifiedItems(
+    [survey()],
+    [article({ eventLocation: "N5" })],
+    NOW,
+  );
+
+  assert.equal(items.find((item) => item.kind === "SURVEY").location, null);
+  assert.equal(items.find((item) => item.kind === "EVENT").location, "N5");
+  assert.equal(
+    buildUnifiedItems([], [article({ eventLocation: "   " })], NOW)[0].location,
+    null,
+  );
+});
+
 test("keeps event-connected surveys out of the pure survey tab", () => {
   const items = buildUnifiedItems(
     [

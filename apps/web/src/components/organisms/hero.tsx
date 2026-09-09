@@ -45,7 +45,9 @@ export function Hero() {
           <h1 id="home-hero-title" className="home-hero-title home-hero-title-enter whitespace-pre-line text-white">
             {title}
           </h1>
-          <p className="home-hero-description whitespace-pre-line">{description}</p>
+          {description.trim() ? (
+            <p className="home-hero-description whitespace-pre-line">{description}</p>
+          ) : null}
           {quickLinks.length > 0 ? (
             <div className="home-hero-links-enter mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
               {quickLinks.map((block) => {

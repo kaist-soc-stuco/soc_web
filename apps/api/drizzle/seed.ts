@@ -374,57 +374,57 @@ const REFERENCE_PLEDGE_SEEDS: readonly ReferencePledgeSeed[] = [
   {
     titleKo: "전산학부 학생회 웹사이트 개발",
     titleEn: "Development of the SoC Student Council website",
-    bodyKo: "학생회 웹사이트 ver 1.0을 정식 배포하였습니다. 앞으로도 기능을 개발하고 서비스를 지속적으로 유지·보수할 예정입니다. 이용 중 불편한 점이나 버그를 발견하셨다면 우측 하단 채널톡 또는 문의 채널을 통해 알려주시기 바랍니다.",
-    bodyEn: "Version 1.0 of the Student Council website has been officially released. We will continue to develop features and maintain the service. If you encounter an issue or bug, please leave a message through Channel Talk in the lower-right corner or another inquiry channel.",
+    bodyKo: "현재 학생회 웹사이트의 ver 1.0이 이렇게 배포 되었습니다! 앞으로 추가적인 기능 개발과 지속적인 유지 보수를 할 예정이니, 혹시 사이트를 이용하면서 불편하신점이나, 버그가 있다면 편하게 아래 채널톡 등을 통해 연락해 주시기 바랍니다.",
+    bodyEn: "Version 1.0 of the Student Council website is now live! We plan to continue developing features and maintaining the site. If you experience any inconvenience or find a bug, please contact us through Channel Talk or one of the channels below.",
     pledgeStatus: "COMPLETED",
   },
   {
     titleKo: "사업 전문화를 위한 집행위원회 구조 개편",
     titleEn: "Restructuring the executive committee for specialized operations",
-    bodyKo: "사업의 전문화와 원활한 업무 분배를 위해 기존 부서·팀 체계를 독립적인 부서 체계로 개편하였으며, 외부 기업 및 타 학교와의 교류를 담당하는 대외소통부와 웹사이트 개발 등을 담당하는 전산관리부를 신설하였습니다. 자세한 부서 구성은 아래 조직도 영역에서 확인하실 수 있습니다.",
-    bodyEn: "To specialize our work and distribute responsibilities clearly, we reorganized the former department-and-team structure into an independent department structure. We established the External Communications Division for exchanges with companies and other schools, and the IT Administration Division for website development and related work. You can find the detailed department structure in the organization chart below.",
+    bodyKo: "사업의 전문화와 원활한 업무 분배를 위해 기존의 부서 + 팀체계에서 온전한 부서 체계로 개편하였으며, 외부 기업 및 타학교 교류 업무를 위한 대외소통부, 웹사이트 개발 등의 업무를 위한 전산관리부를 새롭게 신설하였습니다. 자세한 조직도는 웹사이트 학생회 소개에서 보실 수 있습니다.",
+    bodyEn: "To specialize our work and distribute responsibilities smoothly, we reorganized the former department-and-team structure into a full department structure. We newly established the External Communications Division for exchanges with companies and other schools, and the IT Administration Division for website development and related work. See the Student Council Introduction page for the detailed organization chart.",
     pledgeStatus: "COMPLETED",
   },
   {
     titleKo: "과목별 건강톡방 개설",
     titleEn: "Opening course-specific chat rooms",
-    bodyKo: "2026년 상반기, 담당 교수님과의 사전 협의를 거친 9개 과목의 건강톡방을 개설하여 한 학기 동안 운영하였습니다.",
-    bodyEn: "In the first half of 2026, we opened chat rooms for nine courses after prior consultation with the instructors and operated them throughout the semester.",
+    bodyKo: "2026년 상반기, 담당 교수님께 허락을 받은 9개 과목의 건강톡방을 개설하여 한 학기 동안 운영하였습니다.",
+    bodyEn: "In the first half of 2026, we opened chat rooms for nine courses with the permission of the instructors and operated them throughout the semester.",
     pledgeStatus: "COMPLETED",
   },
   {
     titleKo: "타 학교, 타 학과와의 교류 행사 추진",
     titleEn: "Pursuing exchange events with other schools and departments",
-    bodyKo: "타 학교의 전산학부(컴퓨터공학부)와의 교류 행사를 기획 중입니다.",
-    bodyEn: "We are planning an exchange event with School of Computing or Computer Engineering departments at other universities.",
+    bodyKo: "타 학교의 전산학부(컴퓨터공학부)와 교류 할 수 있는 행사 기획을 준비 중입니다.",
+    bodyEn: "We are preparing an event to exchange ideas and experiences with the School of Computing or Computer Engineering departments at other schools.",
     pledgeStatus: "IN_PROGRESS",
   },
   {
     titleKo: "진로 탐색 기회 확장",
     titleEn: "Expanding career exploration opportunities",
-    bodyKo: "진로콘서트를 토크콘서트로 개편하고 다양한 분야의 연사를 초청하여 강연을 진행하였습니다. 이번 학기에는 다양한 산업군의 기업을 방문할 수 있도록 준비 중입니다.",
-    bodyEn: "We redesigned the Career Concert as a talk concert and invited speakers from a range of fields. This semester, we are preparing visits to companies across a wider range of industries.",
+    bodyKo: "진로콘서트를 토크콘서트로 개편하며 더 다양한 분야의 연사 분들을 모셔 강연을 진행하였습니다. 이번 학기 중 진행할 기업체 탐방도 더 다양한 기업들을 탐방 할 수 있도록 노력 중입니다.",
+    bodyEn: "We redesigned the Career Concert as a talk concert and invited speakers from a wider range of fields. We are also working to visit a more diverse range of companies during this semester's company tour.",
     pledgeStatus: "IN_PROGRESS",
   },
   {
     titleKo: "스승의 날 행사 개최",
     titleEn: "Holding a Teachers' Day event",
-    bodyKo: "한동안 중단되었던 '스승의 날 행사'를 다시 진행하였습니다. 전산학부 교수님들께 감사의 마음을 글로 전할 수 있는 소중한 기회였습니다.",
-    bodyEn: "We brought back the Teachers' Day event after it had been suspended for some time. It gave students a valuable opportunity to express their gratitude to the School of Computing faculty in writing.",
+    bodyKo: "기존에 사라졌던 사업인 '스승의 날 행사'를 다시 진행하였습니다. 전산학부 교수님들께 감사한 마음을 글로 전달할 수 있는 소중한 기회가 되었습니다.",
+    bodyEn: "We brought back the previously discontinued Teachers' Day event. It was a valuable opportunity to express our gratitude to the School of Computing faculty in writing.",
     pledgeStatus: "COMPLETED",
   },
   {
     titleKo: "전산학부 OTL 수강 후기 이벤트 진행",
     titleEn: "Running an SoC OTL course-review event",
-    bodyKo: "전산학부 전공 수강 계획에 도움이 되는 양질의 OTL 수강 후기를 제공하고자 봄학기 종강 이후 OTL 수강 후기 이벤트를 진행하였습니다. 가을 학기에도 동일한 행사를 진행할 예정입니다.",
+    bodyKo: "전산학부의 전공 수강 계획에 도움이 되는 양질의 OTL 수강 후기를 제공해 드리기 위해 OTL 수강후기 이벤트를 봄학기 종강 이후 진행하였습니다. 가을 학기에도 동일한 행사를 진행 예정입니다.",
     bodyEn: "To provide high-quality OTL course reviews that help students plan their major courses, we ran an OTL course-review event after the spring semester ended. We plan to hold the same event in the fall semester as well.",
     pledgeStatus: "COMPLETED",
   },
   {
     titleKo: "공약이행상황판 제작",
     titleEn: "Creating the pledge progress board",
-    bodyKo: "전산학부 학생회장단의 공약 이행 상황을 학우들과 투명하게 공유하고자 웹사이트 내 공약 이행 상황판을 구축하였습니다.",
-    bodyEn: "We built the pledge progress board on the website to share the SoC Student Council leadership's progress transparently with students.",
+    bodyKo: "전산학부 학생회장단의 공약이행상황을 학우분들과 공유하고자 이번 웹사이트에 공약이행상황판을 만들게 되었습니다.",
+    bodyEn: "We created this pledge progress board on the website to share the SoC Student Council leadership's pledge progress with students.",
     pledgeStatus: "COMPLETED",
   },
 ];
@@ -1088,7 +1088,6 @@ type ArticleAssetSeed = {
   mimeType: string;
   usageType: "IMAGE" | "ATTACHMENT" | "THUMBNAIL";
   sortOrder: number;
-  sizeBytes?: number;
 };
 
 function makeSeedPosterSvg(input: {
@@ -1956,7 +1955,10 @@ async function attachAssetsToArticle(
         storageKey: written.storageKey,
         originalFilename: asset.originalFilename,
         mimeType: asset.mimeType,
-        sizeBytes: asset.sizeBytes ?? written.sizeBytes,
+        // The response endpoint advertises this value as Content-Length. The
+        // generated seed file is the source of truth; a nominal size would
+        // make otherwise valid SVG/PDF responses look truncated to browsers.
+        sizeBytes: written.sizeBytes,
         uploadedBy,
       })
       .onConflictDoUpdate({
@@ -2711,7 +2713,6 @@ async function seedMockData() {
         content: item.poster,
         originalFilename: `${item.titleKo}_포스터.svg`,
         mimeType: "image/svg+xml",
-        sizeBytes: 88000,
         usageType: "THUMBNAIL",
         sortOrder: 0,
       },
@@ -2724,7 +2725,6 @@ async function seedMockData() {
           content: "Student council recruitment application guide.\n",
           originalFilename: "학생회_임원모집_지원서.pdf",
           mimeType: "application/pdf",
-          sizeBytes: 556400,
           usageType: "ATTACHMENT",
           sortOrder: 1,
         },
@@ -2733,7 +2733,6 @@ async function seedMockData() {
           content: "Student council recruitment application form template.\n",
           originalFilename: "지원서_양식.xlsx",
           mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          sizeBytes: 24800,
           usageType: "ATTACHMENT",
           sortOrder: 2,
         },
@@ -3265,7 +3264,6 @@ async function seedMockData() {
         mimeType: "image/svg+xml",
         usageType: "THUMBNAIL",
         sortOrder: 0,
-        sizeBytes: 96000,
       },
     ]);
 

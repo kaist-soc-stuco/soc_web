@@ -3,6 +3,7 @@ import type {
 } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
 import { CalendarDays, ClipboardList, Clock, MapPin } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ArticleEngagementActions } from "@/components/ui/article-engagement-actions";
@@ -146,6 +147,72 @@ function getAudienceText(item: UnifiedItem, lang: string) {
   return [audienceText, languageText].filter(Boolean).join(" · ");
 }
 
+function CardMedia({
+  imageUrl,
+  isSurvey,
+}: {
+  imageUrl: string | null | undefined;
+  isSurvey: boolean;
+}) {
+  const mediaUrl = imageUrl ? resolveAssetUrl(imageUrl) : null;
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [mediaUrl]);
+
+  if (!mediaUrl || imageFailed) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50">
+        {isSurvey ? (
+          <ClipboardList
+            aria-hidden="true"
+            className="h-8 w-8 text-emerald-600/60"
+          />
+        ) : (
+          <CalendarDays
+            aria-hidden="true"
+            className="h-8 w-8 text-slate-400"
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={mediaUrl}
+      alt=""
+      aria-hidden="true"
+      onError={() => setImageFailed(true)}
+      className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
+    />
+  );
+}
+
+function EventLocation({ item, lang }: { item: UnifiedItem; lang: string }) {
+  if (item.kind !== "EVENT") return null;
+
+  const location = item.location?.trim();
+  if (!location) {
+    return (
+      <div className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-400">
+        <span aria-hidden="true" className="shrink-0 leading-5">📍</span>
+        <span className="min-w-0 break-words">
+          {lang === "ko" ? "장소 미정" : "Location TBD"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-600">
+      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+      <span className="min-w-0 break-words">{location}</span>
+    </div>
+  );
+}
+
 export function EventsSurveysGrid({
   isAuthenticated,
   items,
@@ -175,7 +242,6 @@ export function EventsSurveysGrid({
         const canEngage = item.kind === "EVENT" && onEngagementToggle;
         const submitting =
           engagementSubmitting === `${item.id}:SCRAP` ? "SCRAP" : null;
-        const mediaUrl = item.imageUrl ? resolveAssetUrl(item.imageUrl) : null;
 
         return (
           <div
@@ -188,28 +254,7 @@ export function EventsSurveysGrid({
                 to={href}
                 className="absolute inset-0 block"
               >
-                {mediaUrl ? (
-                  <img
-                    src={mediaUrl}
-                    alt=""
-                    aria-hidden="true"
-                    className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-                    {isSurvey ? (
-                      <ClipboardList
-                        aria-hidden="true"
-                        className="h-8 w-8 text-emerald-600/60"
-                      />
-                    ) : (
-                      <CalendarDays
-                        aria-hidden="true"
-                        className="h-8 w-8 text-slate-400"
-                      />
-                    )}
-                  </div>
-                )}
+                <CardMedia imageUrl={item.imageUrl} isSurvey={isSurvey} />
               </Link>
               {badges.length > 0 ? (
                 <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap gap-1.5">
@@ -269,12 +314,7 @@ export function EventsSurveysGrid({
                   <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600" />
                   <span className="min-w-0 break-words">{getCardPeriodText(item, lang)}</span>
                 </Link>
-                {item.location ? (
-                  <div className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-600">
-                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
-                    <span className="min-w-0 break-words">{item.location}</span>
-                  </div>
-                ) : null}
+                <EventLocation item={item} lang={lang} />
               </div>
             </div>
           </div>
