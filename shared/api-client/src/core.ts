@@ -53,6 +53,11 @@ export interface ApiClientContext {
     body: BodyInit,
     headers?: HeadersInit,
   ) => Promise<void>;
+  postObject: (
+    url: string,
+    fields: Record<string, string>,
+    file: File,
+  ) => Promise<void>;
   requestVoid: (
     url: string,
     init: RequestInit,
@@ -204,15 +209,38 @@ const shouldAttachTemporaryAuth = (url: string): boolean => {
       url,
       typeof window === "undefined" ? "http://localhost" : window.location.origin,
     );
+    const sameOrigin =
+      typeof window === "undefined" || parsed.origin === window.location.origin;
 
     return (
-      /\/v1\/surveys(?:\/|$)/.test(parsed.pathname) ||
-      /\/v1\/auth\/(?:session|me)$/.test(parsed.pathname)
+      sameOrigin &&
+      (/\/(?:api\/)?(?:v1\/)?surveys(?:\/|$)/.test(parsed.pathname) ||
+        /\/(?:api\/)?(?:v1\/)?auth\/(?:session|me)$/.test(parsed.pathname))
     );
   } catch {
     return false;
   }
 };
+
+const readCsrfToken = (): string | undefined => {
+  if (typeof document === "undefined") return undefined;
+
+  const cookie = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("soc_csrf="));
+  if (!cookie) return undefined;
+
+  const value = cookie.slice("soc_csrf=".length);
+  try {
+    return decodeURIComponent(value) || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const isUnsafeMethod = (method?: string): boolean =>
+  !["GET", "HEAD", "OPTIONS"].includes((method ?? "GET").toUpperCase());
 
 const withCredentialsAndTemporaryAuth = (
   url: string,
@@ -221,13 +249,13 @@ const withCredentialsAndTemporaryAuth = (
   const accessToken = shouldAttachTemporaryAuth(url)
     ? readTemporaryAccessToken()
     : undefined;
-  if (!accessToken) {
-    return { credentials: "include", ...init };
-  }
-
   const headers = new Headers(init.headers);
-  if (!headers.has("Authorization")) {
+  if (accessToken && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+  const csrfToken = isUnsafeMethod(init.method) ? readCsrfToken() : undefined;
+  if (csrfToken && !headers.has("X-CSRF-Token")) {
+    headers.set("X-CSRF-Token", csrfToken);
   }
 
   return {
@@ -253,14 +281,16 @@ export const createApiClientContext = ({
 
     if (!refreshInFlight) {
       refreshInFlight = (async () => {
-        const response = await fetcher(`${authBaseUrl}/refresh`, {
-          body: JSON.stringify({}),
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        });
+        const response = await fetcher(
+          `${authBaseUrl}/refresh`,
+          withCredentialsAndTemporaryAuth(`${authBaseUrl}/refresh`, {
+            body: JSON.stringify({}),
+            headers: {
+              "Content-Type": "application/json",
+            },
+            method: "POST",
+          }),
+        );
 
         if (!response.ok) {
           const error = new ApiClientHttpError(response.status);
@@ -401,6 +431,25 @@ export const createApiClientContext = ({
     }
   };
 
+  const postObject = async (
+    url: string,
+    fields: Record<string, string>,
+    file: File,
+  ): Promise<void> => {
+    const formData = new FormData();
+    for (const [name, value] of Object.entries(fields)) {
+      formData.append(name, value);
+    }
+    formData.append("file", file);
+    const response = await fetcher(url, {
+      body: formData,
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new ApiClientHttpError(response.status);
+    }
+  };
+
   return {
     auditLogsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "audit-logs"),
     assetBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "assets"),
@@ -412,6 +461,7 @@ export const createApiClientContext = ({
     notificationsBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "notifications"),
     roadmapBaseUrl: resolveResourceBaseUrl(normalizedBaseUrl, "roadmap"),
     putObject,
+    postObject,
     requestJson,
     requestBlob,
     requestText,

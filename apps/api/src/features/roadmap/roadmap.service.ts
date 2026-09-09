@@ -32,8 +32,7 @@ export class RoadmapService {
   ) {}
 
   async listPublic(): Promise<RoadmapOfferingListResponse> {
-    const data = await this.roadmapRepository.findAdminData();
-    return data;
+    return this.roadmapRepository.findPublicData();
   }
 
   async listAdmin(): Promise<AdminRoadmapOfferingListResponse> {

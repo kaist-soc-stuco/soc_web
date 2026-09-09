@@ -8,6 +8,8 @@ import type {
   ContactRecord,
   ContactDepartmentRecord,
   ContactDepartmentListResponse,
+  PublicContactDepartmentListResponse,
+  PublicContactListResponse,
   ContactListOptions,
   ContactListResponse,
   CreateContactDepartmentRequest,
@@ -36,6 +38,7 @@ export class ContactsRepository {
       email: row.email,
       phoneNumber: row.phoneNumber,
       privacyConsented: row.privacyConsented,
+      publiclyListed: row.publiclyListed,
       sortOrder: row.sortOrder,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -48,6 +51,28 @@ export class ContactsRepository {
       .from(executiveContacts)
       .orderBy(asc(executiveContacts.sortOrder), asc(executiveContacts.createdAt));
     return rows.map((row) => this.map(row));
+  }
+
+  async findPublic(): Promise<PublicContactListResponse> {
+    const rows = await this.db
+      .select({
+        nameKo: executiveContacts.nameKo,
+        nameEn: executiveContacts.nameEn,
+        departmentKo: executiveContacts.departmentKo,
+        departmentEn: executiveContacts.departmentEn,
+         roleKo: executiveContacts.roleKo,
+         roleEn: executiveContacts.roleEn,
+         sortOrder: executiveContacts.sortOrder,
+      })
+      .from(executiveContacts)
+      .where(
+        and(
+          eq(executiveContacts.publiclyListed, true),
+          eq(executiveContacts.privacyConsented, true),
+        ),
+      )
+      .orderBy(asc(executiveContacts.sortOrder), asc(executiveContacts.createdAt));
+    return { items: rows };
   }
 
   private mapDepartment(
@@ -74,6 +99,23 @@ export class ContactsRepository {
       .where(includeInactive ? undefined : eq(executiveContactDepartments.isActive, true))
       .orderBy(asc(executiveContactDepartments.sortOrder), asc(executiveContactDepartments.nameKo));
     return { items: rows.map((row) => this.mapDepartment(row)) };
+  }
+
+  async findPublicDepartments(): Promise<PublicContactDepartmentListResponse> {
+    const rows = await this.db
+      .select({
+        id: executiveContactDepartments.id,
+        nameKo: executiveContactDepartments.nameKo,
+        nameEn: executiveContactDepartments.nameEn,
+        descriptionKo: executiveContactDepartments.descriptionKo,
+        descriptionEn: executiveContactDepartments.descriptionEn,
+        sortOrder: executiveContactDepartments.sortOrder,
+        isActive: executiveContactDepartments.isActive,
+      })
+      .from(executiveContactDepartments)
+      .where(eq(executiveContactDepartments.isActive, true))
+      .orderBy(asc(executiveContactDepartments.sortOrder), asc(executiveContactDepartments.nameKo));
+    return { items: rows };
   }
 
   async findDepartmentById(id: string): Promise<ContactDepartmentRecord | null> {
@@ -243,6 +285,7 @@ export class ContactsRepository {
         email: dto.email ?? null,
         phoneNumber: dto.phoneNumber ?? null,
         privacyConsented: dto.privacyConsented ?? true,
+        publiclyListed: dto.publiclyListed ?? false,
         sortOrder: dto.sortOrder ?? nextSortOrder,
         updatedAt: nowDate(),
       })
@@ -278,6 +321,7 @@ export class ContactsRepository {
             email: item.email ?? null,
             phoneNumber: item.phoneNumber ?? null,
             privacyConsented: item.privacyConsented ?? true,
+            publiclyListed: item.publiclyListed ?? false,
             sortOrder: item.sortOrder ?? index * 10,
             updatedAt: nowDate(),
           })),
@@ -318,6 +362,7 @@ export class ContactsRepository {
     if (dto.email !== undefined) set.email = dto.email;
     if (dto.phoneNumber !== undefined) set.phoneNumber = dto.phoneNumber;
     if (dto.privacyConsented !== undefined) set.privacyConsented = dto.privacyConsented;
+    if (dto.publiclyListed !== undefined) set.publiclyListed = dto.publiclyListed;
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
 
     const [row] = await this.db

@@ -13,6 +13,8 @@ import {
 } from "./survey-definition-validation";
 import type { ReorderSurveyQuestionsRequest } from "@soc/contracts";
 import { AuditLogService } from "../audit/audit-log.service";
+import { AssetRepository } from "../asset/repositories/asset.repository";
+import { assertSurveyAssetReferences } from "./survey-asset-access";
 
 const surveyQuestionAuditSnapshot = (question: SurveyQuestionRecord): Record<string, unknown> => ({
   id: question.id,
@@ -33,6 +35,7 @@ export class SurveyQuestionsService {
     private readonly sectionsRepo: SurveySectionsRepository,
     private readonly mutationPolicy: SurveyMutationPolicy,
     @Optional() private readonly auditLogService?: AuditLogService,
+    @Optional() private readonly assetRepository?: AssetRepository,
   ) {}
 
   async create(
@@ -45,6 +48,7 @@ export class SurveyQuestionsService {
       const section = await this.sectionsRepo.findById(sectionId, surveyId, tx);
       if (!section) throw new NotFoundException("section_not_found");
       const question = await this.questionsRepo.insert(sectionId, dto, tx);
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, question, tx);
       assertSurveyQuestionDefinition(question);
       if (
         typeof (
@@ -92,6 +96,7 @@ export class SurveyQuestionsService {
         tx,
       );
       if (!question) throw new NotFoundException("question_not_found");
+      await assertSurveyAssetReferences(this.assetRepository, actorUserId, question, tx);
       assertSurveyQuestionDefinition(question);
       if (
         typeof (

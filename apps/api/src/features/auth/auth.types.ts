@@ -55,6 +55,8 @@ export interface BaseAccessTokenClaims {
  */
 export interface TemporaryAccessTokenClaims extends BaseAccessTokenClaims {
   mode: "temporary";
+  /** Random non-secret namespace used to isolate client-side drafts per login. */
+  draftNamespace?: string;
   /** SSO subject의 HMAC 해시를 기반으로 한 임시 주체 식별자입니다. */
   sub: string;
   /** 원문 학번이 아닌 서버 비밀키 기반 HMAC 해시입니다. */
@@ -72,6 +74,7 @@ export interface TemporaryAccessTokenClaims extends BaseAccessTokenClaims {
  */
 export interface PersistedAccessTokenClaims extends BaseAccessTokenClaims {
   mode: "persisted";
+  sid: string;
   userId: string;
 }
 
@@ -106,6 +109,7 @@ export interface AuthSessionRecord {
   temporaryPrimaryMajor?: string;
   temporaryStudentNumberHash?: string;
   temporarySubjectHash?: string;
+  temporaryDraftNamespace?: string;
   userId?: string;
 }
 
@@ -117,7 +121,9 @@ export interface ConsentDecisionRequest {
   pendingLoginToken: string;
 }
 
-export type ConsentDecisionRequestDto = ConsentDecisionRequest;
+export interface ConsentDecisionRequestDto {
+  consent: boolean;
+}
 
 /**
  * refresh 요청 DTO입니다.
@@ -154,6 +160,8 @@ export interface SsoCallbackBodyDto {
 export interface AuthSessionSummary {
   authenticated: boolean;
   canUsePersistentFeatures: boolean;
+  /** Opaque per-auth-session namespace; it is not a user id or token. */
+  draftNamespace?: string;
   permission?: number;
   requiresConsent: boolean;
   storageMode: StorageMode | null;

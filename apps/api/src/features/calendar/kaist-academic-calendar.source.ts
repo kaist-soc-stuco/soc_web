@@ -8,10 +8,12 @@ import {
   seoulEndOfDay,
   seoulStartOfDay,
 } from "./calendar.utils";
+import { readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
 
 const KAIST_CALENDAR_URL = "https://kaist.ac.kr/kr/html/edu/03110101.html";
 const REQUEST_DELAY_MS = 300;
 const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_MONTH_RESPONSE_BYTES = 2_000_000;
 
 export interface KaistAcademicCalendarItem {
   titleKo: string;
@@ -118,6 +120,7 @@ export class KaistAcademicCalendarSource {
     });
     const response = await fetch(KAIST_CALENDAR_URL, {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "KAIST-SOC-Web/1.0 academic-calendar-sync",
@@ -128,7 +131,7 @@ export class KaistAcademicCalendarSource {
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    const html = await response.text();
+    const html = await readResponseTextWithLimit(response, MAX_MONTH_RESPONSE_BYTES);
     const $ = cheerio.load(html);
     const items: Array<{ dates: string; title: string }> = [];
 

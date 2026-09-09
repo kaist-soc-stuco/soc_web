@@ -18,10 +18,12 @@ import type {
   CreateBulkEmailTemplateRequest,
   UpdateBulkEmailTemplateRequest,
   ContactListResponse,
+  PublicContactListResponse,
   ContactListOptions,
   ContactRecord,
   ContactDepartmentListResponse,
   ContactDepartmentRecord,
+  PublicContactDepartmentListResponse,
   ContactSpreadsheetSyncResponse,
   CreateContactDepartmentRequest,
   CreateContactRequest,
@@ -399,15 +401,15 @@ export const createAdminApi = ({
     );
   },
 
-  getContacts: async (): Promise<ContactListResponse> => {
-    return requestJson<ContactListResponse>(
+  getContacts: async (): Promise<PublicContactListResponse> => {
+    return requestJson<PublicContactListResponse>(
       contactsBaseUrl,
       { method: "GET" },
     );
   },
 
-  getContactDepartments: async (): Promise<ContactDepartmentListResponse> => {
-    return requestJson<ContactDepartmentListResponse>(
+  getContactDepartments: async (): Promise<PublicContactDepartmentListResponse> => {
+    return requestJson<PublicContactDepartmentListResponse>(
       `${contactsBaseUrl}/departments`,
       { method: "GET" },
     );

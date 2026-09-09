@@ -48,6 +48,8 @@ import { UiInput, UiTextarea } from "@/components/ui/form-control";
 import { Permissions } from "@/lib/permissions";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
+import { useCurrentSession } from "@/hooks/use-current-session";
+import { getDraftStorageKey } from "@/lib/draft-storage";
 
 const RECIPIENT_TYPES: ReadonlyArray<{
   value: SendBulkEmailRequest["recipientType"];
@@ -61,8 +63,6 @@ const RECIPIENT_TYPES: ReadonlyArray<{
 type RecipientFilters = NonNullable<SendBulkEmailRequest["filters"]>;
 type RecipientFilterKey = keyof RecipientFilters;
 type DeliveryMode = "now" | "scheduled";
-
-const EMAIL_DRAFT_STORAGE_KEY = "soc:admin:bulk-email:draft";
 
 function firstEmailBodyLine(value: string) {
   const text = value
@@ -147,6 +147,8 @@ const EXECUTION_HISTORY_STATUSES = new Set<BulkEmailRecord["status"]>([
   "SUCCESS",
   "SCHEDULED",
   "DRY_RUN",
+  "SENDING",
+  "UNKNOWN",
 ]);
 
 export function BulkEmailPage() {
@@ -159,6 +161,11 @@ export function BulkEmailPage() {
 
 function BulkEmailPageContent() {
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
+  const { data: session, isLoading: sessionLoading } = useCurrentSession();
+  const emailDraftStorageKey = useMemo(
+    () => getDraftStorageKey("bulk-email", "compose", session),
+    [session?.authenticated, session?.storageMode, session?.draftNamespace],
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
@@ -168,7 +175,9 @@ function BulkEmailPageContent() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
 
-  const [initialLocalDraft] = useState<StoredEmailDraft | null>(() => readStoredEmailDraft());
+  const [initialLocalDraft, setInitialLocalDraft] = useState<StoredEmailDraft | null>(null);
+  const [draftIdentityKey, setDraftIdentityKey] = useState<string | null | undefined>(undefined);
+  const [loadedDraftIdentityKey, setLoadedDraftIdentityKey] = useState<string | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [draftNoticeVisible, setDraftNoticeVisible] = useState(false);
@@ -206,6 +215,26 @@ function BulkEmailPageContent() {
 
   const [operationError, setOperationError] = useState<string | null>(null);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sessionLoading || draftIdentityKey === emailDraftStorageKey) return;
+
+    setInitialLocalDraft(readStoredEmailDraft(emailDraftStorageKey));
+    setDraftIdentityKey(emailDraftStorageKey);
+    setLoadedDraftIdentityKey(null);
+    setDraftReady(false);
+    setDraftRestored(false);
+    setDraftSavedAt(null);
+    setDraftNoticeVisible(false);
+    setSelectedTemplateId("");
+    setRecipientType("UNPAID_STUDENTS");
+    setFilters({});
+    setSubject("");
+    setContent("");
+    setContentType("html");
+    setAttachments([]);
+    setScheduledAt("");
+  }, [draftIdentityKey, emailDraftStorageKey, sessionLoading]);
 
   const filterSignature = useMemo(() => JSON.stringify(normalizeFilters(filters)), [filters]);
   const activeFilterEntries = useMemo(() => {
@@ -270,6 +299,7 @@ function BulkEmailPageContent() {
   };
 
   useEffect(() => {
+    if (sessionLoading || draftIdentityKey !== emailDraftStorageKey) return;
     let mounted = true;
     if (initialLocalDraft) applyLocalDraftToForm(initialLocalDraft);
 
@@ -293,13 +323,14 @@ function BulkEmailPageContent() {
       if (mounted) {
         setTemplatesLoading(false);
         setDraftReady(true);
+        setLoadedDraftIdentityKey(emailDraftStorageKey);
       }
     };
     void loadInitialData();
     return () => {
       mounted = false;
     };
-  }, [apiClient, initialLocalDraft]);
+  }, [apiClient, draftIdentityKey, emailDraftStorageKey, initialLocalDraft, sessionLoading]);
 
   useEffect(() => {
     let active = true;
@@ -358,7 +389,9 @@ function BulkEmailPageContent() {
         subject,
       };
       try {
-        window.localStorage.setItem(EMAIL_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        if (emailDraftStorageKey) {
+          window.localStorage.setItem(emailDraftStorageKey, JSON.stringify(draft));
+        }
         if (draftRestored) setDraftSavedAt(savedAt);
       } catch {
         // Storage can be unavailable in private browsing; the editor remains usable.
@@ -366,7 +399,7 @@ function BulkEmailPageContent() {
     }, 500);
 
     return () => window.clearTimeout(timer);
-  }, [content, contentType, draftReady, draftRestored, filters, recipientType, subject]);
+  }, [content, contentType, draftReady, draftRestored, emailDraftStorageKey, filters, recipientType, subject]);
 
   const buildRequest = (options?: {
     includeSchedule?: boolean;
@@ -414,7 +447,7 @@ function BulkEmailPageContent() {
 
   const clearStoredDraft = () => {
     try {
-      window.localStorage.removeItem(EMAIL_DRAFT_STORAGE_KEY);
+      if (emailDraftStorageKey) window.localStorage.removeItem(emailDraftStorageKey);
     } catch {
       // Storage can be unavailable in private browsing; continue clearing the form.
     }
@@ -653,6 +686,10 @@ function BulkEmailPageContent() {
       ]}
     />
   );
+
+  if (sessionLoading || draftIdentityKey !== emailDraftStorageKey || loadedDraftIdentityKey !== emailDraftStorageKey) {
+    return <div className="flex min-h-64 items-center justify-center text-sm text-slate-500" aria-busy="true">불러오는 중…</div>;
+  }
 
   return (
     <AdminPageShell className="email-composer-page min-h-screen !bg-slate-50">
@@ -1046,11 +1083,12 @@ function RecipientToken({ label, onRemove }: { label: string; onRemove: () => vo
   );
 }
 
-function readStoredEmailDraft(): StoredEmailDraft | null {
+function readStoredEmailDraft(storageKey: string | null): StoredEmailDraft | null {
   if (typeof window === "undefined") return null;
+  if (!storageKey) return null;
 
   try {
-    const raw = window.localStorage.getItem(EMAIL_DRAFT_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
@@ -1118,6 +1156,10 @@ function formatBulkEmailStatus(status: BulkEmailRecord["status"]): string {
       return "예약 중";
     case "DRY_RUN":
       return "테스트 발송";
+    case "SENDING":
+      return "전송 확인 중";
+    case "UNKNOWN":
+      return "전송 결과 확인 필요";
     default:
       return "처리 기록";
   }

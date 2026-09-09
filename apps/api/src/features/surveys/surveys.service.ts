@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,6 +12,7 @@ import {
   Permissions,
   type SurveyParticipationEligibility,
   type SurveyParticipationEligibilityReason,
+  type PublicSurveyRecord,
 } from "@soc/contracts";
 
 import { SurveysRepository } from "./surveys.repository";
@@ -31,6 +33,11 @@ import { getSurveyEligibilityFailures } from "./survey-eligibility";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 import { AuditLogService } from "../audit/audit-log.service";
+import { AssetRepository } from "../asset/repositories/asset.repository";
+import { assertSurveyAssetReferences } from "./survey-asset-access";
+import { toPublicSurveyDetail, toPublicSurveyRecord } from "./public-survey.mapper";
+import { DRIZZLE_DB } from "../../infrastructure/postgres/postgres.provider";
+import type { PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
 
 interface SurveyCaller {
   id?: string;
@@ -85,6 +92,8 @@ export class SurveysService {
     @Optional() private readonly usersService?: UsersService,
     @Optional() private readonly surveySheetsService?: GoogleSurveySheetsService,
     @Optional() private readonly auditLogService?: AuditLogService,
+    @Optional() private readonly assetRepository?: AssetRepository,
+    @Optional() @Inject(DRIZZLE_DB) private readonly db?: PostgresDatabase,
   ) {}
 
   private computeState(survey: {
@@ -250,34 +259,38 @@ export class SurveysService {
     });
   }
 
-  async findPublished(caller?: SurveyCaller): Promise<SurveyRecordWithState[]> {
-    const surveys = await this.surveysRepo.findPublished();
+  async findPublished(
+    caller?: SurveyCaller,
+    input: { page?: number; pageSize?: number; query?: string } = {},
+  ): Promise<import("@soc/contracts").PublicSurveyListResponse> {
+    const page = Number.isInteger(input.page) && (input.page ?? 0) > 0 ? input.page! : 1;
+    const pageSize = Number.isInteger(input.pageSize) && (input.pageSize ?? 0) > 0
+      ? Math.min(input.pageSize!, 100)
+      : 20;
+    const result = await this.surveysRepo.findPublished({
+      page,
+      pageSize,
+      query: input.query,
+    });
+    const surveys = result.items;
     const eligibilityContext = await this.loadEligibilityContext(caller);
-    const responseCounts = await Promise.all(
-      surveys.map(async (survey) => ({
-        surveyId: survey.id,
-        responseCount: await this.responsesRepo.countSubmitted(survey.id),
-      })),
-    );
-
-    const responseCountMap = new Map(responseCounts.map((item) => [item.surveyId, item.responseCount]));
-
-    return surveys.map((s) => {
+    const items = surveys.map((s) => {
       const computedState = this.computeState(s);
       const withState = {
         ...s,
         computedState,
-        responseCount: responseCountMap.get(s.id) ?? 0,
+        responseCount: s.responseCount ?? 0,
       };
-      return {
+      return toPublicSurveyRecord({
         ...withState,
         participationEligibility: this.getParticipationEligibility(
           withState,
           caller,
           eligibilityContext,
         ),
-      };
+      });
     });
+    return { page, pageSize, total: result.total, items };
   }
 
   async findById(id: string): Promise<SurveyRecordWithState> {
@@ -316,7 +329,7 @@ export class SurveysService {
         }
       : null;
 
-    return {
+    const detail = {
       ...survey,
       participationEligibility: this.getParticipationEligibility(
         survey,
@@ -328,6 +341,11 @@ export class SurveysService {
       hasSubmitted: Boolean(existingResponse),
       isPreview: isManagerPreview,
     };
+
+    // The same route serves the public survey page and the permission-gated
+    // admin editor. Only the latter may receive integration and lineage
+    // metadata.
+    return (this.hasManageSurvey(caller) ? detail : toPublicSurveyDetail(detail)) as SurveyDetailResponse;
   }
 
   async create(creatorId: string, dto: CreateSurveyDto): Promise<SurveyRecordWithState> {
@@ -340,8 +358,17 @@ export class SurveysService {
       academicEligibility: dto.academicEligibility ?? "ANY",
       allowAnonymous: dto.allowAnonymous ?? false,
     });
-    await this.assertConnectedArticleAvailable(dto.connectedArticleId);
-    const survey = await this.surveysRepo.insert(creatorId, dto);
+    const survey = this.db
+      ? await this.db.transaction(async (tx) => {
+          await assertSurveyAssetReferences(this.assetRepository, creatorId, dto, tx);
+          await this.assertConnectedArticleAvailable(dto.connectedArticleId, undefined, tx);
+          return this.surveysRepo.insert(creatorId, dto, tx);
+        })
+      : await (async () => {
+          await assertSurveyAssetReferences(this.assetRepository, creatorId, dto);
+          await this.assertConnectedArticleAvailable(dto.connectedArticleId);
+          return this.surveysRepo.insert(creatorId, dto);
+        })();
     const computedState = this.computeState(survey);
     await this.auditLogService?.record({
       action: "survey.create",
@@ -380,6 +407,14 @@ export class SurveysService {
       });
       await this.assertConnectedArticleAvailable(dto.connectedArticleId, id, tx);
 
+      const candidate = { ...current, ...dto };
+      await assertSurveyAssetReferences(
+        this.assetRepository,
+        actorUserId,
+        candidate,
+        tx,
+      );
+
       const isAlwaysOpen = dto.isAlwaysOpen ?? current.isAlwaysOpen;
       const opensAt = isAlwaysOpen ? null : dto.openAt === undefined ? current.opensAt : dto.openAt;
       const closesAt = isAlwaysOpen ? null : dto.closeAt === undefined ? current.closesAt : dto.closeAt;
@@ -399,6 +434,12 @@ export class SurveysService {
             titleEn: dto.titleEn === undefined ? current.titleEn : dto.titleEn ?? null,
           },
           withQuestions,
+        );
+        await assertSurveyAssetReferences(
+          this.assetRepository,
+          actorUserId,
+          withQuestions,
+          tx,
         );
       }
 
@@ -499,6 +540,13 @@ export class SurveysService {
           ...section,
           questions: await this.questionsRepo.findBySectionId(section.id, tx),
         })),
+      );
+
+      await assertSurveyAssetReferences(
+        this.assetRepository,
+        creatorId,
+        { original, sections: sectionsWithQuestions },
+        tx,
       );
 
       const newSurvey = await this.surveysRepo.insert(
@@ -658,7 +706,12 @@ export class SurveysService {
     const totalResponses = await this.responsesRepo.countSubmitted(surveyId);
 
     const sections = await this.sectionsRepo.findBySurveyId(surveyId);
-    const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);
+    // Analytics is intentionally bounded at the query boundary. A caller gets
+    // an explicit error instead of an incomplete result if the survey grows
+    // beyond the in-memory aggregation cap.
+    const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId, {
+      limit: 20_000,
+    });
 
     const analyticsSections = await Promise.all(
       sections.map(async (section) => {

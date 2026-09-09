@@ -21,6 +21,7 @@ import {
 import { buildCalendarGrid } from "./events-surveys-calendar-utils";
 
 const PUBLIC_ITEMS_PAGE_SIZE = 9;
+const PUBLIC_LIST_PAGE_REQUIRED = "public_list_page_required";
 
 function parseSelectedCalendarDate(value: string | null) {
   if (!value) return null;
@@ -105,11 +106,18 @@ export function useEventsSurveysPageController({
     queryKey: ["events-surveys", "list", session?.userId ?? "anonymous"],
     queryFn: async () => {
       const [surveysData, eventsData] = await Promise.all([
-        apiClient.getPublicSurveys(),
+        apiClient.getPublicSurveys({ page: 1, pageSize: 100 }),
         apiClient
           .getArticles("_EVENT", { page: 1, limit: 100 })
           .catch(() => ({ items: [], total: 0 })),
       ]);
+
+      if (
+        surveysData.total > surveysData.items.length ||
+        eventsData.total > eventsData.items.length
+      ) {
+        throw new Error(PUBLIC_LIST_PAGE_REQUIRED);
+      }
 
       const eventsWithImages = eventsData.items.map((event) => ({
         ...event,
@@ -119,7 +127,7 @@ export function useEventsSurveysPageController({
       }));
 
       return {
-        surveys: surveysData,
+        surveys: surveysData.items,
         events: eventsWithImages,
       };
     },
@@ -386,9 +394,14 @@ export function useEventsSurveysPageController({
             : "Failed to load calendar events."
           : null
         : listQuery.isError
-          ? lang === "ko"
-            ? "목록을 불러오는 중 오류가 발생했습니다."
-            : "Failed to load events and surveys."
+          ? listQuery.error instanceof Error &&
+            listQuery.error.message === PUBLIC_LIST_PAGE_REQUIRED
+            ? lang === "ko"
+              ? "항목이 많아 한 번에 표시할 수 없습니다. 검색 조건을 좁혀 다시 시도해 주세요."
+              : "There are too many items to display at once. Narrow your search and try again."
+            : lang === "ko"
+              ? "목록을 불러오는 중 오류가 발생했습니다."
+              : "Failed to load events and surveys."
           : null,
     holidays,
     loading:

@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { msToDate, nowDate, nowMs } from "@soc/shared";
 
 import {
@@ -32,6 +34,7 @@ const PROCESSING_STATUS = "PROCESSING";
 const SUCCEEDED_STATUS = "SUCCEEDED";
 const FAILED_STATUS = "FAILED";
 const MAX_ATTEMPTS = 8;
+const LEASE_MS = 5 * 60 * 1_000;
 
 type CalendarEventRow = typeof calendarEvents.$inferSelect;
 
@@ -74,9 +77,13 @@ export class CalendarSyncService {
         targetCalendarId,
         operation: row.isActive && !row.isHiddenByAdmin ? UPSERT_OPERATION : DELETE_OPERATION,
         status: PENDING_STATUS,
+        revision: 1,
+        resourceUpdatedAt: row.updatedAt,
         attempts: 0,
         availableAt: nowDate(),
         lockedAt: null,
+        leaseUntil: null,
+        claimToken: null,
         lastError: null,
       })
       .onConflictDoUpdate({
@@ -84,9 +91,13 @@ export class CalendarSyncService {
         set: {
           operation: row.isActive && !row.isHiddenByAdmin ? UPSERT_OPERATION : DELETE_OPERATION,
           status: PENDING_STATUS,
+          revision: sql`${calendarSyncJobs.revision} + 1`,
+          resourceUpdatedAt: row.updatedAt,
           attempts: 0,
           availableAt: nowDate(),
           lockedAt: null,
+          leaseUntil: null,
+          claimToken: null,
           lastError: null,
           updatedAt: nowDate(),
         },
@@ -294,11 +305,23 @@ export class CalendarSyncService {
     const staleLockAt = msToDate(nowMs() - 10 * 60 * 1_000);
     await this.db
       .update(calendarSyncJobs)
-      .set({ status: PENDING_STATUS, lockedAt: null, updatedAt: nowDate() })
+      .set({
+        status: PENDING_STATUS,
+        lockedAt: null,
+        leaseUntil: null,
+        claimToken: null,
+        updatedAt: nowDate(),
+      })
       .where(
         and(
           eq(calendarSyncJobs.status, PROCESSING_STATUS),
-          lte(calendarSyncJobs.lockedAt, staleLockAt),
+          or(
+            lte(calendarSyncJobs.leaseUntil, nowDate()),
+            and(
+              isNull(calendarSyncJobs.leaseUntil),
+              lte(calendarSyncJobs.lockedAt, staleLockAt),
+            ),
+          ),
         ),
       );
 
@@ -325,12 +348,15 @@ export class CalendarSyncService {
           status: PROCESSING_STATUS,
           attempts: candidate.attempts + 1,
           lockedAt: nowDate(),
+          leaseUntil: msToDate(nowMs() + LEASE_MS),
+          claimToken: randomUUID(),
           updatedAt: nowDate(),
         })
         .where(
           and(
             eq(calendarSyncJobs.calendarSyncJobId, candidate.calendarSyncJobId),
             eq(calendarSyncJobs.status, PENDING_STATUS),
+            eq(calendarSyncJobs.revision, candidate.revision),
           ),
         )
         .returning();
@@ -338,11 +364,9 @@ export class CalendarSyncService {
 
       processedCount += 1;
       try {
-        await this.processJob(job.calendarSyncJobId);
-        succeededCount += 1;
+        if (await this.processJob(job)) succeededCount += 1;
       } catch (error) {
-        failedCount += 1;
-        await this.markJobFailed(job, error);
+        if (await this.markJobFailed(job, error)) failedCount += 1;
       }
     }
 
@@ -377,23 +401,17 @@ export class CalendarSyncService {
     }
   }
 
-  private async processJob(jobId: number): Promise<void> {
-    const [job] = await this.db
-      .select()
-      .from(calendarSyncJobs)
-      .where(eq(calendarSyncJobs.calendarSyncJobId, jobId));
-    if (!job) return;
+  private async processJob(
+    job: typeof calendarSyncJobs.$inferSelect,
+  ): Promise<boolean> {
+    if (!(await this.isCurrentClaim(job))) return false;
 
     const [row] = await this.db
       .select()
       .from(calendarEvents)
       .where(eq(calendarEvents.calendarEventId, job.calendarEventId));
     if (!row) {
-      await this.db
-        .update(calendarSyncJobs)
-        .set({ status: SUCCEEDED_STATUS, lockedAt: null, lastError: null, updatedAt: nowDate() })
-        .where(eq(calendarSyncJobs.calendarSyncJobId, jobId));
-      return;
+      return this.markJobSucceeded(job);
     }
 
     if (job.operation === DELETE_OPERATION) {
@@ -404,9 +422,15 @@ export class CalendarSyncService {
           etag: row.googleEtag,
         });
       }
-      await this.markJobSucceeded(jobId);
-      await this.markEventSynced(row.calendarEventId, job.targetCalendarId, row.googleEventId, row.googleEtag);
-      return;
+      return this.markJobSucceededWithEvent(job, row, {
+        googleCalendarId: job.targetCalendarId,
+        googleEventId: row.googleEventId,
+        googleEtag: row.googleEtag,
+        googleSyncStatus: "SYNCED",
+        googleSyncedAt: nowDate(),
+        googleSyncError: null,
+        updatedAt: nowDate(),
+      });
     }
 
     const existingEventId = row.googleCalendarId === job.targetCalendarId
@@ -419,75 +443,138 @@ export class CalendarSyncService {
       resource: this.toGoogleResource(row),
     });
 
-    await this.db
-      .update(calendarEvents)
-      .set({
-        googleCalendarId: job.targetCalendarId,
-        googleEventId: result.eventId,
-        googleEtag: result.etag,
-        googleSyncStatus: "SYNCED",
-        googleSyncedAt: nowDate(),
-        googleSyncError: null,
-        updatedAt: nowDate(),
-      })
-      .where(eq(calendarEvents.calendarEventId, row.calendarEventId));
-    await this.markJobSucceeded(jobId);
+    return this.markJobSucceededWithEvent(job, row, {
+      googleCalendarId: job.targetCalendarId,
+      googleEventId: result.eventId,
+      googleEtag: result.etag,
+      googleSyncStatus: "SYNCED",
+      googleSyncedAt: nowDate(),
+      googleSyncError: null,
+      updatedAt: nowDate(),
+    });
   }
 
-  private async markJobSucceeded(jobId: number): Promise<void> {
-    await this.db
+  private async markJobSucceeded(
+    job: typeof calendarSyncJobs.$inferSelect,
+  ): Promise<boolean> {
+    const updated = await this.db
       .update(calendarSyncJobs)
-      .set({ status: SUCCEEDED_STATUS, lockedAt: null, lastError: null, updatedAt: nowDate() })
-      .where(eq(calendarSyncJobs.calendarSyncJobId, jobId));
-  }
-
-  private async markEventSynced(
-    eventId: number,
-    calendarId: string,
-    googleEventId: string | null,
-    googleEtag: string | null,
-  ): Promise<void> {
-    await this.db
-      .update(calendarEvents)
       .set({
-        googleCalendarId: calendarId,
-        googleEventId,
-        googleEtag,
-        googleSyncStatus: "SYNCED",
-        googleSyncedAt: nowDate(),
-        googleSyncError: null,
+        status: SUCCEEDED_STATUS,
+        lockedAt: null,
+        leaseUntil: null,
+        claimToken: null,
+        lastError: null,
         updatedAt: nowDate(),
       })
-      .where(eq(calendarEvents.calendarEventId, eventId));
+      .where(this.currentClaim(job))
+      .returning({ calendarSyncJobId: calendarSyncJobs.calendarSyncJobId });
+    return updated.length > 0;
+  }
+
+  private async markJobSucceededWithEvent(
+    job: typeof calendarSyncJobs.$inferSelect,
+    row: CalendarEventRow,
+    eventUpdate: Partial<typeof calendarEvents.$inferInsert>,
+  ): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      // Lock and fence the queue row and the resource update in one
+      // transaction. A new enqueue waits for this commit, so it cannot be
+      // overwritten by a stale worker between the two updates.
+      const [updatedJob] = await tx
+        .update(calendarSyncJobs)
+        .set({
+          status: SUCCEEDED_STATUS,
+          lockedAt: null,
+          leaseUntil: null,
+          claimToken: null,
+          lastError: null,
+          updatedAt: nowDate(),
+        })
+        .where(this.currentClaim(job))
+        .returning({ calendarSyncJobId: calendarSyncJobs.calendarSyncJobId });
+      if (!updatedJob) return false;
+
+      const [updatedEvent] = await tx
+        .update(calendarEvents)
+        .set(eventUpdate)
+        .where(and(
+          eq(calendarEvents.calendarEventId, row.calendarEventId),
+          eq(calendarEvents.updatedAt, job.resourceUpdatedAt),
+          eq(calendarEvents.googleSyncStatus, "PENDING"),
+        ))
+        .returning({ calendarEventId: calendarEvents.calendarEventId });
+      if (!updatedEvent) {
+        throw new Error("calendar_event_fence_lost");
+      }
+      return true;
+    });
   }
 
   private async markJobFailed(
     job: typeof calendarSyncJobs.$inferSelect,
     error: unknown,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const message = sanitizeError(error);
     const conflict = error instanceof GoogleCalendarConflictError;
     const terminal = conflict || job.attempts >= MAX_ATTEMPTS;
     const retryDelay = Math.min(60 * 60 * 1_000, 30 * 1_000 * 2 ** Math.max(job.attempts - 1, 0));
 
-    await this.db
-      .update(calendarSyncJobs)
-      .set({
-        status: terminal ? FAILED_STATUS : PENDING_STATUS,
-        availableAt: msToDate(nowMs() + retryDelay),
-        lockedAt: null,
-        lastError: message,
-        updatedAt: nowDate(),
-      })
-      .where(eq(calendarSyncJobs.calendarSyncJobId, job.calendarSyncJobId));
-    await this.db
-      .update(calendarEvents)
-      .set({
-        googleSyncStatus: conflict ? "CONFLICT" : "FAILED",
-        googleSyncError: message,
-        updatedAt: nowDate(),
-      })
-      .where(eq(calendarEvents.calendarEventId, job.calendarEventId));
+    return this.db.transaction(async (tx) => {
+      const failedJob = await tx
+        .update(calendarSyncJobs)
+        .set({
+          status: terminal ? FAILED_STATUS : PENDING_STATUS,
+          availableAt: msToDate(nowMs() + retryDelay),
+          lockedAt: null,
+          leaseUntil: null,
+          claimToken: null,
+          lastError: message,
+          updatedAt: nowDate(),
+        })
+        .where(this.currentClaim(job))
+        .returning({ calendarSyncJobId: calendarSyncJobs.calendarSyncJobId });
+      if (failedJob.length === 0) return false;
+
+      // The queue-row update above holds the resource's fence until commit.
+      // If a newer resource version is already visible, this conditional
+      // update leaves its PENDING state untouched.
+      await tx
+        .update(calendarEvents)
+        .set({
+          googleSyncStatus: conflict ? "CONFLICT" : "FAILED",
+          googleSyncError: message,
+          updatedAt: nowDate(),
+        })
+        .where(and(
+          eq(calendarEvents.calendarEventId, job.calendarEventId),
+          eq(calendarEvents.googleSyncStatus, "PENDING"),
+          eq(calendarEvents.updatedAt, job.resourceUpdatedAt),
+        ));
+      return true;
+    });
+  }
+
+  private async isCurrentClaim(
+    job: typeof calendarSyncJobs.$inferSelect,
+  ): Promise<boolean> {
+    const [current] = await this.db
+      .select({ calendarSyncJobId: calendarSyncJobs.calendarSyncJobId })
+      .from(calendarSyncJobs)
+      .where(this.currentClaim(job))
+      .limit(1);
+    return Boolean(current);
+  }
+
+  private currentClaim(job: typeof calendarSyncJobs.$inferSelect) {
+    if (!job.claimToken) return sql`false`;
+    return and(
+      eq(calendarSyncJobs.calendarSyncJobId, job.calendarSyncJobId),
+      eq(calendarSyncJobs.status, PROCESSING_STATUS),
+      eq(calendarSyncJobs.revision, job.revision),
+      eq(calendarSyncJobs.claimToken, job.claimToken),
+      gt(calendarSyncJobs.leaseUntil, nowDate()),
+    );
   }
 
   private toGoogleResource(row: CalendarEventRow): GoogleCalendarEventResource {

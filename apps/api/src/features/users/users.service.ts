@@ -328,23 +328,25 @@ export class UsersService {
         return { update, userId: user.userId };
       }),
     );
-
-    const updated: StudentFeeStatusRecord[] = [];
-    for (const { update, userId } of resolved) {
-      updated.push(
-        await this.updateStudentFeeStatus(
-          userId,
-          {
-            paidAmount: update.paidAmount,
-            status: update.status,
-            coverageSemesters: update.coverageSemesters,
-            note: update.note,
-            verifiedBy: audit?.actorUserId ?? undefined,
-          },
-          audit,
-        ),
-      );
+    const userIds = resolved.map(({ userId }) => userId);
+    if (new Set(userIds).size !== userIds.length) {
+      throw new BadRequestException("fee_duplicate_user");
     }
+
+    // The repository owns one transaction for the complete request. The
+    // audit/queue side effects run only after that transaction commits.
+    const updated = await this.usersRepository.bulkUpdateStudentFeeStatuses(
+      resolved,
+      audit?.actorUserId ?? undefined,
+    );
+    await this.auditLogService.record({
+      action: "student_fee_status.bulk_update",
+      actorUserId: audit?.actorUserId ?? null,
+      ipAddress: audit?.ipAddress ?? null,
+      payload: { count: updated.length, userIds },
+      targetType: "student_fee_status",
+    });
+    await this.googleSheetsQueue?.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
 
     return { updated, count: updated.length };
   }

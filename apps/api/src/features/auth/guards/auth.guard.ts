@@ -10,6 +10,7 @@ import { isExpired } from "@soc/shared";
 import { UsersService } from "../../users/users.service";
 import { AuthSessionRepository } from "../auth-session.repository";
 import { AUTH_SESSION_COOKIE_NAME } from "../auth.tokens";
+import { RequestRateLimitService } from "../../../infrastructure/redis/request-rate-limit.service";
 
 interface AuthenticatedRequest {
   cookies?: Record<string, string | undefined>;
@@ -24,6 +25,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly authSessionRepository: AuthSessionRepository,
     private readonly usersService: UsersService,
+    private readonly requestRateLimitService: RequestRateLimitService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -64,6 +66,8 @@ export class AuthGuard implements CanActivate {
       permission:
         await this.usersService.resolvePermissionBitmaskByUserId(user.userId),
     };
+
+    await this.requestRateLimitService.enforceAuthenticated(request, user.userId);
 
     return true;
   }

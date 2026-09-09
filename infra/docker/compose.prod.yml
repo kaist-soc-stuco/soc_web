@@ -21,6 +21,12 @@ services:
     expose:
       - '3000'
     init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
@@ -61,6 +67,16 @@ services:
       dockerfile: apps/web/Dockerfile.prod
     expose:
       - '5173'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,mode=1777
+      - /var/run:rw,noexec,nosuid,nodev,mode=1777
+      - /var/log/nginx:rw,noexec,nosuid,nodev,mode=1777
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
@@ -74,7 +90,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-soc_web}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -93,6 +109,7 @@ services:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile.prod
+      target: migration
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,6 +121,12 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
     volumes:
       - ../../apps/api/uploads:/app/apps/api/uploads
     logging: *default-logging
@@ -115,11 +138,13 @@ services:
       ]
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     command: ['redis-server', '/usr/local/etc/redis/redis.conf']
     volumes:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
@@ -129,7 +154,18 @@ services:
       retries: 5
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    user: '101:101'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,mode=1777
+      - /var/run:rw,noexec,nosuid,nodev,mode=1777
+      - /var/log/nginx:rw,noexec,nosuid,nodev,mode=1777
     ports:
       - '127.0.0.1:${NGINX_PORT:-8080}:80'
     restart: unless-stopped

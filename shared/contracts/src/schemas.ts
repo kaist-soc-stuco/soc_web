@@ -9,6 +9,46 @@
 
 import { z } from "zod";
 
+/** URL references accepted by user-authored content. */
+export const isSafeUrlReference = (
+  value: string,
+  allowedProtocols: readonly string[] = ["http:", "https:", "mailto:", "tel:"],
+  allowRelative = true,
+): boolean => {
+  const normalized = value.trim();
+  if (!normalized || /[\u0000-\u001f\u007f]/.test(normalized)) return false;
+  if (normalized.includes("\\") || normalized.startsWith("//")) return false;
+
+  let decoded = normalized;
+  try {
+    decoded = decodeURIComponent(normalized);
+  } catch {
+    return false;
+  }
+  if (
+    !decoded ||
+    /[\u0000-\u001f\u007f]/.test(decoded) ||
+    decoded.includes("\\") ||
+    decoded.startsWith("//")
+  ) {
+    return false;
+  }
+
+  const schemeMatch = decoded.match(/^([a-z][a-z\d+.-]*):/i);
+  if (!schemeMatch) return allowRelative;
+
+  try {
+    const parsed = new URL(decoded);
+    return allowedProtocols.includes(parsed.protocol.toLowerCase());
+  } catch {
+    return false;
+  }
+};
+
+export const isSafeAssetOrImageReference = (value: string): boolean =>
+  /^asset:\d+$/.test(value.trim()) ||
+  isSafeUrlReference(value, ["http:", "https:"], false);
+
 // ─── Site Content ────────────────────────────────────────────────────────────
 
 /**
@@ -89,9 +129,12 @@ export const CONTENT_BLOCK_STATUSES = [
 export const ContentBlockTypeSchema = z.enum(CONTENT_BLOCK_TYPES);
 export const ContentBlockStatusSchema = z.enum(CONTENT_BLOCK_STATUSES);
 
-const NullableContentBlockUrlSchema = z.string().trim().url().max(2_000).nullable();
+const NullableContentBlockUrlSchema = z.string().trim().max(2_000).refine(
+  (value) => isSafeUrlReference(value),
+  "content_block_url_invalid",
+).nullable();
 const NullableContentBlockImageSchema = z.string().trim().max(2_000).refine(
-  (value) => /^asset:\d+$/.test(value) || z.string().url().safeParse(value).success,
+  isSafeAssetOrImageReference,
   "content_block_image_invalid",
 ).nullable();
 
@@ -144,8 +187,7 @@ export const ReorderContentBlocksSchema = z.object({
 
 export const ConsentDecisionSchema = z.object({
   consent: z.boolean(),
-  pendingLoginToken: z.string().min(1),
-});
+}).strict();
 
 export const SsoCallbackBodySchema = z.object({
   code: z.string().optional(),
@@ -254,6 +296,7 @@ export const ArticleAssetRequestSchema = z.object({
 
 const ArticleAssetsSchema = z
   .array(ArticleAssetRequestSchema)
+  .max(50, "article_assets_too_many")
   .superRefine((items, context) => {
     const seen = new Set<string>();
     for (const item of items) {
@@ -374,7 +417,7 @@ export const SurveyAcademicEligibilitySchema = z.enum([
 const NullableSurveyDateTimeSchema = z.string().datetime({ offset: true }).nullable();
 const SurveyRichTextSchema = z.string().max(50_000).optional();
 const SurveyImageReferenceSchema = z.string().trim().max(2_000).refine(
-  (value) => /^asset:\d+$/.test(value) || z.string().url().safeParse(value).success,
+  isSafeAssetOrImageReference,
   "survey_image_invalid",
 );
 const SurveyTitleKoSchema = z.string().max(255).transform((value) => value.trim() || "설문조사");
@@ -424,8 +467,8 @@ export const UpdateSurveySchema = SurveyFieldsSchema.partial().extend({
 }).superRefine(validateSurveySchedule);
 
 export const CreateSectionSchema = z.object({
-  titleKo: z.string().min(1),
-  titleEn: z.string().optional(),
+  titleKo: z.string().trim().min(1).max(255),
+  titleEn: z.string().trim().max(255).optional(),
   descriptionKo: SurveyRichTextSchema,
   descriptionEn: SurveyRichTextSchema,
   // Google Forms-style default navigation. `SUBMIT` ends the survey and an
@@ -451,9 +494,9 @@ export const QuestionTypeSchema = z.enum([
 ]);
 
 export const QuestionOptionSchema = z.object({
-  value: z.string().min(1),
-  labelKo: z.string().min(1),
-  labelEn: z.string().optional(),
+  value: z.string().trim().min(1).max(100),
+  labelKo: z.string().trim().min(1).max(255),
+  labelEn: z.string().trim().max(255).optional(),
   imageUrlKo: SurveyImageReferenceSchema.nullable().optional(),
   imageUrlEn: SurveyImageReferenceSchema.nullable().optional(),
 });
@@ -531,7 +574,7 @@ export const CreateQuestionSchema = z.object({
   questionType: QuestionTypeSchema,
   options: QuestionOptionsSchema.optional(),
   config: QuestionConfigSchema.optional(),
-  answerRegex: z.string().optional(),
+  answerRegex: z.string().trim().max(256).optional(),
   isRequired: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
 });
@@ -557,13 +600,38 @@ const ReorderItemsSchema = z.object({
 export const ReorderSurveySectionsSchema = ReorderItemsSchema;
 export const ReorderSurveyQuestionsSchema = ReorderItemsSchema;
 
+const SurveyAnswerContentSchema = z
+  .record(z.string().trim().min(1).max(64), z.unknown())
+  .superRefine((content, context) => {
+    try {
+      if (JSON.stringify(content).length > 100_000) {
+        context.addIssue({ code: "custom", message: "answer_content_too_large" });
+      }
+    } catch {
+      context.addIssue({ code: "custom", message: "answer_content_invalid" });
+    }
+  });
+
 export const SubmitResponseSchema = z.object({
   answers: z.array(
     z.object({
-      questionId: z.string().min(1),
-      content: z.record(z.string(), z.unknown()),
+      questionId: z.string().trim().min(1).max(100),
+      content: SurveyAnswerContentSchema,
     }),
-  ),
+  ).max(200),
+}).superRefine((value, context) => {
+  value.answers.forEach((answer, index) => {
+    if (
+      Object.prototype.hasOwnProperty.call(answer.content, "assetId") &&
+      Object.prototype.hasOwnProperty.call(answer.content, "assetIds")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "answer_file_mixed_asset_fields",
+        path: ["answers", index, "content"],
+      });
+    }
+  });
 });
 
 // ─── Role Groups ─────────────────────────────────────────────────────────────
@@ -652,6 +720,12 @@ const StudentFeePaymentInputSchema = z.object({
 });
 
 export const BulkProcessStudentFeePaymentsSchema = z.object({
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(16)
+    .max(128)
+    .regex(/^[A-Za-z0-9._:-]+$/, "invalid_idempotency_key"),
   payments: z.array(StudentFeePaymentInputSchema).min(1).max(1_000),
 });
 
@@ -699,11 +773,13 @@ const ContactFieldsSchema = z.object({
   email: z.string().email().or(z.literal("")).nullable().optional(),
   phoneNumber: z.string().max(50).nullable().optional(),
   privacyConsented: z.boolean(),
+  publiclyListed: z.boolean(),
   sortOrder: z.number().int().optional(),
 });
 
 export const CreateContactSchema = ContactFieldsSchema.extend({
   privacyConsented: z.boolean().default(true),
+  publiclyListed: z.boolean().default(false),
 });
 
 export const ReorderContactsSchema = z
@@ -757,7 +833,7 @@ const BulkEmailAttachmentIdsSchema = z
 
 export const SendBulkEmailSchema = z.object({
   subject: z.string().min(1).max(255),
-  content: z.string().min(1),
+  content: z.string().min(1).max(50_000),
   contentType: z.enum(["plain", "html"]).default("html"),
   recipientType: z.enum(["ALL", "PAID_STUDENTS", "UNPAID_STUDENTS"]),
   filters: BulkEmailRecipientFiltersSchema.optional(),

@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { BadRequestException } = require("@nestjs/common");
+const { BadRequestException, ForbiddenException } = require("@nestjs/common");
 const { Permissions } = require("@soc/contracts");
 
 const {
@@ -135,7 +135,32 @@ test("update sanitizes only supplied article bodies and preserves safe editor fo
     assert.match(stored.contentEn, new RegExp(`<${tag}(?:>| )`, "i"));
   }
   assert.match(stored.contentEn, /<a href="\/board\/공지">내부 링크<\/a>/);
-  assert.match(stored.contentEn, />protocol relative<\/a>/);
+  assert.match(stored.contentEn, />protocol relative<\/span>/);
+});
+
+test("article links use the shared URL policy at the persistence boundary", async () => {
+  const { calls, service } = createServiceHarness();
+
+  await service.updateArticle(
+    "공지",
+    "1",
+    {
+      contentKo: [
+        '<a href="mailto:ops@example.com">mail</a>',
+        '<a href="tel:+821012345678">phone</a>',
+        '<a href="java%73cript:alert(1)">encoded</a>',
+        '<a href="//evil.example">protocol relative</a>',
+      ].join(""),
+    },
+    { id: "user-1", permission: Permissions.POST_CREATE },
+  );
+
+  assert.equal(calls.update.length, 1);
+  const stored = calls.update[0].payload.contentKo;
+  assert.match(stored, /href="mailto:ops@example.com"/);
+  assert.match(stored, /href="tel:\+821012345678"/);
+  assert.doesNotMatch(stored, /java|evil\.example/i);
+  assert.doesNotMatch(stored, /href="\/\/evil\.example"/);
 });
 
 test("create rejects a required body that becomes empty after sanitization", async () => {
@@ -171,4 +196,27 @@ test("update rejects a supplied required body that becomes empty after sanitizat
   );
 
   assert.equal(calls.update.length, 0);
+});
+
+test("only the anonymous article owner can edit without exposing their identity", async () => {
+  const { calls, service } = createServiceHarness();
+
+  await service.updateArticle(
+    "공지",
+    "1",
+    { contentKo: "소유자 수정" },
+    { id: "user-1", permission: 0 },
+  );
+  assert.equal(calls.update.length, 1);
+
+  await assert.rejects(
+    service.updateArticle(
+      "공지",
+      "1",
+      { contentKo: "타인 수정" },
+      { id: "other-user", permission: 0 },
+    ),
+    ForbiddenException,
+  );
+  assert.equal(calls.update.length, 1);
 });

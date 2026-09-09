@@ -1,7 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { DRIZZLE_DB, PostgresDatabase } from "../../infrastructure/postgres/postgres.provider";
-import { bulkEmails, users } from "../../infrastructure/postgres/postgres.schema";
+import {
+  bulkEmailDeliveryAttempts,
+  bulkEmails,
+  users,
+} from "../../infrastructure/postgres/postgres.schema";
 import type {
   BulkEmailRecord,
   BulkEmailStatus,
@@ -20,6 +24,21 @@ export interface BulkEmailStoredRecord extends BulkEmailRecord {
   errorMessage: string | null;
   completedAt: string | null;
   idempotencyKey: string | null;
+}
+
+export type BulkEmailDeliveryAttemptStatus =
+  | "PENDING"
+  | "SENDING"
+  | "SENT"
+  | "UNKNOWN"
+  | "FAILED";
+
+export interface BulkEmailDeliveryAttemptRecord {
+  attemptId: string;
+  emailId: string;
+  attemptNumber: number;
+  messageId: string;
+  status: BulkEmailDeliveryAttemptStatus;
 }
 
 type EmailRow = {
@@ -52,8 +71,10 @@ const isBulkEmailStatus = (value: string): value is BulkEmailStatus =>
   value === "DRAFT" ||
   value === "SCHEDULED" ||
   value === "PENDING" ||
+  value === "SENDING" ||
   value === "SUCCESS" ||
   value === "DRY_RUN" ||
+  value === "UNKNOWN" ||
   value === "FAILED" ||
   value === "CANCELLED";
 
@@ -300,18 +321,110 @@ export class BulkEmailRepository {
   }
 
   async claimFailedForRetry(senderId: string, id: string): Promise<BulkEmailStoredRecord | null> {
-    const updated = await this.db
-      .update(bulkEmails)
-      .set({ status: "PENDING", updatedAt: nowDate(), completedAt: null, errorMessage: null })
+    return this.db.transaction(async (tx) => {
+      // An aggregate can be stale after a partial DB failure. Never let an
+      // explicit retry send again when any attempt already sent or may have
+      // been accepted by the provider.
+      const [uncertainAttempt] = await tx
+        .select({ attemptId: bulkEmailDeliveryAttempts.attemptId })
+        .from(bulkEmailDeliveryAttempts)
+        .where(and(
+          eq(bulkEmailDeliveryAttempts.emailId, id),
+          inArray(bulkEmailDeliveryAttempts.status, ["SENDING", "SENT", "UNKNOWN"]),
+        ))
+        .limit(1);
+      if (uncertainAttempt) return null;
+
+      const updated = await tx
+        .update(bulkEmails)
+        .set({ status: "PENDING", updatedAt: nowDate(), completedAt: null, errorMessage: null })
+        .where(
+          and(
+            eq(bulkEmails.id, id),
+            eq(bulkEmails.senderId, senderId),
+            eq(bulkEmails.status, "FAILED"),
+          ),
+        )
+        .returning({ id: bulkEmails.id });
+      if (!updated[0]) return null;
+
+      const rows = await tx
+        .select(this.selectColumns())
+        .from(bulkEmails)
+        .leftJoin(users, eq(bulkEmails.senderId, users.userId))
+        .where(eq(bulkEmails.id, updated[0].id));
+      return rows[0] ? this.mapRow(rows[0] as EmailRow) : null;
+    });
+  }
+
+  async createDeliveryAttempt(
+    emailId: string,
+    messageId: string,
+  ): Promise<BulkEmailDeliveryAttemptRecord> {
+    const [next] = await this.db
+      .select({
+        attemptNumber: sql<number>`coalesce(max(${bulkEmailDeliveryAttempts.attemptNumber}), 0) + 1`,
+      })
+      .from(bulkEmailDeliveryAttempts)
+      .where(eq(bulkEmailDeliveryAttempts.emailId, emailId));
+    const [row] = await this.db
+      .insert(bulkEmailDeliveryAttempts)
+      .values({
+        emailId,
+        attemptNumber: Number(next?.attemptNumber ?? 1),
+        messageId,
+        status: "PENDING",
+      })
+      .returning();
+    if (!row) throw new Error("bulk_email_attempt_create_failed");
+    return {
+      attemptId: row.attemptId,
+      emailId: row.emailId,
+      attemptNumber: row.attemptNumber,
+      messageId: row.messageId,
+      status: "PENDING",
+    };
+  }
+
+  async markDeliveryAttemptSending(attemptId: string): Promise<boolean> {
+    const rows = await this.db
+      .update(bulkEmailDeliveryAttempts)
+      .set({ status: "SENDING" })
       .where(
         and(
-          eq(bulkEmails.id, id),
-          eq(bulkEmails.senderId, senderId),
-          eq(bulkEmails.status, "FAILED"),
+          eq(bulkEmailDeliveryAttempts.attemptId, attemptId),
+          eq(bulkEmailDeliveryAttempts.status, "PENDING"),
         ),
       )
-      .returning({ id: bulkEmails.id });
-    return updated[0] ? this.findById(updated[0].id) : null;
+      .returning({ attemptId: bulkEmailDeliveryAttempts.attemptId });
+    return rows.length > 0;
+  }
+
+  async finishDeliveryAttempt(
+    attemptId: string,
+    status: Exclude<BulkEmailDeliveryAttemptStatus, "PENDING" | "SENDING">,
+    input: { acceptedCount?: number; rejectedCount?: number; errorCode?: string | null } = {},
+  ): Promise<boolean> {
+    const allowedCurrentStatuses = status === "SENT"
+      ? ["SENDING"]
+      : status === "UNKNOWN"
+        ? ["PENDING", "SENDING", "FAILED", "UNKNOWN"]
+        : ["PENDING", "SENDING", "FAILED"];
+    const updated = await this.db
+      .update(bulkEmailDeliveryAttempts)
+      .set({
+        status,
+        acceptedCount: input.acceptedCount ?? 0,
+        rejectedCount: input.rejectedCount ?? 0,
+        completedAt: nowDate(),
+        errorCode: input.errorCode ?? null,
+      })
+      .where(and(
+        eq(bulkEmailDeliveryAttempts.attemptId, attemptId),
+        inArray(bulkEmailDeliveryAttempts.status, allowedCurrentStatuses),
+      ))
+      .returning({ attemptId: bulkEmailDeliveryAttempts.attemptId });
+    return updated.length > 0;
   }
 
   async findDueScheduled(now: Date, limit = 20): Promise<string[]> {
@@ -334,10 +447,23 @@ export class BulkEmailRepository {
     id: string,
     status: BulkEmailStatus,
     errorMessage?: string | null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const now = nowDate();
-    const terminal = status === "SUCCESS" || status === "DRY_RUN" || status === "FAILED";
-    await this.db
+    const terminal =
+      status === "SUCCESS" ||
+      status === "DRY_RUN" ||
+      status === "FAILED" ||
+      status === "UNKNOWN";
+    const allowedCurrentStatuses = status === "SENDING"
+      ? ["PENDING"]
+      : status === "SUCCESS" || status === "DRY_RUN"
+        ? ["SENDING"]
+        : status === "UNKNOWN"
+          ? ["PENDING", "SENDING", "FAILED", "UNKNOWN"]
+          : status === "FAILED"
+            ? ["PENDING", "SENDING", "FAILED"]
+            : ["PENDING", "SCHEDULED", "SENDING"];
+    const updated = await this.db
       .update(bulkEmails)
       .set({
         status,
@@ -345,6 +471,11 @@ export class BulkEmailRepository {
         completedAt: terminal ? now : null,
         errorMessage: errorMessage ?? null,
       })
-      .where(eq(bulkEmails.id, id));
+      .where(and(
+        eq(bulkEmails.id, id),
+        inArray(bulkEmails.status, allowedCurrentStatuses),
+      ))
+      .returning({ id: bulkEmails.id });
+    return updated.length > 0;
   }
 }

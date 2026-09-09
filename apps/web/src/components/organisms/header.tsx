@@ -138,6 +138,11 @@ export function Header({ variant = "default" }: HeaderProps) {
           permission: session.permission ?? 0,
         }
       : null;
+  const isTemporarySession = Boolean(
+    session?.authenticated &&
+      session.storageMode === "temporary" &&
+      !session.userId,
+  );
   const canUseAdminDashboard = user
     ? Permissions.hasAny(
         user.permission,
@@ -243,7 +248,11 @@ export function Header({ variant = "default" }: HeaderProps) {
   };
 
   const handleLogout = async () => {
-    await apiClient.logout();
+    const isTemporary = session?.storageMode === "temporary";
+    // Temporary sessions are stateless JWTs with no server-side record. Clear
+    // the tab-scoped credential immediately; persisted sessions still need a
+    // server-side revoke before the auth cookies are cleared.
+    if (!isTemporary) await apiClient.logout();
     clearStoredAuthState();
     await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
     window.location.assign("/");
@@ -801,6 +810,15 @@ export function Header({ variant = "default" }: HeaderProps) {
                 </PopoverPanel>
               )}
             </div>
+          ) : isTemporarySession ? (
+            <IconButton
+              aria-label={lang === "ko" ? "임시 세션 로그아웃" : "Log out temporary session"}
+              title={lang === "ko" ? "임시 세션 로그아웃" : "Log out temporary session"}
+              onClick={() => void handleLogout()}
+              className={variant === "home" ? "home-header-icon" : undefined}
+            >
+              <LogOut aria-hidden="true" />
+            </IconButton>
           ) : (
             <>
               <Button variant="ghost"

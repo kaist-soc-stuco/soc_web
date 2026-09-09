@@ -83,6 +83,20 @@ test("hero content is an image-only operational block", () => {
   assert.equal(CreateContentBlockSchema.safeParse({ ...base, imageUrl: "asset:7" }).success, true);
 });
 
+test("site content URL schemas reject encoded and protocol-relative schemes", () => {
+  const base = {
+    type: "HERO",
+    titleKo: "홈 히어로",
+    titleEn: "Home hero",
+    imageUrl: "asset:7",
+  };
+  assert.equal(CreateContentBlockSchema.safeParse({ ...base, linkUrl: "JaVaScRiPt:alert(1)" }).success, false);
+  assert.equal(CreateContentBlockSchema.safeParse({ ...base, linkUrl: "java%73cript:alert(1)" }).success, false);
+  assert.equal(CreateContentBlockSchema.safeParse({ ...base, linkUrl: "//evil.example" }).success, false);
+  assert.equal(CreateContentBlockSchema.safeParse({ ...base, linkUrl: "mailto:ops@example.com" }).success, true);
+  assert.equal(CreateContentBlockSchema.safeParse({ ...base, linkUrl: "/internal/path" }).success, true);
+});
+
 test("public listing omits editor identity while admin listing retains audit fields", async () => {
   const repository = {
     findAll: async () => [record],

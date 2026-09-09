@@ -84,6 +84,29 @@ export interface SurveyRecord {
   spreadsheetLastSyncedAt: string | null;
 }
 
+/**
+ * Public survey metadata. Creator, version lineage, and spreadsheet
+ * integration fields are deliberately absent from this contract.
+ */
+export type PublicSurveyRecord = Omit<
+  SurveyRecord,
+  | "creatorId"
+  | "previousVersionId"
+  | "versionNumber"
+  | "derivedVersionCount"
+  | "spreadsheetId"
+  | "spreadsheetUrl"
+  | "spreadsheetSyncStatus"
+  | "spreadsheetLastSyncedAt"
+>;
+
+export interface PublicSurveyListResponse {
+  page: number;
+  pageSize: number;
+  total: number;
+  items: PublicSurveyRecord[];
+}
+
 export interface SurveySectionRecord {
   id: string;
   surveyId: string;
@@ -176,12 +199,38 @@ export interface SurveyDetailResponse extends SurveyRecord {
   isPreview?: boolean;
 }
 
+export type PublicSurveyDetailResponse = Omit<
+  SurveyDetailResponse,
+  | "creatorId"
+  | "previousVersionId"
+  | "versionNumber"
+  | "derivedVersionCount"
+  | "spreadsheetId"
+  | "spreadsheetUrl"
+  | "spreadsheetSyncStatus"
+  | "spreadsheetLastSyncedAt"
+>;
+
 export interface ResponseDetailResponse extends SurveyResponseRecord {
   answers: SurveyAnswerRecord[];
 }
 
 export interface SurveyResponseWithAnswers extends SurveyResponseRecord {
   answers: SurveyAnswerRecord[];
+}
+
+export interface SurveyResponseListResponse {
+  page: number;
+  pageSize: number;
+  total: number;
+  items: SurveyResponseRecord[];
+}
+
+export interface SurveyResponseWithAnswersListResponse {
+  page: number;
+  pageSize: number;
+  total: number;
+  items: SurveyResponseWithAnswers[];
 }
 
 export interface SurveyChoiceAnalyticsItem {

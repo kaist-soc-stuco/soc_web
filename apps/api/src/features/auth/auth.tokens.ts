@@ -17,6 +17,9 @@ export const AUTH_TEMPORARY_ACCESS_TOKEN_TTL_SECONDS = 10 * 60;
 export const AUTH_ACCESS_COOKIE_NAME = "soc_access_token";
 export const AUTH_REFRESH_COOKIE_NAME = "soc_refresh_token";
 export const AUTH_SESSION_COOKIE_NAME = "soc_session_id";
+export const AUTH_SSO_TRANSACTION_COOKIE_NAME = "soc_sso_transaction";
+export const AUTH_LOGIN_TRANSACTION_COOKIE_NAME = "soc_login_transaction";
+export const AUTH_CSRF_COOKIE_NAME = "soc_csrf";
 export const AUTH_TEMPORARY_STORAGE_KEY = "soc.auth.temporary-session";
 
 export const extractBearerToken = (

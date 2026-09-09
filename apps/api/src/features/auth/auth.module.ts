@@ -36,6 +36,10 @@ import { AuditLogModule } from "../audit/audit-log.module";
     AuthCookieService,
     AuthSessionRepository,
     AuthSessionService,
+    // Auth guards are consumed by feature controllers. Re-export the rate
+    // limiter they depend on so Nest can resolve the guard across module
+    // boundaries instead of creating a partially scoped provider.
+    RedisModule,
   ],
 })
 export class AuthModule {}

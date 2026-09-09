@@ -7,6 +7,7 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TextStyleKit } from "@tiptap/extension-text-style";
+import { isSafeUrlReference } from "@soc/contracts";
 import {
   Bold,
   Code,
@@ -143,7 +144,15 @@ function promptForLink(editor: Editor, lang: string) {
     editor.chain().focus().extendMarkRange("link").unsetLink().run();
     return;
   }
-  const finalUrl = /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
+  const trimmedUrl = url.trim();
+  const finalUrl =
+    /^(?:[a-z][a-z\d+.-]*:|[/#?])/i.test(trimmedUrl)
+      ? trimmedUrl
+      : `https://${trimmedUrl}`;
+  if (!isSafeUrlReference(finalUrl)) {
+    window.alert(lang === "ko" ? "안전하지 않은 URL은 사용할 수 없습니다." : "This URL is not allowed.");
+    return;
+  }
   editor.chain().focus().extendMarkRange("link").setLink({ href: finalUrl }).run();
 }
 

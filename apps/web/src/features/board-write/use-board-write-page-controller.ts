@@ -20,6 +20,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
+import { getDraftStorageKey } from "@/lib/draft-storage";
 import { hasAdminPermission } from "@/lib/permissions";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 
@@ -143,6 +144,11 @@ export function useBoardWritePageController(forcedCategory?: string) {
   const canManageTemplates = hasAdminPermission(userPermission);
   const canConfigurePostSettings =
     !PUBLIC_WRITE_BOARD_CODES.has(selectedCategory);
+  const localDraftStorageKey = getDraftStorageKey(
+    "article",
+    selectedCategory,
+    session,
+  );
 
   useEffect(() => {
     if (!canUseWriteFeatures || writableBoardCodes.length === 0) return;
@@ -442,7 +448,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
 
   const handleSaveDraft = async () => {
     setDraftStatus("saving");
-    const key = `draft_${selectedCategory}`;
+    const key = localDraftStorageKey;
     const data = {
       titleKo,
       titleEn,
@@ -465,7 +471,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
       updatedAt: nowMs(),
     };
     try {
-      localStorage.setItem(key, JSON.stringify(data));
+      if (key) localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
       console.error(error);
       setDraftStatus("failed");
@@ -590,7 +596,8 @@ export function useBoardWritePageController(forcedCategory?: string) {
       }
     }
 
-    const key = `draft_${selectedCategory}`;
+    const key = localDraftStorageKey;
+    if (!key) return;
     const raw = localStorage.getItem(key);
     if (!raw) return;
     try {
@@ -651,7 +658,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         current.filter((draft) => draft.draftId !== serverDraftId),
       );
     }
-    localStorage.removeItem(`draft_${selectedCategory}`);
+    if (localDraftStorageKey) localStorage.removeItem(localDraftStorageKey);
     setTitleKo("");
     setTitleEn("");
     setContentKo("");
@@ -940,7 +947,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
               : undefined,
         });
       }
-      localStorage.removeItem(`draft_${selectedCategory}`);
+      if (localDraftStorageKey) localStorage.removeItem(localDraftStorageKey);
       if (serverDraftId) {
         await apiClient.deleteArticleDraft(serverDraftId).catch(() => undefined);
       }

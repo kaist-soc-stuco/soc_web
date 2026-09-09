@@ -163,6 +163,13 @@ export class PendingLoginRepository {
     return rawValue ? this.parse(rawValue) : null;
   }
 
+  /** Redis GETDEL makes consent a one-time decision under concurrent submits. */
+  async consume(pendingLoginToken: string): Promise<PendingSsoUser | null> {
+    const pendingKey = this.buildKey(pendingLoginToken);
+    const rawValue = await this.redis.getdel(pendingKey);
+    return rawValue ? this.parse(rawValue) : null;
+  }
+
   async delete(pendingLoginToken: string): Promise<void> {
     const pendingKey = this.buildKey(pendingLoginToken);
     await this.redis.del(pendingKey);

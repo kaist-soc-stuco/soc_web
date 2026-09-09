@@ -25,6 +25,7 @@ import { getSurveyEligibilityFailure } from "./survey-eligibility";
 import { GoogleSurveySheetsService } from "./google-survey-sheets.service";
 import type { TemporaryAccessTokenClaims } from "../auth/auth.types";
 import { AuditLogService } from "../audit/audit-log.service";
+import { getCanonicalSurveyAssetIds } from "./survey-answer-validation";
 
 interface SurveyCaller {
   id?: string;
@@ -55,11 +56,7 @@ export class SurveyResponsesService {
     const questionById = new Map(questions.map((question) => [question.id, question]));
     const assetInputs = answers.flatMap((answer) => {
       const content = answer.content;
-      const ids = typeof content.assetId === "string"
-        ? [content.assetId]
-        : Array.isArray(content.assetIds)
-          ? content.assetIds.filter((assetId): assetId is string => typeof assetId === "string")
-          : [];
+      const ids = getCanonicalSurveyAssetIds(content);
       return ids.map((assetId) => ({ assetId, question: questionById.get(answer.questionId) }));
     });
     const uniqueAssetIds = [...new Set(assetInputs.map((input) => input.assetId))];
@@ -194,6 +191,9 @@ export class SurveyResponsesService {
     if (submission.status === "capacity_full") {
       throw new ConflictException("survey_capacity_full");
     }
+    if (submission.status === "answer_file_not_owned") {
+      throw new ForbiddenException("answer_file_not_owned");
+    }
 
     await this.auditLogService?.record({
       action: "survey_response.submit",
@@ -327,6 +327,9 @@ export class SurveyResponsesService {
     if (update.status === "multiple_response_edit_not_supported") {
       throw new ConflictException("multiple_response_edit_not_supported");
     }
+    if (update.status === "answer_file_not_owned") {
+      throw new ForbiddenException("answer_file_not_owned");
+    }
     throw new NotFoundException("response_not_found");
   }
 
@@ -339,17 +342,53 @@ export class SurveyResponsesService {
     return questions.flat();
   }
 
-  async findAll(surveyId: string): Promise<SurveyResponseRecord[]> {
+  async findAll(
+    surveyId: string,
+    input: {
+      page?: number;
+      pageSize?: number;
+      query?: string;
+      sortOrder?: "asc" | "desc";
+    } = {},
+  ): Promise<import("@soc/contracts").SurveyResponseListResponse> {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
-    return this.responsesRepo.findBySurveyId(surveyId);
+    const page = Number.isInteger(input.page) && (input.page ?? 0) > 0 ? input.page! : 1;
+    const pageSize = Number.isInteger(input.pageSize) && (input.pageSize ?? 0) > 0
+      ? Math.min(input.pageSize!, 100)
+      : 100;
+    const result = await this.responsesRepo.findBySurveyId(surveyId, {
+      page,
+      pageSize,
+      query: input.query,
+      sortOrder: input.sortOrder,
+    });
+    return { page, pageSize, ...result };
   }
 
-  async findAllWithAnswers(surveyId: string): Promise<Array<SurveyResponseRecord & { answers: SurveyAnswerRecord[] }>> {
+  async findAllWithAnswers(
+    surveyId: string,
+    input: {
+      page?: number;
+      pageSize?: number;
+      query?: string;
+      sortOrder?: "asc" | "desc";
+    } = {},
+  ): Promise<import("@soc/contracts").SurveyResponseWithAnswersListResponse> {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
-    const responses = await this.responsesRepo.findBySurveyId(surveyId);
-    const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);
+    const page = Number.isInteger(input.page) && (input.page ?? 0) > 0 ? input.page! : 1;
+    const pageSize = Number.isInteger(input.pageSize) && (input.pageSize ?? 0) > 0
+      ? Math.min(input.pageSize!, 100)
+      : 100;
+    const responsePage = await this.responsesRepo.findBySurveyId(surveyId, {
+      page,
+      pageSize,
+      query: input.query,
+      sortOrder: input.sortOrder,
+    });
+    const responses = responsePage.items;
+    const answers = await this.responsesRepo.findAnswersByResponseIds(responses.map((response) => response.id));
 
     const answersMap: Record<string, SurveyAnswerRecord[]> = {};
     for (const a of answers) {
@@ -359,10 +398,15 @@ export class SurveyResponsesService {
       answersMap[a.responseId].push(a);
     }
 
-    return responses.map((r) => ({
-      ...r,
-      answers: answersMap[r.id] || [],
-    }));
+    return {
+      page,
+      pageSize,
+      total: responsePage.total,
+      items: responses.map((r) => ({
+        ...r,
+        answers: answersMap[r.id] || [],
+      })),
+    };
   }
 
   async findDetail(surveyId: string, responseId: string): Promise<ResponseDetailResponse> {

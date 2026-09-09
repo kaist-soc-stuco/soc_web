@@ -25,6 +25,7 @@ export const executiveContacts = pgTable("executive_contact", {
   email: varchar("email", { length: 255 }),
   phoneNumber: varchar("phone_number", { length: 50 }),
   privacyConsented: boolean("privacy_consented").notNull().default(true),
+  publiclyListed: boolean("publicly_listed").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

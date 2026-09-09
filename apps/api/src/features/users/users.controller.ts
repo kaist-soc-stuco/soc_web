@@ -224,6 +224,7 @@ export class UsersController {
   }
 
   @Get("fee-status/list")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async listStudentsByFeeStatus(
     @Query("status") status?: string,
@@ -266,6 +267,7 @@ export class UsersController {
   }
 
   @Get("fee-status/stats")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async getStudentFeeStats(
     @Query("dateFrom") dateFrom?: string,
@@ -285,6 +287,7 @@ export class UsersController {
   }
 
   @Post("fee-status/spreadsheet/sync")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async syncStudentFeeSpreadsheet(
     @Req() req: AuthenticatedRequest,
@@ -321,6 +324,7 @@ export class UsersController {
   }
 
   @Get("fee-status/spreadsheet")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async getStudentFeeSpreadsheet(
     @Req() req: AuthenticatedRequest,
@@ -332,6 +336,7 @@ export class UsersController {
   }
 
   @Get("fee-status/export.xlsx")
+  @Header("Cache-Control", "private, no-store")
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="student_fee_status.xlsx"')
   @RequirePermissions(Permissions.MANAGE_FINANCE)
@@ -403,6 +408,7 @@ export class UsersController {
   }
 
   @Post("fee-status/bulk")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async bulkUpdateStudentFeeStatus(
     @Body(new ZodValidationPipe(BulkUpdateStudentFeeStatusSchema))
@@ -416,6 +422,7 @@ export class UsersController {
   }
 
   @Post("fee-status/payments")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async processStudentFeePayments(
     @Body(new ZodValidationPipe(BulkProcessStudentFeePaymentsSchema))
@@ -429,6 +436,7 @@ export class UsersController {
   }
 
   @Get("fee-status/detail/:userId")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async getStudentFeeDetail(@Param("userId") userId: string) {
     const detail = await this.usersService.getStudentFeeDetail(userId);
@@ -437,6 +445,7 @@ export class UsersController {
   }
 
   @Get(":userId/fee-status")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async getStudentFeeStatus(@Param("userId") userId: string) {
     const status = await this.usersService.getStudentFeeStatus(userId);
@@ -448,6 +457,7 @@ export class UsersController {
   }
 
   @Put(":userId/fee-status")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.MANAGE_FINANCE)
   async updateStudentFeeStatus(
     @Param("userId") userId: string,

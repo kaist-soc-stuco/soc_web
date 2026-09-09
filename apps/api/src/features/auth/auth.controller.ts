@@ -26,8 +26,10 @@ import { AuditLogService } from "../audit/audit-log.service";
 import { OptionalAuthGuard } from "./guards";
 import {
   AUTH_ACCESS_COOKIE_NAME,
+  AUTH_LOGIN_TRANSACTION_COOKIE_NAME,
   AUTH_REFRESH_COOKIE_NAME,
   AUTH_SESSION_COOKIE_NAME,
+  AUTH_SSO_TRANSACTION_COOKIE_NAME,
   extractBearerToken,
 } from "./auth.tokens";
 
@@ -51,8 +53,15 @@ export class AuthController {
    * SSO authorize 요청에 필요한 초기 payload를 발급합니다.
    */
   @Get("login/start")
-  async startLogin() {
-    return this.authService.createLoginStartPayload();
+  async startLogin(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const payload = await this.authService.createLoginStartPayload();
+    // The state is also stored in an HttpOnly cookie so a callback copied from
+    // another browser cannot complete this browser's login transaction.
+    this.authCookieService.setSsoTransactionCookie(response, payload.state, request);
+    return payload;
   }
 
   @Get("channel-talk")
@@ -70,7 +79,19 @@ export class AuthController {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    const redirectUrl = await this.authService.handleLoginCallback(body);
+    const result = await this.authService.handleLoginCallback(
+      body,
+      request.cookies?.[AUTH_SSO_TRANSACTION_COOKIE_NAME],
+    );
+    this.authCookieService.clearSsoTransactionCookie(response, request);
+    if (result.transactionToken) {
+      this.authCookieService.setLoginTransactionCookie(
+        response,
+        result.transactionToken,
+        request,
+      );
+    }
+    const redirectUrl = result.redirectUrl;
     const redirect = new URL(redirectUrl, "http://localhost");
     await this.auditLogService?.record({
       action: "auth.sso.callback",
@@ -85,15 +106,17 @@ export class AuthController {
     response.redirect(302, redirectUrl);
   }
 
-  @Get("login/result")
+  @Post("login/result")
   async consumeLoginResult(
-    @Query("resultToken") resultToken: string | undefined,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    // Redirect 이후 1회성 resultToken을 소비해 쿠키 세팅에 필요한 값을 회수합니다.
-    const result = await this.authService.consumeLoginResult(resultToken);
+    // The one-time token is HttpOnly and never enters the URL or browser
+    // storage. Redis GETDEL makes this completion single-use.
+    const transactionToken = request.cookies?.[AUTH_LOGIN_TRANSACTION_COOKIE_NAME];
+    const result = await this.authService.consumeLoginResult(transactionToken);
     this.authCookieService.setAuthCookies(response, result, request);
+    this.authCookieService.clearLoginTransactionCookie(response, request);
     await this.auditLogService?.record({
       action: "auth.login.success",
       actorUserId: result.userId ?? null,
@@ -111,7 +134,7 @@ export class AuthController {
 
   /**
    * 개인정보 저장 동의/비동의 결정을 처리합니다.
-   * @body pendingLoginToken, consent
+   * @body consent
    */
   @Post("login/consent")
   async handleConsentDecision(
@@ -119,7 +142,16 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authSessionService.handleConsentDecision(body);
+    const transactionToken = request.cookies?.[AUTH_LOGIN_TRANSACTION_COOKIE_NAME];
+    const pendingLoginToken = await this.authService.getPendingLoginToken(
+      transactionToken,
+    );
+    const result = await this.authSessionService.handleConsentDecision({
+      consent: body.consent,
+      pendingLoginToken,
+    });
+    await this.authService.clearLoginTransaction(transactionToken);
+    this.authCookieService.clearLoginTransactionCookie(response, request);
 
     if (result.storageMode === "persisted") {
       this.authCookieService.setAuthCookies(response, result, request);

@@ -1,0 +1,11 @@
+flowchart LR
+  U[요청 actor] --> A[본문 서비스 secret 검사]
+  U --> C[댓글 서비스에 동일 검사 추가]
+  U --> F[파일 서비스에 동일 검사 추가]
+  A --> D[(원본 객체 DB)]
+  C --> D
+  F --> D
+  F --> S[Storage bytes]
+  I[설문 파일 입력] --> V[정규화 및 owner 검증]
+  V --> P[검증된 입력 저장]
+  P --> D
