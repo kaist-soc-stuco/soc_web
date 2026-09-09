@@ -6,6 +6,7 @@ import { msToIso, nowMs } from "@soc/shared";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { useLanguage } from "@/hooks/use-language";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { getDraftStorageKey } from "@/lib/draft-storage";
 import {
   answerContentToValue,
   emptyAnswerValue,
@@ -16,10 +17,6 @@ import {
 import { getVisibleSurveySectionIds } from "./survey-branching";
 
 const SURVEY_RESPONSE_DRAFT_VERSION = 1;
-
-function getSurveyResponseDraftKey(surveyId: string, userId?: string) {
-  return `soc:survey-response-draft:${surveyId}:${userId ?? "anonymous"}`;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -96,7 +93,10 @@ export function useSurveyPageController(surveyId: string | undefined) {
   useEffect(() => {
     if (!surveyId) return;
 
-    const storageKey = getSurveyResponseDraftKey(surveyId, session?.userId);
+    if (sessionLoading) return;
+
+    const storageKey = getDraftStorageKey("survey-response", surveyId, session);
+    if (!storageKey) return;
     let active = true;
 
     setLoadError(null);
@@ -143,11 +143,12 @@ export function useSurveyPageController(surveyId: string | undefined) {
     return () => {
       active = false;
     };
-  }, [surveyId, apiClient, lang, session?.userId]);
+  }, [surveyId, apiClient, lang, session, sessionLoading]);
 
   const draftStorageKey = surveyId
-    ? getSurveyResponseDraftKey(surveyId, session?.userId)
+    ? getDraftStorageKey("survey-response", surveyId, session)
     : null;
+  const draftHydrated = Boolean(draftStorageKey && hydratedDraftKey === draftStorageKey);
 
   const resetResponseDraft = useCallback(() => {
     const clearedAnswers: Record<string, AnswerValue> = {};
@@ -366,6 +367,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
     allSurveyQuestions,
     answers,
     draftRestored,
+    draftHydrated,
     handleAnswerChange,
     handleSubmit,
     lang,

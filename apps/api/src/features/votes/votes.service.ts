@@ -207,11 +207,14 @@ export class VotesService {
     }
     const receipt = this.crypto.createReceipt();
     const encrypted = this.crypto.encryptBallot({ answers: input.answers }, this.unwrapKey(vote));
-    const accepted = await this.repo.submitBallot({
+    const submission = await this.repo.submitBallot({
       voteId: id, userId, ciphertext: encrypted.ciphertext, iv: encrypted.iv,
       authTag: encrypted.authTag, receiptHash: receipt.hash,
     });
-    if (!accepted) throw new ConflictException("vote_already_submitted");
+    if (submission === "vote_not_found") throw new NotFoundException("vote_not_found");
+    if (submission === "vote_not_eligible") throw new ForbiddenException("vote_not_eligible");
+    if (submission === "already_submitted") throw new ConflictException("vote_already_submitted");
+    if (submission === "vote_not_open") throw new ConflictException("vote_not_open");
     return { receiptCode: receipt.code, submittedAt: nowIso() };
   }
 

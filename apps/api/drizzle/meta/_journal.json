@@ -120,6 +120,48 @@
       "when": 1788749854456,
       "tag": "0016_noisy_iron_lad",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788852602093,
+      "tag": "0017_wide_mindworm",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788853738682,
+      "tag": "0018_sturdy_thunderball",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788854500030,
+      "tag": "0019_yellow_the_hand",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788864302641,
+      "tag": "0020_late_genesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788865538935,
+      "tag": "0021_vengeful_vision",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788868316021,
+      "tag": "0022_square_manta",
+      "breakpoints": true
     }
   ]
 }

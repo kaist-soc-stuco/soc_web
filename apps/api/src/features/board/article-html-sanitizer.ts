@@ -1,9 +1,10 @@
 import sanitizeHtml, { type IOptions } from "sanitize-html";
+import { isSafeUrlReference } from "@soc/contracts";
 
 const isSafeImageSource = (value: string | undefined) => {
   const source = value?.trim() ?? "";
   return (
-    /^https?:\/\//i.test(source) ||
+    isSafeUrlReference(source, ["http:", "https:"], false) ||
     /^\/(?:api\/)?(?:v\d+\/)?assets\/\d+\/content(?:[?#].*)?$/i.test(source)
   );
 };
@@ -62,6 +63,12 @@ const ARTICLE_HTML_SANITIZE_OPTIONS: IOptions = {
   exclusiveFilter: (frame) => frame.tag === "img" && !isSafeImageSource(frame.attribs.src),
   transformTags: {
     a: (tagName, attributes) => {
+      const href = attributes.href?.trim();
+      if (!href || !isSafeUrlReference(href)) {
+        const { href: _href, rel: _rel, target: _target, ...withoutLink } = attributes;
+        return { tagName: "span", attribs: withoutLink };
+      }
+
       if (attributes.target === "_blank") {
         return {
           tagName,

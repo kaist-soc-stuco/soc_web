@@ -90,15 +90,16 @@ export class AssetController {
     const file = await this.assetService.getFile(assetId, currentUser, {
       actorUserId: currentUser.user?.id ?? null,
       ipAddress: request.ip ?? null,
-    });
+    }, true);
     const headers = buildAssetResponseHeaders(file);
 
     for (const [name, value] of Object.entries(headers)) {
       response.setHeader(name, value);
     }
-    response.setHeader("Content-Length", String(file.buffer.byteLength));
+    response.setHeader("Content-Length", String(file.sizeBytes));
 
-    return new StreamableFile(file.buffer);
+    if (!file.stream) throw new BadRequestException("asset_stream_unavailable");
+    return new StreamableFile(file.stream);
   }
 
   @Post("upload")

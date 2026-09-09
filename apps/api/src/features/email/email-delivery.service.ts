@@ -6,7 +6,16 @@ import {
 import { ConfigService } from "@nestjs/config";
 import nodemailer from "nodemailer";
 
+import { EmailDeliveryError } from "./email-delivery-error";
+
 export const EMAIL_DELIVERY_NOT_CONFIGURED = "email_delivery_not_configured";
+
+export interface EmailDeliveryResult {
+  dryRun: boolean;
+  messageId?: string;
+  acceptedCount?: number;
+  rejectedCount?: number;
+}
 
 @Injectable()
 export class EmailDeliveryService {
@@ -19,13 +28,14 @@ export class EmailDeliveryService {
     subject: string;
     content: string;
     html?: string;
+    messageId?: string;
     attachments?: Array<{
       filename: string;
       content: Buffer;
       contentType: string;
       cid?: string;
     }>;
-  }): Promise<{ dryRun: boolean }> {
+  }): Promise<EmailDeliveryResult> {
     const dryRun = this.configService.get<boolean>(
       "EMAIL_DRY_RUN",
       this.configService.get<string>("NODE_ENV") !== "production",
@@ -53,15 +63,44 @@ export class EmailDeliveryService {
       ...(user && password ? { auth: { user, pass: password } } : {}),
     });
 
-    await transporter.sendMail({
-      from,
-      bcc: input.recipients,
-      subject: input.subject,
-      text: input.content,
-      ...(input.html ? { html: input.html } : {}),
-      ...(input.attachments?.length ? { attachments: input.attachments } : {}),
-    });
-
-    return { dryRun: false };
+    try {
+      const result = await transporter.sendMail({
+        from,
+        bcc: input.recipients,
+        subject: input.subject,
+        text: input.content,
+        ...(input.html ? { html: input.html } : {}),
+        ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+        ...(input.messageId ? { messageId: input.messageId } : {}),
+      });
+      return {
+        dryRun: false,
+        messageId: typeof result.messageId === "string" ? result.messageId : input.messageId,
+        acceptedCount: Array.isArray(result.accepted) ? result.accepted.length : input.recipients.length,
+        rejectedCount: Array.isArray(result.rejected) ? result.rejected.length : 0,
+      };
+    } catch (error) {
+      const details = error as {
+        accepted?: unknown;
+        rejected?: unknown;
+        messageId?: unknown;
+        responseCode?: unknown;
+      };
+      const acceptedCount = Array.isArray(details.accepted) ? details.accepted.length : 0;
+      const rejectedCount = Array.isArray(details.rejected) ? details.rejected.length : 0;
+      const responseCode = typeof details.responseCode === "number" ? details.responseCode : null;
+      const isDefinitePreSendFailure =
+        acceptedCount === 0 && responseCode !== null && responseCode >= 500 && responseCode < 600;
+      throw new EmailDeliveryError(
+        isDefinitePreSendFailure ? "email_delivery_rejected" : "email_delivery_ambiguous",
+        isDefinitePreSendFailure ? "pre_send" : "ambiguous",
+        {
+          acceptedCount,
+          rejectedCount,
+          providerMessageId: typeof details.messageId === "string" ? details.messageId : input.messageId,
+          cause: error,
+        },
+      );
+    }
   }
 }

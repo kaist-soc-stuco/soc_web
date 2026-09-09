@@ -5,7 +5,7 @@ const {
   GoogleSurveySheetsService,
 } = require("../dist/apps/api/src/features/surveys/google-survey-sheets.service.js");
 
-function createService(initialSurvey, sheets = {}) {
+function createService(initialSurvey, sheets = {}, auditLogService) {
   let survey = { ...initialSurvey };
   const calls = [];
   const repository = {
@@ -15,6 +15,10 @@ function createService(initialSurvey, sheets = {}) {
     },
     updateSpreadsheetSyncState: async (_id, status) => {
       survey = { ...survey, spreadsheetSyncStatus: status };
+    },
+    updateSpreadsheetSyncStateForClaim: async (_id, status) => {
+      survey = { ...survey, spreadsheetSyncStatus: status };
+      return true;
     },
   };
   const sharedSheets = {
@@ -39,9 +43,12 @@ function createService(initialSurvey, sheets = {}) {
     { findBySurveyId: async () => [] },
     { findBySectionId: async () => [] },
     {
-      findBySurveyId: async () => [],
+      findBySurveyId: async () => ({ items: [], total: 0 }),
       findAnswersBySurveyId: async () => [],
+      findAnswersByResponseIds: async () => [],
     },
+    undefined,
+    auditLogService,
   );
   return { service, calls, getSurvey: () => survey };
 }
@@ -129,4 +136,33 @@ test("marks a failed sheet connection as an error", async () => {
 
   await assert.rejects(service.connect("survey-1"), /oauth unavailable/);
   assert.equal(getSurvey().spreadsheetSyncStatus, "ERROR");
+});
+
+test("a background survey write is not repeated when its audit row fails", async () => {
+  const { service, calls, getSurvey } = createService(
+    {
+      id: "survey-1",
+      titleKo: "진로 설문",
+      spreadsheetId: "existing-sheet",
+    },
+    {},
+    {
+      record: async () => {
+        throw new Error("synthetic_audit_store_failure");
+      },
+    },
+  );
+
+  await service.refresh("survey-1", true, {
+    jobId: "job-1",
+    resourceKey: "survey-1",
+    resourceType: "SURVEY",
+    revision: 4,
+    claimToken: "claim-1",
+    leaseUntil: new Date(Date.now() + 60_000),
+    isCurrentClaim: async () => true,
+  });
+
+  assert.equal(calls.filter((call) => call.kind === "syncSheet").length, 1);
+  assert.equal(getSurvey().spreadsheetSyncStatus, "CONNECTED");
 });

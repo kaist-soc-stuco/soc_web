@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { nowMs } from "@soc/shared";
+import { readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
 
 interface GoogleOAuthClient {
   client_id: string;
@@ -449,7 +450,7 @@ export class GoogleSheetsClient {
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(20_000),
     });
-    const responseText = await response.text();
+    const responseText = await readResponseTextWithLimit(response, 5 * 1024 * 1024);
     if (!response.ok) {
       throw new Error(
         `google_workspace_http_${response.status}${responseText ? `: ${responseText.slice(0, 300)}` : ""}`,
@@ -487,7 +488,9 @@ export class GoogleSheetsClient {
       }),
       signal: AbortSignal.timeout(20_000),
     });
-    const payload = (await response.json()) as GoogleTokenResponse;
+    const payload = JSON.parse(
+      await readResponseTextWithLimit(response, 512 * 1024),
+    ) as GoogleTokenResponse;
     if (!response.ok || !payload.access_token) {
       const detail = payload.error_description ?? payload.error;
       throw new Error(

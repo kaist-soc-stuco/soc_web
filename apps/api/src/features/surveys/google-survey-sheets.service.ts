@@ -4,6 +4,7 @@ import { GoogleSheetsClient } from "../../infrastructure/google/google-sheets.cl
 import {
   GOOGLE_SHEET_RESOURCE,
   GoogleSpreadsheetSyncQueueService,
+  type GoogleSpreadsheetSyncJobContext,
 } from "../../infrastructure/google/google-spreadsheet-sync-queue.service";
 import { SurveysRepository } from "./surveys.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
@@ -30,8 +31,8 @@ export class GoogleSurveySheetsService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.SURVEY, (surveyId) =>
-      this.refresh(surveyId, true),
+    this.syncQueue.registerHandler(GOOGLE_SHEET_RESOURCE.SURVEY, (surveyId, job) =>
+      this.refresh(surveyId, true, job),
     );
   }
 
@@ -100,19 +101,39 @@ export class GoogleSurveySheetsService implements OnModuleInit {
     );
   }
 
-  async refresh(surveyId: string, throwOnError = false): Promise<void> {
+  async refresh(
+    surveyId: string,
+    throwOnError = false,
+    job?: GoogleSpreadsheetSyncJobContext,
+  ): Promise<void> {
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey?.spreadsheetId) return;
+    const auditContext = {
+      executor: job ? "background-worker" : "request",
+      jobId: job?.jobId ?? null,
+      resource: job?.resourceKey ?? surveyId,
+      revision: job?.revision ?? null,
+    };
 
     try {
+      if (job && !(await job.isCurrentClaim())) return;
       const sections = await this.sectionsRepo.findBySurveyId(surveyId);
       const questions = (
         await Promise.all(
           sections.map((section) => this.questionsRepo.findBySectionId(section.id)),
         )
       ).flat();
-      const responses = await this.responsesRepo.findBySurveyId(surveyId);
-      const answers = await this.responsesRepo.findAnswersBySurveyId(surveyId);
+      const responsePage = await this.responsesRepo.findBySurveyId(surveyId, {
+        page: 1,
+        pageSize: 100,
+      });
+      if (responsePage.total > responsePage.items.length) {
+        throw new Error("survey_sheet_response_limit_exceeded");
+      }
+      const responses = responsePage.items;
+      const answers = await this.responsesRepo.findAnswersByResponseIds(
+        responses.map((response) => response.id),
+      );
       const answersByResponse = new Map<string, Map<string, SurveyAnswerRecord>>();
       for (const answer of answers) {
         const responseAnswers = answersByResponse.get(answer.responseId) ?? new Map();
@@ -144,6 +165,8 @@ export class GoogleSurveySheetsService implements OnModuleInit {
         ];
       });
 
+      if (job && !(await job.isCurrentClaim())) return;
+
       await this.sheets.syncSheet({
         spreadsheetId: survey.spreadsheetId,
         sheetTitle: SHEET_TITLE,
@@ -153,13 +176,60 @@ export class GoogleSurveySheetsService implements OnModuleInit {
         columnWidths: [230, 155, 105, 240, 150, 100, ...questions.map(() => 240)],
         protectionDescription: `KAIST SOC · 설문 응답 · ${survey.id} (읽기 전용)`,
       });
-      await this.surveysRepo.updateSpreadsheetSyncState(surveyId, "CONNECTED");
+      if (job && !(await job.isCurrentClaim())) return;
+      const stateUpdated = job
+        ? await this.surveysRepo.updateSpreadsheetSyncStateForClaim(
+            surveyId,
+            "CONNECTED",
+            job,
+          )
+        : await this.surveysRepo.updateSpreadsheetSyncState(surveyId, "CONNECTED").then(() => true);
+      if (!stateUpdated) return;
+      await this.recordAuditSafely({
+        action: "survey.spreadsheet.refresh",
+        actorUserId: null,
+        payload: { ...auditContext, result: "succeeded", responseCount: responses.length },
+        targetId: surveyId,
+        targetType: "survey",
+      });
     } catch (error) {
-      await this.surveysRepo.updateSpreadsheetSyncState(surveyId, "ERROR");
+      if (job) {
+        await this.surveysRepo.updateSpreadsheetSyncStateForClaim(surveyId, "ERROR", job);
+      } else {
+        await this.surveysRepo.updateSpreadsheetSyncState(surveyId, "ERROR");
+      }
+      await this.recordAuditSafely({
+        action: "survey.spreadsheet.refresh",
+        actorUserId: null,
+        payload: {
+          ...auditContext,
+          result: "failed",
+          errorCode: error instanceof Error ? error.name : "unknown_error",
+        },
+        targetId: surveyId,
+        targetType: "survey",
+      });
       this.logger.warn(
         `Survey sheet sync failed (${surveyId}): ${error instanceof Error ? error.message : String(error)}`,
       );
       if (throwOnError) throw error;
+    }
+  }
+
+  private async recordAuditSafely(input: {
+    action: string;
+    actorUserId: string | null;
+    payload: Record<string, unknown>;
+    targetId: string;
+    targetType: string;
+  }): Promise<void> {
+    try {
+      await this.auditLogService?.record(input);
+    } catch (error) {
+      // Audit retry is independent from the already-completed Google write.
+      this.logger.warn(
+        `Survey spreadsheet audit failed (${input.action}): ${error instanceof Error ? error.name : "unknown_error"}`,
+      );
     }
   }
 

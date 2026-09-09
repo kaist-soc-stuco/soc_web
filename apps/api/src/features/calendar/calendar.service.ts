@@ -39,9 +39,13 @@ import { CalendarSyncService } from "./calendar-sync.service";
 import { addSeoulDays, formatSeoulDate } from "./calendar.utils";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
+import { fetchBoundedText, readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
 
 const HOLIDAY_API_URL =
   "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo";
+const MAX_EXTERNAL_ICS_BYTES = 2_000_000;
+const MAX_EXTERNAL_ICS_REDIRECTS = 3;
+const MAX_HOLIDAY_RESPONSE_BYTES = 512 * 1024;
 
 interface DataGoKrHolidayItem {
   locdate?: number | string;
@@ -474,6 +478,13 @@ export class CalendarService {
     userId: string,
     audit?: AuditMetadata,
   ): Promise<CalendarExternalSyncResponse> {
+    const isProduction = this.configService.get<string>("NODE_ENV") === "production";
+    const allowedHosts = new Set(
+      (this.configService.get<string>("CALENDAR_EXTERNAL_ICS_ALLOWED_HOSTS") ?? "")
+        .split(",")
+        .map((value) => value.trim().toLowerCase().replace(/\.$/, ""))
+        .filter(Boolean),
+    );
     const configuredSources = (this.configService.get<string>("CALENDAR_EXTERNAL_ICS_URLS") ?? "")
       .split(",")
       .map((value) => value.trim())
@@ -481,7 +492,8 @@ export class CalendarService {
       .filter((value) => {
         try {
           const url = new URL(value);
-          return url.protocol === "https:" || (url.protocol === "http:" && this.configService.get<string>("NODE_ENV") !== "production");
+          return (url.protocol === "https:" || (url.protocol === "http:" && !isProduction)) &&
+            (!isProduction || allowedHosts.has(url.hostname.toLowerCase().replace(/\.$/, "")));
         } catch {
           return false;
         }
@@ -493,9 +505,15 @@ export class CalendarService {
 
     for (const source of configuredSources) {
       try {
-        const response = await fetch(source, { signal: AbortSignal.timeout(15_000) });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const result = await this.importIcs(userId, await response.text(), audit);
+        const fetched = await fetchBoundedText({
+          url: source,
+          timeoutMs: 15_000,
+          maxBytes: MAX_EXTERNAL_ICS_BYTES,
+          maxRedirects: MAX_EXTERNAL_ICS_REDIRECTS,
+          allowedHosts: allowedHosts.size > 0 ? allowedHosts : undefined,
+          rejectPrivateAddresses: true,
+        });
+        const result = await this.importIcs(userId, fetched.text, audit);
         importedCount += result.importedCount;
         skippedCount += result.skippedCount;
       } catch (error) {
@@ -612,14 +630,17 @@ export class CalendarService {
     });
 
     try {
-      const response = await fetch(`${HOLIDAY_API_URL}?${params.toString()}`);
+      const response = await fetch(`${HOLIDAY_API_URL}?${params.toString()}`, {
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+      });
 
       if (!response.ok) {
         this.logger.warn(`Holiday API failed with HTTP ${response.status}`);
         return [];
       }
 
-      const text = await response.text();
+      const text = await readResponseTextWithLimit(response, MAX_HOLIDAY_RESPONSE_BYTES);
       const items = text.trim().startsWith("<")
         ? this.parseXmlItems(text)
         : this.parseJsonItems(text);

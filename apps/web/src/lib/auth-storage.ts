@@ -7,7 +7,6 @@
  */
 
 export interface StoredAuthState {
-  pendingLoginToken?: string;
   temporarySession?: {
     accessToken?: string;
   };

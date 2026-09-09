@@ -28,21 +28,21 @@ function question(overrides = {}) {
   };
 }
 
-function expectHttpError(fn, ExceptionClass, message) {
-  assert.throws(fn, (error) => {
+async function expectHttpError(fn, ExceptionClass, message) {
+  await assert.rejects(Promise.resolve().then(fn), (error) => {
     assert.ok(error instanceof ExceptionClass);
     assert.equal(error.message, message);
     return true;
   });
 }
 
-test("accepts valid required and optional answers", () => {
+test("accepts valid required and optional answers", async () => {
   const questions = [
     question({ id: "name" }),
     question({ id: "memo", isRequired: false, questionType: "long_text" }),
   ];
 
-  assert.doesNotThrow(() =>
+  await assert.doesNotReject(() =>
     validateSurveyAnswers(
       questions,
       [
@@ -54,16 +54,16 @@ test("accepts valid required and optional answers", () => {
   );
 });
 
-test("rejects missing required answer", () => {
-  expectHttpError(
+test("rejects missing required answer", async () => {
+  await expectHttpError(
     () => validateSurveyAnswers([question({ id: "name" })], [], NOW),
     BadRequestException,
     "required_answer_missing",
   );
 });
 
-test("rejects duplicate answers for the same question", () => {
-  expectHttpError(
+test("rejects duplicate answers for the same question", async () => {
+  await expectHttpError(
     () =>
       validateSurveyAnswers(
         [question({ id: "name" })],
@@ -78,8 +78,8 @@ test("rejects duplicate answers for the same question", () => {
   );
 });
 
-test("rejects unknown question ids", () => {
-  expectHttpError(
+test("rejects unknown question ids", async () => {
+  await expectHttpError(
     () =>
       validateSurveyAnswers(
         [question({ id: "known" })],
@@ -91,7 +91,7 @@ test("rejects unknown question ids", () => {
   );
 });
 
-test("validates choice answers against defined options", () => {
+test("validates choice answers against defined options", async () => {
   const choiceQuestion = question({
     id: "meal",
     questionType: "single_choice",
@@ -101,7 +101,7 @@ test("validates choice answers against defined options", () => {
     ],
   });
 
-  assert.doesNotThrow(() =>
+  await assert.doesNotReject(() =>
     validateSurveyAnswers(
       [choiceQuestion],
       [{ questionId: "meal", content: { value: "pizza" } }],
@@ -109,7 +109,7 @@ test("validates choice answers against defined options", () => {
     ),
   );
 
-  expectHttpError(
+  await expectHttpError(
     () =>
       validateSurveyAnswers(
         [choiceQuestion],
@@ -121,13 +121,13 @@ test("validates choice answers against defined options", () => {
   );
 });
 
-test("validates text answer regex", () => {
+test("validates text answer regex", async () => {
   const emailQuestion = question({
     id: "email",
     answerRegex: "^[^@]+@kaist\\.ac\\.kr$",
   });
 
-  expectHttpError(
+  await expectHttpError(
     () =>
       validateSurveyAnswers(
         [emailQuestion],
@@ -139,8 +139,8 @@ test("validates text answer regex", () => {
   );
 });
 
-test("ignores the retired question edit deadline", () => {
-  assert.doesNotThrow(() =>
+test("ignores the retired question edit deadline", async () => {
+  await assert.doesNotReject(() =>
     validateSurveyAnswers(
       [
         question({
@@ -153,19 +153,19 @@ test("ignores the retired question edit deadline", () => {
   );
 });
 
-test("rejects duplicate values in multiple-choice answers", () => {
+test("rejects duplicate values in multiple-choice answers", async () => {
   const multiple = question({
     questionType: "multiple_choice",
     options: [{ value: "a", labelKo: "A" }, { value: "b", labelKo: "B" }],
   });
-  expectHttpError(
+  await expectHttpError(
     () => validateSurveyAnswers([multiple], [{ questionId: multiple.id, content: { values: ["a", "a"] } }]),
     BadRequestException,
     "answer_option_invalid",
   );
 });
 
-test("requires every row of a required checkbox grid to contain a selection", () => {
+test("requires every row of a required checkbox grid to contain a selection", async () => {
   const grid = question({
     questionType: "grid_multiple",
     config: {
@@ -173,27 +173,27 @@ test("requires every row of a required checkbox grid to contain a selection", ()
       columns: [{ value: "col-1", labelKo: "1열" }, { value: "col-2", labelKo: "2열" }],
     },
   });
-  expectHttpError(
+  await expectHttpError(
     () => validateSurveyAnswers([grid], [{ questionId: grid.id, content: { grid: { "row-1": [] } } }]),
     BadRequestException,
     "required_answer_missing",
   );
 });
 
-test("validates date and time answer formats", () => {
-  expectHttpError(
+test("validates date and time answer formats", async () => {
+  await expectHttpError(
     () => validateSurveyAnswers([question({ questionType: "date" })], [{ questionId: "question-1", content: { date: "2026-02-31" } }]),
     BadRequestException,
     "answer_content_invalid",
   );
-  expectHttpError(
+  await expectHttpError(
     () => validateSurveyAnswers([question({ questionType: "time" })], [{ questionId: "question-1", content: { time: "25:80" } }]),
     BadRequestException,
     "answer_content_invalid",
   );
 });
 
-test("validates configured text and checkbox response rules", () => {
+test("validates configured text and checkbox response rules", async () => {
   const short = question({
     id: "short",
     config: {
@@ -203,10 +203,10 @@ test("validates configured text and checkbox response rules", () => {
       validationErrorMessage: "세 글자 이상 입력해주세요.",
     },
   });
-  assert.doesNotThrow(() =>
+  await assert.doesNotReject(() =>
     validateSurveyAnswers([short], [{ questionId: "short", content: { text: "abc" } }]),
   );
-  expectHttpError(
+  await expectHttpError(
     () => validateSurveyAnswers([short], [{ questionId: "short", content: { text: "ab" } }]),
     BadRequestException,
     "세 글자 이상 입력해주세요.",
@@ -225,15 +225,15 @@ test("validates configured text and checkbox response rules", () => {
       validationValue: 1,
     },
   });
-  expectHttpError(
+  await expectHttpError(
     () => validateSurveyAnswers([checkbox], [{ questionId: "checkbox", content: { values: ["a", "b"] } }]),
     BadRequestException,
     "answer_validation_mismatch",
   );
 });
 
-test("honors date and time answer settings", () => {
-  assert.doesNotThrow(() =>
+test("honors date and time answer settings", async () => {
+  await assert.doesNotReject(() =>
     validateSurveyAnswers(
       [
         question({ id: "date", questionType: "date", config: { dateIncludeTime: true } }),
@@ -245,7 +245,7 @@ test("honors date and time answer settings", () => {
       ],
     ),
   );
-  expectHttpError(
+  await expectHttpError(
     () => validateSurveyAnswers(
       [question({ questionType: "date", config: { dateIncludeYear: false } })],
       [{ questionId: "question-1", content: { date: "02-30" } }],
@@ -255,11 +255,22 @@ test("honors date and time answer settings", () => {
   );
 });
 
-test("accepts a valid uploaded asset reference", () => {
-  assert.doesNotThrow(() =>
+test("accepts a valid uploaded asset reference", async () => {
+  await assert.doesNotReject(() =>
     validateSurveyAnswers(
       [question({ questionType: "file_upload", config: { maxFiles: 1 } })],
       [{ questionId: "question-1", content: { assetId: "1" } }],
     ),
+  );
+});
+
+test("rejects mixed singular and plural uploaded asset fields", async () => {
+  await expectHttpError(
+    () => validateSurveyAnswers(
+      [question({ questionType: "file_upload", config: { maxFiles: 2 } })],
+      [{ questionId: "question-1", content: { assetId: "1", assetIds: ["2"] } }],
+    ),
+    BadRequestException,
+    "answer_file_mixed_asset_fields",
   );
 });

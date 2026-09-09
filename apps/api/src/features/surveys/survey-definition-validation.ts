@@ -7,6 +7,7 @@ import {
   assertSectionNavigation,
   compareSurveySections,
 } from "./survey-branching";
+import { assertSafeSurveyRegex } from "./survey-regex-policy";
 
 type SectionWithQuestions = SurveySectionRecord & { questions: SurveyQuestionRecord[] };
 
@@ -42,11 +43,7 @@ export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): 
     }
   }
   if (question.answerRegex) {
-    try {
-      new RegExp(question.answerRegex);
-    } catch {
-      throw new BadRequestException("answer_regex_invalid");
-    }
+    assertSafeSurveyRegex(question.answerRegex);
   }
 }
 

@@ -1,0 +1,12 @@
+flowchart LR
+  U[요청 actor] --> A[본문 서비스 secret 검사]
+  U --> C[댓글 서비스 scope 검사]
+  U --> F[파일 서비스 scope 또는 참조 검사]
+  A --> D[(원본 객체 DB)]
+  C --> D
+  F --> D
+  F --> S[Storage bytes]
+  I[설문 파일 입력] --> V[owner 검증 assetId 우선]
+  I --> P[answer 저장 assetIds 우선]
+  V --> P
+  P --> D

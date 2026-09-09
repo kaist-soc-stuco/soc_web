@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Req } from "@nestjs/common";
 import {
   CreateBulkEmailTemplateSchema,
   SaveBulkEmailDraftSchema,
@@ -33,6 +33,7 @@ export class BulkEmailController {
   constructor(private readonly bulkEmailService: BulkEmailService) {}
 
   @Get("history")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async getHistory(): Promise<BulkEmailListResponse> {
     const items = await this.bulkEmailService.getHistory();
@@ -40,12 +41,14 @@ export class BulkEmailController {
   }
 
   @Get("templates")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async getTemplates() {
     return { items: await this.bulkEmailService.getTemplates() };
   }
 
   @Post("templates")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async createTemplate(
     @Req() req: AuthedRequest,
@@ -55,6 +58,7 @@ export class BulkEmailController {
   }
 
   @Patch("templates/:templateId")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async updateTemplate(
     @Req() req: AuthedRequest,
@@ -65,18 +69,21 @@ export class BulkEmailController {
   }
 
   @Delete("templates/:templateId")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async deleteTemplate(@Req() req: AuthedRequest, @Param("templateId") templateId: string) {
     return this.bulkEmailService.deleteTemplate(templateId, auditMetadataFromRequest(req));
   }
 
   @Get("drafts")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async getDrafts(@Req() req: AuthedRequest): Promise<BulkEmailDraftListResponse> {
     return this.bulkEmailService.getDrafts(req.user.id);
   }
 
   @Post("drafts")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async saveDraft(
     @Req() req: AuthedRequest,
@@ -86,6 +93,7 @@ export class BulkEmailController {
   }
 
   @Delete("drafts/:draftId")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async deleteDraft(
     @Req() req: AuthedRequest,
@@ -95,6 +103,7 @@ export class BulkEmailController {
   }
 
   @Post("send")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async sendBulkEmail(
     @Req() req: AuthedRequest,
@@ -104,6 +113,7 @@ export class BulkEmailController {
   }
 
   @Post("test")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async sendTestEmail(
     @Req() req: AuthedRequest,
@@ -113,6 +123,7 @@ export class BulkEmailController {
   }
 
   @Post(":emailId/cancel")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async cancelScheduled(
     @Req() req: AuthedRequest,
@@ -122,6 +133,7 @@ export class BulkEmailController {
   }
 
   @Post(":emailId/retry")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async retryFailed(
     @Req() req: AuthedRequest,
@@ -131,6 +143,7 @@ export class BulkEmailController {
   }
 
   @Post("preview")
+  @Header("Cache-Control", "private, no-store")
   @RequirePermissions(Permissions.SEND_BULK_EMAIL)
   async previewRecipients(
     @Body(new ZodValidationPipe(SendBulkEmailSchema)) body: SendBulkEmailRequest,

@@ -22,6 +22,9 @@ const {
 const {
   UsersService,
 } = require("../dist/apps/api/src/features/users/users.service.js");
+const {
+  RequestRateLimitService,
+} = require("../dist/apps/api/src/infrastructure/redis/request-rate-limit.service.js");
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
@@ -91,6 +94,10 @@ const startUploadServer = async () => {
         useValue: authSessionRepository,
       },
       { provide: UsersService, useValue: usersService },
+      {
+        provide: RequestRateLimitService,
+        useValue: { enforceAuthenticated: async () => undefined },
+      },
     ],
   })(UploadTestModule);
 

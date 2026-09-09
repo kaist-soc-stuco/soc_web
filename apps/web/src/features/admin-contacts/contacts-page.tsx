@@ -298,6 +298,7 @@ function ContactsPageContent() {
       email: values.email.trim(),
       phoneNumber: values.phoneNumber.trim(),
       privacyConsented: true,
+      publiclyListed: values.publiclyListed,
     };
     try {
       setMemberSaving(true);

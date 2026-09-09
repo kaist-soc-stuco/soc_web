@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import type {
   ContentBlockRecord,
   CreateContentBlockRequest,
@@ -9,17 +9,60 @@ import type {
   UpsertSiteContentRequest,
 } from "@soc/contracts";
 import { msToIso, nowDate } from "@soc/shared";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import {
   DRIZZLE_DB,
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
-import { contentBlocks, siteContents } from "../../infrastructure/postgres/postgres.schema";
+import type { PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
+import { assets, contentBlocks, siteContents } from "../../infrastructure/postgres/postgres.schema";
+
+const ASSET_REFERENCE_PATTERN = /(?:asset:|\/assets\/)(\d+)(?:\/content)?/g;
+
+const collectAssetIds = (...values: unknown[]): number[] => {
+  const assetIds = new Set<number>();
+  const visit = (value: unknown): void => {
+    if (typeof value === "string") {
+      for (const match of value.matchAll(ASSET_REFERENCE_PATTERN)) {
+        if (match[1]) assetIds.add(Number(match[1]));
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.values(value).forEach(visit);
+    }
+  };
+  values.forEach(visit);
+  return [...assetIds];
+};
 
 @Injectable()
 export class SiteContentRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: PostgresDatabase) {}
+
+  private async lockAssetReferences(
+    tx: PostgresTransaction,
+    ...values: unknown[]
+  ): Promise<void> {
+    const assetIds = collectAssetIds(...values);
+    if (assetIds.length === 0) return;
+    const rows = await tx
+      .select({ assetId: assets.assetId, uploadStatus: assets.uploadStatus })
+      .from(assets)
+      .where(inArray(assets.assetId, assetIds))
+      .for("update");
+    if (
+      rows.length !== assetIds.length ||
+      rows.some((asset) => asset.uploadStatus !== "COMPLETED")
+    ) {
+      throw new BadRequestException("asset_reference_not_found");
+    }
+  }
 
   private map(row: typeof siteContents.$inferSelect): SiteContentRecord {
     return {
@@ -128,21 +171,24 @@ export class SiteContentRepository {
   }
 
   async createContentBlock(input: CreateContentBlockRequest, actorUserId: string): Promise<ContentBlockRecord> {
-    const [row] = await this.db
-      .insert(contentBlocks)
-      .values({
-        ...input,
-        bodyEn: input.bodyEn ?? null,
-        bodyKo: input.bodyKo ?? null,
-        createdBy: actorUserId,
-        imageUrl: input.imageUrl ?? null,
-        imageUrlEn: input.imageUrlEn ?? null,
-        linkUrl: input.linkUrl ?? null,
-        pledgeStatus: input.pledgeStatus ?? null,
-        updatedBy: actorUserId,
-      })
-      .returning();
-    return this.mapBlock(row);
+    return this.db.transaction(async (tx) => {
+      await this.lockAssetReferences(tx, input.imageUrl, input.imageUrlEn);
+      const [row] = await tx
+        .insert(contentBlocks)
+        .values({
+          ...input,
+          bodyEn: input.bodyEn ?? null,
+          bodyKo: input.bodyKo ?? null,
+          createdBy: actorUserId,
+          imageUrl: input.imageUrl ?? null,
+          imageUrlEn: input.imageUrlEn ?? null,
+          linkUrl: input.linkUrl ?? null,
+          pledgeStatus: input.pledgeStatus ?? null,
+          updatedBy: actorUserId,
+        })
+        .returning();
+      return this.mapBlock(row);
+    });
   }
 
   async updateContentBlock(
@@ -165,12 +211,15 @@ export class SiteContentRepository {
     if (input.pledgeStatus !== undefined) values.pledgeStatus = input.pledgeStatus;
     if (input.sortOrder !== undefined) values.sortOrder = input.sortOrder;
 
-    const [row] = await this.db
-      .update(contentBlocks)
-      .set(values)
-      .where(eq(contentBlocks.contentBlockId, contentBlockId))
-      .returning();
-    return row ? this.mapBlock(row) : null;
+    return this.db.transaction(async (tx) => {
+      await this.lockAssetReferences(tx, input.imageUrl, input.imageUrlEn);
+      const [row] = await tx
+        .update(contentBlocks)
+        .set(values)
+        .where(eq(contentBlocks.contentBlockId, contentBlockId))
+        .returning();
+      return row ? this.mapBlock(row) : null;
+    });
   }
 
   async reorderContentBlocks(

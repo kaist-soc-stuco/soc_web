@@ -19,6 +19,7 @@ export function SurveyPage() {
   const { id } = useParams<{ id: string }>();
   const {
     answers,
+    draftHydrated,
     draftRestored,
     handleAnswerChange,
     handleSubmit,
@@ -72,7 +73,7 @@ export function SurveyPage() {
         </div>
       );
     }
-    if (!survey || sessionLoading) return null;
+    if (!survey || sessionLoading || !draftHydrated) return null;
     if (submitted) {
       return (
         <SuccessView
@@ -152,7 +153,7 @@ export function SurveyPage() {
   return (
     <PageShell>
       <Header />
-      <main className="channel-talk-safe-area flex-1 bg-[#f3f5f4] px-4 py-6 sm:py-10 lg:px-0" aria-busy={(!survey || sessionLoading) && !loadError}>
+      <main className="channel-talk-safe-area flex-1 bg-[#f3f5f4] px-4 py-6 sm:py-10 lg:px-0" aria-busy={(!survey || sessionLoading || !draftHydrated) && !loadError}>
         <div className="mx-auto max-w-[52rem] space-y-5">
           {survey && <SurveySummaryCard lang={lang} survey={survey} />}
           {renderBody()}

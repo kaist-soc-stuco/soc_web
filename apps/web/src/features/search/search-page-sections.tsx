@@ -4,7 +4,7 @@ import type {
   ArticleListItem,
   BoardSummary,
   PublicCalendarEventItem,
-  SurveyRecord,
+  PublicSurveyRecord,
   VoteRecord,
 } from "@soc/contracts";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -214,7 +214,7 @@ export function SearchResults({
   loading: boolean;
   onRetry?: () => void;
   query: string;
-  surveys: SurveyRecord[];
+  surveys: PublicSurveyRecord[];
   totalCount: number;
   votes: VoteRecord[];
 }) {
@@ -439,7 +439,7 @@ function SurveyResults({
 }: {
   lang: string;
   query: string;
-  surveys: SurveyRecord[];
+  surveys: PublicSurveyRecord[];
 }) {
   return (
     <SectionShell count={surveys.length} title={lang === "ko" ? "설문" : "Surveys"}>

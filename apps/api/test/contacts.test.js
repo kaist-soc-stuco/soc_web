@@ -36,6 +36,7 @@ test("contact creation requires complete non-blank bilingual identity fields", (
       roleKo: "회장",
       roleEn: "President",
       privacyConsented: true,
+      publiclyListed: false,
     },
   );
 

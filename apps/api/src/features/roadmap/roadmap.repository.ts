@@ -4,6 +4,9 @@ import type {
   AdminRoadmapOfferingListResponse,
   CreateRoadmapCourseRequest,
   CreateRoadmapOfferingRequest,
+  PublicRoadmapCourseRecord,
+  PublicRoadmapOfferingRecord,
+  PublicRoadmapOfferingTermSummary,
   RoadmapCourseRecord,
   RoadmapCourseRelationRecord,
   RoadmapOfferingRecord,
@@ -117,6 +120,62 @@ export class RoadmapRepository {
       this.findRelations(),
       this.findTermSummaries(),
     ]);
+    return { courses, items, relations, terms };
+  }
+
+  /**
+   * Build the public catalogue from visible course rows only. Keeping this
+   * aggregate separate from the admin response prevents admin metadata from
+   * becoming public through a future field addition.
+   */
+  async findPublicData(): Promise<{
+    items: PublicRoadmapOfferingRecord[];
+    courses: PublicRoadmapCourseRecord[];
+    relations: RoadmapCourseRelationRecord[];
+    terms: PublicRoadmapOfferingTermSummary[];
+  }> {
+    const [offeringRows, courseRows, relationRows] = await Promise.all([
+      this.db
+        .select({ offering: roadmapOfferings })
+        .from(roadmapOfferings)
+        .innerJoin(
+          roadmapCourses,
+          eq(roadmapOfferings.courseCode, roadmapCourses.courseCode),
+        )
+        .where(eq(roadmapCourses.isVisible, true))
+        .orderBy(
+          desc(roadmapOfferings.term),
+          asc(roadmapOfferings.courseCode),
+          asc(roadmapOfferings.section),
+        ),
+      this.db
+        .select()
+        .from(roadmapCourses)
+        .where(eq(roadmapCourses.isVisible, true))
+        .orderBy(asc(roadmapCourses.courseCode)),
+      this.db.select().from(roadmapCourseRelations),
+    ]);
+
+    const visibleCodeById = new Map(
+      courseRows.map((row) => [row.courseId, row.courseCode]),
+    );
+    const items = offeringRows.map(({ offering }) =>
+      toPublicRoadmapOffering(mapOffering(offering)),
+    );
+    const courses = courseRows.map((row) =>
+      toPublicRoadmapCourse(mapCourse(row, relationRows, visibleCodeById)),
+    );
+    const relations = relationRows.flatMap((row) => {
+      const prerequisiteCourseCode = visibleCodeById.get(row.prerequisiteCourseId);
+      const postrequisiteCourseCode = visibleCodeById.get(row.postrequisiteCourseId);
+      return prerequisiteCourseCode && postrequisiteCourseCode
+        ? [{ prerequisiteCourseCode, postrequisiteCourseCode }]
+        : [];
+    });
+    const terms = summarizeRoadmapOfferings(
+      offeringRows.map(({ offering }) => mapOffering(offering)),
+    ).map(toPublicRoadmapOfferingTermSummary);
+
     return { courses, items, relations, terms };
   }
 
@@ -436,6 +495,43 @@ function mapCourse(
     trackIds: row.trackIds ?? [],
     updatedAt: msToIso(row.updatedAt.valueOf()),
   };
+}
+
+export function toPublicRoadmapCourse(
+  course: RoadmapCourseRecord,
+): PublicRoadmapCourseRecord {
+  const {
+    courseId: _courseId,
+    createdAt: _createdAt,
+    isVisible: _isVisible,
+    source: _source,
+    updatedAt: _updatedAt,
+    ...publicCourse
+  } = course;
+  return publicCourse;
+}
+
+export function toPublicRoadmapOffering(
+  offering: RoadmapOfferingRecord,
+): PublicRoadmapOfferingRecord {
+  const {
+    importedAt: _importedAt,
+    offeringId: _offeringId,
+    sourceFileName: _sourceFileName,
+    ...publicOffering
+  } = offering;
+  return publicOffering;
+}
+
+export function toPublicRoadmapOfferingTermSummary(
+  summary: RoadmapOfferingTermSummary,
+): PublicRoadmapOfferingTermSummary {
+  const {
+    importedAt: _importedAt,
+    sourceFileName: _sourceFileName,
+    ...publicSummary
+  } = summary;
+  return publicSummary;
 }
 
 export function summarizeRoadmapOfferings(

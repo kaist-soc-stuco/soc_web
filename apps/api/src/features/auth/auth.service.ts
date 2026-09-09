@@ -8,7 +8,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { ChannelTalkConfigResponse } from "@soc/contracts";
 import { nowIso, expiresAtMs } from "@soc/shared";
 
@@ -17,6 +17,7 @@ import { UsersService } from "../users/users.service";
 import { AuthSessionService } from "./auth-session.service";
 import { PendingLoginRepository } from "./pending-login.repository";
 import { InitialAdminService } from "./initial-admin.service";
+import { readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
 
 interface SsoConfig {
   clientId: string;
@@ -48,6 +49,15 @@ interface LoginResultPayload {
   userId?: string;
 }
 
+type LoginTransactionPayload =
+  | { kind: "result"; result: LoginResultPayload }
+  | { kind: "pending"; pendingLoginToken: string };
+
+export interface LoginCallbackResult {
+  redirectUrl: string;
+  transactionToken?: string;
+}
+
 interface CallbackBody {
   code?: string;
   error?: string;
@@ -67,7 +77,8 @@ interface SsoApiErrorResponse {
 
 const STATE_TTL_SECONDS = 300;
 const PENDING_LOGIN_TTL_SECONDS = 10 * 60;
-const LOGIN_RESULT_TTL_SECONDS = 60;
+const LOGIN_TRANSACTION_RESULT_TTL_SECONDS = 60;
+const LOGIN_TRANSACTION_PENDING_TTL_SECONDS = PENDING_LOGIN_TTL_SECONDS;
 
 const isSsoApiErrorResponse = (
   value: SsoApiErrorResponse | SsoApiSuccessResponse,
@@ -174,25 +185,33 @@ export class AuthService {
   /**
    * SSO callback 결과를 처리하고 다음 화면으로 redirect할 URL을 계산합니다.
    */
-  async handleLoginCallback(body: CallbackBody): Promise<string> {
-    if (body.error || body.errorCode) {
-      return this.buildFrontendRedirect(
-        "error",
-        body.errorCode ?? body.error ?? "sso_authorize_failed",
-      );
+  async handleLoginCallback(
+    body: CallbackBody,
+    transactionCookie?: string,
+  ): Promise<LoginCallbackResult> {
+    if (!body.state) {
+      return this.redirectResult("error", "missing_callback_params");
     }
 
-    if (!body.state || !body.code) {
-      return this.buildFrontendRedirect("error", "missing_callback_params");
+    if (!transactionCookie || !this.safeEqual(body.state, transactionCookie)) {
+      return this.redirectResult("error", "invalid_sso_transaction");
+    }
+
+    if (body.error || body.errorCode) {
+      return this.redirectResult("error", "sso_authorize_failed");
+    }
+
+    if (!body.code) {
+      return this.redirectResult("error", "missing_callback_params");
     }
 
     const config = this.readCallbackConfig();
 
     const stateKey = this.buildRedisKey(body.state);
-    const storedState = await this.readPendingState(stateKey);
+    const storedState = await this.consumePendingState(stateKey);
 
     if (!storedState) {
-      return this.buildFrontendRedirect("error", "invalid_or_expired_state");
+      return this.redirectResult("error", "invalid_or_expired_state");
     }
 
     try {
@@ -207,41 +226,28 @@ export class AuthService {
           code: body.code,
           redirect_uri: config.redirectUri,
         }).toString(),
+        signal: AbortSignal.timeout(15_000),
       });
 
-      const parsedResponse = (await response.json()) as
+      const parsedResponse = JSON.parse(await readResponseTextWithLimit(response, 512 * 1024)) as
         | SsoApiErrorResponse
         | SsoApiSuccessResponse;
 
       if (!response.ok) {
-        const failureReason = isSsoApiErrorResponse(parsedResponse)
-          ? (parsedResponse.errorCode ??
-            parsedResponse.error ??
-            `http_${response.status}`)
-          : `http_${response.status}`;
-
-        return this.buildFrontendRedirect("error", failureReason);
+        return this.redirectResult("error", "sso_exchange_failed");
       }
 
       if (isSsoApiErrorResponse(parsedResponse) && parsedResponse.errorCode) {
-        return this.buildFrontendRedirect("error", parsedResponse.errorCode);
+        return this.redirectResult("error", "sso_exchange_failed");
       }
 
       if (isSsoApiErrorResponse(parsedResponse)) {
-        return this.buildFrontendRedirect(
-          "error",
-          parsedResponse.error ??
-            parsedResponse.errorCode ??
-            "sso_exchange_failed",
-        );
+        return this.redirectResult("error", "sso_exchange_failed");
       }
 
       if (parsedResponse.nonce !== storedState.nonce) {
-        await this.deletePendingState(stateKey);
-        return this.buildFrontendRedirect("error", "nonce_mismatch");
+        return this.redirectResult("error", "nonce_mismatch");
       }
-
-      await this.deletePendingState(stateKey);
 
       const userInfo = this.normalizeUserInfo(parsedResponse.userInfo);
       const ssoSubject = this.readRequiredUserInfoString(
@@ -277,14 +283,14 @@ export class AuthService {
       const userMobile = this.readUserInfoString(userInfo, "user_mbtlnum");
 
       if (!userEmail) {
-        return this.buildFrontendRedirect("error", "missing_email");
+        return this.redirectResult("error", "missing_email");
       }
 
       const existingUser = await this.usersService.findByKaistUid(kaistUid);
 
       if (existingUser) {
         if (!existingUser.isActive) {
-          return this.buildFrontendRedirect("error", "account_expired");
+          return this.redirectResult("error", "account_expired");
         }
 
         if (nameKo || nameEn || userEmail) {
@@ -315,20 +321,26 @@ export class AuthService {
         // 로그인 직후에 권한 캐시가 오래된 값을 가지고 있을 수 있으므로 무효화합니다.
         await this.usersService.invalidatePermissionCache(existingUser.userId);
 
-        const resultToken = randomUUID();
-        await this.storeLoginResult(resultToken, {
-          accessToken: issued.accessToken,
-          refreshToken: issued.refreshToken,
-          sessionId: issued.session.sessionId,
-          storageMode: "persisted",
-          userId: existingUser.userId,
-        });
+        const transactionToken = randomUUID();
+        await this.storeLoginTransaction(
+          transactionToken,
+          {
+            kind: "result",
+            result: {
+              accessToken: issued.accessToken,
+              refreshToken: issued.refreshToken,
+              sessionId: issued.session.sessionId,
+              storageMode: "persisted",
+              userId: existingUser.userId,
+            },
+          },
+          LOGIN_TRANSACTION_RESULT_TTL_SECONDS,
+        );
 
-        return this.buildFrontendRedirect("success", "ok", {
-          resultToken,
-          storageMode: "persisted",
-          userId: existingUser.userId,
-        });
+        return {
+          redirectUrl: this.buildFrontendRedirect("success", "ok"),
+          transactionToken,
+        };
       }
 
       const pendingLoginToken = randomUUID();
@@ -349,15 +361,42 @@ export class AuthService {
         userMobile,
       }, PENDING_LOGIN_TTL_SECONDS);
 
-      return this.buildFrontendRedirect("consent-required", "pending_consent", {
-        pendingLoginToken,
-      });
-    } catch (error) {
-      return this.buildFrontendRedirect(
-        "error",
-        error instanceof Error ? error.message : "sso_exchange_failed",
+      const transactionToken = randomUUID();
+      await this.storeLoginTransaction(
+        transactionToken,
+        { kind: "pending", pendingLoginToken },
+        LOGIN_TRANSACTION_PENDING_TTL_SECONDS,
       );
+
+      return {
+        redirectUrl: this.buildFrontendRedirect(
+          "consent-required",
+          "pending_consent",
+        ),
+        transactionToken,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `SSO callback failed: ${error instanceof Error ? error.name : "unknown_error"}`,
+      );
+      return this.redirectResult("error", "sso_exchange_failed");
     }
+  }
+
+  private safeEqual(left: string, right: string): boolean {
+    const leftBuffer = Buffer.from(left);
+    const rightBuffer = Buffer.from(right);
+    return (
+      leftBuffer.length === rightBuffer.length &&
+      timingSafeEqual(leftBuffer, rightBuffer)
+    );
+  }
+
+  private redirectResult(
+    status: "consent-required" | "error" | "success",
+    reason: string,
+  ): LoginCallbackResult {
+    return { redirectUrl: this.buildFrontendRedirect(status, reason) };
   }
 
   /** 프런트 로그인 페이지로 상태/사유를 담아 redirect URL을 생성합니다. */
@@ -380,9 +419,9 @@ export class AuthService {
     return `auth:sso:state:${state}`;
   }
 
-  /** 로그인 결과 1회 소비 토큰용 Redis 키를 생성합니다. */
-  private buildLoginResultKey(resultToken: string): string {
-    return `auth:login-result:${resultToken}`;
+  /** 로그인 완료 transaction용 Redis 키를 생성합니다. */
+  private buildLoginTransactionKey(transactionToken: string): string {
+    return `auth:login-transaction:${transactionToken}`;
   }
 
   /** 필수 환경변수가 비어 있으면 예외를 발생시킵니다. */
@@ -454,10 +493,15 @@ export class AuthService {
     }
   }
 
-  /** Redis에 저장된 로그인 결과 payload를 안전하게 파싱합니다. */
-  private parseLoginResult(rawValue: string): LoginResultPayload | null {
+  /** Redis에 저장된 로그인 transaction payload를 안전하게 파싱합니다. */
+  private parseLoginTransaction(
+    rawValue: string,
+  ): LoginTransactionPayload | null {
     try {
-      return JSON.parse(rawValue) as LoginResultPayload;
+      const parsed = JSON.parse(rawValue) as LoginTransactionPayload;
+      if (parsed.kind === "result" && parsed.result?.accessToken) return parsed;
+      if (parsed.kind === "pending" && parsed.pendingLoginToken) return parsed;
+      return null;
     } catch {
       return null;
     }
@@ -476,31 +520,27 @@ export class AuthService {
     );
   }
 
-  /** Redis에서 state를 조회하고 저장 payload로 역직렬화합니다. */
-  private async readPendingState(
+  /** Redis에서 state를 원자적으로 소비하고 저장 payload로 역직렬화합니다. */
+  private async consumePendingState(
     stateKey: string,
   ): Promise<StoredLoginState | null> {
-    const rawValue = await this.redis.get(stateKey);
+    const rawValue = await this.consumeRedisValueOnce(stateKey);
     return rawValue ? this.parseStoredState(rawValue) : null;
   }
 
-  /** 사용한 state를 Redis에서 제거합니다. */
-  private async deletePendingState(stateKey: string): Promise<void> {
-    await this.redis.del(stateKey);
-  }
-
-  /** 로그인 완료 후 쿠키 세팅 전까지의 결과를 Redis에 임시 저장합니다. */
-  private async storeLoginResult(
-    resultToken: string,
-    payload: LoginResultPayload,
+  /** 로그인 완료 후 쿠키 세팅 전까지의 transaction을 Redis에 저장합니다. */
+  private async storeLoginTransaction(
+    transactionToken: string,
+    payload: LoginTransactionPayload,
+    ttlSeconds: number,
   ): Promise<void> {
-    const resultKey = this.buildLoginResultKey(resultToken);
+    const transactionKey = this.buildLoginTransactionKey(transactionToken);
 
     await this.redis.set(
-      resultKey,
+      transactionKey,
       JSON.stringify(payload),
       "EX",
-      LOGIN_RESULT_TTL_SECONDS,
+      ttlSeconds,
     );
   }
 
@@ -509,28 +549,54 @@ export class AuthService {
     return this.redis.getdel(key);
   }
 
-  /** resultToken으로 로그인 결과를 1회 소비하고 payload를 반환합니다. */
+  /** HttpOnly transaction cookie로 로그인 결과를 1회 소비합니다. */
   async consumeLoginResult(
-    resultToken: string | undefined,
+    transactionToken: string | undefined,
   ): Promise<LoginResultPayload> {
-    if (!resultToken) {
-      throw new BadRequestException("resultToken_is_required");
+    if (!transactionToken) {
+      throw new BadRequestException("login_transaction_required");
     }
 
-    const resultKey = this.buildLoginResultKey(resultToken);
-
-    const rawValue = await this.consumeRedisValueOnce(resultKey);
+    const rawValue = await this.consumeRedisValueOnce(
+      this.buildLoginTransactionKey(transactionToken),
+    );
 
     if (!rawValue) {
-      throw new UnauthorizedException("resultToken_not_found_or_expired");
+      throw new UnauthorizedException("login_transaction_not_found_or_expired");
     }
 
-    const parsed = this.parseLoginResult(rawValue);
-    if (!parsed) {
-      throw new UnauthorizedException("resultToken_invalid_payload");
+    const parsed = this.parseLoginTransaction(rawValue);
+    if (!parsed || parsed.kind !== "result") {
+      throw new UnauthorizedException("login_transaction_invalid_payload");
     }
 
-    return parsed;
+    return parsed.result;
+  }
+
+  /** consent 화면에서만 pending token을 서버 내부에서 꺼냅니다. */
+  async getPendingLoginToken(
+    transactionToken: string | undefined,
+  ): Promise<string> {
+    if (!transactionToken) {
+      throw new BadRequestException("login_transaction_required");
+    }
+
+    const rawValue = await this.redis.get(
+      this.buildLoginTransactionKey(transactionToken),
+    );
+    const parsed = rawValue ? this.parseLoginTransaction(rawValue) : null;
+
+    if (!parsed || parsed.kind !== "pending") {
+      throw new UnauthorizedException("login_transaction_not_found_or_expired");
+    }
+
+    return parsed.pendingLoginToken;
+  }
+
+  async clearLoginTransaction(transactionToken?: string): Promise<void> {
+    if (transactionToken) {
+      await this.redis.del(this.buildLoginTransactionKey(transactionToken));
+    }
   }
 
   /** 프런트가 login/start에 쓰는 SSO 기본 설정을 구성합니다. */

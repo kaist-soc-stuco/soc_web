@@ -10,8 +10,10 @@ export type BulkEmailStatus =
   | "DRAFT"
   | "SCHEDULED"
   | "PENDING"
+  | "SENDING"
   | "SUCCESS"
   | "DRY_RUN"
+  | "UNKNOWN"
   | "FAILED"
   | "CANCELLED";
 
@@ -39,7 +41,7 @@ export interface SendBulkEmailResponse {
   success: boolean;
   recipientCount: number;
   emailId: string;
-  deliveryMode: "sent" | "dry_run" | "scheduled";
+  deliveryMode: "sent" | "dry_run" | "scheduled" | "unknown";
 }
 
 export interface SendBulkEmailTestResponse {

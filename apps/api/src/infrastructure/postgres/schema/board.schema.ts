@@ -183,6 +183,8 @@ export const assets = pgTable("asset", {
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
   checksum: text("checksum"),
+  uploadStatus: varchar("upload_status", { length: 16 }).notNull().default("COMPLETED"),
+  uploadExpiresAt: timestamp("upload_expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   uploadedBy: uuid("uploaded_by")
     .notNull()
@@ -190,7 +192,33 @@ export const assets = pgTable("asset", {
 }, (table) => [
   index("asset_created_idx").on(table.createdAt),
   index("asset_uploaded_by_idx").on(table.uploadedBy),
+  index("asset_upload_status_expiry_idx").on(table.uploadStatus, table.uploadExpiresAt),
 ]);
+
+/**
+ * A committed reservation closes the check-then-insert race for uploads that
+ * have not produced an asset row yet (for example while a presigned POST is
+ * being created). Active rows count toward the owner's quota.
+ */
+export const assetUploadReservations = pgTable("asset_upload_reservation", {
+  reservationId: uuid("reservation_id").defaultRandom().primaryKey(),
+  uploadedBy: uuid("uploaded_by")
+    .notNull()
+    .references(() => users.userId, { onDelete: "cascade" }),
+  sizeBytes: integer("size_bytes").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("asset_upload_reservation_owner_expiry_idx").on(table.uploadedBy, table.expiresAt),
+]);
+
+/** DB lease for orphan cleanup; this prevents duplicate storage deletes across API replicas. */
+export const assetCleanupLeases = pgTable("asset_cleanup_lease", {
+  leaseName: varchar("lease_name", { length: 64 }).primaryKey(),
+  ownerToken: varchar("owner_token", { length: 64 }).notNull(),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const articleAssets = pgTable("article_asset", {
   articleAssetId: serial("article_asset_id").primaryKey(),

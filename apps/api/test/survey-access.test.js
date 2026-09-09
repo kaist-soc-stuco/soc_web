@@ -57,7 +57,9 @@ function createService({
     {
       findAll: async () => [surveyRecord],
       findPublished: async () =>
-        surveyRecord.isPublished ? [surveyRecord] : [],
+        surveyRecord.isPublished
+          ? { items: [surveyRecord], total: 1 }
+          : { items: [], total: 0 },
       findById: async () => surveyRecord,
     },
     { findBySurveyId: async () => sections },
@@ -101,6 +103,40 @@ test("survey managers can preview unpublished surveys without publishing them", 
   assert.equal(detail.id, "survey-1");
   assert.equal(detail.isPreview, true);
   assert.equal(detail.isPublished, false);
+});
+
+test("public survey list and detail omit creator, lineage, and spreadsheet metadata", async () => {
+  const record = survey({
+    previousVersionId: "previous-survey",
+    versionNumber: 4,
+    derivedVersionCount: 2,
+    spreadsheetId: "sheet-id",
+    spreadsheetUrl: "https://docs.google.com/spreadsheets/d/sheet-id",
+    spreadsheetSyncStatus: "CONNECTED",
+    spreadsheetLastSyncedAt: "2026-05-02T00:00:00.000Z",
+  });
+  const service = createService({ surveyRecord: record });
+
+  const listedResult = await service.findPublished(user);
+  const [listed] = listedResult.items;
+  const detail = await service.findDetail(record.id, user);
+
+  for (const payload of [listed, detail]) {
+    for (const field of [
+      "creatorId",
+      "previousVersionId",
+      "versionNumber",
+      "derivedVersionCount",
+      "spreadsheetId",
+      "spreadsheetUrl",
+      "spreadsheetSyncStatus",
+      "spreadsheetLastSyncedAt",
+    ]) {
+      assert.equal(field in payload, false, `${field} must not be public`);
+    }
+  }
+  assert.equal(listed.participationEligibility.status, "ELIGIBLE");
+  assert.equal(detail.titleKo, "설문");
 });
 
 test("private survey analytics are backend-protected for regular users", async () => {

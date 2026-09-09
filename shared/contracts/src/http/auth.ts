@@ -34,6 +34,8 @@ export interface ChannelTalkConfigResponse {
 export interface LoginSessionResponse {
   authenticated: boolean;
   canUsePersistentFeatures: boolean;
+  /** Opaque per-auth-session namespace for client-side drafts; never an auth credential. */
+  draftNamespace?: string;
   permission?: number;
   requiresConsent: boolean;
   storageMode: AuthStorageMode | null;

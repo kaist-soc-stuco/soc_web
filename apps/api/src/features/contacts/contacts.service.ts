@@ -1,5 +1,11 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import type { ContactListOptions, ContactListResponse } from "@soc/contracts";
+import type {
+  ContactListOptions,
+  ContactListResponse,
+  PublicContactRecord,
+  PublicContactDepartmentListResponse,
+  PublicContactListResponse,
+} from "@soc/contracts";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
 import { ContactsRepository } from "./contacts.repository";
@@ -27,9 +33,14 @@ export class ContactsService {
     private readonly googleSheets: GoogleContactSheetsService,
   ) {}
 
-  async findAll(): Promise<ContactRecord[]> {
+  async findAll(): Promise<PublicContactRecord[]> {
+    const response = await this.findPublic();
+    return response.items;
+  }
+
+  async findPublic(): Promise<PublicContactListResponse> {
     await this.purgeRevoked();
-    return this.contactsRepo.findAll();
+    return this.contactsRepo.findPublic();
   }
 
   async findManaged(
@@ -42,6 +53,10 @@ export class ContactsService {
 
   async findDepartments(includeInactive = false): Promise<ContactDepartmentListResponse> {
     return this.contactsRepo.findDepartments(includeInactive);
+  }
+
+  async findPublicDepartments(): Promise<PublicContactDepartmentListResponse> {
+    return this.contactsRepo.findPublicDepartments();
   }
 
   async createDepartment(
@@ -271,6 +286,7 @@ function safeContactSnapshot(contact: ContactRecord) {
     nameKo: contact.nameKo,
     roleEn: contact.roleEn,
     roleKo: contact.roleKo,
+    publiclyListed: contact.publiclyListed,
     sortOrder: contact.sortOrder,
   };
 }

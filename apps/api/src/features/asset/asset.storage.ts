@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { Readable } from "node:stream";
 import path from "node:path";
 
 import {
@@ -9,7 +11,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { msToIso, nowMs } from "@soc/shared";
@@ -30,6 +32,8 @@ export interface AssetDirectUploadPreparation {
   storageKey: string;
   uploadUrl: string;
   uploadHeaders: Record<string, string>;
+  uploadMethod?: "PUT" | "POST";
+  uploadFields?: Record<string, string>;
   expiresAt: string;
 }
 
@@ -41,6 +45,7 @@ export interface AssetUploadedObject {
 export interface AssetStorageProvider {
   upload(input: AssetUploadInput): Promise<string>;
   read(storageKey: string): Promise<Buffer>;
+  readStream?(storageKey: string): Promise<Readable>;
   delete(storageKey: string): Promise<void>;
   createPresignedUpload?(input: AssetDirectUploadInput): Promise<AssetDirectUploadPreparation>;
   verifyUpload?(storageKey: string): Promise<AssetUploadedObject>;
@@ -52,6 +57,8 @@ export interface AssetStorageProvider {
 }
 
 export const AssetStorageProvider = Symbol("AssetStorageProvider");
+
+const MAX_BUFFERED_ASSET_BYTES = 20 * 1024 * 1024;
 
 const sanitizeFilename = (originalName: string) => {
   const normalized = originalName
@@ -100,7 +107,18 @@ export class LocalAssetStorageProvider implements AssetStorageProvider {
       throw new Error("asset_path_outside_upload_dir");
     }
 
-    return readFile(targetPath);
+    return readBoundedBody(createReadStream(targetPath), MAX_BUFFERED_ASSET_BYTES);
+  }
+
+  async readStream(storageKey: string): Promise<Readable> {
+    const storedName = path.basename(storageKey);
+    if (!storedName) throw new Error("asset_storage_key_invalid");
+    const uploadRoot = path.resolve(this.uploadDir);
+    const targetPath = path.resolve(uploadRoot, storedName);
+    if (!targetPath.startsWith(`${uploadRoot}${path.sep}`)) {
+      throw new Error("asset_path_outside_upload_dir");
+    }
+    return createReadStream(targetPath);
   }
 
   async delete(storageKey: string): Promise<void> {
@@ -183,23 +201,27 @@ export class S3AssetStorageProvider implements AssetStorageProvider {
   ): Promise<AssetDirectUploadPreparation> {
     const expiresInSeconds = 10 * 60;
     const objectKey = this.buildObjectKey(input.originalName);
-    const command = new PutObjectCommand({
+    const post = await createPresignedPost(this.client, {
       Bucket: this.bucket,
       Key: objectKey,
-      ContentType: input.contentType,
-      ServerSideEncryption: "AES256",
-    });
-    const uploadUrl = await getSignedUrl(this.client, command, {
-      expiresIn: expiresInSeconds,
+      Expires: expiresInSeconds,
+      Conditions: [
+        ["content-length-range", input.sizeBytes, input.sizeBytes],
+        ["eq", "$Content-Type", input.contentType],
+        ["eq", "$x-amz-server-side-encryption", "AES256"],
+      ],
+      Fields: {
+        "Content-Type": input.contentType,
+        "x-amz-server-side-encryption": "AES256",
+      },
     });
 
     return {
       storageKey: `s3://${this.bucket}/${objectKey}`,
-      uploadUrl,
-      uploadHeaders: {
-        "Content-Type": input.contentType,
-        "x-amz-server-side-encryption": "AES256",
-      },
+      uploadUrl: post.url,
+      uploadHeaders: {},
+      uploadMethod: "POST",
+      uploadFields: post.fields,
       expiresAt: msToIso(nowMs() + expiresInSeconds * 1000),
     };
   }
@@ -227,7 +249,23 @@ export class S3AssetStorageProvider implements AssetStorageProvider {
     );
 
     if (!response.Body) throw new Error("asset_s3_body_missing");
-    return readS3Body(response.Body);
+    return readBoundedBody(response.Body, MAX_BUFFERED_ASSET_BYTES);
+  }
+
+  async readStream(storageKey: string): Promise<Readable> {
+    const objectKey = this.parseStorageKey(storageKey);
+    const response = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: objectKey }),
+    );
+    if (!response.Body) throw new Error("asset_s3_body_missing");
+    if (response.Body instanceof Readable) return response.Body;
+    if (response.Body instanceof Uint8Array) {
+      return Readable.from([Buffer.from(response.Body)]);
+    }
+    if (typeof response.Body === "object" && Symbol.asyncIterator in response.Body) {
+      return Readable.from(response.Body as AsyncIterable<Uint8Array | string>);
+    }
+    throw new Error("asset_s3_body_unsupported");
   }
 
   async delete(storageKey: string): Promise<void> {
@@ -309,6 +347,12 @@ export class ConfiguredAssetStorageProvider implements AssetStorageProvider {
       : this.local.read(storageKey);
   }
 
+  readStream(storageKey: string): Promise<Readable> {
+    return storageKey.startsWith("s3://")
+      ? this.requireS3().readStream(storageKey)
+      : this.local.readStream(storageKey);
+  }
+
   delete(storageKey: string): Promise<void> {
     return storageKey.startsWith("s3://")
       ? this.requireS3().delete(storageKey)
@@ -321,20 +365,24 @@ export class ConfiguredAssetStorageProvider implements AssetStorageProvider {
   }
 }
 
-async function readS3Body(body: unknown): Promise<Buffer> {
-  if (body instanceof Uint8Array) return Buffer.from(body);
-
-  const transformToByteArray = (
-    body as { transformToByteArray?: () => Promise<Uint8Array> }
-  ).transformToByteArray;
-  if (typeof transformToByteArray === "function") {
-    return Buffer.from(await transformToByteArray.call(body));
+async function readBoundedBody(body: unknown, maxBytes: number): Promise<Buffer> {
+  if (body instanceof Uint8Array) {
+    if (body.byteLength > maxBytes) throw new Error("asset_s3_body_too_large");
+    return Buffer.from(body);
   }
 
   if (body && typeof body === "object" && Symbol.asyncIterator in body) {
     const chunks: Buffer[] = [];
+    let total = 0;
     for await (const chunk of body as AsyncIterable<Uint8Array | string>) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buffer.byteLength;
+      if (total > maxBytes) {
+        const destroy = (body as { destroy?: () => void }).destroy;
+        destroy?.();
+        throw new Error("asset_s3_body_too_large");
+      }
+      chunks.push(buffer);
     }
     return Buffer.concat(chunks);
   }

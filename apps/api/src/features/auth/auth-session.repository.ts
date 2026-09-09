@@ -38,6 +38,32 @@ export class AuthSessionRepository {
   }
 
   /**
+   * Refresh rotation is a compare-and-set operation in Redis.  The old JTI
+   * can be accepted only once, even when two API instances refresh together.
+   */
+  async rotate(
+    sessionId: string,
+    expectedRefreshJti: string,
+    replacement: AuthSessionRecord,
+  ): Promise<boolean> {
+    const result = await this.redis.eval(
+      `local current = redis.call('GET', KEYS[1])
+       if not current then return 0 end
+       local record = cjson.decode(current)
+       if record.revoked == true or record.refreshJti ~= ARGV[1] then return 0 end
+       redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3])
+       return 1`,
+      1,
+      this.buildKey(sessionId),
+      expectedRefreshJti,
+      JSON.stringify(replacement),
+      this.resolveTtlSeconds(replacement.expiresAt),
+    );
+
+    return Number(result) === 1;
+  }
+
+  /**
     * 세션 ID로 저장된 세션 메타데이터를 조회합니다.
    */
   async findBySessionId(sessionId: string): Promise<AuthSessionRecord | null> {
@@ -59,15 +85,15 @@ export class AuthSessionRepository {
     * 세션을 revoke 상태로 바꿉니다.
    */
   async revoke(sessionId: string): Promise<void> {
-    const record = await this.findBySessionId(sessionId);
-
-    if (!record) {
-      return;
-    }
-
-    await this.save({
-      ...record,
-      revoked: true,
-    });
+    await this.redis.eval(
+      `local current = redis.call('GET', KEYS[1])
+       if not current then return 0 end
+       local record = cjson.decode(current)
+       record.revoked = true
+       redis.call('SET', KEYS[1], cjson.encode(record), 'KEEPTTL')
+       return 1`,
+      1,
+      this.buildKey(sessionId),
+    );
   }
 }

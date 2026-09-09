@@ -52,6 +52,7 @@ import {
 export const createBoardApi = ({
   assetBaseUrl,
   normalizedBaseUrl,
+  postObject,
   putObject,
   requestJson,
 }: ApiClientContext) => ({
@@ -155,11 +156,15 @@ export const createBoardApi = ({
     }
 
     if (preparation) {
-      await putObject(
-        preparation.uploadUrl,
-        file,
-        preparation.uploadHeaders,
-      );
+      if (preparation.uploadMethod === "POST" && preparation.uploadFields) {
+        await postObject(preparation.uploadUrl, preparation.uploadFields, file);
+      } else {
+        await putObject(
+          preparation.uploadUrl,
+          file,
+          preparation.uploadHeaders,
+        );
+      }
       const completeBody: AssetDirectUploadCompleteRequest = {
         storageKey: preparation.storageKey,
       };

@@ -61,12 +61,14 @@ export class AuthSessionService {
       record.mode === "persisted"
         ? {
             mode: "persisted",
+            sid: record.sessionId,
             sub: record.userId ?? "",
             userId: record.userId ?? "",
           }
         : {
             mode: "temporary",
             academicStatus: record.temporaryAcademicStatus,
+            draftNamespace: record.temporaryDraftNamespace,
             department: record.temporaryDepartment,
             primaryMajor: record.temporaryPrimaryMajor,
             studentNumberHash: record.temporaryStudentNumberHash,
@@ -156,15 +158,17 @@ export class AuthSessionService {
     const mode = decoded.mode;
 
     if (mode === "persisted") {
+      const sessionId = typeof decoded.sid === "string" ? decoded.sid : undefined;
       const userId =
         typeof decoded.userId === "string" ? decoded.userId : undefined;
 
-      if (!userId) {
+      if (!userId || !sessionId) {
         throw new UnauthorizedException("invalid_access_token");
       }
 
       return {
         mode: "persisted",
+        sid: sessionId,
         sub: userId,
         userId,
       };
@@ -181,6 +185,11 @@ export class AuthSessionService {
         academicStatus:
           typeof decoded.academicStatus === "string"
             ? decoded.academicStatus
+            : undefined,
+        draftNamespace:
+          typeof decoded.draftNamespace === "string" &&
+          decoded.draftNamespace.length <= 64
+            ? decoded.draftNamespace
             : undefined,
         department:
           typeof decoded.department === "string" ? decoded.department : undefined,
@@ -292,6 +301,7 @@ export class AuthSessionService {
       revoked: false,
       sessionId,
       temporaryAcademicStatus: pendingUser.academicStatus,
+      temporaryDraftNamespace: randomUUID(),
       temporaryDepartment:
         pendingUser.departmentKo?.trim() || pendingUser.departmentEn?.trim(),
       temporaryPrimaryMajor: pendingUser.primaryMajor?.trim(),
@@ -354,7 +364,17 @@ export class AuthSessionService {
       refreshJti: rotatedJti,
     };
 
-    await this.authSessionRepository.save(rotatedSession);
+    const rotated = await this.authSessionRepository.rotate(
+      claims.sid,
+      claims.jti,
+      rotatedSession,
+    );
+
+    if (!rotated) {
+      // A concurrent refresh or logout won the compare-and-set race.
+      await this.authSessionRepository.revoke(claims.sid);
+      throw new UnauthorizedException("refresh_token_reused_or_invalid");
+    }
 
     return {
       accessToken: this.issueAccessToken(rotatedSession),
@@ -382,7 +402,7 @@ export class AuthSessionService {
     userId?: string;
   }> {
     const now = nowDate();
-    const pendingUser = await this.pendingLoginRepository.find(
+    const pendingUser = await this.pendingLoginRepository.consume(
       input.pendingLoginToken,
     );
 
@@ -413,8 +433,6 @@ export class AuthSessionService {
       );
 
       const issued = await this.issuePersistedSession(persistedUser.userId);
-      await this.pendingLoginRepository.delete(input.pendingLoginToken);
-
       return {
         accessToken: issued.accessToken,
         refreshToken: issued.refreshToken,
@@ -425,8 +443,6 @@ export class AuthSessionService {
     }
 
     const issued = await this.issueTemporarySession(pendingUser);
-    await this.pendingLoginRepository.delete(input.pendingLoginToken);
-
     return {
       accessToken: issued.accessToken,
       storageMode: "temporary",
@@ -442,10 +458,14 @@ export class AuthSessionService {
   ): Promise<AuthSessionSummary> {
     if (accessToken) {
       try {
-        this.validateTemporaryAccessToken(accessToken);
+        const claims = this.validateTemporaryAccessToken(accessToken);
         return {
           authenticated: true,
           canUsePersistentFeatures: false,
+          // A temporary token without the per-login namespace is legacy or
+          // malformed. Do not fall back to a subject-derived key: that would
+          // make two temporary sessions for the same person share drafts.
+          draftNamespace: claims.draftNamespace,
           requiresConsent: true,
           storageMode: "temporary",
         };
@@ -481,10 +501,12 @@ export class AuthSessionService {
     let nameEn: string | null | undefined;
     let primaryMajor: string | null | undefined;
     let feeStatus: "PAID" | "PARTIAL" | "UNPAID" | null | undefined;
+    let draftNamespace: string | undefined;
 
     if (session.mode === "persisted" && session.userId) {
       const user = await this.usersService.findById(session.userId);
       if (user?.isActive) {
+        draftNamespace = this.deriveDraftNamespace(session.sessionId);
         const [resolvedPermission, resolvedFeeStatus] = await Promise.all([
           this.usersService.resolvePermissionBitmaskByUserId(user.userId),
           this.usersService.getStudentFeeStatus(user.userId),
@@ -507,6 +529,7 @@ export class AuthSessionService {
       ),
       canUsePersistentFeatures:
         session.mode === "persisted" && permission !== undefined,
+      draftNamespace,
       permission,
       requiresConsent: session.mode === "temporary",
       storageMode: session.mode,
@@ -517,6 +540,12 @@ export class AuthSessionService {
       primaryMajor,
       feeStatus,
     };
+  }
+
+  private deriveDraftNamespace(sessionId: string): string {
+    return createHmac("sha256", this.getJwtSecret())
+      .update(`draft-namespace:${sessionId}`)
+      .digest("base64url");
   }
 
   /**
@@ -530,6 +559,13 @@ export class AuthSessionService {
         authenticated: true,
         storageMode: "temporary",
       };
+    }
+
+    const session = await this.authSessionRepository.findBySessionId(claims.sid);
+    this.assertActiveSession(session);
+
+    if (session.mode !== "persisted" || session.userId !== claims.userId) {
+      throw new UnauthorizedException("access_session_mismatch");
     }
 
     const user = await this.usersService.findById(claims.userId);

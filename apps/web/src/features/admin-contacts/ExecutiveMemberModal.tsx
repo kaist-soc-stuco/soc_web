@@ -24,6 +24,7 @@ export interface ExecutiveMemberFormValues {
   cohort: number | null;
   email: string;
   phoneNumber: string;
+  publiclyListed: boolean;
 }
 
 interface ExecutiveMemberModalProps {
@@ -54,6 +55,7 @@ function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormVal
     cohort: formatActivityYear(contact?.cohort),
     email: contact?.email ?? "",
     phoneNumber: contact?.phoneNumber ?? "",
+    publiclyListed: contact?.publiclyListed ?? false,
   };
 }
 
@@ -303,10 +305,17 @@ export function ExecutiveMemberModal({
           <AdminFormField label="전화번호" className="sm:col-span-2">
             <UiInput value={formData.phoneNumber} onChange={(event) => updateField("phoneNumber", event.currentTarget.value)} placeholder="010-0000-0000" className="box-border w-full" />
           </AdminFormField>
+          <label className="sm:col-span-2 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+            <UiInput type="checkbox" checked={formData.publiclyListed} onChange={(event) => updateField("publiclyListed", event.currentTarget.checked)} className="mt-0.5 size-4 shrink-0 accent-brand-primary" />
+            <span>
+              <span className="block font-medium">공개 조직도에 표시</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">개인정보 저장 동의와 별도로, 이름·부서·직책을 인터넷 공개 조직도에 표시할 때만 선택하세요.</span>
+            </span>
+          </label>
         </div>
 
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
-          개인정보 제공에 동의한 집행부원만 등록해 주세요. 등록된 연락처는 권한이 있는 관리자에게만 표시됩니다.
+          개인정보 제공 동의는 내부 연락망 저장을 위한 것이며 인터넷 공개 동의와 다릅니다. 이메일·전화번호·학번은 공개 응답에 포함되지 않습니다.
         </p>
       </form>
     </AdminDrawer>

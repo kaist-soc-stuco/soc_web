@@ -107,6 +107,19 @@ const connectedSurveyFields = {
   end`,
 };
 
+const secretArticleFilter = (
+  viewerUserId?: string,
+  allowSecretStaff = false,
+) =>
+  or(
+    eq(articles.isSecret, false),
+    allowSecretStaff
+      ? eq(articles.isSecret, true)
+      : viewerUserId
+        ? eq(articles.authorUserId, viewerUserId)
+        : sql`false`,
+  );
+
 const mapConnectedSurvey = (
   row: ConnectedSurveyFields,
 ): SurveySummary | null => {
@@ -612,6 +625,7 @@ export class ArticleRepository {
     visibilityScopes: VisibilityScope[],
     viewerUserId?: string,
     includeHidden = false,
+    allowSecretStaff = false,
   ): Promise<ArticleDetailResponse | null> {
     const row = await this.db
       .select({
@@ -657,6 +671,7 @@ export class ArticleRepository {
             ? inArray(articles.status, [ARTICLE_STATUS.PUBLISHED, ARTICLE_STATUS.HIDDEN])
             : eq(articles.status, ARTICLE_STATUS.PUBLISHED),
           inArray(articles.visibilityScope, visibilityScopes),
+          secretArticleFilter(viewerUserId, allowSecretStaff),
         ),
       )
       .limit(1);
@@ -707,8 +722,9 @@ export class ArticleRepository {
         and(
           eq(articles.boardId, boardId),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
-          inArray(articles.visibilityScope, visibilityScopes),
-          lt(articles.postedAt, row[0].postedAt)
+           inArray(articles.visibilityScope, visibilityScopes),
+           secretArticleFilter(viewerUserId, allowSecretStaff),
+           lt(articles.postedAt, row[0].postedAt)
         )
       )
       .orderBy(desc(articles.postedAt))
@@ -730,8 +746,9 @@ export class ArticleRepository {
         and(
           eq(articles.boardId, boardId),
           eq(articles.status, ARTICLE_STATUS.PUBLISHED),
-          inArray(articles.visibilityScope, visibilityScopes),
-          gt(articles.postedAt, row[0].postedAt)
+           inArray(articles.visibilityScope, visibilityScopes),
+           secretArticleFilter(viewerUserId, allowSecretStaff),
+           gt(articles.postedAt, row[0].postedAt)
         )
       )
       .orderBy(asc(articles.postedAt))
@@ -760,6 +777,7 @@ export class ArticleRepository {
         userId: String(row[0].authorId ?? ""),
         name: row[0].authorName ?? "unknown",
       },
+      canEdit: false,
       assets: assetRows.map((assetRow) => ({
         assetId: String(assetRow.assetId),
         usageType:
@@ -973,6 +991,8 @@ export class ArticleRepository {
     boardId: number,
     articleId: string,
     visibilityScopes: VisibilityScope[],
+    viewerUserId?: string,
+    allowSecretStaff = false,
   ): Promise<{
     allowComment: boolean;
     status: string;
@@ -988,6 +1008,7 @@ export class ArticleRepository {
           eq(articles.boardId, boardId),
           eq(articles.articleId, Number(articleId)),
           inArray(articles.visibilityScope, visibilityScopes),
+          secretArticleFilter(viewerUserId, allowSecretStaff),
         ),
       )
       .limit(1);
@@ -1191,7 +1212,9 @@ export class ArticleRepository {
     boardId: number,
     articleId: string,
     visibilityScopes: VisibilityScope[],
+    viewerUserId?: string,
     includeHidden = false,
+    allowSecretStaff = false,
   ): Promise<boolean> {
     const row = await this.db
       .select({ articleId: articles.articleId })
@@ -1204,6 +1227,7 @@ export class ArticleRepository {
             ? inArray(articles.status, [ARTICLE_STATUS.PUBLISHED, ARTICLE_STATUS.HIDDEN])
             : eq(articles.status, ARTICLE_STATUS.PUBLISHED),
           inArray(articles.visibilityScope, visibilityScopes),
+          secretArticleFilter(viewerUserId, allowSecretStaff),
         ),
       )
       .limit(1);

@@ -4,6 +4,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { msToDate, nowMs } from "@soc/shared";
 import jwt from "jsonwebtoken";
+import { readResponseTextWithLimit } from "../../shared/http/bounded-fetch";
 
 export interface GoogleCalendarEventResource {
   id?: string;
@@ -175,7 +176,7 @@ export class GoogleCalendarClient {
       signal: AbortSignal.timeout(15_000),
     });
 
-    const responseText = await response.text();
+    const responseText = await readResponseTextWithLimit(response, 2 * 1024 * 1024);
     if (!response.ok) {
       throw new GoogleCalendarApiError(
         response.status,
@@ -234,7 +235,9 @@ export class GoogleCalendarClient {
       }),
       signal: AbortSignal.timeout(15_000),
     });
-    const payload = (await response.json()) as GoogleTokenResponse;
+    const payload = JSON.parse(
+      await readResponseTextWithLimit(response, 512 * 1024),
+    ) as GoogleTokenResponse;
     if (!response.ok || !payload.access_token) {
       this.logger.warn(`Google service-account token request failed with HTTP ${response.status}`);
       throw new Error("google_service_account_token_failed");

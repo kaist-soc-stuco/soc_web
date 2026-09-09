@@ -146,6 +146,10 @@ export function FeeManagementPage() {
   const [openFilterDropdown, setOpenFilterDropdown] = useState<"semester" | "major" | null>(null);
   const [spreadsheetInputKey, setSpreadsheetInputKey] = useState(0);
   const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
+  const paymentIdempotencyRef = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
   const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
   const [detail, setDetail] = useState<StudentFeeDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -385,7 +389,19 @@ export function FeeManagementPage() {
     try {
       setSaving(true);
       setOperationError(null);
-      await apiClient.processStudentFeePayments({ payments });
+      const requestFingerprint = JSON.stringify(payments);
+      if (
+        paymentIdempotencyRef.current?.fingerprint !== requestFingerprint
+      ) {
+        paymentIdempotencyRef.current = {
+          fingerprint: requestFingerprint,
+          key: crypto.randomUUID(),
+        };
+      }
+      await apiClient.processStudentFeePayments({
+        idempotencyKey: paymentIdempotencyRef.current.key,
+        payments,
+      });
       setSelectedUserIds(new Set());
       setLastSelectedUserId(null);
       setSelectionPopoverOpen(false);

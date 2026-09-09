@@ -101,3 +101,72 @@ test("passes the configured contact spreadsheet through without creating a dupli
   const createCall = calls.find((call) => call.kind === "getOrCreateSpreadsheet");
   assert.equal(createCall.options.configuredSpreadsheetId, "configured-sheet");
 });
+
+test("rechecks consent before writing and records a non-PII sync audit trace", async () => {
+  const calls = [];
+  const findManagedCalls = [];
+  const auditEntries = [];
+  const repository = {
+    findManaged: async (input) => {
+      findManagedCalls.push(input);
+      return {
+        items: input.privacyConsented
+          ? [{
+              nameKo: "동의 사용자",
+              nameEn: "Consented User",
+              studentNumber: "20260001",
+              departmentKo: "집행부",
+              departmentEn: "Executive",
+              roleKo: "부원",
+              roleEn: "Member",
+              cohort: 26,
+              email: "consented@example.com",
+              phoneNumber: "010-1111-1111",
+            }]
+          : [{
+              nameKo: "철회 사용자",
+              nameEn: "Revoked User",
+              email: "revoked@example.com",
+              phoneNumber: "010-9999-9999",
+            }],
+      };
+    },
+  };
+  const sheets = {
+    getOrCreateSpreadsheet: async () => ({
+      spreadsheetId: "contact-sheet-1",
+      spreadsheetUrl: "https://docs.google.com/spreadsheets/d/contact-sheet-1/edit",
+    }),
+    syncSheet: async (definition) => calls.push(definition),
+  };
+  const service = new GoogleContactSheetsService(
+    { get: () => undefined },
+    sheets,
+    repository,
+    {},
+    { record: async (entry) => auditEntries.push(entry) },
+  );
+
+  await service.sync(undefined, {
+    jobId: "job-1",
+    resourceKey: "global",
+    resourceType: "CONTACTS",
+    revision: 7,
+  });
+
+  assert.equal(findManagedCalls[0].privacyConsented, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].rows[0][0], "동의 사용자");
+  assert.equal(calls[0].rows.some((row) => row.includes("revoked@example.com")), false);
+  assert.deepEqual(auditEntries[0].payload, {
+    executor: "background-worker",
+    jobId: "job-1",
+    resourceKey: "global",
+    resourceType: "CONTACTS",
+    revision: 7,
+    result: "succeeded",
+    syncedCount: 1,
+  });
+  assert.equal(JSON.stringify(auditEntries).includes("consented@example.com"), false);
+  assert.equal(JSON.stringify(auditEntries).includes("revoked@example.com"), false);
+});

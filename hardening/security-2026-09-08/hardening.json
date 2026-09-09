@@ -1,0 +1,420 @@
+{
+  "documentType": "codex-security.hardening-analysis",
+  "schemaVersion": "1.0",
+  "analysisId": "security-2026-09-08",
+  "sourceEvidence": {
+    "kind": "document_collection",
+    "label": "SOC Web 2026-09-08 보안 상세 결과·범위·요약",
+    "collectionSha256": "914ad6b64629881d74e69451a4b977fabf735392bae3bc82500ad6b698829ae5",
+    "artifactCount": 3,
+    "sourceDrift": "present",
+    "targetRevision": "13c4b9d0c039362bf32b0c8d08ede8370ca9842d",
+    "reviewRevision": "221203ac24a642a3494a3133a63b9e518bbe616c",
+    "limitations": [
+      "Web dirty changes와 로컬 Python SSO fixture 상태 존재",
+      "봉인된 scan manifest 없음",
+      "기존 보고서 HTTP/harness 결과를 이번에 재실행하지 않음"
+    ]
+  },
+  "assessment": {
+    "outcome": "opportunities_identified",
+    "summary": "도메인 객체 정책/정규화된 파일 참조를 공통화하고 나머지 인증·동시성·외부 상태는 국소 수정. 43건은 권장 처리 매핑이며 미구현."
+  },
+  "constraints": {
+    "profile": "balanced",
+    "changeHorizons": [
+      "incremental",
+      "medium_term"
+    ],
+    "nonNegotiables": [
+      "모바일 기존 변경 보존",
+      "개인정보 비저장 로그인·투표 익명성 유지",
+      "실제 provider 호출/secret 출력/운영 mutation 없이 계획 제공"
+    ],
+    "assumptions": [
+      "성능 SLO 미제공",
+      "정책 기본안: public PII 최소화, 제한된 위임, fee 원자성, DB vote cutoff, ambiguous SMTP 자동 retry 금지"
+    ]
+  },
+  "opportunities": [
+    {
+      "opportunityId": "resource-policy",
+      "title": "객체 접근 정책과 파일 참조 정규화",
+      "summary": "본문·댓글·파일의 원본 객체 정책을 공유하고 검증/저장의 파일 ID를 일치시킨다.",
+      "diagnosis": "같은 confidentiality와 입력 의미가 호출자 관례로 분산됨.",
+      "evidence": [
+        {
+          "evidenceId": "S05-F01",
+          "title": "익명 작성자 raw DTO",
+          "path": "apps/api/src/features/board/article.service.ts",
+          "claim": "공개 projection이 secret masking과 분리되어야 함",
+          "sourceKind": "source",
+          "claimType": "observed"
+        },
+        {
+          "evidenceId": "S05-F02",
+          "title": "비밀글 댓글 접근",
+          "path": "apps/api/src/features/board/comment.service.ts",
+          "claim": "본문과 댓글의 secret gate가 다름",
+          "sourceKind": "source",
+          "claimType": "observed"
+        },
+        {
+          "evidenceId": "S05-F03",
+          "title": "비밀 이전/다음 metadata",
+          "path": "docs/SECURITY_AUDIT_RESULTS_2026-09-08.md",
+          "claim": "보고서 하네스에서 neighbor metadata pass-through",
+          "sourceKind": "document",
+          "claimType": "observed"
+        },
+        {
+          "evidenceId": "S06-F01",
+          "title": "비밀 첨부파일 bytes",
+          "path": "apps/api/src/features/asset/asset.service.ts",
+          "claim": "scope-readable 판단 뒤 storage.read 호출",
+          "sourceKind": "source",
+          "claimType": "observed"
+        },
+        {
+          "evidenceId": "S07-F02",
+          "title": "혼합 assetId/assetIds",
+          "path": "apps/api/src/features/surveys/survey-responses.service.ts",
+          "claim": "owner와 answer validation의 필드 우선순위 불일치",
+          "sourceKind": "source",
+          "claimType": "observed"
+        },
+        {
+          "evidenceId": "S07-F03",
+          "title": "설문 이미지 공개 승격",
+          "path": "docs/SECURITY_AUDIT_RESULTS_2026-09-08.md",
+          "claim": "보고서 참조 ownership 부재와 public image sink",
+          "sourceKind": "document",
+          "claimType": "observed"
+        }
+      ],
+      "desiredInvariants": [
+        "동일 게시글의 본문·댓글·파일에 일관된 접근 경계",
+        "canonical file IDs 전체 검증 후 같은 IDs 저장",
+        "private file의 무권한 public reference 승격 금지",
+        "authorization은 원본 metadata로 계산 후 public DTO projection"
+      ],
+      "proposalPath": "proposals/resource-policy.md",
+      "options": [
+        {
+          "optionId": "local-guards",
+          "title": "경로별 검사 보강",
+          "kind": "baseline",
+          "summary": "각 caller의 누락 검사와 입력 해석 수정",
+          "diagramPaths": {
+            "before": "diagrams/resource-policy-before.mmd",
+            "after": "diagrams/resource-policy-local-guards-after.mmd"
+          },
+          "evidenceCoverage": [
+            {
+              "evidenceId": "S05-F01",
+              "title": "익명 작성자 raw DTO",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S05-F02",
+              "title": "비밀글 댓글 접근",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S05-F03",
+              "title": "비밀 이전/다음 metadata",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S06-F01",
+              "title": "비밀 첨부파일 bytes",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S07-F02",
+              "title": "혼합 assetId/assetIds",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S07-F03",
+              "title": "설문 이미지 공개 승격",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            }
+          ],
+          "tradeoffs": [
+            {
+              "dimension": "security",
+              "direction": "improves",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "현재 누락 경로 직접 차단, 반복 관례 잔존",
+              "validationPlan": "actor-resource-sink matrix에서 정상/부정 양쪽 검증"
+            },
+            {
+              "dimension": "performance",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "caller별 추가 조회 가능",
+              "validationPlan": "동일 fixture p50/p95, SQL count, Redis roundtrip 비교"
+            },
+            {
+              "dimension": "memory",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "제한된 metadata context를 사용하며 실측은 없음",
+              "validationPlan": "동일 page cap/동시성의 peak RSS 비교"
+            },
+            {
+              "dimension": "reliability",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "국소적으로 fail-closed 경계 보완",
+              "validationPlan": "DB/storage 실패와 정상 운영진 경로 검증"
+            },
+            {
+              "dimension": "operability",
+              "direction": "neutral",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "기존 배포 유지, caller별 검사 관리",
+              "validationPlan": "PII 없는 trace 및 신규 endpoint 리뷰"
+            },
+            {
+              "dimension": "migration",
+              "direction": "neutral",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "작은 caller patch 중심",
+              "validationPlan": "legacy DTO/참조 및 정상 client 회귀"
+            },
+            {
+              "dimension": "developer_ergonomics",
+              "direction": "neutral",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "중복 조건 유지",
+              "validationPlan": "새 caller가 policy를 우회하는지 sink 검색"
+            },
+            {
+              "dimension": "rollback",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "취약한 guard 제거 대신 기능 제한과 안전 패치 유지",
+              "validationPlan": "단계별 rollback 후 privacy negative test"
+            }
+          ],
+          "residualRisks": [
+            "신규 caller의 정책 우회",
+            "legacy invalid references",
+            "운영 노출 정도 미확인",
+            "인증·SMTP·vote·ACL은 이 제안으로 해결되지 않음"
+          ],
+          "implementationReadiness": {
+            "affectedComponents": [
+              "apps/api/src/features/board",
+              "apps/api/src/features/asset",
+              "apps/api/src/features/surveys",
+              "shared/contracts/src"
+            ],
+            "workPackages": [
+              "H00 격리 fixture/회귀",
+              "H01 객체·파일 경계",
+              "H04 공개 projection"
+            ],
+            "acceptanceCriteria": [
+              "거부된 actor의 bytes read/write side effect 0",
+              "검증/저장 IDs 동일",
+              "정상 작성자/운영진 성공"
+            ],
+            "migrationNotes": [
+              "국소 guard를 유지하며 caller별 이행",
+              "public DTO/client 동시 변경",
+              "legacy ref 읽기 전용 inventory"
+            ],
+            "rollback": "보안 gate는 유지하고 영향 기능을 제한한다."
+          }
+        },
+        {
+          "optionId": "domain-policy",
+          "title": "도메인 공통 정책과 canonical 참조",
+          "kind": "structural",
+          "summary": "현재 모듈 내 정책/DTO/참조 경계 공통화",
+          "diagramPaths": {
+            "before": "diagrams/resource-policy-before.mmd",
+            "after": "diagrams/resource-policy-domain-policy-after.mmd"
+          },
+          "evidenceCoverage": [
+            {
+              "evidenceId": "S05-F01",
+              "title": "익명 작성자 raw DTO",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S05-F02",
+              "title": "비밀글 댓글 접근",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S05-F03",
+              "title": "비밀 이전/다음 metadata",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S06-F01",
+              "title": "비밀 첨부파일 bytes",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S07-F02",
+              "title": "혼합 assetId/assetIds",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            },
+            {
+              "evidenceId": "S07-F03",
+              "title": "설문 이미지 공개 승격",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "목표 효과이며 구현/재검증 전. 각 누락 sink의 직접 guard/projection/참조 검증 필요."
+            }
+          ],
+          "tradeoffs": [
+            {
+              "dimension": "security",
+              "direction": "improves",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "도메인 원본 정책 공유로 caller 간 불일치 감소",
+              "validationPlan": "actor-resource-sink matrix에서 정상/부정 양쪽 검증"
+            },
+            {
+              "dimension": "performance",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "metadata batching 가능, 조회 비용 추가 가능",
+              "validationPlan": "동일 fixture p50/p95, SQL count, Redis roundtrip 비교"
+            },
+            {
+              "dimension": "memory",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "제한된 metadata context를 사용하며 실측은 없음",
+              "validationPlan": "동일 page cap/동시성의 peak RSS 비교"
+            },
+            {
+              "dimension": "reliability",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "일관된 거부이나 공통 함수 오류의 영향 범위 확대",
+              "validationPlan": "DB/storage 실패와 정상 운영진 경로 검증"
+            },
+            {
+              "dimension": "operability",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "별도 process 없이 denial 이유 통일",
+              "validationPlan": "PII 없는 trace 및 신규 endpoint 리뷰"
+            },
+            {
+              "dimension": "migration",
+              "direction": "regresses",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "contracts/client/reference inventory 변경 필요",
+              "validationPlan": "legacy DTO/참조 및 정상 client 회귀"
+            },
+            {
+              "dimension": "developer_ergonomics",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "정책 소유 지점 축소",
+              "validationPlan": "새 caller가 policy를 우회하는지 sink 검색"
+            },
+            {
+              "dimension": "rollback",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "취약한 guard 제거 대신 기능 제한과 안전 패치 유지",
+              "validationPlan": "단계별 rollback 후 privacy negative test"
+            }
+          ],
+          "residualRisks": [
+            "신규 caller의 정책 우회",
+            "legacy invalid references",
+            "운영 노출 정도 미확인",
+            "인증·SMTP·vote·ACL은 이 제안으로 해결되지 않음"
+          ],
+          "implementationReadiness": {
+            "affectedComponents": [
+              "apps/api/src/features/board",
+              "apps/api/src/features/asset",
+              "apps/api/src/features/surveys",
+              "shared/contracts/src"
+            ],
+            "workPackages": [
+              "H00 격리 fixture/회귀",
+              "H01 객체·파일 경계",
+              "H04 공개 projection"
+            ],
+            "acceptanceCriteria": [
+              "거부된 actor의 bytes read/write side effect 0",
+              "검증/저장 IDs 동일",
+              "정상 작성자/운영진 성공"
+            ],
+            "migrationNotes": [
+              "국소 guard를 유지하며 caller별 이행",
+              "public DTO/client 동시 변경",
+              "legacy ref 읽기 전용 inventory"
+            ],
+            "rollback": "보안 gate는 유지하고 영향 기능을 제한한다."
+          }
+        }
+      ],
+      "recommendedOptionId": "domain-policy",
+      "recommendation": "Option 2 권장. 긴급 차단은 Option 1 후 같은 테스트를 유지하며 이동."
+    }
+  ],
+  "implementationPlanPath": "implementation/domain-policy.md",
+  "openQuestions": [
+    "기존 system admin/위임 migration",
+    "실제 공개 연락처 승인 범위",
+    "Google/S3/TLS/SMTP/backup 운영 증거"
+  ],
+  "validationPerformed": [
+    "핵심 소스 직접 재열람",
+    "API/shared/infra/lockfile revision drift 없음 확인",
+    "runtime pnpm audit Moderate 4 재확인"
+  ],
+  "implementationStatus": "not_started"
+}

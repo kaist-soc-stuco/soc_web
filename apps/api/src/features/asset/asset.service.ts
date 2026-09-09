@@ -10,7 +10,8 @@ import {
   Optional,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { isoToDate, msToIso, nowMs } from "@soc/shared";
+import { isoToDate, msToDate, msToIso, nowMs } from "@soc/shared";
+import type { Readable } from "node:stream";
 
 import { AssetRepository } from "./repositories/asset.repository";
 import { AssetStorageProvider } from "./asset.storage";
@@ -18,7 +19,10 @@ import { toAssetReference } from "./asset-reference";
 import { BoardRepository } from "../board/repositories/board.repository";
 import { ArticleRepository } from "../board/repositories/article.repository";
 import type { CurrentUserContext } from "../board/article-access";
-import { getReadableArticleScopes } from "../board/article-access";
+import {
+  canReadSecretArticles,
+  getReadableArticleScopes,
+} from "../board/article-access";
 import { AuditLogService } from "../audit/audit-log.service";
 import type { AuditMetadata } from "../audit/audit-context";
 import type {
@@ -34,11 +38,15 @@ type UploadedAssetFile = {
   size: number;
 };
 
+const DEFAULT_ASSET_USER_MAX_COUNT = 100;
+const DEFAULT_ASSET_USER_MAX_BYTES = 512 * 1024 * 1024;
+const DIRECT_UPLOAD_EXPIRES_MS = 10 * 60 * 1_000;
+const MAX_BUFFERED_ASSET_BYTES = 20 * 1024 * 1024;
+
 @Injectable()
 export class AssetService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AssetService.name);
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
-  private cleanupRunning = false;
 
   constructor(
     private readonly assetRepository: AssetRepository,
@@ -58,7 +66,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
 
     if (!enabled) {
       this.logger.log(
-        "Asset orphan cleanup scheduler is disabled. Use POST /assets/cleanup-orphans or enable ASSET_ORPHAN_CLEANUP_ENABLED on a single runner.",
+        "Asset orphan cleanup scheduler is disabled. Use POST /assets/cleanup-orphans or enable ASSET_ORPHAN_CLEANUP_ENABLED.",
       );
       return;
     }
@@ -99,19 +107,38 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     sizeBytes: number;
     storageKey: string;
   }> {
-    const storageKey = await this.storage.upload({
-      buffer: input.file.buffer,
-      contentType: input.file.mimetype,
-      originalName: input.file.originalname,
-    });
+    const reservationId = await this.reserveAssetUpload(input.userId, input.file.size);
+    let storageKey: string | null = null;
+    let asset: { assetId: string };
+    try {
+      storageKey = await this.storage.upload({
+        buffer: input.file.buffer,
+        contentType: input.file.mimetype,
+        originalName: input.file.originalname,
+      });
 
-    const asset = await this.assetRepository.createAsset({
-      storageKey,
-      originalFilename: input.file.originalname,
-      mimeType: input.file.mimetype,
-      sizeBytes: input.file.size,
-      uploadedBy: input.userId,
-    });
+      asset = await this.assetRepository.createAssetFromReservation({
+        reservationId,
+        storageKey,
+        originalFilename: input.file.originalname,
+        mimeType: input.file.mimetype,
+        sizeBytes: input.file.size,
+        uploadedBy: input.userId,
+      });
+    } catch (error) {
+      await this.releaseAssetUploadReservation(reservationId, input.userId);
+      if (storageKey) {
+        try {
+          await this.storage.delete(storageKey);
+        } catch (cleanupError) {
+          this.logger.error(
+            `Uploaded asset cleanup failed after DB failure (${storageKey}).`,
+            cleanupError instanceof Error ? cleanupError.stack : String(cleanupError),
+          );
+        }
+      }
+      throw error;
+    }
 
     await this.auditLogService?.record({
       action: "asset.upload",
@@ -150,19 +177,43 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       throw new ConflictException("asset_direct_upload_unavailable");
     }
 
-    const preparation = await this.storage.createPresignedUpload({
-      contentType: input.mimeType,
-      originalName: input.originalFilename,
-      sizeBytes: input.sizeBytes,
-    });
+    const uploadExpiresAt = msToDate(nowMs() + DIRECT_UPLOAD_EXPIRES_MS);
+    const reservationId = await this.reserveAssetUpload(input.userId, input.sizeBytes, uploadExpiresAt);
+    let preparation: AssetDirectUploadPrepareResponse;
+    let storageKey: string | null = null;
+    let asset: { assetId: string };
+    try {
+      preparation = await this.storage.createPresignedUpload({
+        contentType: input.mimeType,
+        originalName: input.originalFilename,
+        sizeBytes: input.sizeBytes,
+      });
+      storageKey = preparation.storageKey;
 
-    const asset = await this.assetRepository.createAsset({
-      storageKey: preparation.storageKey,
-      originalFilename: input.originalFilename,
-      mimeType: input.mimeType,
-      sizeBytes: input.sizeBytes,
-      uploadedBy: input.userId,
-    });
+      asset = await this.assetRepository.createAssetFromReservation({
+        reservationId,
+        storageKey: preparation.storageKey,
+        originalFilename: input.originalFilename,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        uploadedBy: input.userId,
+        uploadStatus: "PENDING",
+        uploadExpiresAt,
+      });
+    } catch (error) {
+      await this.releaseAssetUploadReservation(reservationId, input.userId);
+      if (storageKey) {
+        try {
+          await this.storage.delete(storageKey);
+        } catch (cleanupError) {
+          this.logger.error(
+            `Presigned asset cleanup failed after DB failure (${storageKey}).`,
+            cleanupError instanceof Error ? cleanupError.stack : String(cleanupError),
+          );
+        }
+      }
+      throw error;
+    }
 
     await this.auditLogService?.record({
       action: "asset.upload.prepare",
@@ -200,6 +251,12 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     if (!asset) {
       throw new NotFoundException("asset_upload_not_found");
     }
+    if (asset.uploadStatus !== "PENDING") {
+      throw new ConflictException("asset_upload_already_completed");
+    }
+    if (asset.uploadExpiresAt && asset.uploadExpiresAt.valueOf() <= nowMs()) {
+      throw new BadRequestException("asset_upload_expired");
+    }
 
     let uploadedObject: Awaited<ReturnType<NonNullable<AssetStorageProvider["verifyUpload"]>>>;
     try {
@@ -216,6 +273,14 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       uploadedObject.contentType.toLowerCase() !== asset.mimeType.toLowerCase()
     ) {
       throw new BadRequestException("asset_upload_mime_mismatch");
+    }
+
+    const completed = await this.assetRepository.completeDirectUpload(
+      asset.assetId,
+      input.userId,
+    );
+    if (!completed) {
+      throw new ConflictException("asset_upload_expired");
     }
 
     const result = {
@@ -293,8 +358,10 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     assetId: string,
     currentUser: CurrentUserContext,
     audit?: AuditMetadata,
+    streaming = false,
   ): Promise<{
-    buffer: Buffer;
+    buffer?: Buffer;
+    stream?: Readable;
     inline: boolean;
     mimeType: string;
     originalFilename: string;
@@ -302,6 +369,9 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
   }> {
     const asset = await this.assetRepository.findAssetWithLinks(assetId);
     if (!asset) {
+      throw new NotFoundException("asset_not_found");
+    }
+    if (asset.uploadStatus && asset.uploadStatus !== "COMPLETED") {
       throw new NotFoundException("asset_not_found");
     }
 
@@ -336,6 +406,9 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
           board.boardId,
           link.articleId,
           readableScopes,
+          currentUser.user?.id,
+          false,
+          canReadSecretArticles(currentUser),
         );
 
         if (articleReadable) {
@@ -348,10 +421,20 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    let buffer: Buffer;
+    let buffer: Buffer | undefined;
+    let stream: Readable | undefined;
     try {
-      buffer = await this.storage.read(asset.storageKey);
-    } catch {
+      if (streaming) {
+        if (!this.storage.readStream) throw new Error("asset_stream_unavailable");
+        stream = await this.storage.readStream(asset.storageKey);
+      } else {
+        if (asset.sizeBytes > MAX_BUFFERED_ASSET_BYTES) {
+          throw new BadRequestException("asset_buffer_limit_exceeded");
+        }
+        buffer = await this.storage.read(asset.storageKey);
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       throw new NotFoundException("asset_not_found");
     }
 
@@ -383,6 +466,7 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
 
     return {
       buffer,
+      stream,
       inline,
       mimeType: asset.mimeType,
       originalFilename: asset.originalFilename,
@@ -410,6 +494,9 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     if (!asset) {
       throw new NotFoundException("asset_not_found");
     }
+    if (asset.sizeBytes > MAX_BUFFERED_ASSET_BYTES) {
+      throw new BadRequestException("asset_buffer_limit_exceeded");
+    }
 
     try {
       return {
@@ -429,56 +516,78 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
     failed: number;
     olderThanHours: number;
   }> {
-    const olderThanHours = this.configService.get<number>(
-      "ASSET_ORPHAN_GRACE_HOURS",
-      24,
+    const cleanupLease = await this.assetRepository.tryAcquireCleanupLease(
+      "orphan-assets",
+      10 * 60 * 1_000,
     );
-    const cutoff = isoToDate(msToIso(nowMs() - olderThanHours * 60 * 60 * 1000));
-    const candidates = await this.assetRepository.findUnlinkedAssetsBefore(
-      cutoff,
-      100,
-    );
-
-    const deletableAssetIds: string[] = [];
-    let failed = 0;
-
-    for (const candidate of candidates) {
-      try {
-        await this.storage.delete(candidate.storageKey);
-        deletableAssetIds.push(candidate.assetId);
-      } catch {
-        failed += 1;
-      }
+    if (!cleanupLease) {
+      this.logger.log("Skipped asset orphan cleanup because another runner owns the DB lease.");
+      return {
+        scanned: 0,
+        deleted: 0,
+        failed: 0,
+        olderThanHours: this.configService.get<number>(
+          "ASSET_ORPHAN_GRACE_HOURS",
+          24,
+        ),
+      };
     }
 
-    const deleted =
-      await this.assetRepository.deleteAssetsByIds(deletableAssetIds);
+    try {
+      const olderThanHours = this.configService.get<number>(
+        "ASSET_ORPHAN_GRACE_HOURS",
+        24,
+      );
+      const cutoff = isoToDate(msToIso(nowMs() - olderThanHours * 60 * 60 * 1000));
+      await this.assetRepository.releaseExpiredAssetUploadReservations();
+      const candidates = await this.assetRepository.findUnlinkedAssetsBefore(
+        cutoff,
+        100,
+      );
+      let failed = 0;
+      let deleted = 0;
 
-    const result = {
-      scanned: candidates.length,
-      deleted,
-      failed,
-      olderThanHours,
-    };
-    await this.auditLogService?.record({
-      action: "asset.cleanup",
-      actorUserId: audit?.actorUserId ?? null,
-      ipAddress: audit?.ipAddress ?? null,
-      payload: { ...result, source: audit ? "admin" : "scheduler" },
-      targetType: "asset",
-    });
-    return result;
+      for (const candidate of candidates) {
+        try {
+          // Delete the DB row under the same reference predicate and row lock
+          // before touching storage. A concurrent reference either commits
+          // first (so this returns null) or is rejected by the asset fence.
+          const deletable = await this.assetRepository.deleteUnlinkedAsset(candidate.assetId);
+          if (!deletable) continue;
+          await this.storage.delete(deletable.storageKey);
+          deleted += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+
+      const result = {
+        scanned: candidates.length,
+        deleted,
+        failed,
+        olderThanHours,
+      };
+      await this.auditLogService?.record({
+        action: "asset.cleanup",
+        actorUserId: audit?.actorUserId ?? null,
+        ipAddress: audit?.ipAddress ?? null,
+        payload: { ...result, source: audit ? "admin" : "scheduler" },
+        targetType: "asset",
+      });
+      return result;
+    } finally {
+      try {
+        await this.assetRepository.releaseCleanupLease("orphan-assets", cleanupLease);
+      } catch (error) {
+        this.logger.error(
+          "Asset orphan cleanup lease release failed.",
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
   }
 
   private async runScheduledCleanup() {
-    if (this.cleanupRunning) {
-      this.logger.warn(
-        "Skipped asset orphan cleanup because a previous run is still active.",
-      );
-      return;
-    }
-
-    this.cleanupRunning = true;
     try {
       const result = await this.cleanupUnlinkedAssets();
       this.logger.log(
@@ -489,8 +598,49 @@ export class AssetService implements OnModuleInit, OnModuleDestroy {
         "Asset orphan cleanup failed.",
         error instanceof Error ? error.stack : String(error),
       );
-    } finally {
-      this.cleanupRunning = false;
+    }
+  }
+
+  private async reserveAssetUpload(
+    userId: string,
+    incomingBytes: number,
+    expiresAt = msToDate(nowMs() + DIRECT_UPLOAD_EXPIRES_MS),
+  ): Promise<string> {
+    const maxCount = this.configService.get<number>(
+      "ASSET_USER_MAX_COUNT",
+      DEFAULT_ASSET_USER_MAX_COUNT,
+    );
+    const maxBytes = this.configService.get<number>(
+      "ASSET_USER_MAX_BYTES",
+      DEFAULT_ASSET_USER_MAX_BYTES,
+    );
+    try {
+      return await this.assetRepository.reserveAssetUpload({
+        uploadedBy: userId,
+        sizeBytes: incomingBytes,
+        maxCount,
+        maxBytes,
+        expiresAt,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "asset_quota_exceeded") {
+        throw new BadRequestException("asset_quota_exceeded");
+      }
+      throw error;
+    }
+  }
+
+  private async releaseAssetUploadReservation(
+    reservationId: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      await this.assetRepository.releaseAssetUploadReservation(reservationId, userId);
+    } catch (releaseError) {
+      this.logger.error(
+        `Asset upload reservation release failed (${reservationId}).`,
+        releaseError instanceof Error ? releaseError.stack : String(releaseError),
+      );
     }
   }
 }

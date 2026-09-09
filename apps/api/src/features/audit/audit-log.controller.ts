@@ -18,6 +18,7 @@ export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get()
+  @Header("Cache-Control", "private, no-store")
   async listAuditLogs(
     @Query("action") action?: string,
     @Query("page") page?: string,
@@ -46,6 +47,7 @@ export class AuditLogController {
   }
 
   @Get("export.xlsx")
+  @Header("Cache-Control", "private, no-store")
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Header("Content-Disposition", 'attachment; filename="audit-logs.xlsx"')
   async exportAuditLogs(

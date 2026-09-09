@@ -74,7 +74,8 @@ export type ArticleStatus = "DRAFT" | "PUBLISHED" | "HIDDEN" | "DELETED";
 export type VisibilityScope = "PUBLIC" | "MEMBERS" | "STAFF_ONLY";
 
 export interface ArticleAuthorSummary {
-  userId: string;
+  /** Present only for non-anonymous authors/comments. */
+  userId?: string;
   name: string;
 }
 
@@ -166,6 +167,8 @@ export interface ArticleDetailResponse {
   updatedAt: string;
   author: ArticleAuthorSummary;
   isAnonymous: boolean;
+  /** Server-calculated permission for the current viewer. */
+  canEdit: boolean;
   allowComment: boolean;
   assets: ArticleAssetItem[];
   commentCount: number;

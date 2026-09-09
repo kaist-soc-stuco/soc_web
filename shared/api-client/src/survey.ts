@@ -8,9 +8,13 @@ import type {
   SubmitResponseRequest,
   SurveyAnalyticsResponse,
   SurveyDetailResponse,
+  PublicSurveyRecord,
+  PublicSurveyListResponse,
   SurveyQuestionRecord,
   SurveyRecord,
   SurveyResponseWithAnswers,
+  SurveyResponseListResponse,
+  SurveyResponseWithAnswersListResponse,
   SurveyResponseRecord,
   SurveySectionRecord,
   UpdateQuestionRequest,
@@ -254,9 +258,15 @@ export const createSurveyApi = ({
     );
   },
 
-  listResponses: async (surveyId: string): Promise<SurveyResponseRecord[]> => {
-    return requestJson<SurveyResponseRecord[]>(
-      `${surveyBaseUrl}/${surveyId}/responses`,
+  listResponses: async (surveyId: string, options?: { page?: number; pageSize?: number; query?: string; sortOrder?: "asc" | "desc" }): Promise<SurveyResponseListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.page !== undefined) params.set("page", String(options.page));
+    if (options?.pageSize !== undefined) params.set("pageSize", String(options.pageSize));
+    if (options?.query?.trim()) params.set("q", options.query.trim());
+    if (options?.sortOrder) params.set("sort", options.sortOrder);
+    const query = params.toString();
+    return requestJson<SurveyResponseListResponse>(
+      `${surveyBaseUrl}/${surveyId}/responses${query ? `?${query}` : ""}`,
       {
         method: "GET",
       },
@@ -277,9 +287,16 @@ export const createSurveyApi = ({
 
   listResponsesWithAnswers: async (
     surveyId: string,
-  ): Promise<SurveyResponseWithAnswers[]> => {
-    return requestJson<SurveyResponseWithAnswers[]>(
-      `${surveyBaseUrl}/${surveyId}/responses/with-answers`,
+    options?: { page?: number; pageSize?: number; query?: string; sortOrder?: "asc" | "desc" },
+  ): Promise<SurveyResponseWithAnswersListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.page !== undefined) params.set("page", String(options.page));
+    if (options?.pageSize !== undefined) params.set("pageSize", String(options.pageSize));
+    if (options?.query?.trim()) params.set("q", options.query.trim());
+    if (options?.sortOrder) params.set("sort", options.sortOrder);
+    const query = params.toString();
+    return requestJson<SurveyResponseWithAnswersListResponse>(
+      `${surveyBaseUrl}/${surveyId}/responses/with-answers${query ? `?${query}` : ""}`,
       { method: "GET" },
       { retryOnUnauthorized: true },
     );
@@ -293,9 +310,14 @@ export const createSurveyApi = ({
     );
   },
 
-  getPublicSurveys: async (): Promise<SurveyRecord[]> => {
-    return requestJson<SurveyRecord[]>(
-      `${surveyBaseUrl}/list/public`,
+  getPublicSurveys: async (options?: { page?: number; pageSize?: number; query?: string }): Promise<PublicSurveyListResponse> => {
+    const params = new URLSearchParams();
+    if (options?.page !== undefined) params.set("page", String(options.page));
+    if (options?.pageSize !== undefined) params.set("pageSize", String(options.pageSize));
+    if (options?.query?.trim()) params.set("q", options.query.trim());
+    const query = params.toString();
+    return requestJson<PublicSurveyListResponse>(
+      `${surveyBaseUrl}/list/public${query ? `?${query}` : ""}`,
       { method: "GET" },
     );
   },

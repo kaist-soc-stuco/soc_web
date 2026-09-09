@@ -14,8 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 
-const LAST_CONSUMED_RESULT_TOKEN_KEY = "soc.auth.last-consumed-result-token";
-
 type LoginStatus = "idle" | "starting" | "processing" | "failed";
 
 const submitAuthorizeForm = (payload: {
@@ -57,7 +55,7 @@ export function LoginCallbackPage() {
     () => createApiClient({ baseUrl: resolveApiBaseUrl() }),
     [],
   );
-  const consumedResultTokenRef = useRef<Set<string>>(new Set());
+  const consumedLoginResultRef = useRef(false);
   const [status, setStatus] = useState<LoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingConsentToken, setPendingConsentToken] = useState<string | null>(
@@ -92,8 +90,6 @@ export function LoginCallbackPage() {
 
     const searchParams = new URLSearchParams(location.search);
     const loginStatus = searchParams.get("status");
-    const resultToken = searchParams.get("resultToken");
-    const pendingLoginToken = searchParams.get("pendingLoginToken");
 
     const startLogin = async () => {
       setStatus("starting");
@@ -126,28 +122,22 @@ export function LoginCallbackPage() {
       }
     };
 
-    if (loginStatus === "consent-required" && pendingLoginToken) {
-      writeStoredAuthState({ pendingLoginToken });
-      setPendingConsentToken(pendingLoginToken);
+    if (loginStatus === "consent-required") {
+      // The pending SSO transaction is identified by an HttpOnly cookie. No
+      // bearer value is copied into the URL or sessionStorage.
+      setPendingConsentToken("server-transaction");
       setStatus("processing");
       return;
     }
 
-    if (loginStatus === "success" && resultToken) {
-      const consumedByRef = consumedResultTokenRef.current.has(resultToken);
-      const consumedBySessionStorage =
-        window.sessionStorage.getItem(LAST_CONSUMED_RESULT_TOKEN_KEY) ===
-        resultToken;
-
-      if (consumedByRef || consumedBySessionStorage) return;
-
-      consumedResultTokenRef.current.add(resultToken);
-      window.sessionStorage.setItem(LAST_CONSUMED_RESULT_TOKEN_KEY, resultToken);
+    if (loginStatus === "success") {
+      if (consumedLoginResultRef.current) return;
+      consumedLoginResultRef.current = true;
       setStatus("processing");
       setErrorMessage(null);
 
       void apiClient
-        .consumeLoginResult(resultToken)
+        .consumeLoginResult()
         .then(async () => {
           clearStoredAuthState();
           await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
@@ -155,21 +145,13 @@ export function LoginCallbackPage() {
         })
         .catch((error) => {
           console.error(error);
-          consumedResultTokenRef.current.delete(resultToken);
-          window.sessionStorage.removeItem(LAST_CONSUMED_RESULT_TOKEN_KEY);
+          consumedLoginResultRef.current = false;
           returnToPreviousPage(
             lang === "ko"
               ? "로그인 결과를 처리하지 못했습니다."
               : "Failed to process the sign-in result.",
           );
         });
-      return;
-    }
-
-    if (loginStatus === "success") {
-      void queryClient
-        .invalidateQueries({ queryKey: ["auth", "session"] })
-        .finally(() => navigate("/", { replace: true }));
       return;
     }
 
@@ -205,8 +187,8 @@ export function LoginCallbackPage() {
     if (!pendingConsentToken) {
       setConsentErrorMessage(
         lang === "ko"
-          ? "로그인 동의 토큰이 없습니다. 로그인을 다시 시도해 주세요."
-          : "The login consent token is missing. Please sign in again.",
+          ? "로그인 동의 세션이 없습니다. 로그인을 다시 시도해 주세요."
+          : "The login consent session is missing. Please sign in again.",
       );
       return;
     }
@@ -217,7 +199,6 @@ export function LoginCallbackPage() {
     try {
       const payload = await apiClient.submitConsentDecision({
         consent,
-        pendingLoginToken: pendingConsentToken,
       });
 
       if (payload.storageMode === "temporary") {

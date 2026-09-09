@@ -1,0 +1,1 @@
+ALTER TABLE "executive_contact" ADD COLUMN "publicly_listed" boolean DEFAULT false NOT NULL;

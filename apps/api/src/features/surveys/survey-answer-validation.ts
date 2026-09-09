@@ -2,6 +2,10 @@ import { BadRequestException } from "@nestjs/common";
 
 import type { SubmitResponseDto } from "./dto/submit-response.dto";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
+import {
+  MAX_REGEX_INPUT_LENGTH,
+  testSafeSurveyRegex,
+} from "./survey-regex-policy";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const YEARLESS_DATE_PATTERN = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -110,6 +114,27 @@ function hasDuplicateValues(values: readonly string[]): boolean {
   return new Set(values).size !== values.length;
 }
 
+export function getCanonicalSurveyAssetIds(
+  content: Record<string, unknown>,
+): string[] {
+  const hasAssetId = Object.prototype.hasOwnProperty.call(content, "assetId");
+  const hasAssetIds = Object.prototype.hasOwnProperty.call(content, "assetIds");
+
+  if (hasAssetId && hasAssetIds) {
+    throw new BadRequestException("answer_file_mixed_asset_fields");
+  }
+
+  if (hasAssetIds) {
+    return Array.isArray(content.assetIds)
+      ? content.assetIds.filter(
+          (assetId): assetId is string => typeof assetId === "string",
+        )
+      : [];
+  }
+
+  return typeof content.assetId === "string" ? [content.assetId] : [];
+}
+
 function parseRating(value: unknown): number | null {
   if (typeof value === "number" && Number.isInteger(value)) return value;
   if (typeof value === "string" && /^\d+$/.test(value)) return Number(value);
@@ -138,11 +163,7 @@ export function isSurveyAnswerEmpty(
   }
 
   if (question.questionType === "file_upload") {
-    const assetIds = Array.isArray(content.assetIds)
-      ? content.assetIds
-      : typeof content.assetId === "string"
-        ? [content.assetId]
-        : [];
+    const assetIds = getCanonicalSurveyAssetIds(content);
     return assetIds.length === 0;
   }
 
@@ -160,10 +181,10 @@ export function isSurveyAnswerEmpty(
   return typeof value !== "string" || value.trim().length === 0;
 }
 
-function validateAnswerContent(
+async function validateAnswerContent(
   question: SurveyQuestionRecord,
   content: Record<string, unknown>,
-): void {
+): Promise<void> {
   if (!question.isRequired && isSurveyAnswerEmpty(question, content)) {
     return;
   }
@@ -180,6 +201,9 @@ function validateAnswerContent(
       if (typeof content.text !== "string") {
         throw new BadRequestException("answer_content_invalid");
       }
+      if (content.text.length > MAX_REGEX_INPUT_LENGTH) {
+        throw new BadRequestException("answer_text_too_long");
+      }
       const configuredValidationType = question.config?.validationType ??
         (question.answerRegex ? "regex" : undefined);
       const validationType = configuredValidationType === "text"
@@ -192,13 +216,8 @@ function validateAnswerContent(
             ? "max_length"
             : question.config?.validationOperator;
       if (validationType === "regex" && question.answerRegex) {
-        try {
-          if (!new RegExp(question.answerRegex).test(content.text)) {
-            throw validationError(question, "answer_regex_mismatch");
-          }
-        } catch (error) {
-          if (error instanceof BadRequestException) throw error;
-          throw new BadRequestException("answer_regex_invalid");
+        if (!(await testSafeSurveyRegex(question.answerRegex, content.text))) {
+          throw validationError(question, "answer_regex_mismatch");
         }
       }
       if (validationType === "length" && !passesNumericValidation(
@@ -293,11 +312,7 @@ function validateAnswerContent(
       break;
     }
     case "file_upload": {
-      const assetIds = Array.isArray(content.assetIds)
-        ? content.assetIds
-        : typeof content.assetId === "string"
-          ? [content.assetId]
-          : [];
+      const assetIds = getCanonicalSurveyAssetIds(content);
       if (
         !assetIds.every((assetId) => typeof assetId === "string" && /^\d+$/.test(assetId)) ||
         hasDuplicateValues(assetIds as string[]) ||
@@ -338,10 +353,10 @@ function validateAnswerContent(
   }
 }
 
-export function validateSurveyAnswers(
+export async function validateSurveyAnswers(
   questions: SurveyQuestionRecord[],
   answers: SubmitResponseDto["answers"],
-): void {
+): Promise<void> {
   const questionById = new Map(questions.map((question) => [question.id, question]));
   const answerByQuestionId = new Map<string, Record<string, unknown>>();
 
@@ -355,7 +370,7 @@ export function validateSurveyAnswers(
       throw new BadRequestException("question_not_found");
     }
 
-    validateAnswerContent(question, answerInput.content);
+    await validateAnswerContent(question, answerInput.content);
     answerByQuestionId.set(answerInput.questionId, answerInput.content);
   }
 

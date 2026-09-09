@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import Redis from 'ioredis';
 import { nowIso, nowMs } from '@soc/shared';
+import { randomUUID } from 'node:crypto';
 
 import {
   DRIZZLE_DB,
@@ -12,31 +13,34 @@ import { REDIS_CLIENT } from '../../infrastructure/redis/redis.provider';
 interface DependencyHealth {
   ok: boolean;
   latencyMs: number;
-  message?: string;
+  code: 'ok' | 'postgres_unavailable' | 'redis_unavailable';
 }
 
 @Injectable()
 export class HealthService {
+  private readonly logger = new Logger(HealthService.name);
+
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: PostgresDatabase,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   async getHealth() {
+    const correlationId = randomUUID();
     const [postgres, redis] = await Promise.all([
-      this.checkPostgres(),
-      this.checkRedis(),
+      this.checkPostgres(correlationId),
+      this.checkRedis(correlationId),
     ]);
 
     return {
       status: postgres.ok && redis.ok ? 'ok' : 'degraded',
-      postgres,
-      redis,
+      code: postgres.ok && redis.ok ? 'ok' : 'dependency_unavailable',
+      correlationId,
       timestamp: nowIso(),
     };
   }
 
-  private async checkPostgres(): Promise<DependencyHealth> {
+  private async checkPostgres(correlationId: string): Promise<DependencyHealth> {
     const start = nowMs();
 
     try {
@@ -45,17 +49,21 @@ export class HealthService {
       return {
         ok: true,
         latencyMs: nowMs() - start,
+        code: 'ok',
       };
-    } catch (error) {
+    } catch {
+      this.logger.error(
+        `dependency=postgres code=postgres_unavailable correlationId=${correlationId}`,
+      );
       return {
         ok: false,
         latencyMs: nowMs() - start,
-        message: error instanceof Error ? error.message : 'postgres check failed',
+        code: 'postgres_unavailable',
       };
     }
   }
 
-  private async checkRedis(): Promise<DependencyHealth> {
+  private async checkRedis(correlationId: string): Promise<DependencyHealth> {
     const start = nowMs();
 
     try {
@@ -68,12 +76,16 @@ export class HealthService {
       return {
         ok: true,
         latencyMs: nowMs() - start,
+        code: 'ok',
       };
-    } catch (error) {
+    } catch {
+      this.logger.error(
+        `dependency=redis code=redis_unavailable correlationId=${correlationId}`,
+      );
       return {
         ok: false,
         latencyMs: nowMs() - start,
-        message: error instanceof Error ? error.message : 'redis check failed',
+        code: 'redis_unavailable',
       };
     }
   }

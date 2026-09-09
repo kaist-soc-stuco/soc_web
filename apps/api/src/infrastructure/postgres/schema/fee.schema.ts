@@ -1,10 +1,12 @@
 import {
   index,
   integer,
+  jsonb,
   pgTable,
   smallint,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -54,3 +56,29 @@ export const studentFeePayments = pgTable("student_fee_payment", {
   index("student_fee_payment_user_paid_idx").on(table.userId, table.paidAt),
   index("student_fee_payment_semester_idx").on(table.effectiveStartSemester),
 ]);
+
+/**
+ * Durable idempotency record for an authenticated payment batch. The result
+ * is written in the same transaction as the ledger changes, so a replay can
+ * return the original result without inserting another payment.
+ */
+export const studentFeePaymentBatches = pgTable(
+  "student_fee_payment_batch",
+  {
+    batchId: uuid("batch_id").defaultRandom().primaryKey(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.userId),
+    idempotencyKey: varchar("idempotency_key", { length: 128 }).notNull(),
+    payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+    result: jsonb("result").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("student_fee_payment_batch_actor_key_idx").on(
+      table.actorUserId,
+      table.idempotencyKey,
+    ),
+  ],
+);

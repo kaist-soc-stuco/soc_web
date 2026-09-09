@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { and, eq, lte, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { msToDate, nowDate, nowMs } from "@soc/shared";
 
 import {
@@ -17,13 +19,26 @@ export const GOOGLE_SHEET_RESOURCE = {
 
 type GoogleSheetResourceType =
   (typeof GOOGLE_SHEET_RESOURCE)[keyof typeof GOOGLE_SHEET_RESOURCE];
-type SyncHandler = (resourceKey: string) => Promise<void>;
+export interface GoogleSpreadsheetSyncJobContext {
+  jobId: string;
+  resourceKey: string;
+  resourceType: GoogleSheetResourceType;
+  revision: number;
+  claimToken: string;
+  leaseUntil: Date;
+  isCurrentClaim: () => Promise<boolean>;
+}
+type SyncHandler = (
+  resourceKey: string,
+  context: GoogleSpreadsheetSyncJobContext,
+) => Promise<void>;
 
 const PENDING = "PENDING";
 const PROCESSING = "PROCESSING";
 const SUCCEEDED = "SUCCEEDED";
 const FAILED = "FAILED";
 const MAX_ATTEMPTS = 8;
+const LEASE_MS = 5 * 60 * 1_000;
 
 /**
  * Google API 호출을 사용자 요청에서 분리하는 DB 기반 coalescing queue입니다.
@@ -53,6 +68,8 @@ export class GoogleSpreadsheetSyncQueueService {
         attempts: 0,
         availableAt: nowDate(),
         lockedAt: null,
+        leaseUntil: null,
+        claimToken: null,
         lastError: null,
       })
       .onConflictDoUpdate({
@@ -66,6 +83,8 @@ export class GoogleSpreadsheetSyncQueueService {
           attempts: 0,
           availableAt: nowDate(),
           lockedAt: null,
+          leaseUntil: null,
+          claimToken: null,
           lastError: null,
           updatedAt: nowDate(),
         },
@@ -80,11 +99,23 @@ export class GoogleSpreadsheetSyncQueueService {
     const staleLockAt = msToDate(nowMs() - 10 * 60 * 1_000);
     await this.db
       .update(googleSpreadsheetSyncJobs)
-      .set({ status: PENDING, lockedAt: null, updatedAt: nowDate() })
+      .set({
+        status: PENDING,
+        lockedAt: null,
+        leaseUntil: null,
+        claimToken: null,
+        updatedAt: nowDate(),
+      })
       .where(
         and(
           eq(googleSpreadsheetSyncJobs.status, PROCESSING),
-          lte(googleSpreadsheetSyncJobs.lockedAt, staleLockAt),
+          or(
+            lte(googleSpreadsheetSyncJobs.leaseUntil, nowDate()),
+            and(
+              isNull(googleSpreadsheetSyncJobs.leaseUntil),
+              lte(googleSpreadsheetSyncJobs.lockedAt, staleLockAt),
+            ),
+          ),
         ),
       );
 
@@ -114,6 +145,8 @@ export class GoogleSpreadsheetSyncQueueService {
           status: PROCESSING,
           attempts: candidate.attempts + 1,
           lockedAt: nowDate(),
+          leaseUntil: msToDate(nowMs() + LEASE_MS),
+          claimToken: randomUUID(),
           updatedAt: nowDate(),
         })
         .where(
@@ -133,12 +166,19 @@ export class GoogleSpreadsheetSyncQueueService {
       try {
         const handler = this.handlers.get(job.resourceType as GoogleSheetResourceType);
         if (!handler) throw new Error(`google_sheet_sync_handler_missing:${job.resourceType}`);
-        await handler(job.resourceKey);
-        await this.markSucceeded(job);
-        succeededCount += 1;
+        const context: GoogleSpreadsheetSyncJobContext = {
+          jobId: String(job.googleSpreadsheetSyncJobId),
+          resourceKey: job.resourceKey,
+          resourceType: job.resourceType as GoogleSheetResourceType,
+          revision: job.revision,
+          claimToken: job.claimToken as string,
+          leaseUntil: job.leaseUntil as Date,
+          isCurrentClaim: () => this.isCurrentClaim(job),
+        };
+        await handler(job.resourceKey, context);
+        if (await this.markSucceeded(job)) succeededCount += 1;
       } catch (error) {
-        await this.markFailed(job, error);
-        failedCount += 1;
+        if (await this.markFailed(job, error)) failedCount += 1;
       }
     }
 
@@ -158,22 +198,26 @@ export class GoogleSpreadsheetSyncQueueService {
 
   private async markSucceeded(
     job: typeof googleSpreadsheetSyncJobs.$inferSelect,
-  ): Promise<void> {
-    await this.db
+  ): Promise<boolean> {
+    const updated = await this.db
       .update(googleSpreadsheetSyncJobs)
       .set({
         status: SUCCEEDED,
         lockedAt: null,
+        leaseUntil: null,
+        claimToken: null,
         lastError: null,
         updatedAt: nowDate(),
       })
-      .where(this.currentClaim(job));
+      .where(this.currentClaim(job))
+      .returning({ googleSpreadsheetSyncJobId: googleSpreadsheetSyncJobs.googleSpreadsheetSyncJobId });
+    return updated.length > 0;
   }
 
   private async markFailed(
     job: typeof googleSpreadsheetSyncJobs.$inferSelect,
     error: unknown,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const terminal = job.attempts >= MAX_ATTEMPTS;
     const retryDelay = Math.min(
       60 * 60 * 1_000,
@@ -183,19 +227,24 @@ export class GoogleSpreadsheetSyncQueueService {
       .replace(/\s+/g, " ")
       .slice(0, 1_000);
 
-    await this.db
+    const updated = await this.db
       .update(googleSpreadsheetSyncJobs)
       .set({
         status: terminal ? FAILED : PENDING,
         availableAt: msToDate(nowMs() + retryDelay),
         lockedAt: null,
+        leaseUntil: null,
+        claimToken: null,
         lastError: message,
         updatedAt: nowDate(),
       })
-      .where(this.currentClaim(job));
+      .where(this.currentClaim(job))
+      .returning({ googleSpreadsheetSyncJobId: googleSpreadsheetSyncJobs.googleSpreadsheetSyncJobId });
+    return updated.length > 0;
   }
 
   private currentClaim(job: typeof googleSpreadsheetSyncJobs.$inferSelect) {
+    if (!job.claimToken) return sql`false`;
     return and(
       eq(
         googleSpreadsheetSyncJobs.googleSpreadsheetSyncJobId,
@@ -203,6 +252,19 @@ export class GoogleSpreadsheetSyncQueueService {
       ),
       eq(googleSpreadsheetSyncJobs.status, PROCESSING),
       eq(googleSpreadsheetSyncJobs.revision, job.revision),
+      eq(googleSpreadsheetSyncJobs.claimToken, job.claimToken),
+      gt(googleSpreadsheetSyncJobs.leaseUntil, nowDate()),
     );
+  }
+
+  private async isCurrentClaim(
+    job: typeof googleSpreadsheetSyncJobs.$inferSelect,
+  ): Promise<boolean> {
+    const [current] = await this.db
+      .select({ googleSpreadsheetSyncJobId: googleSpreadsheetSyncJobs.googleSpreadsheetSyncJobId })
+      .from(googleSpreadsheetSyncJobs)
+      .where(this.currentClaim(job))
+      .limit(1);
+    return Boolean(current);
   }
 }

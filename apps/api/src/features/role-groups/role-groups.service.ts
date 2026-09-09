@@ -11,6 +11,10 @@ import type {
   ReplaceRoleGroupMembersRequest,
   UpdateRoleGroupRequest,
 } from "@soc/contracts";
+import {
+  PERMISSION_REGISTRY,
+  Permissions,
+} from "@soc/contracts";
 
 import { AuditLogService } from "../audit/audit-log.service";
 import { UsersService } from "../users/users.service";
@@ -20,6 +24,19 @@ interface AuditMetadata {
   actorUserId?: string | null;
   ipAddress?: string | null;
 }
+
+/** Permissions that may not be delegated by a normal role manager. */
+const RESERVED_DELEGATION_BITS =
+  Permissions.MANAGE_ROLES |
+  Permissions.MANAGE_USERS |
+  Permissions.MANAGE_FINANCE |
+  Permissions.MANAGE_CONTACTS |
+  Permissions.SEND_BULK_EMAIL |
+  Permissions.VIEW_AUDIT_LOG |
+  Permissions.MANAGE_VOTE;
+
+const normalizePermissionIds = (permissionIds: number[]): number[] =>
+  [...new Set(permissionIds)];
 
 @Injectable()
 export class RoleGroupsService {
@@ -41,6 +58,7 @@ export class RoleGroupsService {
     input: CreateRoleGroupRequest,
     audit?: AuditMetadata,
   ): Promise<RoleGroupRecord> {
+    await this.assertPermissionDelegationAllowed(input.permissionIds, audit?.actorUserId);
     const created = await this.roleGroupsRepository.createRoleGroup(input);
 
     if (!created) {
@@ -51,7 +69,10 @@ export class RoleGroupsService {
       action: "role_group.create",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
-      payload: { created, input },
+      payload: {
+        permissionIds: normalizePermissionIds(input.permissionIds),
+        roleGroupId: created.roleGroupId,
+      },
       targetId: created.roleGroupId,
       targetType: "role_group",
     });
@@ -74,6 +95,8 @@ export class RoleGroupsService {
       throw new ForbiddenException("system_role_group_cannot_be_updated");
     }
 
+    await this.assertPermissionDelegationAllowed(input.permissionIds, audit?.actorUserId);
+
     const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(
       (member) => member.userId,
     );
@@ -89,7 +112,11 @@ export class RoleGroupsService {
       action: "role_group.update",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
-      payload: { after: updated, before: existing, input },
+      payload: {
+        changedFields: Object.keys(input),
+        permissionIds: normalizePermissionIds(input.permissionIds),
+        roleGroupId,
+      },
       targetId: roleGroupId,
       targetType: "role_group",
     });
@@ -108,6 +135,8 @@ export class RoleGroupsService {
       throw new ForbiddenException("system_role_group_cannot_be_deleted");
     }
 
+    await this.assertRoleMutationAllowed(existing, audit?.actorUserId);
+
     const memberIds = (await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId)).map(
       (member) => member.userId,
     );
@@ -118,7 +147,7 @@ export class RoleGroupsService {
       action: "role_group.delete",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
-      payload: { deleted: existing, memberIds },
+      payload: { memberIds, roleGroupId },
       targetId: roleGroupId,
       targetType: "role_group",
     });
@@ -156,6 +185,11 @@ export class RoleGroupsService {
       throw new NotFoundException("role_group_not_found");
     }
 
+    await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
+    if (input.userId === audit?.actorUserId) {
+      throw new ForbiddenException("role_group_self_assignment_not_allowed");
+    }
+
     const user = await this.usersService.findById(String(input.userId));
     if (!user) {
       throw new NotFoundException("user_not_found");
@@ -175,7 +209,10 @@ export class RoleGroupsService {
       action: "role_group_member.add",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
-      payload: { added, input, roleGroup },
+      payload: {
+        roleGroupId,
+        userId: added.userId,
+      },
       targetId: `${roleGroupId}:${added.userId}`,
       targetType: "role_group_member",
     });
@@ -193,13 +230,15 @@ export class RoleGroupsService {
       throw new NotFoundException("role_group_not_found");
     }
 
+    await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
+
     await this.roleGroupsRepository.removeUserFromRoleGroup(roleGroupId, userId);
     await this.usersService.invalidatePermissionCache(userId);
     await this.auditLogService.record({
       action: "role_group_member.remove",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
-      payload: { roleGroup, userId },
+      payload: { roleGroupId, userId },
       targetId: `${roleGroupId}:${userId}`,
       targetType: "role_group_member",
     });
@@ -213,6 +252,11 @@ export class RoleGroupsService {
     const roleGroup = await this.roleGroupsRepository.findRoleGroupById(roleGroupId);
     if (!roleGroup) {
       throw new NotFoundException("role_group_not_found");
+    }
+
+    await this.assertRoleMutationAllowed(roleGroup, audit?.actorUserId);
+    if (input.userIds.includes(audit?.actorUserId ?? "")) {
+      throw new ForbiddenException("role_group_self_assignment_not_allowed");
     }
 
     const before = await this.roleGroupsRepository.listRoleGroupMembers(roleGroupId);
@@ -233,11 +277,71 @@ export class RoleGroupsService {
       action: "role_group_member.replace",
       actorUserId: audit?.actorUserId ?? null,
       ipAddress: audit?.ipAddress ?? null,
-      payload: { roleGroup, userIds: input.userIds },
+      payload: { roleGroupId, userIds: [...new Set(input.userIds)] },
       targetId: String(roleGroupId),
       targetType: "role_group_member",
     });
 
     return replaced;
+  }
+
+  private async assertPermissionDelegationAllowed(
+    permissionIds: number[],
+    actorUserId?: string | null,
+  ): Promise<void> {
+    if (!actorUserId) {
+      throw new ForbiddenException("role_manager_actor_required");
+    }
+
+    const activePermissions = await this.roleGroupsRepository.listPermissions();
+    const permissionById = new Map(
+      activePermissions
+        .filter((permission) => permission.isActive)
+        .map((permission) => [permission.permissionId, permission]),
+    );
+    const normalizedIds = normalizePermissionIds(permissionIds);
+    const unknownPermission = normalizedIds.find((permissionId) => !permissionById.has(permissionId));
+    if (unknownPermission !== undefined) {
+      throw new BadRequestException("role_permission_inactive_or_unknown");
+    }
+
+    const requestedMask = normalizedIds.reduce(
+      (mask, permissionId) => mask | Number(permissionById.get(permissionId)?.bitValue ?? 0),
+      0,
+    );
+    await this.assertPermissionMaskDelegationAllowed(requestedMask, actorUserId);
+  }
+
+  private async assertPermissionMaskDelegationAllowed(
+    requestedMask: number,
+    actorUserId: string,
+  ): Promise<void> {
+    if (await this.roleGroupsRepository.isSystemAdministrator(actorUserId)) return;
+
+    const actorMask = await this.usersService.resolvePermissionBitmaskByUserId(actorUserId);
+    const delegableActorMask = actorMask & ~RESERVED_DELEGATION_BITS;
+    if ((requestedMask & RESERVED_DELEGATION_BITS) !== 0 || (requestedMask & ~delegableActorMask) !== 0) {
+      throw new ForbiddenException("role_permission_delegation_not_allowed");
+    }
+  }
+
+  private async assertRoleMutationAllowed(
+    roleGroup: RoleGroupRecord,
+    actorUserId?: string | null,
+  ): Promise<void> {
+    if (!actorUserId) {
+      throw new ForbiddenException("role_manager_actor_required");
+    }
+
+    if (roleGroup.isSystem) {
+      const isSystemAdministrator =
+        await this.roleGroupsRepository.isSystemAdministrator(actorUserId);
+      if (!isSystemAdministrator) {
+        throw new ForbiddenException("system_role_group_requires_system_administrator");
+      }
+      return;
+    }
+
+    await this.assertPermissionMaskDelegationAllowed(roleGroup.permissionMask, actorUserId);
   }
 }

@@ -8,6 +8,9 @@ export interface AssetDirectUploadPrepareResponse {
   storageKey: string;
   uploadUrl: string;
   uploadHeaders: Record<string, string>;
+  /** S3 direct uploads use a POST policy so content length is enforced by the provider. */
+  uploadMethod?: "PUT" | "POST";
+  uploadFields?: Record<string, string>;
   expiresAt: string;
 }
 

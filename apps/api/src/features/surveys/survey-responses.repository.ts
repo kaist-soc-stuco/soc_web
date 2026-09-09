@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -14,6 +14,7 @@ import {
   studentFeeStatus,
   surveys,
   users,
+  assets,
 } from "../../infrastructure/postgres/postgres.schema";
 
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
@@ -21,7 +22,11 @@ import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
 import type { PostgresTransaction } from "../../infrastructure/postgres/postgres.provider";
 import type { QuestionOption, QuestionType } from "@soc/contracts";
-import { isSurveyAnswerEmpty, validateSurveyAnswers } from "./survey-answer-validation";
+import {
+  getCanonicalSurveyAssetIds,
+  isSurveyAnswerEmpty,
+  validateSurveyAnswers,
+} from "./survey-answer-validation";
 import {
   getReachableSurveyQuestions,
   type SurveySectionWithQuestions,
@@ -45,6 +50,13 @@ type SurveyResponseQueryRow = {
   userAcademicStatus: string | null;
   userFeeStatus: string | null;
 };
+
+const MAX_ANSWERS_PER_RESPONSE = 200;
+const MAX_ANSWERS_PER_RESPONSE_PAGE = 20_000;
+const MAX_ANALYTICS_ANSWER_ROWS = 20_000;
+const MAX_RESPONSE_IDS_PER_PAGE = 100;
+const MAX_SURVEY_SECTIONS = 200;
+const MAX_SURVEY_QUESTIONS = 20_000;
 
 type InsertSubmissionResult =
   | {
@@ -72,6 +84,9 @@ type InsertSubmissionResult =
     }
   | {
       status: "fee_payer_only";
+    }
+  | {
+      status: "answer_file_not_owned";
     };
 
 type UpdateSubmissionResult =
@@ -87,6 +102,7 @@ type UpdateSubmissionResult =
         | "survey_not_open_yet"
         | "survey_closed"
         | "fee_payer_only"
+        | "answer_file_not_owned"
         | "response_edit_not_allowed"
         | "multiple_response_edit_not_supported"
         | "response_not_found";
@@ -247,7 +263,8 @@ export class SurveyResponsesRepository {
           asc(surveySections.sortOrder),
           asc(surveySections.createdAt),
           asc(surveySections.id),
-        ),
+        )
+        .limit(MAX_SURVEY_SECTIONS + 1),
       tx
         .select({ question: surveyQuestions })
         .from(surveyQuestions)
@@ -256,8 +273,13 @@ export class SurveyResponsesRepository {
           eq(surveyQuestions.sectionId, surveySections.id),
         )
         .where(eq(surveySections.surveyId, surveyId))
-        .orderBy(asc(surveyQuestions.sortOrder), asc(surveyQuestions.id)),
+        .orderBy(asc(surveyQuestions.sortOrder), asc(surveyQuestions.id))
+        .limit(MAX_SURVEY_QUESTIONS + 1),
     ]);
+
+    if (sectionRows.length > MAX_SURVEY_SECTIONS || questionRows.length > MAX_SURVEY_QUESTIONS) {
+      throw new Error("survey_definition_limit_exceeded");
+    }
 
     const questionsBySectionId = new Map<string, SurveyQuestionRecord[]>();
     for (const { question } of questionRows) {
@@ -300,14 +322,85 @@ export class SurveyResponsesRepository {
     return feeStatus?.status === "PAID";
   }
 
-  async findBySurveyId(surveyId: string): Promise<SurveyResponseRecord[]> {
+  /**
+   * Cleanup takes the same asset row lock before deleting an orphan.  Locking
+   * referenced uploads in the submission transaction makes the reference
+   * write and cleanup mutually exclusive instead of relying on a second
+   * non-atomic lookup.
+   */
+  private async lockSurveyAnswerAssets(
+    tx: PostgresTransaction,
+    answers: Array<{ content: Record<string, unknown> }>,
+    userId: string | null,
+  ): Promise<boolean> {
+    const assetIds = [
+      ...new Set(
+        answers.flatMap((answer) => getCanonicalSurveyAssetIds(answer.content)),
+      ),
+    ];
+    if (assetIds.length === 0) return true;
+    if (!userId) return false;
+
+    const rows = await tx
+      .select({
+        assetId: assets.assetId,
+        uploadedBy: assets.uploadedBy,
+        uploadStatus: assets.uploadStatus,
+      })
+      .from(assets)
+      .where(inArray(assets.assetId, assetIds.map((assetId) => Number(assetId))))
+      .for("update");
+
+    return rows.length === assetIds.length && rows.every(
+      (asset) =>
+        String(asset.uploadedBy) === userId &&
+        asset.uploadStatus === "COMPLETED",
+    );
+  }
+
+  async findBySurveyId(
+    surveyId: string,
+    input: {
+      page?: number;
+      pageSize?: number;
+      query?: string;
+      sortOrder?: "asc" | "desc";
+    } = {},
+  ): Promise<{ items: SurveyResponseRecord[]; total: number }> {
+    const page = Number.isInteger(input.page) && (input.page ?? 0) > 0 ? input.page! : 1;
+    const pageSize = Number.isInteger(input.pageSize) && (input.pageSize ?? 0) > 0
+      ? Math.min(input.pageSize!, 100)
+      : 100;
+    const query = input.query?.trim().slice(0, 100) ?? "";
+    const conditions = [eq(surveyResponses.surveyId, surveyId)];
+    if (query) {
+      const escaped = query.replace(/[\\%_]/g, (character) => `\\${character}`);
+      const pattern = `%${escaped}%`;
+      conditions.push(or(
+        ilike(users.nameKo, pattern),
+        ilike(users.email, pattern),
+        ilike(users.stdNo, pattern),
+        ilike(users.departmentKo, pattern),
+      )!);
+    }
+    const submittedAtOrder = input.sortOrder === "asc" ? asc : desc;
     const rows = await this.db
       .select(this.responseSelectFields)
       .from(surveyResponses)
       .leftJoin(users, eq(surveyResponses.userId, users.userId))
-      .where(eq(surveyResponses.surveyId, surveyId))
-      .orderBy(desc(surveyResponses.submittedAt), desc(surveyResponses.createdAt));
-    return rows.map((r) => this.mapResponse(r));
+      .where(and(...conditions))
+      .orderBy(submittedAtOrder(surveyResponses.submittedAt), submittedAtOrder(surveyResponses.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+    const [countRow] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(surveyResponses)
+      .leftJoin(users, eq(surveyResponses.userId, users.userId))
+      .where(and(...conditions));
+    return {
+      items: rows.map((r) => this.mapResponse(r)),
+      total: Number(countRow?.count ?? 0),
+    };
   }
 
   async findById(
@@ -399,12 +492,16 @@ export class SurveyResponsesRepository {
           input.surveyId,
           input.answers,
         );
-        validateSurveyAnswers(questions, input.answers);
+        await validateSurveyAnswers(questions, input.answers);
         const questionById = new Map(questions.map((question) => [question.id, question]));
         const persistedAnswers = input.answers.filter((answer) => {
           const question = questionById.get(answer.questionId);
           return question && !isSurveyAnswerEmpty(question, answer.content);
         });
+
+        if (!(await this.lockSurveyAnswerAssets(tx, persistedAnswers, input.userId))) {
+          return { status: "answer_file_not_owned" } as const;
+        }
 
         const singleResponseUserId = lockedSurvey.allowMultipleResponses || !input.userId
           ? null
@@ -581,12 +678,16 @@ export class SurveyResponsesRepository {
         input.surveyId,
         input.answers,
       );
-      validateSurveyAnswers(questions, input.answers);
+      await validateSurveyAnswers(questions, input.answers);
       const questionById = new Map(questions.map((question) => [question.id, question]));
       const persistedAnswers = input.answers.filter((answer) => {
         const question = questionById.get(answer.questionId);
         return question && !isSurveyAnswerEmpty(question, answer.content);
       });
+
+      if (!(await this.lockSurveyAnswerAssets(tx, persistedAnswers, input.userId))) {
+        return { status: "answer_file_not_owned" } as const;
+      }
 
       const [updatedResponse] = await tx
         .update(surveyResponses)
@@ -664,11 +765,21 @@ export class SurveyResponsesRepository {
     const db = tx ?? this.db;
     const rows = await db.query.surveyAnswers.findMany({
       where: eq(surveyAnswers.responseId, responseId),
+      limit: MAX_ANSWERS_PER_RESPONSE + 1,
     });
+    if (rows.length > MAX_ANSWERS_PER_RESPONSE) {
+      throw new Error("survey_response_answers_limit_exceeded");
+    }
     return rows.map((r) => this.mapAnswer(r));
   }
 
-  async findAnswersBySurveyId(surveyId: string): Promise<SurveyAnswerRecord[]> {
+  async findAnswersBySurveyId(
+    surveyId: string,
+    input: { limit?: number } = {},
+  ): Promise<SurveyAnswerRecord[]> {
+    const limit = Number.isInteger(input.limit) && (input.limit ?? 0) > 0
+      ? Math.min(input.limit!, MAX_ANALYTICS_ANSWER_ROWS)
+      : MAX_ANALYTICS_ANSWER_ROWS;
     const rows = await this.db
       .select({
         id: surveyAnswers.id,
@@ -685,7 +796,34 @@ export class SurveyResponsesRepository {
           eq(surveyResponses.surveyId, surveyId),
           eq(surveyResponses.status, "submitted")
         )
-      );
+      )
+      .limit(limit + 1);
+    if (rows.length > limit) {
+      throw new Error("survey_analytics_answer_limit_exceeded");
+    }
+    return rows.map((r) => this.mapAnswer(r));
+  }
+
+  async findAnswersByResponseIds(responseIds: string[]): Promise<SurveyAnswerRecord[]> {
+    if (responseIds.length === 0) return [];
+    if (responseIds.length > MAX_RESPONSE_IDS_PER_PAGE) {
+      throw new Error("survey_response_ids_limit_exceeded");
+    }
+    const rows = await this.db
+      .select({
+        id: surveyAnswers.id,
+        responseId: surveyAnswers.responseId,
+        questionId: surveyAnswers.questionId,
+        content: surveyAnswers.content,
+        submittedAt: surveyAnswers.submittedAt,
+        updatedAt: surveyAnswers.updatedAt,
+      })
+      .from(surveyAnswers)
+      .where(inArray(surveyAnswers.responseId, responseIds))
+      .limit(MAX_ANSWERS_PER_RESPONSE_PAGE + 1);
+    if (rows.length > MAX_ANSWERS_PER_RESPONSE_PAGE) {
+      throw new Error("survey_response_answers_limit_exceeded");
+    }
     return rows.map((r) => this.mapAnswer(r));
   }
 }

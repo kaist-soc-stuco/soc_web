@@ -1,0 +1,13 @@
+flowchart LR
+  U[요청 actor] --> A[본문 서비스]
+  U --> C[댓글 서비스]
+  U --> F[파일 서비스]
+  A --> G[도메인 객체 정책]
+  C --> G
+  F --> G
+  G --> D[(원본 객체 DB)]
+  G --> M[actor별 공개 또는 관리 DTO]
+  G -->|허용된 파일 read| S[Storage bytes]
+  I[설문 파일 입력] --> V[canonical ID 정규화와 참조 권한]
+  V --> P[검증된 관계 저장]
+  P --> D

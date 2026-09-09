@@ -25,7 +25,9 @@ import { NotificationsModule } from "./features/notifications/notifications.modu
 import { VotesModule } from "./features/votes/votes.module";
 import { RoadmapModule } from "./features/roadmap/roadmap.module";
 
-const devOnlyModules = process.env.NODE_ENV === "production" ? [] : [MockModule];
+const devOnlyModules = new Set(["development", "test"]).has(process.env.NODE_ENV ?? "")
+  ? [MockModule]
+  : [];
 
 @Module({
   imports: [
