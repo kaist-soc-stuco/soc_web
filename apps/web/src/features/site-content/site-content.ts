@@ -35,8 +35,8 @@ export const SITE_CONTENT_DEFINITIONS: readonly SiteContentDefinition[] = [
     key: "home.hero.description",
     labelKo: "히어로 설명",
     multiline: true,
-    valueKo: "학생들의 목소리를 대변하고,\n더 나은 학업 및 문화 환경을 만들어갑니다.",
-    valueEn: "Representing student voices\nand building a better academic community.",
+    valueKo: "",
+    valueEn: "",
   },
   {
     group: "home",

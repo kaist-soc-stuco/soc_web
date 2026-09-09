@@ -321,7 +321,7 @@ export const buildUnifiedItems = (
       pinOrder: event.pinOrder ?? null,
       isAlwaysOpen: !event.eventStartDate && !event.eventEndDate,
       imageUrl: event.imageUrl ?? null,
-      location: event.eventLocation ?? null,
+      location: event.eventLocation?.trim() || null,
       articleBoardCode: event.boardCode ?? "_EVENT",
       likeCount: event.likeCount,
       scrapCount: event.scrapCount,

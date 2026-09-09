@@ -106,19 +106,6 @@ function formatDate(dateIso: string) {
   return formatNumericDate(dateIso);
 }
 
-function NoticeBoardSkeleton() {
-  return (
-    <div className="grid flex-1 content-start divide-y divide-slate-100" aria-busy="true">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="flex h-10 items-center gap-3 px-3">
-          <div className="home-loading-surface h-3.5 w-16 rounded" />
-          <div className="home-loading-surface h-3.5 min-w-0 flex-1 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function NoticeBoard() {
   const { lang } = useLanguage();
   const [activeTab, setActiveTab] = useState(0);
@@ -274,9 +261,7 @@ export function NoticeBoard() {
                 {lang === "ko" ? "다시 시도" : "Try again"}
               </Button>
             </div>
-          ) : isLoadingNotices ? (
-            <NoticeBoardSkeleton />
-          ) : renderedNotices.length > 0 ? (
+          ) : isLoadingNotices ? null : renderedNotices.length > 0 ? (
             <div
               className="grid min-h-0 flex-none content-start"
               style={{

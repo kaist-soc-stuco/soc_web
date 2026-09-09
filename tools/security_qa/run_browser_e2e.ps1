@@ -47,7 +47,21 @@ try {
     LOCAL_QA_UPSTREAM = "http://127.0.0.1:28080"
     LOCAL_QA_CALLBACK_URL = "/api/auth/login"
   }
-  $server = Start-Process -FilePath "python" -ArgumentList "tools/mobile_qa/sso_server.py" -WorkingDirectory $repo -WindowStyle Hidden -Environment $serverEnvironment -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -PassThru
+  # Windows PowerShell 5.1 does not support Start-Process -Environment. Set
+  # the process environment only while starting the child so the fixture gets
+  # the same isolated configuration on both PowerShell generations.
+  $previousServerEnvironment = @{}
+  foreach ($name in $serverEnvironment.Keys) {
+    $previousServerEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+    [Environment]::SetEnvironmentVariable($name, [string]$serverEnvironment[$name], "Process")
+  }
+  try {
+    $server = Start-Process -FilePath "python" -ArgumentList "tools/mobile_qa/sso_server.py" -WorkingDirectory $repo -WindowStyle Hidden -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -PassThru
+  } finally {
+    foreach ($name in $serverEnvironment.Keys) {
+      [Environment]::SetEnvironmentVariable($name, $previousServerEnvironment[$name], "Process")
+    }
+  }
 
   $ready = $false
   for ($attempt = 0; $attempt -lt 60; $attempt++) {

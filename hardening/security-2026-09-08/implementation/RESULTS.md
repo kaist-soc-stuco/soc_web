@@ -1,6 +1,6 @@
 # 독립 보안 재점검 및 H00–H09 구현 결과 — 2026-09-09
 
-대상은 현재 `HEAD c138628cc6dd6f6dd0a563d40818fcc0530c02c3`와 작업 트리다. 과거 계획·결과 문서를 요구사항으로 재사용하지 않았으며, 현재 코드·설정·테스트와 이번 독립 재점검에서 재현된 문제를 기준으로 수정했다. 기존 사용자 변경사항과 모바일 개선 작업은 보존했다. H00–H09는 결과를 묶기 위한 보고 단계이지 과거 문서의 요구사항을 재활용한 것이 아니다.
+대상은 현재 `HEAD 8fff1013bfa8ee811e9bbafab19e0705545c39b2`와 작업 트리다. 과거 계획·결과 문서를 요구사항으로 재사용하지 않았으며, 현재 코드·설정·테스트와 이번 독립 재점검에서 재현된 문제를 기준으로 수정했다. 기존 사용자 변경사항과 모바일 개선 작업은 보존했다. H00–H09는 결과를 묶기 위한 보고 단계이지 과거 문서의 요구사항을 재활용한 것이 아니다.
 
 ## 최종 판정
 
@@ -11,13 +11,21 @@
 | H00 | `fixed_verified` | 현재 checkout, 변경 보존, 격리 DB 기준을 고정 | 없음 |
 | H01 | `fixed_verified` | 게시글·익명 작성자·asset·설문 reference 경계 수정 | 기존 데이터의 불법 reference inventory는 운영 작업 |
 | H02 | `fixed_verified` | session/revoke, SSO browser binding, CSRF, cookie/proxy 경계 수정 | 실제 TLS terminator·IdP 연동은 운영 확인 |
-| H03 | `fixed_verified` | dependency, URL, draft namespace, regex 실행 경계 수정 | legacy draft inventory는 별도 정리 가능 |
+| H03 | `fixed_verified` | dependency advisory 0건, URL, draft namespace, regex 실행 경계 수정 | legacy draft inventory는 별도 정리 가능 |
 | H04 | `fixed_verified` | role ceiling, 공개 DTO, consent 재확인, 민감 응답 no-store | 실제 Google ACL·기존 외부 row 정리는 운영 확인 |
 | H05 | `fixed_verified` | fee 원자성/idempotency와 vote DB fencing 검증 | 외부 결제 provider 계약은 합성 범위 |
 | H06 | `mitigated` | SMTP `UNKNOWN`, 명시 retry, queue/resource fencing, cleanup DB fence | provider idempotency·reconciliation은 운영 확인 |
 | H07 | `mitigated` | quota reservation, streaming/cap, rate/fetch/regex 제한 | 실제 S3 정책·운영 부하 검증 필요 |
 | H08 | `mitigated` | health/mock/runtime/supply-chain/CI 방어 적용 | hosted CI scan, TLS/ACL/secret/backup 확인 필요 |
-| H09 | `fixed_verified` | build·typecheck·lint·audit·격리 전체 테스트·이미지 smoke 통과 | 브라우저 context와 실배포는 별도 범위 |
+| H09 | `fixed_verified` | build·typecheck·lint·audit·로컬 Docker smoke 및 fake SSO browser context 통과; 이번 로컬 API 실행 152 pass/0 fail/21 skip | 전용 DB를 붙인 concurrency 재실행과 실제 IdP·실배포는 별도 범위 |
+
+## 후속 UI·seed 회귀 보정
+
+- 재현: 행사 seed가 SVG의 실제 바이트 수가 아닌 nominal `sizeBytes`를 `Content-Length`로 저장해 행사 목록 브라우저 요청이 잘린 응답으로 실패했다. 이미지가 없거나 로드에 실패한 행사 카드에는 fallback이 없었고, 설문 카드에도 장소 행이 함께 표시됐다. 홈 소식·일정에는 skeleton이 남아 있었으며 로그인 버튼이 클릭 중 문구로 바뀌었다.
+- 수정: `apps/api/drizzle/seed.ts`가 파일의 실제 바이트 수를 저장하고, `apps/web/src/features/events-surveys/events-surveys-grid.tsx`와 `apps/web/src/components/organisms/event-carousel.tsx`가 이미지 실패·부재 fallback과 행사 전용 `📍 장소 미정`을 렌더링한다. 설문 카드에는 장소 행을 만들지 않으며, 홈 소식·일정 skeleton과 로그인 중 문구를 제거했다. `tools/security_qa/run_browser_e2e.ps1`는 Windows PowerShell 5.1에서도 합성 SSO child process 환경을 전달하도록 호환성을 보완했다.
+- 검증: seed 후 행사 포스터 8개가 HTTP 200으로 실제 바이트를 끝까지 반환했다. 행사 asset 요청을 격리 브라우저에서 차단한 경우에도 `/events`에 fallback 아이콘 8개·깨진 이미지 0개·`장소 미정` 8개가 렌더링됐다. 로컬 `/events`, `/surveys`, `/`의 DOM·화면에서 행사/설문 카드 배치를 확인했고, `pnpm --filter @soc/web test` 37/37, root build/typecheck/lint 및 격리 fake SSO Playwright browser context E2E를 통과했다.
+- seed 기준: 이미지 3의 8개 공약 문구는 `REFERENCE_PLEDGE_SEEDS`에 원문으로 복원했다. 현재 `.env`의 `SEED_MODE=demo`는 기존 설계대로 demo 공약 3개를 생성하므로, 8개 reference 화면을 보려면 별도 격리 DB에서 `SEED_MODE=reference`를 사용해야 한다.
+- 로그인 확인: 현재 개발 `.env`의 `SSO_LOGIN_URL=/__local-sso/authorize`는 Python fixture와 같은 origin에서만 동작한다. 앱을 `localhost:8080`으로 열면 해당 POST가 404이고, fixture를 띄운 `http://192.168.0.3:8765/`에서는 정상 응답한다. 격리 Compose에서는 이 origin을 사용한 fake SSO smoke와 temporary/persisted browser context를 통과했다. 이는 실제 KAIST IdP·운영 redirect/TLS 설정의 증거가 아니다.
 
 ## 독립 재점검 항목별 재현·수정·검증
 
@@ -25,7 +33,7 @@
 
 - 수정 전 재현: `ArticleAssetsSchema`의 `min(1)` 때문에 `assets: []`인 첨부 없는 글, 빈 첨부 초안, 기존 첨부 전체 제거가 거절됐다. 익명 author DTO에서 `userId`를 제거한 뒤 Web이 그 값을 기준으로 `canEdit`을 계산해 본인 익명글도 편집할 수 없었다.
 - 수정: `shared/contracts/src/schemas.ts`에서 최소 개수 제약만 제거하고 최대 50개·중복 검사는 유지했다. `apps/api/src/features/board/article-access.ts`와 `shared/contracts/src/http/board.ts`에 서버 계산 `canEdit`을 추가했다. 내부 author ID로만 소유권을 판단한 뒤 공개 DTO에서는 익명 `userId`를 생략한다. `article.service.ts`는 실제 owner ID로 update/delete를 검사한다.
-- 검증: `article-access.test.js`, `article-html-sanitization.test.js`에서 빈 목록, 51개, 중복, 익명 DTO JSON, 본인 익명글 수정, 타 사용자 거절을 확인했다. API 전체 173/173 통과.
+- 검증: `article-access.test.js`, `article-html-sanitization.test.js`에서 빈 목록, 51개, 중복, 익명 DTO JSON, 본인 익명글 수정, 타 사용자 거절을 확인했다. 기존 격리 실행은 API 173/173 통과했고, 이번 로컬 재실행에서도 관련 회귀 테스트가 통과했다.
 - 잔여 제한: 관리자 전용 익명 신원 공개 경로 외에는 익명 신원을 응답하지 않는다.
 
 ### 2. SMTP 후속 DB/audit 실패에 따른 중복 발송
@@ -53,7 +61,7 @@
 
 - 수정 전 재현: 최대 100개·기존 99개에서 병렬 prepare 3개가 모두 성공해 102개가 됐다.
 - 수정: `apps/api/src/features/asset/repositories/asset.repository.ts`와 `asset.service.ts`에서 owner row를 `FOR UPDATE`로 잠그고 완료 asset·유효한 pending asset·유효한 reservation을 함께 세어 reservation을 원자적으로 만든다. 미완료 업로드도 quota에 포함하며, 만료·실패·정리에서 reservation을 회수한다. migration은 `0020_late_genesis.sql`이다. 완료 endpoint는 `PENDING` 조건부 update로 일회성이다. S3 body는 streaming cap을 사용한다.
-- 검증: `asset-quota-concurrency.test.js`에서 3개 중 1개만 남은 quota를 획득, 만료 회수, finalize/replay 방지를 확인했다. `asset-storage-bounds.test.js`와 multipart 테스트에서 transform-only body 거절, 20MiB 경계 수락, 초과 body 중단을 확인했다.
+- 검증: `asset-quota-concurrency.test.js`에서 3개 중 1개만 남은 quota를 획득, 만료 회수, finalize/replay 방지를 확인했다. `asset-storage-bounds.test.js`와 multipart 테스트에서 transform-only body 거절, 20MiB 경계 수락, 초과 body 중단을 확인했다. Multer 보안 버전 상향 후 multipart 회귀를 재현해 초과 파일을 413으로 매핑하고 해당 HTTP 테스트를 통과시켰다.
 - 잔여 제한: presigned POST와 DB 완료 상태만으로 S3 object key의 provider-level write-once를 주장하지 않는다. 현재는 random key·짧은 만료·exact content-type/SSE/size policy로 위험을 줄였고, overwrite/replay 차단을 위한 실제 bucket policy·versioning/object-lock은 운영 확인이다.
 
 ### 6. 공개 연락처 최소화
@@ -93,8 +101,8 @@
 
 ### 11. CI와 완료 보고
 
-- 수정: `.github/workflows/quality.yml`의 전용 Postgres 환경에 `VOTE_CONCURRENCY_TEST_DATABASE_URL`과 `GOOGLE_QUEUE_FENCING_TEST_DATABASE_URL`을 추가했고, fee/survey/asset concurrency 및 `DATABASE_URL`도 함께 설정했다. migration apply 후 `pnpm test`를 실행한다. `RESULTS.md`의 과비 설명은 “mutation transaction commit 후 audit/enqueue”로 정정했다.
-- 검증: 격리 PostgreSQL 환경에서 실행한 API 테스트 173건과 Web 테스트 36건이 모두 통과했다. `.github/workflows/quality.yml`에는 두 전용 concurrency DB 변수가 모두 설정되어 있다.
+- 수정: `.github/workflows/quality.yml`의 전용 Postgres 환경에 `VOTE_CONCURRENCY_TEST_DATABASE_URL`과 `GOOGLE_QUEUE_FENCING_TEST_DATABASE_URL`을 추가했고, fee/survey/asset concurrency 및 `DATABASE_URL`도 함께 설정했다. migration apply 후 `pnpm test`를 실행한다. `RESULTS.md`의 과비 설명은 “mutation transaction commit 후 audit/enqueue”로 정정했다. 이번 보정에서는 `nodemailer`를 9.1.1로, `multer` override를 2.3.0으로 올려 기존 hosted run의 dependency audit 실패 원인을 해소했다.
+- 검증: 로컬 `pnpm install --frozen-lockfile`, audit 0건, API 173건(152 pass/0 fail/21 skip), Web 37건(37 pass)을 실행했다. 21개 skip은 이번 로컬 명령에 전용 concurrency DB URL을 주지 않았기 때문이며, 이전 격리 PostgreSQL 실행의 173/173 결과와 구분한다. `.github/workflows/quality.yml`에는 두 전용 concurrency DB 변수가 모두 설정되어 있다. 버전 보정 후 hosted CI는 아직 push하지 않아 재실행 전이다.
 - 보고 구분: service/DB/fake provider 테스트와 로컬 fake SSO + Playwright browser context E2E는 실행했다. 이는 실제 KAIST IdP/운영 브라우저·외부 provider·hosted CI의 증거가 아니다. TLS/proxy 실배포, Google ACL/철회 행, SMTP provider 정책, S3 실제 정책, credential 노출 판단, backup/restore는 증거 부족으로 운영 확인 필요다.
 
 ## 검증 증거
@@ -105,11 +113,11 @@
 | `pnpm build` | PASS (shared/API/Web) |
 | `pnpm typecheck` | PASS |
 | `pnpm lint` | PASS (UI unit contract 포함) |
-| `pnpm audit --prod --json` | PASS; info/low/moderate/high/critical 0, advisories `{}` |
+| `pnpm audit --prod --json` | PASS; info/low/moderate/high/critical 0, advisories `{}`; nodemailer 9.1.1 / multer 2.3.0 |
 | `node tools/security/verify-supply-chain.mjs` | PASS |
 | `pwsh -NoProfile -File tools/security_qa/run_browser_e2e.ps1` | PASS; 격리 Compose + fake SSO smoke + Playwright 390×844 context, temporary/persisted A→logout→B |
 | 격리 PostgreSQL migration | PASS; `0017`–`0022` 적용 |
-| 격리 DB 환경의 API/Web test | PASS; API 173/173 + Web 36/36, fail/skip/todo 0 |
+| 격리 DB 환경의 API/Web test | 기존 실행 PASS; API 173/173 + Web 37/37, fail/skip/todo 0. 이번 로컬 재실행은 API 152 pass/0 fail/21 skip + Web 37/37 |
 | API production Docker build | PASS; pinned base digest, runtime non-root |
 | Web production Docker build | PASS; pinned base digest, runtime non-root |
 | API/Web image UID smoke | PASS; `nodeapp` UID 100, `nginx` UID 101 |

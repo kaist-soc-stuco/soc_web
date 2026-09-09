@@ -831,13 +831,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                     : "text-kaist-black hover:bg-slate-100 hover:text-kaist-darkgreen-main"
                 }`}
                 >
-                  {loginStarting
-                    ? lang === "ko"
-                      ? "로그인 중"
-                      : "Signing in"
-                    : lang === "ko"
-                      ? "로그인"
-                      : "Login"}
+                  {lang === "ko" ? "로그인" : "Login"}
               </Button>
             </>
           )}
@@ -986,13 +980,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                   disabled={loginStarting}
                   className="inline-flex min-h-11 items-center justify-center rounded-xl bg-kaist-darkgreen px-4 text-xs font-medium text-white disabled:opacity-60"
                 >
-                  {loginStarting
-                    ? lang === "ko"
-                      ? "로그인 중"
-                      : "Signing in"
-                    : lang === "ko"
-                      ? "로그인"
-                      : "Login"}
+                  {lang === "ko" ? "로그인" : "Login"}
                 </Button>
               </div>
             )}
