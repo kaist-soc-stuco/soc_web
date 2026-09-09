@@ -51,19 +51,6 @@ function getScheduleDdayLabel(item: HomeScheduleItem) {
   return dayDifference === 0 ? "D-Day" : `D-${dayDifference}`;
 }
 
-function ScheduleSkeleton() {
-  return (
-    <div className="grid flex-1 divide-y divide-slate-100" style={{ gridTemplateRows: `repeat(${HOME_SCHEDULE_LIMIT}, minmax(0, 1fr))` }} aria-busy="true">
-      {Array.from({ length: HOME_SCHEDULE_LIMIT }).map((_, index) => (
-        <div key={index} className="flex items-center gap-4 px-4 py-3">
-          <div className="home-loading-surface h-4 w-12 rounded" />
-          <div className="home-loading-surface h-3.5 min-w-0 flex-1 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function Calendar() {
   const { lang } = useLanguage();
   const apiClient = useMemo(
@@ -125,9 +112,7 @@ export function Calendar() {
         </Link>
       </header>
 
-      {eventsQuery.isPending ? (
-        <ScheduleSkeleton />
-      ) : eventsQuery.isError ? (
+      {eventsQuery.isPending ? null : eventsQuery.isError ? (
         <div className="home-data-error flex-1" role="alert">
           <p>{lang === "ko" ? "일정을 불러오지 못했습니다." : "We couldn't load the schedule."}</p>
           <Button type="button" variant="outline" size="lg" onClick={() => void eventsQuery.refetch()}>

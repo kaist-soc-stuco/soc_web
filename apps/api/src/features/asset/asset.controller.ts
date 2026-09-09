@@ -16,6 +16,7 @@ import {
 import {
   ParseFilePipe,
   MaxFileSizeValidator,
+  PayloadTooLargeException,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Permissions } from "@soc/contracts";
@@ -118,7 +119,7 @@ export class AssetController {
             maxSize: FIRST_INVALID_FILE_SIZE_BYTES,
           }),
         ],
-        exceptionFactory: (error) => new BadRequestException(error),
+        exceptionFactory: () => new PayloadTooLargeException("File too large"),
       }),
     )
     file: UploadedAssetFile,
