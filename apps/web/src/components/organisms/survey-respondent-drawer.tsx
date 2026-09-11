@@ -29,10 +29,8 @@ export function SurveyRespondentDrawer({
             <dl className="mt-4 grid gap-x-5 gap-y-4 text-sm sm:grid-cols-2">
               <RespondentDetailItem label="학번" value={user.stdNo ?? ""} />
               <RespondentDetailItem label="이메일" value={user.email ?? ""} />
-              <RespondentDetailItem label="전화번호" value={user.phoneNumber ?? ""} />
               <RespondentDetailItem label="소속" value={user.departmentKo ?? ""} />
               <RespondentDetailItem label="주전공" value={user.primaryMajor ?? ""} />
-              <RespondentDetailItem label="학적 상태" value={user.academicStatus ?? ""} />
             </dl>
           </section>
           <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">

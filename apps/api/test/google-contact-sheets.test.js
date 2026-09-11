@@ -11,6 +11,8 @@ function createService(config = {}) {
     findManaged: async () => ({
       items: [
         {
+          id: "contact-fixture-1",
+          activities: [{ year: 2025, departmentKo: "기획부", roleKo: "부원" }, { year: 2026, departmentKo: "회장단", roleKo: "회장" }],
           nameKo: "홍길동",
           nameEn: "Gildong Hong",
           studentNumber: "20261234",
@@ -66,29 +68,27 @@ test("creates and formats an executive contact sheet through the shared Sheets c
   const syncCall = calls.find((call) => call.kind === "syncSheet");
   assert.deepEqual(syncCall.definition.headers, [
     "이름",
-    "영문명",
     "학번",
     "부서",
-    "영문부서",
     "직책",
-    "영문직책",
     "활동 연도",
     "이메일",
     "전화번호",
+    "연락처 ID",
+    "활동 이력",
   ]);
   assert.deepEqual(syncCall.definition.rows, [[
     "홍길동",
-    "Gildong Hong",
     "20261234",
     "회장단",
-    "Presidium",
     "회장",
-    "President",
     2026,
     "hong@example.com",
     "010-0000-0000",
+    "contact-fixture-1",
+    "2025 / 기획부 / 부원\n2026 / 회장단 / 회장",
   ]]);
-  assert.deepEqual(syncCall.definition.columnWidths, [120, 160, 100, 140, 160, 140, 160, 100, 230, 140]);
+  assert.deepEqual(syncCall.definition.columnWidths, [120, 100, 140, 140, 100, 230, 140, 280, 360]);
   assert.equal(syncCall.definition.protectionDescription, "KAIST SOC · 집행부원 연락망 (읽기 전용)");
 });
 

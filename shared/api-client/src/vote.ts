@@ -1,5 +1,6 @@
 import type {
   CreateVoteRequest,
+  VoteEligibilityPreviewRequest,
   SubmitVoteBallotRequest,
   UpdateVoteRequest,
   VoteDetailResponse,
@@ -30,8 +31,13 @@ export const createVoteApi = ({ requestJson, requestVoid, votesBaseUrl }: ApiCli
   deleteVote: (id: string) => requestVoid(`${votesBaseUrl}/admin/${id}`, { method: "DELETE" }, { retryOnUnauthorized: true }),
   publishVote: (id: string) => requestJson<VoteDetailResponse>(`${votesBaseUrl}/admin/${id}/publish`, { method: "POST" }, { retryOnUnauthorized: true }),
   closeVote: (id: string) => requestJson<VoteDetailResponse>(`${votesBaseUrl}/admin/${id}/close`, { method: "POST" }, { retryOnUnauthorized: true }),
-  tallyVote: (id: string) => requestJson<VoteResultsResponse>(`${votesBaseUrl}/admin/${id}/tally`, { method: "POST" }, { retryOnUnauthorized: true }),
+  tallyVote: async (id: string) => {
+    const confirmation = await requestJson<{ token: string }>(`${votesBaseUrl}/admin/${id}/tally-confirmation`, { method: "POST" }, { retryOnUnauthorized: true });
+    return requestJson<VoteResultsResponse>(`${votesBaseUrl}/admin/${id}/tally`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(confirmation) }, { retryOnUnauthorized: true });
+  },
   publishVoteResults: (id: string) => requestJson<VoteResultsResponse>(`${votesBaseUrl}/admin/${id}/publish-results`, { method: "POST" }, { retryOnUnauthorized: true }),
+  unpublishVoteResults: (id: string) => requestJson<{ unpublished: boolean }>(`${votesBaseUrl}/admin/${id}/unpublish-results`, { method: "POST" }, { retryOnUnauthorized: true }),
+  previewVoteVoters: (body: VoteEligibilityPreviewRequest) => requestJson<VoteVoterRecord[]>(`${votesBaseUrl}/admin/eligibility-preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { retryOnUnauthorized: true }),
   listVoteVoters: (id: string) => requestJson<VoteVoterRecord[]>(`${votesBaseUrl}/admin/${id}/voters`, { method: "GET" }, { retryOnUnauthorized: true }),
   addVoteVoters: (id: string, identifiers: { userIds?: string[]; studentNumbers?: string[] }) => requestJson<{ added: number }>(`${votesBaseUrl}/admin/${id}/voters`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userIds: identifiers.userIds ?? [], studentNumbers: identifiers.studentNumbers ?? [] }),

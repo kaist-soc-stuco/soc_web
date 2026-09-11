@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { isoToMs, nowMs } from "@soc/shared";
 import {
+  OPERATIONAL_SURVEY_IDS,
   Permissions,
   type SurveyParticipationEligibility,
   type SurveyParticipationEligibilityReason,
@@ -137,7 +138,7 @@ export class SurveysService {
       input.allowAnonymous &&
       (input.feePayersOnly ||
         input.eligibleSocAffiliations.length > 0 ||
-        input.academicEligibility !== "ANY")
+        false)
     ) {
       throw new BadRequestException("anonymous_survey_cannot_require_member_attributes");
     }
@@ -189,11 +190,11 @@ export class SurveysService {
     context: EligibilityContext | null,
   ): SurveyParticipationEligibility {
     const eligibleSocAffiliations = survey.eligibleSocAffiliations ?? [];
-    const academicEligibility = survey.academicEligibility ?? "ANY";
+    const academicEligibility = "ANY";
     const hasMemberRequirements =
       survey.feePayersOnly ||
       eligibleSocAffiliations.length > 0 ||
-      academicEligibility !== "ANY";
+      false;
 
     if (survey.allowAnonymous && !hasMemberRequirements) {
       return { status: "ANONYMOUS", reasons: [] };
@@ -385,6 +386,7 @@ export class SurveysService {
     dto: UpdateSurveyDto,
     actorUserId?: string,
   ): Promise<SurveyRecordWithState> {
+    if (id === OPERATIONAL_SURVEY_IDS.corporatePartnership) throw new BadRequestException("partnership_inquiry_archived");
     let auditBefore: SurveyRecord | null = null;
     let auditWasPublished = false;
     let publishedForTheFirstTime = false;

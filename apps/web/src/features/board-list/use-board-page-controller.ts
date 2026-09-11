@@ -58,6 +58,12 @@ export function useBoardPageController() {
     parsePageParam(searchParams.get("page")),
   );
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
+  // Keep the table schema aligned with the rows currently on screen while a
+  // category request is in flight. The route/category navigation may update
+  // immediately, but the table switches columns only with the new response.
+  const [renderedCategory, setRenderedCategory] = useState<string | undefined>(
+    () => category,
+  );
   const [isArticleLoading, setIsArticleLoading] = useState(true);
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const [articleError, setArticleError] = useState<string | null>(null);
@@ -181,12 +187,14 @@ export function useBoardPageController() {
 
         setArticles(items);
         setTotalCount(data.total);
+        setRenderedCategory(category);
       })
       .catch((error) => {
         console.error("Failed to load board articles:", error);
         if (!cancelled) {
           setArticles([]);
           setTotalCount(0);
+          setRenderedCategory(category);
           setArticleError("failed");
         }
       })
@@ -378,6 +386,7 @@ export function useBoardPageController() {
     boardTitle,
     canWrite,
     category,
+    renderedCategory,
     currentPage,
     handlePageChange,
     handleSetEngagement,

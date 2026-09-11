@@ -31,7 +31,6 @@ export interface PendingSsoUser {
   gender?: string;
   academicStatus?: string;
   identityCode?: string;
-  userMobile?: string;
 }
 
 /**

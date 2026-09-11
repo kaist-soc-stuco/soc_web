@@ -48,7 +48,7 @@ export function useAboutPageController() {
     const hashSection = location.hash.replace(/^#/, "");
     const resolvedHash = resolveAboutSectionId(hashSection);
     if (resolvedHash) return resolvedHash;
-    return resolveAboutSectionId(legacyTab) ?? "intro";
+    return resolveAboutSectionId(legacyTab);
   }, [legacyTab, location.hash]);
 
   const [activeSection, setActiveSection] = useState<AboutSectionId>(requestedSection ?? "intro");

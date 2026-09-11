@@ -82,3 +82,12 @@ export const studentFeePaymentBatches = pgTable(
     ),
   ],
 );
+
+export const studentFeePolicies = pgTable("student_fee_policy", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  effectiveSemester: varchar("effective_semester", { length: 6 }).notNull(),
+  amount: integer("amount").notNull(),
+  coverageSemesters: smallint("coverage_semesters").notNull().default(6),
+  createdBy: uuid("created_by").references(() => users.userId, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

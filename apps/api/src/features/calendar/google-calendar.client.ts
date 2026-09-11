@@ -159,6 +159,7 @@ export class GoogleCalendarClient {
     url: string,
     body?: unknown,
     headers?: Record<string, string>,
+    retryOnUnauthorized = true,
   ): Promise<T> {
     const token = await this.getAccessToken();
     const requestUrl = method === "GET" || method === "DELETE"
@@ -177,6 +178,10 @@ export class GoogleCalendarClient {
     });
 
     const responseText = await readResponseTextWithLimit(response, 2 * 1024 * 1024);
+    if (response.status === 401 && retryOnUnauthorized) {
+      if (this.cachedToken?.value === token) this.cachedToken = null;
+      return this.send<T>(method, url, body, headers, false);
+    }
     if (!response.ok) {
       throw new GoogleCalendarApiError(
         response.status,

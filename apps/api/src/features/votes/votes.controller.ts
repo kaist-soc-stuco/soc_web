@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import {
   CreateVoteSchema,
@@ -39,6 +40,8 @@ export class VotesController {
     await this.audit.record({ action: "vote.create", ...auditMetadataFromRequest(req), targetId: result.id, targetType: "vote" });
     return result;
   }
+
+
 
   @Get("admin/:id/voters")
   @RequirePermissions(Permissions.MANAGE_VOTE)
@@ -91,10 +94,14 @@ export class VotesController {
     return result;
   }
 
+  @Post("admin/:id/tally-confirmation")
+  @RequirePermissions(Permissions.MANAGE_VOTE)
+  prepareTally(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) { return this.service.prepareTally(id, req.user.id); }
+
   @Post("admin/:id/tally")
   @RequirePermissions(Permissions.MANAGE_VOTE)
-  async tally(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
-    const result = await this.service.tally(id);
+  async tally(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest, @Body(new ZodValidationPipe(z.object({ token: z.string().min(1).max(2000) }).strict())) body: { token: string }) {
+    const result = await this.service.confirmedTally(id, req.user.id, body.token);
     await this.audit.record({ action: "vote.tally", ...auditMetadataFromRequest(req), payload: { totalBallots: result.totalBallots }, targetId: id, targetType: "vote" });
     return result;
   }
@@ -104,6 +111,14 @@ export class VotesController {
   async publishResults(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     const result = await this.service.publishResults(id);
     await this.audit.record({ action: "vote.results.publish", ...auditMetadataFromRequest(req), targetId: id, targetType: "vote" });
+    return result;
+  }
+
+  @Post("admin/:id/unpublish-results")
+  @RequirePermissions(Permissions.MANAGE_VOTE)
+  async unpublishResults(@Param("id", ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
+    const result = await this.service.unpublishResults(id);
+    await this.audit.record({ action: "vote.results.unpublish", ...auditMetadataFromRequest(req), targetId: id, targetType: "vote" });
     return result;
   }
 

@@ -79,11 +79,12 @@ export class GoogleContactSheetsService implements OnModuleInit {
       // Read consent immediately before constructing the external payload. A
       // revoke deletes the local row and queues another full replacement, so
       // retries never reuse an old PII snapshot.
-      const contacts = await this.contactsRepo.findManaged({
-        page: 1,
-        pageSize: 500,
-        privacyConsented: true,
-      });
+      const contacts = await this.contactsRepo.findManaged({ page: 1, pageSize: 500, privacyConsented: true });
+      for (let page = 2; contacts.items.length < (contacts.total ?? contacts.items.length); page += 1) {
+        const next = await this.contactsRepo.findManaged({ page, pageSize: 500, privacyConsented: true });
+        if (!next.items.length) break;
+        contacts.items.push(...next.items);
+      }
 
       if (job && typeof job.isCurrentClaim === "function" && !(await job.isCurrentClaim())) {
         throw new Error("google_sheet_sync_claim_lost");
@@ -94,29 +95,27 @@ export class GoogleContactSheetsService implements OnModuleInit {
         sheetTitle: SHEET_TITLE,
         headers: [
           "이름",
-          "영문명",
           "학번",
           "부서",
-          "영문부서",
           "직책",
-          "영문직책",
           "활동 연도",
           "이메일",
           "전화번호",
+          "연락처 ID",
+          "활동 이력",
         ],
         rows: contacts.items.map((contact) => [
           contact.nameKo,
-          contact.nameEn,
           contact.studentNumber ?? "",
           contact.departmentKo ?? "",
-          contact.departmentEn ?? "",
           contact.roleKo,
-          contact.roleEn,
           contact.cohort ? formatActivityYear(contact.cohort) : "",
           contact.email ?? "",
           contact.phoneNumber ?? "",
+          contact.id,
+          (contact.activities ?? []).map((activity) => `${activity.year} / ${activity.departmentKo} / ${activity.roleKo}`).join("\n"),
         ]),
-        columnWidths: [120, 160, 100, 140, 160, 140, 160, 100, 230, 140],
+        columnWidths: [120, 100, 140, 140, 100, 230, 140, 280, 360],
         protectionDescription: "KAIST SOC · 집행부원 연락망 (읽기 전용)",
       });
 

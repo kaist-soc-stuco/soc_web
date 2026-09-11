@@ -163,7 +163,7 @@ export function SuccessView({
           className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
-          {lang === "ko" ? "설문 목록으로" : "Back to surveys"}
+          {lang === "ko" ? "목록으로" : "Back to surveys"}
         </Link>
       </div>
     </div>
@@ -224,7 +224,7 @@ export function AlreadySubmittedView({
           className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
         >
           <ListChecks className="h-4 w-4" />
-          {lang === "ko" ? "설문 목록으로" : "Back to surveys"}
+          {lang === "ko" ? "목록으로" : "Back to surveys"}
         </Link>
       </div>
     </div>

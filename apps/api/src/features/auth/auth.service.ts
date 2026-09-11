@@ -278,9 +278,8 @@ export class AuthService {
       const gender =
         this.readUserInfoString(userInfo, "gender") ??
         this.readUserInfoString(userInfo, "gender_cd");
-      const academicStatus = this.readUserInfoString(userInfo, "std_status_kor");
+      const academicStatus = undefined;
       const identityCode = this.readUserInfoString(userInfo, "socps_cd");
-      const userMobile = this.readUserInfoString(userInfo, "user_mbtlnum");
 
       if (!userEmail) {
         return this.redirectResult("error", "missing_email");
@@ -305,11 +304,15 @@ export class AuthService {
             nameEn,
             nameKo,
             stdNo,
-            userMobile,
           });
         }
 
         await this.initialAdminService.ensureRoleForUser(
+          existingUser.userId,
+          stdNo,
+        );
+
+        await this.usersService.applyStudentFeeBootstrap(
           existingUser.userId,
           stdNo,
         );
@@ -358,7 +361,6 @@ export class AuthService {
         stdNo,
         primaryMajor,
         gender,
-        userMobile,
       }, PENDING_LOGIN_TTL_SECONDS);
 
       const transactionToken = randomUUID();

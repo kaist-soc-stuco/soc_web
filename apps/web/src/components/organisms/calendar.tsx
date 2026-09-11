@@ -11,6 +11,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { Button } from "@/components/ui/button";
 
 interface HomeScheduleItem {
+  priority: number;
   id: string;
   titleKo: string;
   titleEn?: string | null;
@@ -18,7 +19,7 @@ interface HomeScheduleItem {
   endAt: Date;
 }
 
-const HOME_SCHEDULE_LIMIT = 8;
+const HOME_SCHEDULE_LIMIT = 6;
 const HOME_SCHEDULE_DDAY_WINDOW_DAYS = 7;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -83,6 +84,7 @@ export function Calendar() {
       if (!previous) {
         grouped.set(event.id, {
           id: event.id,
+          priority: event.sourceType !== "KAIST_ACADEMIC" ? 0 : event.category === "HOLIDAY" ? 1 : 2,
           titleKo: event.titleKo,
           titleEn: event.titleEn,
           startAt,
@@ -96,12 +98,12 @@ export function Calendar() {
 
     return [...grouped.values()]
       .filter((item) => item.endAt.getTime() >= range.from.getTime())
-      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime() || a.titleKo.localeCompare(b.titleKo))
+      .sort((a, b) => localDayTimestamp(a.startAt) - localDayTimestamp(b.startAt) || a.priority - b.priority || a.startAt.getTime() - b.startAt.getTime() || a.titleKo.localeCompare(b.titleKo))
       .slice(0, HOME_SCHEDULE_LIMIT);
   }, [eventsQuery.data?.items, range.from]);
 
   return (
-    <section className="home-bento-card flex min-h-[24rem] min-w-0 flex-col overflow-hidden">
+    <section className="home-bento-card flex min-h-[18rem] min-w-0 flex-col overflow-hidden">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-100 px-4">
         <h3 className="text-sm font-semibold tracking-[-0.01em] text-[#172033]">
           {lang === "ko" ? "다가오는 일정" : "Upcoming schedule"}
@@ -140,7 +142,7 @@ export function Calendar() {
                   <div className="min-w-0 flex-1">
                     <p className="block min-w-0 truncate text-sm font-normal text-[#172033]">{title}</p>
                   </div>
-                  {showDdayBadge ? <span className="home-editorial-dday shrink-0">{ddayLabel}</span> : null}
+                  {showDdayBadge ? <span className="home-editorial-dday home-schedule-dday shrink-0">{ddayLabel}</span> : null}
                 </Link>
               </li>
             );

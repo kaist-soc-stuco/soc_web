@@ -6,9 +6,9 @@ type AdminStatusTone = "neutral" | "positive" | "warning" | "danger" | "info";
 
 const toneClassNames: Record<AdminStatusTone, string> = {
   neutral: "border-slate-200 bg-white text-[#344054]",
-  positive: "border-slate-200 bg-white text-[#344054]",
-  warning: "border-slate-200 bg-white text-[#344054]",
-  danger: "border-slate-200 bg-white text-[#344054]",
+  positive: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  warning: "border-amber-200 bg-amber-50 text-amber-700",
+  danger: "border-rose-200 bg-rose-50 text-rose-700",
   info: "border-slate-200 bg-white text-[#344054]",
 };
 

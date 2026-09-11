@@ -24,10 +24,8 @@ import { cn } from "@/lib/utils";
 type DetailTab = "permissions" | "members";
 type CandidateMajorType = "" | "PRIMARY";
 type CandidateFeeStatus = "" | "PAID" | "PARTIAL" | "UNPAID";
-type CandidateAcademicStatus = "" | "재학" | "졸업";
 
 interface RoleDraft {
-  description: string;
   nameKo: string;
   permissionIds: number[];
 }
@@ -57,8 +55,8 @@ const permissionLabels: Record<string, string> = {
   MANAGE_ROLES: "권한·역할 관리",
 };
 
-const emptyRoleDraft = (): RoleDraft => ({ description: "", nameKo: "", permissionIds: [] });
-const draftFromRole = (role: RoleGroupRecord): RoleDraft => ({ description: role.description ?? "", nameKo: role.nameKo, permissionIds: [...role.permissionIds] });
+const emptyRoleDraft = (): RoleDraft => ({ nameKo: "", permissionIds: [] });
+const draftFromRole = (role: RoleGroupRecord): RoleDraft => ({ nameKo: role.nameKo, permissionIds: [...role.permissionIds] });
 const sameIds = (left: number[], right: number[]) => left.length === right.length && left.every((id) => right.includes(id));
 
 const formatDate = (value?: string | null) => {
@@ -94,9 +92,6 @@ export function PermissionPage() {
   const [memberEditorOpen, setMemberEditorOpen] = useState(false);
   const [candidateData, setCandidateData] = useState<RoleGroupCandidateListResponse | null>(null);
   const [candidateQuery, setCandidateQuery] = useState("");
-  const [candidateMajorType, setCandidateMajorType] = useState<CandidateMajorType>("");
-  const [candidateFeeStatus, setCandidateFeeStatus] = useState<CandidateFeeStatus>("");
-  const [candidateAcademicStatus, setCandidateAcademicStatus] = useState<CandidateAcademicStatus>("");
   const [candidatePage, setCandidatePage] = useState(1);
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [candidateSaving, setCandidateSaving] = useState(false);
@@ -106,13 +101,13 @@ export function PermissionPage() {
 
   const selectedRoleId = Number(searchParams.get("role")) || roles[0]?.roleGroupId || null;
   const selectedRole = roles.find((role) => role.roleGroupId === selectedRoleId) ?? null;
-  const selectedTab: DetailTab = searchParams.get("tab") === "members" ? "members" : "permissions";
-  const isDirty = Boolean(selectedRole && (draft.nameKo !== selectedRole.nameKo || draft.description !== (selectedRole.description ?? "") || !sameIds(draft.permissionIds, selectedRole.permissionIds)));
+  const selectedTab: DetailTab = searchParams.get("tab") === "permissions" ? "permissions" : "members";
+  const isDirty = Boolean(selectedRole && (draft.nameKo !== selectedRole.nameKo || !sameIds(draft.permissionIds, selectedRole.permissionIds)));
 
   const filteredRoles = useMemo(() => {
     const query = roleQuery.trim().toLocaleLowerCase("ko-KR");
     if (!query) return roles;
-    return roles.filter((role) => `${role.nameKo} ${role.description ?? ""}`.toLocaleLowerCase("ko-KR").includes(query));
+    return roles.filter((role) => role.nameKo.toLocaleLowerCase("ko-KR").includes(query));
   }, [roleQuery, roles]);
 
   const groupedPermissions = useMemo(() => {
@@ -184,7 +179,7 @@ export function PermissionPage() {
     setSaving(true);
     setError(null);
     try {
-      const updated = await client.updateRoleGroup(selectedRole.roleGroupId, { nameKo: draft.nameKo.trim(), description: draft.description.trim(), permissionIds: draft.permissionIds });
+      const updated = await client.updateRoleGroup(selectedRole.roleGroupId, { nameKo: draft.nameKo.trim(), permissionIds: draft.permissionIds });
       setRoles((current) => current.map((role) => role.roleGroupId === updated.roleGroupId ? updated : role));
       setDraft(draftFromRole(updated));
     } catch (saveError) {
@@ -205,7 +200,7 @@ export function PermissionPage() {
     setSaving(true);
     setError(null);
     try {
-      const created = await client.createRoleGroup({ nameKo: createDraft.nameKo.trim(), description: createDraft.description.trim(), permissionIds: [] });
+      const created = await client.createRoleGroup({ nameKo: createDraft.nameKo.trim(), permissionIds: [] });
       setRoles((current) => [...current, created]);
       setCreateDraft(emptyRoleDraft());
       setCreateOpen(false);
@@ -253,9 +248,6 @@ export function PermissionPage() {
     try {
       const data = await client.listRoleGroupCandidates(roleId, {
         q: query,
-        academicStatus: candidateAcademicStatus || undefined,
-        majorType: candidateMajorType || undefined,
-        feeStatus: candidateFeeStatus || undefined,
         page,
         pageSize: CANDIDATE_PAGE_SIZE,
       });
@@ -267,7 +259,7 @@ export function PermissionPage() {
     } finally {
       if (requestId === candidateRequestIdRef.current) setCandidateLoading(false);
     }
-  }, [candidateAcademicStatus, candidateFeeStatus, candidateMajorType, candidateQuery, client]);
+  }, [candidateQuery, client]);
 
   useEffect(() => {
     if (!memberEditorOpen || !selectedRole) return;
@@ -288,8 +280,6 @@ export function PermissionPage() {
       return;
     }
     setCandidateQuery("");
-    setCandidateMajorType("");
-    setCandidateFeeStatus("");
     setCandidateData(null);
     setCandidateLoading(true);
     setCandidatePage(1);
@@ -348,7 +338,7 @@ export function PermissionPage() {
                   : <div className="grid gap-1" role="listbox" aria-label="역할 목록">{filteredRoles.map((role) => {
                       const selected = role.roleGroupId === selectedRoleId;
                       return <Button key={role.roleGroupId} type="button" variant="ghost" role="option" aria-selected={selected} onClick={() => void selectRole(role)} className={cn("relative h-auto min-h-14 w-full rounded-lg px-3 py-2 text-left", selected ? "bg-slate-100 text-[#172033]" : "text-[#344054] hover:bg-slate-50 hover:text-[#172033]")}>
-                        <span className="min-w-0 flex-1"><span className="flex min-w-0 items-center justify-between gap-2"><span className="min-w-0 truncate text-sm !font-semibold text-[#172033]">{role.nameKo}</span><span className="shrink-0 text-xs font-normal text-[#344054]">{role.userCount}명</span></span><span className="block truncate text-xs font-normal text-[#344054]">{role.description || "설명 없음"}</span></span>
+                        <span className="min-w-0 flex-1"><span className="flex min-w-0 items-center justify-between gap-2"><span className="min-w-0 truncate text-sm !font-semibold text-[#172033]">{role.nameKo}</span><span className="shrink-0 text-xs font-normal text-[#344054]">{role.userCount}명</span></span></span>
                       </Button>;
                     })}</div>}
               </div>
@@ -385,39 +375,13 @@ export function PermissionPage() {
                     )}
                     {selectedRole.isSystem ? <AdminStatusBadge>시스템 역할</AdminStatusBadge> : null}
                   </div>
-                  {editingField === "description" ? (
-                    <UiInput
-                      autoFocus
-                      value={draft.description}
-                      aria-label="역할 설명"
-                      className="mt-1 h-9 max-w-xl text-sm font-normal text-[#344054]"
-                      placeholder="역할 설명"
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setDraft((current) => ({ ...current, description: value }));
-                      }}
-                      onBlur={() => setEditingField(null)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") setEditingField(null);
-                        if (event.key === "Escape") {
-                          setDraft((current) => ({ ...current, description: selectedRole.description ?? "" }));
-                          setEditingField(null);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <button type="button" disabled={selectedRole.isSystem} onClick={() => setEditingField("description")} className="group mt-1 inline-flex max-w-full items-center gap-1.5 rounded-md text-left text-xs font-normal text-[#344054] disabled:cursor-default">
-                      <span className="truncate">{draft.description || "설명 추가"}</span>
-                      {!selectedRole.isSystem ? <Pencil aria-hidden="true" className="size-3 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" /> : null}
-                    </button>
-                  )}
-                  {selectedRole.isSystem ? <AdminMetaText className="mt-1 block text-[#344054]">기본 시스템 역할의 이름과 권한은 변경할 수 없습니다.</AdminMetaText> : null}
+
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {!selectedRole.isSystem ? <Button type="button" size="sm" variant="outline" className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void deleteRole()}><Trash2 aria-hidden="true" /> 역할 삭제</Button> : null}
                 </div>
               </AdminCardHeader>
-              <div className="border-b border-slate-100 px-5 pt-3"><SegmentedControl ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control mb-3 w-fit" options={[{ value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }, { value: "members", label: `구성원 (${selectedRole.userCount})` }]} /></div>
+              <div className="border-b border-slate-100 px-5 pt-3"><SegmentedControl ariaLabel="역할 상세 탭" role="tablist" value={selectedTab} onChange={(tab) => setSelection(selectedRole.roleGroupId, tab)} className="clean-segmented-control mb-3 w-fit" options={[{ value: "members", label: `구성원 (${selectedRole.userCount})` }, { value: "permissions", label: `권한 설정 (${draft.permissionIds.length})` }]} /></div>
 
               {selectedTab === "permissions" ? <div className="p-5">
                 <div className="grid items-start gap-4 xl:grid-cols-2">{groupedPermissions.map((group) => {
@@ -449,46 +413,13 @@ export function PermissionPage() {
         </AdminPageMain>
 
         <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="새 역할 만들기" footer={<><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>취소</Button><Button type="button" onClick={() => void createRole()} disabled={saving || !createDraft.nameKo.trim()}>{saving ? "만드는 중" : "역할 만들기"}</Button></>}>
-          <div className="grid gap-4"><AdminFormField label="역할 이름"><UiInput autoFocus value={createDraft.nameKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, nameKo: value })); }} placeholder="예: 콘텐츠 관리자" /></AdminFormField><AdminFormField label="설명" hint="권한은 역할을 만든 뒤 상세 화면에서 지정합니다."><UiInput value={createDraft.description} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, description: value })); }} placeholder="이 역할이 담당하는 업무" /></AdminFormField></div>
+          <div className="grid gap-4"><AdminFormField label="역할 이름"><UiInput autoFocus value={createDraft.nameKo} onChange={(event) => { const value = event.currentTarget.value; setCreateDraft((current) => ({ ...current, nameKo: value })); }} placeholder="예: 콘텐츠 관리자" /></AdminFormField></div>
         </Modal>
 
-        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="h-[680px] max-h-[calc(100dvh-3rem)] max-w-4xl" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><span className="mr-auto self-center text-sm font-normal text-[#344054]">전체 {candidateData?.total ?? 0}명 · 선택 {selectedMemberIds.length}명</span><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button type="button" onClick={() => void saveMembers()} disabled={candidateSaving}>{candidateSaving ? "적용 중" : "적용"}</Button></>}>
+        <Modal open={memberEditorOpen} onClose={() => setMemberEditorOpen(false)} title={selectedRole ? `${selectedRole.nameKo} 구성원 편집` : "구성원 편집"} className="h-[680px] max-h-[calc(100dvh-3rem)] max-w-4xl" bodyClassName="!overflow-hidden flex min-h-0 flex-1 flex-col" footer={<><Button type="button" variant="outline" onClick={() => setMemberEditorOpen(false)}>취소</Button><Button type="button" onClick={() => void saveMembers()} disabled={candidateSaving}>{candidateSaving ? "적용 중" : "적용"}</Button></>}>
           <div className="flex min-h-0 flex-1 flex-col gap-4">
-            <div className="grid shrink-0 gap-2 md:grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_7.5rem]">
+            <div className="grid shrink-0 gap-2">
               <AdminSearchField aria-label="구성원 검색" value={candidateQuery} onValueChange={setCandidateQuery} placeholder="이름, 학번, 이메일, 소속 검색" />
-              <AdminSelectDropdown
-                ariaLabel="학적 상태 필터"
-                className="w-full"
-                value={candidateAcademicStatus}
-                onChange={(value) => setCandidateAcademicStatus(value as CandidateAcademicStatus)}
-                options={[
-                  { value: "", label: "전체 학적" },
-                  { value: "재학", label: "재학" },
-                  { value: "졸업", label: "졸업" },
-                ]}
-              />
-              <AdminSelectDropdown
-                ariaLabel="전공 유형 필터"
-                className="w-full"
-                value={candidateMajorType}
-                onChange={(value) => setCandidateMajorType(value as CandidateMajorType)}
-                options={[
-                  { value: "", label: "전체 전공" },
-                  { value: "PRIMARY", label: "주전공" },
-                ]}
-              />
-              <AdminSelectDropdown
-                ariaLabel="과비 납부 상태 필터"
-                className="w-full"
-                value={candidateFeeStatus}
-                onChange={(value) => setCandidateFeeStatus(value as CandidateFeeStatus)}
-                options={[
-                  { value: "", label: "전체 과비" },
-                  { value: "PAID", label: "완납" },
-                  { value: "PARTIAL", label: "부분 납부" },
-                  { value: "UNPAID", label: "미납" },
-                ]}
-              />
             </div>
             <div className={cn("scrollbar-hidden min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 transition-opacity duration-150", candidateLoading && candidateData ? "opacity-60" : "opacity-100")} aria-busy={candidateLoading}>
               <AdminDataTable minWidth={688}><colgroup><col style={{ width: 48 }} /><col style={{ width: 240 }} /><col style={{ width: 150 }} /><col style={{ width: 250 }} /></colgroup><AdminTableHeader><tr><AdminTableHead className="text-center"><UiInput type="checkbox" aria-label="현재 페이지 전체 선택" checked={Boolean(candidateData?.items.length && candidateData.items.every((item) => selectedMemberIds.includes(item.userId)))} onChange={(event) => { const pageIds = candidateData?.items.map((item) => item.userId) ?? []; const checked = event.currentTarget.checked; setSelectedMemberIds((current) => checked ? [...new Set([...current, ...pageIds])] : current.filter((id) => !pageIds.includes(id))); }} /></AdminTableHead><AdminTableHead>이름</AdminTableHead><AdminTableHead>학번</AdminTableHead><AdminTableHead>이메일</AdminTableHead></tr></AdminTableHeader><AdminTableBody>

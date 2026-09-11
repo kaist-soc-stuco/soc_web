@@ -1,7 +1,7 @@
 import { createApiClient, ApiClientHttpError } from "@soc/api-client";
 import type { VoteDetailResponse, VoteResultsResponse } from "@soc/contracts";
 import { isoToMs, nowMs } from "@soc/shared";
-import { Check, LockKeyhole } from "lucide-react";
+import { Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -9,13 +9,9 @@ import { Header } from "@/components/organisms/header";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageContainer, PageMain, PageShell } from "@/components/ui/page-layout";
-import { VoteStatusBadge } from "@/components/ui/vote-status-badge";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { formatVotePeriod } from "@/lib/vote-display";
 import { useLanguage } from "@/hooks/use-language";
-
-const formatDateTime = (value: string, locale: string) => new Intl.DateTimeFormat(locale, {
-  year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
-}).format(isoToMs(value));
 
 export function VotePage() {
   const { lang } = useLanguage();
@@ -31,15 +27,15 @@ export function VotePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const t = lang === "ko" ? {
-    back: "← 투표 목록", private: "전산학부 주전공 학부생 대상 · 개인별 선택은 관리자에게 공개되지 않습니다.", submitted: "투표가 제출되었습니다.",
-    receiptHelp: "영수증 코드는 투표 내용이 아니라 정상 접수 여부를 확인하는 용도입니다.", verify: "접수 확인", verified: "정상 접수 확인됨",
+    back: "목록으로", submitted: "투표가 제출되었습니다.",
+    verify: "접수 확인", verified: "정상 접수 확인됨",
     results: "투표 결과", ballots: "표", notStarted: "아직 투표가 시작되지 않았습니다.", ended: "투표가 종료되었습니다. 결과는 공개 후 확인할 수 있습니다.",
     loginHelp: "투표 자격 확인을 위해 로그인해 주세요.", login: "로그인", ineligible: "게시 시점의 전산학부 주전공 학부생 명부에 포함되지 않아 참여할 수 없습니다.",
     voted: "이미 투표를 제출했습니다.", submit: "투표 제출", submitting: "제출 중", required: "모든 문항에 응답해 주세요.",
     confirmTitle: "투표를 제출할까요?", confirmDescription: "제출한 뒤에는 선택을 확인하거나 수정할 수 없습니다.", confirmLabel: "제출", loadFailed: "투표를 불러오지 못했습니다.", retry: "다시 시도",
   } : {
-    back: "← All votes", private: "School of Computing primary majors only · Individual choices are never shown to administrators.", submitted: "Your ballot was submitted.",
-    receiptHelp: "This receipt verifies acceptance only; it does not reveal your selections.", verify: "Verify receipt", verified: "Receipt verified",
+    back: "Back to list", submitted: "Your ballot was submitted.",
+    verify: "Verify receipt", verified: "Receipt verified",
     results: "Results", ballots: "ballots", notStarted: "Voting has not started yet.", ended: "Voting has ended. Results will appear after publication.",
     loginHelp: "Sign in to verify your eligibility.", login: "Sign in", ineligible: "You are not included in the primary-major voter roll fixed at publication.",
     voted: "You have already submitted a ballot.", submit: "Submit ballot", submitting: "Submitting", required: "Please answer every question.",
@@ -53,6 +49,17 @@ export function VotePage() {
       if (data.resultsPublishedAt) void client.getVoteResults(id).then(setResults).catch(() => undefined);
     }).catch(() => setError(t.loadFailed));
   }, [client, id, reloadKey, t.loadFailed]);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      if (document.hidden) return;
+      void client.getVote(id).then((data) => { if (active) setVote(data); }).catch(() => undefined);
+    };
+    const timer = window.setInterval(refresh, 30_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, [client, id]);
 
   const select = (itemId: string, optionId: string, multiple: boolean, maxSelections: number) => {
     setAnswers((current) => {
@@ -101,32 +108,28 @@ export function VotePage() {
     <PageShell>
       <Header />
       <PageMain>
-        <PageContainer className="max-w-[54rem] px-4 py-6 pb-16 sm:px-5 md:px-6 md:py-10">
+        <PageContainer className="max-w-4xl px-4 py-6 pb-16 sm:px-5 md:px-6 md:py-10">
           <Link to="/votes" className="text-sm font-normal text-[#344054] hover:text-brand-primary">{t.back}</Link>
           <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 md:p-8">
-            <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <VoteStatusBadge status={vote.status} startsAt={vote.startsAt} endsAt={vote.endsAt} />
-              <span className="max-w-full break-words text-xs font-normal text-[#344054] sm:text-right">{formatDateTime(vote.startsAt, lang === "ko" ? "ko-KR" : "en-US")} – {formatDateTime(vote.endsAt, lang === "ko" ? "ko-KR" : "en-US")}</span>
+            <h1 className="break-words text-2xl font-bold tracking-[-0.03em] text-[#172033] sm:text-3xl">{lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}</h1>
+            <div className="mt-3 flex">
+              <span className="max-w-full break-words text-xs font-normal text-[#344054] sm:text-right">{formatVotePeriod(vote.startsAt, vote.endsAt)}</span>
             </div>
-            <h1 className="mt-5 break-words text-2xl font-bold tracking-[-0.03em] text-[#172033] sm:text-3xl">{lang === "en" && vote.titleEn ? vote.titleEn : vote.titleKo}</h1>
             {(lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo) ? <p className="mt-3 break-words whitespace-pre-wrap text-sm font-normal leading-6 text-[#344054]">{lang === "en" && vote.descriptionEn ? vote.descriptionEn : vote.descriptionKo}</p> : null}
-            <div className="mt-6 flex items-start gap-2 border-t border-slate-100 pt-5 text-xs font-normal leading-5 text-[#344054]">
-              <LockKeyhole className="mt-0.5 size-4 shrink-0 text-brand-primary" />
-              <span className="min-w-0 break-words">{t.private}</span>
-            </div>
+
           </section>
 
           {receipt ? (
             <section className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-8 text-center">
               <Check className="mx-auto size-8 text-emerald-700" />
               <h2 className="mt-3 text-xl font-semibold text-[#172033]">{t.submitted}</h2>
-              <p className="mt-2 text-sm font-normal text-[#344054]">{t.receiptHelp}</p>
               <code className="mt-5 inline-block max-w-full break-all rounded-lg border border-emerald-200 bg-white px-4 py-3 text-sm font-normal text-[#172033]">{receipt}</code>
               <div className="mt-4"><Button variant="outline" size="sm" onClick={async () => setReceiptVerified((await client.verifyVoteReceipt(id, receipt)).accepted)}>{receiptVerified ? t.verified : t.verify}</Button></div>
             </section>
           ) : results ? (
             <section className="mt-5 space-y-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-6 md:p-8">
               <h2 className="text-xl font-semibold text-[#172033]">{t.results}</h2>
+              <div className="rounded-xl bg-slate-50 p-4"><p className="font-semibold">{lang === "ko" ? "최종 투표율" : "Final turnout"} {vote.eligibleCount ? (100 * results.totalBallots / vote.eligibleCount).toFixed(1) : "0.0"}% ({results.totalBallots}/{vote.eligibleCount})</p>{vote.quorumPercent !== null ? <span className="mt-2 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs">{(vote.quorumInclusive ? results.totalBallots * 100 >= vote.eligibleCount * vote.quorumPercent : results.totalBallots * 100 > vote.eligibleCount * vote.quorumPercent) && vote.eligibleCount > 0 ? "개표 정족수 충족" : "개표 정족수 미달"}</span> : null}</div>
               <p className="text-sm font-normal text-[#344054]">{lang === "ko" ? `총 ${results.totalBallots}표` : `${results.totalBallots} ${t.ballots}`}</p>
               {results.items.map((item) => (
                 <div key={item.itemId} className="border-t border-slate-100 pt-5">
@@ -135,7 +138,7 @@ export function VotePage() {
                     {item.options.map((option) => (
                       <div key={option.optionId}>
                         <div className="flex flex-col gap-1 text-sm font-normal text-[#344054] sm:flex-row sm:items-baseline sm:justify-between"><span className="min-w-0 break-words">{lang === "en" && option.labelEn ? option.labelEn : option.labelKo}</span><span className="shrink-0 tabular-nums">{option.count}{lang === "ko" ? "표" : ""} · {option.percentage}%</span></div>
-                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-primary" style={{ width: `${option.percentage}%` }} /></div>
+                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${option.count > 0 && option.count === Math.max(...item.options.map(value => value.count)) ? "bg-emerald-500" : "bg-emerald-500"}`} style={{ width: `${option.percentage}%` }} /></div>
                       </div>
                     ))}
                   </div>
@@ -169,7 +172,7 @@ export function VotePage() {
                       return (
                         <label key={option.id} className={`flex min-h-11 items-start gap-3 rounded-lg border p-4 transition-colors ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${checked ? "border-brand-primary bg-emerald-50/40" : "border-slate-200 hover:bg-slate-50"}`}>
                           <input type={item.type === "MULTIPLE_CHOICE" ? "checkbox" : "radio"} name={item.id} checked={checked} disabled={disabled} onChange={() => select(item.id, option.id, item.type === "MULTIPLE_CHOICE", item.maxSelections)} className="mt-0.5 accent-[var(--color-primary)]" />
-                          <span className="min-w-0 break-words"><span className="block break-words text-sm font-normal text-[#172033]">{lang === "en" && option.labelEn ? option.labelEn : option.labelKo}</span>{(lang === "en" && option.descriptionEn ? option.descriptionEn : option.descriptionKo) ? <span className="mt-1 block break-words text-xs font-normal text-[#344054]">{lang === "en" && option.descriptionEn ? option.descriptionEn : option.descriptionKo}</span> : null}</span>
+                          <span className="min-w-0 break-words"><span className="block break-words text-sm font-normal text-[#172033]">{lang === "en" && option.labelEn ? option.labelEn : option.labelKo}</span></span>
                         </label>
                       );
                     })}

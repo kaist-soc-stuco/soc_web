@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
-import { createApiClient } from "@soc/api-client";
+import { ApiClientHttpError, createApiClient } from "@soc/api-client";
 import type {
   CalendarEventCategory,
   CalendarEventCreateRequest,
@@ -358,11 +358,14 @@ function CalendarManagementContent() {
       const result = await apiClient.syncGoogleCalendars();
       await refresh();
       toast({
-        type: "success",
-        message: `구글 캘린더 동기화 완료 · 성공 ${result.succeededCount} · 실패 ${result.failedCount}`,
+        type: result.failedCount > 0 ? "error" : result.skippedCount ? "warning" : result.queuedCount === 0 ? "info" : "success",
+        message: result.queuedCount === 0 && !result.skippedCount
+          ? "Google에 반영할 직접 등록 일정이나 학사 일정이 없습니다."
+          : `Google 반영 성공 ${result.succeededCount} · 실패 ${result.failedCount} · 처리 대기 ${Math.max(0, result.queuedCount - result.processedCount)}${result.skippedCount ? ` · 대상 캘린더 미설정 ${result.skippedCount}` : ""}${result.errorCodes?.length ? ` — ${result.errorCodes.map((code) => ({ permission_denied: "캘린더 쓰기 권한을 확인해 주세요", calendar_not_found: "캘린더 ID와 공유 설정을 확인해 주세요", authentication_failed: "서비스 계정 인증을 확인해 주세요", edit_conflict: "Google에서 변경된 일정과 충돌했습니다", sync_failed: "실패한 일정의 동기화 오류를 확인해 주세요" } as Record<string, string>)[code] ?? code).join(" · ")}` : ""}`,
       });
-    } catch {
-      toast({ type: "error", message: "Google Calendar를 동기화하지 못했습니다." });
+    } catch (error) {
+      const code = error instanceof ApiClientHttpError ? error.code : undefined;
+      toast({ type: "error", message: code === "google_calendar_not_configured" ? "Google Calendar 서비스 계정이 설정되지 않았습니다." : code === "google_calendar_target_not_configured" ? "반영할 Google 캘린더 ID가 설정되지 않았습니다." : "Google Calendar를 동기화하지 못했습니다." });
     } finally {
       setSyncing(null);
     }
@@ -412,7 +415,7 @@ function CalendarManagementContent() {
 
         <AdminTableCard
           toolbar={(
-            <div className="px-5 py-4">
+            <div className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <SegmentedControl<SourceFilter>
                   ariaLabel="일정 출처"
@@ -553,11 +556,7 @@ function CalendarManagementContent() {
         open={drawerOpen}
         onClose={() => !saving && setDrawerOpen(false)}
         title={editingEvent?.sourceType === "ARTICLE" ? "행사 게시글 일정" : editingEvent ? "일정 설정" : "일정 추가"}
-        footer={editingEvent?.sourceType === "ARTICLE" ? (
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setDrawerOpen(false)}>닫기</Button>
-          </div>
-        ) : (
+        footer={editingEvent?.sourceType === "ARTICLE" ? undefined : (
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDrawerOpen(false)} disabled={saving}>취소</Button>
             <Button type="submit" form="calendar-management-form" disabled={saving}>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
+import { Navigate, useParams } from "react-router-dom";
 import { Header } from "@/components/organisms/header";
 import { SurveyResponseForm } from "@/features/survey/survey-response-form";
 import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
@@ -16,6 +17,11 @@ import { PageShell } from "@/components/ui/page-layout";
 import { useToast } from "@/components/ui/toast";
 
 export function SurveyPage() {
+  const { id } = useParams<{ id: string }>();
+  return id === OPERATIONAL_SURVEY_IDS.corporatePartnership ? <Navigate to="/about#partnership" replace /> : <ActiveSurveyPage />;
+}
+
+function ActiveSurveyPage() {
   const { id } = useParams<{ id: string }>();
   const {
     answers,

@@ -78,6 +78,7 @@ function getVisibleEventRange(
 function buildWeekLaneLayouts(
   ranges: Array<EventRange | null>,
   calendarGrid: CalendarCell[],
+  events: CalendarEvent[],
 ): WeekLaneLayout[] {
   const weekCount = Math.ceil(calendarGrid.length / 7);
 
@@ -100,22 +101,23 @@ function buildWeekLaneLayouts(
       )
       .sort(
         (first, second) =>
+          calendarPriority(events[first.eventIndex]) - calendarPriority(events[second.eventIndex]) ||
           first.start - second.start ||
           first.end - second.end ||
           first.eventIndex - second.eventIndex,
       );
 
-    const laneEnds: number[] = [];
+    const lanes: Array<Array<{ start: number; end: number }>> = [];
     const eventLanes = new Map<number, number>();
 
     entries.forEach(({ end, eventIndex, start }) => {
-      const availableLane = laneEnds.findIndex((laneEnd) => laneEnd < start);
-      const laneIndex = availableLane === -1 ? laneEnds.length : availableLane;
-      laneEnds[laneIndex] = end;
+      const availableLane = lanes.findIndex((lane) => lane.every((range) => range.end < start || range.start > end));
+      const laneIndex = availableLane === -1 ? lanes.length : availableLane;
+      (lanes[laneIndex] ??= []).push({ start, end });
       eventLanes.set(eventIndex, laneIndex);
     });
 
-    return { eventLanes, laneCount: laneEnds.length };
+    return { eventLanes, laneCount: lanes.length };
   });
 }
 
@@ -210,6 +212,13 @@ function getTooltipPosition({ x, y }: Pick<CalendarTooltipState, "x" | "y">) {
   };
 }
 
+function calendarPriority(event: CalendarEvent): number {
+  if (event.sourceType === "VOTE" || event.sourceType === "ARTICLE" || event.sourceType === "SURVEY" || event.sourceType === "MANUAL") return 0;
+  if (event.category === "HOLIDAY") return 1;
+  if (event.sourceType === "KAIST_ACADEMIC" || event.category === "ACADEMIC") return 2;
+  return 3;
+}
+
 export function EventsSurveysCalendarGrid({
   calendarEvents,
   calendarGrid,
@@ -247,7 +256,7 @@ export function EventsSurveysCalendarGrid({
   const eventRanges = calendarEvents.map((event) =>
     getVisibleEventRange(event, calendarGrid),
   );
-  const weekLaneLayouts = buildWeekLaneLayouts(eventRanges, calendarGrid);
+  const weekLaneLayouts = buildWeekLaneLayouts(eventRanges, calendarGrid, calendarEvents);
   const weekRowHeights = Array.from(
     { length: Math.ceil(calendarGrid.length / 7) },
     (_, weekIndex) => {

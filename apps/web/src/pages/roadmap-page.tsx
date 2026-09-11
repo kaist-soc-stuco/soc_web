@@ -39,6 +39,7 @@ export function RoadmapPage() {
           className="mb-0"
           containerClassName="max-w-[100rem] flex-col items-start gap-2 sm:flex-row sm:items-end sm:gap-4"
           actions={
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
             <a
               href={ROADMAP_SOURCE.url}
               target="_blank"
@@ -48,6 +49,10 @@ export function RoadmapPage() {
               {lang === "ko" ? "2025.04.22 원본 로드맵" : "Source roadmap · 2025.04.22"}
               <ExternalLink aria-hidden="true" className="size-3.5" />
             </a>
+            <a href="https://bulletin.kaist.ac.kr/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-kaist-darkgreen hover:underline">
+              {lang === "ko" ? "KAIST 학사요람" : "KAIST Academic Bulletin"}<ExternalLink aria-hidden="true" className="size-3.5" />
+            </a>
+            </div>
           }
         />
 

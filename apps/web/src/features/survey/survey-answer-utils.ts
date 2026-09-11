@@ -270,11 +270,6 @@ export function getAudienceLabel(survey: SurveyDetailResponse, lang: string) {
   if (affiliations.length > 0) {
     parts.push(lang === "ko" ? `전산학부 ${affiliations.join("·")}` : `School of Computing ${affiliations.join(", ")}`);
   }
-  if (survey.academicEligibility === "ENROLLED_ONLY") {
-    parts.push(lang === "ko" ? "재학생" : "enrolled students");
-  } else if (survey.academicEligibility === "ENROLLED_OR_LEAVE") {
-    parts.push(lang === "ko" ? "재학생·휴학생" : "enrolled or on leave");
-  }
   if (survey.feePayersOnly) {
     parts.push(lang === "ko" ? "과비 납부자" : "fee-paying members");
   }

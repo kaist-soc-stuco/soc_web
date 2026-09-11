@@ -175,3 +175,13 @@ export interface BulkUpdateStudentFeeStatusResponse {
   updated: StudentFeeStatusRecord[];
   count: number;
 }
+
+export interface StudentFeeImportPreview {
+  rows: Array<{
+    identifier: string;
+    userId: string | null;
+    current: StudentFeeStatusRecord | null;
+    error: "USER_NOT_FOUND" | "DUPLICATE_USER" | null;
+  }>;
+  canApply: boolean;
+}

@@ -45,6 +45,8 @@ export class VotesService {
       endsAt: row.endsAt.toISOString(),
       academicStatuses: row.academicStatuses,
       feePayersOnly: row.feePayersOnly,
+      quorumPercent: row.quorumPercent,
+      quorumInclusive: row.quorumInclusive,
       studentNumberFrom: row.studentNumberFrom,
       studentNumberTo: row.studentNumberTo,
       voterSnapshotAt: row.voterSnapshotAt?.toISOString() ?? null,
@@ -159,10 +161,11 @@ export class VotesService {
     return this.detail(id, { id: vote.creatorId ?? "", permission: Permissions.MANAGE_VOTE });
   }
 
+
   async addVoters(id: string, input: { userIds: string[]; studentNumbers: string[] }) {
     const vote = await this.repo.findVote(id);
     if (!vote) throw new NotFoundException("vote_not_found");
-    if (vote.status !== "PUBLISHED" || nowMs() >= vote.endsAt.valueOf()) {
+    if (vote.status !== "DRAFT") {
       throw new ConflictException("vote_voter_roll_locked");
     }
     return { added: await this.repo.addVoters(id, input.userIds, input.studentNumbers) };
@@ -171,7 +174,7 @@ export class VotesService {
   async excludeVoters(id: string, input: { userIds: string[] }) {
     const vote = await this.repo.findVote(id);
     if (!vote) throw new NotFoundException("vote_not_found");
-    if (vote.status !== "PUBLISHED" || nowMs() >= vote.endsAt.valueOf()) {
+    if (vote.status !== "DRAFT") {
       throw new ConflictException("vote_voter_roll_locked");
     }
     return { excluded: await this.repo.excludeVoters(id, input.userIds) };
@@ -218,11 +221,28 @@ export class VotesService {
     return { receiptCode: receipt.code, submittedAt: nowIso() };
   }
 
+  async prepareTally(id: string, actorId: string) {
+    const vote = await this.repo.findVote(id);
+    if (!vote || vote.status !== "CLOSED") throw new ConflictException("vote_must_be_closed_before_tally");
+    return { token: this.crypto.issueTallyConfirmation(id, actorId, vote.updatedAt.toISOString()) };
+  }
+
+  async confirmedTally(id: string, actorId: string, token: string) {
+    const vote = await this.repo.findVote(id);
+    if (!vote || vote.status !== "CLOSED" || !this.crypto.verifyTallyConfirmation(token, id, actorId, vote.updatedAt.toISOString())) throw new ConflictException("vote_tally_confirmation_expired_or_invalid");
+    return this.tally(id);
+  }
+
   async tally(id: string): Promise<VoteResultsResponse> {
     const vote = await this.repo.findVote(id);
     if (!vote) throw new NotFoundException("vote_not_found");
     if (vote.status !== "CLOSED" && vote.status !== "TALLIED") throw new ConflictException("vote_must_be_closed_before_tally");
     if (vote.status === "TALLIED") return this.results(id, { id: "", permission: Permissions.MANAGE_VOTE });
+    const participation = await this.repo.counts(id);
+    if (vote.quorumPercent != null && (participation.eligibleCount === 0 ||
+      (vote.quorumInclusive ? participation.votedCount * 100 < participation.eligibleCount * vote.quorumPercent : participation.votedCount * 100 <= participation.eligibleCount * vote.quorumPercent))) {
+      throw new ConflictException("vote_quorum_not_met");
+    }
     const definition = this.mapItems(await this.repo.findDefinition(id));
     const counts = new Map<string, number>();
     for (const item of definition) for (const option of item.options) counts.set(option.id, 0);
@@ -250,6 +270,11 @@ export class VotesService {
   async verifyReceipt(id: string, code: string): Promise<{ accepted: boolean }> {
     if (!/^[A-Za-z0-9_-]{20,40}$/.test(code)) return { accepted: false };
     return { accepted: await this.repo.hasReceipt(id, this.crypto.hashReceipt(code)) };
+  }
+
+  async unpublishResults(id: string) {
+    if (!await this.repo.unpublishResults(id)) throw new ConflictException("vote_result_cannot_be_unpublished");
+    return { unpublished: true };
   }
 
   async publishResults(id: string): Promise<VoteResultsResponse> {

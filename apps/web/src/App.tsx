@@ -259,6 +259,7 @@ export function App() {
           <Route path="/survey/:id/results" element={<SurveyResultsPage />} />
           <Route path="/votes" element={<VoteListPage />} />
           <Route path="/votes/:id" element={<VotePage />} />
+          <Route path="/votes/:id/result" element={<VotePage />} />
           <Route path="/login" element={<LoginCallbackPage />} />
           <Route path="/mypage" element={<MyPage />} />
           {/* Admin Routes with nested Outlet */}

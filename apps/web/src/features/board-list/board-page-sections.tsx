@@ -51,7 +51,7 @@ export function BoardCategoryNavigation({
   const categoryOptions = [
     { value: "", label: lang === "ko" ? "전체" : "All" },
     ...boards
-      .filter((board) => !isLegacyPublicBoardCode(board.code))
+      .filter((board) => board.code !== "faq" && !isLegacyPublicBoardCode(board.code))
       .map((board) => ({
         value: board.code,
         label: getBoardLabelFromMetadata(board, board.code, lang),
@@ -84,7 +84,7 @@ export function BoardCategoryNavigation({
           {lang === "ko" ? "전체" : "All"}
         </PageTabLink>
         {boards
-          .filter((board) => !isLegacyPublicBoardCode(board.code))
+          .filter((board) => board.code !== "faq" && !isLegacyPublicBoardCode(board.code))
           .map((board) => {
             const isActive = category === board.code;
             return (
@@ -346,25 +346,27 @@ export function BoardArticleTable({
         </div>
         </DataViewBody>
 
-        <DataViewFooter className="select-none">
-          <Pagination
-            className="w-full"
-            currentPage={currentPage}
-            lang={lang}
-            onPageChange={onPageChange}
-            pageSizeControl={<PageSizeSelect
+        {totalCount > 0 ? (
+          <DataViewFooter className="select-none">
+            <Pagination
+              className="w-full"
+              currentPage={currentPage}
               lang={lang}
-              value={postsPerPage}
-              onChange={onPostsPerPageChange}
-            />}
-            range={<span className="whitespace-nowrap text-sm font-normal text-[var(--j-color-text-secondary)]">
-              {lang === "ko"
-                ? `총 ${totalCount}건 중 ${rangeStart}-${rangeEnd}`
-                : `${rangeStart}-${rangeEnd} of ${totalCount}`}
-            </span>}
-            totalPages={totalPages}
-          />
-        </DataViewFooter>
+              onPageChange={onPageChange}
+              pageSizeControl={<PageSizeSelect
+                lang={lang}
+                value={postsPerPage}
+                onChange={onPostsPerPageChange}
+              />}
+              range={<span className="whitespace-nowrap text-sm font-normal text-[var(--j-color-text-secondary)]">
+                {lang === "ko"
+                  ? `총 ${totalCount}건 중 ${rangeStart}-${rangeEnd}`
+                  : `${rangeStart}-${rangeEnd} of ${totalCount}`}
+              </span>}
+              totalPages={totalPages}
+            />
+          </DataViewFooter>
+        ) : null}
       </DataViewCard>
     </PageContainer>
   );

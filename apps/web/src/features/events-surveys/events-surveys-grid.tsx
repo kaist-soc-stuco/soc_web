@@ -2,7 +2,7 @@ import type {
   ArticleEngagementKind,
 } from "@soc/contracts";
 import { isoToDate, localDate, nowDate } from "@soc/shared";
-import { CalendarDays, ClipboardList, Clock, MapPin } from "lucide-react";
+import { ClipboardList, Clock, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -14,6 +14,7 @@ import {
   type UnifiedItem,
 } from "@/lib/events-surveys";
 import { resolveAssetUrl } from "@/lib/asset-url";
+import { EventCardFallback } from "@/components/organisms/event-card-fallback";
 
 interface EventsSurveysGridProps {
   isAuthenticated: boolean;
@@ -70,6 +71,45 @@ function getStatusText(item: UnifiedItem, lang: string) {
   }
 
   return lang === "ko" ? "진행 중" : "Ongoing";
+}
+
+interface CardBadge {
+  label: string;
+  className: string;
+}
+
+const DEFAULT_CARD_BADGE_CLASS =
+  "border-white/30 bg-slate-950/35 text-white";
+const OPEN_CARD_BADGE_CLASS =
+  "border-brand-primary/70 bg-brand-primary/90 text-white";
+
+function getCardBadges(item: UnifiedItem, lang: string): CardBadge[] {
+  const statusBadge: CardBadge = {
+    label: getStatusText(item, lang),
+    className:
+      item.computedState === "open"
+        ? OPEN_CARD_BADGE_CLASS
+        : DEFAULT_CARD_BADGE_CLASS,
+  };
+  const badges: CardBadge[] = [
+    statusBadge,
+    {
+      label: getApplicationText(item, lang) ?? "",
+      className: DEFAULT_CARD_BADGE_CLASS,
+    },
+    {
+      label: getAudienceText(item, lang),
+      className: DEFAULT_CARD_BADGE_CLASS,
+    },
+  ];
+
+  return badges
+    .filter((badge) => badge.label)
+    .filter(
+      (badge, index, allBadges) =>
+        allBadges.findIndex((candidate) => candidate.label === badge.label) ===
+        index,
+    );
 }
 
 function isApplicationFull(item: UnifiedItem) {
@@ -154,7 +194,8 @@ function CardMedia({
   imageUrl: string | null | undefined;
   isSurvey: boolean;
 }) {
-  const mediaUrl = imageUrl ? resolveAssetUrl(imageUrl) : null;
+  const normalizedImageUrl = imageUrl?.trim() || null;
+  const mediaUrl = normalizedImageUrl ? resolveAssetUrl(normalizedImageUrl) : null;
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -162,19 +203,13 @@ function CardMedia({
   }, [mediaUrl]);
 
   if (!mediaUrl || imageFailed) {
+    if (!isSurvey) return <EventCardFallback />;
     return (
       <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50">
-        {isSurvey ? (
-          <ClipboardList
-            aria-hidden="true"
-            className="h-8 w-8 text-emerald-600/60"
-          />
-        ) : (
-          <CalendarDays
-            aria-hidden="true"
-            className="h-8 w-8 text-slate-400"
-          />
-        )}
+        <ClipboardList
+          aria-hidden="true"
+          className="h-8 w-8 text-emerald-600/60"
+        />
       </div>
     );
   }
@@ -190,29 +225,6 @@ function CardMedia({
   );
 }
 
-function EventLocation({ item, lang }: { item: UnifiedItem; lang: string }) {
-  if (item.kind !== "EVENT") return null;
-
-  const location = item.location?.trim();
-  if (!location) {
-    return (
-      <div className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-400">
-        <span aria-hidden="true" className="shrink-0 leading-5">📍</span>
-        <span className="min-w-0 break-words">
-          {lang === "ko" ? "장소 미정" : "Location TBD"}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-600">
-      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
-      <span className="min-w-0 break-words">{location}</span>
-    </div>
-  );
-}
-
 export function EventsSurveysGrid({
   isAuthenticated,
   items,
@@ -221,9 +233,9 @@ export function EventsSurveysGrid({
   onEngagementToggle,
 }: EventsSurveysGridProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => {
-        const title = lang === "ko" ? item.titleKo : item.titleEn || item.titleKo;
+        const title = stripRichText(lang === "ko" ? item.titleKo : item.titleEn || item.titleKo);
         const desc = stripRichText(
           lang === "ko"
             ? item.descriptionKo
@@ -232,13 +244,10 @@ export function EventsSurveysGrid({
         const closed = isClosedItem(item);
         const href = getItemHref(item);
         const isSurvey = item.kind !== "EVENT";
-        const badges = [
-          getStatusText(item, lang),
-          getApplicationText(item, lang),
-          getAudienceText(item, lang),
-        ]
-          .filter(Boolean)
-          .filter((label, index, labels) => labels.indexOf(label) === index);
+        const isHomeEventCard = item.kind === "EVENT";
+        const period = getCardPeriodText(item, lang);
+        const location = item.location?.trim() || null;
+        const badges = getCardBadges(item, lang);
         const canEngage = item.kind === "EVENT" && onEngagementToggle;
         const submitting =
           engagementSubmitting === `${item.id}:SCRAP` ? "SCRAP" : null;
@@ -246,9 +255,19 @@ export function EventsSurveysGrid({
         return (
           <div
             key={item.id}
-            className={`interaction-card select-none group flex h-full min-h-[24rem] w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`}
+            className={
+              isHomeEventCard
+                ? `home-portal-event-card select-none group ${closed ? "opacity-50" : ""}`
+                : `interaction-card select-none group flex h-full w-full flex-col overflow-hidden rounded-xl border bg-white text-left shadow-card transition-[transform,box-shadow,opacity] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-elevated ${closed ? "border-slate-200 opacity-50" : "border-gray-200"}`
+            }
           >
-            <div className="relative aspect-video shrink-0 overflow-hidden border-b border-slate-100 bg-slate-50">
+            <div
+              className={
+                isHomeEventCard
+                  ? "home-portal-event-media"
+                  : "relative aspect-video shrink-0 overflow-hidden border-b border-slate-100 bg-slate-50"
+              }
+            >
               <Link
                 aria-label={title}
                 to={href}
@@ -257,13 +276,15 @@ export function EventsSurveysGrid({
                 <CardMedia imageUrl={item.imageUrl} isSurvey={isSurvey} />
               </Link>
               {badges.length > 0 ? (
-                <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-wrap gap-1.5">
+                <div
+                  className={`pointer-events-none absolute z-10 flex flex-wrap gap-1.5 ${isHomeEventCard ? "left-4 top-4 max-w-[calc(100%-2rem)]" : "left-3 top-3 max-w-[calc(100%-4.5rem)]"}`}
+                >
                   {badges.map((badge) => (
                     <span
-                      key={badge}
-                      className="rounded-full border border-white/30 bg-slate-950/35 px-2.5 py-1 text-[length:var(--ui-text-caption-size)] font-medium leading-none text-white shadow-sm backdrop-blur-md"
+                      key={badge.label}
+                      className={`rounded-full border px-2.5 py-1 text-[length:var(--ui-text-caption-size)] font-medium leading-none shadow-sm backdrop-blur-md ${badge.className}`}
                     >
-                      {badge}
+                      {badge.label}
                     </span>
                   ))}
                 </div>
@@ -289,32 +310,40 @@ export function EventsSurveysGrid({
               ) : null}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col p-5">
-              <Link
-                aria-label={title}
-                to={href}
-                className="min-w-0 flex-1"
-              >
-                <h3 className="line-clamp-2 break-words text-[length:var(--ui-text-section-size)] font-semibold leading-5 text-app-text-strong">
-                  {title}
-                </h3>
-                {desc ? (
-                  <p className="mt-2.5 min-h-[3.375rem] line-clamp-3 text-[length:var(--ui-text-body-sm-size)] font-normal leading-snug text-app-text-body">
-                    {desc}
-                  </p>
-                ) : null}
+            <div className="home-portal-event-body break-keep">
+              <Link aria-label={title} to={href} className="min-w-0">
+                <h3 className="line-clamp-2">{title}</h3>
+                {desc ? <p className="line-clamp-2">{desc}</p> : null}
               </Link>
-
-              <div className="mt-auto space-y-1.5 pt-5">
-                <Link
-                  aria-label={`${title} ${getCardPeriodText(item, lang)}`}
-                  to={href}
-                  className="flex min-h-11 min-w-0 items-start gap-1.5 text-xs font-normal text-slate-700"
-                >
-                  <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600" />
-                  <span className="min-w-0 break-words">{getCardPeriodText(item, lang)}</span>
-                </Link>
-                <EventLocation item={item} lang={lang} />
+              <div className="home-portal-event-meta">
+                {period ? (
+                  <Link
+                    aria-label={`${title} ${period}`}
+                    to={href}
+                    className="home-portal-event-time"
+                  >
+                    <Clock
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0 text-slate-400"
+                    />
+                    <span className="truncate">{period}</span>
+                  </Link>
+                ) : null}
+                {item.kind === "EVENT" ? (
+                  <div className="home-portal-event-location flex min-w-0 items-center gap-1.5">
+                    <MapPin
+                      aria-hidden="true"
+                      className={
+                        location
+                          ? "size-3.5 shrink-0 text-slate-400"
+                          : "size-3.5 shrink-0 text-slate-300"
+                      }
+                    />
+                    <span className="truncate text-slate-600">
+                      {location ?? (lang === "ko" ? "장소 미정" : "Location TBD")}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

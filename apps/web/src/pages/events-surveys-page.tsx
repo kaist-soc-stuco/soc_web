@@ -8,6 +8,7 @@ import { useEventsSurveysPageController } from "@/features/events-surveys/use-ev
 import { AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/data-state";
 import { Pagination } from "@/components/ui/pagination";
 import { useCurrentSession } from "@/hooks/use-current-session";
 import { Permissions } from "@/lib/permissions";
@@ -19,6 +20,37 @@ import {
 } from "@/components/ui/page-layout";
 
 export type EventsSurveysView = "event" | "survey" | "calendar";
+
+function getEmptyStateMessage(
+  view: EventsSurveysView,
+  stateFilter: string,
+  lang: string,
+) {
+  if (lang !== "ko") {
+    const subject = view === "survey" ? "surveys" : "events";
+    const status =
+      stateFilter === "before_open"
+        ? "upcoming"
+        : stateFilter === "open"
+          ? "ongoing"
+          : stateFilter === "closed"
+            ? "closed"
+            : "published";
+    return `No ${status} ${subject} available.`;
+  }
+
+  if (view === "survey") {
+    if (stateFilter === "before_open") return "시작 예정인 설문이 없습니다.";
+    if (stateFilter === "open") return "진행 중인 설문이 없습니다.";
+    if (stateFilter === "closed") return "마감된 설문이 없습니다.";
+    return "등록된 설문이 없습니다.";
+  }
+
+  if (stateFilter === "before_open") return "시작 예정인 행사가 없습니다.";
+  if (stateFilter === "open") return "진행 중인 행사가 없습니다.";
+  if (stateFilter === "closed") return "마감된 행사가 없습니다.";
+  return "등록된 행사가 없습니다.";
+}
 
 export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
   const [searchParams] = useSearchParams();
@@ -59,6 +91,25 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
     lang,
     selectedParam,
   });
+
+  const hasActiveListFilters =
+    currentTab !== "calendar" &&
+    Boolean(itemQuery.trim() || dateFrom || dateTo);
+  const emptyStateMessage = hasActiveListFilters
+    ? lang === "ko"
+      ? currentTab === "survey"
+        ? "조건에 맞는 설문이 없습니다."
+        : "조건에 맞는 행사가 없습니다."
+      : currentTab === "survey"
+        ? "No surveys match these filters."
+        : "No events match these filters."
+    : getEmptyStateMessage(currentTab, stateFilter, lang);
+  const resetListFilters = () => {
+    setItemQuery("");
+    setDateFrom("");
+    setDateTo("");
+    setStateFilter("all");
+  };
 
   return (
     <PageShell>
@@ -143,18 +194,24 @@ export function EventsSurveysPage({ view }: { view?: EventsSurveysView }) {
               selectedDate={selectedDate}
             />
           ) : totalItems === 0 ? (
-            <div className="space-y-4 rounded-lg border border-dashed border-gray-200 bg-white py-16 text-center">
-              <div className="text-lg font-medium text-gray-300">
-                {lang === "ko"
-                  ? "표시할 항목이 없습니다."
-                  : "No events or surveys to display."}
-              </div>
-              <p className="text-sm text-kaist-grey">
-                {lang === "ko"
-                  ? "다른 탭을 확인해 보세요."
-                  : "Please check out the other tab."}
-              </p>
-            </div>
+            <EmptyState
+              className="min-h-48 rounded-none border-0 bg-transparent"
+              message={emptyStateMessage}
+              minHeightClassName="min-h-48"
+            >
+              <span className="flex flex-col items-center gap-2">
+                <span>{emptyStateMessage}</span>
+                {hasActiveListFilters ? (
+                  <button
+                    className="text-xs font-normal text-slate-500 underline-offset-4 transition-colors hover:text-brand-primary hover:underline"
+                    onClick={resetListFilters}
+                    type="button"
+                  >
+                    {lang === "ko" ? "필터 초기화" : "Reset filters"}
+                  </button>
+                ) : null}
+              </span>
+            </EmptyState>
           ) : (
             <>
               <EventsSurveysGrid

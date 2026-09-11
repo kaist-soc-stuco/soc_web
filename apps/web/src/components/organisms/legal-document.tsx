@@ -211,8 +211,8 @@ const termsSections: readonly LegalSection[] = [
     title: t("설문·투표·행사 참여", "Surveys, votes, and events"),
     paragraphs: [
       t(
-        "설문과 투표는 게시자가 설정한 기간, 응답 횟수, 주전공·학적상태·학생회비 납부 여부 등 참여 조건에 따라 이용할 수 있습니다. 이용자는 참여 전에 본인의 자격과 입력 내용을 확인해야 하며, 조건을 충족하지 못한 경우 참여가 제한될 수 있습니다.",
-        "Surveys and votes are available according to the period, response limit, and eligibility rules set by their publisher, including primary-major, academic-status, and student-fee conditions. Users must check their eligibility and entries before participating; participation may be restricted when requirements are not met.",
+        "설문과 투표는 게시자가 설정한 기간, 응답 횟수, 주전공·학생회비 납부 여부 등 참여 조건에 따라 이용할 수 있습니다. 이용자는 참여 전에 본인의 자격과 입력 내용을 확인해야 하며, 조건을 충족하지 못한 경우 참여가 제한될 수 있습니다.",
+        "Surveys and votes are available according to the period, response limit, and eligibility rules set by their publisher, including primary-major and student-fee conditions. Users must check their eligibility and entries before participating; participation may be restricted when requirements are not met.",
       ),
       t(
         "투표의 비밀성과 결과의 신뢰성을 위해 투표자격 명부와 실제 투표 내용은 분리하여 관리될 수 있습니다. 설문 결과는 게시자가 정한 공개 범위에 따라 집계·표시됩니다.",
@@ -351,16 +351,16 @@ const privacySections: readonly LegalSection[] = [
         kind: "required",
         label: t("필수 항목", "Required items"),
         value: t(
-          "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속 학과, 주전공, 학적 상태(SSO 연동 및 권한·회원 식별용). 수집 방법: KAIST SSO 로그인과 동의 후 계정 연계.",
-          "KAIST UID, Korean and English names, student number, email address, department, primary major, and academic status (for SSO linking and Member or permission identification). Method: KAIST SSO sign-in and account linking after consent.",
+          "KAIST UID, 성명(한글·영문), 학번, 이메일, 소속 학과, 주전공(SSO 연동 및 권한·회원 식별용). 수집 방법: KAIST SSO 로그인과 동의 후 계정 연계.",
+          "KAIST UID, Korean and English names, student number, email address, department, and primary major (for SSO linking and Member or permission identification). Method: KAIST SSO sign-in and account linking after consent.",
         ),
       },
       {
         kind: "optional",
         label: t("선택 항목", "Optional items"),
         value: t(
-          "휴대전화번호, 성별(SSO에서 제공되고 이용자가 동의한 경우에만 프로필·연락망 처리에 사용).",
-          "Mobile number and gender (used for profile or contact-directory operations only when provided by SSO and consented to by the User).",
+          "성별(SSO에서 제공되고 이용자가 동의한 경우에만 처리).",
+          "Gender (processed only when provided by SSO and consented to by the User).",
         ),
       },
       {
@@ -380,8 +380,8 @@ const privacySections: readonly LegalSection[] = [
       {
         label: t("설문·투표 정보", "Survey and voting information"),
         value: t(
-          "설문 응답·문항별 답변·응답 상태·제출 시각, 투표 참여 자격 명부의 이름·학번·이메일·주전공·학적상태·회비 상태, 암호화된 투표용지와 집계 결과. 수집 방법: 이용자의 설문·투표 참여 및 운영자의 자격 명부 생성.",
-          "Survey responses, question-level answers, response status, and submission time; name, student number, email, primary major, academic status, and fee status in voter-eligibility lists; encrypted ballots; and tallies. Method: User participation and eligibility-list creation by the Operator.",
+          "설문 응답·문항별 답변·응답 상태·제출 시각, 투표 참여 자격 명부의 이름·학번·이메일·주전공·회비 상태, 암호화된 투표용지와 집계 결과. 수집 방법: 이용자의 설문·투표 참여 및 운영자의 자격 명부 생성.",
+          "Survey responses, question-level answers, response status, and submission time; name, student number, email, primary major and fee status in voter-eligibility lists; encrypted ballots; and tallies. Method: User participation and eligibility-list creation by the Operator.",
         ),
       },
       {

@@ -214,7 +214,7 @@ export function AdminStickyActionBar({ className, ...props }: ComponentProps<"di
   return (
     <div
       className={cn(
-        "sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur",
+        "sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-none backdrop-blur",
         className,
       )}
       {...props}

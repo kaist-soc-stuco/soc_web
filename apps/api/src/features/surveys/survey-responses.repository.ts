@@ -43,7 +43,6 @@ type SurveyResponseQueryRow = {
   userNameKo: string | null;
   userNameEn: string | null;
   userEmail: string | null;
-  userPhoneNumber: string | null;
   userDepartmentKo: string | null;
   userStdNo: string | null;
   userPrimaryMajor: string | null;
@@ -176,7 +175,6 @@ export class SurveyResponsesRepository {
             nameKo: row.userNameKo,
             nameEn: row.userNameEn,
             email: row.userEmail,
-            phoneNumber: row.userPhoneNumber,
             departmentKo: row.userDepartmentKo,
             stdNo: row.userStdNo,
             primaryMajor: row.userPrimaryMajor,
@@ -205,7 +203,6 @@ export class SurveyResponsesRepository {
     userNameKo: users.nameKo,
     userNameEn: users.nameEn,
     userEmail: users.email,
-    userPhoneNumber: users.phoneNumber,
     userDepartmentKo: users.departmentKo,
     userStdNo: users.stdNo,
     userPrimaryMajor: users.primaryMajor,
@@ -588,7 +585,6 @@ export class SurveyResponsesRepository {
               userNameKo: null,
               userNameEn: null,
               userEmail: null,
-              userPhoneNumber: null,
               userDepartmentKo: null,
               userStdNo: null,
               userPrimaryMajor: null,
@@ -744,7 +740,6 @@ export class SurveyResponsesRepository {
             userNameKo: null,
             userNameEn: null,
             userEmail: null,
-            userPhoneNumber: null,
             userDepartmentKo: null,
             userStdNo: null,
             userPrimaryMajor: null,
