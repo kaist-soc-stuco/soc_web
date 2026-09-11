@@ -69,8 +69,7 @@ export function FeeStatisticsPanel({
     <div className="space-y-4">
       <AdminCard className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-1.5">
-          {([[
-            "30d", "최근 30일"], ["90d", "최근 90일"], ["year", "올해"], ["custom", "직접 선택"]] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={preset === value ? "secondary" : "ghost"} className="!font-normal" onClick={() => onPresetChange(value)}>{label}</Button>)}
+          {([["30d", "최근 30일"], ["90d", "최근 90일"], ["year", "올해"]] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={preset === value ? "secondary" : "ghost"} className="!font-normal" onClick={() => onPresetChange(value)}>{label}</Button>)}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <UiInput aria-label="조회 시작일" type="date" value={dateFrom} onChange={(event) => onDateFromChange(event.currentTarget.value)} className="w-40" />
@@ -87,11 +86,9 @@ export function FeeStatisticsPanel({
       ].map(([label, value]) => <div key={label} className="px-5 py-4"><p className="text-xs font-normal text-[#344054]">{label}</p><p className="mt-1.5 text-lg font-medium tabular-nums text-[#172033]">{value}</p></div>)}</AdminCard>}
 
       <AdminCard className="p-5">
-        <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[var(--ui-text-strong)]">기간별 납부 추이</h2><span className="text-xs font-normal text-[var(--ui-text-body)]">납부 원장 기준</span></div>
+        <div className="mb-5"><h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[var(--ui-text-strong)]">기간별 납부 추이</h2></div>
         {!stats ? <div aria-busy="true" className="min-h-64" /> : <div className={loading ? "opacity-60 transition-opacity" : undefined}><FeeTrendChart data={stats.trend} /></div>}
       </AdminCard>
-
-      {stats && stats.majorBreakdown.length > 0 ? <AdminCard className={loading ? "overflow-hidden opacity-60 transition-opacity" : "overflow-hidden"}><div className="border-b border-[var(--ui-border-subtle)] px-5 py-4"><h2 className="text-[length:var(--ui-text-section-size)] font-medium text-[var(--ui-text-strong)]">전공 구분별 현황</h2></div><div className="overflow-x-auto"><table className="w-full min-w-[42.5rem] text-sm"><thead className="bg-[var(--ui-surface-muted)] text-xs font-normal text-[var(--ui-text-body)]"><tr><th className="px-5 py-3 text-left font-normal">구분</th><th className="px-5 py-3 text-right font-normal">대상</th><th className="px-5 py-3 text-right font-normal">납부 학생</th><th className="px-5 py-3 text-right font-normal">비율</th><th className="px-5 py-3 text-right font-normal">납부 금액</th></tr></thead><tbody className="divide-y divide-[var(--ui-border-subtle)]">{stats.majorBreakdown.map((item) => <tr key={item.category}><td className="px-5 py-3 font-normal text-[var(--ui-text-strong)]">{item.label}</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-body)]">{item.totalStudents}명</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-strong)]">{item.paidStudents}명</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-body)]">{item.paymentRate}%</td><td className="px-5 py-3 text-right font-normal tabular-nums text-[var(--ui-text-strong)]">{formatCurrency(item.paidAmount)}</td></tr>)}</tbody></table></div></AdminCard> : null}
     </div>
   );
 }
