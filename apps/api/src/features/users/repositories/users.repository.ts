@@ -23,6 +23,7 @@ import {
   studentFeePaymentBatches,
   studentFeePayments,
   studentFeeStatus,
+  studentFeePolicies,
   userRoleGroups,
   users,
   articles,
@@ -36,7 +37,9 @@ import {
 
 import type { UserRecord } from "../entities/user";
 import { hashStudentFeePaymentPayload } from "../fee-payment-idempotency";
+import { getStudentFeeBootstrap } from "../student-fee-bootstrap";
 import type {
+  StudentFeePolicy,
   AdminUserListResponse,
   AdminUserRecord,
   BulkUpdateStudentFeeStatusRequest,
@@ -75,7 +78,6 @@ type UserUpsertInput = {
   departmentKo?: string | null;
   primaryMajor?: string | null;
   gender?: string | null;
-  phoneNumber?: string | null;
   email: string;
   identityCode?: string | null;
   isActive?: boolean;
@@ -89,7 +91,6 @@ type UserProfileUpdateInput = {
   departmentKo?: string | null;
   primaryMajor?: string | null;
   gender?: string | null;
-  phoneNumber?: string | null;
   email?: string;
   identityCode?: string | null;
   nameEn?: string | null;
@@ -168,7 +169,6 @@ export class UsersRepository {
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
       gender: row.gender ?? null,
-      phoneNumber: row.phoneNumber ?? null,
       academicStatus: row.academicStatus ?? null,
       identityCode: row.identityCode ?? null,
       privacyConsentAt: row.privacyConsentAt ? msToIso(row.privacyConsentAt.valueOf()) : null,
@@ -189,7 +189,6 @@ export class UsersRepository {
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
       gender: row.gender ?? null,
-      phoneNumber: row.phoneNumber ?? null,
       privacyConsentAt: row.privacyConsentAt
         ? msToIso(row.privacyConsentAt.valueOf())
         : null,
@@ -248,7 +247,7 @@ export class UsersRepository {
     const inserted = await this.db
       .insert(users)
       .values({
-        academicStatus: input.academicStatus ?? null,
+        academicStatus: null,
         kaistUid: input.kaistUid,
         lastLoginAt: input.lastLoginAt ?? nowDate(),
         nameEn: input.nameEn ?? null,
@@ -258,7 +257,6 @@ export class UsersRepository {
         departmentKo: input.departmentKo ?? null,
         primaryMajor: input.primaryMajor ?? null,
         gender: input.gender ?? null,
-        phoneNumber: input.phoneNumber ?? null,
         email: input.email,
         identityCode: input.identityCode ?? null,
         isActive: input.isActive ?? true,
@@ -291,9 +289,6 @@ export class UsersRepository {
         ? { primaryMajor: input.primaryMajor }
         : {}),
       ...(input.gender !== undefined ? { gender: input.gender } : {}),
-      ...(input.phoneNumber !== undefined
-        ? { phoneNumber: input.phoneNumber }
-        : {}),
       ...(input.academicStatus !== undefined
         ? { academicStatus: input.academicStatus }
         : {}),
@@ -347,9 +342,8 @@ export class UsersRepository {
           departmentKo: input.departmentKo ?? null,
           primaryMajor: input.primaryMajor ?? null,
           gender: input.gender ?? null,
-          phoneNumber: input.phoneNumber ?? null,
           departmentEn: input.departmentEn ?? null,
-          academicStatus: input.academicStatus ?? null,
+          academicStatus: null,
           identityCode: input.identityCode ?? null,
           privacyConsentAt: input.privacyConsentAt ?? null,
         })
@@ -371,7 +365,6 @@ export class UsersRepository {
       departmentKo?: string | null;
       primaryMajor?: string | null;
       gender?: string | null;
-      phoneNumber?: string | null;
       updatedAt: Date;
       email?: string;
       identityCode?: string | null;
@@ -415,12 +408,9 @@ export class UsersRepository {
       updateSet.gender = input.gender;
     }
 
-    if (input.phoneNumber !== undefined) {
-      updateSet.phoneNumber = input.phoneNumber;
-    }
 
     if (input.academicStatus !== undefined) {
-      updateSet.academicStatus = input.academicStatus;
+      updateSet.academicStatus = null;
     }
 
     if (input.identityCode !== undefined) {
@@ -558,7 +548,6 @@ export class UsersRepository {
     Array<{
       email: string;
       nameKo: string;
-      phoneNumber: string | null;
       studentNumber: string | null;
     }>
   > {
@@ -591,13 +580,11 @@ export class UsersRepository {
       conditions.push(ilike(users.stdNo, `%${studentNumber}%`));
     }
     if (filters?.primaryMajor?.trim()) conditions.push(ilike(users.primaryMajor, `%${filters.primaryMajor.trim()}%`));
-    if (filters?.academicStatus?.trim()) conditions.push(eq(users.academicStatus, filters.academicStatus.trim()));
 
     const rows = await this.db
       .select({
         email: users.email,
         nameKo: users.nameKo,
-        phoneNumber: users.phoneNumber,
         studentNumber: users.stdNo,
       })
       .from(users)
@@ -638,9 +625,6 @@ export class UsersRepository {
         : input.status === "inactive"
           ? eq(users.isActive, false)
           : undefined,
-      input.academicStatus?.trim()
-        ? eq(users.academicStatus, input.academicStatus.trim())
-        : undefined,
     ].filter(Boolean) as SQL[];
     const conditions = [...baseConditions];
     if (input.majorType === "PRIMARY") conditions.push(sql`nullif(trim(${users.primaryMajor}), '') is not null`);
@@ -684,9 +668,6 @@ export class UsersRepository {
         primaryMajor: sql<number>`count(*) filter (where nullif(trim(${users.primaryMajor}), '') is not null)`,
         paid: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PAID'))`,
         partial: sql<number>`count(*) filter (where exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} = 'PARTIAL'))`,
-        enrolled: sql<number>`count(*) filter (where ${users.academicStatus} = '재학')`,
-        graduated: sql<number>`count(*) filter (where ${users.academicStatus} = '졸업')`,
-        otherAcademic: sql<number>`count(*) filter (where ${users.academicStatus} is null or ${users.academicStatus} not in ('재학', '졸업'))`,
         unpaid: sql<number>`count(*) filter (where not exists (select 1 from ${studentFeeStatus} where ${studentFeeStatus.userId} = ${users.userId} and ${studentFeeStatus.status} in ('PAID', 'PARTIAL')))`,
       })
       .from(users)
@@ -718,9 +699,9 @@ export class UsersRepository {
         partial: Number(facetRows[0]?.partial ?? 0),
         unpaid: Number(facetRows[0]?.unpaid ?? 0),
         academic: {
-          enrolled: Number(facetRows[0]?.enrolled ?? 0),
-          graduated: Number(facetRows[0]?.graduated ?? 0),
-          other: Number(facetRows[0]?.otherAcademic ?? 0),
+          enrolled: 0,
+          graduated: 0,
+          other: 0,
         },
       },
     };
@@ -768,6 +749,97 @@ export class UsersRepository {
     return permissionBits;
   }
 
+  async getStudentFeePolicy(referenceSemester: string): Promise<StudentFeePolicy> {
+    const [row] = await this.db.select().from(studentFeePolicies).where(lte(studentFeePolicies.effectiveSemester, referenceSemester)).orderBy(desc(studentFeePolicies.effectiveSemester), desc(studentFeePolicies.createdAt)).limit(1);
+    return row ? { effectiveSemester: row.effectiveSemester, amount: row.amount, coverageSemesters: row.coverageSemesters } : { effectiveSemester: "2026-1", amount: 45_000, coverageSemesters: 6 };
+  }
+
+  async createStudentFeePolicy(input: StudentFeePolicy, actorId: string) {
+    await this.db.insert(studentFeePolicies).values({ ...input, createdBy: actorId });
+    return input;
+  }
+
+  /**
+   * 첫 영속 로그인 시 제공된 과비 실자료를 학번으로 한 번만 적용합니다.
+   * 이미 운영자가 확인하거나 수정한 상태는 절대 덮어쓰지 않습니다.
+   */
+  async applyStudentFeeBootstrap(
+    userId: string,
+    stdNo: string | null | undefined,
+  ): Promise<StudentFeeStatusRecord | null> {
+    const source = getStudentFeeBootstrap(stdNo);
+    if (!source) return null;
+
+    const row = await this.db.transaction(async (tx) => {
+      const lockedUser = await tx
+        .select({ userId: users.userId })
+        .from(users)
+        .where(eq(users.userId, userId))
+        .for("update")
+        .limit(1);
+
+      if (!lockedUser.length) {
+        throw new InternalServerErrorException("Can't load data");
+      }
+
+      const [current] = await tx
+        .select()
+        .from(studentFeeStatus)
+        .where(eq(studentFeeStatus.userId, userId))
+        .for("update")
+        .limit(1);
+
+      const isUntouchedDefault = Boolean(
+        current &&
+          current.status === "UNPAID" &&
+          current.coverageSemesters === 6 &&
+          current.paidAmount === 0 &&
+          current.paidAt === null &&
+          current.verifiedBy === null &&
+          current.verifiedAt === null &&
+          current.note === null,
+      );
+
+      if (current && !isUntouchedDefault) return current;
+
+      const now = nowDate();
+      const nextRecord = {
+        coverageSemesters: source.paidSemesters,
+        paidAmount: source.paidAmount,
+        paidAt: null,
+        status:
+          source.paidSemesters >= 6
+            ? ("PAID" as const)
+            : source.paidSemesters > 0
+              ? ("PARTIAL" as const)
+              : ("UNPAID" as const),
+        updatedAt: now,
+        userId,
+        verifiedAt: null,
+        verifiedBy: null,
+        note: "과비 실자료 정리본 기준 최초 로그인 자동 반영",
+      };
+
+      if (current) {
+        return (
+          await tx
+            .update(studentFeeStatus)
+            .set(nextRecord)
+            .where(eq(studentFeeStatus.userId, userId))
+            .returning()
+        )[0];
+      }
+
+      return (await tx.insert(studentFeeStatus).values(nextRecord).returning())[0];
+    });
+
+    if (!row) {
+      throw new InternalServerErrorException("fee_bootstrap_failed");
+    }
+
+    return this.mapFeeStatusRow(row);
+  }
+
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
     const found = await this.db
       .select()
@@ -779,7 +851,7 @@ export class UsersRepository {
 
     const row = found[0];
     const normalizedStatus: FeeStatus =
-      row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID";
+      row.status === "PAID" ? "PAID" : row.status === "PARTIAL" && row.paidAmount > 0 ? "PARTIAL" : "UNPAID";
 
     return {
       userId: row.userId,
@@ -815,7 +887,7 @@ export class UsersRepository {
   ): StudentFeeStatusRecord {
     return {
       userId: row.userId,
-      status: row.status === "PAID" || row.status === "PARTIAL" ? row.status : "UNPAID",
+      status: row.status === "PAID" ? "PAID" : row.status === "PARTIAL" && row.paidAmount > 0 ? "PARTIAL" : "UNPAID",
       coverageSemesters: row.coverageSemesters,
       paidAmount: row.paidAmount,
       paidAt: row.paidAt ? msToIso(row.paidAt.valueOf()) : null,
@@ -1300,6 +1372,7 @@ export class UsersRepository {
     const normalizedReference = this.semesterOrdinal(referenceSemester)
       ? referenceSemester!
       : this.currentReferenceSemester();
+    const feePolicy = await this.getStudentFeePolicy(normalizedReference);
     const paymentRows = rows.length
       ? await this.db
           .select()
@@ -1337,9 +1410,11 @@ export class UsersRepository {
       const totalPaidAmount = payments.length
         ? payments.reduce((sum, payment) => sum + payment.amount, 0)
         : row.paidAmount ?? 0;
+      const legacyPartial = row.status === "PARTIAL" && (row.paidAmount ?? 0) > 0 &&
+        (row.paidAt === null || this.isSemesterCovered(legacyStartSemester, row.coverageSemesters ?? 6, normalizedReference));
 
       return {
-        status: eligible ? ("PAID" as const) : ("UNPAID" as const),
+        status: eligible ? ("PAID" as const) : legacyPartial ? ("PARTIAL" as const) : ("UNPAID" as const),
         eligible,
         userId: row.userId,
         nameKo: row.nameKo,
@@ -1355,7 +1430,7 @@ export class UsersRepository {
         paymentType: (latestPayment?.paymentType ?? null) as FeePaymentType | null,
         paymentMethod: (latestPayment?.paymentMethod ?? null) as FeePaymentMethod | null,
         paidAmount: totalPaidAmount,
-        requiredAmount: 45_000,
+        requiredAmount: feePolicy.amount,
         paidAt: latestPayment?.paidAt
           ? msToIso(latestPayment.paidAt.valueOf())
           : row.paidAt
@@ -1368,7 +1443,7 @@ export class UsersRepository {
 
     const filtered = mapped.filter((row) => {
       if (!status) return true;
-      return status === "PAID" ? row.status === "PAID" : row.status === "UNPAID";
+      return row.status === status;
     });
     const direction = sortDirection === "desc" ? -1 : 1;
     const sorted = [...filtered].sort((left, right) => {
@@ -1393,7 +1468,8 @@ export class UsersRepository {
     const paged = sorted.slice(offset, offset + normalizedPageSize);
     const summaryTotal = mapped.length;
     const summaryPaid = mapped.filter((row) => row.status === "PAID").length;
-    const summaryUnpaid = summaryTotal - summaryPaid;
+    const summaryPartial = mapped.filter((row) => row.status === "PARTIAL").length;
+    const summaryUnpaid = summaryTotal - summaryPaid - summaryPartial;
 
     return {
       students: paged,
@@ -1403,7 +1479,7 @@ export class UsersRepository {
       summary: {
         totalStudents: summaryTotal,
         paidStudents: summaryPaid,
-        partialStudents: 0,
+        partialStudents: summaryPartial,
         unpaidStudents: summaryUnpaid,
         paymentRate:
           summaryTotal > 0

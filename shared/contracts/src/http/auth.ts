@@ -19,6 +19,10 @@ export interface LoginStartResponse {
   state: string;
 }
 
+export interface CsrfTokenResponse {
+  csrfToken: string;
+}
+
 export interface ChannelTalkConfigResponse {
   enabled: boolean;
   language: "ko" | "en";

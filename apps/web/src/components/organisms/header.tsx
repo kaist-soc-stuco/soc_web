@@ -321,7 +321,7 @@ export function Header({ variant = "default" }: HeaderProps) {
   }, [notificationOpen]);
 
   const publicBoardItems = boardNavItems.filter(
-    (board) => !isLegacyPublicBoardCode(board.code),
+    (board) => board.code !== "faq" && !isLegacyPublicBoardCode(board.code),
   );
   const navItems: HeaderNavItem[] =
     lang === "ko"
@@ -337,9 +337,10 @@ export function Header({ variant = "default" }: HeaderProps) {
           {
             label: "학부 생활",
             href: "/life/roadmap",
-            activePaths: ["/life"],
+            activePaths: ["/life", "/board/faq", "/faq"],
             megaItems: [
               { label: "전산학부 로드맵", href: "/life/roadmap" },
+              { label: "FAQ", href: "/board/faq" },
               {
                 label: "학번톡 참여 신청",
                 href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
@@ -388,9 +389,10 @@ export function Header({ variant = "default" }: HeaderProps) {
           {
             label: "Campus Life",
             href: "/life/roadmap",
-            activePaths: ["/life"],
+            activePaths: ["/life", "/board/faq", "/faq"],
             megaItems: [
               { label: "SoC Roadmap", href: "/life/roadmap" },
+              { label: "FAQ", href: "/board/faq" },
               {
                 label: "Join Cohort Chat",
                 href: operationalSurveyPath(OPERATIONAL_SURVEY_IDS.cohortChatInvitation),
@@ -433,7 +435,7 @@ export function Header({ variant = "default" }: HeaderProps) {
 
   const isNavItemActive = (item: HeaderNavItem) => {
     if (item.href === "/board") {
-      return location.pathname === "/board" || location.pathname.startsWith("/board/");
+      return location.pathname !== "/board/faq" && !location.pathname.startsWith("/board/faq/") && (location.pathname === "/board" || location.pathname.startsWith("/board/"));
     }
 
     return (item.activePaths ?? [item.href]).some(isPathActive);

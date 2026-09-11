@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 
 interface CipherPayload {
   ciphertext: string;
@@ -27,6 +27,22 @@ export class VoteCryptoService {
     this.masterKey = createHash("sha256")
       .update(`soc-web:vote-ballot-key:v1:${secret}`, "utf8")
       .digest();
+  }
+
+  issueTallyConfirmation(voteId: string, actorId: string, revision: string): string {
+    const body = Buffer.from(JSON.stringify({ voteId, actorId, revision, expires: Date.now() + 120_000 })).toString("base64url");
+    return `${body}.${createHmac("sha256", this.masterKey).update(`tally-confirmation:v1:${body}`).digest("base64url")}`;
+  }
+
+  verifyTallyConfirmation(token: string, voteId: string, actorId: string, revision: string): boolean {
+    try {
+      const [body, signature, extra] = token.split("."); if (!body || !signature || extra) return false;
+      const expected = createHmac("sha256", this.masterKey).update(`tally-confirmation:v1:${body}`).digest();
+      const actual = Buffer.from(signature, "base64url");
+      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return false;
+      const value = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+      return value.voteId === voteId && value.actorId === actorId && value.revision === revision && value.expires > Date.now();
+    } catch { return false; }
   }
 
   generateVoteKey(): Buffer {

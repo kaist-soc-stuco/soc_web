@@ -1235,44 +1235,6 @@
     line-height: 1.4;
   }
 
-  .home-event-fallback {
-    position: relative;
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
-  }
-
-  .home-event-fallback::after {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgb(15 49 41 / 0.04), rgb(15 49 41 / 0.26));
-    content: "";
-  }
-
-  .home-event-fallback-image {
-    height: 100%;
-    width: 100%;
-    object-fit: cover;
-    object-position: center 58%;
-    filter: saturate(0.72) contrast(0.94);
-    transition: transform 700ms ease;
-  }
-
-  .group:hover .home-event-fallback-image {
-    transform: scale(1.025);
-  }
-
-  .home-event-fallback-mark {
-    position: absolute;
-    right: 0.875rem;
-    bottom: 0.75rem;
-    z-index: 1;
-    color: rgb(255 255 255 / 0.86);
-    font-size: 0.625rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-  }
-
   .home-events-navigation {
     position: absolute;
     top: calc(50% - 0.75rem);

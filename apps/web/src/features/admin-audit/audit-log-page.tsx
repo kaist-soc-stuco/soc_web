@@ -1,3 +1,4 @@
+import { useToast } from "@/components/ui/toast";
 import { createApiClient } from "@soc/api-client";
 import type { AuditLogEventKind, AuditLogRecord } from "@soc/contracts";
 import { isoToDate, nowIso } from "@soc/shared";
@@ -144,6 +145,7 @@ export function AuditLogPage() {
   const [data, setData] = useState<{ items: AuditLogRecord[]; page: number; pageSize: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   const [operationError, setOperationError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [targetType, setTargetType] = useState("");
@@ -172,7 +174,7 @@ export function AuditLogPage() {
       setData(response);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "운영 로그를 불러오지 못했습니다.");
+      setError("운영 로그를 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -215,7 +217,7 @@ export function AuditLogPage() {
       });
       downloadBlob(blob, `audit-logs-${dateFrom || "all"}-${dateTo || dateInputToday()}.xlsx`);
     } catch (err) {
-      setOperationError(err instanceof Error ? err.message : "엑셀 파일을 만들지 못했습니다.");
+      toast({ type: "error", message: "엑셀 파일을 만들지 못했습니다." });
     }
   };
 

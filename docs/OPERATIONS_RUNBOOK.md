@@ -17,7 +17,9 @@ pnpm build
 
 ## DB Migration And Seed
 
-`apps/api/drizzle/0000_baseline.sql`은 빈 PostgreSQL용 기준 스키마이며, 이후 번호의 migration을 순서대로 적용합니다. 운영 DB에는 적용 이력이 남은 migration 파일을 삭제하거나 다시 squash하지 않습니다. 최초 운영 배포는 개발 DB volume을 복사하지 말고 빈 DB에서 migration 전체를 재현합니다.
+`apps/api/drizzle/0000_baseline.sql`은 `0029_remove_user_phone`까지의 스키마·migration 변경을 합친 단일 기준 migration입니다. 신규 운영 DB는 이 baseline 하나만 적용합니다. 이미 기존 migration 이력이 있고 최종 스키마까지 적용된 운영 DB는 `drizzle.__drizzle_migrations` 이력을 삭제하지 않고 그대로 유지합니다. 아직 최종 migration까지 올라오지 않은 DB에는 squash된 baseline을 직접 재실행하지 말고, 백업 후 별도 upgrade/rebaseline 절차를 먼저 검증합니다.
+
+이번 squash 이후 migration 파일은 `0000_baseline.sql`과 현재 snapshot만 유지합니다. migration을 적용하기 전에는 항상 PostgreSQL 백업을 만들고, 신규 DB에서 baseline이 끝까지 재현되는지 확인합니다.
 
 운영 최초 배포:
 

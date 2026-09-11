@@ -55,7 +55,6 @@ export interface BulkEmailPreviewResponse {
   sample: Array<{
     nameKo: string;
     email: string;
-    phoneNumber: string | null;
     studentNumber: string | null;
   }>;
 }

@@ -16,6 +16,12 @@ export default defineConfig(({ mode }) => {
     process.env.DEV_API_PROXY_TARGET?.trim() ||
     env.DEV_API_PROXY_TARGET?.trim() ||
     `http://localhost:${Number.isNaN(apiPort) ? 3000 : apiPort}`;
+  const localSsoTarget =
+    process.env.LOCAL_SSO_PROXY_TARGET?.trim() ||
+    env.LOCAL_SSO_PROXY_TARGET?.trim() ||
+    (env.LOCAL_QA_BIND?.trim() && env.LOCAL_QA_PORT?.trim()
+      ? `http://${env.LOCAL_QA_BIND.trim()}:${env.LOCAL_QA_PORT.trim()}`
+      : "http://127.0.0.1:8765");
 
   return {
     envDir: workspaceRoot,
@@ -83,6 +89,10 @@ export default defineConfig(({ mode }) => {
         },
         "/health": {
           target: apiTarget,
+          changeOrigin: true,
+        },
+        "/__local-sso": {
+          target: localSsoTarget,
           changeOrigin: true,
         },
       },

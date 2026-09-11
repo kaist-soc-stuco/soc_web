@@ -34,6 +34,7 @@ import {
   boards,
   calendarEvents,
   surveys,
+  votes,
 } from "../../infrastructure/postgres/postgres.schema";
 import { CalendarSyncService } from "./calendar-sync.service";
 import { addSeoulDays, formatSeoulDate } from "./calendar.utils";
@@ -75,14 +76,15 @@ export class CalendarService {
     to: Date,
     query?: string,
   ): Promise<PublicCalendarEventsResponse> {
-    const [surveyEvents, articleEvents, manualEvents] = await Promise.all([
+    const [surveyEvents, articleEvents, manualEvents, voteEvents] = await Promise.all([
       this.listSurveyCalendarEvents(from, to, query),
       this.listArticleCalendarEvents(from, to, query),
       this.listManualCalendarEvents(from, to, query),
+      this.listVoteCalendarEvents(from, to, query),
     ]);
 
     return {
-      items: [...surveyEvents, ...articleEvents, ...manualEvents].sort(
+      items: [...surveyEvents, ...articleEvents, ...manualEvents, ...voteEvents].sort(
         (a, b) => a.date.localeCompare(b.date) || a.titleKo.localeCompare(b.titleKo),
       ),
     };
@@ -92,15 +94,16 @@ export class CalendarService {
     query: string | undefined,
     limit: number,
   ): Promise<PublicCalendarEventsResponse> {
-    const [surveyEvents, articleEvents, manualEvents] = await Promise.all([
+    const [surveyEvents, articleEvents, manualEvents, voteEvents] = await Promise.all([
       this.listSurveyCalendarEvents(undefined, undefined, query),
       this.listArticleCalendarEvents(undefined, undefined, query),
       this.listManualCalendarEvents(undefined, undefined, query),
+      this.listVoteCalendarEvents(undefined, undefined, query),
     ]);
     const normalizedLimit = Math.min(Math.max(limit, 1), 100);
 
     return {
-      items: [...surveyEvents, ...articleEvents, ...manualEvents]
+      items: [...surveyEvents, ...articleEvents, ...manualEvents, ...voteEvents]
         .sort(
           (a, b) =>
             a.date.localeCompare(b.date) || a.titleKo.localeCompare(b.titleKo),
@@ -699,6 +702,16 @@ export class CalendarService {
   private readXmlTag(block: string, tag: string): string {
     const match = block.match(new RegExp(`<${tag}>(.*?)<\\/${tag}>`));
     return match?.[1] ?? "";
+  }
+
+  private async listVoteCalendarEvents(from?: Date, to?: Date, query?: string): Promise<PublicCalendarEventItem[]> {
+    const rows = await this.db.select({ id: votes.voteId, titleKo: votes.titleKo, titleEn: votes.titleEn, startAt: votes.startsAt, endAt: votes.endsAt }).from(votes).where(and(
+      inArray(votes.status, ["PUBLISHED", "CLOSED", "TALLIED"]),
+      from ? gte(votes.endsAt, from) : undefined,
+      to ? lte(votes.startsAt, to) : undefined,
+      query?.trim() ? or(ilike(votes.titleKo, `%${query.trim()}%`), ilike(votes.titleEn, `%${query.trim()}%`)) : undefined,
+    ));
+    return rows.map((row) => ({ id: `vote:${row.id}`, voteId: row.id, sourceType: "VOTE", kind: "EVENT", titleKo: `[투표] ${row.titleKo}`, titleEn: `[Vote] ${row.titleEn || row.titleKo}`, startAt: row.startAt.toISOString(), endAt: row.endAt.toISOString(), date: row.startAt.toISOString(), dateType: "open", category: "EVENT" }));
   }
 
   private async listSurveyCalendarEvents(

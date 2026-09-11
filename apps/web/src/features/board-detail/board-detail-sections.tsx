@@ -48,6 +48,7 @@ interface ArticleCardProps {
   onShare: () => void;
   onToggle: (kind: ArticleEngagementKind, active: boolean) => void;
   posterAsset?: ArticleAssetItem;
+  posterStorageKey?: string | null;
   shareCopied: boolean;
   surveyDescription: string;
   surveyTitle: string;
@@ -72,6 +73,7 @@ export function BoardDetailArticleCard({
   onShare,
   onToggle,
   posterAsset,
+  posterStorageKey,
   shareCopied,
   surveyDescription,
   surveyTitle,
@@ -162,7 +164,7 @@ export function BoardDetailArticleCard({
                         <DropdownMenu.Item asChild>
                           <AdminActionMenuItem
                             icon={article.status === "HIDDEN" ? <Eye /> : <EyeOff />}
-                            tone={article.status === "HIDDEN" ? "default" : "danger"}
+                            tone="danger"
                             onClick={article.status === "HIDDEN" ? onRestoreArticle : onHideArticle}
                           >
                             {article.status === "HIDDEN"
@@ -181,15 +183,15 @@ export function BoardDetailArticleCard({
       </header>
 
       <div className="pt-5">
-        {posterAsset && (
+        {posterStorageKey ? (
           <figure className="w-full mb-6 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             <img
-              src={resolveAssetUrl(posterAsset.storageKey)}
-              alt={posterAsset.originalFilename}
+              src={resolveAssetUrl(posterStorageKey)}
+              alt={posterAsset?.originalFilename ?? title}
               className="mx-auto max-h-[520px] w-full object-contain"
             />
           </figure>
-        )}
+        ) : null}
 
         <RichTextContent
           content={content}

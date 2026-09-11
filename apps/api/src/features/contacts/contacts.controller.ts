@@ -72,20 +72,16 @@ export class ContactsController {
       auditMetadataFromRequest(request),
     );
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "공개조직도", "표시순서"],
+      ["이름", "학번", "부서", "직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
       ...items.map((item) => [
         item.nameKo,
-        item.nameEn,
         item.studentNumber,
         item.departmentKo,
-        item.departmentEn,
         item.roleKo,
-        item.roleEn,
         item.cohort,
         item.email,
         item.phoneNumber,
         item.privacyConsented ? "동의" : "미동의",
-        item.publiclyListed ? "공개" : "비공개",
         item.sortOrder,
       ]),
     ]);
@@ -93,8 +89,16 @@ export class ContactsController {
       { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 22 },
       { wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 12 },
     ];
+    const activities = XLSX.utils.aoa_to_sheet([
+      ["연락처 ID", "포털 사용자 ID", "이름", "활동 연도", "부서 ID", "부서", "직책"],
+      ...items.flatMap((item) => (item.activities ?? []).map((activity) => [
+        item.id, item.portalUserId, item.nameKo, activity.year, activity.departmentId,
+        activity.departmentKo, activity.roleKo,
+      ])),
+    ]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "연락망");
+    XLSX.utils.book_append_sheet(workbook, activities, "활동 이력");
     const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
     return new StreamableFile(buffer);
   }

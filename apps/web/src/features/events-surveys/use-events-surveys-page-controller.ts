@@ -121,8 +121,8 @@ export function useEventsSurveysPageController({
 
       const eventsWithImages = eventsData.items.map((event) => ({
         ...event,
-        imageUrl: event.thumbnailStorageKey
-          ? resolveAssetUrl(event.thumbnailStorageKey)
+        imageUrl: event.thumbnailStorageKey?.trim()
+          ? resolveAssetUrl(event.thumbnailStorageKey.trim())
           : null,
       }));
 

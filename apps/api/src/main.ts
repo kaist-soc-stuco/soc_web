@@ -62,6 +62,20 @@ async function bootstrap(): Promise<void> {
 
   const corsOrigin = configService.get<string>('CORS_ORIGIN');
   const isProd = configService.get<string>('NODE_ENV') === 'production';
+  const configuredCorsOrigins = corsOrigin
+    ? corsOrigin.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : [];
+  const localDevelopmentOrigins = isProd
+    ? []
+    : [
+        `http://localhost:${configService.get<string>('WEB_PORT') ?? '5173'}`,
+        `http://127.0.0.1:${configService.get<string>('WEB_PORT') ?? '5173'}`,
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+      ];
+  const allowedCorsOrigins = Array.from(
+    new Set([...configuredCorsOrigins, ...localDevelopmentOrigins]),
+  );
   const trustedProxyIps = (configService.get<string>('TRUST_PROXY_IPS') ?? '')
     .split(',')
     .map((value) => value.trim().toLowerCase())
@@ -83,8 +97,8 @@ async function bootstrap(): Promise<void> {
   }
 
   app.enableCors({
-    origin: corsOrigin
-      ? corsOrigin.split(',').map((o) => o.trim())
+    origin: allowedCorsOrigins.length > 0
+      ? allowedCorsOrigins
       : isProd
         ? false
         : true,
@@ -113,14 +127,14 @@ async function bootstrap(): Promise<void> {
     next();
   });
 
-  const allowedOrigins = corsOrigin
-    ? corsOrigin.split(',').map((origin) => origin.trim()).filter(Boolean)
-    : [];
+  const allowedOrigins = allowedCorsOrigins;
 
-  app.use((request: Request & { cookies?: Record<string, string | undefined> }, response: Response, next: NextFunction) => {
+  app.use((request: Request & { cookies?: Record<string, string | undefined>; csrfToken?: string }, response: Response, next: NextFunction) => {
     const csrfCookie = request.cookies?.[AUTH_CSRF_COOKIE_NAME];
+    const csrfToken = csrfCookie ?? randomBytes(32).toString('base64url');
+    request.csrfToken = csrfToken;
     if (!csrfCookie) {
-      response.cookie(AUTH_CSRF_COOKIE_NAME, randomBytes(32).toString('base64url'), {
+      response.cookie(AUTH_CSRF_COOKIE_NAME, csrfToken, {
         httpOnly: false,
         maxAge: 2 * 60 * 60 * 1000,
         path: '/',
@@ -157,10 +171,9 @@ async function bootstrap(): Promise<void> {
     );
     if (hasCookieAuth) {
       const headerToken = request.get('x-csrf-token');
-      const cookieBuffer = Buffer.from(csrfCookie ?? '');
+      const cookieBuffer = Buffer.from(csrfToken);
       const headerBuffer = Buffer.from(headerToken ?? '');
       if (
-        !csrfCookie ||
         !headerToken ||
         cookieBuffer.length !== headerBuffer.length ||
         !timingSafeEqual(cookieBuffer, headerBuffer)

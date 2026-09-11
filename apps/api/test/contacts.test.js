@@ -22,7 +22,7 @@ const contactRow = {
   updatedAt: new Date("2026-07-15T01:00:00.000Z"),
 };
 
-test("contact creation requires complete non-blank bilingual identity fields", () => {
+test("contact creation accepts Korean-only identity and position", () => {
   assert.deepEqual(
     CreateContactSchema.parse({
       nameKo: "  홍길동  ",
@@ -36,7 +36,6 @@ test("contact creation requires complete non-blank bilingual identity fields", (
       roleKo: "회장",
       roleEn: "President",
       privacyConsented: true,
-      publiclyListed: false,
     },
   );
 
@@ -46,7 +45,7 @@ test("contact creation requires complete non-blank bilingual identity fields", (
       roleKo: "회장",
       roleEn: "President",
     }).success,
-    false,
+    true,
   );
 });
 
@@ -71,7 +70,7 @@ test("contact PATCH accepts individual fields and preserves their validation", (
     sortOrder: 3,
   });
 
-  for (const field of ["nameKo", "nameEn", "roleKo", "roleEn"]) {
+  for (const field of ["nameKo", "roleKo"]) {
     assert.equal(
       UpdateContactSchema.safeParse({ [field]: "   " }).success,
       false,
@@ -109,4 +108,17 @@ test("contact repository updates only fields present in a PATCH", async () => {
   assert.equal(Object.hasOwn(updateSet, "nameKo"), false);
   assert.equal(Object.hasOwn(updateSet, "nameEn"), false);
   assert.equal(Object.hasOwn(updateSet, "roleKo"), false);
+});
+
+test("Korean-only contact activities need no English fields or public directory option", () => {
+  const parsed = CreateContactSchema.parse({nameKo: "검증", roleKo: "회장", publiclyListed: true, activities: [{year: 2026, departmentKo: "회장단", roleKo: "회장"}]});
+  assert.equal(parsed.nameEn, "");
+  assert.equal(parsed.activities[0].roleEn, "");
+  assert.equal(Object.hasOwn(parsed, "publiclyListed"), false);
+});
+
+test("retired public directory never reads internal contact data", async () => {
+  const repo = new ContactsRepository({ select() { throw new Error("private data read"); } });
+  assert.deepEqual(await repo.findPublic(), {items: []});
+  assert.deepEqual(await repo.findPublicDepartments(), {items: []});
 });

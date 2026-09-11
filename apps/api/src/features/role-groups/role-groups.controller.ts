@@ -63,7 +63,6 @@ export class RoleGroupsController {
     @Param("roleGroupId", ParseIntPipe) roleGroupId: number,
     @Query("q") q?: string,
     @Query("department") department?: string,
-    @Query("academicStatus") academicStatus?: string,
     @Query("majorType") majorType?: string,
     @Query("feeStatus") feeStatus?: string,
     @Query("status") status?: string,
@@ -73,7 +72,6 @@ export class RoleGroupsController {
     return this.roleGroupsService.listRoleGroupCandidates(roleGroupId, {
       q,
       department,
-      academicStatus,
       majorType:
         majorType === "PRIMARY"
           ? "PRIMARY"

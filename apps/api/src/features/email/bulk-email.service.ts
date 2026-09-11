@@ -103,7 +103,6 @@ type EmailCompose = {
 type EmailRecipient = {
   email: string;
   nameKo: string;
-  phoneNumber: string | null;
   studentNumber: string | null;
 };
 
@@ -448,7 +447,6 @@ export class BulkEmailService implements OnModuleInit, OnModuleDestroy {
     const testRecipient: EmailRecipient = {
       email: recipientEmail,
       nameKo: sender?.nameKo ?? "학우",
-      phoneNumber: sender?.phoneNumber ?? null,
       studentNumber: sender?.stdNo ?? null,
     };
     const subject = renderBulkEmailTemplate(`[테스트] ${dto.subject}`, testRecipient);
@@ -1027,7 +1025,7 @@ function toMailAttachments(attachments: DeliveryAttachment[]) {
 }
 
 function hasBulkEmailTemplateTokens(value: string): boolean {
-  return /\{\{\s*(이름|학번|이메일|전화번호)\s*\}\}|\{(이름|학번|이메일|전화번호)\}/.test(value);
+  return /\{\{\s*(이름|학번|이메일)\s*\}\}|\{(이름|학번|이메일)\}/.test(value);
 }
 
 function renderBulkEmailTemplate(value: string, recipient: EmailRecipient): string {
@@ -1035,9 +1033,8 @@ function renderBulkEmailTemplate(value: string, recipient: EmailRecipient): stri
     이름: recipient.nameKo,
     학번: recipient.studentNumber ?? "",
     이메일: recipient.email,
-    전화번호: recipient.phoneNumber ?? "",
   };
   return value
     .replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, key: string) => variables[key.trim()] ?? match)
-    .replace(/\{(이름|학번|이메일|전화번호)\}/g, (match, key: string) => variables[key] ?? match);
+    .replace(/\{(이름|학번|이메일)\}/g, (match, key: string) => variables[key] ?? match);
 }

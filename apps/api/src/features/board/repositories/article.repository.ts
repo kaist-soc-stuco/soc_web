@@ -660,6 +660,7 @@ export class ArticleRepository {
         eventLocation: articles.eventLocation,
         eventDescriptionKo: articles.eventDescriptionKo,
         eventDescriptionEn: articles.eventDescriptionEn,
+        thumbnailStorageKey: articleThumbnailStorageKey,
       })
       .from(articles)
       .leftJoin(users, eq(articles.authorUserId, users.userId))
@@ -771,6 +772,7 @@ export class ArticleRepository {
       isSecret: row[0].isSecret,
       isAnonymous: row[0].isAnonymous,
       allowComment: row[0].allowComment,
+      thumbnailStorageKey: row[0].thumbnailStorageKey ?? undefined,
       postedAt: msToIso(row[0].postedAt.valueOf()),
       updatedAt: msToIso(row[0].updatedAt.valueOf()),
       author: {

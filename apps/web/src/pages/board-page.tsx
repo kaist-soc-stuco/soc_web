@@ -22,6 +22,7 @@ export function BoardPage() {
     isBoardNotFound,
     isArticleLoading,
     retryArticles,
+    renderedCategory,
     lang,
     postsPerPage,
     searchQuery,
@@ -66,7 +67,7 @@ export function BoardPage() {
           articles={articles}
           articleError={articleError}
           boardByCode={boardByCode}
-          category={category}
+          category={renderedCategory}
           currentPage={currentPage}
           isLoading={isArticleLoading}
           showInitialSkeleton={showInitialSkeleton}

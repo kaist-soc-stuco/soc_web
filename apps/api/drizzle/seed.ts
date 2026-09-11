@@ -20,6 +20,7 @@ import {
   surveyQuestions,
   surveySections,
   surveys,
+  siteContents,
   userRoleGroups,
   users,
   voteItems,
@@ -315,8 +316,8 @@ const REFERENCE_FAQ_SEEDS: ReferenceFaqSeed[] = [
   {
     titleKo: "기업 후원이나 제휴를 제안하려면 어떻게 하나요?",
     titleEn: "How can a company propose sponsorship or a partnership?",
-    contentKo: "[학생회 소개] > [후원 및 제휴] 또는 [설문·투표] > [신청형 설문]의 ‘기업 후원 및 제휴 문의’를 이용해 주세요.\n\n• 기업·기관명, 회신 이메일, 제안 유형과 내용을 입력해 주세요.\n• 담당자가 내용을 확인하며, 제출만으로 제휴 성사나 회신 일정이 확정되지는 않습니다.",
-    contentEn: "Use About → Sponsorship & Partnerships or submit ‘Corporate Sponsorship and Partnership Inquiry’ under Surveys & Voting.\n\n• Include your organization, reply email, proposal type, and details.\n• A council member will review the request; submission alone does not confirm a partnership or response schedule.",
+    contentKo: "후원 및 제휴 제안은 학생회 소개 → 후원 및 제휴에서 채널톡으로 보내 주세요. 기관명, 회신 연락처와 제안 내용을 함께 알려 주세요.",
+    contentEn: "Send sponsorship and partnership proposals through Channel Talk under About \u2192 Partnerships. Include your organization, contact details, and proposal.",
   },
   {
     titleKo: "전산학부 학생회칙은 어디서 확인하나요?",
@@ -386,10 +387,10 @@ const REFERENCE_PLEDGE_SEEDS: readonly ReferencePledgeSeed[] = [
     pledgeStatus: "COMPLETED",
   },
   {
-    titleKo: "과목별 건강톡방 개설",
+    titleKo: "과목별 겹강톡 개설",
     titleEn: "Opening course-specific chat rooms",
-    bodyKo: "2026년 상반기, 담당 교수님께 허락을 받은 9개 과목의 건강톡방을 개설하여 한 학기 동안 운영하였습니다.",
-    bodyEn: "In the first half of 2026, we opened chat rooms for nine courses with the permission of the instructors and operated them throughout the semester.",
+    bodyKo: "2026년 봄학기, 담당 교수님께 운영 계획을 안내하고 동의를 받은 과목의 겹강톡을 개설했습니다. 교수·조교 없이 수강생만 익명으로 참여하며, 개설 과목과 참여 코드는 안내 스프레드시트에서 확인할 수 있습니다.",
+    bodyEn: "In spring 2026, we opened course-specific group chats for courses whose instructors agreed to the operating plan. Enrolled students could join anonymously without professors or TAs, with the course list and access codes provided in the announcement spreadsheet.",
     pledgeStatus: "COMPLETED",
   },
   {
@@ -426,6 +427,98 @@ const REFERENCE_PLEDGE_SEEDS: readonly ReferencePledgeSeed[] = [
     bodyKo: "전산학부 학생회장단의 공약이행상황을 학우분들과 공유하고자 이번 웹사이트에 공약이행상황판을 만들게 되었습니다.",
     bodyEn: "We created this pledge progress board on the website to share the SoC Student Council leadership's pledge progress with students.",
     pledgeStatus: "COMPLETED",
+  },
+];
+
+type ReferenceAboutWorkContentSeed = {
+  key:
+    | "about.hero.description"
+    | "about.nav.intro"
+    | "about.work.card.1.title"
+    | "about.work.card.1.description"
+    | "about.work.card.2.title"
+    | "about.work.card.2.description"
+    | "about.work.card.3.title"
+    | "about.work.card.3.description"
+    | "about.organization.description"
+    | "about.partnership.description"
+    | "about.partnership.cta";
+  legacyKo: string;
+  valueKo: string;
+  valueEn: string;
+};
+
+/**
+ * 공개 카드뉴스에서 확인한 실제 사업명을 about 주요 사업 카드의
+ * reference site-content seed로 보관한다. 기존에 관리자가 편집한 값은
+ * 보존하고, 이전의 추상 기본값만 구체적인 사업 목록으로 교체한다.
+ */
+const REFERENCE_ABOUT_WORK_CONTENT_SEEDS: readonly ReferenceAboutWorkContentSeed[] = [
+  {
+    key: "about.hero.description",
+    legacyKo: "KAIST 전산학부 학부생을 대표하는 학생자치기구 집행위원회입니다.",
+    valueKo: "전산학부 학우들을 위한 사업을 기획하고 진행하는 학생자치기구, 집행위원회입니다.",
+    valueEn: "The SoC Student Council plans and runs programs for students in KAIST's School of Computing.",
+  },
+  {
+    key: "about.nav.intro",
+    legacyKo: "집행위원회 소개",
+    valueKo: "소개",
+    valueEn: "About",
+  },
+  {
+    key: "about.work.card.1.title",
+    legacyKo: "겹강톡 · 학업 소통",
+    valueKo: "학업 · 소통",
+    valueEn: "Academic communication",
+  },
+  {
+    key: "about.work.card.1.description",
+    legacyKo: "• 과목별 겹강톡\n• OTL 수강후기 이벤트\n• 건의사항 게시판",
+    valueKo: "• 과목별 겹강톡 운영\n• OTL 수강후기 작성 이벤트\n• 학부 건의사항 소통 창구",
+    valueEn: "• Course-specific group chats\n• OTL course-review writing event\n• Student feedback channel",
+  },
+  {
+    key: "about.work.card.2.title",
+    legacyKo: "기업체 탐방 · 진로 연결",
+    valueKo: "진로 탐색 및 커리어",
+    valueEn: "Career exploration",
+  },
+  {
+    key: "about.work.card.2.description",
+    legacyKo: "• 기업체 탐방\n• 토크콘서트\n• Human of CS\n• 테크 세미나 및 기업 채용설명회",
+    valueKo: "• IT 기업체 탐방 프로그램\n• 선배 초청 토크콘서트\n• 테크 세미나 및 기업 채용설명회\n• Humans of CS (학우 인터뷰)",
+    valueEn: "• IT company tour program\n• Alumni talk concert\n• Tech seminars and company recruiting sessions\n• Humans of CS (student interviews)",
+  },
+  {
+    key: "about.work.card.3.title",
+    legacyKo: "SOC LOUNGE · 학부 생활",
+    valueKo: "학생 복지",
+    valueEn: "Student welfare",
+  },
+  {
+    key: "about.work.card.3.description",
+    legacyKo: "• 전산학부 과방(SOC LOUNGE)\n• 전산학부 워크샵\n• SoC 해피아워\n• 시험기간 간식 이벤트\n• 단체복 굿즈 제작",
+    valueKo: "• 과방(SoC Lounge) 운영\n• 시험기간 야식 및 간식\n• 학부 워크샵 & 해피아워\n• 과잠 및 학부 굿즈 제작",
+    valueEn: "• SoC Lounge operation\n• Exam-period late-night snacks\n• School workshop & Happy Hour\n• Department varsity jackets and merchandise",
+  },
+  {
+    key: "about.organization.description",
+    legacyKo: "전산학부 집행위원회를 구성하는 부서별 주요 업무입니다.",
+    valueKo: "전산학부 집행위원회를 구성하는 부서들입니다.",
+    valueEn: "These are the departments that make up the SoC Student Council.",
+  },
+  {
+    key: "about.partnership.description",
+    legacyKo: "전산학부 학우들과 함께할 기업 채용 설명회, 기술 세미나(Tech Talk), 행사 후원 등 다양한 제휴 제안을 기다립니다. 담당자 연락처와 함께 문의해 주시면 검토 후 회신드리겠습니다.",
+    valueKo: "전산학부 학우들과 함께할 채용 설명회, 기술 세미나(Tech Talk), 행사 후원 등의 제휴를 기다립니다. 제안 내용을 보내 주시면 검토 후 회신드리겠습니다.",
+    valueEn: "We welcome partnerships for recruiting sessions, technical seminars (Tech Talks), and event sponsorship with School of Computing students. Send us your proposal and we will review it and get back to you.",
+  },
+  {
+    key: "about.partnership.cta",
+    legacyKo: "후원·제휴 문의하기",
+    valueKo: "제휴 문의",
+    valueEn: "Partnership inquiry",
   },
 ];
 
@@ -644,7 +737,7 @@ async function seedInitialAdminRole() {
   );
 }
 
-async function seedDevAdminRole() {
+async function seedDemoAccount() {
   const now = new Date();
   const permissionRows = await db
     .select({ permissionId: permissions.permissionId })
@@ -658,7 +751,7 @@ async function seedDevAdminRole() {
   const [devAdmin] = await db
     .insert(users)
     .values({
-      academicStatus: "재학",
+      academicStatus: null,
       departmentEn: "School of Computing",
       departmentKo: "전산학부",
       email: "dev-admin@kaist.ac.kr",
@@ -696,60 +789,7 @@ async function seedDevAdminRole() {
     throw new Error("Failed to upsert dev admin user");
   }
 
-  const [devRoleGroup] = await db
-    .insert(roleGroups)
-    .values({
-      description: "개발 환경용 전체 권한 테스트 그룹",
-      isSystem: true,
-      nameKo: "개발 관리자",
-    })
-    .onConflictDoUpdate({
-      target: roleGroups.nameKo,
-      set: {
-        description: "개발 환경용 전체 권한 테스트 그룹",
-        isSystem: true,
-        updatedAt: sql`now()`,
-      },
-    })
-    .returning({ roleGroupId: roleGroups.roleGroupId });
 
-  if (!devRoleGroup) {
-    throw new Error("Failed to upsert dev admin role group");
-  }
-
-  await db
-    .delete(roleGroupPermissions)
-    .where(eq(roleGroupPermissions.roleGroupId, devRoleGroup.roleGroupId));
-
-  await db.insert(roleGroupPermissions).values(
-    permissionRows.map((permission) => ({
-      permissionId: permission.permissionId,
-      roleGroupId: devRoleGroup.roleGroupId,
-    })),
-  );
-
-  await db
-    .delete(userRoleGroups)
-    .where(
-      and(
-        eq(userRoleGroups.userId, devAdmin.userId),
-        eq(userRoleGroups.roleGroupId, devRoleGroup.roleGroupId),
-      ),
-    );
-
-  await db.insert(userRoleGroups).values({
-    grantedAt: now,
-    grantedBy: devAdmin.userId,
-    isActive: true,
-    roleGroupId: devRoleGroup.roleGroupId,
-    userId: devAdmin.userId,
-    validFrom: now,
-    validTo: null,
-  });
-
-  console.log(
-    `Seeded dev admin role with ${permissionRows.length} active permission(s)`,
-  );
 }
 
 const recruitmentPosterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
@@ -995,73 +1035,7 @@ const OPERATIONAL_SURVEY_SEEDS: OperationalSurveySeed[] = [
       },
     ],
   },
-  {
-    surveyId: OPERATIONAL_SURVEY_IDS.corporatePartnership,
-    sectionId: "7a120000-0000-4000-8000-000000000003",
-    sectionTitleKo: "문의 정보",
-    sectionTitleEn: "Inquiry details",
-    kind: "APPLICATION",
-    titleKo: "기업 후원 및 제휴 문의",
-    titleEn: "Corporate Sponsorship and Partnership Inquiry",
-    descriptionKo: "행사 후원, 채용·기술 세션과 공동 프로그램 제안을 접수합니다.",
-    descriptionEn: "Submit proposals for event sponsorships, recruiting or technical sessions, and joint programs.",
-    eligibleSocAffiliations: [],
-    academicEligibility: "ANY",
-    allowAnonymous: true,
-    allowMultipleResponses: true,
-    questions: [
-      {
-        id: "7a130000-0000-4000-8000-000000000021",
-        titleKo: "기업 또는 기관명",
-        titleEn: "Company or organization",
-        questionType: "short_text",
-        sortOrder: 0,
-      },
-      {
-        id: "7a130000-0000-4000-8000-000000000022",
-        titleKo: "담당자 이름과 직책",
-        titleEn: "Contact name and title",
-        questionType: "short_text",
-        sortOrder: 1,
-      },
-      {
-        id: "7a130000-0000-4000-8000-000000000023",
-        titleKo: "회신 받을 이메일",
-        titleEn: "Reply email",
-        questionType: "short_text",
-        sortOrder: 2,
-      },
-      {
-        id: "7a130000-0000-4000-8000-000000000024",
-        titleKo: "제안 유형",
-        titleEn: "Proposal type",
-        questionType: "dropdown",
-        options: [
-          { value: "sponsorship", labelKo: "행사 후원", labelEn: "Event sponsorship" },
-          { value: "career", labelKo: "채용·커리어", labelEn: "Recruiting and careers" },
-          { value: "technical", labelKo: "기술 세션", labelEn: "Technical session" },
-          { value: "partnership", labelKo: "공동 프로그램", labelEn: "Joint program" },
-          { value: "other", labelKo: "기타", labelEn: "Other" },
-        ],
-        sortOrder: 3,
-      },
-      {
-        id: "7a130000-0000-4000-8000-000000000025",
-        titleKo: "제안 내용",
-        titleEn: "Proposal details",
-        questionType: "long_text",
-        sortOrder: 4,
-      },
-      {
-        id: "7a130000-0000-4000-8000-000000000026",
-        titleKo: "제안서 또는 참고 자료 링크",
-        titleEn: "Proposal or reference link",
-        questionType: "short_text",
-        isRequired: false,
-        sortOrder: 5,
-      },
-    ],
-  },
+
 ];
 
 type EventSeed = {
@@ -1073,6 +1047,7 @@ type EventSeed = {
   eventDescriptionEn: string;
   eventStartDate: Date;
   eventEndDate: Date;
+  eventLocation: string;
   isPinned: boolean;
   pinOrder?: number;
   viewCount: number;
@@ -1458,7 +1433,7 @@ async function seedReferenceFaqs() {
       email: "reference-faq@invalid.local",
       departmentKo: "전산학부",
       departmentEn: "School of Computing",
-      academicStatus: "운영",
+      academicStatus: null,
       identityCode: "O",
       isActive: false,
     })
@@ -1646,10 +1621,10 @@ async function seedAboutPageContent(seedAuthorId: string) {
     {
       type: "PLEDGE",
       status: "PUBLISHED",
-      titleKo: "학생 복지 품목과 대여 절차 확대",
-      titleEn: "Expand student welfare items and lending access",
-      bodyKo: "학생회가 운영하는 복지 물품을 늘리고 대여 절차를 한눈에 확인할 수 있도록 정리합니다.",
-      bodyEn: "Expand council-managed welfare items and make the lending process easier to access.",
+      titleKo: "과목별 겹강톡 개설",
+      titleEn: "Open course-specific group chats",
+      bodyKo: "과목별 겹강톡을 개설해 교수·조교 없이 수강생만 익명으로 질문하고 소통할 수 있도록 운영합니다.",
+      bodyEn: "Open course-specific group chats where enrolled students can ask questions and communicate anonymously without professors or TAs.",
       pledgeStatus: "COMPLETED",
       sortOrder: 0,
       createdBy: seedAuthorId,
@@ -1660,11 +1635,11 @@ async function seedAboutPageContent(seedAuthorId: string) {
     {
       type: "PLEDGE",
       status: "PUBLISHED",
-      titleKo: "전산학부 커뮤니티 라운지 개선",
-      titleEn: "Improve the School of Computing community lounge",
-      bodyKo: "학우들이 편하게 머물고 교류할 수 있도록 라운지 환경과 이용 프로그램을 단계적으로 개선합니다.",
-      bodyEn: "Improve the lounge environment and community programs so students can stay and connect comfortably.",
-      pledgeStatus: "IN_PROGRESS",
+      titleKo: "SOC LOUNGE(과방) 리뉴얼",
+      titleEn: "Renovate the SOC LOUNGE",
+      bodyKo: "N1 318호 SOC LOUNGE(과방)에 빔프로젝터·소파·빈백을 마련하고, 학생증으로 이용할 수 있도록 정비했습니다.",
+      bodyEn: "We renovated the SOC LOUNGE in N1 Room 318 with a projector, sofas, and bean bags, and made it available to students with their ID.",
+      pledgeStatus: "COMPLETED",
       sortOrder: 1,
       createdBy: seedAuthorId,
       updatedBy: seedAuthorId,
@@ -1674,11 +1649,11 @@ async function seedAboutPageContent(seedAuthorId: string) {
     {
       type: "PLEDGE",
       status: "PUBLISHED",
-      titleKo: "진로·학업 지원 프로그램 정례화",
-      titleEn: "Establish regular academic and career support programs",
-      bodyKo: "선배 초청 세션과 연구·진로 정보를 정기적으로 공유해 학업과 진로 탐색을 돕습니다.",
-      bodyEn: "Regularly share research and career information through alumni sessions and peer programs.",
-      pledgeStatus: "PLANNED",
+      titleKo: "토크콘서트·기업체 탐방 확대",
+      titleEn: "Expand Talk Concerts and company tours",
+      bodyKo: "진로콘서트를 토크콘서트로 개편하고, 더 다양한 기업을 만나는 기업체 탐방을 준비합니다.",
+      bodyEn: "We redesigned the Career Concert as a Talk Concert and are preparing company tours that introduce students to a wider range of employers.",
+      pledgeStatus: "IN_PROGRESS",
       sortOrder: 2,
       createdBy: seedAuthorId,
       updatedBy: seedAuthorId,
@@ -1942,6 +1917,47 @@ async function seedReferenceAboutPageContent() {
   );
 }
 
+async function seedReferenceAboutWorkContent() {
+  const [referenceAuthor] = await db
+    .select({ userId: users.userId })
+    .from(users)
+    .where(eq(users.kaistUid, "reference-faq"))
+    .limit(1);
+  if (!referenceAuthor) {
+    throw new Error("Reference content author is missing while seeding about work content");
+  }
+
+  const existing = await db
+    .select({ key: siteContents.key, valueKo: siteContents.valueKo })
+    .from(siteContents);
+  const existingByKey = new Map(existing.map((item) => [item.key, item]));
+
+  for (const seed of REFERENCE_ABOUT_WORK_CONTENT_SEEDS) {
+    const current = existingByKey.get(seed.key);
+    if (current && current.valueKo !== seed.legacyKo) continue;
+
+    await db
+      .insert(siteContents)
+      .values({
+        key: seed.key,
+        updatedBy: referenceAuthor.userId,
+        valueEn: seed.valueEn,
+        valueKo: seed.valueKo,
+      })
+      .onConflictDoUpdate({
+        target: siteContents.key,
+        set: {
+          updatedAt: new Date(),
+          updatedBy: referenceAuthor.userId,
+          valueEn: seed.valueEn,
+          valueKo: seed.valueKo,
+        },
+      });
+  }
+
+  console.log(`Reference about work content ready (${REFERENCE_ABOUT_WORK_CONTENT_SEEDS.length} entries)`);
+}
+
 async function attachAssetsToArticle(
   articleId: number,
   uploadedBy: string,
@@ -2140,83 +2156,54 @@ function wrapSeedVoteKey(key: Buffer) {
   };
 }
 
-async function seedVotes(creatorId: string) {
-  const [devAdmin] = await db
-    .select({
-      userId: users.userId,
-      nameKo: users.nameKo,
-      stdNo: users.stdNo,
-      email: users.email,
-      primaryMajor: users.primaryMajor,
-      academicStatus: users.academicStatus,
-    })
-    .from(users)
-    .where(eq(users.kaistUid, "DEV0001"))
-    .limit(1);
+type SeedVoteDefinition = {
+  titleKo: string;
+  titleEn: string;
+  descriptionKo: string;
+  descriptionEn: string;
+  startsAt: Date;
+  endsAt: Date;
+  items: SeedVoteItem[];
+};
 
-  if (!devAdmin) {
-    console.log("Dev admin not found, skipping vote seed");
-    return;
-  }
-
-  const startsAt = new Date("2026-08-24T09:00:00+09:00");
-  const endsAt = new Date("2026-09-07T23:59:00+09:00");
+async function createSeedVote(
+  creatorId: string,
+  devAdmin: {
+    userId: string;
+    nameKo: string;
+    stdNo: string | null;
+    email: string;
+    primaryMajor: string | null;
+    academicStatus: string | null;
+  },
+  definition: SeedVoteDefinition,
+) {
   const wrappedVoteKey = wrapSeedVoteKey(randomBytes(32));
   const [vote] = await db
     .insert(votes)
     .values({
       creatorId,
-      titleKo: "2026 하반기 학생회 프로그램 선호도 투표",
-      titleEn: "Fall 2026 Student Council Program Poll",
-      descriptionKo: "이번 학기에 함께하고 싶은 학생회 프로그램을 선택해 주세요.",
-      descriptionEn: "Choose the student council programs you would like to join this semester.",
+      titleKo: definition.titleKo,
+      titleEn: definition.titleEn,
+      descriptionKo: definition.descriptionKo,
+      descriptionEn: definition.descriptionEn,
       status: "PUBLISHED",
-      startsAt,
-      endsAt,
-      academicStatuses: ["재학", "휴학"],
+      startsAt: definition.startsAt,
+      endsAt: definition.endsAt,
+      academicStatuses: [],
       feePayersOnly: false,
       encryptedBallotKey: wrappedVoteKey.ciphertext,
       keyIv: wrappedVoteKey.iv,
       keyTag: wrappedVoteKey.authTag,
-      voterSnapshotAt: startsAt,
+      voterSnapshotAt: definition.startsAt,
     })
     .returning({ voteId: votes.voteId });
 
   if (!vote) {
-    throw new Error("Failed to create seed vote");
+    throw new Error(`Failed to create seed vote: ${definition.titleKo}`);
   }
 
-  const items: SeedVoteItem[] = [
-    {
-      titleKo: "가장 참여하고 싶은 프로그램을 골라 주세요.",
-      titleEn: "Which program would you most like to join?",
-      descriptionKo: "가장 기대되는 프로그램 하나를 선택해 주세요.",
-      descriptionEn: "Select one program you are most interested in.",
-      type: "SINGLE_CHOICE",
-      maxSelections: 1,
-      options: [
-        { labelKo: "알고리즘 스터디", labelEn: "Algorithm study" },
-        { labelKo: "개발 워크숍", labelEn: "Development workshop" },
-        { labelKo: "선후배 네트워킹", labelEn: "Student-alumni networking" },
-      ],
-    },
-    {
-      titleKo: "관심 있는 활동 분야를 모두 골라 주세요.",
-      titleEn: "Which activity areas are you interested in?",
-      descriptionKo: "최대 두 개까지 선택할 수 있습니다.",
-      descriptionEn: "You can select up to two areas.",
-      type: "MULTIPLE_CHOICE",
-      maxSelections: 2,
-      options: [
-        { labelKo: "학업·스터디", labelEn: "Study" },
-        { labelKo: "진로·커리어", labelEn: "Career" },
-        { labelKo: "문화·교류", labelEn: "Culture and community" },
-        { labelKo: "복지", labelEn: "Welfare" },
-      ],
-    },
-  ];
-
-  for (const [sortOrder, item] of items.entries()) {
+  for (const [sortOrder, item] of definition.items.entries()) {
     const [itemRow] = await db
       .insert(voteItems)
       .values({
@@ -2258,7 +2245,110 @@ async function seedVotes(creatorId: string) {
     source: "FILTER",
   });
 
-  console.log(`Seeded vote with ${items.length} items and one eligible voter`);
+  return vote.voteId;
+}
+
+async function seedVotes(creatorId: string) {
+  const [devAdmin] = await db
+    .select({
+      userId: users.userId,
+      nameKo: users.nameKo,
+      stdNo: users.stdNo,
+      email: users.email,
+      primaryMajor: users.primaryMajor,
+      academicStatus: users.academicStatus,
+    })
+    .from(users)
+    .where(eq(users.kaistUid, "DEV0001"))
+    .limit(1);
+
+  if (!devAdmin) {
+    console.log("Dev admin not found, skipping vote seed");
+    return;
+  }
+
+  const definitions: SeedVoteDefinition[] = [
+    {
+      titleKo: "2026 하반기 학생회 프로그램 선호도 투표",
+      titleEn: "Fall 2026 Student Council Program Poll",
+      descriptionKo: "이번 학기에 함께하고 싶은 학생회 프로그램을 선택해 주세요.",
+      descriptionEn: "Choose the student council programs you would like to join this semester.",
+      startsAt: new Date("2026-08-24T09:00:00+09:00"),
+      endsAt: new Date("2026-09-07T23:59:00+09:00"),
+      items: [
+        {
+          titleKo: "가장 참여하고 싶은 프로그램을 골라 주세요.",
+          titleEn: "Which program would you most like to join?",
+          descriptionKo: "가장 기대되는 프로그램 하나를 선택해 주세요.",
+          descriptionEn: "Select one program you are most interested in.",
+          type: "SINGLE_CHOICE",
+          maxSelections: 1,
+          options: [
+            { labelKo: "알고리즘 스터디", labelEn: "Algorithm study" },
+            { labelKo: "개발 워크숍", labelEn: "Development workshop" },
+            { labelKo: "선후배 네트워킹", labelEn: "Student-alumni networking" },
+          ],
+        },
+        {
+          titleKo: "관심 있는 활동 분야를 모두 골라 주세요.",
+          titleEn: "Which activity areas are you interested in?",
+          descriptionKo: "최대 두 개까지 선택할 수 있습니다.",
+          descriptionEn: "You can select up to two areas.",
+          type: "MULTIPLE_CHOICE",
+          maxSelections: 2,
+          options: [
+            { labelKo: "학업·스터디", labelEn: "Study" },
+            { labelKo: "진로·커리어", labelEn: "Career" },
+            { labelKo: "문화·교류", labelEn: "Culture and community" },
+            { labelKo: "복지", labelEn: "Welfare" },
+          ],
+        },
+      ],
+    },
+    {
+      titleKo: "2026 가을학기 학생회 프로그램 선호도 투표",
+      titleEn: "Fall 2026 Student Council Program Preferences",
+      descriptionKo: "2026 가을학기에 열렸으면 하는 학생회 프로그램을 골라 주세요.",
+      descriptionEn: "Choose the student council programs you would like to see this fall.",
+      startsAt: new Date("2026-09-08T09:00:00+09:00"),
+      endsAt: new Date("2026-09-30T23:59:00+09:00"),
+      items: [
+        {
+          titleKo: "가장 기대되는 가을 프로그램을 골라 주세요.",
+          titleEn: "Which fall program are you most excited about?",
+          descriptionKo: "가장 기대되는 프로그램 하나를 선택해 주세요.",
+          descriptionEn: "Select one program you are most excited about.",
+          type: "SINGLE_CHOICE",
+          maxSelections: 1,
+          options: [
+            { labelKo: "전산학부 가을 네트워킹 데이", labelEn: "Fall SoC Networking Day" },
+            { labelKo: "전산학부 워크샵", labelEn: "SoC Workshop" },
+            { labelKo: "SoC 해피아워", labelEn: "SoC Happy Hour" },
+          ],
+        },
+        {
+          titleKo: "가을학기에 필요한 지원을 모두 골라 주세요.",
+          titleEn: "Which kinds of support would help this fall?",
+          descriptionKo: "최대 두 개까지 선택할 수 있습니다.",
+          descriptionEn: "You can select up to two options.",
+          type: "MULTIPLE_CHOICE",
+          maxSelections: 2,
+          options: [
+            { labelKo: "SOC LOUNGE 운영", labelEn: "SOC LOUNGE access" },
+            { labelKo: "시험기간 간식 이벤트", labelEn: "Exam-period snack events" },
+            { labelKo: "과목별 겹강톡", labelEn: "Course group chats" },
+            { labelKo: "진로·커리어 프로그램", labelEn: "Career programs" },
+          ],
+        },
+      ],
+    },
+  ];
+
+  for (const definition of definitions) {
+    await createSeedVote(creatorId, devAdmin, definition);
+  }
+
+  console.log(`Seeded ${definitions.length} votes with one eligible voter each`);
 }
 
 async function seedReferenceRoadmap() {
@@ -2784,6 +2874,7 @@ async function seedMockData() {
       eventDescriptionEn: "A School of Computing networking event featuring dinner and an alumni panel talk.",
       eventStartDate: new Date("2026-06-05T18:30:00+09:00"),
       eventEndDate: new Date("2026-06-05T21:00:00+09:00"),
+      eventLocation: "N1 1층 다목적홀",
       isPinned: true,
       pinOrder: 0,
       viewCount: 214,
@@ -2874,6 +2965,7 @@ async function seedMockData() {
       eventDescriptionEn: "Pre-registration snack distribution for School of Computing students during finals.",
       eventStartDate: new Date("2026-06-12T17:00:00+09:00"),
       eventEndDate: new Date("2026-06-12T19:00:00+09:00"),
+      eventLocation: "N1 1층 학생회 부스",
       isPinned: false,
       viewCount: 176,
       postedAt: new Date("2026-05-28T12:00:00+09:00"),
@@ -2962,6 +3054,7 @@ async function seedMockData() {
       eventDescriptionEn: "A one-day summer workshop covering product planning, implementation, and deployment.",
       eventStartDate: new Date("2026-06-18T14:00:00+09:00"),
       eventEndDate: new Date("2026-06-18T18:00:00+09:00"),
+      eventLocation: "N1 102호 전산 실습실",
       isPinned: false,
       viewCount: 142,
       postedAt: new Date("2026-05-31T11:00:00+09:00"),
@@ -3050,6 +3143,7 @@ async function seedMockData() {
       eventDescriptionEn: "A preliminary survey to plan the schedule and capacity for the fall retreat.",
       eventStartDate: new Date("2026-09-18T10:00:00+09:00"),
       eventEndDate: new Date("2026-09-19T15:00:00+09:00"),
+      eventLocation: "대전 근교 연수원",
       isPinned: false,
       viewCount: 96,
       postedAt: new Date("2026-05-30T09:30:00+09:00"),
@@ -3123,6 +3217,7 @@ async function seedMockData() {
       eventDescriptionEn: "An evening meetup with alumni and industry mentors about software careers.",
       eventStartDate: new Date("2026-08-28T18:30:00+09:00"),
       eventEndDate: new Date("2026-08-28T20:30:00+09:00"),
+      eventLocation: "N1 라운지",
       isPinned: false,
       viewCount: 87,
       postedAt: new Date("2026-08-21T09:00:00+09:00"),
@@ -3153,6 +3248,7 @@ async function seedMockData() {
       eventDescriptionEn: "A hands-on session that guides participants to their first open-source pull request.",
       eventStartDate: new Date("2026-09-03T14:00:00+09:00"),
       eventEndDate: new Date("2026-09-04T18:00:00+09:00"),
+      eventLocation: "온라인",
       isPinned: false,
       viewCount: 63,
       postedAt: new Date("2026-08-20T14:00:00+09:00"),
@@ -3183,6 +3279,7 @@ async function seedMockData() {
       eventDescriptionEn: "A fall showcase for undergraduate research and project teams.",
       eventStartDate: new Date("2026-09-11T16:00:00+09:00"),
       eventEndDate: new Date("2026-09-11T19:00:00+09:00"),
+      eventLocation: "N1 대강당",
       isPinned: false,
       viewCount: 52,
       postedAt: new Date("2026-08-19T10:30:00+09:00"),
@@ -3213,6 +3310,7 @@ async function seedMockData() {
       eventDescriptionEn: "A fall networking day for sharing interests and career paths.",
       eventStartDate: new Date("2026-10-02T18:00:00+09:00"),
       eventEndDate: new Date("2026-10-02T21:00:00+09:00"),
+      eventLocation: "N1 다목적홀",
       isPinned: false,
       viewCount: 41,
       postedAt: new Date("2026-08-18T11:00:00+09:00"),
@@ -3251,6 +3349,7 @@ async function seedMockData() {
       postedAt: event.postedAt,
       eventStartDate: event.eventStartDate,
       eventEndDate: event.eventEndDate,
+      eventLocation: event.eventLocation,
       eventDescriptionKo: event.eventDescriptionKo,
       eventDescriptionEn: event.eventDescriptionEn,
       isAnonymous: false,
@@ -3298,12 +3397,13 @@ async function main() {
     await seedBoards();
     await seedOperationalSurveys();
     if (seedMode === "demo") {
-      await seedDevAdminRole();
+      await seedDemoAccount();
       await seedMockData();
     }
     await seedReferenceFaqs();
     if (seedMode === "reference") {
       await seedReferenceAboutPageContent();
+      await seedReferenceAboutWorkContent();
     }
     await seedReferenceRoadmap();
     console.log("Seed finished");

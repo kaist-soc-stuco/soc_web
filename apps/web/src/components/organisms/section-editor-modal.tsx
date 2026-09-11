@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { createApiClient } from "@soc/api-client";
+import { useEffect, useRef, useState } from "react";
 
-import { RichTextEditor } from "./rich-text-editor";
 import { Button } from "@/components/ui/button";
 import { AdminFormField } from "@/components/ui/admin-page";
 import { UiInput } from "@/components/ui/form-control";
+import { RichTextInput } from "@/components/ui/rich-text-input";
 import { Modal } from "@/components/ui/modal";
-import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { resolveAssetUrl } from "@/lib/asset-url";
 
 export interface SectionFormState {
   titleKo: string;
@@ -23,16 +20,6 @@ interface SectionEditorModalProps {
   onSave: (section: SectionFormState) => void;
   onCancel: () => void;
 }
-
-const escapeHtmlAttribute = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-
-const appendInlineImage = (content: string, src: string) =>
-  `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
 
 const DEFAULT_SECTION_DESCRIPTION_KO = "섹션 설명";
 const DEFAULT_SECTION_DESCRIPTION_EN = "Section description";
@@ -51,7 +38,6 @@ export function SectionEditorModal({
   }));
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [error, setError] = useState<string | null>(null);
-  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
 
   useEffect(() => {
     if (isKoreanOnly && activeTab === "en") setActiveTab("ko");
@@ -61,20 +47,6 @@ export function SectionEditorModal({
     key: K,
     value: SectionFormState[K],
   ) => setForm((current) => ({ ...current, [key]: value }));
-
-  const handleDescriptionImageUpload = async (file: File) => {
-    if (!file.type.startsWith("image/")) return null;
-
-    const uploadLanguage = activeTab;
-    const asset = await apiClient.uploadAsset(file);
-    const src = resolveAssetUrl(asset.storageKey);
-    const otherKey = uploadLanguage === "ko" ? "descriptionEn" : "descriptionKo";
-    setForm((current) => ({
-      ...current,
-      [otherKey]: appendInlineImage(current[otherKey], src),
-    }));
-    return src;
-  };
 
   const handleSave = () => {
     if (!form.titleKo.trim()) {
@@ -154,14 +126,11 @@ export function SectionEditorModal({
             </AdminFormField>
             <div className="grid min-w-0 gap-1.5">
               <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
-              <RichTextEditor
-                compact
-                contentClassName="leading-7"
-                disabled={isOngoing}
-                content={form.descriptionKo}
-                onImageUpload={handleDescriptionImageUpload}
+              <RichTextInput
+                value={form.descriptionKo}
                 onChange={(value) => update("descriptionKo", value)}
-                lang="ko"
+                ariaLabel="국문 섹션 설명"
+                disabled={isOngoing}
                 placeholder={DEFAULT_SECTION_DESCRIPTION_KO}
               />
             </div>
@@ -179,14 +148,11 @@ export function SectionEditorModal({
             </AdminFormField>
             <div className="grid min-w-0 gap-1.5">
               <span className="text-xs font-normal leading-4 text-[#344054]">섹션 설명</span>
-              <RichTextEditor
-                compact
-                contentClassName="leading-7"
-                disabled={isOngoing || isKoreanOnly}
-                content={form.descriptionEn}
-                onImageUpload={handleDescriptionImageUpload}
+              <RichTextInput
+                value={form.descriptionEn}
                 onChange={(value) => update("descriptionEn", value)}
-                lang="en"
+                ariaLabel="영문 섹션 설명"
+                disabled={isOngoing || isKoreanOnly}
                 placeholder={DEFAULT_SECTION_DESCRIPTION_EN}
               />
             </div>
@@ -201,4 +167,49 @@ export function SectionEditorModal({
 
     </Modal>
   );
+}
+
+interface SectionInlineEditorProps {
+  commitRef?: { current: (() => Promise<boolean>) | null };
+  initial: SectionFormState;
+  isKoreanOnly?: boolean;
+  isOngoing?: boolean;
+  onSave: (section: SectionFormState) => void | Promise<void>;
+  onCancel: () => void;
+}
+
+export function SectionInlineEditor({ commitRef, initial, isKoreanOnly = false, isOngoing = false, onSave, onCancel }: SectionInlineEditorProps) {
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const saveRef = useRef<() => Promise<void>>(async () => undefined);
+  const savingRef = useRef<Promise<boolean> | null>(null);
+  const save = (): Promise<boolean> => {
+    if (savingRef.current) return savingRef.current;
+    if (JSON.stringify(form) === JSON.stringify(initial)) { onCancel(); return Promise.resolve(true); }
+    if (!form.titleKo.replace(/<[^>]*>/g, "").trim() || (!isKoreanOnly && !form.titleEn.replace(/<[^>]*>/g, "").trim())) { setError("섹션 제목을 입력해 주세요."); return Promise.resolve(false); }
+    savingRef.current = Promise.resolve().then(() => onSave(form)).then(() => true).catch(() => { setError("저장하지 못했습니다. 다시 시도해 주세요."); return false; }).finally(() => { savingRef.current = null; });
+    return savingRef.current;
+  };
+  saveRef.current = async () => { await save(); };
+  if (commitRef) commitRef.current = save;
+  useEffect(() => () => { if (commitRef) commitRef.current = null; }, [commitRef]);
+  useEffect(() => {
+    rootRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus();
+    const outside = (event: PointerEvent) => { if (!isOngoing && !rootRef.current?.contains(event.target as Node)) void saveRef.current(); };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [isOngoing]);
+  return <div ref={rootRef} className="survey-expand rounded-b-xl rounded-tr-xl border-b border-slate-300 bg-white p-5" onBlurCapture={event => {
+    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node) && !isOngoing) void save();
+  }}>
+    <div className={`grid gap-5 ${isKoreanOnly ? "" : "md:grid-cols-2"}`}>
+      {(["ko", "en"] as const).filter(language => language === "ko" || !isKoreanOnly).map(language => <div key={language} className="space-y-4">
+
+        <RichTextInput singleLine placeholder={language === "ko" ? "섹션 제목" : "Section title"} value={form[language === "ko" ? "titleKo" : "titleEn"]} onChange={value => setForm(current => ({ ...current, [language === "ko" ? "titleKo" : "titleEn"]: value }))} ariaLabel={language === "ko" ? "국문 섹션 제목" : "영문 섹션 제목"} disabled={isOngoing} />
+        <RichTextInput placeholder={language === "ko" ? "섹션 설명" : "Section description"} value={form[language === "ko" ? "descriptionKo" : "descriptionEn"]} onChange={value => setForm(current => ({ ...current, [language === "ko" ? "descriptionKo" : "descriptionEn"]: value }))} ariaLabel={language === "ko" ? "국문 섹션 설명" : "영문 섹션 설명"} disabled={isOngoing} />
+      </div>)}
+    </div>
+    {error ? <p role="alert" className="mt-3 text-sm text-red-600">{error}</p> : null}
+  </div>;
 }

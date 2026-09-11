@@ -227,6 +227,7 @@ export function EventsSurveysDayDetails({
 }
 
 function getCalendarEventHref(event: CalendarEvent) {
+  if (event.sourceType === "VOTE" && event.voteId) return `/votes/${event.voteId}`;
   if (event.sourceType === "ARTICLE" && event.articleId) {
     return `/events/${event.articleId}`;
   }

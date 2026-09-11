@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
-import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
@@ -50,27 +50,27 @@ export class CalendarSyncService {
     @Optional() private readonly auditLogService?: AuditLogService,
   ) {}
 
-  async enqueueEvent(calendarEventId: number): Promise<boolean> {
-    const [row] = await this.db
+  async enqueueEvent(calendarEventId: number, options: { manual?: boolean } = {}): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+    const [row] = await tx
       .select()
       .from(calendarEvents)
       .where(eq(calendarEvents.calendarEventId, calendarEventId));
     if (!row) return false;
 
     const targetCalendarId = this.targetCalendarId(row.sourceType);
-    if (!targetCalendarId || !this.isTargetEnabled(row.sourceType)) {
-      await this.db
+    if (!targetCalendarId || !this.googleCalendar.isConfigured() || (!options.manual && !this.isTargetEnabled(row.sourceType))) {
+      await tx
         .update(calendarEvents)
         .set({
           googleSyncStatus: "NOT_CONFIGURED",
           googleSyncError: null,
-          updatedAt: nowDate(),
         })
         .where(eq(calendarEvents.calendarEventId, calendarEventId));
       return false;
     }
 
-    await this.db
+    await tx
       .insert(calendarSyncJobs)
       .values({
         calendarEventId,
@@ -103,17 +103,19 @@ export class CalendarSyncService {
         },
       });
 
-    await this.db
+    const marked = await tx
       .update(calendarEvents)
       .set({
         googleCalendarId: targetCalendarId,
         googleSyncStatus: "PENDING",
         googleSyncError: null,
-        updatedAt: nowDate(),
+        // Sync metadata must not change the content revision captured by the job.
       })
-      .where(eq(calendarEvents.calendarEventId, calendarEventId));
-
+      .where(and(eq(calendarEvents.calendarEventId, calendarEventId), sql`date_trunc('milliseconds', ${calendarEvents.updatedAt}) = ${row.updatedAt}`))
+      .returning({ id: calendarEvents.calendarEventId });
+    if (!marked.length) throw new Error("calendar_event_changed_during_enqueue");
     return true;
+    });
   }
 
   async syncKaistAcademicCalendar(year: number, audit?: AuditMetadata): Promise<{
@@ -165,6 +167,7 @@ export class CalendarSyncService {
             sourceHash: item.sourceHash,
             isReadOnly: true,
             isActive: true,
+            isHiddenByAdmin: true,
             createdByUserId: null,
           })
           .returning();
@@ -260,7 +263,11 @@ export class CalendarSyncService {
     processedCount: number;
     succeededCount: number;
     failedCount: number;
+    skippedCount: number;
+    errorCodes: string[];
   }> {
+    if (!this.googleCalendar.isConfigured()) throw new BadRequestException("google_calendar_not_configured");
+    if (!this.targetCalendarId(MANUAL_SOURCE) && !this.targetCalendarId(KAIST_SOURCE)) throw new BadRequestException("google_calendar_target_not_configured");
     let queuedCount = 0;
     const rows = await this.db
       .select({ calendarEventId: calendarEvents.calendarEventId })
@@ -268,7 +275,7 @@ export class CalendarSyncService {
       .where(inArray(calendarEvents.sourceType, [MANUAL_SOURCE, KAIST_SOURCE]));
 
     for (const row of rows) {
-      if (await this.enqueueEvent(row.calendarEventId)) queuedCount += 1;
+      if (await this.enqueueEvent(row.calendarEventId, { manual: true })) queuedCount += 1;
     }
 
     let processedCount = 0;
@@ -282,7 +289,9 @@ export class CalendarSyncService {
       if (result.processedCount === 0) break;
     }
 
-    const result = { queuedCount, processedCount, succeededCount, failedCount };
+    const failures = failedCount > 0 ? await this.db.select({ error: calendarEvents.googleSyncError }).from(calendarEvents).where(inArray(calendarEvents.googleSyncStatus, ["FAILED", "CONFLICT"])) : [];
+    const errorCodes = [...new Set(failures.map(({ error }) => error?.includes("403") ? "permission_denied" : error?.includes("404") ? "calendar_not_found" : error?.includes("401") || error?.includes("token") ? "authentication_failed" : error?.includes("412") || error?.includes("Conflict") ? "edit_conflict" : "sync_failed"))];
+    const result = { queuedCount, processedCount, succeededCount, failedCount, skippedCount: rows.length - queuedCount, errorCodes };
     await this.auditLogService?.record({
       action: "calendar.sync.google",
       actorUserId: audit?.actorUserId ?? null,
@@ -438,7 +447,7 @@ export class CalendarSyncService {
       : null;
     const result = await this.googleCalendar.upsertEvent({
       calendarId: job.targetCalendarId,
-      eventId: existingEventId,
+      eventId: existingEventId ?? `soc${createHash("sha256").update(`${row.calendarEventId}:${row.createdAt.toISOString()}`).digest("hex").slice(0, 40)}`,
       etag: existingEventId ? row.googleEtag : null,
       resource: this.toGoogleResource(row),
     });
@@ -500,8 +509,8 @@ export class CalendarSyncService {
         .set(eventUpdate)
         .where(and(
           eq(calendarEvents.calendarEventId, row.calendarEventId),
-          eq(calendarEvents.updatedAt, job.resourceUpdatedAt),
-          eq(calendarEvents.googleSyncStatus, "PENDING"),
+          sql`date_trunc('milliseconds', ${calendarEvents.updatedAt}) = ${job.resourceUpdatedAt}`,
+          inArray(calendarEvents.googleSyncStatus, ["PENDING", "FAILED"]),
         ))
         .returning({ calendarEventId: calendarEvents.calendarEventId });
       if (!updatedEvent) {
@@ -544,12 +553,11 @@ export class CalendarSyncService {
         .set({
           googleSyncStatus: conflict ? "CONFLICT" : "FAILED",
           googleSyncError: message,
-          updatedAt: nowDate(),
         })
         .where(and(
           eq(calendarEvents.calendarEventId, job.calendarEventId),
-          eq(calendarEvents.googleSyncStatus, "PENDING"),
-          eq(calendarEvents.updatedAt, job.resourceUpdatedAt),
+          inArray(calendarEvents.googleSyncStatus, ["PENDING", "FAILED"]),
+          sql`date_trunc('milliseconds', ${calendarEvents.updatedAt}) = ${job.resourceUpdatedAt}`,
         ));
       return true;
     });

@@ -286,7 +286,6 @@ function safeContactSnapshot(contact: ContactRecord) {
     nameKo: contact.nameKo,
     roleEn: contact.roleEn,
     roleKo: contact.roleKo,
-    publiclyListed: contact.publiclyListed,
     sortOrder: contact.sortOrder,
   };
 }

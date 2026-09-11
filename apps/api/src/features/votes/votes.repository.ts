@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { CreateVoteRequest, UpdateVoteRequest, VoteVoterRecord } from "@soc/contracts";
 import { isoToDate, msToDate, nowDate, nowMs } from "@soc/shared";
@@ -35,11 +35,13 @@ export class VotesRepository {
     return this.db
       .select({
         vote: votes,
-        eligibleCount: sql<number>`(select count(*)::int from ${voteVoters} vv where vv.vote_id = ${votes.voteId} and vv.status = 'ELIGIBLE')`,
-        votedCount: sql<number>`(select count(*)::int from ${voteVoters} vv where vv.vote_id = ${votes.voteId} and vv.status = 'ELIGIBLE' and vv.has_voted = true)`,
+        eligibleCount: sql<number>`count(*) filter (where ${voteVoters.status} = 'ELIGIBLE')::int`,
+        votedCount: sql<number>`count(*) filter (where ${voteVoters.status} = 'ELIGIBLE' and ${voteVoters.hasVoted} = true)::int`,
       })
       .from(votes)
+      .leftJoin(voteVoters, eq(voteVoters.voteId, votes.voteId))
       .where(condition)
+      .groupBy(votes.voteId)
       .orderBy(desc(votes.createdAt));
   }
 
@@ -81,6 +83,8 @@ export class VotesRepository {
         endsAt: isoToDate(input.endsAt),
         academicStatuses: input.academicStatuses,
         feePayersOnly: input.feePayersOnly,
+        quorumPercent: input.quorumPercent ?? 50,
+        quorumInclusive: input.quorumInclusive ?? true,
         studentNumberFrom: input.studentNumberFrom ?? null,
         studentNumberTo: input.studentNumberTo ?? null,
       }).returning();
@@ -99,6 +103,8 @@ export class VotesRepository {
       if (input.startsAt !== undefined) values.startsAt = isoToDate(input.startsAt);
       if (input.endsAt !== undefined) values.endsAt = isoToDate(input.endsAt);
       if (input.academicStatuses !== undefined) values.academicStatuses = input.academicStatuses;
+      if (input.quorumPercent !== undefined) values.quorumPercent = input.quorumPercent;
+      if (input.quorumInclusive !== undefined) values.quorumInclusive = input.quorumInclusive;
       if (input.feePayersOnly !== undefined) values.feePayersOnly = input.feePayersOnly;
       if (input.studentNumberFrom !== undefined) values.studentNumberFrom = input.studentNumberFrom ?? null;
       if (input.studentNumberTo !== undefined) values.studentNumberTo = input.studentNumberTo ?? null;
@@ -150,31 +156,8 @@ export class VotesRepository {
       }).where(and(eq(votes.voteId, vote.voteId), eq(votes.status, "DRAFT"))).returning();
       if (!published) return { published: null, eligibleCount: 0 };
 
-      const conditions = [
-        eq(users.isActive, true),
-        schoolOfComputingPrimaryMajor,
-      ];
-      if (vote.academicStatuses.length > 0) conditions.push(inArray(users.academicStatus, vote.academicStatuses));
-      if (vote.studentNumberFrom) conditions.push(sql`${users.stdNo} >= ${vote.studentNumberFrom}`);
-      if (vote.studentNumberTo) conditions.push(sql`${users.stdNo} <= ${vote.studentNumberTo}`);
-      if (vote.feePayersOnly) conditions.push(eq(studentFeeStatus.status, "PAID"));
-      const eligible = await tx.select({ user: users, feeStatus: studentFeeStatus.status })
-        .from(users)
-        .leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
-        .where(and(...conditions));
-      if (eligible.length > 0) {
-        await tx.insert(voteVoters).values(eligible.map(({ user, feeStatus }) => ({
-          voteId: vote.voteId,
-          userId: user.userId,
-          nameKo: user.nameKo,
-          studentNumber: user.stdNo,
-          email: user.email,
-          primaryMajor: user.primaryMajor,
-          academicStatus: user.academicStatus,
-          feeStatus: feeStatus ?? null,
-          source: "FILTER",
-        })));
-      }
+      const eligible = await tx.select({ userId: voteVoters.userId }).from(voteVoters).where(and(eq(voteVoters.voteId, vote.voteId), eq(voteVoters.status, "ELIGIBLE")));
+      if (!eligible.length) throw new ConflictException("vote_voter_roll_empty");
       return { published, eligibleCount: eligible.length };
     });
   }
@@ -203,32 +186,44 @@ export class VotesRepository {
   }
 
   async addVoters(voteId: string, userIds: string[], studentNumbers: string[] = []) {
-    const selected = await this.db.select({ user: users, feeStatus: studentFeeStatus.status })
-      .from(users).leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
-      .where(and(
-        userIds.length > 0 && studentNumbers.length > 0
-          ? or(inArray(users.userId, userIds), inArray(users.stdNo, studentNumbers))!
-          : userIds.length > 0
-            ? inArray(users.userId, userIds)
-            : inArray(users.stdNo, studentNumbers),
-        eq(users.isActive, true),
-        schoolOfComputingPrimaryMajor,
-      ));
-    for (const { user, feeStatus } of selected) {
-      await this.db.insert(voteVoters).values({
-        voteId, userId: user.userId, nameKo: user.nameKo, studentNumber: user.stdNo,
-        email: user.email, primaryMajor: user.primaryMajor, academicStatus: user.academicStatus,
-        feeStatus: feeStatus ?? null, status: "ELIGIBLE", source: "MANUAL",
-      }).onConflictDoUpdate({ target: [voteVoters.voteId, voteVoters.userId], set: { status: "ELIGIBLE", source: "MANUAL" } });
-    }
-    return selected.length;
+    return this.transaction(async (tx) => {
+      const [vote] = await tx.select().from(votes).where(eq(votes.voteId, voteId)).for("update");
+      if (!vote || vote.status !== "DRAFT") {
+        throw new ConflictException("vote_voter_roll_locked");
+      }
+      const selected = await tx.select({ user: users, feeStatus: studentFeeStatus.status })
+        .from(users).leftJoin(studentFeeStatus, eq(studentFeeStatus.userId, users.userId))
+        .where(and(
+          userIds.length > 0 && studentNumbers.length > 0
+            ? or(inArray(users.userId, userIds), inArray(users.stdNo, studentNumbers))!
+            : userIds.length > 0 ? inArray(users.userId, userIds) : inArray(users.stdNo, studentNumbers),
+          eq(users.isActive, true), schoolOfComputingPrimaryMajor,
+        ));
+      if (userIds.some(id => !selected.some(({user}) => user.userId === id)) || studentNumbers.some(number => !selected.some(({user}) => user.stdNo === number))) throw new BadRequestException("vote_voter_not_found_or_ineligible");
+      for (const { user, feeStatus } of selected) {
+        await tx.insert(voteVoters).values({
+          voteId, userId: user.userId, nameKo: user.nameKo, studentNumber: user.stdNo,
+          email: user.email, primaryMajor: user.primaryMajor, academicStatus: user.academicStatus,
+          feeStatus: feeStatus ?? null, status: "ELIGIBLE", source: "MANUAL",
+        }).onConflictDoUpdate({ target: [voteVoters.voteId, voteVoters.userId], set: { status: "ELIGIBLE", source: "MANUAL" } });
+      }
+      return selected.length;
+    });
   }
 
   async excludeVoters(voteId: string, userIds: string[]) {
-    const changed = await this.db.update(voteVoters).set({ status: "EXCLUDED" })
-      .where(and(eq(voteVoters.voteId, voteId), inArray(voteVoters.userId, userIds), eq(voteVoters.hasVoted, false)))
-      .returning({ userId: voteVoters.userId });
-    return changed.length;
+    return this.transaction(async (tx) => {
+      const [vote] = await tx.select().from(votes).where(eq(votes.voteId, voteId)).for("update");
+      if (!vote || vote.status !== "DRAFT") {
+        throw new ConflictException("vote_voter_roll_locked");
+      }
+      const selected = await tx.select().from(users).where(and(inArray(users.userId, userIds), eq(users.isActive, true), schoolOfComputingPrimaryMajor));
+      for (const user of selected) await tx.insert(voteVoters).values({ voteId, userId: user.userId, nameKo: user.nameKo, studentNumber: user.stdNo, email: user.email, primaryMajor: user.primaryMajor, academicStatus: user.academicStatus, source: "MANUAL", status: "EXCLUDED" }).onConflictDoNothing();
+      const changed = await tx.update(voteVoters).set({ status: "EXCLUDED", source: "MANUAL" })
+        .where(and(eq(voteVoters.voteId, voteId), inArray(voteVoters.userId, userIds), eq(voteVoters.hasVoted, false)))
+        .returning({ userId: voteVoters.userId });
+      return changed.length;
+    });
   }
 
   async submitBallot(input: { voteId: string; userId: string; ciphertext: string; iv: string; authTag: string; receiptHash: string }) {
@@ -311,10 +306,21 @@ export class VotesRepository {
   }
 
   async saveTally(id: string, result: unknown, totalBallots: number) {
-    const [tally] = await this.db.insert(voteTallies).values({ voteId: id, result, totalBallots })
-      .onConflictDoUpdate({ target: voteTallies.voteId, set: { result, totalBallots, talliedAt: nowDate() } }).returning();
-    await this.db.update(votes).set({ status: "TALLIED", updatedAt: nowDate() }).where(eq(votes.voteId, id));
-    return tally;
+    return this.transaction(async (tx) => {
+      const [vote] = await tx.select().from(votes).where(eq(votes.voteId, id)).for("update");
+      if (!vote || !["CLOSED", "TALLIED"].includes(vote.status)) throw new ConflictException("vote_must_be_closed_before_tally");
+      const [existing] = await tx.select().from(voteTallies).where(eq(voteTallies.voteId, id));
+      if (existing) return existing;
+      const counts = await this.counts(id, tx);
+      if (vote.quorumPercent !== null && (counts.eligibleCount === 0 ||
+        (vote.quorumInclusive ? counts.votedCount * 100 < counts.eligibleCount * vote.quorumPercent : counts.votedCount * 100 <= counts.eligibleCount * vote.quorumPercent))) {
+        throw new ConflictException("vote_quorum_not_met");
+      }
+      if (totalBallots !== counts.votedCount) throw new ConflictException("vote_ballot_count_mismatch");
+      const [tally] = await tx.insert(voteTallies).values({ voteId: id, result, totalBallots }).returning();
+      await tx.update(votes).set({ status: "TALLIED", updatedAt: nowDate() }).where(eq(votes.voteId, id));
+      return tally;
+    });
   }
 
   async findTally(id: string) {
@@ -327,4 +333,10 @@ export class VotesRepository {
       .where(and(eq(votes.voteId, id), eq(votes.status, "TALLIED"), isNull(votes.resultsPublishedAt))).returning();
     return row ?? null;
   }
+  async unpublishResults(id: string) {
+    const [row] = await this.db.update(votes).set({ resultsPublishedAt: null, updatedAt: nowDate() })
+      .where(and(eq(votes.voteId, id), eq(votes.status, "TALLIED"))).returning();
+    return row ?? null;
+  }
+
 }

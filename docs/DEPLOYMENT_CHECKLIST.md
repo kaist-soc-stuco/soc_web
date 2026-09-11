@@ -21,7 +21,7 @@
 
 ## 3. Database And Administrator
 
-- [ ] 빈 PostgreSQL에서 모든 migration을 순서대로 적용한다.
+- [ ] 빈 PostgreSQL에서 `apps/api/drizzle/0000_baseline.sql` 단일 baseline migration을 적용한다.
 - [ ] `SEED_MODE=reference`로 기준 데이터만 생성한다.
 - [ ] 개발 사용자 `DEV0001`, `개발 관리자`, 샘플 콘텐츠가 존재하지 않는다.
 - [ ] `INITIAL__ADMIN_STDNOS` 사용자가 개인정보 동의 후 `최고 관리자` 역할을 받는다.

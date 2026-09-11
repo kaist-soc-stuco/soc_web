@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  InternalServerErrorException,
   Post,
   Query,
   Req,
@@ -26,6 +27,7 @@ import { AuditLogService } from "../audit/audit-log.service";
 import { OptionalAuthGuard } from "./guards";
 import {
   AUTH_ACCESS_COOKIE_NAME,
+  AUTH_CSRF_COOKIE_NAME,
   AUTH_LOGIN_TRANSACTION_COOKIE_NAME,
   AUTH_REFRESH_COOKIE_NAME,
   AUTH_SESSION_COOKIE_NAME,
@@ -68,6 +70,17 @@ export class AuthController {
   @UseGuards(OptionalAuthGuard)
   async getChannelTalkConfig(@Req() request: ChannelTalkRequest) {
     return this.authService.getChannelTalkConfig(request.user?.id);
+  }
+
+  @Get("csrf")
+  getCsrfToken(
+    @Req() request: Request & { csrfToken?: string },
+  ) {
+    const csrfToken = request.csrfToken ?? request.cookies?.[AUTH_CSRF_COOKIE_NAME];
+    if (!csrfToken) {
+      throw new InternalServerErrorException("csrf_token_unavailable");
+    }
+    return { csrfToken };
   }
 
   /**

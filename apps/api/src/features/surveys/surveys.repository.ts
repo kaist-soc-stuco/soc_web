@@ -1,5 +1,6 @@
+import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ne, ilike, or, sql } from "drizzle-orm";
 import { isoToDate, msToIso, nowDate } from "@soc/shared";
 
 import {
@@ -41,7 +42,7 @@ export class SurveysRepository {
       connectedPostId: row.connectedArticleId ? String(row.connectedArticleId) : null,
       feePayersOnly: row.feeRequirementPolicy === "PAID_ONLY",
       eligibleSocAffiliations: row.eligibleSocAffiliations,
-      academicEligibility: row.academicEligibility as SurveyRecord["academicEligibility"],
+      academicEligibility: "ANY",
       allowAnonymous: row.allowAnonymous,
       allowMultipleResponses: row.allowMultipleResponses,
       allowResponseEdit: row.allowResponseEdit,
@@ -129,7 +130,7 @@ export class SurveysRepository {
         descriptionImageUrlEn: dto.descriptionImageUrlEn ?? null,
         feeRequirementPolicy: dto.feeRequirementPolicy ?? "NONE",
         eligibleSocAffiliations: dto.eligibleSocAffiliations ?? [],
-        academicEligibility: dto.academicEligibility ?? "ANY",
+        academicEligibility: "ANY",
         allowAnonymous: dto.allowAnonymous ?? false,
         allowMultipleResponses: dto.allowMultipleResponses ?? false,
         allowResponseEdit: dto.allowResponseEdit ?? false,
@@ -178,7 +179,7 @@ export class SurveysRepository {
       set.eligibleSocAffiliations = dto.eligibleSocAffiliations;
     }
     if (dto.academicEligibility !== undefined) {
-      set.academicEligibility = dto.academicEligibility;
+      set.academicEligibility = "ANY";
     }
     if (dto.allowAnonymous !== undefined) set.allowAnonymous = dto.allowAnonymous;
     if (dto.allowMultipleResponses !== undefined) set.allowMultipleResponses = dto.allowMultipleResponses;
@@ -324,6 +325,7 @@ export class SurveysRepository {
     const query = input.query?.trim();
     const whereClause = and(
       eq(surveys.lifecycleStatus, "PUBLISHED"),
+      ne(surveys.surveyId, OPERATIONAL_SURVEY_IDS.corporatePartnership),
       query
         ? or(
             ilike(surveys.titleKo, `%${query}%`),

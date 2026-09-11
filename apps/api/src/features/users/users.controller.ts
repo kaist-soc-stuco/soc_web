@@ -1,3 +1,4 @@
+import { StudentFeePolicySchema, type StudentFeePolicy } from "@soc/contracts";
 import { Body, Controller, Get, Header, Param, Post, Put, Query, Req, StreamableFile, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 import * as XLSX from "xlsx";
@@ -185,7 +186,6 @@ export class UsersController {
     @Query("status") status?: string,
     @Query("majorType") majorType?: string,
     @Query("feeStatus") feeStatus?: string,
-    @Query("academicStatus") academicStatus?: string,
   ) {
     const adminUserSortBy =
       sortBy === "studentId" ||
@@ -207,7 +207,6 @@ export class UsersController {
       status: adminUserStatus,
       majorType: majorType === "PRIMARY" ? majorType : undefined,
       feeStatus: feeStatus === "PAID" || feeStatus === "PARTIAL" || feeStatus === "UNPAID" ? feeStatus : undefined,
-      academicStatus: academicStatus?.trim() || undefined,
     });
   }
 
@@ -221,6 +220,20 @@ export class UsersController {
       limit: limit ? Number(limit) : undefined,
       query,
     });
+  }
+
+  @Get("fee-status/policy")
+  @Header("Cache-Control", "private, no-store")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  getStudentFeePolicy(@Query("semester") semester?: string) {
+    return this.usersService.getStudentFeePolicy(/^\d{4}-[12]$/.test(semester ?? "") ? semester! : "2026-1");
+  }
+
+  @Post("fee-status/policy")
+  @Header("Cache-Control", "private, no-store")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  createStudentFeePolicy(@Body(new ZodValidationPipe(StudentFeePolicySchema)) body: StudentFeePolicy, @Req() req: AuthenticatedRequest) {
+    return this.usersService.createStudentFeePolicy(body, req.user!.id);
   }
 
   @Get("fee-status/list")
@@ -405,6 +418,15 @@ export class UsersController {
     XLSX.utils.book_append_sheet(workbook, worksheet, "과비 납부");
     const buffer = Buffer.from(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
     return new StreamableFile(buffer);
+  }
+
+  @Post("fee-status/preview")
+  @Header("Cache-Control", "private, no-store")
+  @RequirePermissions(Permissions.MANAGE_FINANCE)
+  previewStudentFeeImport(
+    @Body(new ZodValidationPipe(BulkUpdateStudentFeeStatusSchema)) body: BulkUpdateStudentFeeStatusRequest,
+  ) {
+    return this.usersService.previewStudentFeeImport(body);
   }
 
   @Post("fee-status/bulk")

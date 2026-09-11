@@ -55,6 +55,7 @@ export interface UnifiedItem {
 }
 
 export interface CalendarEvent {
+  voteId?: string | null;
   id: string;
   calendarEventId?: string | null;
   sourceType?: PublicCalendarEventItem["sourceType"];
@@ -502,6 +503,7 @@ export const buildCalendarEventsFromPublicItems = (
     return {
       id: item.id,
       calendarEventId: item.calendarEventId,
+      voteId: item.voteId,
       sourceType: item.sourceType,
       category: item.category,
       articleId: item.articleId,

@@ -1,4 +1,6 @@
 import {
+  BaseEdge,
+  type EdgeProps,
   Background,
   BackgroundVariant,
   Controls,
@@ -11,7 +13,7 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { Clock3, MapPin, Maximize2, Minimize2, Search, X } from "lucide-react";
+import { Clock3, MapPin, Maximize2, Minimize2, RotateCcw, Search, X } from "lucide-react";
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -47,15 +49,24 @@ import {
 } from "./roadmap-offerings";
 
 import "@xyflow/react/dist/style.css";
+import { routeConnection, roundedPath, type Point } from "./roadmap-routing";
+
+function RoutedEdge(props: EdgeProps) {
+  const points = props.data?.points as Point[] | undefined;
+  return points ? <BaseEdge id={props.id} path={roundedPath(points)} markerEnd={props.markerEnd} style={props.style} interactionWidth={0} /> : null;
+}
+const edgeTypes = { smoothstep: RoutedEdge };
 
 const COURSE_WIDTH = 184;
 const COURSE_HEIGHT = 108;
 const COURSE_GAP_X = 20;
 const COURSE_GAP_Y = 18;
-const LANE_LABEL_WIDTH = 178;
-const LANE_WIDTH = 1_430;
-const COURSES_PER_ROW = 6;
-const LANE_GAP = 22;
+const GROUP_PADDING = 20;
+const GROUP_HEADER = 52;
+const LANE_GAP = 28;
+const BASE_WIDTH = COURSE_WIDTH * 2 + COURSE_GAP_X + GROUP_PADDING * 2;
+const TRACK_WIDTH = COURSE_WIDTH * 3 + COURSE_GAP_X * 2 + GROUP_PADDING * 2;
+const LANE_WIDTH = BASE_WIDTH + TRACK_WIDTH * 2 + LANE_GAP * 2;
 
 interface CourseNodeData extends Record<string, unknown> {
   course: RoadmapCourse;
@@ -91,79 +102,69 @@ function buildLayout(
   const instancesByCode = new Map<string, string[]>();
   const nodes: GraphNode[] = [];
   const courseByCode = new Map(courses.map((item) => [item.code, item]));
-  let offsetY = 0;
-
-  lanes.forEach((lane) => {
-    const courseCodes = lane.courses.filter(
-      (code) => !visibleCourseCodes || visibleCourseCodes.has(code),
-    );
-    if (courseCodes.length === 0) return;
-
-    const rowCount = Math.ceil(courseCodes.length / COURSES_PER_ROW);
-    const laneHeight = 62 + rowCount * (COURSE_HEIGHT + COURSE_GAP_Y);
-    const track = lane.trackId
-      ? ROADMAP_TRACKS.find((item) => item.id === lane.trackId)
-      : undefined;
-
+  let baseY = 0;
+  let trackY = 0;
+  const prepared = lanes.map((lane) => ({
+    ...lane,
+    courses: lane.courses.filter((code) => courseByCode.has(code) && (!visibleCourseCodes || visibleCourseCodes.has(code))),
+  })).filter((lane) => lane.courses.length);
+  const addGroup = (lane: RoadmapLane, x: number, y: number, columns: number, width: number) => {
+    const height = GROUP_HEADER + Math.ceil(lane.courses.length / columns) * (COURSE_HEIGHT + COURSE_GAP_Y) + 4;
+    const track = ROADMAP_TRACKS.find((item) => item.id === lane.trackId);
     nodes.push({
-      id: `lane:${lane.id}`,
-      type: "lane",
-      position: { x: 0, y: offsetY },
-      data: {
-        color: track?.color ?? "#64748b",
-        label: lane.label[lang],
-      },
-      draggable: false,
-      selectable: false,
-      focusable: false,
-      zIndex: -1,
-      style: { height: laneHeight, width: LANE_WIDTH },
+      id: `lane:${lane.id}`, type: "lane", position: { x, y },
+      data: { color: track?.color ?? "#64748b", label: lane.label[lang] },
+      draggable: false, selectable: false, focusable: false, zIndex: -1,
+      style: { width, height },
     });
-
-    courseCodes.forEach((code, index) => {
-      const item = courseByCode.get(code);
-      if (!item) return;
-
+    lane.courses.forEach((code, index) => {
+      const item = courseByCode.get(code)!;
       const instanceId = `${lane.id}:${code}`;
-      const previousInstances = instancesByCode.get(code) ?? [];
-      instancesByCode.set(code, [...previousInstances, instanceId]);
+      instancesByCode.set(code, [...(instancesByCode.get(code) ?? []), instanceId]);
       if (!canonicalNodeByCode.has(code)) canonicalNodeByCode.set(code, instanceId);
-
       nodes.push({
-        id: instanceId,
-        type: "course",
-        position: {
-          x: LANE_LABEL_WIDTH + (index % COURSES_PER_ROW) * (COURSE_WIDTH + COURSE_GAP_X),
-          y: offsetY + 48 + Math.floor(index / COURSES_PER_ROW) * (COURSE_HEIGHT + COURSE_GAP_Y),
-        },
-        data: {
-          course: item,
-          duplicate: false,
-          displayCode: displayCodeByCourse.get(item.code) ?? item.code,
-          lang,
-        },
-        draggable: false,
-        selectable: true,
-        focusable: true,
-        ariaLabel: [displayCodeByCourse.get(item.code) ?? item.code, item.name[lang]].join(" "),
-        zIndex: 1,
-        style: { height: COURSE_HEIGHT, width: COURSE_WIDTH },
+        id: instanceId, type: "course",
+        position: { x: x + GROUP_PADDING + (index % columns) * (COURSE_WIDTH + COURSE_GAP_X), y: y + GROUP_HEADER + Math.floor(index / columns) * (COURSE_HEIGHT + COURSE_GAP_Y) },
+        data: { course: item, duplicate: false, displayCode: displayCodeByCourse.get(code) ?? code, lang },
+        draggable: false, selectable: true, focusable: true,
+        ariaLabel: [displayCodeByCourse.get(code) ?? code, item.name[lang]].join(" "),
+        zIndex: 1, style: { width: COURSE_WIDTH, height: COURSE_HEIGHT },
       });
     });
-
-    offsetY += laneHeight + LANE_GAP;
-  });
-
-  return { canonicalNodeByCode, height: offsetY, instancesByCode, nodes };
+    return height;
+  };
+  // A stable base column, then paired track cards; broad tracks span both columns.
+  for (const lane of prepared.filter((item) => !item.trackId)) {
+    baseY += addGroup(lane, 0, baseY, 2, BASE_WIDTH) + LANE_GAP;
+  }
+  let pending: RoadmapLane | undefined;
+  const flush = () => {
+    if (!pending) return;
+    trackY += addGroup(pending, BASE_WIDTH + LANE_GAP, trackY, 3, TRACK_WIDTH) + LANE_GAP;
+    pending = undefined;
+  };
+  for (const lane of prepared.filter((item) => item.trackId)) {
+    if (["theory", "ai", "interactive"].includes(lane.trackId!)) {
+      flush();
+      trackY += addGroup(lane, BASE_WIDTH + LANE_GAP, trackY, 6, TRACK_WIDTH * 2 + LANE_GAP) + LANE_GAP;
+    } else if (pending) {
+      const leftHeight = addGroup(pending, BASE_WIDTH + LANE_GAP, trackY, 3, TRACK_WIDTH);
+      const rightHeight = addGroup(lane, BASE_WIDTH + TRACK_WIDTH + LANE_GAP * 2, trackY, 3, TRACK_WIDTH);
+      trackY += Math.max(leftHeight, rightHeight) + LANE_GAP;
+      pending = undefined;
+    } else pending = lane;
+  }
+  flush();
+  return { canonicalNodeByCode, height: Math.max(baseY, trackY), instancesByCode, nodes };
 }
 
 const LaneCard = memo(function LaneCard({ data }: NodeProps<LaneNode>) {
   return (
     <div
-      className="select-none h-full w-full rounded-xl border border-slate-200/80 bg-white/70"
-      style={{ borderTopColor: data.color, borderTopWidth: 3 }}
+      className="roadmap-track-group select-none h-full w-full rounded-2xl border"
+      style={{ backgroundColor: `color-mix(in srgb, ${data.color} 11%, white)`, borderColor: `color-mix(in srgb, ${data.color} 18%, white)` }}
     >
-      <div className="flex h-full w-[9.5rem] items-start px-5 pt-5">
+      <div className="flex items-center gap-2 px-5 pt-4">
         <span className="text-sm font-semibold tracking-tight text-slate-700">{data.label}</span>
       </div>
     </div>
@@ -176,7 +177,6 @@ interface RoadmapInteractionContextValue {
   previousCodes: ReadonlySet<string>;
   selectedCourseCode: string | null;
   selectedTrackIds: ReadonlySet<string>;
-  setHoveredCourseCode: (courseCode: string | null) => void;
 }
 
 const RoadmapInteractionContext = createContext<RoadmapInteractionContextValue | null>(null);
@@ -204,8 +204,6 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
 
   return (
     <div
-      onMouseEnter={() => interaction?.setHoveredCourseCode(course.code)}
-      onMouseLeave={() => interaction?.setHoveredCourseCode(null)}
       className={cn(
         "roadmap-course-card select-none group relative h-full w-full rounded-lg border bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[opacity,border-color,box-shadow,transform] duration-300",
         selected
@@ -217,11 +215,12 @@ const CourseCard = memo(function CourseCard({ data }: NodeProps<CourseNode>) {
               : relation === "current"
                 ? "border-kaist-darkgreen"
                 : "border-slate-200 hover:border-slate-400 hover:shadow-md",
-        dimmed && "opacity-[0.14]",
+        dimmed && "opacity-40",
       )}
     >
-      <Handle className="!h-px !w-px !border-0 !bg-transparent !opacity-0" position={Position.Left} type="target" />
-      <Handle className="!h-px !w-px !border-0 !bg-transparent !opacity-0" position={Position.Right} type="source" />
+      {([Position.Left, Position.Right, Position.Top, Position.Bottom] as const).flatMap(position =>
+        (["source", "target"] as const).map(type => <Handle key={`${type}-${position}`} id={`${type}-${position}`} type={type} position={position} className="!h-px !w-px !border-0 !bg-transparent !opacity-0" />)
+      )}
 
       <div className="flex items-start justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
@@ -344,7 +343,7 @@ export function RoadmapGraph({
     retry: false,
     staleTime: 60_000,
   });
-  const [hoveredCourseCode, setHoveredCourseCode] = useState<string | null>(null);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(() => new Set());
   const [searchText, setSearchText] = useState("");
   const [selectedTerm, setSelectedTerm] = useState<RoadmapOfferingTerm>("2026-fall");
@@ -352,7 +351,7 @@ export function RoadmapGraph({
   const [flow, setFlow] = useState<ReactFlowInstance<GraphNode, Edge> | null>(null);
   const flowViewportRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const activeCourseCode = hoveredCourseCode ?? selectedCourseCode;
+  const activeCourseCode = selectedCourseCode;
 
   const remoteCourses = useMemo(
     () => (importedOfferingsResponse?.courses ?? []).map(toRoadmapCourse),
@@ -539,6 +538,16 @@ export function RoadmapGraph({
     [layout],
   );
 
+  const panBounds = useMemo<[[number, number], [number, number]]>(() => {
+    if (!nodes.length) return [[-LANE_WIDTH, -LANE_WIDTH], [LANE_WIDTH, LANE_WIDTH]];
+    const minX = Math.min(...nodes.map((node) => node.position.x));
+    const minY = Math.min(...nodes.map((node) => node.position.y));
+    const maxX = Math.max(...nodes.map((node) => node.position.x + Number(node.style?.width ?? COURSE_WIDTH)));
+    const maxY = Math.max(...nodes.map((node) => node.position.y + Number(node.style?.height ?? COURSE_HEIGHT)));
+    const margin = Math.max(LANE_WIDTH / 2, (maxX - minX) / 2);
+    return [[minX - margin, minY - margin], [maxX + margin, maxY + margin]];
+  }, [nodes]);
+
   const interactionValue = useMemo<RoadmapInteractionContextValue>(
     () => ({
       activeCourseCode,
@@ -546,7 +555,6 @@ export function RoadmapGraph({
       previousCodes,
       selectedCourseCode,
       selectedTrackIds,
-      setHoveredCourseCode,
     }),
     [activeCourseCode, nextCodes, previousCodes, selectedCourseCode, selectedTrackIds],
   );
@@ -554,34 +562,54 @@ export function RoadmapGraph({
   const edges = useMemo<Edge[]>(
     () =>
       roadmapRelations.flatMap((relation) => {
-        const source = layout.canonicalNodeByCode.get(relation.source);
-        const target = layout.canonicalNodeByCode.get(relation.target);
+        const selectedInstance = layout.nodes.find((node) => node.id === selectedInstanceId && node.type === "course" && node.data.course.code === activeCourseCode);
+        const nodeFor = (code: string) => {
+          if (code === activeCourseCode && selectedInstance) return selectedInstance.id;
+          const canonical = layout.canonicalNodeByCode.get(code);
+          if (!selectedInstance || canonical?.startsWith("core:") || canonical?.startsWith("foundation:")) return canonical;
+          const instances = layout.nodes.filter((node) => node.type === "course" && node.data.course.code === code);
+          return instances.sort((a, b) => Math.hypot(a.position.x - selectedInstance.position.x, a.position.y - selectedInstance.position.y) - Math.hypot(b.position.x - selectedInstance.position.x, b.position.y - selectedInstance.position.y))[0]?.id ?? canonical;
+        };
+        const source = nodeFor(relation.source);
+        const target = nodeFor(relation.target);
         if (!source || !target) return [];
         const highlighted =
           relation.source === activeCourseCode || relation.target === activeCourseCode;
 
+        const sourceNode = layout.nodes.find((node) => node.id === source)!;
+        const targetNode = layout.nodes.find((node) => node.id === target)!;
+        const coreLine = source.startsWith("core:") && target.startsWith("core:");
+        if (activeCourseCode ? !highlighted : !coreLine) return [];
+        const route = routeConnection({ id: source, ...sourceNode.position }, { id: target, ...targetNode.position }, layout.nodes.filter(node => node.type === "course").map(node => ({ id: node.id, ...node.position })));
+        if (!route) return [];
+        const color = highlighted ? (relation.target === activeCourseCode ? "#d97706" : "#0284c7") : "#94a3b8";
         return [
           {
             id: `${relation.source}-${relation.target}`,
+            sourceHandle: `source-${route.sourceSide}`,
+            targetHandle: `target-${route.targetSide}`,
             source,
             target,
             type: "smoothstep",
+            data: { points: route.points },
+            className: highlighted ? "roadmap-edge-flow" : undefined,
             focusable: false,
             interactionWidth: 0,
             markerEnd: {
               type: MarkerType.ArrowClosed,
               width: 13,
               height: 13,
-              color: highlighted ? "#0f766e" : "#94a3b8",
+              color: color,
             },
             style: {
-              opacity: activeCourseCode && !highlighted ? 0.08 : highlighted ? 1 : 0.34,
+              opacity: highlighted ? 0.85 : 0.25,
               pointerEvents: "none",
-              stroke: highlighted ? "#0f766e" : "#94a3b8",
-              strokeWidth: highlighted ? 2 : 1.25,
+              stroke: color,
+              strokeWidth: highlighted ? 1.5 : 1,
+              vectorEffect: "non-scaling-stroke",
             },
             selectable: false,
-            zIndex: 0,
+            zIndex: 2,
             ariaLabel:
               lang === "ko"
                 ? `${relation.source}에서 ${relation.target}로 이어지는 권장 수강 순서`
@@ -589,7 +617,7 @@ export function RoadmapGraph({
           },
         ];
       }),
-    [activeCourseCode, lang, layout.canonicalNodeByCode, roadmapRelations],
+    [activeCourseCode, lang, layout, roadmapRelations, selectedInstanceId],
   );
 
   const searchMatches = useMemo(() => {
@@ -620,7 +648,7 @@ export function RoadmapGraph({
   );
 
   useEffect(() => {
-    if (!flow || !selectedCourseCode) return;
+    if (!flow || !selectedCourseCode || selectedInstanceId) return;
     const nodeId = layout.canonicalNodeByCode.get(selectedCourseCode);
     if (!nodeId) return;
     void flow.fitView({
@@ -629,7 +657,7 @@ export function RoadmapGraph({
       padding: 0.85,
       maxZoom: 1.25,
     });
-  }, [flow, layout.canonicalNodeByCode, selectedCourseCode]);
+  }, [flow, layout.canonicalNodeByCode, selectedCourseCode, selectedInstanceId]);
 
   const toggleTrack = (trackId: string) => {
     setSelectedTrackIds((current) => {
@@ -809,7 +837,18 @@ export function RoadmapGraph({
           </div>
         </div>
 
-        <div ref={flowViewportRef} className={cn("roadmap-flow-viewport relative h-[calc(100svh-13rem)] min-h-[38rem] max-h-[54rem] overflow-hidden rounded-xl border border-slate-200 bg-slate-50", isFullscreen && "roadmap-flow-viewport--fullscreen")}>
+        <div ref={flowViewportRef} className={cn("roadmap-flow-viewport relative h-[calc(100svh-13rem)] min-h-[24rem] md:min-h-[38rem] max-h-[54rem] overflow-hidden rounded-xl border border-slate-200 bg-slate-50", isFullscreen && "roadmap-flow-viewport--fullscreen")}>
+          <div className="absolute right-14 top-3 z-10 flex items-center gap-2">
+            <IconButton
+              type="button"
+              aria-label={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
+              title={lang === "ko" ? "로드맵 전체 보기" : "Fit roadmap to view"}
+              onClick={() => void flow?.fitView({ padding: 0.15, duration: 300 })}
+              className="size-9 border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-white hover:text-slate-900"
+            >
+              <RotateCcw aria-hidden="true" className="size-4" />
+            </IconButton>
+          </div>
           <button
             type="button"
             onClick={() => void toggleFullscreen()}
@@ -825,13 +864,16 @@ export function RoadmapGraph({
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onInit={setFlow}
               onNodeClick={(_, node) => {
-                if (node.type === "course") focusCourse(node.data.course.code);
+                if (node.type === "course") { setSelectedInstanceId(node.id); onSelectedCourseChange(node.data.course.code); }
               }}
               onPaneClick={() => onSelectedCourseChange(null)}
-              defaultViewport={{ x: 16, y: 16, zoom: 0.72 }}
-              minZoom={0.28}
+              fitView
+              fitViewOptions={{ padding: 0.12, maxZoom: 0.85, minZoom: 0.1 }}
+              translateExtent={panBounds}
+              minZoom={0.1}
               maxZoom={1.7}
               nodesDraggable={false}
               nodesConnectable={false}
@@ -858,7 +900,7 @@ export function RoadmapGraph({
 
       <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start" aria-live="polite">
         {selectedCourseCode ? (
-          <div key="course-details" className="roadmap-side-panel__view">
+          <div key="course-details" className="roadmap-side-panel__view roadmap-details-panel">
             <div className="mb-4 flex h-10 items-center border-b border-slate-200">
               <h2 className="text-sm font-semibold text-slate-900">
                 {lang === "ko" ? "과목 상세 정보" : "Course details"}
@@ -1018,7 +1060,7 @@ function CourseDetails({
   }
 
   return (
-    <section className="pt-5" aria-live="polite">
+    <section className="roadmap-course-details pt-5" aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="text-xs font-semibold text-kaist-darkgreen">
@@ -1058,6 +1100,7 @@ function CourseDetails({
         </button>
       </div>
 
+      <div className="roadmap-details-scroll" key={`${courseCode}-${activeTab}`} role="tabpanel" tabIndex={0}>
       {activeTab === "offerings" ? (
         <OfferingList offerings={offerings} lang={lang} />
       ) : (
@@ -1097,7 +1140,7 @@ function CourseDetails({
           </div>
 
           <RelationList
-            title={lang === "ko" ? "먼저 들으면 좋은 과목" : "Recommended before"}
+            title={lang === "ko" ? "권장 선수 과목" : "Recommended prerequisites"}
             codes={previous}
             courseByCode={courseByCode}
             displayCodeByCourse={displayCodeByCourse}
@@ -1106,7 +1149,7 @@ function CourseDetails({
             onCourseClick={onCourseClick}
           />
           <RelationList
-            title={lang === "ko" ? "다음에 이어지는 과목" : "Recommended next"}
+            title={lang === "ko" ? "후속 과목" : "Follow-up courses"}
             codes={next}
             courseByCode={courseByCode}
             displayCodeByCourse={displayCodeByCourse}
@@ -1116,6 +1159,7 @@ function CourseDetails({
           />
         </>
       )}
+      </div>
     </section>
   );
 }
@@ -1169,13 +1213,13 @@ function OfferingList({
               </div>
               {offering.time ? (
                 <p className="flex items-start gap-1.5 break-keep leading-5 text-slate-600">
-                  <Clock3 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                  <Clock3 aria-hidden="true" className="mt-1 size-3 shrink-0 text-slate-400" />
                   <span className="whitespace-pre-line">{offering.time}</span>
                 </p>
               ) : null}
               {offering.room ? (
                 <p className="flex items-start gap-1.5 break-keep leading-5 text-slate-600">
-                  <MapPin aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                  <MapPin aria-hidden="true" className="mt-1 size-3 shrink-0 text-slate-400" />
                   <span className="whitespace-pre-line">{offering.room}</span>
                 </p>
               ) : null}

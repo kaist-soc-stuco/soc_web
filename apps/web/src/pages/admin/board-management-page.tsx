@@ -1,3 +1,4 @@
+import { restrictListDrag } from "@/lib/drag-bounds";
 import { createApiClient } from "@soc/api-client";
 import {
   PERMISSION_REGISTRY,
@@ -235,7 +236,7 @@ function BoardManagementPageContent() {
       {message ? <div role="status" className={cn("rounded-lg border px-4 py-3 text-sm font-medium", message.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700")}>{message.text}</div> : null}
 
       <AdminCard>
-        <DndContext
+        <DndContext modifiers={[restrictListDrag]}
           autoScroll={false}
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -243,8 +244,8 @@ function BoardManagementPageContent() {
           onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
         >
-          <AdminDataTable minWidth={780} isDragging={Boolean(activeBoardCode)} className={loading && boards.length > 0 ? "opacity-60 transition-opacity" : undefined}>
-            <colgroup><col style={{ width: 52 }} /><col style={{ width: 360 }} /><col style={{ width: 280 }} /><col style={{ width: 100 }} /></colgroup>
+          <AdminDataTable minWidth={780} isDragging={Boolean(activeBoardCode)} className={`admin-sortable-table ${loading && boards.length > 0 ? "opacity-60 transition-opacity" : ""}`}>
+            <colgroup><col style={{ width: 52 }} /><col /><col style={{ width: 280 }} /><col style={{ width: 100 }} /></colgroup>
             <AdminTableHeader><tr><AdminTableHead><span className="sr-only">순서</span></AdminTableHead><AdminTableHead>게시판</AdminTableHead><AdminTableHead>운영 설정</AdminTableHead><AdminTableHead>상태</AdminTableHead></tr></AdminTableHeader>
             <AdminTableBody>
               {loading && boards.length === 0 ? <tr><AdminTableCell colSpan={4} className="py-16 text-center">불러오는 중...</AdminTableCell></tr>
@@ -349,7 +350,7 @@ function SortableBoardRow({ board, disabled, onOpen }: { board: BoardSummary; di
   const style = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease", willChange: isDragging ? "transform" : undefined };
 
   return <tr ref={setNodeRef} style={style} className={cn("transition-colors hover:bg-slate-50/60", isDragging && "relative z-0 opacity-0")} onClick={() => onOpen(board)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(board); } }} tabIndex={0}>
-    <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} title="드래그하여 순서 변경" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="flex size-7 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
+    <AdminTableCell className="text-center"><button ref={setActivatorNodeRef} type="button" aria-label={`${board.nameKo} 순서 이동`} title="드래그하여 순서 변경" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></button></AdminTableCell>
     <AdminTableCell truncate><span className="admin-table-text-emphasis block truncate">{board.nameKo}</span><span className="admin-table-text mt-0.5 block truncate">{board.code}{board.nameEn ? ` · ${board.nameEn}` : ""}</span></AdminTableCell>
     <AdminTableCell truncate>{[board.allowComment && "댓글", board.allowSecret && "비밀글", board.allowLike && "추천·스크랩"].filter(Boolean).join(" · ") || "추가 기능 없음"}</AdminTableCell>
     <AdminTableCell>{board.isActive ? <AdminStatusBadge tone="positive">활성</AdminStatusBadge> : <AdminStatusBadge>비활성</AdminStatusBadge>}</AdminTableCell>

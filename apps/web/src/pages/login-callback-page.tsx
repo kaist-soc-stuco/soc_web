@@ -56,6 +56,7 @@ export function LoginCallbackPage() {
     [],
   );
   const consumedLoginResultRef = useRef(false);
+  const loginStartingRef = useRef(false);
   const [status, setStatus] = useState<LoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingConsentToken, setPendingConsentToken] = useState<string | null>(
@@ -76,10 +77,6 @@ export function LoginCallbackPage() {
         navigate(returnPath, { replace: true });
         return;
       }
-      if (window.history.length > 1) {
-        navigate(-1);
-        return;
-      }
       navigate("/", { replace: true });
     },
     [navigate, toast],
@@ -92,6 +89,8 @@ export function LoginCallbackPage() {
     const loginStatus = searchParams.get("status");
 
     const startLogin = async () => {
+      if (loginStartingRef.current) return;
+      loginStartingRef.current = true;
       setStatus("starting");
       setErrorMessage(null);
 
@@ -113,6 +112,7 @@ export function LoginCallbackPage() {
 
         submitAuthorizeForm(payload);
       } catch (error) {
+        loginStartingRef.current = false;
         console.error(error);
         returnToPreviousPage(
           lang === "ko"
@@ -223,29 +223,27 @@ export function LoginCallbackPage() {
     }
   };
 
+  const isProcessing = status !== "failed" && !pendingConsentToken;
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-white px-6 text-kaist-black">
-      <section className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-        <p className="text-sm font-semibold text-kaist-darkgreen">
-          {status === "failed"
-            ? lang === "ko"
-              ? "로그인 실패"
-              : "Sign-in failed"
-            : lang === "ko"
-              ? "로그인 처리 중"
-              : "Signing you in"}
-        </p>
-        <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-          {status === "failed"
-            ? (errorMessage ??
+      {isProcessing ? (
+        <span
+          className="login-processing-spinner"
+          role="status"
+          aria-label={lang === "ko" ? "로그인 처리 중" : "Signing you in"}
+        />
+      ) : status === "failed" ? (
+        <section className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-semibold text-kaist-darkgreen">
+            {lang === "ko" ? "로그인 실패" : "Sign-in failed"}
+          </p>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+            {errorMessage ??
               (lang === "ko"
                 ? "잠시 후 다시 시도해 주세요."
-                : "Please try again shortly."))
-            : lang === "ko"
-              ? "SSO 로그인 화면으로 이동하거나 로그인 결과를 확인하고 있습니다."
-              : "Opening the SSO sign-in page or verifying your sign-in result."}
-        </p>
-        {status === "failed" ? (
+                : "Please try again shortly.")}
+          </p>
           <Button variant="ghost"
             type="button"
             onClick={() => window.location.assign("/login")}
@@ -253,8 +251,8 @@ export function LoginCallbackPage() {
           >
             {lang === "ko" ? "다시 로그인" : "Try again"}
           </Button>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
 
       {pendingConsentToken ? (
         <Modal

@@ -23,7 +23,7 @@ function lockBodyScroll() {
     previousDocumentScrollbarGutter = document.documentElement.style.scrollbarGutter;
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
-    document.documentElement.style.scrollbarGutter = "auto";
+    document.documentElement.style.scrollbarGutter = "stable";
   }
   bodyScrollLockCount += 1;
 

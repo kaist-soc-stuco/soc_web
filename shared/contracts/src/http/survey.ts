@@ -153,7 +153,6 @@ export interface SurveyResponseUserRecord {
   nameKo: string | null;
   nameEn: string | null;
   email: string | null;
-  phoneNumber: string | null;
   departmentKo: string | null;
   stdNo: string | null;
   primaryMajor: string | null;

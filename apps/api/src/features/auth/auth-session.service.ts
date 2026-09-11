@@ -67,7 +67,7 @@ export class AuthSessionService {
           }
         : {
             mode: "temporary",
-            academicStatus: record.temporaryAcademicStatus,
+            academicStatus: undefined,
             draftNamespace: record.temporaryDraftNamespace,
             department: record.temporaryDepartment,
             primaryMajor: record.temporaryPrimaryMajor,
@@ -300,7 +300,7 @@ export class AuthSessionService {
       mode: "temporary",
       revoked: false,
       sessionId,
-      temporaryAcademicStatus: pendingUser.academicStatus,
+      temporaryAcademicStatus: undefined,
       temporaryDraftNamespace: randomUUID(),
       temporaryDepartment:
         pendingUser.departmentKo?.trim() || pendingUser.departmentEn?.trim(),
@@ -412,7 +412,7 @@ export class AuthSessionService {
 
     if (input.consent) {
       const persistedUser = await this.usersService.upsertUserFromConsent({
-        academicStatus: pendingUser.academicStatus,
+        academicStatus: undefined,
         departmentEn: pendingUser.departmentEn,
         departmentKo: pendingUser.departmentKo,
         primaryMajor: pendingUser.primaryMajor,
@@ -423,11 +423,15 @@ export class AuthSessionService {
         nameEn: pendingUser.nameEn,
         nameKo: pendingUser.nameKo,
         stdNo: pendingUser.stdNo,
-        userMobile: pendingUser.userMobile,
         consentedAt: now,
       });
 
       await this.initialAdminService.ensureRoleForUser(
+        persistedUser.userId,
+        pendingUser.stdNo,
+      );
+
+      await this.usersService.applyStudentFeeBootstrap(
         persistedUser.userId,
         pendingUser.stdNo,
       );
@@ -604,7 +608,7 @@ export class AuthSessionService {
         departmentEn: user.departmentEn,
         primaryMajor: user.primaryMajor,
         feeStatus: feeStatus?.status ?? null,
-        academicStatus: user.academicStatus,
+        academicStatus: null,
       },
     };
   }

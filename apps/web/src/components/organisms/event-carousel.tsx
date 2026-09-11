@@ -1,6 +1,6 @@
 import { createApiClient } from "@soc/api-client";
 import { isoToMs, localDate, msToDate, nowMs } from "@soc/shared";
-import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 
+import { EventCardFallback } from "@/components/organisms/event-card-fallback";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { useLanguage } from "@/hooks/use-language";
@@ -20,7 +21,6 @@ import { getEventArticleState } from "@/lib/events-surveys";
 interface EventCardRecord {
   id: string;
   imageUrl: string | null;
-  palette: string;
   titleKo: string;
   titleEn?: string | null;
   descriptionKo?: string;
@@ -42,7 +42,6 @@ interface EventCardRecord {
 interface EventCardItem {
   id: string;
   imageUrl: string | null;
-  palette: string;
   title: string;
   description?: string;
   startAt: string | null;
@@ -56,18 +55,6 @@ interface EventCardItem {
 }
 
 type EventSortRecord = Pick<EventCardRecord, "isPinned" | "pinOrder" | "homeOrder" | "startAt" | "endAt">;
-
-const EVENT_PALETTES = [
-  "home-event-palette-green",
-  "home-event-palette-blue",
-  "home-event-palette-clay",
-  "home-event-palette-violet",
-] as const;
-
-function resolvePalette(id: string) {
-  const hash = Array.from(id).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return EVENT_PALETTES[hash % EVENT_PALETTES.length];
-}
 
 function getEventSortGroup(event: EventSortRecord, referenceTime: number) {
   if (event.isPinned) return 0;
@@ -124,6 +111,25 @@ function formatEventDateRange(startAt: string | null, endAt: string | null) {
   return `${start} – ${end}`;
 }
 
+function formatEventTime(value: string | null) {
+  if (!value) return null;
+  const timestamp = isoToMs(value);
+  if (!Number.isFinite(timestamp)) return null;
+  const date = msToDate(timestamp);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatEventDateTimeRange(startAt: string | null, endAt: string | null) {
+  const dateRange = formatEventDateRange(startAt, endAt);
+  const start = formatEventTime(startAt);
+  const end = formatEventTime(endAt);
+  const timeRange = start && end && start !== end
+    ? `${start} – ${end}`
+    : start || end;
+
+  return [dateRange, timeRange].filter(Boolean).join(" · ") || null;
+}
+
 function normalizeEventState(value: string | null | undefined): EventCardRecord["linkedSurveyState"] {
   return value === "before_open" || value === "open" || value === "closed"
     ? value
@@ -134,7 +140,6 @@ function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
   return {
     id: record.id,
     imageUrl: record.imageUrl,
-    palette: record.palette,
     title: lang === "ko" ? record.titleKo : record.titleEn || record.titleKo,
     description: lang === "ko"
       ? record.descriptionKo || record.titleKo
@@ -150,34 +155,10 @@ function localizeEvent(record: EventCardRecord, lang: string): EventCardItem {
   };
 }
 
-function EventFallback({ event }: { event: EventCardItem }) {
-  const fallbackImages = [
-    "/hero_background_1.jpg",
-    "/hero_background4.jpeg",
-    "/hero_background2.jpeg",
-  ];
-  const imageIndex = Array.from(event.id).reduce(
-    (sum, character) => sum + character.charCodeAt(0),
-    0,
-  ) % fallbackImages.length;
-
-  return (
-    <div className={`home-event-fallback ${event.palette}`} aria-hidden="true">
-      <img
-        src={fallbackImages[imageIndex]}
-        alt=""
-        draggable={false}
-        className="home-event-fallback-image"
-      />
-      <span className="home-event-fallback-mark">KAIST SoC</span>
-    </div>
-  );
-}
-
 function EventImage({ event }: { event: EventCardItem }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [event.imageUrl]);
-  if (!event.imageUrl || failed) return <EventFallback event={event} />;
+  if (!event.imageUrl || failed) return <EventCardFallback />;
   return (
     <img
       src={event.imageUrl}
@@ -240,9 +221,27 @@ function getEventApplicationLabel(event: EventCardItem, lang: string) {
   return lang === "ko" ? "신청 예정" : "Registration opens soon";
 }
 
+function isEventApplicationClosed(event: EventCardItem) {
+  if (!event.surveyId || !event.linkedSurveyState) return false;
+
+  const isFull = Boolean(
+    event.linkedSurveyMaxResponses &&
+      event.linkedSurveyMaxResponses > 0 &&
+      event.linkedSurveyResponseCount >= event.linkedSurveyMaxResponses,
+  );
+
+  return isFull || event.linkedSurveyState === "closed";
+}
+
 function EventApplicationBadge({ event, lang }: { event: EventCardItem; lang: string }) {
   const label = getEventApplicationLabel(event, lang);
-  return label ? <span className="home-editorial-event-application">{label}</span> : null;
+  return label ? (
+    <span
+      className={`home-editorial-event-application ${isEventApplicationClosed(event) ? "is-closed" : ""}`}
+    >
+      {label}
+    </span>
+  ) : null;
 }
 
 function EventCard({
@@ -256,7 +255,7 @@ function EventCard({
   enterIndex: number;
   lang: string;
 }) {
-  const dateRange = formatEventDateRange(event.startAt, event.endAt);
+  const dateTimeRange = formatEventDateTimeRange(event.startAt, event.endAt);
   const location = event.location?.trim();
   const style = {
     "--home-event-card-delay": `${enterIndex * 80}ms`,
@@ -277,19 +276,26 @@ function EventCard({
           <EventApplicationBadge event={event} lang={lang} />
         </div>
       </div>
-      <div className="home-portal-event-body">
-        {dateRange ? <time className="home-portal-event-date">{dateRange}</time> : null}
+      <div className="home-portal-event-body break-keep">
         <h3 className="line-clamp-2">{event.title}</h3>
         {event.description ? <p className="line-clamp-2">{event.description}</p> : null}
-        <div className={`home-portal-event-location mt-auto flex min-w-0 items-center gap-1.5 ${location ? "" : "text-slate-400"}`}>
-          {location ? (
-            <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-          ) : (
-            <span aria-hidden="true" className="shrink-0">📍</span>
-          )}
-          <span className="truncate">
-            {location ?? (lang === "ko" ? "장소 미정" : "Location TBD")}
-          </span>
+        <div className="home-portal-event-meta">
+          {dateTimeRange ? (
+            <time className="home-portal-event-time">
+              <Clock aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+              <span className="truncate">{dateTimeRange}</span>
+            </time>
+          ) : null}
+          <div className={`home-portal-event-location flex min-w-0 items-center gap-1.5 ${location ? "" : "text-slate-400"}`}>
+            {location ? (
+              <MapPin aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+            ) : (
+              <MapPin aria-hidden="true" className="size-3.5 shrink-0 text-slate-300" />
+            )}
+            <span className="truncate">
+              {location ?? (lang === "ko" ? "장소 미정" : "Location TBD")}
+            </span>
+          </div>
         </div>
       </div>
     </Link>
@@ -365,10 +371,9 @@ export function EventCarousel() {
             titleEn: item.titleEn,
             descriptionKo: item.eventDescriptionKo ?? item.titleKo,
             descriptionEn: item.eventDescriptionEn || item.titleEn || item.eventDescriptionKo || item.titleKo,
-            imageUrl: item.thumbnailStorageKey
-              ? resolveAssetUrl(item.thumbnailStorageKey)
+            imageUrl: item.thumbnailStorageKey?.trim()
+              ? resolveAssetUrl(item.thumbnailStorageKey.trim())
               : null,
-            palette: resolvePalette(item.articleId),
             isPinned: item.isPinned,
             pinOrder: item.pinOrder ?? null,
             homeVisible: item.homeVisible !== false,

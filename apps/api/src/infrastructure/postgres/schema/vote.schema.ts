@@ -28,6 +28,8 @@ export const votes = pgTable("vote", {
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   academicStatuses: jsonb("academic_statuses").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   feePayersOnly: boolean("fee_payers_only").notNull().default(false),
+  quorumPercent: integer("quorum_percent"),
+  quorumInclusive: boolean("quorum_inclusive").notNull().default(true),
   studentNumberFrom: varchar("student_number_from", { length: 20 }),
   studentNumberTo: varchar("student_number_to", { length: 20 }),
   encryptedBallotKey: text("encrypted_ballot_key"),

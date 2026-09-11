@@ -48,7 +48,7 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-function sanitizeForDisplay(value: string) {
+export function sanitizeForDisplay(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";
 
@@ -181,13 +181,27 @@ export function stripRichText(value: string | null | undefined) {
 }
 
 interface RichTextContentProps {
+  inline?: boolean;
   content: string | null | undefined;
   className?: string;
 }
 
-export function RichTextContent({ content, className = "" }: RichTextContentProps) {
+export function RichTextContent({ content, className = "", inline = false }: RichTextContentProps) {
   const html = useMemo(() => sanitizeForDisplay(content ?? ""), [content]);
+  const inlineHtml = useMemo(() => {
+    if (!inline || typeof DOMParser === "undefined") return html;
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const inlineTags = new Set(["STRONG", "B", "EM", "I", "U", "S", "STRIKE", "CODE", "A", "SPAN"]);
+    Array.from(doc.body.querySelectorAll("*")).reverse().forEach((element) => {
+      if (!inlineTags.has(element.tagName)) {
+        if (element.tagName === "BR") element.replaceWith(" ");
+        else element.replaceWith(...Array.from(element.childNodes));
+      }
+    });
+    return doc.body.innerHTML;
+  }, [html, inline]);
   if (!html) return null;
+  if (inline) return <span className={`select-text [overflow-wrap:anywhere] ${className}`} dangerouslySetInnerHTML={{ __html: inlineHtml }} />;
 
   return (
     <div

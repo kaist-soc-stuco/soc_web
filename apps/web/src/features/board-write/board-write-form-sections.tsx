@@ -112,7 +112,7 @@ export function BoardWriteHeaderControls({
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {leadingActions}
-        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
+        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group py-1.5">
           <div
             className={`flex h-4 w-4 items-center justify-center rounded border ${
               isKoreanOnly
@@ -177,7 +177,7 @@ export function BoardEditHeaderControls({
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {leadingActions}
-        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group bg-slate-100/50 border border-slate-200 px-3.5 py-1.5 rounded-lg">
+        <label className="flex min-h-[var(--ui-control-height-mobile)] items-center gap-2.5 cursor-pointer group py-1.5">
           <div
             className={`flex h-4 w-4 items-center justify-center rounded border ${
               isKoreanOnly
@@ -370,12 +370,13 @@ export function BoardWriteEventFields({
         >
           <UiInput
             id="event-start-date"
-            type={isAllDay ? "date" : "datetime-local"}
+            type="date"
             disabled={isEventAlwaysOpen}
             className="w-full min-w-0 text-[length:var(--ui-text-body-sm-size)]"
-            value={eventStartInputValue}
-            onChange={(event) => onEventStartDateChange(event.target.value)}
+            value={eventStartInputValue.slice(0, 10)}
+            onChange={(event) => onEventStartDateChange(!event.target.value ? "" : isAllDay ? event.target.value : `${event.target.value}T${eventStartInputValue.slice(11, 16) || "00:00"}`)}
           />
+          {!isAllDay ? <UiInput type="time" aria-label={lang === "ko" ? "시작 시간 (한국 시간)" : "Start time (Seoul)"} disabled={isEventAlwaysOpen || !eventStartInputValue} value={eventStartInputValue.slice(11, 16)} onChange={(event) => onEventStartDateChange(`${eventStartInputValue.slice(0, 10)}T${event.target.value}`)} className="mt-2 w-full min-w-0" /> : null}
         </UiFormField>
         <UiFormField
           className="min-w-0"
@@ -384,12 +385,13 @@ export function BoardWriteEventFields({
         >
           <UiInput
             id="event-end-date"
-            type={isAllDay ? "date" : "datetime-local"}
+            type="date"
             disabled={isEventAlwaysOpen}
             className="w-full min-w-0 text-[length:var(--ui-text-body-sm-size)]"
-            value={eventEndInputValue}
-            onChange={(event) => onEventEndDateChange(event.target.value)}
+            value={eventEndInputValue.slice(0, 10)}
+            onChange={(event) => onEventEndDateChange(!event.target.value ? "" : isAllDay ? event.target.value : `${event.target.value}T${eventEndInputValue.slice(11, 16) || "23:59"}`)}
           />
+          {!isAllDay ? <UiInput type="time" aria-label={lang === "ko" ? "종료 시간 (한국 시간)" : "End time (Seoul)"} disabled={isEventAlwaysOpen || !eventEndInputValue} value={eventEndInputValue.slice(11, 16)} onChange={(event) => onEventEndDateChange(`${eventEndInputValue.slice(0, 10)}T${event.target.value}`)} className="mt-2 w-full min-w-0" /> : null}
         </UiFormField>
       </div>
       <UiFormField
@@ -419,7 +421,7 @@ export function BoardWriteEventFields({
           }
         />
       </UiFormField>
-      <div className="min-w-0">
+      <UiFormField label={lang === "ko" ? "행사 장소" : "Event location"} htmlFor="event-location" className="min-w-0">
         <UiInput
           id="event-location"
           type="text"
@@ -430,7 +432,7 @@ export function BoardWriteEventFields({
           value={eventLocation}
           onChange={(event) => onEventLocationChange(event.target.value)}
         />
-      </div>
+      </UiFormField>
       <div className="grid gap-1.5">
         <div className="flex items-center justify-between gap-3">
           <label
@@ -837,25 +839,6 @@ export function BoardWriteFooter({
         </Button>
       ) : null}
       <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-        {onSaveDraft ? (
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => void onSaveDraft()}
-            disabled={isSubmitting || isSavingDraft || !canWriteSelected}
-            aria-busy={isSavingDraft}
-            className="h-[var(--ui-control-height)] min-w-0 px-3 !font-medium text-slate-700"
-          >
-            {isSavingDraft ? (
-              <span className="flex items-center gap-1.5">
-                <Loader2 className="size-4 animate-spin" />
-                <span>{defaultSavingLabel}</span>
-              </span>
-            ) : (
-              <span>{defaultSaveLabel}</span>
-            )}
-          </Button>
-        ) : null}
         {leadingActions}
         <Button
           type="button"

@@ -1,8 +1,10 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type { SurveyRecord } from "@soc/contracts";
+import { OPERATIONAL_SURVEY_IDS, type SurveyRecord } from "@soc/contracts";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { isoToDate, nowMs } from "@soc/shared";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -36,14 +38,10 @@ import {
 } from "@/lib/survey-display";
 import {
   Copy, 
-  Edit2, 
-  BarChart3, 
-  ClipboardList,
   Trash2, 
   Link2, 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
 import { useToast } from "@/components/ui/toast";
 
 // Convert timestamp to 24-hour format
@@ -119,6 +117,7 @@ export function SurveyListPage() {
   const [duplicating, setDuplicating] = useState<string | null>(null);
 
   // Filter States
+  const [surveyGroup, setSurveyGroup] = useState<"general" | "operational">("general");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<SurveyStatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -178,7 +177,7 @@ export function SurveyListPage() {
       description: (
         <>
           <span className="block">
-            정말 <strong className="font-semibold text-slate-900">“{survey.titleKo}”</strong> 설문을 삭제하시겠습니까?
+            정말 <strong className="font-semibold text-slate-900">“{stripRichText(survey.titleKo)}”</strong> 설문을 삭제하시겠습니까?
           </span>
           <span className="mt-1 block">삭제된 응답 데이터는 복구할 수 없습니다.</span>
         </>
@@ -271,7 +270,7 @@ export function SurveyListPage() {
 
   // Perform Dynamic Client-Side Filtering & Sorting
   const filteredSurveys = useMemo(() => {
-    return filterAndSortSurveys(surveys, {
+    return filterAndSortSurveys(surveys.filter((survey) => survey.id !== OPERATIONAL_SURVEY_IDS.corporatePartnership).filter((survey) => Object.values(OPERATIONAL_SURVEY_IDS).some((id) => id === survey.id) === (surveyGroup === "operational")), {
       periodFilter: "all",
       searchQuery,
       sortBy,
@@ -280,6 +279,7 @@ export function SurveyListPage() {
       typeFilter,
     });
   }, [
+    surveyGroup,
     surveys,
     searchQuery,
     statusFilter,
@@ -323,6 +323,7 @@ export function SurveyListPage() {
             }
           />
 
+          <SegmentedControl ariaLabel="설문 업무" value={surveyGroup} onChange={(value) => { setSurveyGroup(value); setCurrentPage(1); }} options={[{ value: "general", label: "일반 설문" }, { value: "operational", label: "상시 설문" }]} />
           {/* Inline filters use the shared search and select controls. */}
           <AdminTableCard className="overflow-visible">
             <div className="border-b border-slate-100 p-5">
@@ -424,20 +425,20 @@ export function SurveyListPage() {
                     >
                       최근 수정
                     </AdminSortableHead>
-                    <AdminTableHead className="text-center">응답</AdminTableHead>
+                    <AdminTableHead className="text-center">작업</AdminTableHead>
                   </tr>
                 </AdminTableHeader>
                 <AdminTableBody>
                   {paginatedSurveys.map((survey) => {
                     return (
-                      <tr key={survey.id} className="interaction-row transition-colors hover:bg-slate-50/60">
+                      <tr key={survey.id} onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)} className="interaction-row cursor-pointer transition-colors hover:bg-slate-50/60">
                         <AdminTableCell className="pl-5" truncate>
                           <button
                             type="button"
-                            onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)}
+                            onClick={(event) => { event.stopPropagation(); navigate(`/admin/surveys/${survey.id}/edit`); }}
                             className="admin-table-text-emphasis block max-w-full truncate text-left hover:underline"
                           >
-                            {survey.titleKo}
+                            {stripRichText(survey.titleKo)}
                           </button>
                         </AdminTableCell>
                         <AdminTableCell data-mobile-label="상태" className="text-center">
@@ -455,33 +456,9 @@ export function SurveyListPage() {
                         </AdminTableCell>
                         <AdminTableCell data-mobile-label="작업" className="text-center">
                           <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-50/80 p-0.5">
-                            <IconButton
-                              size="sm"
-                              tone="table-action"
-                              aria-label={`${survey.titleKo} 응답 목록`}
-                              onClick={() => navigate(`/admin/surveys/${survey.id}/responses`)}
-                            >
-                              <ClipboardList className="size-4" />
-                            </IconButton>
-                            <IconButton
-                              size="sm"
-                              tone="table-action"
-                              aria-label={`${survey.titleKo} 결과 요약`}
-                              onClick={() => navigate(`/survey/${survey.id}/results`)}
-                            >
-                              <BarChart3 className="size-4" />
-                            </IconButton>
-                            <IconButton
-                              size="sm"
-                              tone="table-action"
-                              aria-label={`${survey.titleKo} 편집`}
-                              onClick={() => navigate(`/admin/surveys/${survey.id}/edit`)}
-                            >
-                              <Edit2 className="size-4" />
-                            </IconButton>
                             <AdminRowActions
-                              label={`${survey.titleKo} 작업 메뉴`}
-                              onClick={(event) => openRowDropdown(survey.id, event.currentTarget)}
+                              label={`${stripRichText(survey.titleKo)} 작업 메뉴`}
+                              onClick={(event) => { event.stopPropagation(); openRowDropdown(survey.id, event.currentTarget); }}
                             />
                           </div>
                         </AdminTableCell>

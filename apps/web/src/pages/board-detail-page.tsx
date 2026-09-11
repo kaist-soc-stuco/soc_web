@@ -54,6 +54,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
     lang,
     loading,
     posterAsset,
+    posterStorageKey,
     commentPageTotal,
     replySubmitting,
     replyTargetId,
@@ -174,6 +175,7 @@ export function BoardDetailPage({ forcedCategory, publicBasePath }: { forcedCate
               void handleSetArticleEngagement(kind, active)
             }
             posterAsset={posterAsset}
+            posterStorageKey={posterStorageKey}
             shareCopied={shareCopied}
             surveyDescription={surveyDescription}
             surveyTitle={surveyTitle}

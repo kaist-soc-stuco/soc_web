@@ -12,7 +12,6 @@ export interface ParsedContactSpreadsheetRow {
   email: string;
   phoneNumber: string;
   privacyConsented: boolean;
-  publiclyListed: boolean;
   sortOrder?: number;
 }
 
@@ -33,16 +32,10 @@ const HEADER_ALIASES: Record<keyof ParsedContactSpreadsheetRow, string[]> = {
   email: ["email", "이메일", "메일"],
   phoneNumber: ["phonenumber", "phone", "전화번호", "연락처", "휴대전화"],
   privacyConsented: ["privacyconsented", "개인정보동의", "동의여부"],
-  publiclyListed: ["publiclylisted", "공개조직도", "인터넷공개", "공개여부"],
   sortOrder: ["sortorder", "순서", "정렬순서"],
 };
 
-const requiredFields: Array<keyof ParsedContactSpreadsheetRow> = [
-  "nameKo",
-  "nameEn",
-  "roleKo",
-  "roleEn",
-];
+const requiredFields: Array<keyof ParsedContactSpreadsheetRow> = ["nameKo", "roleKo"];
 
 function normalizeCell(value: unknown) {
   if (value === null || value === undefined) return "";
@@ -109,15 +102,12 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
       roleKo: value("roleKo"),
       roleEn: value("roleEn"),
       studentNumber: value("studentNumber"),
-      cohort: cohortText ? Number(cohortText) : undefined,
+      cohort: cohortText ? (Number(cohortText) < 100 ? 2000 + Number(cohortText) : Number(cohortText)) : undefined,
       email: value("email"),
       phoneNumber: value("phoneNumber"),
       privacyConsented: value("privacyConsented")
         ? !["false", "0", "no", "아니오", "미동의"].includes(value("privacyConsented").toLowerCase())
         : true,
-      publiclyListed: value("publiclyListed")
-        ? ["true", "1", "yes", "예", "동의", "공개"].includes(value("publiclyListed").toLowerCase())
-        : false,
       sortOrder: sortOrderText ? Number(sortOrderText) : undefined,
     } satisfies ParsedContactSpreadsheetRow;
 
@@ -146,6 +136,6 @@ export function parseContactSpreadsheet(input: ArrayBuffer): ContactSpreadsheetP
 }
 
 export const CONTACT_XLSX_TEMPLATE_ROWS = [
-  ["이름", "영문명", "학번", "부서", "영문부서", "직책", "영문직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "공개조직도", "표시순서"],
-  ["홍길동", "Gildong Hong", "20261234", "회장단", "Presidium", "회장", "President", 2026, "hong@example.com", "010-0000-0000", "동의", "비공개", 10],
+  ["이름", "학번", "부서", "직책", "활동 연도", "이메일", "전화번호", "개인정보동의", "표시순서"],
+  ["홍길동", "20261234", "회장단", "회장", 2026, "hong@example.com", "010-0000-0000", "동의", 10],
 ] as const;

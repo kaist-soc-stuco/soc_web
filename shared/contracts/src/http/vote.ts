@@ -46,10 +46,15 @@ const VoteDefinitionFields = z.object({
   endsAt: z.string().datetime({ offset: true }),
   academicStatuses: z.array(z.string().trim().min(1).max(30)).max(10).default([]),
   feePayersOnly: z.boolean().default(false),
+  quorumPercent: z.number().int().min(0).max(100).default(50),
+  quorumInclusive: z.boolean().default(true),
   studentNumberFrom: z.string().trim().max(20).nullable().optional(),
   studentNumberTo: z.string().trim().max(20).nullable().optional(),
   items: z.array(VoteItemInputSchema).min(1).max(30),
 });
+
+export const VoteEligibilityPreviewSchema = VoteDefinitionFields.pick({ academicStatuses: true, feePayersOnly: true, studentNumberFrom: true, studentNumberTo: true }).strict();
+export type VoteEligibilityPreviewRequest = z.infer<typeof VoteEligibilityPreviewSchema>;
 
 const validateSchedule = (
   value: { startsAt?: string; endsAt?: string },
@@ -117,6 +122,8 @@ export interface VoteRecord {
   endsAt: string;
   academicStatuses: string[];
   feePayersOnly: boolean;
+  quorumPercent: number | null;
+  quorumInclusive: boolean;
   studentNumberFrom: string | null;
   studentNumberTo: string | null;
   voterSnapshotAt: string | null;

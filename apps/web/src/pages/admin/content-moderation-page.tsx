@@ -120,7 +120,7 @@ function ContentModerationPageContent() {
         />
         <AdminTableCard
           toolbar={(
-            <div className="flex items-center justify-between gap-3 px-5 py-4">
+            <div className="flex items-center justify-between gap-3 py-4">
               <p className="text-sm font-normal text-app-text-secondary">숨김 {activeItems.length}건</p>
               <PageSearchField
                 ariaLabel="숨김 게시글 검색"
@@ -155,7 +155,7 @@ function ContentModerationPageContent() {
                     <AdminTableCell data-mobile-label="숨김 사유"><span className="line-clamp-2 font-normal">{article.hiddenReason}</span></AdminTableCell>
                     <AdminTableCell data-mobile-label="처리 일시">{formatDate(article.hiddenAt)}</AdminTableCell>
                     <AdminTableCell data-mobile-label="작업" className="text-center align-middle">
-                      <Button type="button" variant="ghost" size="sm" disabled={restoringId === article.articleId} onClick={() => void restore(article)}>
+                      <Button type="button" variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700" disabled={restoringId === article.articleId} onClick={() => void restore(article)}>
                         <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
                       </Button>
                     </AdminTableCell>
@@ -176,7 +176,7 @@ function ContentModerationPageContent() {
                     <AdminTableCell data-mobile-label="작성자" truncate>{comment.authorName}</AdminTableCell>
                     <AdminTableCell data-mobile-label="숨김 사유"><span className="line-clamp-2 font-normal">{comment.hiddenReason}</span></AdminTableCell>
                     <AdminTableCell data-mobile-label="작업" className="text-center align-middle">
-                      <Button type="button" variant="ghost" size="sm" disabled={restoringId === `comment:${comment.commentId}`} onClick={() => void restoreComment(comment)}>
+                      <Button type="button" variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700" disabled={restoringId === `comment:${comment.commentId}`} onClick={() => void restoreComment(comment)}>
                         <RotateCcw className="size-3.5" aria-hidden="true" /> 복구
                       </Button>
                     </AdminTableCell>

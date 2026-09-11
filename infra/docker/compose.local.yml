@@ -39,6 +39,7 @@ services:
       dockerfile: apps/web/Dockerfile
     environment:
       DEV_API_PROXY_TARGET: http://api:3000
+      LOCAL_SSO_PROXY_TARGET: http://${LOCAL_QA_BIND:-192.168.0.3}:${LOCAL_QA_PORT:-8765}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     ports:
       - '${WEB_PORT:-5173}:5173'

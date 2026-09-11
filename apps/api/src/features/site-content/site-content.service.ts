@@ -135,13 +135,6 @@ export class SiteContentService {
     const before = await this.siteContentRepository.findContentBlockById(contentBlockId);
     if (!before) throw new NotFoundException("content_block_not_found");
     const nextType = input.type ?? before.type;
-    const nextImageUrl = input.imageUrl === undefined ? before.imageUrl : input.imageUrl;
-    if (nextType === "HERO" && !nextImageUrl) {
-      throw new BadRequestException("hero_image_required");
-    }
-    if (nextType === "LOGO" && !nextImageUrl) {
-      throw new BadRequestException("logo_image_required");
-    }
     if (nextType === "LOGO") {
       const existing = await this.siteContentRepository.listContentBlocks();
       if (existing.some((block) =>
@@ -152,7 +145,6 @@ export class SiteContentService {
       }
     }
     if (nextType === "ORGANIZATION_CHART") {
-      if (!nextImageUrl) throw new BadRequestException("organization_chart_image_required");
       const existing = await this.siteContentRepository.listContentBlocks();
       if (existing.some((block) =>
         block.contentBlockId !== contentBlockId &&
