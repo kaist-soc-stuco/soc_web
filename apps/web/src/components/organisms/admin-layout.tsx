@@ -2,7 +2,7 @@ import { createApiClient } from "@soc/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { LogOut, User } from "lucide-react";
 import { Suspense } from "react";
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSidebar } from "@/components/organisms/admin-sidebar";
@@ -34,7 +34,7 @@ export function AdminLayout() {
   return <AuthGuard requireAnyPermission={ADMIN_ACCESS_PERMISSIONS}>
     <div className="flex min-h-screen max-w-full flex-col md:flex-row bg-[#f7f9fc]">
       <aside className="flex w-full shrink-0 flex-col border-r border-slate-200 bg-white md:sticky md:top-0 md:h-svh md:w-64">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-6 py-4"><div><p className="mb-1 text-lg font-bold tracking-tight text-slate-900">KAIST SoC</p><p className="text-xs font-medium text-slate-500">관리자 대시보드</p></div></div>
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-6 py-4"><Link to="/" aria-label="홈으로 이동" className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"><p className="mb-1 text-lg font-bold tracking-tight text-slate-900">KAIST SoC</p><p className="text-xs font-medium text-slate-500">관리자 대시보드</p></Link></div>
         <div className="min-h-0 max-h-56 flex-1 overflow-y-auto md:max-h-none"><AdminSidebar /></div>
         <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-6 py-4"><div className="flex items-center gap-2 text-sm"><User className="size-4" /><span className="truncate">{session?.nameKo ?? "관리자"}</span></div><Button variant="ghost" size="icon" className="ml-auto shrink-0 text-slate-700" aria-label="로그아웃" title="로그아웃" onClick={() => void logout()}><LogOut className="size-4" /></Button></div>
       </aside>
