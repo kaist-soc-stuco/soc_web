@@ -25,9 +25,7 @@ import { Permissions } from "@/lib/permissions";
 type UserSortBy = "name" | "lastLoginAt";
 type SortDirection = "asc" | "desc";
 type UserStatusFilter = "all" | "active" | "inactive";
-type MajorTypeFilter = "all" | "PRIMARY";
 type FeeStatusFilter = "all" | "PAID" | "PARTIAL" | "UNPAID";
-type AcademicStatusFilter = "all" | "재학" | "졸업";
 
 const formatShortDateTime = (value?: string | null) => {
   if (!value) return "-";
@@ -77,9 +75,7 @@ export function UserManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
-  const [majorTypeFilter, setMajorTypeFilter] = useState<MajorTypeFilter>("all");
   const [feeStatusFilter, setFeeStatusFilter] = useState<FeeStatusFilter>("all");
-  const [academicStatusFilter, setAcademicStatusFilter] = useState<AcademicStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,9 +136,7 @@ export function UserManagementPage() {
         sortBy,
         sortDirection,
         status: statusFilter === "all" ? undefined : statusFilter,
-        majorType: majorTypeFilter === "all" ? undefined : majorTypeFilter,
         feeStatus: feeStatusFilter === "all" ? undefined : feeStatusFilter,
-        academicStatus: academicStatusFilter === "all" ? undefined : academicStatusFilter,
       })
       .then((response) => {
         if (!cancelled) setData(response);
@@ -165,9 +159,8 @@ export function UserManagementPage() {
     currentPage,
     pageSize,
     query,
-    majorTypeFilter,
     feeStatusFilter,
-    academicStatusFilter,
+
     refreshVersion,
     sessionLoading,
     sortBy,
@@ -323,27 +316,6 @@ export function UserManagementPage() {
                   }}
                 />
                 <AdminSelectDropdown
-                  ariaLabel="학적 상태"
-                  className="w-32"
-                  value={academicStatusFilter}
-                  onChange={(value) => { setAcademicStatusFilter(value as AcademicStatusFilter); setCurrentPage(1); }}
-                  options={[
-                    { value: "all", label: "전체 학적" },
-                    { value: "재학", label: "재학" },
-                    { value: "졸업", label: "졸업" },
-                  ]}
-                />
-                <AdminSelectDropdown
-                  ariaLabel="전공 유형"
-                  className="w-36"
-                  value={majorTypeFilter}
-                  onChange={(value) => { setMajorTypeFilter(value as MajorTypeFilter); setCurrentPage(1); }}
-                  options={[
-                    { value: "all", label: "전체 전공" },
-                    { value: "PRIMARY", label: "주전공" },
-                  ]}
-                />
-                <AdminSelectDropdown
                   ariaLabel="과비 납부 상태"
                   className="w-36"
                   value={feeStatusFilter}
@@ -403,7 +375,7 @@ export function UserManagementPage() {
                     >
                       이름
                     </AdminSortableHead>
-                    <AdminTableHead>연락처</AdminTableHead>
+                    <AdminTableHead>이메일</AdminTableHead>
                     <AdminTableHead>전공</AdminTableHead>
                     <AdminTableHead>동의 시각</AdminTableHead>
                     <AdminSortableHead
@@ -443,9 +415,8 @@ export function UserManagementPage() {
                             {displayStudentId(user)}
                           </div>
                         </AdminTableCell>
-                        <AdminTableCell data-mobile-label="연락처" className="py-3">
+                        <AdminTableCell data-mobile-label="이메일" className="py-3">
                           <div className="truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={user.email}>{user.email}</div>
-                          <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]" title={user.phoneNumber ?? undefined}>{user.phoneNumber ?? ""}</div>
                         </AdminTableCell>
                         <AdminTableCell data-mobile-label="전공" className="py-3">
                           {major ? <div className="mt-0.5 truncate text-sm font-normal leading-5 text-[var(--j-color-text-secondary)]">{major}</div> : null}
@@ -624,9 +595,7 @@ function UserDetailDrawer({
               <UserDetailItem label="학번" value={displayStudentId(user)} />
               <UserDetailItem label="KAIST UID" value={user.kaistUid} />
               <UserDetailItem label="이메일" value={user.email} />
-              <UserDetailItem label="전화번호" value={user.phoneNumber ?? ""} />
               <UserDetailItem label="주전공" value={user.primaryMajor ?? "—"} />
-              <UserDetailItem label="학적 상태" value={user.academicStatus ?? "—"} />
             </dl>
           </section>
 

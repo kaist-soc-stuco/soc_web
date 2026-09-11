@@ -10,7 +10,8 @@ import type {
   RoadmapOfferingRecord,
   UpdateRoadmapCourseRequest,
 } from "@soc/contracts";
-import { Plus, Save, Trash2, Upload } from "lucide-react";
+import { isoToDate, nowIso } from "@soc/shared";
+import { Plus, Save, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -66,6 +67,11 @@ const CATEGORY_OPTIONS: Array<{ value: RoadmapCourseCategory; label: string }> =
   { value: "major-required", label: "전공필수" },
   { value: "major-elective", label: "전공선택" },
 ];
+
+function getCurrentRoadmapTerm() {
+  const date = isoToDate(nowIso());
+  return `${date.getFullYear()}-${date.getMonth() < 6 ? "spring" : "fall"}`;
+}
 
 type ActiveTab = "courses" | "offerings";
 type EditorTab = "master" | "offerings";
@@ -147,10 +153,13 @@ function RoadmapManagementPageContent() {
     try {
       const response = await apiClient.getAdminRoadmapOfferings();
       setData(response);
+      const currentTerm = getCurrentRoadmapTerm();
       setSelectedTerm((current) =>
         current && response.terms.some((term) => term.term === current)
           ? current
-          : response.terms[0]?.term ?? "",
+          : response.terms.some((term) => term.term === currentTerm)
+            ? currentTerm
+            : response.terms[0]?.term ?? "",
       );
     } catch {
       toast({ type: "error", message: "로드맵 정보를 불러오지 못했습니다." });
@@ -339,7 +348,7 @@ function CourseTable({ courses, loading, onOpen }: { courses: RoadmapCourseRecor
   return (
     <AdminDataTable minWidth="68rem">
       <colgroup><col style={{ width: 130 }} /><col style={{ width: 250 }} /><col style={{ width: 180 }} /><col style={{ width: 100 }} /><col style={{ width: 220 }} /></colgroup>
-      <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead>교육 분야</AdminTableHead><AdminTableHead>학점</AdminTableHead><AdminTableHead>선수 과목</AdminTableHead></tr></AdminTableHeader>
+      <AdminTableHeader><tr><AdminTableHead>과목코드</AdminTableHead><AdminTableHead>과목명</AdminTableHead><AdminTableHead>교육 분야</AdminTableHead><AdminTableHead>학점</AdminTableHead><AdminTableHead>권장 선수 과목</AdminTableHead></tr></AdminTableHeader>
       <AdminTableBody>
         {loading && courses.length === 0 ? <AdminTableEmpty colSpan={5}>불러오는 중...</AdminTableEmpty> : courses.length === 0 ? <AdminTableEmpty colSpan={5}>등록된 전체 교과목이 없습니다.</AdminTableEmpty> : courses.map((course) => (
           <tr key={course.courseId} tabIndex={0} role="button" onClick={() => onOpen(course)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(course); } }} className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50/70 focus:bg-slate-50/70 focus:outline-none">
@@ -384,6 +393,7 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
   const [saving, setSaving] = useState(false);
   const [offeringDraft, setOfferingDraft] = useState<OfferingForm | null>(null);
   const [selectedOfferingId, setSelectedOfferingId] = useState<string | null>(null);
+  const [offeringTerm, setOfferingTerm] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -391,9 +401,23 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
     setForm(course ? courseToForm(course) : emptyCourseForm());
     setOfferingDraft(null);
     setSelectedOfferingId(null);
+    setOfferingTerm("");
   }, [course, open]);
 
   const offerings = useMemo(() => data.items.filter((offering) => offering.courseCode === course?.courseCode), [course?.courseCode, data.items]);
+  const defaultOfferingTerm = useMemo(() => {
+    const currentTerm = getCurrentRoadmapTerm();
+    const availableTerms = new Set(offerings.map((offering) => offering.term));
+    const candidates = [currentTerm, selectedTerm, offerings[0]?.term].filter(Boolean);
+    return candidates.find((term) => offerings.length === 0 || availableTerms.has(term)) ?? candidates[0] ?? "";
+  }, [offerings, selectedTerm]);
+  useEffect(() => {
+    if (open) setOfferingTerm(defaultOfferingTerm);
+  }, [defaultOfferingTerm, open]);
+  const activeOfferingTerm = offeringTerm && (offerings.length === 0 || offerings.some((offering) => offering.term === offeringTerm))
+    ? offeringTerm
+    : defaultOfferingTerm;
+  const offeringCount = offerings.filter((offering) => offering.term === activeOfferingTerm).length;
 
   const saveCourse = async () => {
     if (!form.courseCode.trim() || !form.nameKo.trim()) {
@@ -472,9 +496,9 @@ function CourseEditorModal({ apiClient, course, data, isNew, onClose, onSaved, o
     <Modal open={open} onClose={onClose} title={isNew ? "새 과목 등록" : `${course?.courseCode ?? "과목"} 통합 편집`} mobileFullscreen className="max-w-4xl" bodyClassName="space-y-5 px-4 py-5 sm:px-5" footer={tab === "master" ? <><Button type="button" variant="outline" onClick={onClose}>취소</Button><Button type="button" disabled={saving} onClick={() => void saveCourse()}><Save aria-hidden="true" />{saving ? "저장 중..." : "저장하기"}</Button></> : null}>
       <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label="과목 편집 탭">
         <button type="button" role="tab" aria-selected={tab === "master"} onClick={() => setTab("master")} className={cn("min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "master" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>기본 정보 (마스터)</button>
-        <button type="button" role="tab" aria-selected={tab === "offerings"} onClick={() => setTab("offerings")} className={cn("min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>학기별 개설 ({offerings.length})</button>
+        <button type="button" role="tab" aria-selected={tab === "offerings"} onClick={() => setTab("offerings")} className={cn("min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium", tab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500")}>학기별 개설 ({offeringCount})</button>
       </div>
-      {tab === "master" ? <MasterCourseForm form={form} onChange={setForm} courseCodeEditable={isNew} /> : <OfferingEditor defaultTerm={selectedTerm} draft={offeringDraft} onDraftChange={setOfferingDraft} onNew={(term) => { setSelectedOfferingId(null); setOfferingDraft(blankOffering(term)); }} offerings={offerings} onSelect={(offering) => { setSelectedOfferingId(offering.offeringId); setOfferingDraft(offeringToForm(offering)); }} onSave={() => void saveOffering()} onDelete={() => void removeOffering()} saving={saving} />}
+      {tab === "master" ? <MasterCourseForm form={form} onChange={setForm} courseCodeEditable={isNew} /> : <OfferingEditor defaultTerm={activeOfferingTerm} offeringTerm={activeOfferingTerm} onOfferingTermChange={setOfferingTerm} draft={offeringDraft} onDraftChange={setOfferingDraft} onNew={(term) => { setSelectedOfferingId(null); setOfferingDraft(blankOffering(term)); }} offerings={offerings} onSelect={(offering) => { setSelectedOfferingId(offering.offeringId); setOfferingDraft(offeringToForm(offering)); }} onSave={() => void saveOffering()} onCancel={() => { setOfferingDraft(null); setSelectedOfferingId(null); }} onDelete={() => void removeOffering()} editingExisting={Boolean(selectedOfferingId)} saving={saving} />}
     </Modal>
   );
 }
@@ -492,7 +516,7 @@ function MasterCourseForm({ form, onChange, courseCodeEditable }: { form: Course
         <AdminFormField label="강·실·학"><UiInput value={form.credits} onChange={(event) => set("credits", event.currentTarget.value)} placeholder="3:0:3(0)" /></AdminFormField>
         <AdminFormField label="개설 학기"><UiInput value={form.semesters} onChange={(event) => set("semesters", event.currentTarget.value)} placeholder="S/F" /></AdminFormField>
       </div>
-      <AdminFormField label="선수 과목" hint="과목코드를 쉼표로 구분해 입력하면 연결 관계가 저장됩니다."><UiInput value={form.prerequisiteCourseCodes} onChange={(event) => set("prerequisiteCourseCodes", event.currentTarget.value)} placeholder="CS10001, CS20004" /></AdminFormField>
+      <AdminFormField label="권장 선수 과목" hint="과목코드를 쉼표로 구분해 입력하면 연결 관계가 저장됩니다."><UiInput value={form.prerequisiteCourseCodes} onChange={(event) => set("prerequisiteCourseCodes", event.currentTarget.value)} placeholder="CS10001, CS20004" /></AdminFormField>
       <div><p className="mb-2 text-xs font-normal text-[#344054]">교육 분야(트랙)</p><div className="grid gap-2 sm:grid-cols-3">{TRACKS.map(([id, label]) => <label key={id} className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.trackIds.includes(id)} onChange={(event) => set("trackIds", event.currentTarget.checked ? [...form.trackIds, id] : form.trackIds.filter((current) => current !== id))} className="size-4 accent-emerald-700" />{label}</label>)}</div></div>
       <div className="flex flex-wrap gap-4"><label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.ai} onChange={(event) => set("ai", event.currentTarget.checked)} className="size-4 accent-emerald-700" />AI 중점 과목</label><label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.isVisible} onChange={(event) => set("isVisible", event.currentTarget.checked)} className="size-4 accent-emerald-700" />로드맵에 표시</label></div>
     </div>
@@ -501,23 +525,31 @@ function MasterCourseForm({ form, onChange, courseCodeEditable }: { form: Course
 
 function OfferingEditor({
   defaultTerm,
+  offeringTerm,
+  onOfferingTermChange,
   draft,
   onDraftChange,
   onNew,
   offerings,
   onSelect,
   onSave,
+  onCancel,
   onDelete,
+  editingExisting,
   saving,
 }: {
   defaultTerm: string;
+  offeringTerm: string;
+  onOfferingTermChange: (term: string) => void;
   draft: OfferingForm | null;
   onDraftChange: (draft: OfferingForm | null) => void;
   onNew: (term: string) => void;
   offerings: RoadmapOfferingRecord[];
   onSelect: (offering: RoadmapOfferingRecord) => void;
   onSave: () => void;
+  onCancel: () => void;
   onDelete: () => void;
+  editingExisting: boolean;
   saving: boolean;
 }) {
   const offeringTerms = useMemo(() => {
@@ -525,19 +557,10 @@ function OfferingEditor({
     if (defaultTerm && !terms.includes(defaultTerm)) terms.push(defaultTerm);
     return terms.sort((left, right) => right.localeCompare(left));
   }, [defaultTerm, offerings]);
-  const [offeringTerm, setOfferingTerm] = useState(
-    defaultTerm || offeringTerms[0] || "",
-  );
-
-  useEffect(() => {
-    setOfferingTerm((current) =>
-      current && offeringTerms.includes(current)
-        ? current
-        : offeringTerms[0] || defaultTerm,
-    );
-  }, [defaultTerm, offeringTerms]);
-
-  const visibleOfferings = offerings.filter((offering) => offering.term === offeringTerm);
+  const visibleTerm = offeringTerm && offeringTerms.includes(offeringTerm)
+    ? offeringTerm
+    : offeringTerms[0] || defaultTerm || "";
+  const visibleOfferings = offerings.filter((offering) => offering.term === visibleTerm);
   const set = <K extends keyof OfferingForm>(key: K, value: OfferingForm[K]) => {
     if (draft) onDraftChange({ ...draft, [key]: value });
   };
@@ -549,12 +572,12 @@ function OfferingEditor({
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <AdminSelectDropdown
             ariaLabel="개설 정보 학기"
-            value={offeringTerm}
+            value={visibleTerm}
             options={offeringTerms.map((term) => ({ value: term, label: formatTerm(term) }))}
-            onChange={setOfferingTerm}
+            onChange={onOfferingTermChange}
             className="w-36"
           />
-          <Button type="button" size="sm" variant="outline" onClick={() => onNew(offeringTerm || offeringTerms[0] || defaultTerm)}>
+          <Button type="button" size="sm" variant="outline" onClick={() => onNew(visibleTerm || offeringTerms[0] || defaultTerm)}>
             <Plus aria-hidden="true" /> 분반 추가
           </Button>
         </div>
@@ -608,7 +631,16 @@ function OfferingEditor({
             <AdminFormField label="수강인원"><UiInput type="number" value={draft.enrolled} onChange={(event) => set("enrolled", event.currentTarget.value)} /></AdminFormField>
           </div>
           <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={draft.inEnglish} onChange={(event) => set("inEnglish", event.currentTarget.checked)} className="size-4 accent-emerald-700" />영어 강의</label>
-          <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={saving} onClick={onDelete}><Trash2 aria-hidden="true" /> 삭제</Button><Button type="button" disabled={saving} onClick={onSave}><Save aria-hidden="true" /> 저장</Button></div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" disabled={saving} onClick={editingExisting ? onDelete : onCancel}>
+              {editingExisting ? <Trash2 aria-hidden="true" /> : <X aria-hidden="true" />}
+              {editingExisting ? "삭제" : "취소"}
+            </Button>
+            <Button type="button" disabled={saving} onClick={onSave}>
+              {editingExisting ? <Save aria-hidden="true" /> : <Plus aria-hidden="true" />}
+              {saving ? (editingExisting ? "저장 중..." : "추가 중...") : editingExisting ? "저장" : "추가"}
+            </Button>
+          </div>
         </div>
       ) : (
         <p className="text-xs text-slate-500">분반을 선택하거나 추가하면 한 곳에서 개설 정보를 편집할 수 있습니다.</p>

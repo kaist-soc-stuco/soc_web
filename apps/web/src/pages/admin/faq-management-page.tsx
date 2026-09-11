@@ -1,3 +1,4 @@
+import { restrictListDrag } from "@/lib/drag-bounds";
 import type { ArticleListItem } from "@soc/contracts";
 import { createApiClient } from "@soc/api-client";
 import {
@@ -17,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
@@ -210,7 +211,7 @@ function FaqManagementPageContent() {
         />
         <AdminTableCard>
           {loading && items.length === 0 ? null : (
-            <DndContext
+            <DndContext modifiers={[restrictListDrag]}
               autoScroll={false}
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -218,11 +219,11 @@ function FaqManagementPageContent() {
               onDragCancel={() => setActiveFaqId(null)}
               onDragEnd={(event) => void handleDragEnd(event)}
             >
-              <AdminDataTable minWidth={760} isDragging={Boolean(activeFaqId)}>
+              <AdminDataTable className="admin-sortable-table" minWidth={900} isDragging={Boolean(activeFaqId)}>
                 <colgroup>
                   <col style={{ width: 52 }} />
-                  <col style={{ width: 280 }} />
-                  <col style={{ width: 320 }} />
+                  <col />
+                  <col style={{ width: 420 }} />
                   <col style={{ width: 112 }} />
                 </colgroup>
                 <AdminTableHeader>
@@ -310,9 +311,9 @@ function SortableFaqRow({
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: item.articleId, disabled });
   return (
-    <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease" }} className={cn("group transition-colors hover:bg-slate-50/60", isDragging && "relative z-10 opacity-70")}>
+    <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease" }} className={cn("group cursor-pointer transition-colors hover:bg-slate-50/60", isDragging && "relative z-10 opacity-70")} tabIndex={disabled ? -1 : 0} onClick={() => { if (!disabled) onEdit(item); }} onKeyDown={(event) => { if (event.target === event.currentTarget && !disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onEdit(item); } }}>
       <AdminTableCell className="text-center">
-        <button ref={setActivatorNodeRef} type="button" aria-label="FAQ 순서 이동" title="드래그하여 순서 변경" {...attributes} {...listeners} className="inline-flex size-7 cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-slate-400 hover:bg-slate-100 active:cursor-grabbing">
+        <button ref={setActivatorNodeRef} type="button" aria-label="FAQ 순서 이동" title="드래그하여 순서 변경" onClick={(event) => event.stopPropagation()} {...attributes} {...listeners} className="admin-list-drag-handle">
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
       </AdminTableCell>
@@ -320,8 +321,7 @@ function SortableFaqRow({
       <AdminTableCell><span className="admin-table-text line-clamp-2 whitespace-normal">{stripRichText(item.snippetKo)}</span></AdminTableCell>
       <AdminTableCell>
         <div className="flex items-center gap-1 opacity-70 transition-opacity group-hover:opacity-100">
-          <Button type="button" variant="ghost" size="icon" aria-label="FAQ 편집" onClick={() => onEdit(item)} disabled={disabled}><Pencil aria-hidden="true" /></Button>
-          <Button type="button" variant="ghost" size="icon" aria-label="FAQ 삭제" onClick={() => onDelete(item)} disabled={disabled} className="text-slate-400 hover:text-rose-600"><Trash2 aria-hidden="true" /></Button>
+          <Button type="button" variant="ghost" size="icon" aria-label="FAQ 삭제" onClick={(event) => { event.stopPropagation(); onDelete(item); }} disabled={disabled} className="text-slate-400 hover:text-rose-600"><Trash2 aria-hidden="true" /></Button>
         </div>
       </AdminTableCell>
     </tr>

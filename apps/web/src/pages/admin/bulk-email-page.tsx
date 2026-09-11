@@ -1,5 +1,8 @@
+import { useToast } from "@/components/ui/toast";
+import { randomId } from "@/lib/random-id";
 import {
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -9,6 +12,7 @@ import {
 import { createApiClient } from "@soc/api-client";
 import type {
   BulkEmailPreviewResponse,
+  CurrentUserResponse,
   BulkEmailRecord,
   BulkEmailTemplate,
   SendBulkEmailRequest,
@@ -39,7 +43,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { RichTextEditor } from "@/components/organisms/rich-text-editor";
 import { RichTextContent } from "@/components/ui/rich-text-content";
-import { AdminEditorGuidance, AdminFormField, AdminPageShell } from "@/components/ui/admin-page";
+import { AdminEditorGuidance, AdminFormField, AdminPageShell, AdminPageHeader } from "@/components/ui/admin-page";
 import { Button } from "@/components/ui/button";
 import { DraftRestoredBanner } from "@/components/ui/draft-restored-banner";
 import { Modal } from "@/components/ui/modal";
@@ -127,13 +131,6 @@ const RECIPIENT_FILTER_GROUPS: ReadonlyArray<{
       { kind: "recipientType", value: "UNPAID_STUDENTS", label: "미납부" },
     ],
   },
-  {
-    label: "학적",
-    options: [
-      { kind: "filter", key: "academicStatus", value: "재학", label: "재학" },
-      { kind: "filter", key: "academicStatus", value: "졸업", label: "졸업" },
-    ],
-  },
 ];
 
 type AttachmentView = {
@@ -160,6 +157,7 @@ export function BulkEmailPage() {
 }
 
 function BulkEmailPageContent() {
+  const { toast } = useToast();
   const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const { data: session, isLoading: sessionLoading } = useCurrentSession();
   const emailDraftStorageKey = useMemo(
@@ -202,7 +200,6 @@ function BulkEmailPageContent() {
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewPreview, setReviewPreview] = useState<BulkEmailPreviewResponse | null>(null);
-  const [recipientListOpen, setRecipientListOpen] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("now");
   const [scheduledAt, setScheduledAt] = useState("");
   const [sending, setSending] = useState(false);
@@ -213,8 +210,10 @@ function BulkEmailPageContent() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
-  const [operationError, setOperationError] = useState<string | null>(null);
-  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const setOperationError = useCallback((message: string | null) => { if (message) toast({ type: "error", message }); }, [toast]);
+  const [currentUser, setCurrentUser] = useState<CurrentUserResponse["user"]>();
+  useEffect(() => { let active = true; void apiClient.getCurrentUser().then((response) => { if (active) setCurrentUser(response.user); }).catch(() => {}); return () => { active = false; }; }, [apiClient]);
+  const setStatusNotice = (message: string | null) => { if (message) toast({ type: "success", message }); };
 
   useEffect(() => {
     if (sessionLoading || draftIdentityKey === emailDraftStorageKey) return;
@@ -255,20 +254,19 @@ function BulkEmailPageContent() {
     };
 
     add("studentNumber", "학번", formatStudentNumberFilter(filters.studentNumber));
-    add("academicStatus", "학적", filters.academicStatus);
     add("primaryMajor", "주전공", filters.primaryMajor, `${filters.primaryMajor ?? ""} 주전공`);
     add("query", "검색", filters.query, `검색: ${filters.query ?? ""}`);
     return entries;
   }, [filters]);
   const selectedRecipientLabel =
-    RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "수신 대상";
-  const previewRecipient = reviewPreview?.sample[0];
-  const previewContent = renderEmailTemplate(content, {
-    이름: previewRecipient?.nameKo || "학우",
-    학번: previewRecipient?.studentNumber ?? "",
-    이메일: previewRecipient?.email ?? "",
-    전화번호: previewRecipient?.phoneNumber ?? "",
-  });
+    RECIPIENT_TYPES.find((option) => option.value === recipientType)?.label ?? "받는 사람";
+  const previewVariables = {
+    이름: currentUser?.nameKo || session?.nameKo || "",
+    학번: currentUser?.studentNumber ?? "",
+    이메일: currentUser?.email ?? "",
+  };
+  const previewContent = renderEmailTemplate(content, previewVariables);
+  const previewSubject = renderEmailTemplate(subject, previewVariables);
 
   const applyTemplateToForm = (template: BulkEmailTemplate) => {
     setSelectedTemplateId(template.id);
@@ -436,10 +434,9 @@ function BulkEmailPageContent() {
       setOperationError(null);
       setSending(true);
       setReviewPreview(await apiClient.previewBulkEmailRecipients(buildRequest()));
-      setRecipientListOpen(false);
       setReviewOpen(true);
     } catch {
-      setOperationError("발송 전 수신 대상을 확인하지 못했습니다.");
+      setOperationError("발송 전 받는 사람을 확인하지 못했습니다.");
     } finally {
       setSending(false);
     }
@@ -488,7 +485,7 @@ function BulkEmailPageContent() {
     try {
       setSending(true);
       setOperationError(null);
-      idempotencyKeyRef.current ??= crypto.randomUUID();
+      idempotencyKeyRef.current ??= randomId();
       const response = await apiClient.sendBulkEmail(
         buildRequest({ idempotencyKey: idempotencyKeyRef.current }),
       );
@@ -614,10 +611,16 @@ function BulkEmailPageContent() {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (!files.length) return;
+    if (uploading) return;
+    if (attachments.length + files.length > 10) {
+      setOperationError(`첨부파일은 최대 10개입니다. ${10 - attachments.length}개까지 추가할 수 있습니다.`);
+      return;
+    }
     try {
       setUploading(true);
       setOperationError(null);
-      const uploaded = await Promise.all(files.map((file) => apiClient.uploadAsset(file)));
+      const results = await Promise.allSettled(files.map((file) => apiClient.uploadAsset(file, { transport: "server" })));
+      const uploaded = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
       setAttachments((previous) =>
         [
           ...previous,
@@ -627,8 +630,10 @@ function BulkEmailPageContent() {
             mimeType: asset.mimeType,
             sizeBytes: asset.sizeBytes,
           })),
-        ].slice(0, 10),
+        ],
       );
+      const failed = files.filter((_, index) => results[index].status === "rejected");
+      if (failed.length) setOperationError(`업로드하지 못한 파일: ${failed.map((file) => file.name).join(", ")}. 성공한 파일은 유지됩니다. 실패한 파일만 다시 선택해 주세요.`);
     } catch {
       setOperationError("첨부파일을 업로드하지 못했습니다.");
     } finally {
@@ -637,6 +642,10 @@ function BulkEmailPageContent() {
   };
 
   const handleInlineImageUpload = async (file: File): Promise<string | null> => {
+    if (uploading || attachments.length >= 10) {
+      setOperationError(uploading ? "현재 업로드가 끝난 뒤 다시 시도해 주세요." : "본문 이미지를 포함해 첨부파일은 최대 10개입니다.");
+      return null;
+    }
     if (!file.type.startsWith("image/")) {
       setOperationError("본문 이미지는 이미지 파일만 첨부할 수 있습니다.");
       return null;
@@ -644,7 +653,7 @@ function BulkEmailPageContent() {
     try {
       setUploading(true);
       setOperationError(null);
-      const asset = await apiClient.uploadAsset(file);
+      const asset = await apiClient.uploadAsset(file, { transport: "server" });
       setAttachments((previous) =>
         [
           ...previous,
@@ -693,11 +702,10 @@ function BulkEmailPageContent() {
 
   return (
     <AdminPageShell className="email-composer-page min-h-screen !bg-slate-50">
-      <main className="email-composer-main w-full px-4 pb-16 sm:px-5 md:px-8">
-        <div className="email-composer-shell mx-auto mt-4 w-full max-w-5xl overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm sm:mt-6 sm:rounded-2xl">
-        <header className="email-composer-header flex flex-wrap items-center justify-end gap-4 border-b border-slate-100 bg-white p-4 md:p-5">
+      <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-4 py-6 sm:px-5 md:px-8 xl:px-10">
+        <AdminPageHeader title="이메일 일괄발송" actions={
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-            <Button type="button" variant="ghost" size="sm" onClick={openHistory}>
+            <Button type="button" variant="outline" size="sm" onClick={openHistory}>
               <History aria-hidden="true" />
               발송 이력
             </Button>
@@ -714,10 +722,12 @@ function BulkEmailPageContent() {
             </Button>
             <Button form="bulk-email-compose" type="submit" size="sm" disabled={sending || templatesLoading}>
               <Rocket aria-hidden="true" />
-              {sending ? "검토 중…" : "검토 및 발송"}
+              검토 및 발송
             </Button>
           </div>
-        </header>
+        } />
+        <div className="email-composer-shell w-full overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+
 
         <div className="p-4 pb-0 sm:p-5 sm:pb-0 md:hidden">
           <AdminEditorGuidance>
@@ -725,16 +735,8 @@ function BulkEmailPageContent() {
           </AdminEditorGuidance>
         </div>
 
-        {operationError ? (
-          <div className="mx-4 mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700 md:mx-6" role="alert">
-            {operationError}
-          </div>
-        ) : null}
-        {statusNotice ? (
-          <div className="mx-4 mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700 md:mx-6" role="status">
-            {statusNotice}
-          </div>
-        ) : null}
+
+
 
         <form id="bulk-email-compose" className="w-full" onSubmit={(event) => void handleReview(event)}>
           <div className="email-composer-canvas bg-white p-4 sm:p-6 md:p-8">
@@ -746,7 +748,7 @@ function BulkEmailPageContent() {
                 onDismiss={() => setDraftNoticeVisible(false)}
               />
             ) : null}
-            <section className="border-b border-slate-100 pb-5" aria-label="수신 대상">
+            <section className="border-b border-slate-100 pb-5" aria-label="받는 사람">
               <div className="flex min-h-10 flex-wrap items-start justify-between gap-3 sm:items-center sm:gap-4">
                 <div className="flex min-w-0 flex-wrap items-center gap-2.5">
                   <span className="shrink-0 text-sm font-medium text-slate-600">받는 사람:</span>
@@ -805,7 +807,7 @@ function BulkEmailPageContent() {
                   </DropdownMenu.Root>
                 </div>
                 <span className="w-full shrink-0 text-right text-sm font-normal text-slate-500 sm:w-auto sm:whitespace-nowrap">
-                  수신 대상: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
+                  받는 사람: {recipientCountLoading ? "계산 중…" : recipientCount === null ? "—" : `총 ${recipientCount}명`}
                 </span>
               </div>
             </section>
@@ -819,7 +821,7 @@ function BulkEmailPageContent() {
               maxLength={255}
               placeholder="제목을 입력하세요"
               required
-              className="!h-auto !rounded-none border-0 bg-transparent px-0 py-4 text-2xl font-bold leading-tight text-slate-800 shadow-none focus:border-0 focus:outline-none focus:ring-0 placeholder:text-slate-300 md:text-[length:var(--ui-text-page-title-size)]"
+              className="w-full min-w-0 !h-auto !rounded-none border-0 bg-transparent px-0 py-4 text-2xl font-bold leading-tight text-slate-800 shadow-none focus:border-0 focus:outline-none focus:ring-0 placeholder:text-slate-300 md:text-[length:var(--ui-text-page-title-size)]"
             />
             {editorMode === "editor" ? (
               <div className="mt-2 min-w-0 overflow-hidden">
@@ -837,11 +839,11 @@ function BulkEmailPageContent() {
                   spellCheck={false}
                   toolbarVariant="email"
                   uploading={uploading}
+                  variableLabel="변수 삽입"
                   variableOptions={[
-                    { label: "{이름}", token: "{{이름}}" },
-                    { label: "{이메일}", token: "{{이메일}}" },
-                    { label: "{전화번호}", token: "{{전화번호}}" },
-                    { label: "{학번}", token: "{{학번}}" },
+                    { label: "받는 사람 이름", token: "{{이름}}" },
+                    { label: "받는 사람 이메일", token: "{{이메일}}" },
+                    { label: "받는 사람 학번", token: "{{학번}}" },
                   ]}
                   toolbarSuffix={editorModeTabs}
                 />
@@ -932,8 +934,7 @@ function BulkEmailPageContent() {
         bodyClassName="space-y-5 px-4 py-5 sm:px-5"
       >
         <div className="space-y-5">
-          {operationError ? <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">{operationError}</div> : null}
-          {statusNotice ? <div role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700">{statusNotice}</div> : null}
+
           <section>
             {templatesLoading ? (
               <p className="py-6 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
@@ -974,7 +975,6 @@ function BulkEmailPageContent() {
         mobileFullscreen
         className="max-w-2xl"
         bodyClassName="space-y-5 px-4 py-5 sm:px-5"
-        footer={<Button type="button" variant="outline" onClick={() => setHistoryOpen(false)}>닫기</Button>}
       >
         {historyLoading ? (
           <p className="py-8 text-center text-sm font-normal text-slate-500">불러오는 중…</p>
@@ -1017,36 +1017,30 @@ function BulkEmailPageContent() {
               {testSending ? "테스트 발송 중…" : "내 계정으로 테스트 발송"}
             </Button>
             <Button type="button" variant="outline" onClick={dismissReview} disabled={sending || testSending}>취소</Button>
-            <Button type="button" onClick={() => void handleConfirmSend()} disabled={sending || !reviewPreview}>{sending ? "발송 중…" : "최종 발송 확정"}</Button>
+            <Button type="button" onClick={() => void handleConfirmSend()} disabled={sending || !reviewPreview}>{sending ? "발송 중…" : "보내기"}</Button>
           </div>
         }
       >
         {reviewPreview ? (
           <div className="space-y-5">
-            {operationError ? <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-normal text-rose-700">{operationError}</div> : null}
-            {statusNotice ? <div role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-normal text-emerald-700">{statusNotice}</div> : null}
-            <dl className="divide-y divide-slate-100 text-sm">
-              <div className="grid grid-cols-[5rem_1fr] gap-3 py-2 first:pt-0">
-                <dt className="text-slate-500">발송 대상</dt>
-                <dd className="font-medium text-slate-800">
-                  {selectedRecipientLabel} · 총 {reviewPreview.recipientCount}명{" "}
-                  <Button type="button" variant="link" size="sm" onClick={() => setRecipientListOpen((open) => !open)} className="ml-2 inline-flex min-h-11 items-center p-0 text-xs font-normal text-slate-500 sm:min-h-0">
-                    {recipientListOpen ? "명단 닫기" : "명단 확인"}
-                  </Button>
-                  {activeFilterEntries.length ? <span className="mt-1 block text-xs font-normal text-slate-500">{activeFilterEntries.map((entry) => `${entry.label}: ${entry.value}`).join(" · ")}</span> : null}
-                  {recipientListOpen && reviewPreview.sample.length ? <div className="mt-2 flex flex-wrap gap-1.5">{reviewPreview.sample.map((sample) => <span key={sample.email} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-normal text-slate-600">{sample.nameKo}{sample.studentNumber ? ` · ${sample.studentNumber}` : ""} · {sample.email}</span>)}</div> : null}
-                </dd>
+
+            <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2">
+                <dt className="leading-6 text-slate-500">받는 사람</dt>
+                <dd className="min-w-0 leading-6 text-slate-800">{[selectedRecipientLabel, ...activeFilterEntries.map((entry) => entry.tokenLabel)].join(", ")} <span className="whitespace-nowrap font-semibold">· 총 {reviewPreview.recipientCount}명</span></dd>
+                <dt className="leading-6 text-slate-500">발송 방식</dt><dd className="leading-6">{deliveryMode === "now" ? "즉시 발송" : "예약 발송"}</dd>
+              </dl>
+              <div className="mt-3 max-h-28 overflow-y-auto border-t border-slate-200 pt-3 text-xs leading-6 text-slate-600" aria-label="받는 사람 명단">
+                {reviewPreview.sample.map((sample) => <div key={sample.email} className="break-all">{sample.nameKo} &lt;{sample.email}&gt;</div>)}
+                {reviewPreview.recipientCount > reviewPreview.sample.length ? <p>외 {reviewPreview.recipientCount - reviewPreview.sample.length}명</p> : null}
               </div>
-              <div className="grid grid-cols-[5rem_1fr] gap-3 py-2">
-                <dt className="text-slate-500">제목</dt>
-                <dd className="font-medium text-slate-800">{subject}</dd>
-              </div>
-            </dl>
-            <section>
-              <h3 className="mb-2 text-xs font-medium text-slate-500">치환자 미리보기</h3>
-              <div className="scrollbar-hidden max-h-48 overflow-y-auto rounded-lg bg-slate-50 px-3 py-3">
-                <RichTextContent content={previewContent} className="text-sm leading-6 text-slate-700" />
-              </div>
+            </section>
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-label="미리보기">
+              <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 border-b border-slate-100 p-4 text-sm">
+                <dt className="text-slate-500">제목</dt><dd className="break-words font-medium">{previewSubject}</dd>
+                <dt className="text-slate-500">받는 사람</dt><dd className="break-all">{previewVariables.이름} &lt;{previewVariables.이메일}&gt;</dd>
+              </dl>
+              <div className="max-h-72 overflow-y-auto p-4"><RichTextContent content={previewContent} className="text-sm leading-6 text-slate-700" /></div>
             </section>
             <fieldset className="space-y-2">
               <legend className="text-xs font-medium text-slate-500">발송 방식</legend>
@@ -1054,14 +1048,14 @@ function BulkEmailPageContent() {
                 <label className="inline-flex items-center gap-2"><input type="radio" name="delivery-mode" checked={deliveryMode === "now"} onChange={() => setDeliveryMode("now")} className="accent-emerald-700" />즉시 발송</label>
                 <label className="inline-flex items-center gap-2"><input type="radio" name="delivery-mode" checked={deliveryMode === "scheduled"} onChange={() => setDeliveryMode("scheduled")} className="accent-emerald-700" />예약 발송</label>
               </div>
-              {deliveryMode === "scheduled" ? (
+              <div className="email-schedule-panel" data-open={deliveryMode === "scheduled"} inert={deliveryMode !== "scheduled"}><div className="min-h-0 overflow-hidden">
                 <AdminFormField label="예약 일시" className="max-w-xs">
                   <div className="relative">
                     <CalendarClock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                     <UiInput spellCheck={false} type="datetime-local" value={scheduledAt} min={isoToHtmlDatetimeLocal(msToIso(nowMs() + 60_000))} onChange={(event) => setScheduledAt(event.target.value)} className="w-full pl-9 text-sm font-normal" />
                   </div>
                 </AdminFormField>
-              ) : null}
+              </div></div>
             </fieldset>
             {attachments.length ? <p className="text-xs font-normal text-slate-500">첨부 파일 {attachments.length}개</p> : null}
           </div>
@@ -1136,12 +1130,12 @@ function formatStudentNumberFilter(value: string | undefined): string | undefine
 
 function renderEmailTemplate(
   content: string,
-  variables: { 이름: string; 학번: string; 이메일: string; 전화번호: string },
+  variables: { 이름: string; 학번: string; 이메일: string },
 ): string {
   const values: Record<string, string> = variables;
   return content
     .replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, key: string) => values[key.trim()] ?? match)
-    .replace(/\{(이름|학번|이메일|전화번호)\}/g, (match, key: string) => values[key] ?? match);
+    .replace(/\{(이름|학번|이메일)\}/g, (match, key: string) => values[key] ?? match);
 }
 
 function normalizeFilters(filters: RecipientFilters): RecipientFilters {
