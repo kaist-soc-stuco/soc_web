@@ -110,14 +110,13 @@ services:
       context: ../..
       dockerfile: apps/api/Dockerfile.prod
       target: migration
+    env_file:
+      - ../../.env.production
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
