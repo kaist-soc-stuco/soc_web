@@ -14,6 +14,7 @@
     "dev:web": "pnpm build:shared && pnpm --filter @soc/web dev",
     "db:migrate": "docker compose exec -T api pnpm db:migrate",
     "db:seed": "docker compose exec -T api pnpm db:seed",
+    "db:seed:prod": "docker compose --env-file .env.production -f infra/docker/compose.prod.yml run --rm db-migrate pnpm db:seed",
     "build": "pnpm -r build",
     "typecheck": "pnpm build:shared && pnpm -r typecheck",
     "lint": "pnpm -r lint",
