@@ -17,10 +17,12 @@ export type CalendarEventCategory = "EVENT" | "ACADEMIC" | "HOLIDAY";
 export type PublicCalendarEventSourceType =
   | "ARTICLE"
   | "SURVEY"
+  | "VOTE"
   | "MANUAL"
   | "KAIST_ACADEMIC";
 
 export interface PublicCalendarEventItem {
+  voteId?: string | null;
   id: string;
   sourceType: PublicCalendarEventSourceType;
   articleId?: string | null;
@@ -107,6 +109,8 @@ export interface CalendarKaistSyncResponse {
 }
 
 export interface CalendarGoogleSyncResponse {
+  skippedCount?: number;
+  errorCodes?: string[];
   queuedCount: number;
   processedCount: number;
   succeededCount: number;

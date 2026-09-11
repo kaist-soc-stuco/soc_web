@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -10,8 +11,13 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+import type { ContactActivity } from "@soc/contracts";
+import { users } from "./auth.schema";
+
 export const executiveContacts = pgTable("executive_contact", {
   id: uuid("id").defaultRandom().primaryKey(),
+  portalUserId: uuid("portal_user_id").references(() => users.userId, { onDelete: "set null" }),
+  activities: jsonb("activities").$type<ContactActivity[]>().notNull().default([]),
   nameKo: varchar("name_ko", { length: 100 }).notNull(),
   nameEn: varchar("name_en", { length: 100 }).notNull(),
   departmentKo: varchar("department_ko", { length: 100 }),
@@ -31,6 +37,7 @@ export const executiveContacts = pgTable("executive_contact", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("executive_contact_sort_idx").on(table.sortOrder),
+  uniqueIndex("executive_contact_portal_user_uq").on(table.portalUserId),
 ]);
 
 export const executiveContactDepartments = pgTable("executive_contact_department", {

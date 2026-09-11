@@ -284,7 +284,7 @@ function ResultSectionHeader({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.035)]">
       {title ? (
-        <div className="bg-[#5545e8] px-5 py-3.5 text-white">
+        <div className="bg-brand-primary px-5 py-3.5 text-white">
           <h2 className="text-base font-normal leading-6">{title}</h2>
         </div>
       ) : null}
@@ -371,7 +371,7 @@ export function SurveyResultsContent({
           to="/surveys"
           className="mx-auto inline-flex w-fit items-center justify-center rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-semibold text-white shadow-md shadow-kaist-darkgreen/15 transition hover:bg-kaist-darkgreen/90"
         >
-          {lang === "ko" ? "설문 목록으로" : "Back to surveys"}
+          {lang === "ko" ? "목록으로" : "Back to surveys"}
         </Link>
       </ResultShell>
     );

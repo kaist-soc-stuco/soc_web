@@ -955,7 +955,7 @@ export function useBoardWritePageController(forcedCategory?: string) {
         type: "success",
         message:
           lang === "ko"
-            ? "게시글이 작성되었습니다."
+            ? selectedCategory === "_EVENT" ? "행사가 성공적으로 등록되었습니다" : "게시글이 작성되었습니다."
             : "Article published successfully.",
       });
       navigate(selectedCategory === "_EVENT" ? `/events/${article.articleId}` : `/board/${selectedCategory}/${article.articleId}`);

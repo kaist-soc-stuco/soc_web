@@ -67,6 +67,7 @@ function createUsersService() {
     },
     async resolvePermissionBitmaskByUserId() { return 0; },
     async getStudentFeeStatus() { return null; },
+    async applyStudentFeeBootstrap() { return null; },
   };
 }
 

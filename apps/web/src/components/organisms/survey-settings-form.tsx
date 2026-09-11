@@ -1,15 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormContext, Controller } from "react-hook-form";
-import { createApiClient } from "@soc/api-client";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import type { ArticleListItem } from "@soc/contracts";
-import { RichTextEditor } from "./rich-text-editor";
 import { AdminFormField } from "@/components/ui/admin-page";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { resolveAssetUrl } from "@/lib/asset-url";
+import { RichTextInput } from "@/components/ui/rich-text-input";
 
 export const SURVEY_KINDS = [
   { value: "SURVEY", label: "일반 설문" },
@@ -56,18 +52,6 @@ interface SurveySettingsFormProps {
   onSelectArticle: (articleId: string, title: string) => void;
   onSubmit: (values: SurveySettingsFormValues) => void;
 }
-
-const escapeHtmlAttribute = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-
-const appendInlineImage = (content: string, src: string) =>
-  `${content.trim() ? `${content}<p><br /></p>` : ""}<p><img src="${escapeHtmlAttribute(src)}" alt="" /></p>`;
-
-const RICH_TEXT_OVERLAY_SELECTOR = "[data-rich-text-overlay], .rich-text-editor-menu";
 
 const plainText = (value: string | undefined) =>
   (value ?? "")
@@ -309,13 +293,11 @@ export function SurveySettingsForm({
   const [activeTab, setActiveTab] = useState<"ko" | "en">("ko");
   const [basicEditorExpanded, setBasicEditorExpanded] = useState(mode !== "basic");
   const basicEditorRef = useRef<HTMLDivElement>(null);
-  const apiClient = useMemo(() => createApiClient({ baseUrl: resolveApiBaseUrl() }), []);
   const {
     register,
     handleSubmit,
     watch,
     setValue,
-    getValues,
     control,
     formState: { errors },
   } = useFormContext<SurveySettingsFormValues>();
@@ -351,7 +333,6 @@ export function SurveySettingsForm({
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (basicEditorRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest(RICH_TEXT_OVERLAY_SELECTOR)) return;
       setBasicEditorExpanded(false);
     };
 
@@ -399,20 +380,6 @@ export function SurveySettingsForm({
     }
   };
 
-  const handleDescriptionImageUpload = async (file: File) => {
-    if (!file.type.startsWith("image/")) return null;
-
-    const asset = await apiClient.uploadAsset(file);
-    const src = resolveAssetUrl(asset.storageKey);
-    const otherDescription = activeTab === "ko" ? "descriptionEn" : "descriptionKo";
-    const currentOtherDescription = getValues(otherDescription) ?? "";
-    setValue(otherDescription, appendInlineImage(currentOtherDescription, src), {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-    return src;
-  };
-
   const inputCls =
     "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-[#172033] outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60";
 
@@ -425,124 +392,21 @@ export function SurveySettingsForm({
         {/* 좌측 메인 영역 */}
         {mode !== "delivery" ? basicEditorExpanded ? <div
           ref={basicEditorRef}
-          className={`${mode === "all" ? "lg:col-span-2" : ""} h-full space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}
+          className={`${mode === "all" ? "lg:col-span-2" : ""} survey-expand h-full space-y-5 rounded-xl border-0 border-b border-slate-300 bg-white p-5 md:p-6`}
           onFocusCapture={() => setBasicEditorExpanded(true)}
           onBlurCapture={(event) => {
             const nextTarget = event.relatedTarget;
             if (nextTarget && event.currentTarget.contains(nextTarget as Node)) return;
-            if (nextTarget instanceof Element && nextTarget.closest(RICH_TEXT_OVERLAY_SELECTOR)) return;
             if (nextTarget) setBasicEditorExpanded(false);
           }}
         >
-          {/* 탭 및 Korean Only 옵션 */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <SegmentedControl
-              ariaLabel="설문 언어"
-              role="tablist"
-              value={activeTab}
-              onChange={setActiveTab}
-              options={[
-                { value: "ko", label: "국문" },
-                { value: "en", label: "영문", disabled: isKoreanOnly },
-              ]}
-            />
-
-            <div className="flex items-center gap-4 flex-wrap">
-              <label
-                className={`flex items-center gap-2.5 ${
-                  isOngoing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                }`}
-              >
-                <UiInput
-                  type="checkbox"
-                  className="size-4 rounded border-slate-300 accent-brand-primary"
-                  checked={isKoreanOnly}
-                  disabled={isOngoing}
-                  onChange={(e) => {
-                    if (isOngoing) return;
-                    const checked = e.target.checked;
-                    setValue("isKoreanOnly", checked);
-                    if (checked) setActiveTab("ko");
-                  }}
-                />
-                <span
-                  className="text-sm font-normal text-[#344054]"
-                >
-                  한국어 전용
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              {activeTab === "ko" ? (
-                 <UiInput
-                   key="titleKo"
-                   aria-label="설문 제목"
-                   autoFocus={mode === "basic"}
-                   className={`${inputCls} !h-14 !px-4 !text-2xl !font-medium leading-8`}
-                  placeholder="설문 제목"
-                  {...register("titleKo")}
-                />
-              ) : (
-                <UiInput
-                  key="titleEn"
-                  aria-label="Survey title"
-                  className={`${inputCls} !h-14 !px-4 !text-2xl !font-medium leading-8`}
-                  placeholder="Survey title"
-                  {...register("titleEn")}
-                />
-              )}
-              {activeTab === "ko" && errors.titleKo && (
-                <p className="mt-1 text-xs font-normal text-red-500">
-                  {errors.titleKo.message as string}
-                </p>
-              )}
-              {activeTab === "en" && errors.titleEn && (
-                <p className="mt-1 text-xs font-normal text-red-500">
-                  {errors.titleEn.message as string}
-                </p>
-              )}
-            </div>
-
-            <div>
-              {activeTab === "ko" ? (
-                <Controller
-                  name="descriptionKo"
-                  control={control}
-                  render={({ field }) => (
-                    <RichTextEditor
-                      className="!mx-0 !max-w-none"
-                      contentClassName="!text-base leading-6"
-                      compact
-                      content={field.value ?? ""}
-                      onImageUpload={handleDescriptionImageUpload}
-                      onChange={field.onChange}
-                      lang="ko"
-                      placeholder="설문지 설명"
-                    />
-                  )}
-                />
-              ) : (
-                <Controller
-                  name="descriptionEn"
-                  control={control}
-                  render={({ field }) => (
-                    <RichTextEditor
-                      className="!mx-0 !max-w-none"
-                      contentClassName="!text-base leading-6"
-                      compact
-                      content={field.value ?? ""}
-                      onImageUpload={handleDescriptionImageUpload}
-                      onChange={field.onChange}
-                      lang="en"
-                      placeholder="Survey description"
-                    />
-                  )}
-                />
-              )}
-            </div>
+          <div className={`grid gap-5 ${isKoreanOnly ? "" : "md:grid-cols-2"}`}>
+            {(["ko", "en"] as const).filter(language => language === "ko" || !isKoreanOnly).map(language => <div key={language} className="min-w-0 space-y-4">
+              <span className="text-xs font-medium text-slate-500">{language === "ko" ? "한국어" : "English"}</span>
+              <Controller name={language === "ko" ? "titleKo" : "titleEn"} control={control} render={({ field }) => <RichTextInput singleLine value={field.value ?? ""} onChange={field.onChange} ariaLabel={language === "ko" ? "설문 제목" : "Survey title"} placeholder={language === "ko" ? "설문 제목" : "Survey title"} />} />
+              <Controller name={language === "ko" ? "descriptionKo" : "descriptionEn"} control={control} render={({ field }) => <RichTextInput value={field.value ?? ""} onChange={field.onChange} ariaLabel={language === "ko" ? "설문지 설명" : "Survey description"} placeholder={language === "ko" ? "설문지 설명" : "Survey description"} />} />
+              {errors[language === "ko" ? "titleKo" : "titleEn"] ? <p className="text-xs text-red-600">제목을 입력해 주세요.</p> : null}
+            </div>)}
           </div>
         </div> : (
           <button
@@ -550,12 +414,13 @@ export function SurveySettingsForm({
             aria-label="설문 제목 및 설명 편집"
             aria-expanded={false}
             onClick={() => setBasicEditorExpanded(true)}
-            className={`${mode === "all" ? "lg:col-span-2" : ""} block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-5 py-5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/20 md:px-6`}
+            onFocus={() => setBasicEditorExpanded(true)}
+            className={`${mode === "all" ? "lg:col-span-2" : ""} block w-full min-w-0 rounded-xl border-0 border-b border-slate-300 bg-white px-5 py-5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/20 md:px-6`}
           >
             <div className="flex min-w-0 items-baseline gap-1 text-2xl font-medium leading-8 text-slate-900">
-              <span className="min-w-0 truncate">{titleKo.trim() || "설문 제목"}</span>
+              <span className="min-w-0 truncate">{plainText(titleKo) || "설문 제목"}</span>
               {titleEn.trim() ? (
-                <span className="min-w-0 truncate text-lg font-normal text-slate-400">({titleEn.trim()})</span>
+                <span className="min-w-0 truncate text-lg font-normal text-slate-400">({plainText(titleEn)})</span>
               ) : null}
             </div>
             {plainText(descriptionKo) || (!isKoreanOnly && plainText(descriptionEn)) ? (
@@ -567,8 +432,23 @@ export function SurveySettingsForm({
         ) : null}
 
         {/* 우측 메타데이터 영역 */}
-        {mode !== "basic" ? <div className={`${mode === "all" ? "lg:col-span-1" : ""} h-full space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6`}>
+        {mode !== "basic" ? <div className={`${mode === "all" ? "lg:col-span-1" : ""} h-full space-y-6 rounded-xl border-0 border-b border-slate-300 bg-white p-5 md:p-6`}>
           <div className="space-y-6">
+            <section className="space-y-3" aria-labelledby="survey-language-settings">
+              <div>
+                <h3 id="survey-language-settings" className="text-sm font-semibold text-[#172033]">언어 설정</h3>
+              </div>
+              <SettingCheckbox
+                checked={isKoreanOnly}
+                disabled={isOngoing}
+                label="한국어 전용"
+                hint="영문 입력 없이 국문으로만 설문을 운영합니다."
+                onChange={(checked) => {
+                  setValue("isKoreanOnly", checked, { shouldDirty: true, shouldValidate: true });
+                  if (checked) setActiveTab("ko");
+                }}
+              />
+            </section>
             <section className="space-y-3" aria-labelledby="survey-basic-settings">
               <div>
                 <h3 id="survey-basic-settings" className="text-sm font-semibold text-[#172033]">기본 설정</h3>
@@ -613,7 +493,7 @@ export function SurveySettingsForm({
                 <SettingCheckbox
                   checked={isAlwaysOpen}
                   disabled={isOngoing}
-                  label="상시 진행"
+                  label="상시 설문"
                   onChange={(checked) => setValue("isAlwaysOpen", checked, { shouldDirty: true })}
                 />
                 <SettingCheckbox
@@ -695,26 +575,7 @@ export function SurveySettingsForm({
                   label="전산학부 주전공"
                   onChange={() => toggleSocAffiliation("PRIMARY")}
                 />
-                <AdminFormField label="학적 조건">
-                  <Controller
-                    name="academicEligibility"
-                    control={control}
-                    render={({ field }) => (
-                      <AdminSelectDropdown
-                        value={field.value}
-                        options={[
-                          { value: "ANY", label: "제한 없음" },
-                          { value: "ENROLLED_ONLY", label: "재학생만" },
-                        ]}
-                        onChange={(value) => {
-                          field.onChange(value);
-                          if (value !== "ANY") setValue("allowAnonymous", false, { shouldDirty: true, shouldValidate: true });
-                        }}
-                        disabled={isOngoing}
-                      />
-                    )}
-                  />
-                </AdminFormField>
+
               </div>
             </section>
 

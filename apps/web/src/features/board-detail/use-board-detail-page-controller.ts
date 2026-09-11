@@ -25,6 +25,29 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
 const COMMENT_PAGE_SIZE = 10;
 
+async function copyShareUrl(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    if (!document.execCommand("copy")) {
+      throw new Error("clipboard_unavailable");
+    }
+  } finally {
+    textarea.remove();
+  }
+}
+
 export function useBoardDetailPageController(forcedCategory?: string) {
   const { category: routeCategory = "notice", articleId } = useParams<{
     category: string;
@@ -114,8 +137,10 @@ export function useBoardDetailPageController(forcedCategory?: string) {
   const posterAsset = useMemo(
     () =>
       article?.assets?.find(
-        (asset) =>
-          asset.usageType === "THUMBNAIL" || asset.usageType === "IMAGE",
+        (asset) => asset.storageKey === article?.thumbnailStorageKey,
+      ) ??
+      article?.assets?.find(
+        (asset) => asset.usageType === "THUMBNAIL" || asset.usageType === "IMAGE",
       ),
     [article],
   );
@@ -127,6 +152,8 @@ export function useBoardDetailPageController(forcedCategory?: string) {
       ) ?? [],
     [article, posterAsset],
   );
+
+  const posterStorageKey = article?.thumbnailStorageKey ?? posterAsset?.storageKey ?? null;
 
   useEffect(() => {
     if (!articleId) return;
@@ -553,15 +580,10 @@ export function useBoardDetailPageController(forcedCategory?: string) {
         return;
       }
 
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareUrl);
-        setShareCopied(true);
-        window.setTimeout(() => setShareCopied(false), 1800);
-        toast({ type: "success", message: lang === "ko" ? "클립보드에 복사되었습니다." : "Link copied." });
-        return;
-      }
-
-      toast({ type: "info", message: shareUrl });
+      await copyShareUrl(shareUrl);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1800);
+      toast({ type: "success", message: lang === "ko" ? "클립보드에 복사되었습니다." : "Link copied." });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       toast({
@@ -658,6 +680,7 @@ export function useBoardDetailPageController(forcedCategory?: string) {
     loading,
     articleErrorCode,
     posterAsset,
+    posterStorageKey,
     replySubmitting,
     replyTargetId,
     replyText,

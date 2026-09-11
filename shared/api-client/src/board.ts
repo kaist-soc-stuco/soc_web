@@ -131,7 +131,12 @@ export const createBoardApi = ({
     );
   },
 
-  uploadAsset: async (file: File): Promise<AssetUploadResponse> => {
+  uploadAsset: async (file: File, options?: { transport?: "direct" | "server" }): Promise<AssetUploadResponse> => {
+    if (options?.transport === "server") {
+      const body = new FormData();
+      body.set("file", file);
+      return requestJson<AssetUploadResponse>(`${assetBaseUrl}/upload`, { body, method: "POST" }, { retryOnUnauthorized: true });
+    }
     const prepareBody: AssetDirectUploadPrepareRequest = {
       originalFilename: file.name,
       mimeType: file.type,

@@ -24,7 +24,6 @@ export const users = pgTable("users", {
   departmentEn: varchar("dept_en", { length: 100 }),
   primaryMajor: varchar("primary_major", { length: 100 }),
   gender: varchar("gender", { length: 20 }),
-  phoneNumber: varchar("phone_number", { length: 50 }),
   academicStatus: varchar("academic_status", { length: 20 }),
   identityCode: varchar("identity_code", { length: 10 }),
   isActive: boolean("is_active").notNull().default(true),

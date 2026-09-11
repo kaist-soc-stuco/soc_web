@@ -26,7 +26,7 @@ interface NoticeItemProps {
   showCategoryBadge?: boolean;
 }
 
-const HOME_NOTICE_LIMIT = 8;
+const HOME_NOTICE_LIMIT = 6;
 
 function NoticeItem({
   id,
@@ -222,8 +222,8 @@ export function NoticeBoard() {
   };
 
   return (
-    <section className="home-bento-card flex min-h-[24rem] min-w-0 flex-col overflow-hidden">
-      <div className="mx-auto flex min-h-[24rem] w-full flex-col">
+    <section className="home-bento-card flex min-h-[18rem] min-w-0 flex-col overflow-hidden">
+      <div className="mx-auto flex min-h-[18rem] w-full flex-col">
         <SectionHeader
           navigation={
             <SegmentedControl

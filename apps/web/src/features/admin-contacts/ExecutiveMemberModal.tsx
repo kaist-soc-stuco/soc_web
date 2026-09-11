@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { nowDate } from "@soc/shared";
+import { Search, Trash2, X } from "lucide-react";
 import type {
   AdminUserRecord,
   ContactDepartmentRecord,
   ContactRecord,
+  ContactActivity,
 } from "@soc/contracts";
 
 import { AdminFormField } from "@/components/ui/admin-page";
@@ -12,19 +14,16 @@ import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UiInput } from "@/components/ui/form-control";
+import { IconButton } from "@/components/ui/icon-button";
 
 export interface ExecutiveMemberFormValues {
+  portalUserId: string | null;
+  activities: ContactActivity[];
   nameKo: string;
   nameEn: string;
   studentNumber: string;
-  departmentKo: string;
-  departmentEn: string;
-  roleKo: string;
-  roleEn: string;
-  cohort: number | null;
   email: string;
   phoneNumber: string;
-  publiclyListed: boolean;
 }
 
 interface ExecutiveMemberModalProps {
@@ -45,17 +44,13 @@ function formatActivityYear(value: number | null | undefined): number | null {
 
 function getInitialValues(contact: ContactRecord | null): ExecutiveMemberFormValues {
   return {
+    portalUserId: contact?.portalUserId ?? null,
+    activities: contact?.activities?.length ? contact.activities.map((activity) => ({ ...activity, year: formatActivityYear(activity.year) ?? 2026 })) : [{ year: contact ? (formatActivityYear(contact.cohort) ?? 0) : nowDate().getFullYear(), departmentKo: contact?.departmentKo ?? "", departmentEn: contact?.departmentEn ?? "", roleKo: contact?.roleKo ?? "", roleEn: contact?.roleEn ?? "" }],
     nameKo: contact?.nameKo ?? "",
     nameEn: contact?.nameEn ?? "",
     studentNumber: contact?.studentNumber ?? "",
-    departmentKo: contact?.departmentKo ?? "",
-    departmentEn: contact?.departmentEn ?? "",
-    roleKo: contact?.roleKo ?? "",
-    roleEn: contact?.roleEn ?? "",
-    cohort: formatActivityYear(contact?.cohort),
     email: contact?.email ?? "",
     phoneNumber: contact?.phoneNumber ?? "",
-    publiclyListed: contact?.publiclyListed ?? false,
   };
 }
 
@@ -142,30 +137,23 @@ export function ExecutiveMemberModal({
   };
 
   const selectPortalMember = (member: AdminUserRecord) => {
-    const department = departments.find(
-      (item) => item.nameKo === member.departmentKo || (item.nameEn && item.nameEn === member.departmentEn),
-    );
     setFormData((current) => ({
       ...current,
+      portalUserId: member.userId,
       nameKo: member.nameKo,
       nameEn: member.nameEn ?? "",
       studentNumber: member.stdNo ?? "",
-      departmentKo: department?.nameKo ?? "",
-      departmentEn: department?.nameEn ?? "",
       email: member.email,
-      phoneNumber: member.phoneNumber ?? "",
+      phoneNumber: "",
     }));
     setSelectedPortalMember(member);
     setPortalQuery("");
     setPortalMembers([]);
-    setPortalError(
-      member.departmentKo && !department
-        ? "회원의 소속이 등록된 부서 목록에 없습니다. 부서를 먼저 등록한 뒤 선택해 주세요."
-        : null,
-    );
+    setPortalError(null);
   };
 
   const clearPortalMember = () => {
+    updateField("portalUserId", null);
     setSelectedPortalMember(null);
     setPortalQuery("");
     setPortalMembers([]);
@@ -178,11 +166,11 @@ export function ExecutiveMemberModal({
       .filter((department) => department.isActive)
       .map((department) => ({
         value: department.nameKo,
-        label: department.nameEn ? `${department.nameKo} · ${department.nameEn}` : department.nameKo,
+        label: department.nameKo,
       })),
-    ...(formData.departmentKo && !departments.some((department) => department.nameKo === formData.departmentKo)
-      ? [{ value: formData.departmentKo, label: `${formData.departmentKo} (현재 값)` }]
-      : []),
+    ...[...new Set(formData.activities.map(activity => activity.departmentKo))]
+      .filter(name => name && !departments.some(department => department.isActive && department.nameKo === name))
+      .map(name => ({ value: name, label: `${name} (기존 이력)` })),
   ];
 
   return (
@@ -190,6 +178,7 @@ export function ExecutiveMemberModal({
       open={open}
       onClose={onClose}
       title={contact ? "집행부원 정보 수정" : "새 집행부원 등록"}
+      width="max-w-2xl"
       footer={
         <div className="flex items-center justify-between gap-3">
           {contact && onDelete ? (
@@ -200,7 +189,8 @@ export function ExecutiveMemberModal({
               disabled={saving}
               className="rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
             >
-              삭제
+              <Trash2 aria-hidden="true" className="size-4" />
+              부원 삭제
             </Button>
           ) : <span />}
           <div className="flex items-center gap-2">
@@ -216,32 +206,38 @@ export function ExecutiveMemberModal({
           event.preventDefault();
           void onSave(formData);
         }}
-        className="space-y-5 pb-1"
+        className="space-y-7 pb-1"
       >
-        <AdminFormField label="포털 가입 회원 검색" hint="이름, 학번, 이메일로 검색한 뒤 회원을 선택하세요.">
+        <section className="space-y-3" aria-labelledby="portal-member-heading">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 id="portal-member-heading" className="text-sm font-semibold text-slate-900">포털 회원 정보 불러오기</h3>
+            <span className="shrink-0 text-xs text-slate-400">선택 사항</span>
+          </div>
           {selectedPortalMember ? (
-            <div className="flex min-h-10 w-full items-center rounded-lg border border-emerald-200 bg-emerald-50/45 px-2 py-1.5">
-              <Badge tone="success" className="h-auto min-h-7 w-full min-w-0 max-w-full justify-between gap-1.5 rounded-md px-2 py-1 text-xs font-medium leading-4">
+            <div className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg bg-emerald-50/70 px-3 py-2">
+              <Badge tone="success" className="h-auto min-h-7 min-w-0 max-w-full gap-1.5 rounded-md border-0 bg-transparent px-0 py-1 text-xs font-medium leading-4 text-emerald-800">
                 <span className="min-w-0 truncate">{formatPortalMemberSummary(selectedPortalMember)}</span>
-                <button
-                  type="button"
-                  aria-label="연결된 포털 회원 해제"
-                  onClick={clearPortalMember}
-                  className="inline-flex size-5 shrink-0 items-center justify-center rounded text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-900"
-                >
-                  <X aria-hidden="true" className="size-3.5" />
-                </button>
               </Badge>
+              <button
+                type="button"
+                aria-label="연결된 포털 회원 해제"
+                onClick={clearPortalMember}
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-900"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
             </div>
           ) : (
             <div className="relative">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400" />
               <UiInput
                 value={portalQuery}
                 onChange={(event) => setPortalQuery(event.currentTarget.value)}
-                placeholder="포털 가입 회원 검색"
+                placeholder="학번, 이름, 이메일로 가입 회원 검색"
+                aria-label="포털 회원 검색"
                 autoComplete="off"
                 aria-busy={portalLoading}
-                className="box-border w-full focus-visible:border-brand-primary focus-visible:ring-2 focus-visible:ring-brand-primary/20"
+                className="box-border w-full pl-9 focus-visible:border-brand-primary focus-visible:ring-2 focus-visible:ring-brand-primary/20"
               />
               {portalQuery.trim().length >= 2 && !portalError ? (
                 <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-elevated" role="listbox" aria-label="포털 회원 검색 결과">
@@ -265,58 +261,59 @@ export function ExecutiveMemberModal({
             </div>
           )}
           {portalError ? <span className="text-xs font-normal leading-4 text-rose-600">{portalError}</span> : null}
-        </AdminFormField>
+        </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <AdminFormField label="이름 (한글) *">
+        <section className="space-y-4" aria-labelledby="basic-member-info-heading">
+          <h3 id="basic-member-info-heading" className="text-sm font-semibold text-slate-900">기본 개인정보</h3>
+          <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+          <AdminFormField label="이름">
             <UiInput required value={formData.nameKo} onChange={(event) => updateField("nameKo", event.currentTarget.value)} placeholder="예: 김성찬" className="box-border w-full" />
-          </AdminFormField>
-          <AdminFormField label="이름 (영문) *">
-            <UiInput required value={formData.nameEn} onChange={(event) => updateField("nameEn", event.currentTarget.value)} placeholder="예: Seongchan Kim" className="box-border w-full" />
           </AdminFormField>
           <AdminFormField label="학번">
             <UiInput value={formData.studentNumber} onChange={(event) => updateField("studentNumber", event.currentTarget.value)} placeholder="포털 회원 선택 시 자동 입력" className="box-border w-full" />
           </AdminFormField>
-          <AdminFormField label="활동 연도">
-            <UiInput type="number" min="1900" max="3000" value={formData.cohort ?? ""} onChange={(event) => updateField("cohort", event.currentTarget.value ? Number(event.currentTarget.value) : null)} placeholder="예: 2026" className="box-border w-full" />
-          </AdminFormField>
-          <AdminFormField label="부서">
-            <AdminSelectDropdown
-              value={formData.departmentKo}
-              onChange={(value) => {
-                const department = departments.find((item) => item.nameKo === value);
-                updateField("departmentKo", department?.nameKo ?? value);
-                updateField("departmentEn", department?.nameEn ?? "");
-              }}
-              ariaLabel="부서 선택"
-              options={departmentOptions}
-              className="w-full"
-            />
-          </AdminFormField>
           <AdminFormField label="이메일">
             <UiInput type="email" value={formData.email} onChange={(event) => updateField("email", event.currentTarget.value)} placeholder="name@kaist.ac.kr" className="box-border w-full" />
           </AdminFormField>
-          <AdminFormField label="직책 (한글) *">
-            <UiInput required value={formData.roleKo} onChange={(event) => updateField("roleKo", event.currentTarget.value)} placeholder="예: 회장" className="box-border w-full" />
-          </AdminFormField>
-          <AdminFormField label="직책 (영문) *">
-            <UiInput required value={formData.roleEn} onChange={(event) => updateField("roleEn", event.currentTarget.value)} placeholder="예: President" className="box-border w-full" />
-          </AdminFormField>
-          <AdminFormField label="전화번호" className="sm:col-span-2">
+          <AdminFormField label="전화번호">
             <UiInput value={formData.phoneNumber} onChange={(event) => updateField("phoneNumber", event.currentTarget.value)} placeholder="010-0000-0000" className="box-border w-full" />
           </AdminFormField>
-          <label className="sm:col-span-2 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
-            <UiInput type="checkbox" checked={formData.publiclyListed} onChange={(event) => updateField("publiclyListed", event.currentTarget.checked)} className="mt-0.5 size-4 shrink-0 accent-brand-primary" />
-            <span>
-              <span className="block font-medium">공개 조직도에 표시</span>
-              <span className="mt-1 block text-xs leading-5 text-slate-500">개인정보 저장 동의와 별도로, 이름·부서·직책을 인터넷 공개 조직도에 표시할 때만 선택하세요.</span>
-            </span>
-          </label>
-        </div>
 
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
-          개인정보 제공 동의는 내부 연락망 저장을 위한 것이며 인터넷 공개 동의와 다릅니다. 이메일·전화번호·학번은 공개 응답에 포함되지 않습니다.
-        </p>
+          </div>
+        </section>
+
+        <section className="space-y-4 border-t border-slate-200 pt-6" aria-labelledby="activity-history-heading">
+          <div className="flex items-center justify-between gap-3">
+            <h3 id="activity-history-heading" className="text-sm font-semibold text-slate-900">활동 이력</h3>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => updateField("activities", [...formData.activities, { year: nowDate().getFullYear(), departmentKo: "", departmentEn: "", roleKo: "", roleEn: "" }])}
+              className="shrink-0 text-brand-primary hover:bg-emerald-50 hover:text-brand-primary"
+            >
+              + 이력 추가
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {formData.activities.map((activity, index) => {
+              const activitySummary = [
+                activity.year ? `${activity.year}년도` : null,
+                activity.departmentKo || null,
+              ].filter(Boolean).join(" · ") || `이력 ${index + 1}`;
+
+              return (
+                <div key={index} className="grid grid-cols-[88px_minmax(0,1fr)_minmax(0,1fr)_28px] items-center gap-2">
+                  <UiInput aria-label={`활동 연도 ${index + 1}`} type="number" min={1900} max={3000} required value={activity.year || ""} onChange={(event) => { const year = Number(event.currentTarget.value); updateField("activities", formData.activities.map((item, i) => i === index ? { ...item, year } : item)); }} />
+                  <AdminSelectDropdown ariaLabel={`활동 부서 ${index + 1}`} value={activity.departmentKo} options={departmentOptions} onChange={(value) => { const dept = departments.find((item) => item.nameKo === value); updateField("activities", formData.activities.map((item, i) => i === index ? { ...item, departmentId: dept?.id ?? null, departmentKo: value, departmentEn: "" } : item)); }} />
+                  <UiInput aria-label={`직책 ${index + 1}`} placeholder="직책" required value={activity.roleKo} onChange={(event) => { const roleKo = event.currentTarget.value; updateField("activities", formData.activities.map((item, i) => i === index ? { ...item, roleKo } : item)); }} />
+                  <IconButton type="button" size="sm" aria-label={`${activitySummary} 삭제`} disabled={formData.activities.length === 1} onClick={() => updateField("activities", formData.activities.filter((_, i) => i !== index))} className="text-slate-400 hover:text-rose-600"><Trash2 className="size-4" /></IconButton>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
       </form>
     </AdminDrawer>
   );

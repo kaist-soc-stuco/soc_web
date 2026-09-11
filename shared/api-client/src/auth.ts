@@ -2,6 +2,7 @@ import type {
   ConsentDecisionRequest,
   ConsentDecisionResponse,
   ChannelTalkConfigResponse,
+  CsrfTokenResponse,
   CurrentUserResponse,
   LoginSessionResponse,
   LoginStartResponse,
@@ -17,6 +18,12 @@ export interface LoginResultResponse {
 }
 
 export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) => ({
+  getCsrfToken: async (): Promise<CsrfTokenResponse> => {
+    return requestJson<CsrfTokenResponse>(`${authBaseUrl}/csrf`, {
+      method: "GET",
+    });
+  },
+
   getLoginStartPayload: async (): Promise<LoginStartResponse> => {
     return requestJson<LoginStartResponse>(`${authBaseUrl}/login/start`, {
       method: "GET",
@@ -57,12 +64,17 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
   submitConsentDecision: async (
     input: ConsentDecisionRequest,
   ): Promise<ConsentDecisionResponse> => {
+    const { csrfToken } = await requestJson<CsrfTokenResponse>(
+      `${authBaseUrl}/csrf`,
+      { method: "GET" },
+    );
     return requestJson<ConsentDecisionResponse>(
       `${authBaseUrl}/login/consent`,
       {
         body: JSON.stringify(input),
         headers: {
           "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
         },
         method: "POST",
       },
@@ -73,12 +85,17 @@ export const createAuthApi = ({ authBaseUrl, requestJson }: ApiClientContext) =>
   },
 
   consumeLoginResult: async (): Promise<LoginResultResponse> => {
+    const { csrfToken } = await requestJson<CsrfTokenResponse>(
+      `${authBaseUrl}/csrf`,
+      { method: "GET" },
+    );
     return requestJson<LoginResultResponse>(
       `${authBaseUrl}/login/result`,
       {
         body: JSON.stringify({}),
         headers: {
           "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
         },
         method: "POST",
       },

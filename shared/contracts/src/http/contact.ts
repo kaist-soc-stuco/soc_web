@@ -3,12 +3,17 @@ import type {
   BulkImportContactsSchema,
   CreateContactDepartmentSchema,
   CreateContactSchema,
+  ContactActivitySchema,
   ReorderContactsSchema,
   UpdateContactDepartmentSchema,
   UpdateContactSchema,
 } from "../schemas.js";
 
+export type ContactActivity = z.infer<typeof ContactActivitySchema>;
+
 export interface ContactRecord {
+  portalUserId?: string | null;
+  activities?: ContactActivity[];
   id: string;
   nameKo: string;
   nameEn: string;
@@ -21,7 +26,6 @@ export interface ContactRecord {
   email: string | null;
   phoneNumber: string | null;
   privacyConsented: boolean;
-  publiclyListed: boolean;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;

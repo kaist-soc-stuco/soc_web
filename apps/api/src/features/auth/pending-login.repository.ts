@@ -19,7 +19,6 @@ const PENDING_LOGIN_PREFIX = "auth:pending-login:";
 
 interface StoredPendingSsoUser {
   encryptedEmail: string;
-  encryptedUserMobile?: string;
   expiresAt: number;
   kaistUid: string;
   academicStatus?: string;
@@ -98,9 +97,6 @@ export class PendingLoginRepository {
   private serialize(payload: PendingSsoUser): StoredPendingSsoUser {
     return {
       encryptedEmail: this.encrypt(payload.email),
-      encryptedUserMobile: payload.userMobile
-        ? this.encrypt(payload.userMobile)
-        : undefined,
       academicStatus: payload.academicStatus,
       departmentEn: payload.departmentEn,
       departmentKo: payload.departmentKo,
@@ -133,9 +129,6 @@ export class PendingLoginRepository {
         nameKo: parsed.nameKo,
         ssoSubject: parsed.ssoSubject,
         stdNo: parsed.stdNo,
-        userMobile: parsed.encryptedUserMobile
-          ? this.decrypt(parsed.encryptedUserMobile)
-          : undefined,
       };
     } catch {
       return null;

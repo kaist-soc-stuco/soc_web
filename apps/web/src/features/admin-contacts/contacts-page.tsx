@@ -1,3 +1,4 @@
+import { restrictListDrag } from "@/lib/drag-bounds";
 import {
   useCallback,
   useEffect,
@@ -36,7 +37,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createPortal } from "react-dom";
-import { GripVertical, Mail, Pencil, Phone, Plus, Sheet, Trash2, Upload } from "lucide-react";
+import { GripVertical, Mail, Phone, Plus, Sheet, Upload, X } from "lucide-react";
 
 import { AuthGuard } from "@/components/guards/auth-guard";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
@@ -45,10 +46,9 @@ import { AdminDataTable, AdminTableBody, AdminTableCell, AdminTableHead, AdminTa
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
-import { UiInput, UiTextarea } from "@/components/ui/form-control";
+import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
 import { PageSearchField } from "@/components/ui/page-layout";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { CONTACT_XLSX_TEMPLATE_ROWS, parseContactSpreadsheet, type ParsedContactSpreadsheetRow } from "@/lib/contact-spreadsheet";
 import { downloadBlob } from "@/lib/download-blob";
@@ -56,7 +56,7 @@ import { Permissions } from "@/lib/permissions";
 import { ExecutiveMemberModal, type ExecutiveMemberFormValues } from "./ExecutiveMemberModal";
 
 const CONTACT_LIST_PAGE_SIZE = 500;
-const CONTACT_ROW_GRID = "grid min-w-[1120px] grid-cols-[52px_280px_120px_120px_220px_minmax(0,1fr)]";
+const CONTACT_ROW_GRID = "grid min-w-[1120px] grid-cols-[52px_180px_120px_120px_150px_140px_minmax(0,1fr)]";
 
 export function ExecutiveDirectoryPage() {
   return <AuthGuard requirePermission={Permissions.MANAGE_CONTACTS}><ContactsPageContent /></AuthGuard>;
@@ -67,6 +67,8 @@ export const ContactsPage = ExecutiveDirectoryPage;
 function sortContacts(items: ContactRecord[]) {
   return [...items].sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt));
 }
+
+function normalizeYear(value: number | null | undefined): number { return value ? (value < 100 ? 2000 + value : value) : 0; }
 
 function formatActivityYear(value: number | null): string {
   if (!value) return "—";
@@ -81,14 +83,12 @@ function ContactsPageContent() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const [activeTab, setActiveTab] = useState<"members" | "departments">("members");
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [departments, setDepartments] = useState<ContactDepartmentRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [activityYearFilter, setActivityYearFilter] = useState("");
+  const [activityYearFilter, setActivityYearFilter] = useState("2026");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [orderSaving, setOrderSaving] = useState(false);
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
@@ -105,12 +105,7 @@ function ContactsPageContent() {
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [departmentModalOpen, setDepartmentModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<ContactDepartmentRecord | null>(null);
-  const [departmentForm, setDepartmentForm] = useState({
-    nameKo: "",
-    nameEn: "",
-    descriptionKo: "",
-    descriptionEn: "",
-  });
+  const [departmentForm, setDepartmentForm] = useState({ nameKo: "" });
   const [departmentSaving, setDepartmentSaving] = useState(false);
 
   const loadContacts = useCallback(async () => {
@@ -126,14 +121,11 @@ function ContactsPageContent() {
   }, [apiClient]);
 
   const loadDepartments = useCallback(async () => {
-    setDepartmentsLoading(true);
     try {
       const response = await apiClient.getManagedContactDepartments();
       setDepartments(response.items);
     } catch {
       setError("부서 정보를 불러오는 데 실패했습니다.");
-    } finally {
-      setDepartmentsLoading(false);
     }
   }, [apiClient]);
 
@@ -151,8 +143,8 @@ function ContactsPageContent() {
   }, [loadContacts, loadDepartments, loadSpreadsheet]);
 
   const activityYearOptions = useMemo(
-    () => Array.from(new Set(contacts.map((contact) => contact.cohort).filter((year): year is number => year !== null)))
-      .sort((a, b) => a - b),
+    () => Array.from(new Set([2026, ...contacts.flatMap((contact) => contact.activities?.length ? contact.activities.map((activity) => activity.year) : [contact.cohort]).filter((year): year is number => year !== null).map(normalizeYear)]))
+      .filter((year) => year >= 1900).sort((a, b) => b - a),
     [contacts],
   );
   const legacyDepartmentOptions = useMemo(
@@ -175,8 +167,9 @@ function ContactsPageContent() {
         contact.email ?? "",
         contact.phoneNumber ?? "",
       ].some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
-      const matchesYear = !activityYearFilter || String(contact.cohort ?? "") === activityYearFilter;
-      const matchesDepartment = !departmentFilter || contact.departmentKo === departmentFilter;
+      const activities = contact.activities?.length ? contact.activities : [{ year: normalizeYear(contact.cohort), departmentKo: contact.departmentKo }];
+      const matchesYear = !activityYearFilter || activities.some((activity) => String(normalizeYear(activity.year)) === activityYearFilter);
+      const matchesDepartment = !departmentFilter || activities.some((activity) => activity.departmentKo === departmentFilter && (!activityYearFilter || String(normalizeYear(activity.year)) === activityYearFilter));
       return matchesQuery && matchesYear && matchesDepartment;
     });
   }, [activityYearFilter, contacts, departmentFilter, query]);
@@ -286,19 +279,22 @@ function ContactsPageContent() {
   };
 
   const handleMemberSave = async (values: ExecutiveMemberFormValues) => {
+    const latest = values.activities.reduce((current, activity) => !current || activity.year >= current.year ? activity : current, values.activities[0]);
+    if (!latest) { setError("활동 이력을 하나 이상 입력해 주세요."); return; }
     const payload: CreateContactRequest = {
+      portalUserId: values.portalUserId,
+      activities: values.activities,
       nameKo: values.nameKo.trim(),
       nameEn: values.nameEn.trim(),
       studentNumber: values.studentNumber.trim() || null,
-      departmentKo: values.departmentKo.trim() || null,
-      departmentEn: values.departmentEn.trim() || null,
-      roleKo: values.roleKo.trim(),
-      roleEn: values.roleEn.trim(),
-      cohort: values.cohort,
+      departmentKo: latest.departmentKo.trim() || null,
+      departmentEn: latest.departmentEn.trim() || null,
+      roleKo: latest.roleKo.trim(),
+      roleEn: latest.roleEn.trim(),
+      cohort: latest.year,
       email: values.email.trim(),
       phoneNumber: values.phoneNumber.trim(),
       privacyConsented: true,
-      publiclyListed: values.publiclyListed,
     };
     try {
       setMemberSaving(true);
@@ -316,16 +312,13 @@ function ContactsPageContent() {
 
   const openNewDepartmentModal = () => {
     setEditingDepartment(null);
-    setDepartmentForm({ nameKo: "", nameEn: "", descriptionKo: "", descriptionEn: "" });
+    setDepartmentForm({ nameKo: "" });
     setDepartmentModalOpen(true);
   };
   const openEditDepartmentModal = (department: ContactDepartmentRecord) => {
     setEditingDepartment(department);
     setDepartmentForm({
       nameKo: department.nameKo,
-      nameEn: department.nameEn,
-      descriptionKo: department.descriptionKo,
-      descriptionEn: department.descriptionEn,
     });
     setDepartmentModalOpen(true);
   };
@@ -341,23 +334,24 @@ function ContactsPageContent() {
       if (editingDepartment) {
         await apiClient.updateContactDepartment(editingDepartment.id, {
           nameKo: departmentForm.nameKo.trim(),
-          nameEn: departmentForm.nameEn.trim(),
-          descriptionKo: departmentForm.descriptionKo.trim(),
-          descriptionEn: departmentForm.descriptionEn.trim(),
+          nameEn: "",
+          descriptionKo: "",
+          descriptionEn: "",
         });
       } else {
         const payload: CreateContactDepartmentRequest = {
           nameKo: departmentForm.nameKo.trim(),
-          nameEn: departmentForm.nameEn.trim(),
-          descriptionKo: departmentForm.descriptionKo.trim(),
-          descriptionEn: departmentForm.descriptionEn.trim(),
+          nameEn: "",
+          descriptionKo: "",
+          descriptionEn: "",
           inquiryEmail: "",
           isActive: true,
         };
         await apiClient.createContactDepartment(payload);
       }
-      closeDepartmentModal();
-      await loadDepartments();
+      setEditingDepartment(null);
+      setDepartmentForm({ nameKo: "" });
+      await Promise.all([loadDepartments(), loadContacts()]);
       toast({ type: "success", message: editingDepartment ? "부서 정보를 수정했습니다." : "부서를 추가했습니다." });
     } catch {
       setError("부서 저장에 실패했습니다. 중복 여부와 입력값을 확인해 주세요.");
@@ -397,35 +391,22 @@ function ContactsPageContent() {
     </Button>
   );
 
-  const headerActions = activeTab === "members" ? (
-    <>
-      {pageSpreadsheetLink}
-      <Button type="button" variant="outline" onClick={() => bulkFileInputRef.current?.click()}><Upload aria-hidden="true" />불러오기</Button>
-      <Button type="button" onClick={openNewMemberModal}><Plus aria-hidden="true" />부원 추가</Button>
-    </>
-  ) : <>{pageSpreadsheetLink}<Button type="button" onClick={openNewDepartmentModal}><Plus aria-hidden="true" />부서 추가</Button></>;
+  const headerActions = <>
+    {pageSpreadsheetLink}
+    <Button type="button" variant="outline" onClick={openNewDepartmentModal}>부서 관리</Button>
+    <Button type="button" variant="outline" onClick={() => bulkFileInputRef.current?.click()}><Upload aria-hidden="true" />불러오기</Button>
+    <Button type="button" onClick={openNewMemberModal}><Plus aria-hidden="true" />부원 추가</Button>
+  </>;
 
   return (
     <AdminPageShell>
       <main className="admin-page__main mx-auto flex w-full max-w-[var(--ui-admin-page-max-width)] flex-col gap-6 px-5 py-7 md:px-8 xl:px-10">
         {ConfirmDialog}
         <AdminPageHeader title="집행위 연락망" actions={headerActions} />
-        <SegmentedControl
-          ariaLabel="집행위 연락망 관리 탭"
-          role="tablist"
-          value={activeTab}
-          onChange={setActiveTab}
-          options={[
-            { value: "members", label: "구성원" },
-            { value: "departments", label: "부서 관리" },
-          ]}
-          className="w-fit"
-        />
         <UiInput ref={bulkFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => void handleBulkFileChange(event)} />
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
 
-        {activeTab === "members" ? (
-          <>
+        <>
             <ExecutiveMemberModal
               open={memberModalOpen}
               contact={editingContact}
@@ -460,35 +441,33 @@ function ContactsPageContent() {
 
             <AdminTableCard className="overflow-visible">
               <div className="border-b border-slate-100 p-4"><div className="flex flex-wrap items-center justify-end gap-2">
-                <AdminSelectDropdown value={activityYearFilter} onChange={setActivityYearFilter} ariaLabel="활동 연도 필터" className="w-32 shrink-0" options={[{ value: "", label: "활동 연도 전체" }, ...activityYearOptions.map((year) => ({ value: String(year), label: formatActivityYear(year) }))]} />
+                <AdminSelectDropdown value={activityYearFilter} onChange={setActivityYearFilter} ariaLabel="활동 연도 필터" className="w-32 shrink-0" options={[{ value: "", label: "활동 연도" }, ...activityYearOptions.map((year) => ({ value: String(year), label: formatActivityYear(year) }))]} />
                 <AdminSelectDropdown value={departmentFilter} onChange={setDepartmentFilter} ariaLabel="부서 필터" className="w-36 shrink-0" options={[{ value: "", label: "부서 전체" }, ...departments.filter((department) => department.isActive).map((department) => ({ value: department.nameKo, label: department.nameKo })), ...legacyDepartmentOptions.map((department) => ({ value: department, label: department }))]} />
                 <PageSearchField ariaLabel="연락망 통합 검색" className="w-full max-w-[20rem] flex-none" onChange={setQuery} onClear={() => setQuery("")} placeholder="이름·학번·직책·메일·전화번호 검색" value={query} />
               </div></div>
               <div className="min-w-0">
-                {loading && contacts.length === 0 ? null : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-table-viewport--dragging" : undefined}><div className="admin-contacts-table min-w-[1120px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} border-t-2 border-t-brand-primary bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center px-5">이름 (한글/영문)</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">활동 연도</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
+                {loading && contacts.length === 0 ? null : filteredContacts.length === 0 ? <AdminEmptyState message={contacts.length === 0 ? "등록된 집행부원이 없습니다." : "검색 조건에 맞는 집행부원이 없습니다."} /> : <DndContext modifiers={[restrictListDrag]} autoScroll={false} sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragCancel={handleDragCancel} onDragEnd={(event) => void handleDragEnd(event)}><AdminTableViewport className={activeContactId ? "admin-table-viewport--dragging" : undefined}><div className="admin-contacts-table min-w-[1120px]"><div role="row" className={`admin-contacts-table__header ${CONTACT_ROW_GRID} bg-slate-50/70 text-left text-sm font-medium text-[var(--j-color-text-secondary)]`}><div role="columnheader" className="flex h-12 items-center justify-center"><span className="sr-only">순서</span></div><div role="columnheader" className="flex h-12 items-center pl-1 pr-5">이름</div><div role="columnheader" className="flex h-12 items-center px-5">학번</div><div role="columnheader" className="flex h-12 items-center px-5">활동 연도</div><div role="columnheader" className="flex h-12 items-center px-5">부서</div><div role="columnheader" className="flex h-12 items-center px-5">직책</div><div role="columnheader" className="flex h-12 items-center px-5">연락처 정보</div></div><SortableContext items={filteredContacts.map((contact) => contact.id)} strategy={verticalListSortingStrategy}><div role="rowgroup">{filteredContacts.map((contact) => <SortableContactRow key={contact.id} contact={contact} activityYear={activityYearFilter} disabled={orderSaving} onEdit={openEditMemberModal} />)}</div></SortableContext></div></AdminTableViewport>{typeof document !== "undefined" ? createPortal(<DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>{activeContact ? <ContactDragPreview contact={activeContact} width={activeDragWidth} /> : null}</DragOverlay>, document.body) : null}</DndContext>}
               </div>
               {orderSaving ? <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">표시 순서를 저장하는 중입니다...</p> : null}
             </AdminTableCard>
-          </>
-        ) : (
-          <AdminTableCard className="overflow-hidden">
-            {departmentsLoading && departments.length === 0 ? <div className="px-5 py-16 text-center text-sm text-slate-400">부서 정보를 불러오는 중입니다...</div> : departments.length === 0 ? <AdminEmptyState message="등록된 부서가 없습니다." /> : <div className="divide-y divide-slate-100">{departments.map((department) => <div key={department.id} className="flex min-h-16 items-center justify-between gap-4 px-5 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{department.nameKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{department.nameEn || "영문 부서명 미입력"}</p><p className="mt-1 truncate text-xs text-slate-500">{department.descriptionKo || "소개 문구 미입력"}</p></div><div className="flex shrink-0 items-center gap-2"><span className={`rounded-full px-2 py-1 text-xs font-medium ${department.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{department.isActive ? "사용 중" : "비활성"}</span><Button type="button" variant="outline" size="icon" aria-label={`${department.nameKo} 수정`} onClick={() => openEditDepartmentModal(department)}><Pencil aria-hidden="true" className="size-4" /></Button><Button type="button" variant="outline" size="icon" aria-label={`${department.nameKo} 삭제`} onClick={() => void handleDepartmentDelete(department)}><Trash2 aria-hidden="true" className="size-4 text-rose-600" /></Button></div></div>)}</div>}
-          </AdminTableCard>
-        )}
+        </>
 
         <Modal
           open={departmentModalOpen}
           onClose={closeDepartmentModal}
-          title={editingDepartment ? "부서 수정" : "부서 추가"}
+          title="부서 관리"
           className="max-w-md"
           footer={<><Button type="button" variant="outline" onClick={closeDepartmentModal} disabled={departmentSaving}>취소</Button><Button type="button" onClick={() => void handleDepartmentSave()} disabled={departmentSaving || !departmentForm.nameKo.trim()}>{departmentSaving ? "저장 중..." : "저장"}</Button></>}
         >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <AdminFormField label="부서 (한글) *"><UiInput value={departmentForm.nameKo} onChange={(event) => setDepartmentForm((current) => ({ ...current, nameKo: event.currentTarget.value }))} placeholder="예: 회장단" className="box-border w-full" /></AdminFormField>
-              <AdminFormField label="부서 (영문)"><UiInput value={departmentForm.nameEn} onChange={(event) => setDepartmentForm((current) => ({ ...current, nameEn: event.currentTarget.value }))} placeholder="예: Presidium" className="box-border w-full" /></AdminFormField>
-              <AdminFormField label="역할 소개 (한글)" className="sm:col-span-2"><UiTextarea value={departmentForm.descriptionKo} onChange={(event) => setDepartmentForm((current) => ({ ...current, descriptionKo: event.currentTarget.value }))} placeholder="예: 포털 개발 및 인프라 운영, 시스템 관리" className="min-h-24 w-full" /></AdminFormField>
-              <AdminFormField label="역할 소개 (영문)" className="sm:col-span-2"><UiTextarea value={departmentForm.descriptionEn} onChange={(event) => setDepartmentForm((current) => ({ ...current, descriptionEn: event.currentTarget.value }))} placeholder="Describe this department's main responsibilities." className="min-h-24 w-full" /></AdminFormField>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {departments.map((department) => <span key={department.id} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-1 pl-3 pr-1 text-sm">
+                <button type="button" onClick={() => openEditDepartmentModal(department)} className="py-1 text-slate-700">{department.nameKo}</button>
+                <button type="button" aria-label={`${department.nameKo} 삭제`} onClick={() => void handleDepartmentDelete(department)} className="inline-flex size-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-rose-600"><X className="size-3.5" /></button>
+              </span>)}
             </div>
+            <AdminFormField label={editingDepartment ? "부서명 수정" : "부서명"}><UiInput value={departmentForm.nameKo} onChange={(event) => { const value = event.currentTarget.value; setDepartmentForm((current) => ({ ...current, nameKo: value })); }} placeholder="부서명 입력" /></AdminFormField>
+          </div>
         </Modal>
       </main>
     </AdminPageShell>
@@ -515,26 +494,33 @@ function ContactsPageContent() {
   }
 }
 
-function SortableContactRow({ contact, disabled, onEdit }: { contact: ContactRecord; disabled: boolean; onEdit: (contact: ContactRecord) => void }) {
+function ContactCells({ contact, activityYear = "" }: { contact: ContactRecord; activityYear?: string }) {
+  const activities = (contact.activities?.length ? contact.activities : [{ year: normalizeYear(contact.cohort), departmentKo: contact.departmentKo, roleKo: contact.roleKo }])
+    .filter((activity) => !activityYear || String(normalizeYear(activity.year)) === activityYear)
+    .sort((a, b) => normalizeYear(b.year) - normalizeYear(a.year));
+  const years = [...new Set(activities.map((activity) => normalizeYear(activity.year)).filter(Boolean))];
+  return <>
+    <div role="cell" className="min-w-0 py-3 pl-1 pr-5"><div className="admin-table-text-emphasis truncate">{contact.nameKo}</div></div>
+    <div role="cell" className="min-w-0 truncate px-5 py-3 text-sm tabular-nums text-slate-700">{contact.studentNumber || "—"}</div>
+    <div role="cell" data-mobile-label="활동 연도" className="px-5 py-3 text-sm tabular-nums text-slate-700">{years.map(formatActivityYear).join(", ") || "—"}</div>
+    <div role="cell" data-mobile-label="부서" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.departmentKo).filter(Boolean))].join(", ") || "—"}</div>
+    <div role="cell" data-mobile-label="직책" className="min-w-0 px-5 py-3 text-sm text-slate-700">{[...new Set(activities.map((activity) => activity.roleKo).filter(Boolean))].join(", ") || "—"}</div>
+    <div role="cell" className="min-w-0 space-y-1 px-5 py-3"><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.email || "—"}</span></div><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-slate-400" /><span className="truncate">{contact.phoneNumber || "—"}</span></div></div>
+  </>;
+}
+
+function SortableContactRow({ contact, activityYear, disabled, onEdit }: { contact: ContactRecord; activityYear: string; disabled: boolean; onEdit: (contact: ContactRecord) => void }) {
   const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: contact.id, disabled });
-  const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease", willChange: isDragging ? "transform" : undefined };
-  return <div ref={setNodeRef} style={style} role="row" className={`admin-contacts-table__row ${CONTACT_ROW_GRID} ${isDragging ? "relative z-10 opacity-0" : "cursor-pointer transition-colors hover:bg-slate-50/60"}`} onClick={() => onEdit(contact)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEdit(contact); } }} tabIndex={0}>
-    <div role="cell" className="flex min-h-20 items-center justify-center"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="flex size-7 touch-none cursor-grab items-center justify-center rounded-md border-0 bg-transparent p-0 text-kaist-grey/35 transition-colors hover:bg-slate-100 hover:text-kaist-grey/80 active:cursor-grabbing" aria-label={`${contact.nameKo} 표시 순서 변경`} title="드래그하여 순서 변경"><GripVertical aria-hidden="true" className="size-4" /></button></div>
-    <div role="cell" className="min-w-0 px-5 py-3"><div className="admin-table-text-emphasis truncate" title={contact.nameKo}>{contact.nameKo}</div><div className="admin-table-text mt-0.5 truncate" title={contact.nameEn}>{contact.nameEn}</div></div>
-    <div role="cell" data-mobile-label="학번" className="min-w-0 truncate px-5 py-3 text-sm tabular-nums text-slate-700" title={contact.studentNumber ?? undefined}>{contact.studentNumber || "—"}</div>
-    <div role="cell" data-mobile-label="활동 연도" className="px-5 py-3 text-sm tabular-nums text-slate-700">{formatActivityYear(contact.cohort)}</div>
-    <div role="cell" data-mobile-label="직책" className="min-w-0 px-5 py-3"><div className="admin-table-text truncate" title={contact.departmentKo ?? undefined}>{contact.departmentKo || "부서 미지정"}</div><div className="mt-0.5 truncate text-sm font-medium text-slate-700" title={contact.roleKo}>{contact.roleKo}</div><div className="admin-table-text mt-0.5 truncate" title={contact.roleEn}>{contact.roleEn}</div></div>
-    <div role="cell" data-mobile-label="연락처" className="min-w-0 space-y-1 px-5 py-3"><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Mail className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="truncate" title={contact.email ?? undefined}>{contact.email || "—"}</span></div><div className="admin-table-text flex min-w-0 items-center gap-1.5"><Phone className="size-3.5 shrink-0 text-kaist-greygreen" aria-hidden="true" /><span className="truncate" title={contact.phoneNumber ?? undefined}>{contact.phoneNumber || "—"}</span></div></div>
+  const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition: transition ?? "transform 200ms ease" };
+  return <div ref={setNodeRef} style={style} role="row" className={`admin-contacts-table__row ${CONTACT_ROW_GRID} items-center ${isDragging ? "relative z-10 opacity-0" : "cursor-pointer transition-colors hover:bg-slate-50/60"}`} onClick={() => onEdit(contact)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEdit(contact); } }} tabIndex={0}>
+    <div role="cell" className="flex min-h-16 items-center pl-5 pr-1"><button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} onClick={(event) => event.stopPropagation()} className="admin-list-drag-handle" aria-label={`${contact.nameKo} 표시 순서 변경`}><GripVertical aria-hidden="true" className="size-4" /></button></div>
+    <ContactCells contact={contact} activityYear={activityYear} />
   </div>;
 }
 
 function ContactDragPreview({ contact, width }: { contact: ContactRecord; width: number | null }) {
-  return <div style={{ width: width ?? undefined }} className={`admin-contacts-table__row ${CONTACT_ROW_GRID} relative z-50 select-none min-h-20 cursor-grabbing rounded-lg border border-brand-primary/45 bg-white shadow-lg`}>
-    <div className="flex items-center justify-center text-brand-primary"><GripVertical aria-hidden="true" className="size-4" /></div>
-    <div className="min-w-0 px-5 py-3"><p className="truncate text-sm font-semibold text-slate-900">{contact.nameKo}</p><p className="truncate text-xs text-slate-500">{contact.nameEn}</p></div>
-    <div className="min-w-0 truncate px-5 py-3 text-sm text-slate-700">{contact.studentNumber || "—"}</div>
-    <div className="px-5 py-3 text-sm tabular-nums text-slate-700">{formatActivityYear(contact.cohort)}</div>
-    <div className="min-w-0 px-5 py-3"><p className="truncate text-xs text-slate-500">{contact.departmentKo || "부서 미지정"}</p><p className="truncate text-sm text-slate-700">{contact.roleKo}</p><p className="mt-0.5 truncate text-xs text-slate-500">{contact.roleEn}</p></div>
-    <div className="min-w-0 space-y-1 px-5 py-3 text-xs text-slate-500"><p className="truncate">{contact.email || "—"}</p><p className="truncate">{contact.phoneNumber || "—"}</p></div>
+  return <div style={{ width: width ?? undefined }} className={`admin-contacts-table__row ${CONTACT_ROW_GRID} items-center relative z-50 select-none min-h-16 cursor-grabbing rounded-lg border border-slate-200 bg-white shadow-lg`}>
+    <div className="pl-5 pr-1"><span className="admin-list-drag-handle"><GripVertical aria-hidden="true" className="size-4" /></span></div>
+    <ContactCells contact={contact} />
   </div>;
 }

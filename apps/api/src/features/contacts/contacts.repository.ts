@@ -27,6 +27,8 @@ export class ContactsRepository {
   private map(row: typeof executiveContacts.$inferSelect): ContactRecord {
     return {
       id: row.id,
+      portalUserId: row.portalUserId,
+      activities: (row.activities ?? []).map((activity) => ({ ...activity, year: activity.year < 100 ? 2000 + activity.year : activity.year })),
       nameKo: row.nameKo,
       nameEn: row.nameEn,
       departmentKo: row.departmentKo ?? null,
@@ -34,11 +36,10 @@ export class ContactsRepository {
       roleKo: row.roleKo,
       roleEn: row.roleEn,
       studentNumber: row.studentNumber ?? null,
-      cohort: row.cohort ?? null,
+      cohort: row.cohort ? (row.cohort < 100 ? 2000 + row.cohort : row.cohort) : null,
       email: row.email,
       phoneNumber: row.phoneNumber,
       privacyConsented: row.privacyConsented,
-      publiclyListed: row.publiclyListed,
       sortOrder: row.sortOrder,
       createdAt: msToIso(row.createdAt.valueOf()),
       updatedAt: msToIso(row.updatedAt.valueOf()),
@@ -54,25 +55,7 @@ export class ContactsRepository {
   }
 
   async findPublic(): Promise<PublicContactListResponse> {
-    const rows = await this.db
-      .select({
-        nameKo: executiveContacts.nameKo,
-        nameEn: executiveContacts.nameEn,
-        departmentKo: executiveContacts.departmentKo,
-        departmentEn: executiveContacts.departmentEn,
-         roleKo: executiveContacts.roleKo,
-         roleEn: executiveContacts.roleEn,
-         sortOrder: executiveContacts.sortOrder,
-      })
-      .from(executiveContacts)
-      .where(
-        and(
-          eq(executiveContacts.publiclyListed, true),
-          eq(executiveContacts.privacyConsented, true),
-        ),
-      )
-      .orderBy(asc(executiveContacts.sortOrder), asc(executiveContacts.createdAt));
-    return { items: rows };
+    return { items: [] };
   }
 
   private mapDepartment(
@@ -102,20 +85,7 @@ export class ContactsRepository {
   }
 
   async findPublicDepartments(): Promise<PublicContactDepartmentListResponse> {
-    const rows = await this.db
-      .select({
-        id: executiveContactDepartments.id,
-        nameKo: executiveContactDepartments.nameKo,
-        nameEn: executiveContactDepartments.nameEn,
-        descriptionKo: executiveContactDepartments.descriptionKo,
-        descriptionEn: executiveContactDepartments.descriptionEn,
-        sortOrder: executiveContactDepartments.sortOrder,
-        isActive: executiveContactDepartments.isActive,
-      })
-      .from(executiveContactDepartments)
-      .where(eq(executiveContactDepartments.isActive, true))
-      .orderBy(asc(executiveContactDepartments.sortOrder), asc(executiveContactDepartments.nameKo));
-    return { items: rows };
+    return { items: [] };
   }
 
   async findDepartmentById(id: string): Promise<ContactDepartmentRecord | null> {
@@ -180,6 +150,12 @@ export class ContactsRepository {
             ),
           );
       }
+      if (dto.nameKo !== undefined) {
+        await tx.update(executiveContacts).set({
+          activities: sql`(SELECT COALESCE(jsonb_agg(CASE WHEN a->>'departmentId' = ${id} OR (COALESCE(a->>'departmentId', '') = '' AND a->>'departmentKo' = ${current.nameKo}) THEN jsonb_set(a, '{departmentKo}', to_jsonb(${nameKo}::text)) ELSE a END), '[]'::jsonb) FROM jsonb_array_elements(${executiveContacts.activities}) a)`,
+          updatedAt: nowDate(),
+        }).where(sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${executiveContacts.activities}) a WHERE a->>'departmentId' = ${id} OR (COALESCE(a->>'departmentId', '') = '' AND a->>'departmentKo' = ${current.nameKo}))`);
+      }
       const [row] = await tx
         .update(executiveContactDepartments)
         .set(set)
@@ -215,13 +191,19 @@ export class ContactsRepository {
             ilike(executiveContacts.email, `%${normalizedQuery}%`),
             ilike(executiveContacts.phoneNumber, `%${normalizedQuery}%`),
             ilike(executiveContacts.studentNumber, `%${normalizedQuery}%`),
+            sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${executiveContacts.activities}) a WHERE a->>'roleKo' ILIKE ${`%${normalizedQuery}%`} OR a->>'roleEn' ILIKE ${`%${normalizedQuery}%`})`,
           )
         : undefined,
-      input.cohort !== undefined ? eq(executiveContacts.cohort, input.cohort) : undefined,
-        input.department
+      input.cohort !== undefined || input.department
         ? or(
-            eq(executiveContacts.departmentKo, input.department),
-            eq(executiveContacts.departmentEn, input.department),
+            and(
+              sql`jsonb_array_length(${executiveContacts.activities}) = 0`,
+              input.cohort !== undefined ? eq(executiveContacts.cohort, input.cohort) : undefined,
+              input.department ? or(eq(executiveContacts.departmentKo, input.department), eq(executiveContacts.departmentEn, input.department)) : undefined,
+            ),
+            sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${executiveContacts.activities}) a
+              WHERE ${input.cohort !== undefined ? sql`a->>'year' = ${String(input.cohort)}` : sql`TRUE`}
+              AND ${input.department ? sql`(a->>'departmentKo' = ${input.department} OR a->>'departmentEn' = ${input.department})` : sql`TRUE`})`,
           )
         : undefined,
       input.privacyConsented !== undefined
@@ -274,6 +256,8 @@ export class ContactsRepository {
     const [row] = await this.db
       .insert(executiveContacts)
       .values({
+        portalUserId: dto.portalUserId ?? null,
+        activities: dto.activities ?? [],
         nameKo: dto.nameKo,
         nameEn: dto.nameEn,
         departmentKo: dto.departmentKo ?? null,
@@ -285,7 +269,7 @@ export class ContactsRepository {
         email: dto.email ?? null,
         phoneNumber: dto.phoneNumber ?? null,
         privacyConsented: dto.privacyConsented ?? true,
-        publiclyListed: dto.publiclyListed ?? false,
+        publiclyListed: false,
         sortOrder: dto.sortOrder ?? nextSortOrder,
         updatedAt: nowDate(),
       })
@@ -310,6 +294,8 @@ export class ContactsRepository {
         .insert(executiveContacts)
         .values(
           dto.items.map((item, index) => ({
+            portalUserId: item.portalUserId ?? null,
+            activities: item.activities ?? [],
             nameKo: item.nameKo,
             nameEn: item.nameEn,
             departmentKo: item.departmentKo ?? null,
@@ -321,7 +307,7 @@ export class ContactsRepository {
             email: item.email ?? null,
             phoneNumber: item.phoneNumber ?? null,
             privacyConsented: item.privacyConsented ?? true,
-            publiclyListed: item.publiclyListed ?? false,
+            publiclyListed: false,
             sortOrder: item.sortOrder ?? index * 10,
             updatedAt: nowDate(),
           })),
@@ -351,6 +337,8 @@ export class ContactsRepository {
       updatedAt: nowDate(),
     };
 
+    if (dto.portalUserId !== undefined) set.portalUserId = dto.portalUserId;
+    if (dto.activities !== undefined) set.activities = dto.activities;
     if (dto.nameKo !== undefined) set.nameKo = dto.nameKo;
     if (dto.nameEn !== undefined) set.nameEn = dto.nameEn;
     if (dto.departmentKo !== undefined) set.departmentKo = dto.departmentKo;
@@ -362,7 +350,6 @@ export class ContactsRepository {
     if (dto.email !== undefined) set.email = dto.email;
     if (dto.phoneNumber !== undefined) set.phoneNumber = dto.phoneNumber;
     if (dto.privacyConsented !== undefined) set.privacyConsented = dto.privacyConsented;
-    if (dto.publiclyListed !== undefined) set.publiclyListed = dto.publiclyListed;
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
 
     const [row] = await this.db

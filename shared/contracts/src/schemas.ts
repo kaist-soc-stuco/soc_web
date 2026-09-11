@@ -761,25 +761,36 @@ export const BulkUpdateStudentFeeStatusSchema = z.object({
 
 const RequiredContactTextSchema = z.string().trim().min(1).max(100);
 
+export const ContactActivitySchema = z.object({
+  year: z.number().int().min(1900).max(3000),
+  departmentId: z.string().uuid().nullable().optional(),
+  departmentKo: z.string().trim().max(100).default(""),
+  departmentEn: z.string().trim().max(100).default(""),
+  roleKo: RequiredContactTextSchema,
+  roleEn: z.string().trim().max(100).default(""),
+}).strict();
+
 const ContactFieldsSchema = z.object({
+  portalUserId: z.string().uuid().nullable().optional(),
+  activities: z.array(ContactActivitySchema).max(100).optional(),
   nameKo: RequiredContactTextSchema,
-  nameEn: RequiredContactTextSchema,
+  nameEn: z.string().trim().max(100),
   departmentKo: z.string().trim().max(100).nullable().optional(),
   departmentEn: z.string().trim().max(100).nullable().optional(),
   roleKo: RequiredContactTextSchema,
-  roleEn: RequiredContactTextSchema,
+  roleEn: z.string().trim().max(100),
   studentNumber: z.string().trim().max(30).nullable().optional(),
   cohort: z.number().int().positive().max(3000).nullable().optional(),
   email: z.string().email().or(z.literal("")).nullable().optional(),
   phoneNumber: z.string().max(50).nullable().optional(),
   privacyConsented: z.boolean(),
-  publiclyListed: z.boolean(),
   sortOrder: z.number().int().optional(),
 });
 
 export const CreateContactSchema = ContactFieldsSchema.extend({
+  nameEn: z.string().trim().max(100).default(""),
+  roleEn: z.string().trim().max(100).default(""),
   privacyConsented: z.boolean().default(true),
-  publiclyListed: z.boolean().default(false),
 });
 
 export const ReorderContactsSchema = z
@@ -928,3 +939,10 @@ export const RoadmapImportDecisionSchema = z.object({
 export const RoadmapImportCommitSchema = z.object({
   decisions: z.record(z.string().trim().min(1).max(64), RoadmapImportDecisionSchema),
 }).strict();
+
+export const StudentFeePolicySchema = z.object({
+  effectiveSemester: z.string().regex(/^\d{4}-[12]$/),
+  amount: z.number().int().min(1).max(10_000_000),
+  coverageSemesters: z.number().int().min(1).max(6).default(6),
+}).strict();
+export type StudentFeePolicy = z.infer<typeof StudentFeePolicySchema>;

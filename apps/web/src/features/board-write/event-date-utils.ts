@@ -46,11 +46,11 @@ export function isAllDayDateRange(
 export function switchEventDateInputMode(value: string, isAllDay: boolean) {
   if (!value) return "";
   const datePart = value.slice(0, 10);
-  return isAllDay ? datePart : `${datePart}T00:00`;
+  return isAllDay ? datePart : `${datePart}T${value.slice(11, 16) || "00:00"}`;
 }
 
 export function switchEventEndDateInputMode(value: string, isAllDay: boolean) {
   if (!value) return "";
   const datePart = value.slice(0, 10);
-  return isAllDay ? datePart : `${datePart}T23:59`;
+  return isAllDay ? datePart : `${datePart}T${value.slice(11, 16) || "23:59"}`;
 }

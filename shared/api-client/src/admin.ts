@@ -1,4 +1,5 @@
 import type {
+  StudentFeePolicy,
   AdminUserRecord,
   BulkProcessStudentFeePaymentsRequest,
   BulkProcessStudentFeePaymentsResponse,
@@ -7,6 +8,7 @@ import type {
   AuditLogListResponse,
   BulkUpdateStudentFeeStatusRequest,
   BulkUpdateStudentFeeStatusResponse,
+  StudentFeeImportPreview,
   BulkImportContactsRequest,
   BulkImportContactsResponse,
   BulkEmailListResponse,
@@ -375,6 +377,9 @@ export const createAdminApi = ({
     );
   },
 
+  getStudentFeePolicy: (semester: string) => requestJson<StudentFeePolicy>(`${usersBaseUrl}/fee-status/policy?semester=${encodeURIComponent(semester)}`, { method: "GET" }),
+  createStudentFeePolicy: (policy: StudentFeePolicy) => requestJson<StudentFeePolicy>(`${usersBaseUrl}/fee-status/policy`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(policy) }),
+
   listStudentsByFeeStatus: async (
     options?: StudentFeeListOptions,
   ): Promise<StudentFeeListResponse> => {
@@ -636,6 +641,12 @@ export const createAdminApi = ({
       { method: "GET" },
       { retryOnUnauthorized: true },
     );
+  },
+
+  previewStudentFeeImport: async (body: BulkUpdateStudentFeeStatusRequest): Promise<StudentFeeImportPreview> => {
+    return requestJson<StudentFeeImportPreview>(`${usersBaseUrl}/fee-status/preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }, { retryOnUnauthorized: true });
   },
 
   bulkUpdateStudentFeeStatuses: async (

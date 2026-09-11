@@ -171,6 +171,8 @@ export interface ArticleDetailResponse {
   canEdit: boolean;
   allowComment: boolean;
   assets: ArticleAssetItem[];
+  /** Canonical poster used by list and detail views, when one is attached. */
+  thumbnailStorageKey?: string | null;
   commentCount: number;
   viewCount: number;
   likeCount: number;

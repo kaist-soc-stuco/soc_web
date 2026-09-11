@@ -24,52 +24,17 @@ const fullContact = {
   updatedAt: "2026-09-08T00:00:00.000Z",
 };
 
-test("public contacts return only the separately approved organization fields", async () => {
-  const repository = {
+test("retired public contacts stay empty while managed contacts remain available", async () => {
+  const { ContactsRepository } = require("../dist/apps/api/src/features/contacts/contacts.repository.js");
+  const publicRepository = new ContactsRepository({ select() { throw new Error("Public endpoint must not query contacts"); } });
+  const service = new ContactsService({
     purgeRevoked: async () => 0,
-    findPublic: async () => ({
-      items: [{
-        nameKo: fullContact.nameKo,
-        nameEn: fullContact.nameEn,
-        departmentKo: fullContact.departmentKo,
-        departmentEn: fullContact.departmentEn,
-        roleKo: fullContact.roleKo,
-        roleEn: fullContact.roleEn,
-        sortOrder: fullContact.sortOrder,
-      }],
-    }),
+    findPublic: () => publicRepository.findPublic(),
+    findPublicDepartments: () => publicRepository.findPublicDepartments(),
     findManaged: async () => ({ items: [fullContact], total: 1, page: 1, pageSize: 1 }),
-  };
-  const service = new ContactsService(
-    repository,
-    { record: async () => undefined },
-    {},
-    {},
-  );
-
-  const publicResponse = await service.findPublic();
-  const publicJson = JSON.stringify(publicResponse);
-  assert.deepEqual(Object.keys(publicResponse.items[0]).sort(), [
-    "departmentEn",
-    "departmentKo",
-    "nameEn",
-    "nameKo",
-    "roleEn",
-    "roleKo",
-    "sortOrder",
-  ]);
-  for (const sensitive of [
-    "20260001",
-    "private@example.test",
-    "010-0000-0000",
-    "privacyConsented",
-    "createdAt",
-    "updatedAt",
-    "cohort",
-  ]) {
-    assert.equal(publicJson.includes(sensitive), false, `${sensitive} leaked`);
-  }
-
-  const managedResponse = await service.findManaged({ page: 1, pageSize: 1 });
-  assert.equal(JSON.stringify(managedResponse).includes("private@example.test"), true);
+  }, { record: async () => undefined }, {}, {});
+  assert.deepEqual(await service.findPublic(), { items: [] });
+  assert.deepEqual(await service.findPublicDepartments(), { items: [] });
+  const managed = await service.findManaged({ page: 1, pageSize: 1 });
+  assert.equal(managed.items[0].email, "private@example.test");
 });

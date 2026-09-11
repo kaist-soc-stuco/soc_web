@@ -8,6 +8,7 @@ import type {
 import { isoToDate, isoToMs, msToIso, nowIso } from "@soc/shared";
 
 import { AdminCard, AdminEmptyState } from "@/components/ui/admin-page";
+import { resolveAssetUrl } from "@/lib/asset-url";
 import { formatSurveyAnswer } from "@/lib/survey-answer-display";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -100,9 +101,9 @@ function ChoiceBreakdown({ question }: { question: SurveyQuestionAnalyticsItem }
   return (
     <div className="space-y-3">
       {choices.map((choice) => (
-        <div key={choice.value} className="grid grid-cols-[minmax(120px,1fr)_minmax(180px,2fr)_96px] items-center gap-3 text-sm">
+        <div key={choice.value} className="grid grid-cols-[minmax(0,1fr)_80px] sm:grid-cols-[minmax(100px,1fr)_minmax(0,2fr)_96px] items-center gap-3 text-sm">
           <span className="truncate font-normal text-[#172033]">{choice.labelKo}</span>
-          <div className="h-2 overflow-hidden rounded-full bg-[#edf1f4]"><div className="h-full rounded-full bg-[#75b69d]" style={{ width: `${(choice.count / maximum) * 100}%` }} /></div>
+          <div className="hidden h-2 overflow-hidden sm:block rounded-full bg-[#edf1f4]"><div className="h-full rounded-full bg-[#75b69d]" style={{ width: `${(choice.count / maximum) * 100}%` }} /></div>
           <span className="text-right text-xs font-normal tabular-nums text-[#344054]">{choice.count}건 · {choice.percentage}%</span>
         </div>
       ))}
@@ -126,9 +127,15 @@ function GridBreakdown({ question }: { question: SurveyQuestionAnalyticsItem }) 
 }
 
 function RawAnswers({ question, responses }: { question: SurveyQuestionRecord; responses: SurveyResponseWithAnswers[] }) {
-  const values = responses.map((response) => formatSurveyAnswer(response.answers.find((answer) => answer.questionId === question.id), question)).filter((value) => value && value !== "—");
-  if (values.length === 0) return <AdminEmptyState message="제출된 답변이 없습니다." className="py-8" />;
-  return <div className="max-h-72 divide-y divide-[#edf1f4] overflow-y-auto rounded-lg border border-[#e5eaf0]">{values.map((value, index) => <p key={`${index}-${value}`} className="px-4 py-3 text-sm font-normal leading-6 text-[#172033]">{value}</p>)}</div>;
+  const answers = responses.flatMap((response) => {
+    const answer = response.answers.find((item) => item.questionId === question.id);
+    return answer ? [{ response, answer }] : [];
+  });
+  if (!answers.length) return <AdminEmptyState message="현재 응답 범위에 제출된 답변이 없습니다." className="py-8" />;
+  return <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">{answers.map(({ response, answer }) => {
+    const ids = Array.isArray(answer.content.assetIds) ? answer.content.assetIds.filter((id): id is string => typeof id === "string") : typeof answer.content.assetId === "string" ? [answer.content.assetId] : [];
+    return <div key={response.id} className="whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6">{question.questionType === "file_upload" && ids.length ? ids.map((id, index) => <a key={id} className="block text-brand-primary underline" href={resolveAssetUrl(`asset:${id}`)} target="_blank" rel="noopener noreferrer">첨부파일 {index + 1}</a>) : formatSurveyAnswer(answer, question) || "응답 없음"}</div>;
+  })}</div>;
 }
 
 export function SurveyQuestionSummary({ analytics, questions, responses }: { analytics: SurveyAnalyticsResponse; questions: SurveyQuestionRecord[]; responses: SurveyResponseWithAnswers[] }) {

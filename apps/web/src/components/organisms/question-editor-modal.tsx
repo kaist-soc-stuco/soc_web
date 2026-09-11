@@ -1,3 +1,4 @@
+import { restrictListDrag } from "@/lib/drag-bounds";
 import { createPortal } from "react-dom";
 import { createApiClient } from "@soc/api-client";
 import type { QuestionType, SurveyQuestionConfig } from "@soc/contracts";
@@ -8,7 +9,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type Modifier,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -17,7 +17,6 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
-  ChevronUp,
   Circle,
   Clock3,
   Copy,
@@ -54,6 +53,7 @@ import { Button } from "@/components/ui/button";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { IconButton } from "@/components/ui/icon-button";
+import { RichTextInput } from "@/components/ui/rich-text-input";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
@@ -91,11 +91,6 @@ const normalizeQuestionType = (value: unknown): QuestionType =>
   QUESTION_TYPES.some((option) => option.value === value)
     ? (value as QuestionType)
     : "short_text";
-
-const restrictOptionToVerticalAxis: Modifier = ({ transform }) => ({
-  ...transform,
-  x: 0,
-});
 
 type ValidationType = NonNullable<SurveyQuestionConfig["validationType"]>;
 type ValidationOperator = NonNullable<SurveyQuestionConfig["validationOperator"]>;
@@ -226,9 +221,9 @@ interface QuestionInlineEditorProps {
   branchTargets?: Array<{ id: string; titleKo: string }>;
   isNewQuestion?: boolean;
   dragHandle?: ReactNode;
-  commitRef?: MutableRefObject<(() => boolean) | null>;
-  onDuplicate?: () => void;
-  onDelete?: () => void;
+  commitRef?: MutableRefObject<(() => boolean | Promise<boolean>) | null>;
+  onDuplicate?: (draft?: QuestionFormState) => void | Promise<void>;
+  onDelete?: () => void | Promise<void>;
   onSave: (q: QuestionFormState) => void | Promise<void>;
   onCancel: () => void;
 }
@@ -356,7 +351,6 @@ interface SortableOptionRowProps {
   onUpdateOptionImage: (index: number, value: string | null) => void;
   onUpdateBranchTarget: (optionValue: string, target: string) => void;
   onRemoveOption: (index: number) => void;
-  onMoveOption: (fromIndex: number, toIndex: number) => void;
   onError: (message: string) => void;
 }
 
@@ -377,7 +371,6 @@ function SortableOptionRow({
   onUpdateOptionImage,
   onUpdateBranchTarget,
   onRemoveOption,
-  onMoveOption,
   onError,
 }: SortableOptionRowProps) {
   const {
@@ -492,26 +485,6 @@ function SortableOptionRow({
             buttonClassName="!h-9 !text-xs"
           />
         ) : null}
-        <div className="question-option-order-actions flex shrink-0 items-center gap-0.5">
-          <IconButton
-            type="button"
-            size="sm"
-            aria-label={`${option.labelKo || option.value || "선택지"} 위로 이동`}
-            disabled={isOngoing || index === 0}
-            onClick={() => onMoveOption(index, index - 1)}
-          >
-            <ChevronUp aria-hidden="true" className="size-4" />
-          </IconButton>
-          <IconButton
-            type="button"
-            size="sm"
-            aria-label={`${option.labelKo || option.value || "선택지"} 아래로 이동`}
-            disabled={isOngoing || index === optionCount - 1}
-            onClick={() => onMoveOption(index, index + 1)}
-          >
-            <ChevronDown aria-hidden="true" className="size-4" />
-          </IconButton>
-        </div>
       </div>
       <ImagePreview
         label="선택지 이미지"
@@ -553,7 +526,6 @@ export function QuestionInlineEditor({
           initial.config?.validationType,
       ),
   }));
-  const [error, setError] = useState<string | null>(null);
   const [showDescription, setShowDescription] = useState(
     () => Boolean(initial.descriptionKo.trim() || initial.descriptionEn.trim()),
   );
@@ -890,7 +862,7 @@ export function QuestionInlineEditor({
     setShowDescription(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async (): Promise<boolean> => {
     const usedOptionValues = new Set<string>();
     const normalizedOptions = form.options.map((option, index) => {
       let value = option.value.trim() || `option_${index + 1}`;
@@ -935,12 +907,12 @@ export function QuestionInlineEditor({
 
     if (needsOptions) {
       if (form.options.length === 0) {
-        setError("최소 하나의 선택지가 필요합니다.");
+        toast({ type: "error", message: "최소 하나의 선택지가 필요합니다." });
         return false;
       }
       const optionValues = normalizedOptions.map((option) => option.value.trim());
       if (new Set(optionValues).size !== optionValues.length) {
-        setError("선택지 값은 서로 달라야 합니다.");
+        toast({ type: "error", message: "선택지 값은 서로 달라야 합니다." });
         return false;
       }
     }
@@ -948,30 +920,36 @@ export function QuestionInlineEditor({
     if (supportsValidation && form.answerValidationEnabled) {
       if (validationType === "regex" || validationTextType === "regex") {
         if (!form.answerRegex.trim()) {
-          setError("응답 검증 정규식을 입력해주세요.");
+          toast({ type: "error", message: "응답 검증 정규식을 입력해주세요." });
           return false;
         }
         try {
           new RegExp(form.answerRegex.trim());
         } catch {
-          setError("응답 검증 정규식이 올바르지 않습니다.");
+          toast({ type: "error", message: "응답 검증 정규식이 올바르지 않습니다." });
           return false;
         }
       } else if (!Number.isInteger(validationValue) || validationValue < 0) {
-        setError("응답 검증 기준은 0 이상의 정수로 입력해주세요.");
+        toast({ type: "error", message: "응답 검증 기준은 0 이상의 정수로 입력해주세요." });
         return false;
       }
     }
 
-    setError(null);
     if (savingRef.current) return false;
     savingRef.current = true;
-    void Promise.resolve()
-      .then(() => onSave(normalizedForm))
-      .finally(() => {
-        savingRef.current = false;
-      });
-    return true;
+    try {
+      await onSave(normalizedForm);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  const handleDuplicate = () => {
+    if (!onDuplicate) return;
+    void onDuplicate(isNewQuestion ? form : undefined);
   };
 
   useEffect(() => {
@@ -1043,7 +1021,7 @@ export function QuestionInlineEditor({
       const gap = 8;
       const triggerRect = trigger.getBoundingClientRect();
       const naturalHeight = menu.scrollHeight;
-      const naturalWidth = Math.max(menu.scrollWidth, 240);
+      const naturalWidth = Math.max(menu.scrollWidth, 224);
       const availableWidth = Math.max(
         1,
         window.innerWidth - viewportPadding * 2,
@@ -1090,7 +1068,7 @@ export function QuestionInlineEditor({
     "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-base font-normal text-slate-900 outline-none placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      className="question-inline-editor relative animate-in fade-in slide-in-from-top-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 sm:p-5 md:p-6 md:pb-5 md:pt-8"
+      className="question-inline-editor relative animate-in fade-in slide-in-from-top-2 overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 sm:p-5 md:p-6 md:pb-5 md:pt-8"
     >
       {dragHandle ? (
         <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="문항 순서 이동">
@@ -1100,29 +1078,14 @@ export function QuestionInlineEditor({
       <div className="min-w-0 flex-1">
         <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
         <div className="question-editor-field group relative min-w-0">
-          <UiInput
-            autoFocus
-            aria-label="국문 질문"
-            className={`${titleInputCls} min-w-0`}
-            placeholder="질문"
-            value={form.titleKo}
-            disabled={isOngoing}
-            onChange={(event) => set("titleKo", event.target.value)}
-          />
+          <RichTextInput singleLine ariaLabel="국문 질문" value={form.titleKo} disabled={isOngoing} onChange={value => set("titleKo", value)} placeholder="질문" />
           <span
             aria-hidden="true"
              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
            />
          </div>
          <div className="question-editor-field group relative min-w-0">
-          <UiInput
-            aria-label="영문 질문"
-            className={`${titleInputCls} min-w-0`}
-            placeholder="Question"
-            value={form.titleEn}
-            disabled={isOngoing || isKoreanOnly}
-            onChange={(event) => set("titleEn", event.target.value)}
-          />
+          {!isKoreanOnly ? <RichTextInput singleLine ariaLabel="영문 질문" value={form.titleEn} disabled={isOngoing} onChange={value => set("titleEn", value)} placeholder="Question" /> : null}
           <span
             aria-hidden="true"
              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
@@ -1152,32 +1115,22 @@ export function QuestionInlineEditor({
       {showDescription ? (
         <div className="mt-2 grid min-w-0 gap-3 md:grid-cols-2">
           <div className="question-editor-field group relative min-w-0">
-            <UiInput
-              aria-label="국문 설명"
-              className={`${titleInputCls} min-w-0`}
-              placeholder="설명"
+            <RichTextInput
               value={form.descriptionKo}
+              onChange={(value) => set("descriptionKo", value)}
+              ariaLabel="국문 설명"
+              placeholder="설명"
               disabled={isOngoing}
-              onChange={(event) => set("descriptionKo", event.target.value)}
-            />
-            <span
-              aria-hidden="true"
-              className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
             />
           </div>
           {!isKoreanOnly ? (
             <div className="question-editor-field group relative min-w-0">
-              <UiInput
-                aria-label="영문 설명"
-                className={`${titleInputCls} min-w-0`}
-                placeholder="Description"
+              <RichTextInput
                 value={form.descriptionEn}
+                onChange={(value) => set("descriptionEn", value)}
+                ariaLabel="영문 설명"
+                placeholder="Description"
                 disabled={isOngoing}
-                onChange={(event) => set("descriptionEn", event.target.value)}
-              />
-              <span
-                aria-hidden="true"
-                className="question-editor-field__focus-bar pointer-events-none absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 bg-brand-primary"
               />
             </div>
           ) : null}
@@ -1196,11 +1149,12 @@ export function QuestionInlineEditor({
 
       {needsOptions ? (
           <div className="mt-4 pb-4 pt-1">
-          <div className="scrollbar-hidden -ml-4 max-h-80 space-y-1 overflow-y-auto pr-1 md:-ml-5">
+          <div className="scrollbar-hidden -ml-4 max-h-80 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1 md:-ml-5">
             <DndContext
               sensors={optionSensors}
               collisionDetection={closestCenter}
-              modifiers={[restrictOptionToVerticalAxis]}
+              autoScroll={false}
+              modifiers={[restrictListDrag]}
               onDragEnd={handleOptionDragEnd}
             >
               <SortableContext
@@ -1226,24 +1180,23 @@ export function QuestionInlineEditor({
                     onUpdateOptionImage={updateOptionImage}
                     onUpdateBranchTarget={updateBranchTarget}
                     onRemoveOption={removeOption}
-                    onMoveOption={moveOption}
                     onError={(message) => toast({ type: "error", message })}
                   />
                 ))}
               </SortableContext>
             </DndContext>
-             {!isOngoing ? (
-               <div className="flex min-w-0 items-center gap-2 px-4 py-1 md:px-5">
-                 {form.questionType === "dropdown" ? (
-                   <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-400" aria-hidden="true">
-                     {form.options.length + 1}
-                   </span>
-                 ) : (
-                   <span
-                     className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 text-[length:var(--ui-text-micro-size)] text-slate-300 ${form.questionType === "single_choice" ? "rounded-full" : "rounded"}`}
-                     aria-hidden="true"
-                   />
-                 )}
+            {!isOngoing ? (
+              <div className="flex min-w-0 items-center gap-2 px-4 py-1 md:px-5">
+                {form.questionType === "dropdown" ? (
+                  <span className="flex size-5 shrink-0 items-center justify-center text-xs tabular-nums text-slate-400" aria-hidden="true">
+                    {form.options.length + 1}
+                  </span>
+                ) : (
+                  <span
+                    className={`flex size-5 shrink-0 items-center justify-center border border-slate-300 text-[length:var(--ui-text-micro-size)] text-slate-300 ${form.questionType === "single_choice" ? "rounded-full" : "rounded"}`}
+                    aria-hidden="true"
+                  />
+                )}
                 <UiInput
                   type="text"
                   readOnly
@@ -1251,7 +1204,7 @@ export function QuestionInlineEditor({
                   placeholder="옵션 추가"
                   disabled={isOngoing}
                   onFocus={addOption}
-                   className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
+                  className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
                 />
               </div>
             ) : null}
@@ -1400,21 +1353,21 @@ export function QuestionInlineEditor({
 
       <div className="mt-5 border-t border-slate-100 pt-4">
         <div className="flex flex-wrap items-center justify-end gap-3">
-          {!isNewQuestion && !isOngoing && (onDuplicate || onDelete) ? (
+          {!isOngoing && (onDuplicate || onDelete) ? (
             <div className="flex items-center gap-1">
-            {!isNewQuestion && !isOngoing && onDuplicate ? (
-              <IconButton type="button" size="sm" aria-label="문항 복제" onClick={onDuplicate}>
+            {!isOngoing && onDuplicate ? (
+              <IconButton type="button" size="sm" aria-label="문항 복제" onClick={handleDuplicate}>
                 <Copy className="size-4" />
               </IconButton>
             ) : null}
-            {!isNewQuestion && !isOngoing && onDelete ? (
-              <IconButton type="button" size="sm" aria-label="문항 삭제" onClick={onDelete} className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600">
+            {!isOngoing && onDelete ? (
+              <IconButton type="button" size="sm" aria-label="문항 삭제" onClick={() => void onDelete()} className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600">
                 <Trash2 className="size-4" />
               </IconButton>
             ) : null}
             </div>
           ) : null}
-          {!isNewQuestion && !isOngoing && (onDuplicate || onDelete) ? (
+          {!isOngoing && (onDuplicate || onDelete) ? (
             <span aria-hidden="true" className="h-6 border-l border-slate-200" />
           ) : null}
           <div ref={moreMenuRef} className="relative flex items-center gap-3">
@@ -1511,11 +1464,6 @@ export function QuestionInlineEditor({
         ) : null}
       </div>
 
-      {error ? (
-        <div role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
-          {error}
-        </div>
-      ) : null}
       </div>
     </div>
   );
@@ -1600,7 +1548,7 @@ function QuestionMoreMenu({
       style={menuStyle}
       role="menu"
       aria-label="문항 옵션"
-      className="question-editor-more-menu fixed z-[100] min-w-60 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+      className="question-editor-more-menu fixed z-[100] min-w-56 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
     >
       <MoreMenuItem
         label="설명"

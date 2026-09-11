@@ -48,7 +48,6 @@ export class RoleGroupsRepository {
       departmentKo: row.departmentKo ?? null,
       primaryMajor: row.primaryMajor ?? null,
       gender: row.gender ?? null,
-      phoneNumber: row.phoneNumber ?? null,
       privacyConsentAt: row.privacyConsentAt
         ? msToIso(row.privacyConsentAt.valueOf())
         : null,
@@ -351,9 +350,6 @@ export class RoleGroupsRepository {
             ilike(users.departmentKo, `%${input.department.trim()}%`),
             ilike(users.departmentEn, `%${input.department.trim()}%`),
           )
-        : undefined,
-      input.academicStatus?.trim()
-        ? ilike(users.academicStatus, `%${input.academicStatus.trim()}%`)
         : undefined,
       input.majorType === "PRIMARY"
         ? sql`nullif(trim(${users.primaryMajor}), '') is not null`

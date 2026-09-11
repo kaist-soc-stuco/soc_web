@@ -22,7 +22,6 @@ import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { canWriteBoardFromMetadata } from "@/lib/board-metadata";
 import { hasPersistedProfile } from "@/lib/require-persisted-profile";
 import {
-  BoardCategoryNavigation,
   BoardDataControls,
 } from "@/features/board-list/board-page-sections";
 import { RichTextContent } from "@/components/ui/rich-text-content";
@@ -158,7 +157,6 @@ export function FaqPage() {
           titleId="faq-page-title"
         />
 
-        <BoardCategoryNavigation boards={boards} category="faq" lang={lang} />
 
         <PageContainer className="pb-8">
           <DataViewCard aria-label={lang === "ko" ? "FAQ 목록" : "FAQ list"}>

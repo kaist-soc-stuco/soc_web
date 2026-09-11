@@ -10,10 +10,12 @@ import type {
   StudentFeeSortBy,
 } from "./repositories/users.repository";
 import type {
+  StudentFeePolicy,
   AdminUserListResponse,
   AdminUserRecord,
   BulkUpdateStudentFeeStatusRequest,
   BulkUpdateStudentFeeStatusResponse,
+  StudentFeeImportPreview,
   BulkProcessStudentFeePaymentsRequest,
   BulkProcessStudentFeePaymentsResponse,
   FeeMajorCategory,
@@ -91,7 +93,6 @@ export class UsersService {
     gender?: string;
     identityCode?: string;
     stdNo?: string;
-    userMobile?: string;
     consentedAt?: Date;
   }): Promise<UserRecord> {
     const now = nowDate();
@@ -101,7 +102,6 @@ export class UsersService {
       departmentKo: input.departmentKo,
       primaryMajor: input.primaryMajor,
       gender: input.gender,
-      phoneNumber: input.userMobile,
       kaistUid: input.kaistUid,
       identityCode: input.identityCode,
       nameEn: input.nameEn,
@@ -228,7 +228,6 @@ export class UsersService {
     Array<{
       email: string;
       nameKo: string;
-      phoneNumber: string | null;
       studentNumber: string | null;
     }>
   > {
@@ -271,17 +270,29 @@ export class UsersService {
       nameEn?: string;
       nameKo?: string;
       stdNo?: string;
-      userMobile?: string;
     },
   ): Promise<void> {
     await this.usersRepository.updateProfile(userId, {
       ...input,
-      phoneNumber: input.userMobile,
     });
+  }
+
+  getStudentFeePolicy(semester: string) { return this.usersRepository.getStudentFeePolicy(semester); }
+  async createStudentFeePolicy(input: StudentFeePolicy, actorId: string) {
+    const result = await this.usersRepository.createStudentFeePolicy(input, actorId);
+    await this.auditLogService.record({ action: "student_fee_policy.create", actorUserId: actorId, targetType: "student_fee_policy", payload: input });
+    return result;
   }
 
   async getStudentFeeStatus(userId: string): Promise<StudentFeeStatusRecord | null> {
     return this.usersRepository.getStudentFeeStatus(userId);
+  }
+
+  async applyStudentFeeBootstrap(
+    userId: string,
+    stdNo: string | null | undefined,
+  ): Promise<StudentFeeStatusRecord | null> {
+    return this.usersRepository.applyStudentFeeBootstrap(userId, stdNo);
   }
 
   async updateStudentFeeStatus(
@@ -309,6 +320,21 @@ export class UsersService {
     await this.googleSheetsQueue?.enqueue(GOOGLE_SHEET_RESOURCE.STUDENT_FEES);
 
     return record;
+  }
+
+  async previewStudentFeeImport(input: BulkUpdateStudentFeeStatusRequest): Promise<StudentFeeImportPreview> {
+    const seen = new Set<string>();
+    const rows: StudentFeeImportPreview["rows"] = [];
+    for (const update of input.updates) {
+      const user = update.userId
+        ? await this.usersRepository.findById(update.userId)
+        : await this.usersRepository.findByStdNo(update.stdNo!);
+      const error = !user ? "USER_NOT_FOUND" : seen.has(user.userId) ? "DUPLICATE_USER" : null;
+      if (user) seen.add(user.userId);
+      rows.push({ identifier: update.userId ?? update.stdNo!, userId: user?.userId ?? null,
+        current: user ? await this.usersRepository.getStudentFeeStatus(user.userId) : null, error });
+    }
+    return { rows, canApply: rows.length > 0 && rows.every((row) => !row.error) };
   }
 
   async bulkUpdateStudentFeeStatuses(

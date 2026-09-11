@@ -1,3 +1,8 @@
+-- Squashed baseline: schema and migration changes through 0029_remove_user_phone.
+-- Fresh PostgreSQL databases apply this file as the single migration baseline.
+-- Existing databases that already contain the pre-squash migration history keep
+-- their history; the baseline timestamp is intentionally compatible with it.
+
 CREATE TYPE "public"."content_block_status" AS ENUM('DRAFT', 'PUBLISHED');--> statement-breakpoint
 CREATE TYPE "public"."content_block_type" AS ENUM('HERO', 'LOGO', 'TOP_BANNER', 'QUICK_LINK', 'ORGANIZATION_CHART', 'PLEDGE');--> statement-breakpoint
 CREATE TYPE "public"."site_content_key" AS ENUM('home.hero.title', 'home.hero.description', 'home.hero.cta', 'about.hero.description', 'about.intro.title', 'about.intro.body', 'about.roadmap.title', 'about.roadmap.description', 'footer.description', 'footer.contact');--> statement-breakpoint
@@ -586,3 +591,500 @@ CREATE INDEX "calendar_sync_job_due_idx" ON "calendar_sync_job" USING btree ("st
 CREATE UNIQUE INDEX "calendar_sync_job_target_event_idx" ON "calendar_sync_job" USING btree ("calendar_event_id","target_calendar_id");--> statement-breakpoint
 CREATE INDEX "notification_user_created_idx" ON "notification" USING btree ("user_id","created_at");--> statement-breakpoint
 CREATE INDEX "notification_user_unread_idx" ON "notification" USING btree ("user_id","is_read","created_at");
+--> statement-breakpoint
+ALTER TABLE "survey" ALTER COLUMN "eligible_soc_affiliations" SET DEFAULT '[]'::jsonb;--> statement-breakpoint
+ALTER TABLE "survey" ALTER COLUMN "academic_eligibility" SET DEFAULT 'ANY';
+--> statement-breakpoint
+CREATE TABLE "vote_ballot" (
+	"ballot_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"vote_id" uuid NOT NULL,
+	"ciphertext" text NOT NULL,
+	"iv" varchar(32) NOT NULL,
+	"auth_tag" varchar(32) NOT NULL,
+	"receipt_hash" varchar(64) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "vote_item" (
+	"item_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"vote_id" uuid NOT NULL,
+	"title_ko" text NOT NULL,
+	"title_en" text,
+	"description_ko" text,
+	"description_en" text,
+	"type" varchar(30) NOT NULL,
+	"max_selections" integer DEFAULT 1 NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "vote_item_type_check" CHECK ("vote_item"."type" in ('YES_NO_ABSTAIN', 'SINGLE_CHOICE', 'MULTIPLE_CHOICE')),
+	CONSTRAINT "vote_item_max_selection_check" CHECK ("vote_item"."max_selections" >= 1)
+);
+--> statement-breakpoint
+CREATE TABLE "vote_option" (
+	"option_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"item_id" uuid NOT NULL,
+	"label_ko" varchar(255) NOT NULL,
+	"label_en" varchar(255),
+	"description_ko" text,
+	"description_en" text,
+	"image_url" text,
+	"sort_order" integer DEFAULT 0 NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "vote_tally" (
+	"vote_id" uuid PRIMARY KEY NOT NULL,
+	"result" jsonb NOT NULL,
+	"total_ballots" integer NOT NULL,
+	"tallied_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "vote_voter" (
+	"vote_id" uuid NOT NULL,
+	"user_id" uuid NOT NULL,
+	"name_ko" varchar(100) NOT NULL,
+	"student_number" varchar(20),
+	"email" varchar(255) NOT NULL,
+	"primary_major" varchar(100),
+	"academic_status" varchar(30),
+	"fee_status" varchar(20),
+	"status" varchar(20) DEFAULT 'ELIGIBLE' NOT NULL,
+	"source" varchar(20) DEFAULT 'FILTER' NOT NULL,
+	"has_voted" boolean DEFAULT false NOT NULL,
+	"voted_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "vote_voter_vote_id_user_id_pk" PRIMARY KEY("vote_id","user_id"),
+	CONSTRAINT "vote_voter_status_check" CHECK ("vote_voter"."status" in ('ELIGIBLE', 'EXCLUDED')),
+	CONSTRAINT "vote_voter_source_check" CHECK ("vote_voter"."source" in ('FILTER', 'MANUAL', 'IMPORT'))
+);
+--> statement-breakpoint
+CREATE TABLE "vote" (
+	"vote_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"creator_id" uuid,
+	"title_ko" varchar(255) NOT NULL,
+	"title_en" varchar(255),
+	"description_ko" text,
+	"description_en" text,
+	"status" varchar(20) DEFAULT 'DRAFT' NOT NULL,
+	"starts_at" timestamp with time zone NOT NULL,
+	"ends_at" timestamp with time zone NOT NULL,
+	"academic_statuses" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"fee_payers_only" boolean DEFAULT false NOT NULL,
+	"student_number_from" varchar(20),
+	"student_number_to" varchar(20),
+	"encrypted_ballot_key" text,
+	"key_iv" varchar(32),
+	"key_tag" varchar(32),
+	"voter_snapshot_at" timestamp with time zone,
+	"results_published_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "vote_status_check" CHECK ("vote"."status" in ('DRAFT', 'PUBLISHED', 'CLOSED', 'TALLIED')),
+	CONSTRAINT "vote_schedule_check" CHECK ("vote"."ends_at" > "vote"."starts_at")
+);
+--> statement-breakpoint
+ALTER TABLE "vote_ballot" ADD CONSTRAINT "vote_ballot_vote_id_vote_vote_id_fk" FOREIGN KEY ("vote_id") REFERENCES "public"."vote"("vote_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vote_item" ADD CONSTRAINT "vote_item_vote_id_vote_vote_id_fk" FOREIGN KEY ("vote_id") REFERENCES "public"."vote"("vote_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vote_option" ADD CONSTRAINT "vote_option_item_id_vote_item_item_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."vote_item"("item_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vote_tally" ADD CONSTRAINT "vote_tally_vote_id_vote_vote_id_fk" FOREIGN KEY ("vote_id") REFERENCES "public"."vote"("vote_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vote_voter" ADD CONSTRAINT "vote_voter_vote_id_vote_vote_id_fk" FOREIGN KEY ("vote_id") REFERENCES "public"."vote"("vote_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vote_voter" ADD CONSTRAINT "vote_voter_user_id_users_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("user_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vote" ADD CONSTRAINT "vote_creator_id_users_user_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "vote_ballot_vote_idx" ON "vote_ballot" USING btree ("vote_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "vote_ballot_receipt_unique_idx" ON "vote_ballot" USING btree ("receipt_hash");--> statement-breakpoint
+CREATE INDEX "vote_item_vote_sort_idx" ON "vote_item" USING btree ("vote_id","sort_order");--> statement-breakpoint
+CREATE INDEX "vote_option_item_sort_idx" ON "vote_option" USING btree ("item_id","sort_order");--> statement-breakpoint
+CREATE INDEX "vote_voter_vote_status_idx" ON "vote_voter" USING btree ("vote_id","status","has_voted");--> statement-breakpoint
+CREATE INDEX "vote_status_schedule_idx" ON "vote" USING btree ("status","starts_at","ends_at");
+--> statement-breakpoint
+ALTER TABLE "users" DROP COLUMN "double_major";--> statement-breakpoint
+ALTER TABLE "users" DROP COLUMN "minor";
+--> statement-breakpoint
+CREATE TABLE "executive_contact_department" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"name_ko" varchar(100) NOT NULL,
+	"name_en" varchar(100) DEFAULT '' NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "executive_contact" ADD COLUMN "student_number" varchar(30);--> statement-breakpoint
+CREATE UNIQUE INDEX "executive_contact_department_name_ko_uq" ON "executive_contact_department" USING btree ("name_ko");--> statement-breakpoint
+CREATE INDEX "executive_contact_department_sort_idx" ON "executive_contact_department" USING btree ("sort_order");
+--> statement-breakpoint
+-- Replace the implicit all-access bit with the explicit permission set.
+UPDATE "permission"
+SET "is_active" = false
+WHERE "code" = 'SUPER_ADMIN';
+--> statement-breakpoint
+DELETE FROM "role_group_permission"
+WHERE "permission_id" IN (
+  SELECT "permission_id"
+  FROM "permission"
+  WHERE "code" = 'SUPER_ADMIN'
+);
+--> statement-breakpoint
+INSERT INTO "role_group_permission" ("role_group_id", "permission_id")
+SELECT "role_group"."role_group_id", "permission"."permission_id"
+FROM "role_group"
+CROSS JOIN "permission"
+WHERE "role_group"."name_ko" = '최고 관리자'
+  AND "permission"."is_active" = true
+ON CONFLICT ("role_group_id", "permission_id") DO NOTHING;
+
+--> statement-breakpoint
+CREATE TABLE "roadmap_offering" (
+	"offering_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"term" varchar(32) NOT NULL,
+	"course_code" varchar(64) NOT NULL,
+	"current_code" varchar(64) NOT NULL,
+	"name_ko" text NOT NULL,
+	"section" varchar(30),
+	"instructor" text,
+	"credits" varchar(40),
+	"time" text,
+	"room" text,
+	"capacity" integer,
+	"enrolled" integer,
+	"delivery" varchar(80),
+	"in_english" boolean DEFAULT false NOT NULL,
+	"source_data" jsonb NOT NULL,
+	"source_file_name" varchar(255),
+	"imported_by" uuid,
+	"imported_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "roadmap_offering" ADD CONSTRAINT "roadmap_offering_imported_by_users_user_id_fk" FOREIGN KEY ("imported_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "roadmap_offering_term_idx" ON "roadmap_offering" USING btree ("term");--> statement-breakpoint
+CREATE INDEX "roadmap_offering_course_idx" ON "roadmap_offering" USING btree ("course_code");--> statement-breakpoint
+CREATE INDEX "roadmap_offering_import_idx" ON "roadmap_offering" USING btree ("imported_at");
+--> statement-breakpoint
+ALTER TABLE "executive_contact_department" ADD COLUMN "description_ko" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "executive_contact_department" ADD COLUMN "description_en" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "executive_contact_department" ADD COLUMN "inquiry_email" varchar(255) DEFAULT '' NOT NULL;
+--> statement-breakpoint
+ALTER TABLE "article" ADD COLUMN "event_location" varchar(255);
+--> statement-breakpoint
+CREATE TABLE "roadmap_course_relation" (
+	"relation_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"prerequisite_course_id" uuid NOT NULL,
+	"postrequisite_course_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "roadmap_course" (
+	"course_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"course_code" varchar(64) NOT NULL,
+	"legacy_course_code" varchar(64),
+	"name_ko" text NOT NULL,
+	"name_en" text DEFAULT '' NOT NULL,
+	"category" varchar(32) DEFAULT 'major-elective' NOT NULL,
+	"credits" varchar(40) DEFAULT '' NOT NULL,
+	"semesters" varchar(20) DEFAULT 'S/F' NOT NULL,
+	"track_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"ai" boolean DEFAULT false NOT NULL,
+	"position_x" integer DEFAULT 0 NOT NULL,
+	"position_y" integer DEFAULT 0 NOT NULL,
+	"is_visible" boolean DEFAULT true NOT NULL,
+	"source" varchar(20) DEFAULT 'MANUAL' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "roadmap_term" (
+	"term_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"term" varchar(32) NOT NULL,
+	"source_file_name" varchar(255),
+	"imported_by" uuid,
+	"imported_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "roadmap_course_relation" ADD CONSTRAINT "roadmap_course_relation_prerequisite_course_id_roadmap_course_course_id_fk" FOREIGN KEY ("prerequisite_course_id") REFERENCES "public"."roadmap_course"("course_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "roadmap_course_relation" ADD CONSTRAINT "roadmap_course_relation_postrequisite_course_id_roadmap_course_course_id_fk" FOREIGN KEY ("postrequisite_course_id") REFERENCES "public"."roadmap_course"("course_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "roadmap_term" ADD CONSTRAINT "roadmap_term_imported_by_users_user_id_fk" FOREIGN KEY ("imported_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "roadmap_course_relation_pair_uq" ON "roadmap_course_relation" USING btree ("prerequisite_course_id","postrequisite_course_id");--> statement-breakpoint
+CREATE INDEX "roadmap_course_relation_target_idx" ON "roadmap_course_relation" USING btree ("postrequisite_course_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "roadmap_course_code_uq" ON "roadmap_course" USING btree ("course_code");--> statement-breakpoint
+CREATE INDEX "roadmap_course_legacy_code_idx" ON "roadmap_course" USING btree ("legacy_course_code");--> statement-breakpoint
+CREATE INDEX "roadmap_course_visible_idx" ON "roadmap_course" USING btree ("is_visible");--> statement-breakpoint
+CREATE UNIQUE INDEX "roadmap_term_term_uq" ON "roadmap_term" USING btree ("term");--> statement-breakpoint
+CREATE INDEX "roadmap_term_imported_idx" ON "roadmap_term" USING btree ("imported_at");
+--> statement-breakpoint
+CREATE TABLE "google_spreadsheet_sync_job" (
+	"google_spreadsheet_sync_job_id" serial PRIMARY KEY NOT NULL,
+	"resource_type" varchar(32) NOT NULL,
+	"resource_key" varchar(255) NOT NULL,
+	"status" varchar(16) DEFAULT 'PENDING' NOT NULL,
+	"revision" integer DEFAULT 1 NOT NULL,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"available_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"locked_at" timestamp with time zone,
+	"last_error" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "google_spreadsheet_sync_job_status_check" CHECK ("google_spreadsheet_sync_job"."status" in ('PENDING', 'PROCESSING', 'SUCCEEDED', 'FAILED')),
+	CONSTRAINT "google_spreadsheet_sync_job_revision_check" CHECK ("google_spreadsheet_sync_job"."revision" >= 1),
+	CONSTRAINT "google_spreadsheet_sync_job_attempts_check" CHECK ("google_spreadsheet_sync_job"."attempts" >= 0)
+);
+--> statement-breakpoint
+CREATE INDEX "google_spreadsheet_sync_job_due_idx" ON "google_spreadsheet_sync_job" USING btree ("status","available_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "google_spreadsheet_sync_job_resource_idx" ON "google_spreadsheet_sync_job" USING btree ("resource_type","resource_key");
+--> statement-breakpoint
+ALTER TABLE "calendar_event" ADD COLUMN "is_all_day" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "calendar_event" ADD COLUMN "is_always" boolean DEFAULT false NOT NULL;
+--> statement-breakpoint
+ALTER TABLE "board" ADD COLUMN "write_access_scope" varchar(30) DEFAULT 'ANYONE' NOT NULL;
+--> statement-breakpoint
+UPDATE "board"
+SET "write_access_scope" = CASE
+  WHEN "write_permission_id" IS NULL THEN 'AUTHENTICATED'
+  ELSE 'PERMISSION'
+END;
+
+--> statement-breakpoint
+ALTER TABLE "roadmap_course" DROP COLUMN "position_x";--> statement-breakpoint
+ALTER TABLE "roadmap_course" DROP COLUMN "position_y";--> statement-breakpoint
+
+UPDATE "board"
+SET "code" = CASE "code"
+  WHEN '공지' THEN 'notice'
+  WHEN 'HoC' THEN 'hoc'
+  WHEN '홍보글' THEN 'promotions'
+  WHEN '건의사항' THEN 'suggestions'
+  WHEN '연구실' THEN 'labs'
+  WHEN 'FAQ' THEN 'faq'
+  ELSE "code"
+END
+WHERE "code" IN ('공지', 'HoC', '홍보글', '건의사항', '연구실', 'FAQ');--> statement-breakpoint
+
+UPDATE "roadmap_course" AS course
+SET "legacy_course_code" = aliases."legacy_course_code"
+FROM (VALUES
+  ('CS10001', 'CS101'),
+  ('CS10009', 'CS109'),
+  ('CS10003', 'CS103'),
+  ('CS20002', 'CS202'),
+  ('CS20004', 'CS204'),
+  ('CS20006', 'CS206'),
+  ('CS20101', 'CS211'),
+  ('CS20200', 'CS220'),
+  ('CS20300', 'CS230'),
+  ('CS20700', 'CS270'),
+  ('CS30000', 'CS300'),
+  ('CS30100', 'CS310'),
+  ('CS30101', 'CS311'),
+  ('CS30200', 'CS320'),
+  ('CS30202', 'CS322'),
+  ('CS30300', 'CS330'),
+  ('CS30401', 'CS341'),
+  ('CS30408', 'CS348'),
+  ('CS30500', 'CS350'),
+  ('CS30600', 'CS360'),
+  ('CS30601', 'CS361'),
+  ('CS30700', 'CS370'),
+  ('CS30701', 'CS371'),
+  ('CS30702', 'CS372'),
+  ('CS30703', 'CS470'),
+  ('CS30704', 'CS374'),
+  ('CS30705', 'CS40804'),
+  ('CS30706', 'CS376'),
+  ('CS30707', 'CS377'),
+  ('CS30800', 'CS380'),
+  ('CS40002', 'CS402'),
+  ('CS40008', 'CS408'),
+  ('CS40101', 'CS411'),
+  ('CS40200', 'CS420'),
+  ('CS40202', 'CS422'),
+  ('CS40203', 'CS423'),
+  ('CS40204', 'CS424'),
+  ('CS40301', 'CS431'),
+  ('CS40402', 'CS442'),
+  ('CS40403', 'CS443'),
+  ('CS40407', 'CS447'),
+  ('CS40503', 'CS453'),
+  ('CS40504', 'CS454'),
+  ('CS40507', 'CS457'),
+  ('CS40508', 'CS458'),
+  ('CS40509', 'CS459'),
+  ('CS40701', 'CS471'),
+  ('CS40703', 'CS473'),
+  ('CS40704', 'CS474'),
+  ('CS40705', 'CS475'),
+  ('CS40707', 'CS477'),
+  ('CS40709', 'CS479'),
+  ('CS40801', 'CS481'),
+  ('CS40802', 'CS482'),
+  ('CS40805', 'CS485'),
+  ('CS40806', 'CS486'),
+  ('CS40809', 'CS489'),
+  ('CS49900', 'CS492'),
+  ('CS49902', 'CS494'),
+  ('CS93000', 'CS496')
+) AS aliases("course_code", "legacy_course_code")
+WHERE course."course_code" = aliases."course_code"
+  AND course."legacy_course_code" IS NULL;
+
+--> statement-breakpoint
+UPDATE "roadmap_course"
+SET "course_code" = 'MAS10009',
+    "legacy_course_code" = COALESCE(NULLIF("legacy_course_code", ''), 'MAS109'),
+    "updated_at" = NOW()
+WHERE "course_code" = 'MAS109'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM "roadmap_course" AS existing
+    WHERE existing."course_code" = 'MAS10009'
+  );--> statement-breakpoint
+
+UPDATE "roadmap_course"
+SET "legacy_course_code" = COALESCE(NULLIF("legacy_course_code", ''), 'MAS109'),
+    "updated_at" = NOW()
+WHERE "course_code" = 'MAS10009';--> statement-breakpoint
+
+UPDATE "roadmap_offering"
+SET "course_code" = 'MAS10009'
+WHERE "course_code" = 'MAS109';
+
+--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.hero.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.hero.cta.events';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.hero.cta.suggestions';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.intro';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.work';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.organization';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.nav.partnership';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.intro.eyebrow';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.1.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.1.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.2.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.2.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.3.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.3.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.work.card.cta';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.pledges.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.reference.eyebrow';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.organization.reference.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.title';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.description';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.cta';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.area.1';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.area.2';--> statement-breakpoint
+ALTER TYPE "public"."site_content_key" ADD VALUE IF NOT EXISTS 'about.partnership.area.3';
+
+--> statement-breakpoint
+ALTER TABLE "survey_sections" ADD COLUMN "next_section_id" text;
+
+--> statement-breakpoint
+CREATE TABLE "student_fee_payment_batch" (
+	"batch_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"actor_user_id" uuid NOT NULL,
+	"idempotency_key" varchar(128) NOT NULL,
+	"payload_hash" varchar(64) NOT NULL,
+	"result" jsonb,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "student_fee_payment_batch" ADD CONSTRAINT "student_fee_payment_batch_actor_user_id_users_user_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users"("user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "student_fee_payment_batch_actor_key_idx" ON "student_fee_payment_batch" USING btree ("actor_user_id","idempotency_key");
+--> statement-breakpoint
+CREATE TABLE "asset_cleanup_lease" (
+	"lease_name" varchar(64) PRIMARY KEY NOT NULL,
+	"owner_token" varchar(64) NOT NULL,
+	"lease_until" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "bulk_email_delivery_attempt" (
+	"attempt_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"email_id" uuid NOT NULL,
+	"attempt_number" integer NOT NULL,
+	"message_id" varchar(255) NOT NULL,
+	"status" varchar(16) DEFAULT 'PENDING' NOT NULL,
+	"accepted_count" integer DEFAULT 0 NOT NULL,
+	"rejected_count" integer DEFAULT 0 NOT NULL,
+	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"completed_at" timestamp with time zone,
+	"error_code" varchar(120)
+);
+--> statement-breakpoint
+ALTER TABLE "calendar_sync_job" ADD COLUMN "revision" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
+ALTER TABLE "calendar_sync_job" ADD COLUMN "lease_until" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "calendar_sync_job" ADD COLUMN "claim_token" varchar(64);--> statement-breakpoint
+ALTER TABLE "google_spreadsheet_sync_job" ADD COLUMN "lease_until" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "google_spreadsheet_sync_job" ADD COLUMN "claim_token" varchar(64);--> statement-breakpoint
+ALTER TABLE "bulk_email_delivery_attempt" ADD CONSTRAINT "bulk_email_delivery_attempt_email_id_bulk_email_id_fk" FOREIGN KEY ("email_id") REFERENCES "public"."bulk_email"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "bulk_email_delivery_attempt_email_number_idx" ON "bulk_email_delivery_attempt" USING btree ("email_id","attempt_number");--> statement-breakpoint
+CREATE INDEX "bulk_email_delivery_attempt_email_idx" ON "bulk_email_delivery_attempt" USING btree ("email_id","started_at");
+--> statement-breakpoint
+ALTER TABLE "asset" ADD COLUMN "upload_status" varchar(16) DEFAULT 'COMPLETED' NOT NULL;--> statement-breakpoint
+ALTER TABLE "asset" ADD COLUMN "upload_expires_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "asset_upload_status_expiry_idx" ON "asset" USING btree ("upload_status","upload_expires_at");
+--> statement-breakpoint
+CREATE TABLE "asset_upload_reservation" (
+	"reservation_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"uploaded_by" uuid NOT NULL,
+	"size_bytes" integer NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "asset_upload_reservation" ADD CONSTRAINT "asset_upload_reservation_uploaded_by_users_user_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."users"("user_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "asset_upload_reservation_owner_expiry_idx" ON "asset_upload_reservation" USING btree ("uploaded_by","expires_at");
+--> statement-breakpoint
+ALTER TABLE "executive_contact" ADD COLUMN "publicly_listed" boolean DEFAULT false NOT NULL;
+--> statement-breakpoint
+ALTER TABLE "calendar_sync_job" ADD COLUMN "resource_updated_at" timestamp with time zone;
+UPDATE "calendar_sync_job" AS job
+SET "resource_updated_at" = event."updated_at"
+FROM "calendar_event" AS event
+WHERE event."calendar_event_id" = job."calendar_event_id";
+ALTER TABLE "calendar_sync_job" ALTER COLUMN "resource_updated_at" SET NOT NULL;
+
+--> statement-breakpoint
+ALTER TABLE "vote" ADD COLUMN "quorum_percent" integer;--> statement-breakpoint
+ALTER TABLE "vote" ADD COLUMN "quorum_inclusive" boolean DEFAULT true NOT NULL;
+--> statement-breakpoint
+UPDATE "board" SET "write_access_scope" = 'AUTHENTICATED', "write_permission_id" = NULL WHERE "code" = 'labs';
+
+--> statement-breakpoint
+ALTER TABLE "executive_contact" ADD COLUMN "portal_user_id" uuid;--> statement-breakpoint
+ALTER TABLE "executive_contact" ADD COLUMN "activities" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "executive_contact" ADD CONSTRAINT "executive_contact_portal_user_id_users_user_id_fk" FOREIGN KEY ("portal_user_id") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;
+--> statement-breakpoint
+UPDATE "executive_contact" SET "activities" = jsonb_build_array(jsonb_build_object(
+ 'year', CASE WHEN "cohort" < 100 THEN 2000 + "cohort" ELSE "cohort" END,
+ 'departmentKo', coalesce("department_ko", ''), 'departmentEn', coalesce("department_en", ''),
+ 'roleKo', "role_ko", 'roleEn', "role_en"
+)) WHERE "cohort" IS NOT NULL AND ("cohort" BETWEEN 1 AND 99 OR "cohort" BETWEEN 1900 AND 3000);
+
+--> statement-breakpoint
+CREATE TABLE "student_fee_policy" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"effective_semester" varchar(6) NOT NULL,
+	"amount" integer NOT NULL,
+	"coverage_semesters" smallint DEFAULT 6 NOT NULL,
+	"created_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "student_fee_policy" ADD CONSTRAINT "student_fee_policy_created_by_users_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("user_id") ON DELETE set null ON UPDATE no action;
+--> statement-breakpoint
+CREATE UNIQUE INDEX "executive_contact_portal_user_uq" ON "executive_contact" USING btree ("portal_user_id");
+--> statement-breakpoint
+UPDATE survey SET is_published = false, lifecycle_status = 'DRAFT', show_on_calendar = false WHERE survey_id = '7a110000-0000-4000-8000-000000000003';
+--> statement-breakpoint
+UPDATE article SET content_ko = '후원 및 제휴 제안은 학생회 소개 → 후원 및 제휴에서 채널톡으로 보내 주세요. 기관명, 회신 연락처와 제안 내용을 함께 알려 주세요.', content_en = 'Send sponsorship and partnership proposals through Channel Talk under About → Partnerships. Include your organization, contact details, and proposal.' WHERE board_id IN (SELECT board_id FROM board WHERE code = 'faq') AND title_ko = '기업 후원이나 제휴를 제안하려면 어떻게 하나요?';
+
+--> statement-breakpoint
+DELETE FROM user_role_group WHERE role_group_id IN (SELECT role_group_id FROM role_group WHERE name_ko = '개발 관리자');
+--> statement-breakpoint
+DELETE FROM role_group_permission WHERE role_group_id IN (SELECT role_group_id FROM role_group WHERE name_ko = '개발 관리자');
+--> statement-breakpoint
+DELETE FROM role_group WHERE name_ko = '개발 관리자';
+
+--> statement-breakpoint
+ALTER TABLE "users" DROP COLUMN IF EXISTS "phone_number";

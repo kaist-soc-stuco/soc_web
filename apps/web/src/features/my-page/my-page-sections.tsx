@@ -259,9 +259,8 @@ export function MyPageProfilePanel({
     [lang === "ko" ? "학번" : "Student ID", userInfo?.studentNumber ?? "-"],
     [lang === "ko" ? "이메일" : "Email", userInfo?.email ?? "-"],
     [lang === "ko" ? "주전공" : "Primary major", primaryMajor],
-    [lang === "ko" ? "상태" : "Status", userInfo?.academicStatus ?? "-"],
     [
-      lang === "ko" ? "회비 납부" : "Student fee",
+      lang === "ko" ? "과비 납부" : "Student fee",
       userInfo?.feeStatus === "PAID"
         ? lang === "ko"
           ? "납부 완료"

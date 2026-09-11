@@ -15,6 +15,7 @@ import { SurveyQuestionsRepository } from "./survey-questions.repository";
 import { SurveySectionsRepository } from "./survey-sections.repository";
 
 
+import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
 import type { ResponseDetailResponse } from "@soc/contracts";
 import type { SurveyAnswerRecord } from "./entities/survey-answer.entity";
 import type { SurveyResponseRecord } from "./entities/survey-response.entity";
@@ -101,6 +102,7 @@ export class SurveyResponsesService {
     dto: SubmitResponseDto,
     caller?: SurveyCaller,
   ): Promise<ResponseDetailResponse> {
+    if (surveyId === OPERATIONAL_SURVEY_IDS.corporatePartnership) throw new BadRequestException("partnership_inquiry_moved_to_channel_talk");
     const survey = await this.surveysRepo.findById(surveyId);
     if (!survey) throw new NotFoundException("survey_not_found");
 
@@ -217,6 +219,7 @@ export class SurveyResponsesService {
     surveyId: string,
     caller?: SurveyCaller,
   ): Promise<ResponseDetailResponse> {
+    if (surveyId === OPERATIONAL_SURVEY_IDS.corporatePartnership) throw new BadRequestException("partnership_inquiry_moved_to_channel_talk");
     if (!caller?.id) throw new ForbiddenException("login_required");
 
     const survey = await this.surveysRepo.findById(surveyId);
@@ -236,6 +239,7 @@ export class SurveyResponsesService {
     dto: SubmitResponseDto,
     caller?: SurveyCaller,
   ): Promise<ResponseDetailResponse> {
+    if (surveyId === OPERATIONAL_SURVEY_IDS.corporatePartnership) throw new BadRequestException("partnership_inquiry_moved_to_channel_talk");
     if (!caller?.id) throw new ForbiddenException("login_required");
 
     const survey = await this.surveysRepo.findById(surveyId);
