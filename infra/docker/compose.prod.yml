@@ -1,7 +1,7 @@
 x-logging: &default-logging
   driver: json-file
   options:
-    max-file: '3'
+    max-file: "3"
     max-size: 10m
 
 services:
@@ -19,7 +19,7 @@ services:
       ASSET_UPLOAD_DIR: /app/apps/api/uploads/assets
       ASSET_ORPHAN_CLEANUP_ENABLED: ${ASSET_ORPHAN_CLEANUP_ENABLED:-false}
     expose:
-      - '3000'
+      - "3000"
     init: true
     security_opt:
       - no-new-privileges:true
@@ -32,9 +32,9 @@ services:
     healthcheck:
       test:
         [
-          'CMD',
-          'node',
-          '-e',
+          "CMD",
+          "node",
+          "-e",
           "fetch('http://127.0.0.1:3000/health').then(async (response) => { const body = await response.json(); if (!response.ok || body.status !== 'ok') process.exit(1); }).catch(() => process.exit(1))",
         ]
       interval: 15s
@@ -66,7 +66,7 @@ services:
       context: ../..
       dockerfile: apps/web/Dockerfile.prod
     expose:
-      - '5173'
+      - "5173"
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -74,13 +74,15 @@ services:
       - ALL
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,mode=1777
+      - /tmp/nginx:rw,noexec,nosuid,nodev,mode=1777
       - /var/cache/nginx:rw,noexec,nosuid,nodev,mode=1777
       - /var/run:rw,noexec,nosuid,nodev,mode=1777
       - /var/log/nginx:rw,noexec,nosuid,nodev,mode=1777
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:5173/ || exit 1']
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5173/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -100,7 +102,11 @@ services:
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$${POSTGRES_DB:-soc_web}"']
+      test:
+        [
+          "CMD-SHELL",
+          'pg_isready -U "$$POSTGRES_USER" -d "$${POSTGRES_DB:-soc_web}"',
+        ]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -129,16 +135,11 @@ services:
     volumes:
       - ../../apps/api/uploads:/app/apps/api/uploads
     logging: *default-logging
-    command:
-      [
-        'sh',
-        '-c',
-        'pnpm db:migrate',
-      ]
+    command: ["sh", "-c", "pnpm db:migrate"]
 
   redis:
     image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
-    command: ['redis-server', '/usr/local/etc/redis/redis.conf']
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     volumes:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -147,14 +148,14 @@ services:
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   nginx:
     image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
-    user: '101:101'
+    user: "101:101"
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -166,11 +167,12 @@ services:
       - /var/run:rw,noexec,nosuid,nodev,mode=1777
       - /var/log/nginx:rw,noexec,nosuid,nodev,mode=1777
     ports:
-      - '127.0.0.1:${NGINX_PORT:-8080}:80'
+      - "127.0.0.1:${NGINX_PORT:-8080}:80"
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1/health || exit 1']
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
