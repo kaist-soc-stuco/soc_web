@@ -27,6 +27,8 @@ RUN pnpm --filter @soc/api build
 # production dependencies.
 FROM build AS migration
 
+WORKDIR /app/apps/api
+
 RUN addgroup -S nodeapp \
   && adduser -S -G nodeapp nodeapp \
   && chown -R nodeapp:nodeapp /app
