@@ -99,3 +99,10 @@ test("accepts a complete bilingual survey", () => {
     [section()],
   ));
 });
+
+test("optional section titles may stay empty in bilingual surveys", () => {
+  assert.doesNotThrow(() => assertPublishableSurveyDefinition(
+    { isKoreanOnly: false, titleEn: "Survey" },
+    [{ ...section(), titleKo: "", titleEn: "" }],
+  ));
+});

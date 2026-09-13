@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,13 @@ export function ImageUploadField({
   selectLabel,
 }: ImageUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+
+  useEffect(() => {
+    setPreviewFailed(false);
+  }, [imageUrl]);
+
+  const hasPreview = Boolean(imageUrl && !previewFailed);
 
   return (
     <div
@@ -56,13 +63,14 @@ export function ImageUploadField({
         }}
       />
 
-      {imageUrl ? (
+      {hasPreview ? (
         compact ? (
           <div className="flex h-full min-w-0 items-center gap-2 px-2">
             <img
               src={imageUrl}
               alt={alt}
               draggable={false}
+              onError={() => setPreviewFailed(true)}
               className="size-7 shrink-0 rounded-md object-cover"
             />
             <span className="min-w-0 flex-1 truncate text-xs font-medium text-[#172033]">
@@ -75,7 +83,6 @@ export function ImageUploadField({
               disabled={disabled}
               onClick={() => inputRef.current?.click()}
               aria-label={selectLabel}
-              title={selectLabel}
               className="size-7 shrink-0 rounded-md p-0 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
             >
               <ImagePlus aria-hidden="true" className="size-3.5" />
@@ -87,7 +94,7 @@ export function ImageUploadField({
               disabled={disabled}
               onClick={onRemove}
               aria-label={removeLabel}
-              title={removeLabel}
+              data-tooltip={removeLabel}
               className="size-7 shrink-0 rounded-md p-0 text-slate-400 hover:bg-rose-50 hover:text-rose-700"
             >
               <Trash2 aria-hidden="true" className="size-3.5" />
@@ -96,7 +103,7 @@ export function ImageUploadField({
         ) : (
           <div className="grid gap-3 p-3 sm:grid-cols-[12rem_1fr] sm:items-center">
             <div className="aspect-video overflow-hidden rounded-md bg-slate-100">
-              <img src={imageUrl} alt={alt} draggable={false} className="h-full w-full object-cover" />
+              <img src={imageUrl} alt={alt} draggable={false} onError={() => setPreviewFailed(true)} className="h-full w-full object-cover" />
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -135,26 +142,29 @@ export function ImageUploadField({
           <span className="truncate text-xs font-medium text-[#172033]">{selectLabel}</span>
         </button>
       ) : (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => inputRef.current?.click()}
-          className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#344054]">
-            <ImagePlus aria-hidden="true" className="size-4" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-normal text-[#172033]">
+        <div className="grid gap-3 p-3 sm:grid-cols-[12rem_1fr] sm:items-center">
+          <div className="flex aspect-video items-center justify-center overflow-hidden rounded-md bg-slate-100">
+            <ImagePlus aria-hidden="true" className="size-5 text-slate-400" />
+          </div>
+          <div className="min-w-0">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[var(--ui-border-subtle)] bg-white px-3 text-sm font-normal text-[#172033] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <ImagePlus aria-hidden="true" className="size-4" />
               {selectLabel}
-            </span>
-            {emptyText ? (
-              <span className="mt-0.5 block text-xs font-normal text-[#344054]">
+            </button>
+            {previewFailed ? (
+              <p className="mt-1 text-xs font-normal text-rose-600">이미지를 불러오지 못했습니다. 다시 선택해 주세요.</p>
+            ) : emptyText ? (
+              <p className="mt-1 text-xs font-normal text-[#344054]">
                 {emptyText}
-              </span>
+              </p>
             ) : null}
-          </span>
-        </button>
+          </div>
+        </div>
       )}
     </div>
   );

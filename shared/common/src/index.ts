@@ -16,3 +16,5 @@ export const hasPermission = (
 
   return (userPermission & requiredBit) === requiredBit;
 };
+
+export * from "./vote-quorum";

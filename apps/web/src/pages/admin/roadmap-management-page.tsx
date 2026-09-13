@@ -297,7 +297,7 @@ function RoadmapManagementPageContent() {
                   <button type="button" role="tab" aria-selected={activeTab === "offerings"} onClick={() => setActiveTab("offerings")} className={cn("rounded-md px-3 py-2 text-sm font-medium", activeTab === "offerings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900")}>학기별 개설 관리</button>
                 </div>
               </AdminToolbarGroup>
-              <AdminToolbarGroup className="ml-auto w-full justify-end sm:w-auto">
+              <AdminToolbarGroup className="ml-auto w-full justify-end sm:flex-1 sm:flex-nowrap">
                 {activeTab === "offerings" ? <AdminSelectDropdown ariaLabel="개설 학기" value={selectedTerm} options={termOptions} onChange={setSelectedTerm} className="w-36" /> : null}
                 <AdminSearchField className="min-w-0 w-full sm:w-72" value={search} onValueChange={setSearch} placeholder="과목코드·과목명·교수 검색" aria-label="로드맵 검색" />
                 {activeTab === "courses" ? <Button type="button" size="sm" onClick={openNewCourse}><Plus aria-hidden="true" /> 과목 추가</Button> : null}

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/admin-data-table";
 import {
   AdminPageHeader,
+  AdminLoadingState,
   AdminPageMain,
   AdminPageShell,
   AdminTableCard,
@@ -210,7 +211,7 @@ function FaqManagementPageContent() {
           )}
         />
         <AdminTableCard>
-          {loading && items.length === 0 ? null : (
+          {loading && items.length === 0 ? <AdminLoadingState /> : (
             <DndContext modifiers={[restrictListDrag]}
               autoScroll={false}
               sensors={sensors}
@@ -313,7 +314,7 @@ function SortableFaqRow({
   return (
     <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition: transition ?? "transform 180ms ease" }} className={cn("group cursor-pointer transition-colors hover:bg-slate-50/60", isDragging && "relative z-10 opacity-70")} tabIndex={disabled ? -1 : 0} onClick={() => { if (!disabled) onEdit(item); }} onKeyDown={(event) => { if (event.target === event.currentTarget && !disabled && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onEdit(item); } }}>
       <AdminTableCell className="text-center">
-        <button ref={setActivatorNodeRef} type="button" aria-label="FAQ 순서 이동" title="드래그하여 순서 변경" onClick={(event) => event.stopPropagation()} {...attributes} {...listeners} className="admin-list-drag-handle">
+        <button ref={setActivatorNodeRef} type="button" aria-label="FAQ 순서 이동" data-tooltip="드래그하여 순서 변경" onClick={(event) => event.stopPropagation()} {...attributes} {...listeners} className="admin-list-drag-handle">
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
       </AdminTableCell>
@@ -321,7 +322,7 @@ function SortableFaqRow({
       <AdminTableCell><span className="admin-table-text line-clamp-2 whitespace-normal">{stripRichText(item.snippetKo)}</span></AdminTableCell>
       <AdminTableCell>
         <div className="flex items-center gap-1 opacity-70 transition-opacity group-hover:opacity-100">
-          <Button type="button" variant="ghost" size="icon" aria-label="FAQ 삭제" onClick={(event) => { event.stopPropagation(); onDelete(item); }} disabled={disabled} className="text-slate-400 hover:text-rose-600"><Trash2 aria-hidden="true" /></Button>
+          <Button type="button" variant="ghost" size="icon" aria-label="FAQ 삭제" data-tooltip="FAQ 삭제" onClick={(event) => { event.stopPropagation(); onDelete(item); }} disabled={disabled} className="text-slate-400 hover:text-rose-600"><Trash2 aria-hidden="true" /></Button>
         </div>
       </AdminTableCell>
     </tr>

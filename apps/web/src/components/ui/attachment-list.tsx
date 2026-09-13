@@ -65,7 +65,6 @@ export function AttachmentList({
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-650"
-                      title={lang === "ko" ? "다운로드" : "Download"}
                     >
                       <Download className="inline-block h-4 w-4" />
                     </a>

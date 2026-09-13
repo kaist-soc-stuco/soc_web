@@ -1,5 +1,6 @@
 import {
   Body,
+  Delete,
   Controller,
   Get,
   Header,
@@ -11,6 +12,7 @@ import {
   UseGuards,
   Query,
 } from "@nestjs/common";
+import { z } from "zod";
 import { SubmitResponseSchema } from "@soc/contracts";
 import { Permissions } from "@soc/contracts";
 import { Request } from "express";
@@ -106,6 +108,26 @@ export class SurveyResponsesController {
       query,
       sortOrder: sortOrder === "asc" ? "asc" : "desc",
     });
+  }
+
+  @Get("email-notifications")
+  @Header("Cache-Control", "private, no-store")
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  emailSubscription(@Param("surveyId", ParseUUIDPipe) surveyId: string, @Req() req: AuthedRequest) {
+    return this.responsesService.getEmailSubscription(surveyId, req.user.id);
+  }
+
+  @Patch("email-notifications")
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  setEmailSubscription(@Param("surveyId", ParseUUIDPipe) surveyId: string, @Req() req: AuthedRequest,
+    @Body(new ZodValidationPipe(z.object({ enabled: z.boolean() }))) dto: { enabled: boolean }) {
+    return this.responsesService.setEmailSubscription(surveyId, req.user.id, dto.enabled);
+  }
+
+  @Delete()
+  @RequirePermissions(Permissions.MANAGE_SURVEY)
+  deleteAll(@Param("surveyId", ParseUUIDPipe) surveyId: string, @Req() req: AuthedRequest) {
+    return this.responsesService.deleteAll(surveyId, req.user.id);
   }
 
   @Get(":responseId")

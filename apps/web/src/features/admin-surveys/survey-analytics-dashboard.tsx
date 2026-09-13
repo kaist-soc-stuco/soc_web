@@ -1,3 +1,4 @@
+import { stripRichText } from "@/components/ui/rich-text-content";
 import { useMemo } from "react";
 import type {
   SurveyAnalyticsResponse,
@@ -101,9 +102,9 @@ function ChoiceBreakdown({ question }: { question: SurveyQuestionAnalyticsItem }
   return (
     <div className="space-y-3">
       {choices.map((choice) => (
-        <div key={choice.value} className="grid grid-cols-[minmax(0,1fr)_80px] sm:grid-cols-[minmax(100px,1fr)_minmax(0,2fr)_96px] items-center gap-3 text-sm">
-          <span className="truncate font-normal text-[#172033]">{choice.labelKo}</span>
-          <div className="hidden h-2 overflow-hidden sm:block rounded-full bg-[#edf1f4]"><div className="h-full rounded-full bg-[#75b69d]" style={{ width: `${(choice.count / maximum) * 100}%` }} /></div>
+        <div key={choice.value} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 text-sm">
+          <span className="break-words font-normal text-[#172033]">{stripRichText(choice.labelKo)}</span>
+          <div className="order-3 col-span-2 h-2 overflow-hidden rounded-full bg-[#edf1f4]"><div className="h-full rounded-full bg-[#75b69d]" style={{ width: `${Math.min(100, choice.percentage)}%` }} /></div>
           <span className="text-right text-xs font-normal tabular-nums text-[#344054]">{choice.count}건 · {choice.percentage}%</span>
         </div>
       ))}
@@ -148,7 +149,7 @@ export function SurveyQuestionSummary({ analytics, questions, responses }: { ana
         return (
           <AdminCard key={question.id} className="p-5">
             <div className="mb-4 flex items-start justify-between gap-4 border-b border-[#edf1f4] pb-4">
-              <div className="min-w-0"><p className="text-xs font-normal text-[#344054]">문항 {index + 1}</p><h2 className="mt-1 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-[#172033]">{question.titleKo}</h2></div>
+              <div className="min-w-0"><p className="text-xs font-normal text-[#344054]">문항 {index + 1}</p><h2 className="mt-1 text-[length:var(--ui-text-section-size)] font-semibold leading-6 text-[#172033]">{stripRichText(question.titleKo)}</h2></div>
               <span className="shrink-0 text-xs font-normal tabular-nums text-[#344054]">응답 {result?.totalAnswers ?? 0}건</span>
             </div>
             {result?.choices ? <ChoiceBreakdown question={result} /> : result?.grid ? <GridBreakdown question={result} /> : <RawAnswers question={question} responses={responses} />}

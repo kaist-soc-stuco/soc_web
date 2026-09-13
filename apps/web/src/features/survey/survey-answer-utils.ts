@@ -253,10 +253,8 @@ export function getLocalizedText(
 }
 
 export function getSurveyKindLabel(kind: string, lang: string) {
-  if (kind === "APPLICATION") {
-    return lang === "ko" ? "행사 신청" : "Event application";
-  }
-  return lang === "ko" ? "일반 설문" : "Survey";
+
+  return lang === "ko" ? "설문" : "Survey";
 }
 
 export function getAudienceLabel(survey: SurveyDetailResponse, lang: string) {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Target } from "lucide-react";
+import { CheckCircle2, Clock, Target, type LucideIcon } from "lucide-react";
 
 import {
   resolveContentBlockText,
@@ -14,16 +14,28 @@ const filterLabels = {
   COMPLETED: { ko: "완료", en: "Completed" },
 } as const;
 
-function getPledgeStatus(status: string | null | undefined, lang: string) {
+function getPledgeStatus(status: string | null | undefined, lang: string): {
+  cardClassName: string;
+  badgeClassName: string;
+  icon: LucideIcon;
+  iconClassName: string;
+  label: string;
+} | null {
   if (status === "COMPLETED") {
     return {
-      className: "is-completed",
+      cardClassName: "is-completed",
+      badgeClassName: "border border-emerald-200 bg-emerald-50 text-emerald-700",
+      icon: CheckCircle2,
+      iconClassName: "text-emerald-600",
       label: lang === "ko" ? "완료" : "Completed",
     };
   }
   if (status === "IN_PROGRESS") {
     return {
-      className: "is-in-progress",
+      cardClassName: "is-in-progress",
+      badgeClassName: "border border-blue-200 bg-blue-50 text-blue-700",
+      icon: Clock,
+      iconClassName: "text-blue-600",
       label: lang === "ko" ? "진행 중" : "In progress",
     };
   }
@@ -107,22 +119,23 @@ export function PledgesSection({ lang }: { lang: string }) {
           </div>
 
           <div className="about-pledge-list">
-            {visiblePledges.map((pledge, index) => {
+            {visiblePledges.map((pledge) => {
               const text = resolveContentBlockText(pledge, lang === "ko" ? "ko" : "en");
               const status = getPledgeStatus(pledge.pledgeStatus, lang);
+              const StatusIcon = status?.icon ?? Target;
 
               return (
-                <article key={pledge.contentBlockId} className="about-pledge-item">
+                <article key={pledge.contentBlockId} className={`about-pledge-item ${status?.cardClassName ?? ""}`}>
                   <div className="about-pledge-item-heading">
-                    <span className="about-pledge-index">{String(index + 1).padStart(2, "0")}</span>
+                    <StatusIcon aria-hidden="true" className={`size-5 shrink-0 ${status?.iconClassName ?? "text-slate-400"}`} />
                     <div className="about-pledge-title">
                       <span>{text.title}</span>
-                      {status ? (
-                        <span className={`about-pledge-status ${status.className}`}>
-                          {status.label}
-                        </span>
-                      ) : null}
                     </div>
+                    {status ? (
+                      <span className={`about-pledge-status ${status.cardClassName} ${status.badgeClassName}`}>
+                        {status.label}
+                      </span>
+                    ) : null}
                   </div>
                   {text.body ? <p>{text.body}</p> : null}
                 </article>

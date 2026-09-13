@@ -1,14 +1,13 @@
-import { useMemo, type SyntheticEvent } from "react";
+import { useMemo, useState, useEffect, type SyntheticEvent } from "react";
 import type { SurveyDetailResponse } from "@soc/contracts";
 
 import {
   emptyAnswerValue,
-  isAnswerFilled,
   getLocalizedText,
   type AnswerValue,
 } from "./survey-answer-utils";
 import { SurveyQuestionInput } from "./survey-question-input";
-import { PreviewNoticeView } from "./survey-state-views";
+
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { Button } from "@/components/ui/button";
 import { resolveAssetUrl } from "@/lib/asset-url";
@@ -19,6 +18,8 @@ interface SurveyResponseFormProps {
   isPreview: boolean;
   lang: string;
   onAnswerChange: (questionId: string, value: AnswerValue) => void;
+  onClear: () => void;
+  onValidate: (questions: SurveyDetailResponse["sections"][number]["questions"]) => boolean;
   onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
   questionErrors: Record<string, string>;
   submitError: string | null;
@@ -34,6 +35,8 @@ export function SurveyResponseForm({
   lang,
   onAnswerChange,
   onSubmit,
+  onClear,
+  onValidate,
   questionErrors,
   submitError,
   submitting,
@@ -45,13 +48,25 @@ export function SurveyResponseForm({
     [survey.sections, visibleSectionIds],
   );
 
-  const visibleQuestions = visibleSections.flatMap((section) => section.questions);
-  const answeredQuestionCount = visibleQuestions.filter((question) => isAnswerFilled(question.questionType, answers[question.id])).length;
+  const [sectionIndex, setSectionIndex] = useState(0);
+  const activeIndex = Math.min(sectionIndex, Math.max(0, visibleSections.length - 1));
+  const activeSection = visibleSections[activeIndex];
+  const firstError = visibleSections.findIndex(section => section.questions.some(question => questionErrors[question.id]));
+  useEffect(() => {
+    if (firstError >= 0) setSectionIndex(firstError);
+  }, [firstError]);
+  const move = (next: number) => {
+    setSectionIndex(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const nextSection = () => {
+    if (isPreview || !activeSection || onValidate(activeSection.questions)) move(activeIndex + 1);
+  };
 
   return (
     <div className="animate-in fade-in duration-300">
 
-      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
+      <form noValidate onSubmit={event => { if (activeIndex < visibleSections.length - 1) { event.preventDefault(); nextSection(); } else { onSubmit(event); } }} className="flex flex-col gap-5">
         {isEditingExistingResponse && (
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
             {lang === "ko"
@@ -61,7 +76,7 @@ export function SurveyResponseForm({
         )}
 
 
-        {visibleSections.map((section) => (
+        {(activeSection ? [activeSection] : []).map((section) => (
           <section
             key={section.id}
             id={`survey-section-${section.id}`}
@@ -79,7 +94,7 @@ export function SurveyResponseForm({
                 section.descriptionEn,
               );
 
-              if (!sectionTitle && !sectionDescription) return null;
+              if (section.id === survey.sections[0]?.id || (!sectionTitle && !sectionDescription)) return null;
 
               return (
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.035)]">
@@ -143,7 +158,7 @@ export function SurveyResponseForm({
                       }
                       onChange={(value) => onAnswerChange(question.id, value)}
                       lang={lang}
-                      disabled={isPreview}
+                      disabled={false}
                       error={questionError}
                     />
                   </div>
@@ -155,48 +170,12 @@ export function SurveyResponseForm({
 
         {submitError ? <p role="alert" className="text-sm text-rose-700">{submitError}</p> : null}
 
-        <div className="survey-response-actions flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-0 py-3 md:border-t-0 md:py-0">
-          <span className="mr-auto text-xs font-normal tabular-nums text-slate-500">
-            {lang === "ko"
-              ? `응답 ${answeredQuestionCount}/${visibleQuestions.length}`
-              : `${answeredQuestionCount}/${visibleQuestions.length} answered`}
-          </span>
-          <Button
-            variant="default"
-            type="submit"
-            disabled={submitting || isPreview}
-            className="inline-flex min-h-11 w-auto items-center justify-center rounded-xl border-0 bg-kaist-darkgreen px-8 py-3.5 text-sm !font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition-all hover:bg-kaist-darkgreen/90 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {submitting ? (
-              <>
-                <svg
-                  className="mr-2 h-4 w-4 animate-spin text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                {lang === "ko" ? "제출 중..." : "Submitting..."}
-              </>
-            ) : isEditingExistingResponse ? (
-              lang === "ko" ? "저장" : "Save"
-            ) : (
-              lang === "ko" ? "제출" : "Submit"
-            )}
-          </Button>
+        <div className="survey-response-actions flex flex-wrap items-center gap-3">
+          {activeIndex > 0 && <Button type="button" variant="outline" onClick={() => move(activeIndex - 1)}>{lang === "ko" ? "이전" : "Back"}</Button>}
+          {activeIndex < visibleSections.length - 1
+            ? <Button type="button" variant="outline" onClick={nextSection}>{lang === "ko" ? "다음" : "Next"}</Button>
+            : <Button type="submit" disabled={submitting || isPreview}>{submitting ? (lang === "ko" ? "제출 중..." : "Submitting...") : isEditingExistingResponse ? (lang === "ko" ? "저장" : "Save") : (lang === "ko" ? "제출" : "Submit")}</Button>}
+          <Button className="ml-auto text-brand-primary" type="button" variant="ghost" onClick={() => { onClear(); move(0); }}>{lang === "ko" ? "양식 지우기" : "Clear form"}</Button>
         </div>
       </form>
     </div>

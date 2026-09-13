@@ -53,7 +53,7 @@ import { Button } from "@/components/ui/button";
 import { AdminSelectDropdown } from "@/components/ui/admin-select";
 import { UiInput } from "@/components/ui/form-control";
 import { IconButton } from "@/components/ui/icon-button";
-import { RichTextInput } from "@/components/ui/rich-text-input";
+import { BuilderTextField as RichTextInput, BuilderOptionAdd, BuilderRuleRow } from "@/components/ui/builder-field";
 import { useToast } from "@/components/ui/toast";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { resolveAssetUrl } from "@/lib/asset-url";
@@ -320,6 +320,7 @@ function ImagePreview({
         <button
           type="button"
           aria-label={`${label} 삭제`}
+          data-tooltip="파일 삭제"
           onClick={onRemove}
           className="absolute -right-2 -top-2 inline-flex size-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 opacity-0 shadow-[0_2px_6px_rgba(15,23,42,0.18)] transition-opacity hover:bg-slate-50 hover:text-slate-800 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30 group-hover:opacity-100"
         >
@@ -403,6 +404,7 @@ function SortableOptionRow({
           ref={setActivatorNodeRef}
           type="button"
           aria-label={`${option.labelKo || option.value || "선택지"} 순서 이동`}
+          data-tooltip="드래그하여 순서 변경"
           aria-grabbed={isDragging ? "true" : undefined}
           className="absolute left-0 top-1/2 z-10 inline-flex size-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded text-slate-400 opacity-0 outline-none transition-opacity hover:text-slate-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-primary/25 group-hover:opacity-100 group-hover:text-slate-500 group-focus-within:opacity-100 group-focus-within:text-slate-500 active:cursor-grabbing"
           {...attributes}
@@ -461,6 +463,7 @@ function SortableOptionRow({
           <IconButton
             type="button"
             aria-label={`${option.labelKo || option.value || "선택지"} 삭제`}
+            data-tooltip="선택지 삭제"
             size="sm"
             onClick={() => onRemoveOption(index)}
             className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
@@ -864,7 +867,7 @@ export function QuestionInlineEditor({
 
   const handleSave = async (): Promise<boolean> => {
     const usedOptionValues = new Set<string>();
-    const normalizedOptions = form.options.map((option, index) => {
+    const normalizedOptions = (needsOptions && form.options.length === 0 ? [{ value: "option_1", labelKo: "", labelEn: "" }] : form.options).map((option, index) => {
       let value = option.value.trim() || `option_${index + 1}`;
       if (usedOptionValues.has(value)) {
         let suffix = index + 1;
@@ -906,7 +909,7 @@ export function QuestionInlineEditor({
     };
 
     if (needsOptions) {
-      if (form.options.length === 0) {
+      if (normalizedOptions.length === 0) {
         toast({ type: "error", message: "최소 하나의 선택지가 필요합니다." });
         return false;
       }
@@ -1021,7 +1024,9 @@ export function QuestionInlineEditor({
       const gap = 8;
       const triggerRect = trigger.getBoundingClientRect();
       const naturalHeight = menu.scrollHeight;
-      const naturalWidth = Math.max(menu.scrollWidth, 224);
+      // Let the menu hug its actual contents. A fixed minimum made the short
+      // "설명"/"응답 확인" actions look like a wide empty card.
+      const naturalWidth = Math.max(menu.scrollWidth, 1);
       const availableWidth = Math.max(
         1,
         window.innerWidth - viewportPadding * 2,
@@ -1068,7 +1073,7 @@ export function QuestionInlineEditor({
     "h-10 w-full !rounded-none !border-0 !bg-slate-100 px-3 text-base font-normal text-slate-900 outline-none placeholder:text-slate-400 focus:!border-0 focus:!ring-0 disabled:cursor-not-allowed disabled:!bg-slate-100 disabled:text-slate-400 disabled:opacity-70";
   return (
     <div
-      className="question-inline-editor relative animate-in fade-in slide-in-from-top-2 overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-[0_8px_24px_rgba(15,23,42,0.06)] duration-200 sm:p-5 md:p-6 md:pb-5 md:pt-8"
+      className="question-inline-editor relative overflow-visible rounded-xl border border-slate-200 bg-white p-4 pb-5 pt-8 shadow-sm sm:p-5 md:p-6 md:pb-5 md:pt-8"
     >
       {dragHandle ? (
         <div className="absolute left-1/2 top-1 z-10 -translate-x-1/2" aria-label="문항 순서 이동">
@@ -1197,15 +1202,7 @@ export function QuestionInlineEditor({
                     aria-hidden="true"
                   />
                 )}
-                <UiInput
-                  type="text"
-                  readOnly
-                  aria-label="선택지 추가"
-                  placeholder="옵션 추가"
-                  disabled={isOngoing}
-                  onFocus={addOption}
-                  className="!h-9 min-w-0 flex-1 !rounded-none !border-0 !border-b !border-transparent !bg-transparent px-1.5 text-base font-normal text-slate-400 shadow-none placeholder:text-slate-400 hover:!border-b-slate-300 focus:!border-b-brand-primary focus:!ring-0"
-                />
+                <BuilderOptionAdd onAdd={addOption} disabled={isOngoing} />
               </div>
             ) : null}
           </div>
@@ -1250,6 +1247,7 @@ export function QuestionInlineEditor({
                           <IconButton
                             type="button"
                             aria-label={`${isRow ? "행" : "열"} ${index + 1} 삭제`}
+                            data-tooltip={`${isRow ? "행" : "열"} 삭제`}
                             size="sm"
                             onClick={() => removeGridOption(kind, index)}
                             className="text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
@@ -1356,12 +1354,12 @@ export function QuestionInlineEditor({
           {!isOngoing && (onDuplicate || onDelete) ? (
             <div className="flex items-center gap-1">
             {!isOngoing && onDuplicate ? (
-              <IconButton type="button" size="sm" aria-label="문항 복제" onClick={handleDuplicate}>
+              <IconButton type="button" size="sm" aria-label="문항 복제" data-tooltip="문항 복제" onClick={handleDuplicate}>
                 <Copy className="size-4" />
               </IconButton>
             ) : null}
             {!isOngoing && onDelete ? (
-              <IconButton type="button" size="sm" aria-label="문항 삭제" onClick={() => void onDelete()} className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600">
+              <IconButton type="button" size="sm" aria-label="문항 삭제" data-tooltip="문항 삭제" onClick={() => void onDelete()} className="text-slate-500 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600">
                 <Trash2 className="size-4" />
               </IconButton>
             ) : null}
@@ -1380,12 +1378,12 @@ export function QuestionInlineEditor({
             <IconButton
               type="button"
               size="sm"
-              aria-label="문항 더보기"
+              aria-label="옵션 더보기"
               ref={moreMenuButtonRef}
               aria-expanded={moreMenuOpen}
               disabled={isOngoing}
               onClick={() => setMoreMenuOpen((open) => !open)}
-              className={moreMenuOpen ? "border-slate-200 bg-slate-50 text-slate-900" : ""}
+              className={moreMenuOpen ? "border-transparent bg-slate-100 text-slate-900" : ""}
             >
               <MoreVertical aria-hidden="true" className="size-4" />
             </IconButton>
@@ -1548,7 +1546,7 @@ function QuestionMoreMenu({
       style={menuStyle}
       role="menu"
       aria-label="문항 옵션"
-      className="question-editor-more-menu fixed z-[100] min-w-56 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
+      className="question-editor-more-menu fixed z-[100] min-w-0 w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.16)]"
     >
       <MoreMenuItem
         label="설명"
@@ -1640,14 +1638,14 @@ function MoreMenuItem({
       aria-checked={checked}
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-9 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex min-h-9 w-max min-w-0 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm font-normal text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       {checked ? (
         <Check aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
       ) : (
         <span aria-hidden="true" className="size-4 shrink-0" />
       )}
-      <span className="min-w-0 flex-1 whitespace-nowrap">{label}</span>
+      <span className="shrink-0 whitespace-nowrap">{label}</span>
     </button>
   );
 }
@@ -1716,7 +1714,7 @@ function QuestionValidationEditor({
       !["is_number", "integer"].includes(validationOperator));
 
   return (
-    <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 rounded-lg bg-slate-50/80 p-2">
+    <BuilderRuleRow>
       {isCheckbox ? (
         <AdminSelectDropdown
           ariaLabel="선택지 응답 검증 기준"
@@ -1807,12 +1805,13 @@ function QuestionValidationEditor({
         type="button"
         size="sm"
         aria-label="응답 확인 삭제"
+        data-tooltip="응답 규칙 삭제"
         disabled={disabled}
         onClick={onRemove}
         className="shrink-0 text-slate-400 hover:bg-white hover:text-slate-700"
       >
         <X aria-hidden="true" className="size-4" />
       </IconButton>
-    </div>
+    </BuilderRuleRow>
   );
 }

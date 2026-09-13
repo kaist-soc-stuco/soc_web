@@ -81,9 +81,6 @@ export function assertPublishableSurveyDefinition(
       throw new BadRequestException("survey_english_title_required");
     }
     for (const section of sections) {
-      if (!section.titleEn?.trim()) {
-        throw new BadRequestException("survey_section_english_title_required");
-      }
       for (const question of section.questions) {
         if (!question.titleEn?.trim()) {
           throw new BadRequestException("survey_question_english_title_required");

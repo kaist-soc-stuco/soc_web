@@ -25,7 +25,6 @@ export type SurveyStatusFilter =
   | "draft"
   | "open"
   | "closed";
-export type SurveyTypeFilter = "all" | string;
 export type SurveyPeriodFilter = "all" | "7days" | "30days" | "1year";
 export type SurveySortKey = "updatedAt" | "opensAt" | "responseCount";
 export type SurveySortDirection = "asc" | "desc";
@@ -36,7 +35,6 @@ export interface SurveyListFilterOptions {
   sortBy: SurveySortKey;
   sortDirection?: SurveySortDirection;
   statusFilter: SurveyStatusFilter;
-  typeFilter: SurveyTypeFilter;
 }
 
 export function getSurveyStatusInfo(
@@ -107,9 +105,7 @@ export function filterAndSortSurveys(
     });
   }
 
-  if (options.typeFilter !== "all") {
-    result = result.filter((survey) => survey.kind === options.typeFilter);
-  }
+
 
   if (options.periodFilter !== "all") {
     result = result.filter((survey) => {

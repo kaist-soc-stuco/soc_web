@@ -25,24 +25,6 @@ type ScopeItem = {
   title: string;
 };
 
-export function AboutPageHeader({ lang }: { lang: string }) {
-  const title = useLocalizedSiteContent("about.hero.title");
-  const description = useLocalizedSiteContent("about.hero.description");
-
-  return (
-    <header
-      className="about-page-header"
-      aria-labelledby="about-page-title"
-      aria-label={lang === "ko" ? "전산학부 집행위원회" : "KAIST SoC Student Council"}
-    >
-      <div className="about-landing-container">
-        <h1 id="about-page-title">{title.replace(/\r?\n/g, " ")}</h1>
-        <p className="break-keep">{description}</p>
-      </div>
-    </header>
-  );
-}
-
 export function AboutSectionNavigation({
   activeSection,
   lang,
@@ -157,32 +139,9 @@ function SectionHeading({ children, className }: { children: ReactNode; classNam
 }
 
 function IntroSection({ lang }: { lang: string }) {
-  const body = useLocalizedSiteContent("about.intro.body");
-
-  return (
-    <section id="intro" className="about-anchor-section about-landing-section">
-      <div className="about-landing-container">
-        <figure className="about-intro-feature" data-about-reveal>
-          <img
-            src="/hero_background2.jpeg"
-            alt={lang === "ko" ? "전산학부 집행위원회 구성원 단체 사진" : "KAIST SoC Student Council members"}
-            width={3000}
-            height={2000}
-            loading="lazy"
-            decoding="async"
-          />
-        </figure>
-        <div className="about-intro-summary" data-about-reveal>
-          <p className="break-keep">{body}</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function WorkSection({ lang }: { lang: string }) {
+  const title = useLocalizedSiteContent("about.hero.title");
+  const description = useLocalizedSiteContent("about.hero.description");
   const workTitle = useLocalizedSiteContent("about.work.title");
-  const pledgeTitle = useLocalizedSiteContent("about.pledges.title");
   const scopes: ScopeItem[] = [
     {
       title: useLocalizedSiteContent("about.work.card.1.title"),
@@ -199,25 +158,49 @@ function WorkSection({ lang }: { lang: string }) {
   ];
 
   return (
-    <section id="work" className="about-anchor-section about-landing-section about-landing-section-muted">
+    <section id="intro" className="about-anchor-section about-landing-section">
       <div className="about-landing-container">
-        <div data-about-reveal>
-          <SectionHeading className="about-work-heading">{workTitle}</SectionHeading>
+        <div className="about-intro-heading" data-about-reveal>
+          <h1 id="about-page-title">{title.replace(/\r?\n/g, " ")}</h1>
         </div>
-        <div className="about-scope-grid about-reveal-delay-1" data-about-reveal>
-          {scopes.map((scope) => {
-            return (
+        <div className="about-intro-summary" data-about-reveal>
+          <p className="break-keep">{description}</p>
+        </div>
+       <figure className="about-intro-feature about-reveal-delay-1" data-about-reveal>
+          <img
+            src="/hero_background2.jpeg"
+            alt={lang === "ko" ? "전산학부 집행위원회 구성원 단체 사진" : "KAIST SoC Student Council members"}
+            width={3000}
+            height={2000}
+            loading="eager"
+            decoding="async"
+          />
+        </figure>
+        <div className="about-intro-work about-reveal-delay-2" data-about-reveal>
+         <SectionHeading className="about-work-heading">{workTitle}</SectionHeading>
+          <div className="about-scope-grid about-reveal-delay-1" data-about-reveal>
+            {scopes.map((scope) => (
               <article key={scope.title} className="about-scope-card select-none">
                 <span className="about-scope-copy">
                   <strong>{scope.title}</strong>
                   <small className="whitespace-pre-line">{scope.description}</small>
                 </span>
               </article>
-            );
-          })}
+            ))}
+          </div>
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <div id="pledges" className="about-work-pledges about-reveal-delay-2" data-about-reveal>
+function WorkSection({ lang }: { lang: string }) {
+  const pledgeTitle = useLocalizedSiteContent("about.pledges.title");
+
+  return (
+    <section id="work" className="about-anchor-section about-landing-section about-landing-section-muted">
+      <div className="about-landing-container">
+        <div id="pledges" className="about-work-pledges" data-about-reveal>
           <SectionHeading>{pledgeTitle}</SectionHeading>
           <PledgesSection lang={lang} />
         </div>

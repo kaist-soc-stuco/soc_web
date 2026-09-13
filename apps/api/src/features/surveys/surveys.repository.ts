@@ -29,7 +29,7 @@ export class SurveysRepository {
   private map(row: typeof surveys.$inferSelect): SurveyRecord {
     return {
       id: row.surveyId,
-      kind: row.kind,
+      kind: "SURVEY",
       resultVisibility: row.resultVisibility,
       titleKo: row.titleKo,
       titleEn: row.titleEn,
@@ -121,7 +121,7 @@ export class SurveysRepository {
       .insert(surveys)
       .values({
         creatorId: creatorId,
-        kind: dto.kind,
+        kind: "SURVEY",
         titleKo: dto.titleKo,
         titleEn: dto.titleEn,
         descriptionKo: sanitizeSurveyRichText(dto.descriptionKo),
@@ -161,7 +161,7 @@ export class SurveysRepository {
       updatedAt: nowDate(),
     };
 
-    if (dto.kind !== undefined) set.kind = dto.kind;
+
     if (dto.titleKo !== undefined) set.titleKo = dto.titleKo;
     if (dto.titleEn !== undefined) set.titleEn = dto.titleEn;
     if (dto.descriptionKo !== undefined) {

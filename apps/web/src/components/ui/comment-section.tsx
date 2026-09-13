@@ -383,6 +383,7 @@ function CommentRow({
                   variant="ghost"
                   size="icon"
                   aria-label={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
+                  data-tooltip={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                   aria-expanded={canDelete ? deleteModalOpen : hideModalOpen}
                   onClick={() => {
                     if (canDelete) {
@@ -393,7 +394,6 @@ function CommentRow({
                     setHideModalOpen(true);
                   }}
                   className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-rose-600 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                  title={canDelete ? (lang === "ko" ? "댓글 삭제" : "Delete comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                 >
                   {canDelete ? <Trash2 className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
                 </Button> : null}
@@ -402,6 +402,7 @@ function CommentRow({
                   variant="ghost"
                   size="icon"
                   aria-label={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
+                  data-tooltip={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                   onClick={() => {
                     if (canRestore) {
                       void onRestoreComment(comment.commentId);
@@ -411,7 +412,6 @@ function CommentRow({
                     setHideModalOpen(true);
                   }}
                   className="comment-moderation-action pointer-events-none size-7 rounded-md border-0 bg-transparent text-rose-600 opacity-0 transition-opacity hover:border-0 hover:bg-slate-100 hover:text-rose-600 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
-                  title={canRestore ? (lang === "ko" ? "댓글 숨김 해제" : "Unhide comment") : (lang === "ko" ? "댓글 숨기기" : "Hide comment")}
                 >
                   {canRestore ? <Eye className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
                 </Button> : null}

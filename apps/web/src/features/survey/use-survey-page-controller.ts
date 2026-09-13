@@ -55,6 +55,8 @@ export function useSurveyPageController(surveyId: string | undefined) {
   const { lang } = useLanguage();
 
   const [survey, setSurvey] = useState<SurveyDetailResponse | null>(null);
+  const previewRequested = new URLSearchParams(window.location.search).get("preview") === "1";
+  const isPreview = Boolean(previewRequested || survey?.isPreview || (survey && !survey.isPublished));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -112,7 +114,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
         setSurvey(data);
         setResponseSubmittedAt(data.currentResponse?.submittedAt ?? null);
         const answerByQuestionId = new Map(
-          data.currentResponse?.answers.map((answer) => [
+          (data.isPreview || !data.isPublished || previewRequested ? undefined : data.currentResponse)?.answers.map((answer) => [
             answer.questionId,
             answer,
           ]) ?? [],
@@ -126,7 +128,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
             );
           }
         }
-        const savedAnswers = readSurveyResponseDraft(storageKey);
+        const savedAnswers = data.isPreview || !data.isPublished || new URLSearchParams(window.location.search).get("preview") === "1" ? null : readSurveyResponseDraft(storageKey);
         setAnswers(savedAnswers ? { ...init, ...savedAnswers } : init);
         setDraftRestored(Boolean(savedAnswers && Object.keys(savedAnswers).length > 0));
         setHydratedDraftKey(storageKey);
@@ -160,14 +162,14 @@ export function useSurveyPageController(surveyId: string | undefined) {
     setSubmitError(null);
     setDraftRestored(false);
 
-    if (typeof window !== "undefined" && draftStorageKey) {
+    if (typeof window !== "undefined" && draftStorageKey && !isPreview) {
       try {
         window.localStorage.removeItem(draftStorageKey);
       } catch {
         // Draft cleanup is best effort and must not block answering.
       }
     }
-  }, [allSurveyQuestions, draftStorageKey]);
+  }, [allSurveyQuestions, draftStorageKey, isPreview]);
 
   useEffect(() => {
     if (
@@ -176,7 +178,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
       !draftStorageKey ||
       hydratedDraftKey !== draftStorageKey ||
       submitted ||
-      survey.isPreview ||
+      survey.isPreview || new URLSearchParams(window.location.search).get("preview") === "1" ||
       !survey.isPublished
     ) {
       return;
@@ -262,7 +264,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
     setSubmitError(null);
     setQuestionErrors({});
 
-    if (survey.isPreview || !survey.isPublished) {
+    if (survey.isPreview || new URLSearchParams(window.location.search).get("preview") === "1" || !survey.isPublished) {
       setSubmitError(
         lang === "ko"
           ? "공개되지 않은 설문은 제출할 수 없습니다."
@@ -307,7 +309,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
       setResponseSubmittedAt(submittedAt);
       setSubmitted(true);
       setDraftRestored(false);
-      if (typeof window !== "undefined" && draftStorageKey) {
+      if (typeof window !== "undefined" && draftStorageKey && !isPreview) {
         try {
           window.localStorage.removeItem(draftStorageKey);
         } catch {
@@ -369,6 +371,7 @@ export function useSurveyPageController(surveyId: string | undefined) {
     draftRestored,
     draftHydrated,
     handleAnswerChange,
+    validateRequiredQuestions,
     handleSubmit,
     lang,
     loadError,

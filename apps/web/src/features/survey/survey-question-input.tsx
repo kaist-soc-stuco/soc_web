@@ -49,7 +49,7 @@ export function SurveyQuestionInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const base =
-    "min-h-11 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-2 focus:ring-kaist-darkgreen/20 md:text-sm";
+    "survey-answer-control min-h-11 w-full rounded-none border-0 border-b border-slate-300 bg-transparent px-0 py-2 text-base outline-none transition-[border-color,box-shadow] placeholder:text-[length:var(--ui-text-body-size)] placeholder:text-kaist-grey/40 text-kaist-black font-medium hover:border-slate-300 focus:border-kaist-darkgreen focus:ring-0 md:text-sm";
   const controlClass = base;
   const renderError = error ? (
     <p className="mt-1 text-xs font-normal text-rose-600" role="alert">
@@ -130,7 +130,7 @@ export function SurveyQuestionInput({
                   label: getOptionLabel(opt),
                 })),
               ]}
-              className="w-full"
+              className="w-full max-w-xs"
               buttonClassName={`${controlClass} justify-between text-left`}
               menuClassName="rounded-xl border-gray-200"
               emptyLabel={lang === "ko" ? "선택지가 없습니다." : "No options."}
@@ -147,9 +147,9 @@ export function SurveyQuestionInput({
             return (
               <label
                 key={opt.value}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl px-2 py-3.5 transition-colors ${
+                className={`flex cursor-pointer items-center gap-3 py-2 transition-colors ${
                   isSelected
-                    ? "bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold"
+                    ? "text-kaist-black"
                     : "text-kaist-black hover:bg-gray-50/50"
                 }`}
               >
@@ -196,9 +196,9 @@ export function SurveyQuestionInput({
             return (
               <label
                 key={opt.value}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl px-2 py-3.5 transition-colors ${
+                className={`flex cursor-pointer items-center gap-3 py-2 transition-colors ${
                   selected
-                    ? "bg-kaist-lightgreen/5 text-kaist-darkgreen font-semibold"
+                    ? "text-kaist-black"
                     : "text-kaist-black hover:bg-gray-50/50"
                 }`}
               >
@@ -262,7 +262,7 @@ export function SurveyQuestionInput({
             <legend className="sr-only">
               {lang === "ko" ? "등급을 선택하세요" : "Choose a rating"}
             </legend>
-            <div className="flex max-w-lg items-start justify-between gap-3 px-2">
+            <div className="mx-auto flex max-w-lg items-start justify-between gap-3 px-2">
               {Array.from({ length: max }, (_, index) => {
                 const rating = index + 1;
                 const selected = selectedRating === rating;
@@ -279,7 +279,7 @@ export function SurveyQuestionInput({
                     <span className="leading-5">{rating}</span>
                     <RatingIcon
                       aria-hidden="true"
-                      className={`size-7 transition-colors ${selected ? "fill-amber-400 text-amber-400" : "text-slate-500 group-hover:text-slate-700"}`}
+                      className={`size-6 transition-colors ${rating <= selectedRating ? "fill-amber-400 text-amber-400" : "text-slate-500 group-hover:text-slate-700"}`}
                       strokeWidth={1.8}
                     />
                   </button>
@@ -343,10 +343,10 @@ export function SurveyQuestionInput({
           </div>
           <div className="survey-grid__body divide-y divide-slate-100">
             {rows.map((row) => (
-              <fieldset key={row.value} className="survey-grid__row">
-                <legend className="survey-grid__row-label px-3 py-3 pr-1 text-left font-medium text-slate-700">
+              <div key={row.value} role="group" aria-label={getOptionLabel(row)} className="survey-grid__row">
+                <div className="survey-grid__row-label px-3 py-3 pr-1 text-left font-medium text-slate-700">
                   {getOptionLabel(row)}
-                </legend>
+                </div>
                 <div className="survey-grid__options">
                   {columns.map((column) => {
                     const selected = isMultiple
@@ -356,11 +356,7 @@ export function SurveyQuestionInput({
                     return (
                       <label
                         key={column.value}
-                        className={`survey-grid__option ${
-                          selected
-                            ? "border-kaist-darkgreen/30 bg-emerald-50/60"
-                            : "border-transparent"
-                        }`}
+                        className="survey-grid__option border-transparent"
                       >
                         <UiInput
                           type={isMultiple ? "checkbox" : "radio"}
@@ -382,7 +378,7 @@ export function SurveyQuestionInput({
                     );
                   })}
                 </div>
-              </fieldset>
+              </div>
             ))}
           </div>
           {renderError}
@@ -522,7 +518,7 @@ export function SurveyQuestionInput({
                   </span>
                   <span className="min-w-0 flex-1 break-words">{file.fileName}</span>
                   {typeof file.sizeBytes === "number" ? <span className="shrink-0 text-xs text-slate-400">{(file.sizeBytes / 1_000_000).toFixed(1)}MB</span> : null}
-                  <button type="button" className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => removeFile(file.assetId)} disabled={disabled || uploading} aria-label={`${file.fileName} 삭제`}>
+                  <button type="button" className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => removeFile(file.assetId)} disabled={disabled || uploading} aria-label={`${file.fileName} 삭제`} data-tooltip="파일 삭제">
                     <X aria-hidden="true" className="size-3.5" />
                   </button>
                 </div>
@@ -572,7 +568,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiInput
-            className={controlClass}
+            className={`${controlClass} !w-auto max-w-full`}
             type={includeTime ? "datetime-local" : includeYear ? "date" : "text"}
             inputMode={!includeYear && !includeTime ? "numeric" : undefined}
             pattern={!includeYear && !includeTime ? "\\d{2}-\\d{2}" : undefined}
@@ -592,7 +588,7 @@ export function SurveyQuestionInput({
       return (
         <div>
           <UiInput
-            className={controlClass}
+            className={`${controlClass} !w-auto max-w-full`}
             type={isDuration ? "text" : "time"}
             inputMode={isDuration ? "numeric" : undefined}
             pattern={isDuration ? "\\d{1,3}:[0-5]\\d(?::[0-5]\\d)?" : undefined}

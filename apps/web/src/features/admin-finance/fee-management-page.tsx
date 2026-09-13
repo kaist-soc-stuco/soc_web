@@ -31,6 +31,7 @@ import {
 import {
   AdminEditorGuidance,
   AdminFormField,
+  AdminLoadingState,
   AdminPageHeader,
   AdminPageMain,
   AdminPageShell,
@@ -584,7 +585,7 @@ export function FeeManagementPage() {
 
             <div className="min-w-0">
               <div className={loading && !initialLoading ? "opacity-60 transition-opacity duration-150" : "transition-opacity duration-150"}>
-                {initialLoading ? null : students.length === 0 ? <EmptyState message="등록된 학생이 없습니다." className="border-0 py-20" /> : (
+                {initialLoading ? <AdminLoadingState /> : students.length === 0 ? <EmptyState message="등록된 학생이 없습니다." className="border-0 py-20" /> : (
                   <AdminDataTable minWidth={980}>
                     <colgroup><col className="w-12" /><col className="w-44" /><col className="w-28" /><col /><col className="w-28" /><col className="w-24" /><col className="w-32" /></colgroup>
                     <AdminTableHeader>
@@ -641,7 +642,7 @@ export function FeeManagementPage() {
         </Modal>
 
         <Modal open={paymentModalOpen} onClose={() => !saving && setPaymentModalOpen(false)} title="과비 일괄 완납 처리" className="max-w-xl" bodyClassName="space-y-5 px-5 py-5" footer={<><Button variant="outline" disabled={saving} onClick={() => setPaymentModalOpen(false)}>취소</Button><Button disabled={saving || !policyReady || !selectedStudents.some(student => student.status === "UNPAID" && student.paidAmount === 0) || !paymentDate} onClick={() => void submitPayments()}>{saving ? "반영 중" : `${selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명 완납 확정`}</Button></>}>
-          <div><p>선택한 {selectedStudents.length}명 중 미납자 {selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명을 완납 처리하시겠습니까?</p><p className="mt-1 text-sm text-slate-500">기존 납부 기록이 있는 {selectedStudents.filter(student => student.status !== "UNPAID" || student.paidAmount > 0).length}명 자동 제외</p></div>
+          <div><p>선택한 {selectedStudents.length}명 중 미납자 {selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length}명을 완납 처리하시겠습니까?</p>{selectedStudents.some(student => student.status !== "UNPAID" || student.paidAmount > 0) ? <p className="mt-1 text-sm text-slate-500">(기존 납부 기록이 있는 {selectedStudents.filter(student => student.status !== "UNPAID" || student.paidAmount > 0).length}명 자동 제외)</p> : null}</div>
           <dl className="grid grid-cols-[5rem_1fr] gap-2 text-sm"><dt>납부 기준</dt><dd>{referenceSemester.replace("-", "학년도 ")}학기 ({feePolicy.coverageSemesters}학기 완납)</dd><dt>반영 금액</dt><dd>1인당 {formatCurrency(feePolicy.amount)} · 총 {formatCurrency(selectedStudents.filter(student => student.status === "UNPAID" && student.paidAmount === 0).length * feePolicy.amount)}</dd></dl>
           <AdminFormField label="납부 일자"><UiInput type="date" value={paymentDate} onChange={event => setPaymentDate(event.currentTarget.value)} /></AdminFormField>
           {operationError ? <p role="alert" className="text-sm text-rose-700">{operationError}</p> : null}

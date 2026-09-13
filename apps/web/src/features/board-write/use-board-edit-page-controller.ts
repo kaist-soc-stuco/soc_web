@@ -573,7 +573,6 @@ export function useBoardEditPageController(forcedCategory?: string) {
 
         await apiClient.updateSurvey(selectedSurveyId, {
           connectedArticleId: articleId,
-          kind: category === "_EVENT" ? "APPLICATION" : undefined,
           isAlwaysOpen: overwriteAlwaysOpen
             ? true
             : overwriteSchedule

@@ -546,7 +546,7 @@ export function BoardWriteAttachmentList({
                 type="button"
                 onClick={() => onRemoveAsset(asset.assetId)}
                 className="size-7 shrink-0 rounded-md p-0 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                title={lang === "ko" ? "첨부 제거" : "Remove attachment"}
+                data-tooltip={lang === "ko" ? "파일 삭제" : "Delete attachment"}
               >
                 <X className="size-3.5" />
               </Button>

@@ -1335,6 +1335,12 @@
     font-weight: 500;
   }
 
+  .home-footer-address {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+  }
+
   .home-footer-meta {
     color: #667085;
     font-weight: 400;
@@ -1350,7 +1356,7 @@
     font-weight: 400;
   }
 
-  .home-footer-instagram {
+  .home-footer-social {
     display: inline-flex;
     height: 1.5rem;
     width: 1.5rem;
@@ -1361,12 +1367,12 @@
     transition: background-color 180ms ease, color 180ms ease;
   }
 
-  .home-footer-instagram svg {
+  .home-footer-social svg {
     height: 0.875rem;
     width: 0.875rem;
   }
 
-  .home-footer-instagram:hover {
+  .home-footer-social:hover {
     background: #e3ebe6;
     color: var(--app-primary);
   }
@@ -1386,7 +1392,7 @@
       margin-left: 0;
     }
 
-    .home-footer-instagram {
+    .home-footer-social {
       min-height: var(--ui-touch-target-min);
       min-width: var(--ui-touch-target-min);
     }
@@ -2197,30 +2203,6 @@
     margin-inline: auto;
   }
 
-  .about-page-header {
-    border-bottom: 1px solid #edf1ef;
-    padding-block: clamp(2.5rem, 5vw, 4.25rem) 2rem;
-    background: #fff;
-  }
-
-  .about-page-header h1 {
-    max-width: 52rem;
-    color: #172033;
-    font-size: clamp(2rem, 4.2vw, 3.75rem);
-    font-weight: 720;
-    letter-spacing: -0.055em;
-    line-height: 1.08;
-  }
-
-  .about-page-header p {
-    max-width: 42rem;
-    margin-top: 1rem;
-    color: #52605a;
-    font-size: clamp(0.9375rem, 1.2vw, 1.0625rem);
-    font-weight: 400;
-    line-height: 1.75;
-  }
-
   .about-section-nav {
     position: sticky;
     top: var(--ui-header-height);
@@ -2323,14 +2305,28 @@
     font-size: clamp(1.5rem, 2.2vw, 2rem);
   }
 
+  .about-intro-heading {
+    margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  }
+
+  .about-intro-heading h1 {
+    max-width: 52rem;
+    color: #172033;
+    font-size: clamp(2rem, 4.2vw, 3.75rem);
+    font-weight: 720;
+    letter-spacing: -0.055em;
+    line-height: 1.08;
+  }
+
   .about-intro-summary {
     display: grid;
     max-width: 58rem;
     gap: 1rem;
-    margin-top: clamp(2rem, 4vw, 3.25rem);
+    margin-top: 0;
   }
 
   .about-intro-feature {
+    margin: clamp(2rem, 4vw, 3.25rem) 0 0;
     aspect-ratio: 2.35 / 1;
     overflow: hidden;
     border-radius: 1rem;
@@ -2433,9 +2429,13 @@
     white-space: pre-line;
   }
 
+ .about-intro-work {
+   margin-top: clamp(3rem, 6vw, 5rem);
+ }
+
   .about-work-pledges {
-    margin-top: clamp(5rem, 8vw, 7rem);
-    padding-top: clamp(1rem, 2vw, 2rem);
+    margin-top: clamp(1.5rem, 3vw, 2.5rem);
+    padding-top: clamp(0.25rem, 0.5vw, 0.5rem);
     scroll-margin-top: calc(var(--ui-header-height) + 3.75rem);
   }
 
@@ -2667,7 +2667,7 @@
   }
 
   .about-pledge-progress-track {
-    height: 0.3125rem;
+    height: 0.375rem;
     margin-top: 0.75rem;
     overflow: hidden;
     border-radius: 999px;
@@ -2749,10 +2749,9 @@
   }
 
   .about-pledge-item-heading {
-    display: grid;
-    grid-template-columns: 2rem minmax(0, 1fr);
+    display: flex;
     gap: 0.75rem;
-    align-items: start;
+    align-items: center;
     padding: 1.25rem 1.25rem 0;
   }
 
@@ -2774,18 +2773,10 @@
     transform: rotate(180deg);
   }
 
-  .about-pledge-index {
-    color: #92a099;
-    font-size: 0.6875rem;
-    font-variant-numeric: tabular-nums;
-  }
-
   .about-pledge-title {
-    display: inline-flex;
+    display: block;
+    flex: 1 1 auto;
     min-width: 0;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
     color: #172033;
     font-size: 1rem;
     font-weight: 650;
@@ -2810,24 +2801,25 @@
     font-weight: 500;
     line-height: 1;
     white-space: nowrap;
+    margin-left: auto;
   }
 
   .about-pledge-status.is-completed {
-    border-color: #d7dee8;
-    color: #52606d;
-    background: #f1f4f7;
+    border-color: #a7f3d0;
+    color: #047857;
+    background: #ecfdf5;
   }
 
   .about-pledge-status.is-in-progress {
-    border-color: #8fc5a4;
-    color: #006e3f;
-    background: #e3f3e8;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+    background: #eff6ff;
   }
 
   .about-pledge-item p {
     max-width: 52rem;
     margin: 0.75rem 0 0;
-    padding: 0 1.25rem 1.25rem 4rem;
+    padding: 0 1.25rem 1.25rem 3.25rem;
     color: #344054;
     font-size: 0.875rem;
     font-weight: 400;
@@ -2968,20 +2960,6 @@
   @media (max-width: 767px) {
     .about-landing-container {
       width: min(100% - 2rem, 76rem);
-    }
-
-    .about-page-header {
-      padding-block: 2.25rem 1.5rem;
-    }
-
-    .about-page-header h1 {
-      font-size: clamp(2rem, 11vw, 3rem);
-    }
-
-    .about-page-header p {
-      margin-top: 0.75rem;
-      font-size: 0.9375rem;
-      line-height: 1.7;
     }
 
     .about-intro-feature {
@@ -4152,3 +4130,407 @@ html { scrollbar-gutter: stable; }
 .about-scope-grid { margin-top: 2.25rem; }
 .about-scope-card { padding-left: 2rem; }
 .about-scope-copy small { margin-top: 1rem; }
+
+.rich-input-toolbar-space { display:grid; grid-template-rows:0fr; transition:grid-template-rows 160ms ease; }
+.rich-input-toolbar-space[data-open="true"] { grid-template-rows:1fr; }
+.rich-input-toolbar-space[data-open="false"] .rich-input-toolbar { visibility:hidden; pointer-events:none; }
+.section-inline-editor { padding:16px 24px; padding-right:96px; }
+.section-inline-editor.survey-section-header { padding:24px; padding-right:96px; }
+.survey-section-surface { border:1px solid #e2e8f0; border-radius:0 8px 8px 8px; background:white; box-shadow:0 1px 2px rgb(0 0 0 / .05); }
+@media (prefers-reduced-motion:reduce) { .rich-input-toolbar-space { transition:none; } }
+
+/* Selection belongs to a card; field focus only controls its formatting toolbar. */
+.survey-section-surface { border-left:6px solid transparent; }
+.survey-section-surface.is-header { border-top:10px solid var(--brand-primary, #007a4b); border-left:1px solid #e2e8f0; padding-top:0; }
+.survey-section-surface.is-selected { border-left-color:transparent; border-bottom-color:#34a879; }
+[id^="site-nav-flyout-"] { background:#fff !important; color:#172033; backdrop-filter:none !important; }
+[id^="site-nav-flyout-"] a { color:#172033 !important; }
+@media print { body:has(.survey-responses-panel) header, body:has(.survey-responses-panel) aside, .survey-responses-panel button { display:none !important; } }
+
+/* The header accent is a real border, so it cannot bleed beyond the card. */
+.survey-section-surface.is-header::before { display: none; }
+.survey-grid { overflow-x: auto; }
+.survey-grid__row { margin: 0; padding: 0; border: 0; }
+
+.rich-text-input a, .tiptap a, .rich-text-content a { color: #2563eb; text-decoration: underline; font-weight: inherit; }
+.survey-section-surface [role="button"] h3,
+.survey-section-surface [data-section-description] { border-bottom: 1px solid transparent; }
+.survey-section-surface [data-section-description] { margin-top: 20px; }
+.admin-vote-editor { max-width: 64rem !important; }
+
+.rich-content a { color: #2563eb; text-decoration: underline; font-weight: inherit; }
+
+/* Navigation menus should settle in place; only the color/surface changes on
+   hover so the flyout never gives the page a small vertical jolt. The nav rail
+   stays transparent while each fixed-width menu item owns its hover surface. */
+.site-primary-nav,
+.site-primary-nav:hover {
+  background: transparent;
+}
+
+.site-primary-nav > [data-nav-index] {
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.site-primary-nav > [data-nav-index]:hover,
+.site-primary-nav > [data-nav-index]:focus-within {
+  background: #f8fafc;
+}
+
+.site-primary-nav > [data-nav-index] > a,
+.site-primary-nav [role="menu"] a {
+  transform: none !important;
+  transition-property: color, background-color, opacity;
+}
+
+.site-primary-nav > [data-nav-index] > a:hover,
+.site-primary-nav > [data-nav-index] > a:focus-visible {
+  background: transparent;
+}
+
+.site-primary-nav [role="menu"] li {
+  border-radius: 0.375rem;
+  transition: background-color 120ms ease;
+}
+
+.site-primary-nav [role="menu"] li:hover,
+.site-primary-nav [role="menu"] li:focus-within {
+  background: #f8fafc;
+}
+
+.site-header-home:not(.home-header-scrolled) .site-primary-nav > [data-nav-index]:hover,
+.site-header-home:not(.home-header-scrolled) .site-primary-nav > [data-nav-index]:focus-within {
+  background: rgb(255 255 255 / 12%);
+}
+
+.faq-page-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.faq-page-actions {
+  display: flex;
+  min-width: 0;
+  margin-left: auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.faq-page-tools .faq-search-field {
+  width: min(100%, 24rem);
+  flex: 0 1 24rem;
+}
+
+.faq-filter-tabs {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.faq-filter-tabs.filter-chips,
+.faq-filter-tabs.filter-chips :is(button, a) {
+  border-radius: 999px;
+}
+
+.roadmap-flow-viewport .react-flow__controls-button[data-tooltip]::after {
+  left: calc(100% + 0.5rem);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.faq-list-card {
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
+}
+
+@media (max-width: 767px) {
+  .faq-page-tools {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .faq-page-actions {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .faq-page-tools .faq-search-field {
+    width: auto;
+    flex: 1 1 auto;
+  }
+}
+
+/* Keep compact actions discoverable without relying on browser-native title tooltips. */
+button[data-tooltip] {
+  position: relative;
+}
+
+button[data-tooltip]::after {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.5rem);
+  z-index: 80;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #5f6368;
+  color: #fff;
+  content: attr(data-tooltip);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgb(15 23 42 / 18%);
+  transition: opacity 100ms ease;
+  transition-delay: 0s;
+}
+
+button[data-tooltip]:hover::after,
+button[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transition-delay: 300ms;
+}
+
+.survey-editor-header-actions [data-tooltip] {
+  position: relative;
+}
+
+.survey-editor-header-actions [data-tooltip]::after {
+  left: auto;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 40;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #5f6368;
+  color: #fff;
+  content: attr(data-tooltip);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgb(15 23 42 / 18%);
+  transition: opacity 100ms ease;
+  transition-delay: 0s;
+}
+
+.survey-editor-header-actions [data-tooltip]:hover::after,
+.survey-editor-header-actions [data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transition-delay: 300ms;
+}
+
+.survey-editor-header-actions .ui-icon-button:hover:not(:disabled),
+.survey-editor-header-actions .ui-icon-button:focus-visible:not(:disabled) {
+  border-color: transparent !important;
+  background: #f1f3f4 !important;
+}
+
+.question-inline-editor .ui-icon-button:hover:not(:disabled),
+.question-inline-editor .ui-icon-button:focus-visible:not(:disabled),
+.survey-section-surface .ui-icon-button:hover:not(:disabled),
+.survey-section-surface .ui-icon-button:focus-visible:not(:disabled) {
+  border-color: transparent !important;
+  background: #f1f3f4 !important;
+}
+
+/* Google Forms-style action rail for the survey builder. The rail owns the
+   insertion actions, so every section can stay focused on its content. */
+.survey-editor-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.5rem;
+  align-items: start;
+  gap: 1rem;
+}
+
+.survey-editor-floating-toolbar {
+  position: sticky;
+  top: calc(var(--ui-header-height) + 1rem);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  width: 3.5rem;
+  padding: 0.375rem;
+  border: 1px solid #dfe3e8;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
+}
+
+.survey-editor-floating-toolbar button {
+  position: relative;
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.625rem;
+  background: transparent;
+  color: #5f6368;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.survey-editor-floating-toolbar button:hover:not(:disabled),
+.survey-editor-floating-toolbar button:focus-visible:not(:disabled) {
+  background: #f1f3f4;
+  color: #202124;
+  outline: none;
+}
+
+.survey-editor-floating-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.survey-editor-floating-toolbar button[data-tooltip]::after {
+  position: absolute;
+  left: calc(100% + 0.625rem);
+  right: auto;
+  top: 50%;
+  z-index: 30;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #5f6368;
+  color: #fff;
+  content: attr(data-tooltip);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgb(15 23 42 / 18%);
+  transition: opacity 100ms ease;
+  transition-delay: 0s;
+}
+
+.survey-editor-floating-toolbar button[data-tooltip]:hover::after,
+.survey-editor-floating-toolbar button[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transition-delay: 300ms;
+}
+
+.survey-new-question-drag-handle[data-tooltip] {
+  position: relative;
+}
+
+.survey-new-question-drag-handle[data-tooltip]::after {
+  position: absolute;
+  left: calc(100% + 0.5rem);
+  top: 50%;
+  z-index: 30;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #5f6368;
+  color: #fff;
+  content: attr(data-tooltip);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgb(15 23 42 / 18%);
+  transition: opacity 100ms ease;
+  transition-delay: 0s;
+}
+
+.survey-new-question-drag-handle[data-tooltip]:hover::after,
+.survey-new-question-drag-handle[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transition-delay: 300ms;
+}
+
+@media (max-width: 47.9375rem) {
+  .survey-editor-workspace {
+    display: block;
+  }
+
+  .survey-editor-floating-toolbar {
+    position: fixed;
+    right: 0.75rem;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    top: auto;
+    flex-direction: row;
+    width: auto;
+  }
+
+  .survey-editor-floating-toolbar button[data-tooltip]::after {
+    left: 50%;
+    right: auto;
+    bottom: calc(100% + 0.625rem);
+    top: auto;
+    transform: translateX(-50%);
+  }
+}
+
+/* Survey answer controls keep a straight baseline, including validation states. */
+@layer components {
+  .survey-answer-control.interaction-control,
+  .survey-answer-control.interaction-control:focus,
+  .survey-answer-control.interaction-control:focus-visible {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background-color: transparent;
+    background-image: linear-gradient(var(--brand-primary, #007a4b), var(--brand-primary, #007a4b)), linear-gradient(#cbd5e1, #cbd5e1);
+    background-position: center bottom;
+    background-repeat: no-repeat;
+    background-size: 0% 2px, 100% 1px;
+    transition: background-size 180ms ease !important;
+  }
+  .survey-answer-control.interaction-control:focus,
+  .survey-answer-control.interaction-control:focus-visible,
+  .survey-answer-control.interaction-control[aria-expanded="true"] {
+    background-size: 100% 2px, 100% 1px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .survey-answer-control.interaction-control { transition: none !important; }
+  }
+}
+
+@layer components {
+  .builder-text-control.interaction-control,
+  .builder-text-control.interaction-control:focus,
+  .builder-text-control.interaction-control:focus-visible {
+    border: 0 !important;
+    border-bottom: 1px solid transparent !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  .builder-text-control.interaction-control:focus,
+  .builder-text-control.interaction-control:focus-visible {
+    border-bottom-color: var(--brand-primary, #007a4b) !important;
+  }
+}
+
+@layer components {
+  .builder-text-control.interaction-control:hover { border-bottom-color: #cbd5e1 !important; }
+  .builder-text-control.interaction-control:focus,
+  .builder-text-control.interaction-control:focus-visible { border-bottom-color: var(--brand-primary, #007a4b) !important; }
+  .builder-rule-row .interaction-control { border-radius: 0 !important; box-shadow: none !important; }
+}
+.survey-editor-floating-toolbar { position: fixed; }
+.survey-editor-toolbar-slot { width: 3.5rem; }
+@media (max-width: 47.9375rem) {
+  .survey-editor-workspace { padding-bottom: 5rem; }
+  .survey-editor-floating-toolbar { left:auto !important; top:auto !important; }
+}

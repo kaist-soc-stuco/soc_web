@@ -258,6 +258,12 @@ export const createSurveyApi = ({
     );
   },
 
+  getSurveyEmailNotifications: (surveyId: string) => requestJson<{ enabled: boolean }>(
+    `${surveyBaseUrl}/${surveyId}/responses/email-notifications`, { method: "GET" }, { retryOnUnauthorized: true }),
+  setSurveyEmailNotifications: (surveyId: string, enabled: boolean) => requestJson<{ enabled: boolean }>(
+    `${surveyBaseUrl}/${surveyId}/responses/email-notifications`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) }, { retryOnUnauthorized: true }),
+  deleteAllSurveyResponses: (surveyId: string) => requestJson<{ deletedCount: number }>(
+    `${surveyBaseUrl}/${surveyId}/responses`, { method: "DELETE" }, { retryOnUnauthorized: true }),
   listResponses: async (surveyId: string, options?: { page?: number; pageSize?: number; query?: string; sortOrder?: "asc" | "desc" }): Promise<SurveyResponseListResponse> => {
     const params = new URLSearchParams();
     if (options?.page !== undefined) params.set("page", String(options.page));

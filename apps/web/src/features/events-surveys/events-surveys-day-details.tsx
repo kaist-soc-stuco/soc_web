@@ -210,7 +210,7 @@ export function EventsSurveysDayDetails({
             );
 
             return eventHref ? (
-              <Link key={idx} to={eventHref} className={cardClassName}>
+              <Link key={idx} to={eventHref} target={/^\/(survey|votes)\//.test(eventHref) ? "_blank" : undefined} rel="noopener noreferrer" className={cardClassName}>
                 {cardContent}
               </Link>
             ) : (

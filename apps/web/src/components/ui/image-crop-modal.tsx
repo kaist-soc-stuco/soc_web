@@ -175,7 +175,7 @@ export function ImageCropModal({
       open={Boolean(file)}
       onClose={onCancel}
       title="이미지 자르기"
-      className="max-w-3xl"
+      className="h-[min(41rem,calc(100dvh-1rem))] max-w-3xl sm:h-[min(41rem,calc(100dvh-3rem))]"
       bodyClassName="space-y-4"
       footer={(
         <>

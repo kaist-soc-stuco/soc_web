@@ -7,6 +7,7 @@ import {
   PostgresDatabase,
 } from "../../infrastructure/postgres/postgres.provider";
 import {
+  surveyResponseSubscriptions,
   surveyAnswers,
   surveyQuestions,
   surveyResponses,
@@ -353,6 +354,31 @@ export class SurveyResponsesRepository {
         String(asset.uploadedBy) === userId &&
         asset.uploadStatus === "COMPLETED",
     );
+  }
+
+  async getEmailSubscription(surveyId: string, userId: string) {
+    const rows = await this.db.select().from(surveyResponseSubscriptions).where(and(eq(surveyResponseSubscriptions.surveyId, surveyId), eq(surveyResponseSubscriptions.userId, userId))).limit(1);
+    return { enabled: rows.length > 0 };
+  }
+
+  async setEmailSubscription(surveyId: string, userId: string, enabled: boolean) {
+    if (enabled) await this.db.insert(surveyResponseSubscriptions).values({ surveyId, userId }).onConflictDoNothing();
+    else await this.db.delete(surveyResponseSubscriptions).where(and(eq(surveyResponseSubscriptions.surveyId, surveyId), eq(surveyResponseSubscriptions.userId, userId)));
+    return { enabled };
+  }
+
+  async getEmailSubscribers(surveyId: string) {
+    return this.db.select({ userId: users.userId, email: users.email }).from(surveyResponseSubscriptions)
+      .innerJoin(users, eq(users.userId, surveyResponseSubscriptions.userId))
+      .where(and(eq(surveyResponseSubscriptions.surveyId, surveyId), eq(users.isActive, true)));
+  }
+
+  async deleteAllResponses(surveyId: string) {
+    return this.db.transaction(async tx => {
+      await tx.select({ id: surveys.surveyId }).from(surveys).where(eq(surveys.surveyId, surveyId)).for("update");
+      const deleted = await tx.delete(surveyResponses).where(eq(surveyResponses.surveyId, surveyId)).returning({ id: surveyResponses.id });
+      return { deletedCount: deleted.length };
+    });
   }
 
   async findBySurveyId(

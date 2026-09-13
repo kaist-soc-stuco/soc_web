@@ -1,4 +1,4 @@
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
@@ -42,6 +42,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { EditorLinkDialog, EditorLinkPopover, type EditorLinkPreview } from "@/components/ui/editor-link";
 import { cn } from "@/lib/utils";
 
 export interface RichTextEditorProps {
@@ -372,7 +373,7 @@ function useTiptapEditor({
       Underline,
       Link.configure({
         openOnClick: false,
-        HTMLAttributes: { class: "text-kaist-darkgreen font-semibold" },
+        HTMLAttributes: { class: "text-blue-600 underline" },
       }),
       TiptapImage.configure({
         allowBase64: false,
@@ -454,10 +455,10 @@ function ToolbarButton({
       variant="ghost"
       size="icon"
       aria-label={label}
+      data-tooltip={label}
       aria-pressed={active}
       aria-expanded={expanded}
       aria-haspopup={hasPopup}
-      title={label}
       disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
@@ -529,7 +530,6 @@ function ColorPopover({
           variant="ghost"
           size="icon"
           aria-label="닫기"
-          title="닫기"
           onClick={onClose}
           className="size-7 rounded-md text-slate-400"
         >
@@ -699,38 +699,36 @@ function RichTextToolbar({
   variableOptions?: ReadonlyArray<RichTextVariableOption>;
 }) {
   const editorId = useId().replace(/:/g, "");
-  const [linkOpen, setLinkOpen] = useState(false);
-  const linkPopoverRef = useRef<HTMLDivElement>(null);
-  const [linkPosition, setLinkPosition] = useState({ left: 16, top: 16 });
+  const [linkDialog, setLinkDialog] = useState<{text:string;url:string} | null>(null);
+  const [linkPreview, setLinkPreview] = useState<EditorLinkPreview | null>(null);
+  const linkSelection = useRef({from:0,to:0});
   useEffect(() => {
-    if (!linkOpen) return;
-    const outside = (event: PointerEvent) => { if (!linkPopoverRef.current?.contains(event.target as Node)) setLinkOpen(false); };
-    const escape = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); setLinkOpen(false); editor.commands.focus(); } };
-    document.addEventListener("pointerdown", outside);
-    window.addEventListener("keydown", escape, true);
-    return () => { document.removeEventListener("pointerdown", outside); window.removeEventListener("keydown", escape, true); };
-  }, [linkOpen, editor]);
-  const [linkUrl, setLinkUrl] = useState("");
-  const [linkError, setLinkError] = useState(false);
-  useEffect(() => {
+    const capture = () => {
+      if (editor.isActive("link")) editor.commands.extendMarkRange("link");
+      linkSelection.current = {from:editor.state.selection.from,to:editor.state.selection.to};
+    };
     const open = (event: Event) => {
-      if ((event as CustomEvent<{ editor: Editor }>).detail?.editor !== editor) return;
-      setLinkUrl(editor.getAttributes("link").href ?? "");
-      const bounds = editor.view.coordsAtPos(editor.state.selection.from);
-      setLinkPosition({ left: Math.max(12, Math.min(bounds.left, window.innerWidth - 332)), top: Math.max(12, Math.min(bounds.bottom + 8, window.innerHeight - 140)) });
-      setLinkError(false);
-      setLinkOpen(true);
+      if ((event as CustomEvent<{editor:Editor}>).detail?.editor !== editor) return;
+      capture();
+      setLinkDialog({text:editor.state.doc.textBetween(linkSelection.current.from,linkSelection.current.to),url:editor.getAttributes("link").href ?? ""});
+      setLinkPreview(null);
+    };
+    const click = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement).closest("a");
+      if (!anchor || !editor.isInitialized || editor.isDestroyed || !editor.view.dom.contains(anchor)) return;
+      event.preventDefault();
+      editor.commands.setTextSelection(editor.view.posAtDOM(anchor, 0));
+      editor.commands.extendMarkRange("link"); capture();
+      const rect = anchor.getBoundingClientRect();
+      setLinkPreview({text:anchor.textContent ?? "",url:anchor.getAttribute("href") ?? "",left:rect.left,top:rect.bottom+6});
     };
     window.addEventListener("soc-edit-link", open);
-    return () => window.removeEventListener("soc-edit-link", open);
+    document.addEventListener("click", click);
+    return () => { window.removeEventListener("soc-edit-link",open); document.removeEventListener("click",click); };
   }, [editor]);
-  const saveLink = () => {
-    const value = linkUrl.trim();
-    const url = /^(?:[a-z][a-z\d+.-]*:|[/#?])/i.test(value) ? value : `https://${value}`;
-    if (value && !isSafeUrlReference(url)) { setLinkError(true); return; }
-    if (value) editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-    else editor.chain().focus().extendMarkRange("link").unsetLink().run();
-    setLinkOpen(false);
+  const saveLink = (text: string, url: string) => {
+    flushSync(() => setLinkDialog(null));
+    editor.chain().focus().setTextSelection(linkSelection.current).insertContent({type:"text",text,marks:[{type:"link",attrs:{href:url,target:"_blank",rel:"noopener noreferrer"}}]}).run();
   };
   const [colorPopover, setColorPopover] = useState<"text" | "background" | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -810,7 +808,6 @@ function RichTextToolbar({
             variant="ghost"
             size="icon"
             aria-label={lang === "ko" ? "더보기" : "More formatting"}
-            title={lang === "ko" ? "더보기" : "More formatting"}
             aria-haspopup="menu"
             className="size-8 rounded-md text-slate-500 data-[state=open]:bg-brand-primary-light data-[state=open]:text-brand-primary"
           >
@@ -906,7 +903,6 @@ function RichTextToolbar({
               variant="ghost"
               size="sm"
               aria-label={lang === "ko" ? "변수 삽입" : "Choose variable"}
-              title={lang === "ko" ? "변수 삽입" : "Choose variable"}
               className="h-8 shrink-0 rounded-md px-2 text-xs font-normal text-slate-600"
             >
               <span className="whitespace-nowrap">
@@ -995,13 +991,8 @@ function RichTextToolbar({
         <CircleHelp />
       </ToolbarButton>
       </div>
-      {linkOpen ? createPortal(<div ref={linkPopoverRef} role="dialog" aria-label={lang === "ko" ? "링크 편집" : "Edit link"} className="fixed z-[1000] w-80 max-w-[calc(100vw-24px)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg" style={linkPosition}>
-        <form className="flex items-center gap-2" onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); saveLink(); }}>
-          <input autoFocus aria-label="링크 URL" placeholder="https://..." className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" value={linkUrl} onChange={(event) => setLinkUrl(event.currentTarget.value)} />
-          <Button type="submit" variant="ghost" size="icon" aria-label="링크 적용"><Check className="size-4" /></Button>
-        </form>
-        {linkError ? <p role="alert" className="mt-2 text-xs text-rose-700">{lang === "ko" ? "올바른 링크를 입력해 주세요." : "Enter a valid URL."}</p> : null}
-      </div>, document.body) : null}
+      {linkDialog && <EditorLinkDialog initialText={linkDialog.text} initialUrl={linkDialog.url} onApply={saveLink} onClose={() => { flushSync(() => setLinkDialog(null));editor.commands.focus(); }} />}
+      {linkPreview && <EditorLinkPopover link={linkPreview} onClose={() => setLinkPreview(null)} onEdit={() => { setLinkDialog({text:linkPreview.text,url:linkPreview.url});setLinkPreview(null); }} onUnlink={() => { editor.chain().focus().setTextSelection(linkSelection.current).unsetLink().run();setLinkPreview(null); }} />}
       {toolbarSuffix ? <div className="shrink-0">{toolbarSuffix}</div> : null}
     </div>
   );

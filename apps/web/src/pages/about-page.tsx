@@ -1,6 +1,5 @@
 import {
   AboutLandingContent,
-  AboutPageHeader,
   AboutSectionNavigation,
 } from "@/features/about/about-page-sections";
 import { useAboutPageController } from "@/features/about/use-about-page-controller";
@@ -18,7 +17,6 @@ export function AboutPage() {
     <PageShell className="about-landing-page">
       <Header />
       <main className="channel-talk-safe-area flex-1">
-        <AboutPageHeader lang={lang} />
         <AboutSectionNavigation
           activeSection={activeSection}
           lang={lang}

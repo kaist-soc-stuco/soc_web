@@ -753,7 +753,7 @@ export class CalendarService {
         id: row.id,
         sourceType: "SURVEY",
         surveyId: row.id,
-        kind: row.kind,
+        kind: "SURVEY",
         titleKo: row.titleKo,
         titleEn: row.titleEn,
         date: msToIso(row.opensAt.valueOf()),

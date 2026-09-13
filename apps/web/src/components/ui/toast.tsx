@@ -143,7 +143,6 @@ function ToastCard({
       <button
         type="button"
         aria-label="토스트 닫기"
-        title="닫기"
         className="-mr-1 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 outline-none hover:bg-white/10 hover:text-white focus-visible:bg-white/10"
         onClick={requestDismiss}
       >

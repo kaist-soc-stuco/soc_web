@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { OPERATIONAL_SURVEY_IDS } from "@soc/contracts";
 import { Navigate, useParams } from "react-router-dom";
-import { Header } from "@/components/organisms/header";
+import { ArrowLeft, CheckCircle2, Link as LinkIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SurveyResponseForm } from "@/features/survey/survey-response-form";
 import { SurveyParticipationNotice } from "@/features/survey/survey-participation-notice";
 import {
@@ -28,6 +29,7 @@ function ActiveSurveyPage() {
     draftHydrated,
     draftRestored,
     handleAnswerChange,
+    validateRequiredQuestions,
     handleSubmit,
     lang,
     loadError,
@@ -45,7 +47,7 @@ function ActiveSurveyPage() {
   const { toast } = useToast();
   const draftToastShownRef = useRef(false);
 
-  const isPreview = Boolean(survey?.isPreview || (survey && !survey.isPublished));
+  const isPreview = Boolean(new URLSearchParams(window.location.search).get("preview") === "1" || survey?.isPreview || (survey && !survey.isPublished));
   // A temporary consent session is authenticated for eligibility checks, but
   // it still cannot access persistent account features.
   const sessionAuthenticated = Boolean(session?.authenticated);
@@ -135,7 +137,7 @@ function ActiveSurveyPage() {
     }
 
     const isEditingExistingResponse =
-      Boolean(survey.currentResponse) &&
+      !isPreview && Boolean(survey.currentResponse) &&
       survey.allowResponseEdit &&
       !survey.allowMultipleResponses;
 
@@ -147,6 +149,8 @@ function ActiveSurveyPage() {
         lang={lang}
         onAnswerChange={handleAnswerChange}
         onSubmit={handleSubmit}
+        onClear={resetResponseDraft}
+        onValidate={validateRequiredQuestions}
         questionErrors={questionErrors}
         submitError={submitError}
         submitting={submitting}
@@ -158,9 +162,12 @@ function ActiveSurveyPage() {
 
   return (
     <PageShell>
-      <Header />
+      {isPreview && <header className="flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 sm:px-8">
+        <a href={`/admin/surveys/${id}/edit`} className="inline-flex items-center gap-3 text-sm"><ArrowLeft className="size-4" />미리보기 모드</a>
+        <div className="flex items-center gap-4">{survey?.isPublished && <span className="inline-flex items-center gap-2 text-sm text-emerald-600"><CheckCircle2 className="size-4" />게시됨</span>}<Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/survey/${id}`, location.origin).href); toast({type:"success",message:"응답자 링크를 복사했습니다."}); } catch { toast({type:"error",message:"링크를 복사하지 못했습니다."}); } }}><LinkIcon className="size-4" />응답자 링크 복사</Button></div>
+      </header>}
       <main className="channel-talk-safe-area flex-1 bg-[#f3f5f4] px-4 py-6 sm:py-10 lg:px-0" aria-busy={(!survey || sessionLoading || !draftHydrated) && !loadError}>
-        <div className="mx-auto max-w-[52rem] space-y-5">
+        <div className="mx-auto max-w-[42rem] space-y-5">
           {survey && <SurveySummaryCard lang={lang} survey={survey} />}
           {renderBody()}
         </div>
