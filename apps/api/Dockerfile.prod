@@ -44,6 +44,7 @@ ENV NODE_OPTIONS=--conditions=production
 
 RUN addgroup -S nodeapp \
   && adduser -S -G nodeapp nodeapp \
+  && apk upgrade --no-cache \
   && corepack enable
 
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
@@ -52,6 +53,8 @@ COPY --from=build /app/shared/contracts/package.json shared/contracts/package.js
 COPY --from=build /app/shared/common/package.json shared/common/package.json
 
 RUN pnpm install --filter @soc/api... --prod --frozen-lockfile \
+  && rm -rf /root/.cache/node/corepack /usr/local/lib/node_modules/corepack /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/pnpm /usr/local/bin/pnpx \
   && mkdir -p /app/apps/api/uploads/assets /tmp \
   && chown -R nodeapp:nodeapp /app /tmp
 
