@@ -12,7 +12,12 @@ import { surveyQuestions } from "../../infrastructure/postgres/postgres.schema";
 import type { SurveyQuestionRecord } from "./entities/survey-question.entity";
 import type { CreateQuestionDto } from "./dto/create-question.dto";
 import type { UpdateQuestionDto } from "./dto/update-question.dto";
-import type { QuestionType, QuestionOption, SurveyQuestionConfig } from "@soc/contracts";
+import {
+  isSurveyDisplayBlock,
+  type QuestionType,
+  type QuestionOption,
+  type SurveyQuestionConfig,
+} from "@soc/contracts";
 import type { ReorderSurveyQuestionsRequest } from "@soc/contracts";
 import { sanitizeSurveyRichText } from "./survey-rich-text";
 
@@ -87,6 +92,7 @@ export class SurveyQuestionsRepository {
       .orderBy(desc(surveyQuestions.sortOrder))
       .limit(1);
     const sortOrder = dto.sortOrder ?? (lastQuestion?.sortOrder ?? -1) + 1;
+    const isDisplayBlock = isSurveyDisplayBlock(dto.questionType);
     const [row] = await db
       .insert(surveyQuestions)
       .values({
@@ -96,10 +102,10 @@ export class SurveyQuestionsRepository {
         descriptionKo: sanitizeSurveyRichText(dto.descriptionKo),
         descriptionEn: sanitizeSurveyRichText(dto.descriptionEn),
         questionType: dto.questionType,
-        options: dto.options ?? null,
-        config: dto.config ?? null,
-        answerRegex: dto.answerRegex ?? null,
-        isRequired: dto.isRequired ?? true,
+        options: isDisplayBlock ? null : dto.options ?? null,
+        config: isDisplayBlock ? null : dto.config ?? null,
+        answerRegex: isDisplayBlock ? null : dto.answerRegex ?? null,
+        isRequired: isDisplayBlock ? false : dto.isRequired ?? true,
         sortOrder,
         createdAt: nowDate(),
         updatedAt: nowDate(),
@@ -114,6 +120,17 @@ export class SurveyQuestionsRepository {
     dto: UpdateQuestionDto,
     tx?: PostgresTransaction,
   ): Promise<SurveyQuestionRecord | null> {
+    const db = tx ?? this.db;
+    const [current] = await db
+      .select({ questionType: surveyQuestions.questionType })
+      .from(surveyQuestions)
+      .where(and(eq(surveyQuestions.id, id), eq(surveyQuestions.sectionId, sectionId)))
+      .limit(1);
+    if (!current) return null;
+
+    const isDisplayBlock = isSurveyDisplayBlock(
+      (dto.questionType ?? current.questionType) as QuestionType,
+    );
     const set: Partial<typeof surveyQuestions.$inferInsert> & { updatedAt: Date } = {
       updatedAt: nowDate(),
     };
@@ -127,14 +144,20 @@ export class SurveyQuestionsRepository {
       set.descriptionEn = sanitizeSurveyRichText(dto.descriptionEn);
     }
     if (dto.questionType !== undefined) set.questionType = dto.questionType;
-    if (dto.options !== undefined) set.options = dto.options;
-    if (dto.config !== undefined) set.config = dto.config;
-    if (dto.answerRegex !== undefined) set.answerRegex = dto.answerRegex;
-    if (dto.isRequired !== undefined) set.isRequired = dto.isRequired;
+    if (isDisplayBlock) {
+      set.options = null;
+      set.config = null;
+      set.answerRegex = null;
+      set.isRequired = false;
+    } else {
+      if (dto.options !== undefined) set.options = dto.options;
+      if (dto.config !== undefined) set.config = dto.config;
+      if (dto.answerRegex !== undefined) set.answerRegex = dto.answerRegex;
+      if (dto.isRequired !== undefined) set.isRequired = dto.isRequired;
+    }
     if (dto.sortOrder !== undefined) set.sortOrder = dto.sortOrder;
     set.updatedAt = nowDate();
 
-    const db = tx ?? this.db;
     const [row] = await db
       .update(surveyQuestions)
       .set(set)

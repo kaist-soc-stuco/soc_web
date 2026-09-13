@@ -1,10 +1,11 @@
 import { stripRichText } from "@/components/ui/rich-text-content";
 import { useMemo } from "react";
-import type {
-  SurveyAnalyticsResponse,
-  SurveyQuestionAnalyticsItem,
-  SurveyQuestionRecord,
-  SurveyResponseWithAnswers,
+import {
+  isSurveyDisplayBlock,
+  type SurveyAnalyticsResponse,
+  type SurveyQuestionAnalyticsItem,
+  type SurveyQuestionRecord,
+  type SurveyResponseWithAnswers,
 } from "@soc/contracts";
 import { isoToDate, isoToMs, msToIso, nowIso } from "@soc/shared";
 
@@ -140,11 +141,12 @@ function RawAnswers({ question, responses }: { question: SurveyQuestionRecord; r
 }
 
 export function SurveyQuestionSummary({ analytics, questions, responses }: { analytics: SurveyAnalyticsResponse; questions: SurveyQuestionRecord[]; responses: SurveyResponseWithAnswers[] }) {
-  if (questions.length === 0) return <AdminCard><AdminEmptyState message="등록된 문항이 없습니다." /></AdminCard>;
+  const answerableQuestions = questions.filter((question) => !isSurveyDisplayBlock(question.questionType));
+  if (answerableQuestions.length === 0) return <AdminCard><AdminEmptyState message="등록된 문항이 없습니다." /></AdminCard>;
   const analyticsByQuestion = new Map(analytics.questions.map((question) => [question.questionId, question]));
   return (
     <div className="space-y-4">
-      {questions.map((question, index) => {
+      {answerableQuestions.map((question, index) => {
         const result = analyticsByQuestion.get(question.id);
         return (
           <AdminCard key={question.id} className="p-5">

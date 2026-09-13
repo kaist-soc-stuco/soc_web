@@ -1,6 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
 
-import type { SurveyQuestionRecord, SurveySectionRecord } from "@soc/contracts";
+import {
+  isSurveyDisplayBlock,
+  type SurveyQuestionRecord,
+  type SurveySectionRecord,
+} from "@soc/contracts";
 
 import {
   assertQuestionBranchConfiguration,
@@ -15,6 +19,16 @@ const CHOICE_TYPES = new Set(["single_choice", "multiple_choice", "dropdown"]);
 const GRID_TYPES = new Set(["grid_single", "grid_multiple"]);
 
 export function assertSurveyQuestionDefinition(question: SurveyQuestionRecord): void {
+  if (isSurveyDisplayBlock(question.questionType)) {
+    if (question.isRequired) {
+      throw new BadRequestException("survey_display_block_cannot_be_required");
+    }
+    if (question.options || question.config || question.answerRegex) {
+      throw new BadRequestException("survey_display_block_cannot_have_answers");
+    }
+    return;
+  }
+
   if (question.questionType === "file_upload") {
     const maxFiles = question.config?.maxFiles ?? 1;
     const maxSizeBytes = question.config?.maxSizeBytes ?? 10_000_000;
@@ -73,7 +87,9 @@ export function assertPublishableSurveyDefinition(
   if (sections.length === 0) {
     throw new BadRequestException("survey_requires_section");
   }
-  if (sections.every((section) => section.questions.length === 0)) {
+  if (sections.every((section) =>
+    section.questions.every((question) => isSurveyDisplayBlock(question.questionType)),
+  )) {
     throw new BadRequestException("survey_requires_question");
   }
   if (!survey.isKoreanOnly) {

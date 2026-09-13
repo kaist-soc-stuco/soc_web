@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, type SyntheticEvent } from "react";
-import type { SurveyDetailResponse } from "@soc/contracts";
+import { isSurveyDisplayBlock, type SurveyDetailResponse } from "@soc/contracts";
 
 import {
   emptyAnswerValue,
@@ -116,6 +116,34 @@ export function SurveyResponseForm({
             })()}
 
             {section.questions.map((question) => {
+              if (isSurveyDisplayBlock(question.questionType)) {
+                const title = getLocalizedText(lang, question.titleKo, question.titleEn);
+                const description = getLocalizedText(
+                  lang,
+                  question.descriptionKo,
+                  question.descriptionEn,
+                );
+
+                return (
+                  <div
+                    key={question.id}
+                    className="scroll-mt-24 border-b border-slate-200 px-1 py-3 last:border-b-0"
+                  >
+                    {title ? (
+                      <h2 className="break-words text-xl font-medium leading-7 text-slate-950">
+                        <RichTextContent content={title} />
+                      </h2>
+                    ) : null}
+                    {description ? (
+                      <RichTextContent
+                        content={description}
+                        className="mt-2 break-words text-base leading-6 text-slate-600"
+                      />
+                    ) : null}
+                  </div>
+                );
+              }
+
               const questionError = questionErrors[question.id] ?? null;
               const questionImage = lang === "ko"
                 ? question.config?.imageUrlKo

@@ -557,7 +557,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                         return (
                           <li
                             key={child.href}
-                            className={`mx-4 border-b last:border-b-0 ${
+                            className={`border-b last:border-b-0 ${
                               homeHeaderDark ? "border-white/10" : "border-slate-100"
                             }`}
                           >
@@ -567,7 +567,7 @@ export function Header({ variant = "default" }: HeaderProps) {
                               aria-current={childActive ? "page" : undefined}
                               tabIndex={hoveredIndex === index ? 0 : -1}
                               onClick={closePopovers}
-                              className={`flex h-11 items-center justify-center whitespace-nowrap rounded-md px-3 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
+                              className={`flex h-11 w-full items-center justify-center whitespace-nowrap rounded-none px-3 text-center text-sm font-medium leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
                                 homeHeaderDark
                                   ? childActive
                                     ? "text-white hover:bg-slate-50 focus-visible:ring-white/30"

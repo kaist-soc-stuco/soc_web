@@ -7,12 +7,13 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createApiClient } from "@soc/api-client";
-import type {
-  ArticleListItem,
-  SurveyDetailResponse,
-  CreateSurveyRequest,
-  SurveySectionRecord,
-  SurveyQuestionRecord,
+import {
+  isSurveyDisplayBlock,
+  type ArticleListItem,
+  type SurveyDetailResponse,
+  type CreateSurveyRequest,
+  type SurveySectionRecord,
+  type SurveyQuestionRecord,
 } from "@soc/contracts";
 import { z } from "zod";
 import { FormProvider, useForm } from "react-hook-form";
@@ -47,7 +48,11 @@ import {
   SurveySettingsForm,
   type SurveySettingsFormValues,
 } from "@/components/organisms/survey-settings-form";
-import { QuestionFormState, QuestionInlineEditor } from "@/components/organisms/question-editor-modal";
+import {
+  QuestionFormState,
+  QuestionInlineEditor,
+  TitleDescriptionInlineEditor,
+} from "@/components/organisms/question-editor-modal";
 import {
   SectionInlineEditor,
   type SectionFormState,
@@ -382,6 +387,7 @@ type QuestionRowContentProps = {
 const QUESTION_TYPE_LABELS: Record<string, string> = {
   short_text: "단답형",
   long_text: "장문형",
+  title_description: "제목 및 설명",
   single_choice: "객관식 질문",
   multiple_choice: "체크박스",
   dropdown: "드롭다운",
@@ -601,6 +607,27 @@ function QuestionPreview({ question }: { question: SurveyQuestionRecord }) {
 function QuestionRowContent({
   question,
 }: QuestionRowContentProps) {
+  if (isSurveyDisplayBlock(question.questionType)) {
+    return (
+      <div className="min-w-0">
+        <div className="break-words text-xl font-normal leading-7 text-slate-900">
+          {plainText(question.titleKo) || "제목 없음"}
+          {question.titleEn?.trim() ? (
+            <span className="ml-1 font-normal"> / {plainText(question.titleEn)}</span>
+          ) : null}
+        </div>
+        {question.descriptionKo?.trim() || question.descriptionEn?.trim() ? (
+          <div className="mt-2 break-words text-base font-normal leading-6 text-slate-600">
+            {plainText(question.descriptionKo) || "설명"}
+            {question.descriptionEn?.trim() ? (
+              <span className="ml-1"> / {plainText(question.descriptionEn)}</span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="min-w-0">
       <div className="flex min-w-0 items-center gap-1">
@@ -637,16 +664,8 @@ function CollapsedQuestionRow({
       onClick={onEdit}
       className="flex min-h-20 w-full min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-5 text-left text-base transition-colors hover:border-slate-300 hover:bg-slate-50"
     >
-      <span className="flex min-w-0 flex-1 items-baseline gap-1 font-medium text-slate-700">
-        <span className="min-w-0 truncate">
-          {plainText(question.titleKo) || "질문"}
-          {question.titleEn?.trim() ? (
-            <span className="ml-1 font-normal"> / {plainText(question.titleEn)}</span>
-          ) : null}
-        </span>
-        {question.isRequired ? (
-          <span aria-label="필수 응답" className="shrink-0 font-semibold text-red-500">*</span>
-        ) : null}
+      <span className="min-w-0 flex-1">
+        <QuestionRowContent question={question} />
       </span>
     </button>
   );
@@ -1781,9 +1800,49 @@ export function SurveyEditorPage() {
     const sectionId = getFloatingTargetSectionId();
     if (sectionId) await handleAddSection(sectionId);
   });
-  const handleFloatingAddTitle = () => void runFloatingAction(async () => {
-    const headerSection = orderedSections[0];
-    if (headerSection) await openEditSection(headerSection, "titleKo");
+  const handleFloatingAddTitleAndDescription = () => void runFloatingAction(async () => {
+    const sectionId = getFloatingTargetSectionId();
+    if (!sectionId || !loadedSurveyId) return;
+
+    const updated = await client.getSurveyDetail(loadedSurveyId);
+    const section = updated.sections.find((item) => item.id === sectionId);
+    if (!section) return;
+
+    const questions = [...section.questions].sort((a, b) => a.sortOrder - b.sortOrder);
+    const current = questions.findIndex((item) => item.id === editingQuestion?.questionId);
+    const insertAt = current >= 0 ? current + 1 : editingSection ? 0 : questions.length;
+    const created = await client.createQuestion(loadedSurveyId, sectionId, {
+      titleKo: "제목 없음",
+      titleEn: isKoreanOnly ? undefined : "Untitled title",
+      descriptionKo: "",
+      descriptionEn: isKoreanOnly ? undefined : "",
+      questionType: "title_description",
+      isRequired: false,
+      sortOrder: insertAt,
+    });
+
+    questions.splice(insertAt, 0, created);
+    const reordered = await client.reorderSurveyQuestions(loadedSurveyId, sectionId, {
+      items: questions.map((item, sortOrder) => ({ id: item.id, sortOrder })),
+    });
+    setSections(updated.sections.map((item) =>
+      item.id === sectionId ? { ...item, questions: reordered } : item,
+    ));
+    setEditingSection(null);
+    setActiveEditorSectionId(sectionId);
+    setCollapsedSectionIds((previous) => {
+      const next = new Set(previous);
+      next.delete(sectionId);
+      return next;
+    });
+    setEditingQuestion({
+      sectionId,
+      questionId: created.id,
+      initial: questionToFormState(created),
+    });
+    requestAnimationFrame(() =>
+      document.getElementById(`survey-question-${created.id}`)?.scrollIntoView({ block: "nearest" }),
+    );
   });
   const handleSaveQuestion = async (qForm: QuestionFormState) => {
     if (!loadedSurveyId || !editingQuestion) return;
@@ -1816,18 +1875,25 @@ export function SurveyEditorPage() {
       delete questionConfig.validationValue;
       delete questionConfig.validationValueMax;
     }
+    const isDisplayBlock = isSurveyDisplayBlock(qForm.questionType);
     const body = {
-      titleKo: qForm.titleKo.trim() || "질문",
-      titleEn: qForm.titleEn.trim() || (isKoreanOnly ? undefined : "Question"),
+      titleKo: qForm.titleKo.trim() || (isDisplayBlock ? "제목 없음" : "질문"),
+      titleEn: qForm.titleEn.trim() || (isKoreanOnly ? undefined : isDisplayBlock ? "Untitled title" : "Question"),
       descriptionKo: qForm.descriptionKo.trim(),
       descriptionEn: qForm.descriptionEn.trim(),
       questionType: qForm.questionType,
-      options: qForm.options.length > 0 ? qForm.options : undefined,
-      config: questionConfig && Object.keys(questionConfig).length > 0 ? questionConfig : undefined,
-      answerRegex: qForm.answerValidationEnabled
-        ? qForm.answerRegex.trim() || undefined
-        : undefined,
-      isRequired: qForm.isRequired,
+      options: isDisplayBlock ? undefined : qForm.options.length > 0 ? qForm.options : undefined,
+      config: isDisplayBlock
+        ? undefined
+        : questionConfig && Object.keys(questionConfig).length > 0
+          ? questionConfig
+          : undefined,
+      answerRegex: isDisplayBlock
+        ? undefined
+        : qForm.answerValidationEnabled
+          ? qForm.answerRegex.trim() || undefined
+          : undefined,
+      isRequired: isDisplayBlock ? false : qForm.isRequired,
       ...(questionId
         ? {}
         : {
@@ -2246,8 +2312,12 @@ export function SurveyEditorPage() {
                        {orderedSections.map((section, sectionIndex) => {
                          const isCollapsed = collapsedSectionIds.has(section.id);
                          const isSurveyHeader = sectionIndex === 0;
-                         const displayTitleKo = isSurveyHeader ? surveyTitleKo : section.titleKo;
-                         const displayTitleEn = isSurveyHeader ? surveyTitleEn : section.titleEn ?? "";
+                         const displayTitleKo = isSurveyHeader
+                           ? surveyTitleKo || section.titleKo
+                           : section.titleKo;
+                         const displayTitleEn = isSurveyHeader
+                           ? surveyTitleEn || section.titleEn || ""
+                           : section.titleEn ?? "";
                          const sectionDescription = isSurveyHeader
                            ? plainText(surveyDescriptionKo) ||
                              plainText(surveyDescriptionEn) ||
@@ -2413,23 +2483,38 @@ export function SurveyEditorPage() {
                                           isEditing={isEditing}
                                           editor={
                                             isEditing
-                                              ? (dragHandle) => (
-                                                <QuestionInlineEditor
-                                                  key={question.id}
-                                                  initial={editingQuestion.initial}
-                                                  isKoreanOnly={isKoreanOnly}
-                                                  isOngoing={isOngoing}
-                                                  currentSectionId={section.id}
-                                                  branchTargets={branchTargetsForEditing}
-                                                  isNewQuestion={false}
-                                                  dragHandle={dragHandle}
-                                                  commitRef={questionCommitRef}
-                                                  onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
-                                                  onDelete={() => void handleDeleteQuestion(section.id, question.id)}
-                                                  onSave={handleSaveQuestion}
-                                                  onCancel={() => setEditingQuestion(null)}
-                                                />
-                                              )
+                                              ? (dragHandle) => isSurveyDisplayBlock(question.questionType)
+                                                ? (
+                                                  <TitleDescriptionInlineEditor
+                                                    key={question.id}
+                                                    initial={editingQuestion.initial}
+                                                    isKoreanOnly={isKoreanOnly}
+                                                    isOngoing={isOngoing}
+                                                    dragHandle={dragHandle}
+                                                    commitRef={questionCommitRef}
+                                                    onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
+                                                    onDelete={() => void handleDeleteQuestion(section.id, question.id)}
+                                                    onSave={handleSaveQuestion}
+                                                    onCancel={() => setEditingQuestion(null)}
+                                                  />
+                                                )
+                                                : (
+                                                  <QuestionInlineEditor
+                                                    key={question.id}
+                                                    initial={editingQuestion.initial}
+                                                    isKoreanOnly={isKoreanOnly}
+                                                    isOngoing={isOngoing}
+                                                    currentSectionId={section.id}
+                                                    branchTargets={branchTargetsForEditing}
+                                                    isNewQuestion={false}
+                                                    dragHandle={dragHandle}
+                                                    commitRef={questionCommitRef}
+                                                    onDuplicate={() => void handleDuplicateQuestion(section.id, question)}
+                                                    onDelete={() => void handleDeleteQuestion(section.id, question.id)}
+                                                    onSave={handleSaveQuestion}
+                                                    onCancel={() => setEditingQuestion(null)}
+                                                  />
+                                                )
                                               : undefined
                                           }
                                           onEdit={() => openEditQuestion(section.id, question)}
@@ -2506,10 +2591,10 @@ export function SurveyEditorPage() {
                         </button>
                         <button
                           type="button"
-                          data-tooltip="제목 및 설명 편집"
-                          aria-label="제목 및 설명 편집"
+                          data-tooltip="제목 및 설명 추가"
+                          aria-label="제목 및 설명 추가"
                           disabled={!orderedSections.length || floatingBusy || addingSection}
-                          onClick={handleFloatingAddTitle}
+                          onClick={handleFloatingAddTitleAndDescription}
                         >
                           <AlignLeft aria-hidden="true" className="size-5" />
                         </button>

@@ -482,6 +482,9 @@ export const UpdateSectionSchema = CreateSectionSchema.partial();
 export const QuestionTypeSchema = z.enum([
   "short_text",
   "long_text",
+  // A persisted Google Forms-style content block. It renders a title and
+  // description but never accepts or stores a respondent answer.
+  "title_description",
   "single_choice",
   "multiple_choice",
   "dropdown",

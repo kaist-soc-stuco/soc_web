@@ -18,6 +18,12 @@ import type {
 
 export type ResponseStatus = 'submitted';
 export type QuestionType = z.infer<typeof QuestionTypeSchema>;
+export const TITLE_DESCRIPTION_QUESTION_TYPE = "title_description" as const;
+
+export function isSurveyDisplayBlock(questionType: QuestionType): boolean {
+  return questionType === TITLE_DESCRIPTION_QUESTION_TYPE;
+}
+
 export type ComputedSurveyState = 'before_open' | 'open' | 'closed';
 export type SurveyLifecycleStatus = 'DRAFT' | 'PUBLISHED';
 export type SurveySocAffiliation = z.infer<typeof SurveySocAffiliationSchema>;
