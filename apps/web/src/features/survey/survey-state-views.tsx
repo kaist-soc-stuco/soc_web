@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Clock,
   FileText,
-  ListChecks,
   Lock,
 } from "lucide-react";
 
@@ -158,13 +157,6 @@ export function SuccessView({
             {lang === "ko" ? "결과 보기" : "View results"}
           </Link>
         )}
-        <Link
-          to="/surveys"
-          className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
-        >
-          <ListChecks className="h-4 w-4" />
-          {lang === "ko" ? "목록으로" : "Back to surveys"}
-        </Link>
       </div>
     </div>
   );
@@ -202,10 +194,10 @@ export function AlreadySubmittedView({
       <p className="mb-3 text-sm leading-relaxed text-kaist-grey/80">
         {lang === "ko"
           ? canViewResults
-            ? "이 설문조사는 1회만 응답할 수 있습니다. 공개된 결과를 확인하거나 다른 설문 목록으로 이동할 수 있습니다."
+            ? "이 설문조사는 1회만 응답할 수 있습니다. 공개된 결과를 확인할 수 있습니다."
             : "이 설문조사는 1회만 응답할 수 있습니다. 결과는 비공개로 설정되어 있습니다."
           : canViewResults
-            ? "You have already responded to this survey. You can view public results or return to the survey list."
+            ? "You have already responded to this survey. You can view the public results."
             : "You have already responded to this survey. Results are private."}
       </p>
       <ResponseRecordedNotice lang={lang} submittedAt={submittedAt} />
@@ -219,13 +211,6 @@ export function AlreadySubmittedView({
             {lang === "ko" ? "결과 보기" : "View results"}
           </Link>
         )}
-        <Link
-          to="/surveys"
-          className="select-none inline-flex min-w-32 items-center justify-center gap-2 rounded-xl bg-kaist-darkgreen px-4 py-3 text-sm font-medium text-white shadow-sm shadow-kaist-darkgreen/10 transition hover:bg-kaist-darkgreen/90"
-        >
-          <ListChecks className="h-4 w-4" />
-          {lang === "ko" ? "목록으로" : "Back to surveys"}
-        </Link>
       </div>
     </div>
   );

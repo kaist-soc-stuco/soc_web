@@ -11,7 +11,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createApiClient } from "@soc/api-client";
 import { formatKoreanDateTime } from "@soc/shared";
 import { Button } from "@/components/ui/button";
+import { UiInput } from "@/components/ui/form-control";
 import { Modal } from "@/components/ui/modal";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { SelectDropdown } from "@/components/atoms/select-dropdown";
 import { resolveApiBaseUrl } from "@/lib/api";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { formatSurveyAnswer } from "@/lib/survey-answer-display";
@@ -33,7 +36,6 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
     try {
       const result = await client.setSurveyEmailNotifications(surveyId, !subscription.data?.enabled);
       queryClient.setQueryData(["survey-email-notifications", surveyId], result);
-      toast({type:"success",message:result.enabled ? "새 응답 이메일 알림을 켰습니다." : "새 응답 이메일 알림을 껐습니다."});
     } catch { toast({type:"error",message:"이메일 알림 설정을 변경하지 못했습니다."}); }
     finally { setMutating(false); }
   };
@@ -77,7 +79,7 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
   const setPage = (value: number) => update({ [view === "individual" ? "entry" : "answerPage"]: String(Math.max(1, Math.min(pages, value))), response: null });
   const pager = <div className="flex flex-wrap items-center justify-center gap-3">
     <Button variant="ghost" size="icon" aria-label={view === "individual" ? "이전 응답" : "이전 페이지"} disabled={page <= 1} onClick={() => setPage(page - 1)}><ChevronLeft className="size-4" /></Button>
-    <label className="flex items-center gap-2 text-sm"><span className="sr-only">{view === "individual" ? "응답 번호" : "답변 페이지"}</span><input aria-label={view === "individual" ? "응답 번호" : "답변 페이지"} type="number" min={1} max={pages} value={page} onChange={(event) => setPage(positiveInteger(event.currentTarget.value))} className="w-20 rounded-md border border-slate-200 px-2 py-2 text-center" /> / {view === "individual" ? total : pages}</label>
+    <label className="flex items-center gap-2 text-sm"><span className="sr-only">{view === "individual" ? "응답 번호" : "답변 페이지"}</span><UiInput aria-label={view === "individual" ? "응답 번호" : "답변 페이지"} type="number" min={1} max={pages} value={page} onChange={(event) => setPage(positiveInteger(event.currentTarget.value))} className="w-20 text-center" /> / {view === "individual" ? total : pages}</label>
     <Button variant="ghost" size="icon" aria-label={view === "individual" ? "다음 응답" : "다음 페이지"} disabled={page >= pages} onClick={() => setPage(page + 1)}><ChevronRight className="size-4" /></Button>
   </div>;
 
@@ -113,7 +115,18 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
  </DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
 </div>
 </div>
-      <div role="tablist" aria-label="응답 보기 방식" className="-mb-4 mt-8 flex sm:-mb-6">{([{value:"summary",label:"요약"},{value:"questions",label:"질문"},{value:"individual",label:"개별 보기"}] as const).map(tab => <button key={tab.value} role="tab" aria-selected={view === tab.value} onClick={()=>update({view:tab.value})} className={`relative flex-1 py-4 text-sm ${view === tab.value ? "text-brand-primary after:absolute after:bottom-0 after:left-1/2 after:h-1 after:w-10 after:-translate-x-1/2 after:rounded-t after:bg-brand-primary" : "text-slate-700"}`}>{tab.label}</button>)}</div>
+      <SegmentedControl
+        ariaLabel="응답 보기 방식"
+        role="tablist"
+        value={view}
+        onChange={(value) => update({ view: value })}
+        options={[
+          { value: "summary", label: "요약" },
+          { value: "questions", label: "질문" },
+          { value: "individual", label: "개별 보기" },
+        ]}
+        className="mt-8"
+      />
     </div>
     <Modal open={deleteOpen} onClose={()=>{if(!mutating)setDeleteOpen(false);}} title="모든 응답 삭제" className="max-w-md" footer={<><Button variant="outline" disabled={mutating} onClick={()=>setDeleteOpen(false)}>취소</Button><Button variant="destructive" disabled={mutating} onClick={()=>void removeResponses()}>모든 응답 삭제</Button></>}>
       <p>응답 {total}개를 모두 삭제하시겠습니까? 삭제한 응답은 복구할 수 없습니다.</p>
@@ -122,7 +135,13 @@ export function SurveyResponsesPanel({ surveyId, onSheet, onResponsesDeleted, sh
     {pending ? <p role="status">응답을 불러오는 중입니다.</p> : error ? <p role="alert">응답을 불러오지 못했습니다. 새로고침으로 다시 시도해 주세요.</p> : total === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">아직 제출된 응답이 없습니다.</div> : <>
       {view !== "individual" && statistics.data ? <>
         {view === "questions" && question ? <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
-          <select aria-label="질문 선택" className="min-w-0 flex-1 rounded-md border border-slate-200 p-2" value={question.id} onChange={(event) => update({ question: event.currentTarget.value })}>{questions.map((item, index) => <option key={item.id} value={item.id}>{index + 1}. {stripRichText(item.titleKo)}</option>)}</select>
+          <SelectDropdown
+            ariaLabel="질문 선택"
+            className="min-w-0 flex-1"
+            value={question.id}
+            onChange={(value) => update({ question: value })}
+            options={questions.map((item, index) => ({ value: item.id, label: `${index + 1}. ${stripRichText(item.titleKo)}` }))}
+          />
           <Button variant="outline" size="sm" disabled={questionIndex === 0} onClick={() => update({ question: questions[questionIndex - 1].id })}>이전 질문</Button><span className="text-sm">{questionIndex + 1} / {questions.length}</span><Button variant="outline" size="sm" disabled={questionIndex >= questions.length - 1} onClick={() => update({ question: questions[questionIndex + 1].id })}>다음 질문</Button>
         </div> : null}
         {view === "summary" ? <SurveyQuestionSummary analytics={statistics.data} questions={questions} responses={records.data?.items ?? []} /> : question ? <div className="space-y-3"><h3 className="px-1 font-semibold">{stripRichText(question.titleKo)}</h3>{Array.from((records.data?.items ?? []).reduce((groups, entry) => {
